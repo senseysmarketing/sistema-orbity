@@ -9,6 +9,12 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Tasks from "./pages/Tasks";
+import PersonalTasks from "./pages/PersonalTasks";
+import Traffic from "./pages/Traffic";
+import Admin from "./pages/Admin";
+import Reports from "./pages/Reports";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -24,7 +30,12 @@ const App = () => (
               <Route path="/auth" element={<Auth />} />
               <Route path="/" element={<AppLayout />}>
                 <Route index element={<Index />} />
-                {/* ADD ALL AUTHENTICATED ROUTES HERE */}
+                <Route path="tasks" element={<Tasks />} />
+                <Route path="personal-tasks" element={<PersonalTasks />} />
+                <Route path="traffic" element={<Traffic />} />
+                <Route path="admin" element={<Admin />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="settings" element={<Settings />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
