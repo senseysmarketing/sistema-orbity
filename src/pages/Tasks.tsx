@@ -163,6 +163,13 @@ export default function Tasks() {
     return client?.name || 'Cliente desconhecido';
   };
 
+  const formatDateBR = (value: string | null) => {
+    if (!value) return '';
+    const s = String(value);
+    const date = s.includes('T') ? new Date(s) : new Date(`${s}T00:00:00`);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('pt-BR');
+  };
   const handleCreateTask = async () => {
     if (!newTask.title.trim()) {
       toast({
@@ -183,7 +190,7 @@ export default function Tasks() {
           priority: newTask.priority,
           assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
           client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
-          due_date: newTask.due_date || null,
+          due_date: newTask.due_date ? new Date(`${newTask.due_date}T00:00:00`).toISOString() : null,
           created_by: profile?.user_id,
         });
 
@@ -248,7 +255,7 @@ export default function Tasks() {
           priority: newTask.priority,
           assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
           client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
-          due_date: newTask.due_date || null,
+          due_date: newTask.due_date ? new Date(`${newTask.due_date}T00:00:00`).toISOString() : null,
         })
         .eq('id', selectedTask.id);
 
@@ -572,10 +579,10 @@ export default function Tasks() {
                     <Building className="h-4 w-4" />
                     {getClientName(task.client_id)}
                   </div>
-                  {task.due_date && (
+                  {formatDateBR(task.due_date) && (
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      {new Date(task.due_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      {formatDateBR(task.due_date)}
                     </div>
                   )}
                 </div>
@@ -628,10 +635,7 @@ export default function Tasks() {
               <div className="grid gap-2">
                 <Label className="font-semibold">Data de Vencimento</Label>
                 <p className="text-sm">
-                  {selectedTask.due_date 
-                    ? new Date(selectedTask.due_date + 'T00:00:00').toLocaleDateString('pt-BR')
-                    : "Sem data de vencimento"
-                  }
+                  {formatDateBR(selectedTask.due_date) || "Sem data de vencimento"}
                 </p>
               </div>
               <div className="grid gap-2">
