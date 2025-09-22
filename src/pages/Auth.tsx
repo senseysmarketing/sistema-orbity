@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2, User, Palette, TrendingUp } from 'lucide-react';
 import sensysLogo from '@/assets/senseys-logo-new.png';
+import authBackground from '@/assets/auth-background.jpg';
 
 export default function Auth() {
   const { user, loading, signIn, signUp } = useAuth();
@@ -80,8 +81,13 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-6">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative"
+      style={{ backgroundImage: `url(${authBackground})` }}
+    >
+      {/* Overlay para melhor legibilidade */}
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px]"></div>
+      <div className="w-full max-w-md space-y-6 relative z-10">
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex justify-center">
@@ -236,7 +242,7 @@ export default function Auth() {
           </CardContent>
         </Card>
         
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-sm text-white/80">
           Sistema desenvolvido para a Agência Senseys
         </p>
       </div>
