@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
-import { TrendingUp, DollarSign, Target, AlertCircle } from "lucide-react";
+import { TrendingUp, DollarSign, Target, AlertCircle, Eye, Edit, Trash2, MoreVertical } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -85,11 +88,6 @@ export default function Traffic() {
     return client?.name || 'Cliente desconhecido';
   };
 
-  const getClientBudget = (clientId: string) => {
-    const client = clients.find(c => c.id === clientId);
-    return client?.monthly_value || 0;
-  };
-
   const getSituationColor = (situation: string | null) => {
     switch (situation) {
       case 'stable': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
@@ -127,6 +125,30 @@ export default function Traffic() {
       case 'bad': return 'Ruins';
       case 'terrible': return 'Péssimos';
       default: return 'Sem dados';
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('traffic_controls')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Controle excluído!",
+        description: "O controle de tráfego foi excluído com sucesso.",
+      });
+
+      fetchTrafficControls();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao excluir controle",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -230,54 +252,86 @@ export default function Traffic() {
             <Card key={control.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4">
                 <div className="space-y-3">
-                  {/* Header com nome do cliente e badges */}
+                  {/* Header com nome do cliente, badges e menu de ações */}
                   <div className="flex justify-between items-start">
-                    <h3 className="font-semibold text-lg">{getClientName(control.client_id)}</h3>
-                    <div className="flex gap-2">
-                      <Badge className={getSituationColor(control.situation)}>
-                        {getSituationLabel(control.situation)}
-                      </Badge>
-                      <Badge className={getResultsColor(control.results)}>
-                        {getResultsLabel(control.results)}
-                      </Badge>
+                    <div className="space-y-2">
+                      <h3 className="font-semibold text-lg">{getClientName(control.client_id)}</h3>
+                      <div className="flex gap-2">
+                        <Badge className={getSituationColor(control.situation)}>
+                          {getSituationLabel(control.situation)}
+                        </Badge>
+                        <Badge className={getResultsColor(control.results)}>
+                          {getResultsLabel(control.results)}
+                        </Badge>
+                      </div>
                     </div>
+                    
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Visualizar detalhes
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-destructive focus:text-destructive" 
+                          onClick={() => handleDelete(control.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
 
-                  {/* Grid de informações principais */}
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                  {/* Informações em linha única */}
+                  <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
-                      <span className="font-medium text-muted-foreground">Budget Diário:</span>
+                      <span className="font-medium text-muted-foreground">Budget:</span>
                       <p className="font-semibold">
                         {control.daily_budget 
                           ? `R$ ${control.daily_budget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                          : 'Não definido'}
+                          : 'N/D'}
                       </p>
                     </div>
-                    {control.last_optimization && (
-                      <div>
-                        <span className="font-medium text-muted-foreground">Última Otimização:</span>
-                        <p className="font-semibold">
-                          {new Date(control.last_optimization).toLocaleDateString('pt-BR')}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Plataformas */}
-                  {control.platforms && control.platforms.length > 0 && (
                     <div>
-                      <span className="font-medium text-muted-foreground text-sm">Plataformas:</span>
+                      <span className="font-medium text-muted-foreground">Última Otimização:</span>
+                      <p className="font-semibold">
+                        {control.last_optimization 
+                          ? new Date(control.last_optimization).toLocaleDateString('pt-BR')
+                          : 'N/D'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-muted-foreground">Plataformas:</span>
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {control.platforms.map((platform, index) => (
-                          <Badge key={index} variant="outline" className="text-xs px-2 py-0.5">
-                            {platform}
+                        {control.platforms && control.platforms.length > 0 ? (
+                          control.platforms.slice(0, 2).map((platform, index) => (
+                            <Badge key={index} variant="outline" className="text-xs px-1.5 py-0.5">
+                              {platform}
+                            </Badge>
+                          ))
+                        ) : (
+                          <span className="text-xs text-muted-foreground">N/D</span>
+                        )}
+                        {control.platforms && control.platforms.length > 2 && (
+                          <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                            +{control.platforms.length - 2}
                           </Badge>
-                        ))}
+                        )}
                       </div>
                     </div>
-                  )}
+                  </div>
                   
-                  {/* Observações */}
+                  {/* Observações (se houver) */}
                   {control.observations && (
                     <div>
                       <span className="font-medium text-muted-foreground text-sm">Observações:</span>
