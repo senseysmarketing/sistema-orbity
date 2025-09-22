@@ -149,6 +149,10 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 210 11% 30%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Create button color */
+    --create-button: 207 64% 65%;
+    --create-button-foreground: 0 0% 100%;
   }
 
   .dark {
@@ -187,6 +191,10 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 210 11% 30%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Create button color */
+    --create-button: 207 64% 65%;
+    --create-button-foreground: 0 0% 100%;
   }
 }
 

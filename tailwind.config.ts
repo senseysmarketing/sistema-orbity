@@ -57,6 +57,10 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        "create-button": {
+          DEFAULT: "hsl(var(--create-button))",
+          foreground: "hsl(var(--create-button-foreground))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
