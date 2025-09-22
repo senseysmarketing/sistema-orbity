@@ -251,6 +251,38 @@ export default function Admin() {
     }
   };
 
+  const handleUpdatePaymentStatus = async (paymentId: string, newStatus: 'pending' | 'paid' | 'overdue') => {
+    try {
+      const updateData: any = { status: newStatus };
+      
+      if (newStatus === 'paid') {
+        updateData.paid_date = new Date().toISOString().split('T')[0];
+      } else {
+        updateData.paid_date = null;
+      }
+
+      const { error } = await supabase
+        .from('client_payments')
+        .update(updateData)
+        .eq('id', paymentId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Status atualizado",
+        description: "Status do pagamento foi atualizado com sucesso",
+      });
+
+      fetchPayments();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar status",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Função para fechar o mês
   const closeMonth = async () => {
     const currentDate = new Date();
@@ -558,13 +590,33 @@ export default function Admin() {
                         </p>
                       )}
                     </div>
-                    <div className="text-right">
+                    <div className="text-right space-y-2">
                       <div className="text-lg font-semibold">
                         R$ {payment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </div>
-                      <Badge className={getStatusColor(payment.status)}>
-                        {getStatusLabel(payment.status)}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className={getStatusColor(payment.status)}>
+                          {getStatusLabel(payment.status)}
+                        </Badge>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'pending')}>
+                              Pendente
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'paid')}>
+                              Pago
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'overdue')}>
+                              Atrasado
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
