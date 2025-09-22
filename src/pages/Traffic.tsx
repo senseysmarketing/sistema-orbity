@@ -228,64 +228,60 @@ export default function Traffic() {
         ) : (
           trafficControls.map((control) => (
             <Card key={control.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">{getClientName(control.client_id)}</CardTitle>
-                    <CardDescription>
-                      Valor mensal: R$ {getClientBudget(control.client_id).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <Badge className={getSituationColor(control.situation)}>
-                      {getSituationLabel(control.situation)}
-                    </Badge>
-                    <Badge className={getResultsColor(control.results)}>
-                      {getResultsLabel(control.results)}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-medium mb-2">Plataformas</h4>
-                      <div className="flex flex-wrap gap-1">
-                        {control.platforms && control.platforms.length > 0 ? (
-                          control.platforms.map((platform, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {platform}
-                            </Badge>
-                          ))
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Não definidas</span>
-                        )}
-                      </div>
+              <CardContent className="p-4">
+                <div className="space-y-3">
+                  {/* Header com nome do cliente e badges */}
+                  <div className="flex justify-between items-start">
+                    <h3 className="font-semibold text-lg">{getClientName(control.client_id)}</h3>
+                    <div className="flex gap-2">
+                      <Badge className={getSituationColor(control.situation)}>
+                        {getSituationLabel(control.situation)}
+                      </Badge>
+                      <Badge className={getResultsColor(control.results)}>
+                        {getResultsLabel(control.results)}
+                      </Badge>
                     </div>
+                  </div>
+
+                  {/* Grid de informações principais */}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <h4 className="font-medium mb-2">Budget Diário</h4>
-                      <p className="text-sm">
+                      <span className="font-medium text-muted-foreground">Budget Diário:</span>
+                      <p className="font-semibold">
                         {control.daily_budget 
                           ? `R$ ${control.daily_budget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
                           : 'Não definido'}
                       </p>
                     </div>
+                    {control.last_optimization && (
+                      <div>
+                        <span className="font-medium text-muted-foreground">Última Otimização:</span>
+                        <p className="font-semibold">
+                          {new Date(control.last_optimization).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  
-                  {control.last_optimization && (
+
+                  {/* Plataformas */}
+                  {control.platforms && control.platforms.length > 0 && (
                     <div>
-                      <h4 className="font-medium mb-2">Última Otimização</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(control.last_optimization).toLocaleDateString('pt-BR')}
-                      </p>
+                      <span className="font-medium text-muted-foreground text-sm">Plataformas:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {control.platforms.map((platform, index) => (
+                          <Badge key={index} variant="outline" className="text-xs px-2 py-0.5">
+                            {platform}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   )}
                   
+                  {/* Observações */}
                   {control.observations && (
                     <div>
-                      <h4 className="font-medium mb-2">Observações</h4>
-                      <p className="text-sm text-muted-foreground">{control.observations}</p>
+                      <span className="font-medium text-muted-foreground text-sm">Observações:</span>
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{control.observations}</p>
                     </div>
                   )}
                 </div>
