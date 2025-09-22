@@ -170,6 +170,12 @@ export default function Tasks() {
     if (isNaN(date.getTime())) return '';
     return date.toLocaleDateString('pt-BR');
   };
+
+  const dateOnlyToISO = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const ts = Date.UTC(y, (m || 1) - 1, d || 1, 12, 0, 0); // noon UTC avoids TZ shift
+    return new Date(ts).toISOString();
+  };
   const handleCreateTask = async () => {
     if (!newTask.title.trim()) {
       toast({
@@ -190,7 +196,7 @@ export default function Tasks() {
           priority: newTask.priority,
           assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
           client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
-          due_date: newTask.due_date ? new Date(`${newTask.due_date}T00:00:00`).toISOString() : null,
+          due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
           created_by: profile?.user_id,
         });
 
@@ -255,7 +261,7 @@ export default function Tasks() {
           priority: newTask.priority,
           assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
           client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
-          due_date: newTask.due_date ? new Date(`${newTask.due_date}T00:00:00`).toISOString() : null,
+          due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
         })
         .eq('id', selectedTask.id);
 
