@@ -10,52 +10,47 @@ import { useAuth } from '@/hooks/useAuth';
 import { Loader2, User, Palette, TrendingUp } from 'lucide-react';
 import sensysLogo from '@/assets/senseys-logo-new.png';
 import authBackground from '@/assets/auth-background.jpg';
-
 export default function Auth() {
-  const { user, loading, signIn, signUp } = useAuth();
+  const {
+    user,
+    loading,
+    signIn,
+    signUp
+  } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  
+
   // Sign up form state
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
   const [signUpName, setSignUpName] = useState('');
   const [signUpRole, setSignUpRole] = useState('');
-
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+    return <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+      </div>;
   }
-
   if (user) {
     return <Navigate to="/" replace />;
   }
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
     await signIn(loginEmail, loginPassword);
-    
     setIsLoading(false);
   };
-
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signUpRole) {
       return;
     }
-    
     setIsLoading(true);
-    
-    const { error } = await signUp(signUpEmail, signUpPassword, signUpName, signUpRole);
-    
+    const {
+      error
+    } = await signUp(signUpEmail, signUpPassword, signUpName, signUpRole);
     if (!error) {
       // Reset form
       setSignUpEmail('');
@@ -63,10 +58,8 @@ export default function Auth() {
       setSignUpName('');
       setSignUpRole('');
     }
-    
     setIsLoading(false);
   };
-
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'gestor_trafego':
@@ -79,23 +72,16 @@ export default function Auth() {
         return <User className="h-4 w-4" />;
     }
   };
-
-  return (
-    <div 
-      className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative"
-      style={{ backgroundImage: `url(${authBackground})` }}
-    >
+  return <div className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative" style={{
+    backgroundImage: `url(${authBackground})`
+  }}>
       {/* Overlay para melhor legibilidade */}
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px]"></div>
+      <div className="absolute inset-0 bg-black/0 backdrop-blur-[1px]"></div>
       <div className="w-full max-w-md space-y-6 relative z-10">
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex justify-center">
-            <img 
-              src={sensysLogo} 
-              alt="Senseys Marketing Imobiliário" 
-              className="h-16 w-auto object-contain"
-            />
+            <img src={sensysLogo} alt="Senseys Marketing Imobiliário" className="h-16 w-auto object-contain" />
           </div>
           <p className="text-muted-foreground">
             Controle de produtividade para agências de marketing
@@ -121,39 +107,17 @@ export default function Auth() {
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="login-email">Email</Label>
-                    <Input
-                      id="login-email"
-                      type="email"
-                      placeholder="seu@email.com"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      required
-                    />
+                    <Input id="login-email" type="email" placeholder="seu@email.com" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="login-password">Senha</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      placeholder="Sua senha"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      required
-                    />
+                    <Input id="login-password" type="password" placeholder="Sua senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
                   </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full gradient-primary" 
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
+                  <Button type="submit" className="w-full gradient-primary" disabled={isLoading}>
+                    {isLoading ? <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Entrando...
-                      </>
-                    ) : (
-                      'Entrar'
-                    )}
+                      </> : 'Entrar'}
                   </Button>
                 </form>
               </TabsContent>
@@ -162,37 +126,15 @@ export default function Auth() {
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signup-name">Nome completo</Label>
-                    <Input
-                      id="signup-name"
-                      type="text"
-                      placeholder="Seu nome completo"
-                      value={signUpName}
-                      onChange={(e) => setSignUpName(e.target.value)}
-                      required
-                    />
+                    <Input id="signup-name" type="text" placeholder="Seu nome completo" value={signUpName} onChange={e => setSignUpName(e.target.value)} required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="seu@email.com"
-                      value={signUpEmail}
-                      onChange={(e) => setSignUpEmail(e.target.value)}
-                      required
-                    />
+                    <Input id="signup-email" type="email" placeholder="seu@email.com" value={signUpEmail} onChange={e => setSignUpEmail(e.target.value)} required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Senha</Label>
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="Crie uma senha forte"
-                      value={signUpPassword}
-                      onChange={(e) => setSignUpPassword(e.target.value)}
-                      required
-                      minLength={6}
-                    />
+                    <Input id="signup-password" type="password" placeholder="Crie uma senha forte" value={signUpPassword} onChange={e => setSignUpPassword(e.target.value)} required minLength={6} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-role">Função na agência</Label>
@@ -222,19 +164,11 @@ export default function Auth() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full gradient-primary" 
-                    disabled={isLoading || !signUpRole}
-                  >
-                    {isLoading ? (
-                      <>
+                  <Button type="submit" className="w-full gradient-primary" disabled={isLoading || !signUpRole}>
+                    {isLoading ? <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Criando conta...
-                      </>
-                    ) : (
-                      'Criar conta'
-                    )}
+                      </> : 'Criar conta'}
                   </Button>
                 </form>
               </TabsContent>
@@ -242,10 +176,9 @@ export default function Auth() {
           </CardContent>
         </Card>
         
-        <p className="text-center text-sm text-white/80">
+        <p className="text-center text-sm text-slate-700">
           Sistema desenvolvido para a Agência Senseys
         </p>
       </div>
-    </div>
-  );
+    </div>;
 }
