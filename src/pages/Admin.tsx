@@ -1,12 +1,17 @@
 import { useState, useEffect } from "react";
-import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Users, Building } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { ClientForm } from "@/components/admin/ClientForm";
+import { PaymentForm } from "@/components/admin/PaymentForm";
+import { ExpenseForm } from "@/components/admin/ExpenseForm";
+import { SalaryForm } from "@/components/admin/SalaryForm";
 
 interface Client {
   id: string;
@@ -52,6 +57,17 @@ export default function Admin() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [salaries, setSalaries] = useState<Salary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  
+  // Form states
+  const [clientFormOpen, setClientFormOpen] = useState(false);
+  const [paymentFormOpen, setPaymentFormOpen] = useState(false);
+  const [expenseFormOpen, setExpenseFormOpen] = useState(false);
+  const [salaryFormOpen, setSalaryFormOpen] = useState(false);
+  
   const { profile } = useAuth();
   const { toast } = useToast();
 
@@ -64,7 +80,7 @@ export default function Admin() {
     } else {
       setLoading(false);
     }
-  }, [hasAccess]);
+  }, [hasAccess, selectedMonth]);
 
   const fetchData = async () => {
     try {
@@ -95,27 +111,42 @@ export default function Admin() {
   };
 
   const fetchPayments = async () => {
+    const startDate = `${selectedMonth}-01`;
+    const endDate = `${selectedMonth}-31`;
+    
     const { data, error } = await supabase
       .from('client_payments')
       .select('*')
+      .gte('due_date', startDate)
+      .lte('due_date', endDate)
       .order('due_date', { ascending: false });
     if (error) throw error;
     setPayments(data || []);
   };
 
   const fetchExpenses = async () => {
+    const startDate = `${selectedMonth}-01`;
+    const endDate = `${selectedMonth}-31`;
+    
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
+      .gte('due_date', startDate)
+      .lte('due_date', endDate)
       .order('due_date', { ascending: false });
     if (error) throw error;
     setExpenses(data || []);
   };
 
   const fetchSalaries = async () => {
+    const startDate = `${selectedMonth}-01`;
+    const endDate = `${selectedMonth}-31`;
+    
     const { data, error } = await supabase
       .from('salaries')
       .select('*')
+      .gte('due_date', startDate)
+      .lte('due_date', endDate)
       .order('due_date', { ascending: false });
     if (error) throw error;
     setSalaries(data || []);
@@ -147,9 +178,11 @@ export default function Admin() {
   // Cálculos financeiros
   const totalReceivable = payments.filter(p => p.status !== 'paid').reduce((sum, p) => sum + p.amount, 0);
   const totalReceived = payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
-  const totalExpenses = expenses.filter(e => e.status !== 'paid').reduce((sum, e) => sum + e.amount, 0);
-  const totalSalaries = salaries.filter(s => s.status !== 'paid').reduce((sum, s) => sum + s.amount, 0);
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalSalaries = salaries.reduce((sum, s) => sum + s.amount, 0);
+  const totalCosts = totalExpenses + totalSalaries;
   const monthlyRevenue = clients.filter(c => c.active).reduce((sum, c) => sum + (c.monthly_value || 0), 0);
+  const netProfit = monthlyRevenue - totalCosts;
 
   if (!hasAccess) {
     return (
@@ -183,6 +216,27 @@ export default function Admin() {
           <p className="text-muted-foreground">
             Gestão financeira e administrativa da empresa
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4" />
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 12 }, (_, i) => {
+                const date = new Date();
+                date.setMonth(date.getMonth() - i);
+                const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                return (
+                  <SelectItem key={value} value={value}>
+                    {label.charAt(0).toUpperCase() + label.slice(1)}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -218,29 +272,29 @@ export default function Admin() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Despesas</CardTitle>
+            <CardTitle className="text-sm font-medium">Custos Totais</CardTitle>
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">
-              R$ {totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {totalCosts.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
-              contas a pagar
+              despesas + salários
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Salários</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Lucro Líquido</CardTitle>
+            <Banknote className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              R$ {totalSalaries.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              R$ {netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
-              folha de pagamento
+              receita - custos
             </p>
           </CardContent>
         </Card>
@@ -258,7 +312,7 @@ export default function Admin() {
         <TabsContent value="clients" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Clientes</h3>
-            <Button className="flex items-center gap-2">
+            <Button onClick={() => setClientFormOpen(true)} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Novo Cliente
             </Button>
@@ -307,7 +361,7 @@ export default function Admin() {
         <TabsContent value="payments" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Pagamentos de Clientes</h3>
-            <Button className="flex items-center gap-2">
+            <Button onClick={() => setPaymentFormOpen(true)} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Novo Pagamento
             </Button>
@@ -346,7 +400,7 @@ export default function Admin() {
         <TabsContent value="expenses" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Despesas</h3>
-            <Button className="flex items-center gap-2">
+            <Button onClick={() => setExpenseFormOpen(true)} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Nova Despesa
             </Button>
@@ -388,7 +442,7 @@ export default function Admin() {
         <TabsContent value="salaries" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Salários</h3>
-            <Button className="flex items-center gap-2">
+            <Button onClick={() => setSalaryFormOpen(true)} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Novo Salário
             </Button>
@@ -424,6 +478,28 @@ export default function Admin() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Forms */}
+      <ClientForm 
+        open={clientFormOpen} 
+        onOpenChange={setClientFormOpen} 
+        onSuccess={fetchData} 
+      />
+      <PaymentForm 
+        open={paymentFormOpen} 
+        onOpenChange={setPaymentFormOpen} 
+        onSuccess={fetchData} 
+      />
+      <ExpenseForm 
+        open={expenseFormOpen} 
+        onOpenChange={setExpenseFormOpen} 
+        onSuccess={fetchData} 
+      />
+      <SalaryForm 
+        open={salaryFormOpen} 
+        onOpenChange={setSalaryFormOpen} 
+        onSuccess={fetchData} 
+      />
     </div>
   );
 }
