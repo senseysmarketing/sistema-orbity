@@ -85,7 +85,7 @@ export function AppSidebar() {
       {/* Header */}
       <SidebarHeader className="border-b border-sidebar-muted p-4 bg-[#5a636c]">
         {!collapsed && <div className="flex items-center">
-            <img src={senseyLogo} alt="Senseys Logo" className="h-8 w-auto" />
+            <img src={senseyLogo} alt="Senseys Logo" className="w-[122px] h-[32px] object-contain" />
           </div>}
         {collapsed && <div className="flex justify-center">
             <img src={senseyLogo} alt="Senseys Logo" className="h-6 w-6" />
