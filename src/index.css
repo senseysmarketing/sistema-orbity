@@ -2,6 +2,109 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    /* Sistema de cores moderno - tema claro */
+    --background: 220 20% 97%;
+    --foreground: 220 15% 10%;
+    --card: 220 20% 100%;
+    --card-foreground: 220 15% 10%;
+    --popover: 220 20% 100%;
+    --popover-foreground: 220 15% 10%;
+    --primary: 220 70% 50%;
+    --primary-foreground: 220 20% 100%;
+    --secondary: 220 20% 95%;
+    --secondary-foreground: 220 15% 20%;
+    --muted: 220 20% 94%;
+    --muted-foreground: 220 15% 40%;
+    --accent: 220 60% 60%;
+    --accent-foreground: 220 20% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 20% 100%;
+    --border: 220 20% 90%;
+    --input: 220 20% 90%;
+    --ring: 220 70% 50%;
+    --radius: 0.5rem;
+    
+    /* Gradientes modernos */
+    --gradient-primary: linear-gradient(135deg, hsl(220 70% 50%), hsl(220 60% 60%));
+    --gradient-secondary: linear-gradient(135deg, hsl(220 20% 95%), hsl(220 20% 100%));
+    
+    /* Sombras elegantes */
+    --shadow-elegant: 0 10px 30px -10px hsl(220 70% 50% / 0.2);
+    --shadow-card: 0 4px 12px -2px hsl(220 15% 10% / 0.08);
+    
+    /* Transições suaves */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    /* Sistema de cores moderno - tema escuro */
+    --background: 220 15% 8%;
+    --foreground: 220 20% 95%;
+    --card: 220 15% 10%;
+    --card-foreground: 220 20% 95%;
+    --popover: 220 15% 10%;
+    --popover-foreground: 220 20% 95%;
+    --primary: 220 70% 60%;
+    --primary-foreground: 220 15% 8%;
+    --secondary: 220 15% 15%;
+    --secondary-foreground: 220 20% 85%;
+    --muted: 220 15% 12%;
+    --muted-foreground: 220 15% 60%;
+    --accent: 220 60% 70%;
+    --accent-foreground: 220 15% 8%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 20% 100%;
+    --border: 220 15% 20%;
+    --input: 220 15% 20%;
+    --ring: 220 70% 60%;
+    
+    /* Gradientes para tema escuro */
+    --gradient-primary: linear-gradient(135deg, hsl(220 70% 60%), hsl(220 60% 70%));
+    --gradient-secondary: linear-gradient(135deg, hsl(220 15% 15%), hsl(220 15% 10%));
+    
+    /* Sombras para tema escuro */
+    --shadow-elegant: 0 10px 30px -10px hsl(220 70% 60% / 0.3);
+    --shadow-card: 0 4px 12px -2px hsl(220 15% 0% / 0.2);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-sans;
+    transition: var(--transition-smooth);
+  }
+}
+
+@layer components {
+  .card-modern {
+    @apply bg-card border border-border rounded-lg shadow-[var(--shadow-card)] backdrop-blur-sm;
+    transition: var(--transition-smooth);
+  }
+  
+  .card-modern:hover {
+    @apply shadow-[var(--shadow-elegant)];
+    transform: translateY(-2px);
+  }
+  
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  
+  .gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+  
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
+  }
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */

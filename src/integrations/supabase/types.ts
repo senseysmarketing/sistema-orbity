@@ -14,7 +14,394 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_notes: {
+        Row: {
+          content: string | null
+          created_at: string
+          created_by: string
+          id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_notes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      client_payments: {
+        Row: {
+          amount: number
+          client_id: string
+          created_at: string
+          due_date: string
+          id: string
+          paid_date: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          client_id: string
+          created_at?: string
+          due_date: string
+          id?: string
+          paid_date?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          client_id?: string
+          created_at?: string
+          due_date?: string
+          id?: string
+          paid_date?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_payments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          active: boolean
+          contact: string | null
+          created_at: string
+          due_date: number | null
+          id: string
+          monthly_value: number | null
+          name: string
+          observations: string | null
+          service: string | null
+          start_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          contact?: string | null
+          created_at?: string
+          due_date?: number | null
+          id?: string
+          monthly_value?: number | null
+          name: string
+          observations?: string | null
+          service?: string | null
+          start_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          contact?: string | null
+          created_at?: string
+          due_date?: number | null
+          id?: string
+          monthly_value?: number | null
+          name?: string
+          observations?: string | null
+          service?: string | null
+          start_date?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          created_at: string
+          due_date: string
+          id: string
+          is_fixed: boolean
+          name: string
+          paid_date: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          due_date: string
+          id?: string
+          is_fixed?: boolean
+          name: string
+          paid_date?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          due_date?: string
+          id?: string
+          is_fixed?: boolean
+          name?: string
+          paid_date?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      personal_tasks: {
+        Row: {
+          category: string | null
+          client_id: string | null
+          completed: boolean
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          is_routine: boolean
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          client_id?: string | null
+          completed?: boolean
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_routine?: boolean
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          client_id?: string | null
+          completed?: boolean
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          is_routine?: boolean
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personal_tasks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          id: string
+          name: string
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      salaries: {
+        Row: {
+          amount: number
+          created_at: string
+          due_date: string
+          employee_name: string
+          id: string
+          paid_date: string | null
+          status: Database["public"]["Enums"]["payment_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          due_date: string
+          employee_name: string
+          id?: string
+          paid_date?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          due_date?: string
+          employee_name?: string
+          id?: string
+          paid_date?: string | null
+          status?: Database["public"]["Enums"]["payment_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          assigned_to: string | null
+          client_id: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          due_date: string | null
+          id: string
+          priority: Database["public"]["Enums"]["task_priority"]
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          client_id?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["task_priority"]
+          status?: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          client_id?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["task_priority"]
+          status?: Database["public"]["Enums"]["task_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      traffic_controls: {
+        Row: {
+          client_id: string
+          created_at: string
+          daily_budget: number | null
+          id: string
+          last_optimization: string | null
+          observations: string | null
+          platforms: string[] | null
+          results: Database["public"]["Enums"]["traffic_result"] | null
+          situation: Database["public"]["Enums"]["traffic_situation"] | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          daily_budget?: number | null
+          id?: string
+          last_optimization?: string | null
+          observations?: string | null
+          platforms?: string[] | null
+          results?: Database["public"]["Enums"]["traffic_result"] | null
+          situation?: Database["public"]["Enums"]["traffic_situation"] | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          daily_budget?: number | null
+          id?: string
+          last_optimization?: string | null
+          observations?: string | null
+          platforms?: string[] | null
+          results?: Database["public"]["Enums"]["traffic_result"] | null
+          situation?: Database["public"]["Enums"]["traffic_situation"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "traffic_controls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +410,12 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      payment_status: "pending" | "paid" | "overdue"
+      task_priority: "low" | "medium" | "high"
+      task_status: "todo" | "in_progress" | "done"
+      traffic_result: "excellent" | "good" | "average" | "bad" | "terrible"
+      traffic_situation: "stable" | "improving" | "worsening"
+      user_role: "gestor_trafego" | "designer" | "administrador"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +542,13 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      payment_status: ["pending", "paid", "overdue"],
+      task_priority: ["low", "medium", "high"],
+      task_status: ["todo", "in_progress", "done"],
+      traffic_result: ["excellent", "good", "average", "bad", "terrible"],
+      traffic_situation: ["stable", "improving", "worsening"],
+      user_role: ["gestor_trafego", "designer", "administrador"],
+    },
   },
 } as const
