@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { Plus, TrendingUp, DollarSign, Target, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { TrendingUp, DollarSign, Target, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { TrafficControlForm } from "@/components/admin/TrafficControlForm";
 
 interface TrafficControl {
   id: string;
@@ -168,10 +168,7 @@ export default function Traffic() {
             Monitore e gerencie as campanhas de tráfego dos clientes
           </p>
         </div>
-        <Button className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Novo Controle
-        </Button>
+        <TrafficControlForm onSuccess={fetchTrafficControls} />
       </div>
 
       {/* Estatísticas */}

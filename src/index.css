@@ -150,8 +150,8 @@ All colors MUST be HSL.
     --sidebar-border: 210 11% 30%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
-    /* Create button color */
-    --create-button: 207 64% 65%;
+    /* Create button color - #7dafd8 converted to HSL */
+    --create-button: 203 58% 67%;
     --create-button-foreground: 0 0% 100%;
   }
 
@@ -192,8 +192,8 @@ All colors MUST be HSL.
     --sidebar-border: 210 11% 30%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
-    /* Create button color */
-    --create-button: 207 64% 65%;
+    /* Create button color - #7dafd8 converted to HSL */
+    --create-button: 203 58% 67%;
     --create-button-foreground: 0 0% 100%;
   }
 }

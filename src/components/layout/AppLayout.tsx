@@ -4,7 +4,7 @@ import { AppSidebar } from './AppSidebar';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from "@/components/ui/button";
 import { Loader2, Moon, Sun } from 'lucide-react';
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/ui/theme-provider";
 
 export function AppLayout() {
   const { user, loading } = useAuth();
