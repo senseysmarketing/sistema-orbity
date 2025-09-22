@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +35,11 @@ export default function Traffic() {
   const [trafficControls, setTrafficControls] = useState<TrafficControl[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedControl, setSelectedControl] = useState<TrafficControl | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [controlToDelete, setControlToDelete] = useState<string | null>(null);
   const { profile } = useAuth();
   const { toast } = useToast();
 
@@ -128,12 +134,33 @@ export default function Traffic() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleViewDetails = (control: TrafficControl) => {
+    console.log('Visualizando detalhes do controle:', control.id);
+    setSelectedControl(control);
+    setIsDetailsOpen(true);
+  };
+
+  const handleEdit = (control: TrafficControl) => {
+    console.log('Editando controle:', control.id);
+    setSelectedControl(control);
+    setIsEditOpen(true);
+  };
+
+  const handleDeleteClick = (controlId: string) => {
+    console.log('Iniciando exclusão do controle:', controlId);
+    setControlToDelete(controlId);
+    setIsDeleteOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!controlToDelete) return;
+
     try {
+      console.log('Excluindo controle:', controlToDelete);
       const { error } = await supabase
         .from('traffic_controls')
         .delete()
-        .eq('id', id);
+        .eq('id', controlToDelete);
 
       if (error) throw error;
 
@@ -143,7 +170,10 @@ export default function Traffic() {
       });
 
       fetchTrafficControls();
+      setIsDeleteOpen(false);
+      setControlToDelete(null);
     } catch (error: any) {
+      console.error('Erro ao excluir:', error);
       toast({
         title: "Erro ao excluir controle",
         description: error.message,
@@ -272,18 +302,18 @@ export default function Traffic() {
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={() => handleViewDetails(control)}>
                           <Eye className="mr-2 h-4 w-4" />
                           Visualizar detalhes
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(control)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem 
                           className="text-destructive focus:text-destructive" 
-                          onClick={() => handleDelete(control.id)}
+                          onClick={() => handleDeleteClick(control.id)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Excluir
@@ -344,6 +374,134 @@ export default function Traffic() {
           ))
         )}
       </div>
+
+      {/* Dialog de Detalhes */}
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Controle de Tráfego</DialogTitle>
+            <DialogDescription>
+              Informações completas sobre o controle de tráfego
+            </DialogDescription>
+          </DialogHeader>
+          {selectedControl && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Cliente</label>
+                  <p className="text-lg font-semibold">{getClientName(selectedControl.client_id)}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Budget Diário</label>
+                  <p className="text-lg font-semibold">
+                    {selectedControl.daily_budget 
+                      ? `R$ ${selectedControl.daily_budget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                      : 'Não definido'}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Situação</label>
+                  <div className="mt-1">
+                    <Badge className={getSituationColor(selectedControl.situation)}>
+                      {getSituationLabel(selectedControl.situation)}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Resultados</label>
+                  <div className="mt-1">
+                    <Badge className={getResultsColor(selectedControl.results)}>
+                      {getResultsLabel(selectedControl.results)}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {selectedControl.platforms && selectedControl.platforms.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Plataformas</label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {selectedControl.platforms.map((platform, index) => (
+                      <Badge key={index} variant="outline">
+                        {platform}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedControl.last_optimization && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Última Otimização</label>
+                  <p className="text-sm">{new Date(selectedControl.last_optimization).toLocaleDateString('pt-BR')}</p>
+                </div>
+              )}
+
+              {selectedControl.observations && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Observações</label>
+                  <p className="text-sm mt-1">{selectedControl.observations}</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                <div>
+                  <label className="font-medium">Criado em</label>
+                  <p>{new Date(selectedControl.created_at).toLocaleString('pt-BR')}</p>
+                </div>
+                <div>
+                  <label className="font-medium">Atualizado em</label>
+                  <p>{new Date(selectedControl.updated_at).toLocaleString('pt-BR')}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Edição */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar Controle de Tráfego</DialogTitle>
+            <DialogDescription>
+              Edite as informações do controle de tráfego
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4">
+            <p className="text-muted-foreground">Funcionalidade de edição será implementada em breve.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este controle de tráfego? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteOpen(false);
+              setControlToDelete(null);
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
