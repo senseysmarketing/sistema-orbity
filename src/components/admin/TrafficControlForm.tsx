@@ -157,7 +157,7 @@ export function TrafficControlForm({ onSuccess }: TrafficControlFormProps) {
                 <SelectContent>
                   {clients.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
-                      {client.name} - R$ {(client.monthly_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      {client.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
