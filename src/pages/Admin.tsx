@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal, Calendar } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal, Calendar, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +75,11 @@ export default function Admin() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   
+  // Sort states
+  const [clientSort, setClientSort] = useState<'name' | 'monthly_value' | 'start_date'>('name');
+  const [paymentSort, setPaymentSort] = useState<'client' | 'amount' | 'due_date' | 'status'>('due_date');
+  const [expenseSort, setExpenseSort] = useState<'name' | 'amount' | 'due_date' | 'status'>('due_date');
+  
   const { profile } = useAuth();
   const { toast } = useToast();
 
@@ -87,7 +92,7 @@ export default function Admin() {
     } else {
       setLoading(false);
     }
-  }, [hasAccess, selectedMonth]);
+  }, [hasAccess, selectedMonth, clientSort, paymentSort, expenseSort]);
 
   const fetchData = async () => {
     try {
@@ -112,7 +117,7 @@ export default function Admin() {
     const { data, error } = await supabase
       .from('clients')
       .select('*')
-      .order('name');
+      .order(clientSort);
     if (error) throw error;
     setClients(data || []);
   };
@@ -149,7 +154,7 @@ export default function Admin() {
       .select('*')
       .gte('due_date', startDate)
       .lte('due_date', endDate)
-      .order('due_date', { ascending: false });
+      .order(paymentSort, { ascending: paymentSort === 'status' ? true : false });
     if (error) throw error;
     setPayments(data || []);
   };
@@ -164,7 +169,7 @@ export default function Admin() {
       .select('*')
       .gte('due_date', startDate)
       .lte('due_date', endDate)
-      .order('due_date', { ascending: false });
+      .order(expenseSort, { ascending: expenseSort === 'status' ? true : false });
     if (error) throw error;
     setExpenses(data || []);
   };
@@ -490,10 +495,31 @@ export default function Admin() {
         <TabsContent value="clients" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Clientes</h3>
-            <Button onClick={() => setClientFormOpen(true)} variant="create" className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Novo Cliente
-            </Button>
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <ArrowUpDown className="h-4 w-4" />
+                    Ordenar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setClientSort('name')}>
+                    Por Nome
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setClientSort('monthly_value')}>
+                    Por Valor Mensal
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setClientSort('start_date')}>
+                    Por Data de Início
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button onClick={() => setClientFormOpen(true)} variant="create" className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Novo Cliente
+              </Button>
+            </div>
           </div>
           <div className="grid gap-4">
             {clients.map((client) => (
@@ -565,10 +591,31 @@ export default function Admin() {
         <TabsContent value="payments" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Pagamentos de Clientes</h3>
-            <Button onClick={() => setPaymentFormOpen(true)} variant="create" className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Novo Pagamento
-            </Button>
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <ArrowUpDown className="h-4 w-4" />
+                    Ordenar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setPaymentSort('due_date')}>
+                    Por Data de Vencimento
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPaymentSort('amount')}>
+                    Por Valor
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPaymentSort('status')}>
+                    Por Status
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button onClick={() => setPaymentFormOpen(true)} variant="create" className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Novo Pagamento
+              </Button>
+            </div>
           </div>
           <div className="grid gap-4">
             {payments.map((payment) => (
@@ -624,10 +671,34 @@ export default function Admin() {
         <TabsContent value="expenses" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Despesas</h3>
-            <Button onClick={() => setExpenseFormOpen(true)} variant="create" className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Nova Despesa
-            </Button>
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <ArrowUpDown className="h-4 w-4" />
+                    Ordenar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setExpenseSort('name')}>
+                    Por Nome
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setExpenseSort('amount')}>
+                    Por Valor
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setExpenseSort('due_date')}>
+                    Por Data de Vencimento
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setExpenseSort('status')}>
+                    Por Status
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button onClick={() => setExpenseFormOpen(true)} variant="create" className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Nova Despesa
+              </Button>
+            </div>
           </div>
           <div className="grid gap-4">
             {expenses.map((expense) => (
