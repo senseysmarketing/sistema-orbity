@@ -365,7 +365,7 @@ export default function Admin() {
         <TabsContent value="clients" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Clientes</h3>
-            <Button onClick={() => setClientFormOpen(true)} className="flex items-center gap-2">
+            <Button onClick={() => setClientFormOpen(true)} variant="create" className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Novo Cliente
             </Button>
@@ -427,7 +427,7 @@ export default function Admin() {
                     <div>
                       <span className="font-medium">Início:</span>
                       <p>{client.start_date 
-                        ? new Date(client.start_date).toLocaleDateString('pt-BR')
+                        ? new Date(client.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
                         : 'Não informado'}</p>
                     </div>
                   </div>
@@ -440,7 +440,7 @@ export default function Admin() {
         <TabsContent value="payments" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Pagamentos de Clientes</h3>
-            <Button onClick={() => setPaymentFormOpen(true)} className="flex items-center gap-2">
+            <Button onClick={() => setPaymentFormOpen(true)} variant="create" className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Novo Pagamento
             </Button>
@@ -479,7 +479,7 @@ export default function Admin() {
         <TabsContent value="expenses" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Despesas</h3>
-            <Button onClick={() => setExpenseFormOpen(true)} className="flex items-center gap-2">
+            <Button onClick={() => setExpenseFormOpen(true)} variant="create" className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Nova Despesa
             </Button>
@@ -521,7 +521,7 @@ export default function Admin() {
         <TabsContent value="salaries" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Salários</h3>
-            <Button onClick={() => setSalaryFormOpen(true)} className="flex items-center gap-2">
+            <Button onClick={() => setSalaryFormOpen(true)} variant="create" className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Novo Salário
             </Button>
@@ -627,7 +627,7 @@ export default function Admin() {
                       <h4 className="font-medium text-foreground">Data de Início</h4>
                       <p className="text-sm">
                         {selectedClient.start_date 
-                          ? new Date(selectedClient.start_date).toLocaleDateString('pt-BR')
+                          ? new Date(selectedClient.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
                           : 'Não informado'}
                       </p>
                     </div>
