@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -67,6 +69,10 @@ export default function Admin() {
   const [paymentFormOpen, setPaymentFormOpen] = useState(false);
   const [expenseFormOpen, setExpenseFormOpen] = useState(false);
   const [salaryFormOpen, setSalaryFormOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [clientDetailsOpen, setClientDetailsOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -111,8 +117,9 @@ export default function Admin() {
   };
 
   const fetchPayments = async () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
     const startDate = `${selectedMonth}-01`;
-    const endDate = `${selectedMonth}-31`;
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // último dia do mês
     
     const { data, error } = await supabase
       .from('client_payments')
@@ -125,8 +132,9 @@ export default function Admin() {
   };
 
   const fetchExpenses = async () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
     const startDate = `${selectedMonth}-01`;
-    const endDate = `${selectedMonth}-31`;
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // último dia do mês
     
     const { data, error } = await supabase
       .from('expenses')
@@ -139,8 +147,9 @@ export default function Admin() {
   };
 
   const fetchSalaries = async () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
     const startDate = `${selectedMonth}-01`;
-    const endDate = `${selectedMonth}-31`;
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // último dia do mês
     
     const { data, error } = await supabase
       .from('salaries')
@@ -172,6 +181,50 @@ export default function Admin() {
       case 'pending': return 'Pendente';
       case 'overdue': return 'Atrasado';
       default: return status;
+    }
+  };
+
+  const handleEditClient = (client: Client) => {
+    setSelectedClient(client);
+    setClientFormOpen(true);
+  };
+
+  const handleViewClient = (client: Client) => {
+    setSelectedClient(client);
+    setClientDetailsOpen(true);
+  };
+
+  const handleDeleteClient = (client: Client) => {
+    setClientToDelete(client);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteClient = async () => {
+    if (!clientToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientToDelete.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Cliente excluído",
+        description: "Cliente excluído com sucesso!",
+      });
+
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setClientToDelete(null);
     }
   };
 
@@ -328,9 +381,35 @@ export default function Admin() {
                         {client.service || 'Serviço não especificado'}
                       </CardDescription>
                     </div>
-                    <Badge className={client.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                      {client.active ? 'Ativo' : 'Inativo'}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge className={client.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                        {client.active ? 'Ativo' : 'Inativo'}
+                      </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewClient(client)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Visualizar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditClient(client)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteClient(client)}
+                            className="text-red-600 focus:text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -482,8 +561,12 @@ export default function Admin() {
       {/* Forms */}
       <ClientForm 
         open={clientFormOpen} 
-        onOpenChange={setClientFormOpen} 
-        onSuccess={fetchData} 
+        onOpenChange={(open) => {
+          setClientFormOpen(open);
+          if (!open) setSelectedClient(null);
+        }}
+        onSuccess={fetchData}
+        client={selectedClient}
       />
       <PaymentForm 
         open={paymentFormOpen} 
@@ -500,6 +583,91 @@ export default function Admin() {
         onOpenChange={setSalaryFormOpen} 
         onSuccess={fetchData} 
       />
+
+      {/* Client Details Dialog */}
+      {selectedClient && (
+        <AlertDialog open={clientDetailsOpen} onOpenChange={setClientDetailsOpen}>
+          <AlertDialogContent className="max-w-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Detalhes do Cliente</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="font-medium text-foreground">Nome</h4>
+                      <p className="text-sm">{selectedClient.name}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-foreground">Status</h4>
+                      <Badge className={selectedClient.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                        {selectedClient.active ? 'Ativo' : 'Inativo'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="font-medium text-foreground">Serviço</h4>
+                      <p className="text-sm">{selectedClient.service || 'Não especificado'}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-foreground">Valor Mensal</h4>
+                      <p className="text-sm">
+                        {selectedClient.monthly_value 
+                          ? `R$ ${selectedClient.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          : 'Não definido'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="font-medium text-foreground">Contato</h4>
+                      <p className="text-sm">{selectedClient.contact || 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-foreground">Data de Início</h4>
+                      <p className="text-sm">
+                        {selectedClient.start_date 
+                          ? new Date(selectedClient.start_date).toLocaleDateString('pt-BR')
+                          : 'Não informado'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Fechar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => {
+                setClientDetailsOpen(false);
+                handleEditClient(selectedClient);
+              }}>
+                Editar Cliente
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o cliente "{clientToDelete?.name}"? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteClient}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
