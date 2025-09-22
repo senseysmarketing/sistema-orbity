@@ -1,22 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  LayoutDashboard, 
-  CheckSquare, 
-  Users, 
-  Calendar,
-  Plus,
-  TrendingUp,
-  AlertCircle 
-} from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Users, Calendar, Plus, TrendingUp, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-
 const Index = () => {
-  const { profile } = useAuth();
-
+  const {
+    profile
+  } = useAuth();
   const getRoleGreeting = () => {
     if (!profile) return "Bem-vindo";
-    
     switch (profile.role) {
       case 'gestor_trafego':
         return `Bem-vindo, ${profile.name.split(' ')[0]}! 📊`;
@@ -28,36 +19,32 @@ const Index = () => {
         return `Bem-vindo, ${profile.name.split(' ')[0]}!`;
     }
   };
-
-  const quickActions = [
-    {
-      title: "Nova Tarefa",
-      description: "Criar uma nova tarefa geral",
-      icon: Plus,
-      action: () => {}, // TODO: Navigate to task creation
-      color: "bg-primary/10 text-primary",
-    },
-    {
-      title: "Novo Cliente",
-      description: "Cadastrar um novo cliente",
-      icon: Users,
-      action: () => {}, // TODO: Navigate to client creation
-      color: "bg-green-500/10 text-green-600",
-    },
-    {
-      title: "Ver Tarefas",
-      description: "Visualizar todas as tarefas",
-      icon: CheckSquare,
-      action: () => {}, // TODO: Navigate to tasks
-      color: "bg-blue-500/10 text-blue-600",
-    },
-  ];
-
-  return (
-    <div className="space-y-6">
+  const quickActions = [{
+    title: "Nova Tarefa",
+    description: "Criar uma nova tarefa geral",
+    icon: Plus,
+    action: () => {},
+    // TODO: Navigate to task creation
+    color: "bg-primary/10 text-primary"
+  }, {
+    title: "Novo Cliente",
+    description: "Cadastrar um novo cliente",
+    icon: Users,
+    action: () => {},
+    // TODO: Navigate to client creation
+    color: "bg-green-500/10 text-green-600"
+  }, {
+    title: "Ver Tarefas",
+    description: "Visualizar todas as tarefas",
+    icon: CheckSquare,
+    action: () => {},
+    // TODO: Navigate to tasks
+    color: "bg-blue-500/10 text-blue-600"
+  }];
+  return <div className="space-y-6">
       {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-gradient">
+        <h1 className="text-3xl text-gradient font-bold">
           {getRoleGreeting()}
         </h1>
         <p className="text-muted-foreground">
@@ -124,8 +111,7 @@ const Index = () => {
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Ações Rápidas</h2>
         <div className="grid gap-4 md:grid-cols-3">
-          {quickActions.map((action, index) => (
-            <Card key={index} className="card-modern cursor-pointer group" onClick={action.action}>
+          {quickActions.map((action, index) => <Card key={index} className="card-modern cursor-pointer group" onClick={action.action}>
               <CardContent className="p-6">
                 <div className="flex items-center space-x-4">
                   <div className={`p-3 rounded-lg ${action.color} group-hover:scale-110 transition-transform`}>
@@ -137,8 +123,7 @@ const Index = () => {
                   </div>
                 </div>
               </CardContent>
-            </Card>
-          ))}
+            </Card>)}
         </div>
       </div>
 
@@ -160,8 +145,6 @@ const Index = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
-
 export default Index;
