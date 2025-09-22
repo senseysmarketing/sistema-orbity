@@ -50,8 +50,8 @@ export default function Tasks() {
     description: "",
     status: "todo" as const,
     priority: "medium" as const,
-    assigned_to: "",
-    client_id: "",
+    assigned_to: "unassigned",
+    client_id: "no-client",
     due_date: "",
   });
   const { profile } = useAuth();
@@ -175,8 +175,8 @@ export default function Tasks() {
           description: newTask.description,
           status: newTask.status,
           priority: newTask.priority,
-          assigned_to: newTask.assigned_to || null,
-          client_id: newTask.client_id || null,
+          assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
+          client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
           due_date: newTask.due_date || null,
           created_by: profile?.id,
         });
@@ -193,8 +193,8 @@ export default function Tasks() {
         description: "",
         status: "todo",
         priority: "medium",
-        assigned_to: "",
-        client_id: "",
+        assigned_to: "unassigned",
+        client_id: "no-client",
         due_date: "",
       });
       setIsDialogOpen(false);
@@ -304,7 +304,7 @@ export default function Tasks() {
                       <SelectValue placeholder="Selecionar usuário" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Não atribuído</SelectItem>
+                      <SelectItem value="unassigned">Não atribuído</SelectItem>
                       {profiles.map((profile) => (
                         <SelectItem key={profile.id} value={profile.id}>
                           {profile.name}
@@ -320,7 +320,7 @@ export default function Tasks() {
                       <SelectValue placeholder="Selecionar cliente" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sem cliente</SelectItem>
+                      <SelectItem value="no-client">Sem cliente</SelectItem>
                       {clients.map((client) => (
                         <SelectItem key={client.id} value={client.id}>
                           {client.name}
