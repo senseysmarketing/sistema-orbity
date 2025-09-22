@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { TrafficControlForm } from "@/components/admin/TrafficControlForm";
+import { TrafficControlEditForm } from "@/components/admin/TrafficControlEditForm";
 
 interface TrafficControl {
   id: string;
@@ -895,16 +896,27 @@ export default function Traffic() {
 
       {/* Dialog de Edição */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Controle de Tráfego</DialogTitle>
             <DialogDescription>
               Edite as informações do controle de tráfego
             </DialogDescription>
           </DialogHeader>
-          <div className="p-4">
-            <p className="text-muted-foreground">Funcionalidade de edição será implementada em breve.</p>
-          </div>
+          {selectedControl && (
+            <TrafficControlEditForm
+              control={selectedControl}
+              onSuccess={() => {
+                setIsEditOpen(false);
+                setSelectedControl(null);
+                fetchTrafficControls();
+              }}
+              onCancel={() => {
+                setIsEditOpen(false);
+                setSelectedControl(null);
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
