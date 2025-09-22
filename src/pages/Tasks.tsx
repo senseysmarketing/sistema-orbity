@@ -223,7 +223,7 @@ export default function Tasks() {
       priority: task.priority as any,
       assigned_to: task.assigned_to || "unassigned",
       client_id: task.client_id || "no-client",
-      due_date: task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : "",
+      due_date: task.due_date ? task.due_date.split('T')[0] : "",
     });
     setIsEditDialogOpen(true);
   };
@@ -575,7 +575,7 @@ export default function Tasks() {
                   {task.due_date && (
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      {new Date(task.due_date).toLocaleDateString('pt-BR')}
+                      {new Date(task.due_date + 'T00:00:00').toLocaleDateString('pt-BR')}
                     </div>
                   )}
                 </div>
@@ -629,7 +629,7 @@ export default function Tasks() {
                 <Label className="font-semibold">Data de Vencimento</Label>
                 <p className="text-sm">
                   {selectedTask.due_date 
-                    ? new Date(selectedTask.due_date).toLocaleDateString('pt-BR')
+                    ? new Date(selectedTask.due_date + 'T00:00:00').toLocaleDateString('pt-BR')
                     : "Sem data de vencimento"
                   }
                 </p>
@@ -638,7 +638,7 @@ export default function Tasks() {
                 <Label className="font-semibold">Criado em</Label>
                 <p className="text-sm">
                   {new Date(selectedTask.created_at).toLocaleDateString('pt-BR')} às {' '}
-                  {new Date(selectedTask.created_at).toLocaleTimeString('pt-BR')}
+                  {new Date(selectedTask.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
             </div>
