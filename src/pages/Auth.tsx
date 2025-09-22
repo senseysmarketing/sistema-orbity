@@ -83,7 +83,7 @@ export default function Auth() {
           <div className="flex justify-center">
             <img src={sensysLogo} alt="Senseys Marketing Imobiliário" className="h-16 w-auto object-contain" />
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-black">
             Controle de produtividade para agências de marketing
           </p>
         </div>
@@ -176,7 +176,7 @@ export default function Auth() {
           </CardContent>
         </Card>
         
-        <p className="text-center text-sm text-slate-700">
+        <p className="text-center text-sm text-black">
           Sistema desenvolvido para a Agência Senseys
         </p>
       </div>
