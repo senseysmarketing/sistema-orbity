@@ -538,27 +538,23 @@ export default function Admin() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid md:grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium">Valor Mensal:</span>
-                      <p>{client.monthly_value 
+                  <div className="flex flex-wrap items-center gap-6 text-sm">
+                    <span>
+                      <strong>Valor:</strong> {client.monthly_value 
                         ? `R$ ${client.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                        : 'Não definido'}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Contato:</span>
-                      <p>{client.contact || 'Não informado'}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Início:</span>
-                      <p>{client.start_date 
+                        : 'Não definido'}
+                    </span>
+                    <span>
+                      <strong>Contato:</strong> {client.contact || 'Não informado'}
+                    </span>
+                    <span>
+                      <strong>Início:</strong> {client.start_date 
                         ? new Date(client.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
-                        : 'Não informado'}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Vencimento:</span>
-                      <p>{client.due_date ? `Todo dia ${client.due_date}` : 'Não informado'}</p>
-                    </div>
+                        : 'Não informado'}
+                    </span>
+                    <span>
+                      <strong>Vencimento:</strong> {client.due_date ? `Dia ${client.due_date}` : 'Não informado'}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
