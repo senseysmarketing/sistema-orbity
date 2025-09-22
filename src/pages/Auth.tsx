@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2, Building, User, Palette, TrendingUp } from 'lucide-react';
+import { Loader2, User, Palette, TrendingUp } from 'lucide-react';
+import sensysLogo from '@/assets/senseys-logo-new.png';
 
 export default function Auth() {
   const { user, loading, signIn, signUp } = useAuth();
@@ -82,10 +83,13 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center space-x-2">
-            <Building className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold text-gradient">Sistema Senseys</h1>
+        <div className="text-center space-y-4">
+          <div className="flex justify-center">
+            <img 
+              src={sensysLogo} 
+              alt="Senseys Marketing Imobiliário" 
+              className="h-16 w-auto object-contain"
+            />
           </div>
           <p className="text-muted-foreground">
             Controle de produtividade para agências de marketing
