@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ interface Client {
   start_date: string | null;
   contact: string | null;
   service: string | null;
+  due_date: number;
 }
 
 interface ClientPayment {
@@ -116,10 +117,32 @@ export default function Admin() {
     setClients(data || []);
   };
 
+  // Função para atualizar status dos pagamentos automaticamente
+  const updatePaymentStatuses = async () => {
+    const currentDate = new Date().toISOString().split('T')[0];
+    
+    try {
+      const { error } = await supabase
+        .from('client_payments')
+        .update({ status: 'overdue' })
+        .lt('due_date', currentDate)
+        .eq('status', 'pending');
+      
+      if (error) {
+        console.error('Erro ao atualizar status dos pagamentos:', error);
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status dos pagamentos:', error);
+    }
+  };
+
   const fetchPayments = async () => {
     const [year, month] = selectedMonth.split('-').map(Number);
     const startDate = `${selectedMonth}-01`;
     const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // último dia do mês
+    
+    // Primeiro atualizar os status automáticamente
+    await updatePaymentStatuses();
     
     const { data, error } = await supabase
       .from('client_payments')
@@ -228,6 +251,66 @@ export default function Admin() {
     }
   };
 
+  // Função para fechar o mês
+  const closeMonth = async () => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    
+    try {
+      // Gerar pagamentos para o próximo mês para todos os clientes ativos
+      const activeClients = clients.filter(client => client.active && client.monthly_value);
+      
+      for (const client of activeClients) {
+        // Calcular próximo mês
+        const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+        const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+        
+        // Calcular data de vencimento para o próximo mês
+        const dueDate = new Date(nextYear, nextMonth, client.due_date || 1);
+        
+        // Verificar se já existe pagamento para este mês
+        const { data: existingPayment } = await supabase
+          .from('client_payments')
+          .select('id')
+          .eq('client_id', client.id)
+          .gte('due_date', `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-01`)
+          .lt('due_date', `${nextYear}-${String(nextMonth + 2).padStart(2, '0')}-01`)
+          .single();
+        
+        if (!existingPayment) {
+          const { error } = await supabase
+            .from('client_payments')
+            .insert([{
+              client_id: client.id,
+              amount: client.monthly_value,
+              due_date: dueDate.toISOString().split('T')[0],
+              status: 'pending'
+            }]);
+          
+          if (error) {
+            console.error(`Erro ao criar pagamento para cliente ${client.name}:`, error);
+          }
+        }
+      }
+      
+      toast({
+        title: "Mês fechado com sucesso",
+        description: "Pagamentos do próximo mês foram gerados automaticamente.",
+      });
+      
+      // Recarregar dados
+      fetchPayments();
+      
+    } catch (error: any) {
+      toast({
+        title: "Erro ao fechar mês",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Cálculos financeiros
   const totalReceivable = payments.filter(p => p.status !== 'paid').reduce((sum, p) => sum + p.amount, 0);
   const totalReceived = payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
@@ -270,26 +353,36 @@ export default function Admin() {
             Gestão financeira e administrativa da empresa
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4" />
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 12 }, (_, i) => {
-                const date = new Date();
-                date.setMonth(date.getMonth() - i);
-                const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-                return (
-                  <SelectItem key={value} value={value}>
-                    {label.charAt(0).toUpperCase() + label.slice(1)}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 12 }, (_, i) => {
+                  const date = new Date();
+                  date.setMonth(date.getMonth() - i);
+                  const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                  const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                  return (
+                    <SelectItem key={value} value={value}>
+                      {label.charAt(0).toUpperCase() + label.slice(1)}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button 
+            onClick={closeMonth}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Calendar className="h-4 w-4" />
+            Fechar Mês
+          </Button>
         </div>
       </div>
 
@@ -429,6 +522,10 @@ export default function Admin() {
                       <p>{client.start_date 
                         ? new Date(client.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
                         : 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium">Vencimento:</span>
+                      <p>{client.due_date ? `Todo dia ${client.due_date}` : 'Não informado'}</p>
                     </div>
                   </div>
                 </CardContent>

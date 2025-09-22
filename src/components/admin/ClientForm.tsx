@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -25,6 +26,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
     monthly_value: client?.monthly_value || '',
     active: client?.active ?? true,
     start_date: client?.start_date || '',
+    due_date: client?.due_date || 1,
     observations: client?.observations || '',
   });
 
@@ -37,6 +39,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         ...formData,
         monthly_value: formData.monthly_value ? parseFloat(formData.monthly_value as string) : null,
         start_date: formData.start_date || null,
+        due_date: parseInt(formData.due_date as string),
       };
 
       if (client) {
@@ -46,10 +49,36 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
           .eq('id', client.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data: clientData, error: clientError } = await supabase
           .from('clients')
-          .insert([data]);
-        if (error) throw error;
+          .insert([data])
+          .select()
+          .single();
+        
+        if (clientError) throw clientError;
+
+        // Criar pagamento automático para o cliente
+        if (clientData && formData.monthly_value) {
+          const currentDate = new Date();
+          const currentYear = currentDate.getFullYear();
+          const currentMonth = currentDate.getMonth();
+          
+          // Calcular a data de vencimento para o mês atual
+          const dueDate = new Date(currentYear, currentMonth, parseInt(formData.due_date as string));
+          
+          const { error: paymentError } = await supabase
+            .from('client_payments')
+            .insert([{
+              client_id: clientData.id,
+              amount: parseFloat(formData.monthly_value as string),
+              due_date: dueDate.toISOString().split('T')[0],
+              status: 'pending'
+            }]);
+          
+          if (paymentError) {
+            console.error('Erro ao criar pagamento automático:', paymentError);
+          }
+        }
       }
 
       toast({
@@ -66,6 +95,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         monthly_value: '',
         active: true,
         start_date: '',
+        due_date: 1,
         observations: '',
       });
     } catch (error: any) {
@@ -136,6 +166,24 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
                 value={formData.start_date}
                 onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
               />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="due_date">Dia de Vencimento *</Label>
+              <Select 
+                value={formData.due_date.toString()} 
+                onValueChange={(value) => setFormData({ ...formData, due_date: parseInt(value) })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o dia" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                    <SelectItem key={day} value={day.toString()}>
+                      Dia {day}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="observations">Observações</Label>
