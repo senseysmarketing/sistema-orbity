@@ -27,6 +27,7 @@ interface Task {
 
 interface Profile {
   id: string;
+  user_id: string;
   name: string;
   role: string;
 }
@@ -85,7 +86,7 @@ export default function Tasks() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, role');
+        .select('id, user_id, name, role');
 
       if (error) throw error;
       setProfiles(data || []);
@@ -147,7 +148,7 @@ export default function Tasks() {
 
   const getAssignedUserName = (userId: string | null) => {
     if (!userId) return 'Não atribuído';
-    const user = profiles.find(p => p.id === userId);
+    const user = profiles.find(p => p.user_id === userId);
     return user?.name || 'Usuário desconhecido';
   };
 
@@ -178,7 +179,7 @@ export default function Tasks() {
           assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
           client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
           due_date: newTask.due_date || null,
-          created_by: profile?.id,
+          created_by: profile?.user_id,
         });
 
       if (error) throw error;
@@ -306,7 +307,7 @@ export default function Tasks() {
                     <SelectContent>
                       <SelectItem value="unassigned">Não atribuído</SelectItem>
                       {profiles.map((profile) => (
-                        <SelectItem key={profile.id} value={profile.id}>
+                        <SelectItem key={profile.id} value={profile.user_id}>
                           {profile.name}
                         </SelectItem>
                       ))}
