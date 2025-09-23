@@ -296,7 +296,7 @@ const Index = () => {
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{formatCurrency(metrics.monthlyRevenue)}</div>
+                  <div className="text-2xl font-bold text-green-600">{formatCurrency(metrics.monthlyRevenue)}</div>
                   <p className="text-xs text-muted-foreground">
                     {metrics.activeClients} clientes ativos
                   </p>
