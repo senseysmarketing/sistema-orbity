@@ -1,10 +1,30 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Search, Filter, Users, Clock, AlertCircle, Building, Eye, Edit, Trash2, MoreHorizontal, CheckCircle, AlertTriangle, TrendingUp, Calendar, Target, BarChart3, Activity, Timer, UserCheck, Zap } from "lucide-react";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { KanbanColumn } from "@/components/ui/kanban-column";
+import { SortableTaskCard } from "@/components/ui/sortable-task-card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,6 +79,7 @@ export default function Tasks() {
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [dueDateFilter, setDueDateFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const [newTask, setNewTask] = useState({
     title: "",
@@ -72,6 +93,14 @@ export default function Tasks() {
 
   const { profile } = useAuth();
   const { toast } = useToast();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   useEffect(() => {
     fetchTasks();
@@ -482,6 +511,58 @@ export default function Tasks() {
     setAssignedFilter("all");
     setClientFilter("all");
     setDueDateFilter("all");
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) return;
+
+    const taskId = active.id as string;
+    const newStatus = over.id as string;
+
+    // Verificar se o status é válido
+    const validStatuses = ['todo', 'in_progress', 'em_revisao', 'done'];
+    if (!validStatuses.includes(newStatus)) return;
+
+    // Encontrar a tarefa
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || task.status === newStatus) return;
+
+    // Atualizar localmente primeiro para feedback imediato
+    setTasks(prev => prev.map(t => 
+      t.id === taskId ? { ...t, status: newStatus as 'todo' | 'in_progress' | 'em_revisao' | 'done' } : t
+    ));
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: newStatus as 'todo' | 'in_progress' | 'em_revisao' | 'done' })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: `Tarefa movida para ${getStatusLabel(newStatus)}!`,
+      });
+    } catch (error: any) {
+      // Reverter mudança em caso de erro
+      setTasks(prev => prev.map(t => 
+        t.id === taskId ? { ...t, status: task.status as 'todo' | 'in_progress' | 'em_revisao' | 'done' } : t
+      ));
+      
+      toast({
+        title: "Erro ao mover tarefa",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -901,263 +982,99 @@ export default function Tasks() {
             </Card>
           ) : viewMode === 'kanban' ? (
             /* Visualização Kanban */
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {/* Coluna A Fazer */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
-                  <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
-                  <h3 className="font-semibold">A Fazer</h3>
-                  <Badge variant="secondary">{analytics.statusStats.todo}</Badge>
-                </div>
-                <div className="space-y-3">
-                  {filteredTasks.filter(task => task.status === 'todo').map((task) => {
-                    const urgency = getUrgencyLevel(task);
-                    return (
-                      <Card key={task.id} className="hover:shadow-md transition-shadow cursor-pointer">
-                        <CardContent className="p-3">
-                          <div className="space-y-2">
-                            <div className="flex items-start justify-between">
-                              <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                                    <MoreHorizontal className="h-3 w-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                  <DropdownMenuItem onClick={() => handleViewDetails(task)}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Ver detalhes
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleEditTask(task)}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Editar
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    className="text-destructive focus:text-destructive" 
-                                    onClick={() => handleDeleteTask(task.id)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Excluir
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                            
-                            <div className="flex gap-1 flex-wrap">
-                              <Badge className={getPriorityColor(task.priority)} variant="secondary">
-                                {getPriorityLabel(task.priority)}
-                              </Badge>
-                              <Badge className={urgency.color} variant="secondary">
-                                {urgency.label}
-                              </Badge>
-                            </div>
-                            
-                            <div className="text-xs text-muted-foreground space-y-1">
-                              <div>📋 {getAssignedUserName(task.assigned_to)}</div>
-                              <div>🏢 {getClientName(task.client_id)}</div>
-                              {task.due_date && <div>📅 {formatDateBR(task.due_date)}</div>}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <KanbanColumn
+                  id="todo"
+                  title="A Fazer"
+                  tasks={filteredTasks.filter(task => task.status === 'todo')}
+                  color="bg-gray-500"
+                  count={analytics.statusStats.todo}
+                  onViewDetails={handleViewDetails}
+                  onEdit={handleEditTask}
+                  onDelete={handleDeleteTask}
+                  getPriorityColor={getPriorityColor}
+                  getPriorityLabel={getPriorityLabel}
+                  getUrgencyLevel={getUrgencyLevel}
+                  getAssignedUserName={getAssignedUserName}
+                  getClientName={getClientName}
+                  formatDateBR={formatDateBR}
+                />
+                
+                <KanbanColumn
+                  id="in_progress"
+                  title="Em Andamento"
+                  tasks={filteredTasks.filter(task => task.status === 'in_progress')}
+                  color="bg-blue-500"
+                  count={analytics.statusStats.in_progress}
+                  onViewDetails={handleViewDetails}
+                  onEdit={handleEditTask}
+                  onDelete={handleDeleteTask}
+                  getPriorityColor={getPriorityColor}
+                  getPriorityLabel={getPriorityLabel}
+                  getUrgencyLevel={getUrgencyLevel}
+                  getAssignedUserName={getAssignedUserName}
+                  getClientName={getClientName}
+                  formatDateBR={formatDateBR}
+                />
+                
+                <KanbanColumn
+                  id="em_revisao"
+                  title="Em Revisão"
+                  tasks={filteredTasks.filter(task => task.status === 'em_revisao')}
+                  color="bg-purple-500"
+                  count={analytics.statusStats.em_revisao}
+                  onViewDetails={handleViewDetails}
+                  onEdit={handleEditTask}
+                  onDelete={handleDeleteTask}
+                  getPriorityColor={getPriorityColor}
+                  getPriorityLabel={getPriorityLabel}
+                  getUrgencyLevel={getUrgencyLevel}
+                  getAssignedUserName={getAssignedUserName}
+                  getClientName={getClientName}
+                  formatDateBR={formatDateBR}
+                />
+                
+                <KanbanColumn
+                  id="done"
+                  title="Concluídas"
+                  tasks={filteredTasks.filter(task => task.status === 'done')}
+                  color="bg-green-500"
+                  count={analytics.statusStats.done}
+                  onViewDetails={handleViewDetails}
+                  onEdit={handleEditTask}
+                  onDelete={handleDeleteTask}
+                  getPriorityColor={getPriorityColor}
+                  getPriorityLabel={getPriorityLabel}
+                  getUrgencyLevel={getUrgencyLevel}
+                  getAssignedUserName={getAssignedUserName}
+                  getClientName={getClientName}
+                  formatDateBR={formatDateBR}
+                />
               </div>
-
-              {/* Coluna Em Andamento */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <h3 className="font-semibold">Em Andamento</h3>
-                  <Badge variant="secondary">{analytics.statusStats.in_progress}</Badge>
-                </div>
-                <div className="space-y-3">
-                  {filteredTasks.filter(task => task.status === 'in_progress').map((task) => {
-                    const urgency = getUrgencyLevel(task);
-                    return (
-                      <Card key={task.id} className="hover:shadow-md transition-shadow cursor-pointer">
-                        <CardContent className="p-3">
-                          <div className="space-y-2">
-                            <div className="flex items-start justify-between">
-                              <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                                    <MoreHorizontal className="h-3 w-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                  <DropdownMenuItem onClick={() => handleViewDetails(task)}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Ver detalhes
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleEditTask(task)}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Editar
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    className="text-destructive focus:text-destructive" 
-                                    onClick={() => handleDeleteTask(task.id)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Excluir
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                            
-                            <div className="flex gap-1 flex-wrap">
-                              <Badge className={getPriorityColor(task.priority)} variant="secondary">
-                                {getPriorityLabel(task.priority)}
-                              </Badge>
-                              <Badge className={urgency.color} variant="secondary">
-                                {urgency.label}
-                              </Badge>
-                            </div>
-                            
-                            <div className="text-xs text-muted-foreground space-y-1">
-                              <div>📋 {getAssignedUserName(task.assigned_to)}</div>
-                              <div>🏢 {getClientName(task.client_id)}</div>
-                              {task.due_date && <div>📅 {formatDateBR(task.due_date)}</div>}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Coluna Em Revisão */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
-                  <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                  <h3 className="font-semibold">Em Revisão</h3>
-                  <Badge variant="secondary">{analytics.statusStats.em_revisao}</Badge>
-                </div>
-                <div className="space-y-3">
-                  {filteredTasks.filter(task => task.status === 'em_revisao').map((task) => {
-                    const urgency = getUrgencyLevel(task);
-                    return (
-                      <Card key={task.id} className="hover:shadow-md transition-shadow cursor-pointer">
-                        <CardContent className="p-3">
-                          <div className="space-y-2">
-                            <div className="flex items-start justify-between">
-                              <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                                    <MoreHorizontal className="h-3 w-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                  <DropdownMenuItem onClick={() => handleViewDetails(task)}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Ver detalhes
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleEditTask(task)}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Editar
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    className="text-destructive focus:text-destructive" 
-                                    onClick={() => handleDeleteTask(task.id)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Excluir
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                            
-                            <div className="flex gap-1 flex-wrap">
-                              <Badge className={getPriorityColor(task.priority)} variant="secondary">
-                                {getPriorityLabel(task.priority)}
-                              </Badge>
-                              <Badge className={urgency.color} variant="secondary">
-                                {urgency.label}
-                              </Badge>
-                            </div>
-                            
-                            <div className="text-xs text-muted-foreground space-y-1">
-                              <div>📋 {getAssignedUserName(task.assigned_to)}</div>
-                              <div>🏢 {getClientName(task.client_id)}</div>
-                              {task.due_date && <div>📅 {formatDateBR(task.due_date)}</div>}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Coluna Concluída */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <h3 className="font-semibold">Concluída</h3>
-                  <Badge variant="secondary">{analytics.statusStats.done}</Badge>
-                </div>
-                <div className="space-y-3">
-                  {filteredTasks.filter(task => task.status === 'done').map((task) => {
-                    const urgency = getUrgencyLevel(task);
-                    return (
-                      <Card key={task.id} className="hover:shadow-md transition-shadow cursor-pointer">
-                        <CardContent className="p-3">
-                          <div className="space-y-2">
-                            <div className="flex items-start justify-between">
-                              <h4 className="font-medium text-sm leading-tight">{task.title}</h4>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                                    <MoreHorizontal className="h-3 w-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                  <DropdownMenuItem onClick={() => handleViewDetails(task)}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Ver detalhes
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleEditTask(task)}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Editar
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    className="text-destructive focus:text-destructive" 
-                                    onClick={() => handleDeleteTask(task.id)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Excluir
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                            
-                            <div className="flex gap-1 flex-wrap">
-                              <Badge className={getPriorityColor(task.priority)} variant="secondary">
-                                {getPriorityLabel(task.priority)}
-                              </Badge>
-                              <Badge className={urgency.color} variant="secondary">
-                                {urgency.label}
-                              </Badge>
-                            </div>
-                            
-                            <div className="text-xs text-muted-foreground space-y-1">
-                              <div>📋 {getAssignedUserName(task.assigned_to)}</div>
-                              <div>🏢 {getClientName(task.client_id)}</div>
-                              {task.due_date && <div>📅 {formatDateBR(task.due_date)}</div>}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+              
+              <DragOverlay>
+                {activeId ? (
+                  <SortableTaskCard
+                    task={tasks.find(task => task.id === activeId)!}
+                    onViewDetails={() => {}}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    getPriorityColor={getPriorityColor}
+                    getPriorityLabel={getPriorityLabel}
+                    getUrgencyLevel={getUrgencyLevel}
+                    getAssignedUserName={getAssignedUserName}
+                    getClientName={getClientName}
+                    formatDateBR={formatDateBR}
+                  />
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           ) : (
             /* Visualização Lista */
             <div className="grid gap-4">
