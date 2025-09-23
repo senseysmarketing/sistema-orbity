@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -73,9 +75,12 @@ export default function Admin() {
   const [expenseFormOpen, setExpenseFormOpen] = useState(false);
   const [salaryFormOpen, setSalaryFormOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [clientDetailsOpen, setClientDetailsOpen] = useState(false);
+  const [expenseDetailsOpen, setExpenseDetailsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   
   // Filtros e busca
   const [searchTerm, setSearchTerm] = useState("");
@@ -236,6 +241,20 @@ export default function Admin() {
     setDeleteDialogOpen(true);
   };
 
+  const handleEditExpense = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setExpenseFormOpen(true);
+  };
+
+  const handleViewExpense = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setExpenseDetailsOpen(true);
+  };
+
+  const handleDeleteExpense = (expenseId: string) => {
+    setExpenseToDelete(expenseId);
+  };
+
   const confirmDeleteClient = async () => {
     if (!clientToDelete) return;
 
@@ -262,6 +281,33 @@ export default function Admin() {
     } finally {
       setDeleteDialogOpen(false);
       setClientToDelete(null);
+    }
+  };
+
+  const confirmDeleteExpense = async () => {
+    if (!expenseToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', expenseToDelete);
+
+      if (error) throw error;
+
+      toast({
+        title: "Despesa excluída",
+        description: "Despesa excluída com sucesso!",
+      });
+      
+      setExpenseToDelete(null);
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -1076,7 +1122,10 @@ export default function Admin() {
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Despesas ({filteredExpenses.length})</h3>
             <Button 
-              onClick={() => setExpenseFormOpen(true)}
+              onClick={() => {
+                setSelectedExpense(null);
+                setExpenseFormOpen(true);
+              }}
               className="flex items-center gap-2"
             >
               <Plus className="h-4 w-4" />
@@ -1114,6 +1163,30 @@ export default function Admin() {
                         </div>
                       </div>
                     </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleViewExpense(expense)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Ver detalhes
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-destructive focus:text-destructive" 
+                          onClick={() => handleDeleteExpense(expense.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </CardContent>
               </Card>
@@ -1307,11 +1380,16 @@ export default function Admin() {
 
       <ExpenseForm
         open={expenseFormOpen}
-        onOpenChange={setExpenseFormOpen}
+        onOpenChange={(open) => {
+          setExpenseFormOpen(open);
+          if (!open) setSelectedExpense(null);
+        }}
         onSuccess={() => {
           fetchData();
           setExpenseFormOpen(false);
+          setSelectedExpense(null);
         }}
+        expense={selectedExpense}
       />
 
       <SalaryForm
@@ -1339,6 +1417,84 @@ export default function Admin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Expense Delete Confirmation Dialog */}
+      <AlertDialog open={!!expenseToDelete} onOpenChange={() => setExpenseToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta despesa? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteExpense} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Expense Details Dialog */}
+      <Dialog open={expenseDetailsOpen} onOpenChange={setExpenseDetailsOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Detalhes da Despesa</DialogTitle>
+          </DialogHeader>
+          {selectedExpense && (
+            <div className="space-y-4">
+              <div className="grid gap-4">
+                <div>
+                  <Label>Nome</Label>
+                  <div className="text-sm font-medium">{selectedExpense.name}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Valor</Label>
+                    <div className="text-sm font-medium">
+                      R$ {selectedExpense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Tipo</Label>
+                    <div className="text-sm font-medium">
+                      {selectedExpense.is_fixed ? "Fixa" : "Variável"}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Data de Vencimento</Label>
+                    <div className="text-sm font-medium">
+                      {new Date(selectedExpense.due_date).toLocaleDateString('pt-BR')}
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <Badge className={getStatusColor(selectedExpense.status)}>
+                      {getStatusLabel(selectedExpense.status)}
+                    </Badge>
+                  </div>
+                </div>
+                {selectedExpense.paid_date && (
+                  <div>
+                    <Label>Data de Pagamento</Label>
+                    <div className="text-sm font-medium">
+                      {new Date(selectedExpense.paid_date).toLocaleDateString('pt-BR')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExpenseDetailsOpen(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
