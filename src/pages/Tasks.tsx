@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, Filter, Users, Clock, AlertCircle, Building, Eye, Edit, Trash2, MoreHorizontal, CheckCircle, AlertTriangle, TrendingUp, Calendar, Target, BarChart3, Activity, Timer, UserCheck, Zap } from "lucide-react";
+import { Plus, Search, Filter, Users, Clock, AlertCircle, Building, Eye, Edit, Trash2, MoreHorizontal, CheckCircle, AlertTriangle, TrendingUp, Calendar, Target, BarChart3, Activity, Timer, UserCheck, Zap, ArrowUpDown, Archive } from "lucide-react";
 import {
   DndContext,
   DragEndEvent,
@@ -47,6 +47,7 @@ interface Task {
   due_date: string | null;
   created_at: string;
   created_by: string;
+  archived?: boolean;
 }
 
 interface Profile {
@@ -80,6 +81,8 @@ export default function Tasks() {
   const [dueDateFilter, setDueDateFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"due_date" | "priority">("due_date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const [newTask, setNewTask] = useState({
     title: "",
@@ -113,6 +116,7 @@ export default function Tasks() {
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
+        .eq('archived', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -154,9 +158,9 @@ export default function Tasks() {
     }
   };
 
-  // Dados filtrados
+  // Dados filtrados e ordenados
   const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
+    let filtered = tasks.filter(task => {
       // Filtro de busca
       const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            task.description?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -203,7 +207,24 @@ export default function Tasks() {
       
       return matchesSearch && matchesStatus && matchesPriority && matchesAssigned && matchesClient && matchesDueDate;
     });
-  }, [tasks, searchTerm, statusFilter, priorityFilter, assignedFilter, clientFilter, dueDateFilter]);
+
+    // Aplicar ordenação
+    filtered.sort((a, b) => {
+      if (sortBy === 'due_date') {
+        const dateA = a.due_date ? new Date(a.due_date).getTime() : Infinity;
+        const dateB = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      } else if (sortBy === 'priority') {
+        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        const priorityA = priorityOrder[a.priority];
+        const priorityB = priorityOrder[b.priority];
+        return sortOrder === 'asc' ? priorityA - priorityB : priorityB - priorityA;
+      }
+      return 0;
+    });
+
+    return filtered;
+  }, [tasks, searchTerm, statusFilter, priorityFilter, assignedFilter, clientFilter, dueDateFilter, sortBy, sortOrder]);
 
   // Análises e métricas
   const analytics = useMemo(() => {
@@ -563,6 +584,45 @@ export default function Tasks() {
         variant: "destructive",
       });
     }
+  };
+
+  const handleArchiveCompleted = async () => {
+    const completedTasks = tasks.filter(task => task.status === 'done');
+    
+    if (completedTasks.length === 0) {
+      toast({
+        title: "Nenhuma tarefa para arquivar",
+        description: "Não há tarefas concluídas para arquivar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ archived: true })
+        .eq('status', 'done');
+
+      if (error) throw error;
+
+      toast({
+        title: "Sucesso",
+        description: `${completedTasks.length} tarefas concluídas foram arquivadas!`,
+      });
+
+      fetchTasks();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao arquivar tarefas",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const sortedTasksByStatus = (status: string) => {
+    return filteredTasks.filter(task => task.status === status);
   };
 
   if (loading) {
@@ -946,6 +1006,34 @@ export default function Tasks() {
                   {filteredTasks.length} de {tasks.length} tarefas
                 </p>
                 <div className="flex gap-2">
+                  <Select value={sortBy} onValueChange={(value: "due_date" | "priority") => setSortBy(value)}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="due_date">Data de Vencimento</SelectItem>
+                      <SelectItem value="priority">Prioridade</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  >
+                    <ArrowUpDown className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleArchiveCompleted}
+                    className="flex items-center gap-2"
+                  >
+                    <Archive className="h-4 w-4" />
+                    Arquivar
+                  </Button>
+                  
                   <Button
                     variant={viewMode === 'kanban' ? 'default' : 'outline'}
                     size="sm"
@@ -992,7 +1080,7 @@ export default function Tasks() {
                 <KanbanColumn
                   id="todo"
                   title="A Fazer"
-                  tasks={filteredTasks.filter(task => task.status === 'todo')}
+                  tasks={sortedTasksByStatus('todo')}
                   color="bg-gray-500"
                   count={analytics.statusStats.todo}
                   onViewDetails={handleViewDetails}
@@ -1009,7 +1097,7 @@ export default function Tasks() {
                 <KanbanColumn
                   id="in_progress"
                   title="Em Andamento"
-                  tasks={filteredTasks.filter(task => task.status === 'in_progress')}
+                  tasks={sortedTasksByStatus('in_progress')}
                   color="bg-blue-500"
                   count={analytics.statusStats.in_progress}
                   onViewDetails={handleViewDetails}
@@ -1026,7 +1114,7 @@ export default function Tasks() {
                 <KanbanColumn
                   id="em_revisao"
                   title="Em Revisão"
-                  tasks={filteredTasks.filter(task => task.status === 'em_revisao')}
+                  tasks={sortedTasksByStatus('em_revisao')}
                   color="bg-purple-500"
                   count={analytics.statusStats.em_revisao}
                   onViewDetails={handleViewDetails}
@@ -1043,7 +1131,7 @@ export default function Tasks() {
                 <KanbanColumn
                   id="done"
                   title="Concluídas"
-                  tasks={filteredTasks.filter(task => task.status === 'done')}
+                  tasks={sortedTasksByStatus('done')}
                   color="bg-green-500"
                   count={analytics.statusStats.done}
                   onViewDetails={handleViewDetails}
