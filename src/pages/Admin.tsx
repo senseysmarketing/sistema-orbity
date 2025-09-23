@@ -9,8 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -18,7 +16,6 @@ import { ClientForm } from "@/components/admin/ClientForm";
 import { PaymentForm } from "@/components/admin/PaymentForm";
 import { ExpenseForm } from "@/components/admin/ExpenseForm";
 import { SalaryForm } from "@/components/admin/SalaryForm";
-
 interface Client {
   id: string;
   name: string;
@@ -29,7 +26,6 @@ interface Client {
   service: string | null;
   due_date: number;
 }
-
 interface ClientPayment {
   id: string;
   client_id: string;
@@ -38,7 +34,6 @@ interface ClientPayment {
   paid_date: string | null;
   status: 'pending' | 'paid' | 'overdue';
 }
-
 interface Expense {
   id: string;
   name: string;
@@ -48,7 +43,6 @@ interface Expense {
   status: 'pending' | 'paid' | 'overdue';
   is_fixed: boolean;
 }
-
 interface Salary {
   id: string;
   employee_name: string;
@@ -57,7 +51,6 @@ interface Salary {
   paid_date: string | null;
   status: 'pending' | 'paid' | 'overdue';
 }
-
 export default function Admin() {
   const [clients, setClients] = useState<Client[]>([]);
   const [payments, setPayments] = useState<ClientPayment[]>([]);
@@ -68,38 +61,37 @@ export default function Admin() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
-  
+
   // Form states
   const [clientFormOpen, setClientFormOpen] = useState(false);
   const [paymentFormOpen, setPaymentFormOpen] = useState(false);
   const [expenseFormOpen, setExpenseFormOpen] = useState(false);
   const [salaryFormOpen, setSalaryFormOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [clientDetailsOpen, setClientDetailsOpen] = useState(false);
-  const [expenseDetailsOpen, setExpenseDetailsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
-  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
-  
+
   // Filtros e busca
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>("all");
   const [valueRangeFilter, setValueRangeFilter] = useState<string>("all");
-  
+
   // Sort states
   const [clientSort, setClientSort] = useState<'name' | 'monthly_value' | 'start_date'>('name');
   const [paymentSort, setPaymentSort] = useState<'client' | 'amount' | 'due_date' | 'status'>('due_date');
   const [expenseSort, setExpenseSort] = useState<'name' | 'amount' | 'due_date' | 'status'>('due_date');
-
-  const { profile } = useAuth();
-  const { toast } = useToast();
+  const {
+    profile
+  } = useAuth();
+  const {
+    toast
+  } = useToast();
 
   // Verifica se o usuário tem permissão para acessar a página
   const hasAccess = profile?.role === 'administrador';
-
   useEffect(() => {
     if (hasAccess) {
       fetchData();
@@ -107,31 +99,24 @@ export default function Admin() {
       setLoading(false);
     }
   }, [hasAccess, selectedMonth, clientSort, paymentSort, expenseSort]);
-
   const fetchData = async () => {
     try {
-      await Promise.all([
-        fetchClients(),
-        fetchPayments(),
-        fetchExpenses(),
-        fetchSalaries()
-      ]);
+      await Promise.all([fetchClients(), fetchPayments(), fetchExpenses(), fetchSalaries()]);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar dados",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
-
   const fetchClients = async () => {
-    const { data, error } = await supabase
-      .from('clients')
-      .select('*')
-      .order(clientSort);
+    const {
+      data,
+      error
+    } = await supabase.from('clients').select('*').order(clientSort);
     if (error) throw error;
     setClients(data || []);
   };
@@ -139,14 +124,12 @@ export default function Admin() {
   // Função para atualizar status dos pagamentos automaticamente
   const updatePaymentStatuses = async () => {
     const currentDate = new Date().toISOString().split('T')[0];
-    
     try {
-      const { error } = await supabase
-        .from('client_payments')
-        .update({ status: 'overdue' })
-        .lt('due_date', currentDate)
-        .eq('status', 'pending');
-      
+      const {
+        error
+      } = await supabase.from('client_payments').update({
+        status: 'overdue'
+      }).lt('due_date', currentDate).eq('status', 'pending');
       if (error) {
         console.error('Erro ao atualizar status dos pagamentos:', error);
       }
@@ -154,191 +137,137 @@ export default function Admin() {
       console.error('Erro ao atualizar status dos pagamentos:', error);
     }
   };
-
   const fetchPayments = async () => {
     const [year, month] = selectedMonth.split('-').map(Number);
     const startDate = `${selectedMonth}-01`;
     const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // último dia do mês
-    
+
     // Primeiro atualizar os status automáticamente
     await updatePaymentStatuses();
-    
-    const { data, error } = await supabase
-      .from('client_payments')
-      .select('*')
-      .gte('due_date', startDate)
-      .lte('due_date', endDate)
-      .order(paymentSort, { ascending: paymentSort === 'status' ? true : false });
+    const {
+      data,
+      error
+    } = await supabase.from('client_payments').select('*').gte('due_date', startDate).lte('due_date', endDate).order(paymentSort, {
+      ascending: paymentSort === 'status' ? true : false
+    });
     if (error) throw error;
     setPayments(data || []);
   };
-
   const fetchExpenses = async () => {
     const [year, month] = selectedMonth.split('-').map(Number);
     const startDate = `${selectedMonth}-01`;
     const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // último dia do mês
-    
-    const { data, error } = await supabase
-      .from('expenses')
-      .select('*')
-      .gte('due_date', startDate)
-      .lte('due_date', endDate)
-      .order(expenseSort, { ascending: expenseSort === 'status' ? true : false });
+
+    const {
+      data,
+      error
+    } = await supabase.from('expenses').select('*').gte('due_date', startDate).lte('due_date', endDate).order(expenseSort, {
+      ascending: expenseSort === 'status' ? true : false
+    });
     if (error) throw error;
     setExpenses(data || []);
   };
-
   const fetchSalaries = async () => {
     const [year, month] = selectedMonth.split('-').map(Number);
     const startDate = `${selectedMonth}-01`;
     const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // último dia do mês
-    
-    const { data, error } = await supabase
-      .from('salaries')
-      .select('*')
-      .gte('due_date', startDate)
-      .lte('due_date', endDate)
-      .order('due_date', { ascending: false });
+
+    const {
+      data,
+      error
+    } = await supabase.from('salaries').select('*').gte('due_date', startDate).lte('due_date', endDate).order('due_date', {
+      ascending: false
+    });
     if (error) throw error;
     setSalaries(data || []);
   };
-
   const getClientName = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
     return client?.name || 'Cliente desconhecido';
   };
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'paid': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-      case 'overdue': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+      case 'paid':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'overdue':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
   };
-
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'paid': return 'Pago';
-      case 'pending': return 'Pendente';
-      case 'overdue': return 'Atrasado';
-      default: return status;
+      case 'paid':
+        return 'Pago';
+      case 'pending':
+        return 'Pendente';
+      case 'overdue':
+        return 'Atrasado';
+      default:
+        return status;
     }
   };
-
   const handleEditClient = (client: Client) => {
     setSelectedClient(client);
     setClientFormOpen(true);
   };
-
   const handleViewClient = (client: Client) => {
     setSelectedClient(client);
     setClientDetailsOpen(true);
   };
-
   const handleDeleteClient = (client: Client) => {
     setClientToDelete(client);
     setDeleteDialogOpen(true);
   };
-
-  const handleEditExpense = (expense: Expense) => {
-    setSelectedExpense(expense);
-    setExpenseFormOpen(true);
-  };
-
-  const handleViewExpense = (expense: Expense) => {
-    setSelectedExpense(expense);
-    setExpenseDetailsOpen(true);
-  };
-
-  const handleDeleteExpense = (expenseId: string) => {
-    setExpenseToDelete(expenseId);
-  };
-
   const confirmDeleteClient = async () => {
     if (!clientToDelete) return;
-
     try {
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', clientToDelete.id);
-
+      const {
+        error
+      } = await supabase.from('clients').delete().eq('id', clientToDelete.id);
       if (error) throw error;
-
       toast({
         title: "Cliente excluído",
-        description: "Cliente excluído com sucesso!",
+        description: "Cliente excluído com sucesso!"
       });
-
       fetchData();
     } catch (error: any) {
       toast({
         title: "Erro",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setDeleteDialogOpen(false);
       setClientToDelete(null);
     }
   };
-
-  const confirmDeleteExpense = async () => {
-    if (!expenseToDelete) return;
-
-    try {
-      const { error } = await supabase
-        .from('expenses')
-        .delete()
-        .eq('id', expenseToDelete);
-
-      if (error) throw error;
-
-      toast({
-        title: "Despesa excluída",
-        description: "Despesa excluída com sucesso!",
-      });
-      
-      setExpenseToDelete(null);
-      fetchData();
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleUpdatePaymentStatus = async (paymentId: string, newStatus: 'pending' | 'paid' | 'overdue') => {
     try {
-      const updateData: any = { status: newStatus };
-      
+      const updateData: any = {
+        status: newStatus
+      };
       if (newStatus === 'paid') {
         updateData.paid_date = new Date().toISOString().split('T')[0];
       } else {
         updateData.paid_date = null;
       }
-
-      const { error } = await supabase
-        .from('client_payments')
-        .update(updateData)
-        .eq('id', paymentId);
-
+      const {
+        error
+      } = await supabase.from('client_payments').update(updateData).eq('id', paymentId);
       if (error) throw error;
-
       toast({
         title: "Status atualizado",
-        description: "Status do pagamento foi atualizado com sucesso",
+        description: "Status do pagamento foi atualizado com sucesso"
       });
-
       fetchPayments();
     } catch (error: any) {
       toast({
         title: "Erro ao atualizar status",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
@@ -348,57 +277,47 @@ export default function Admin() {
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth();
-    
     try {
       // Gerar pagamentos para o próximo mês para todos os clientes ativos
       const activeClients = clients.filter(client => client.active && client.monthly_value);
-      
       for (const client of activeClients) {
         // Calcular próximo mês
         const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
         const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
-        
+
         // Calcular data de vencimento para o próximo mês
         const dueDate = new Date(nextYear, nextMonth, client.due_date || 1);
-        
+
         // Verificar se já existe pagamento para este mês
-        const { data: existingPayment } = await supabase
-          .from('client_payments')
-          .select('id')
-          .eq('client_id', client.id)
-          .gte('due_date', `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-01`)
-          .lt('due_date', `${nextYear}-${String(nextMonth + 2).padStart(2, '0')}-01`)
-          .single();
-        
+        const {
+          data: existingPayment
+        } = await supabase.from('client_payments').select('id').eq('client_id', client.id).gte('due_date', `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-01`).lt('due_date', `${nextYear}-${String(nextMonth + 2).padStart(2, '0')}-01`).single();
         if (!existingPayment) {
-          const { error } = await supabase
-            .from('client_payments')
-            .insert([{
-              client_id: client.id,
-              amount: client.monthly_value,
-              due_date: dueDate.toISOString().split('T')[0],
-              status: 'pending'
-            }]);
-          
+          const {
+            error
+          } = await supabase.from('client_payments').insert([{
+            client_id: client.id,
+            amount: client.monthly_value,
+            due_date: dueDate.toISOString().split('T')[0],
+            status: 'pending'
+          }]);
           if (error) {
             console.error(`Erro ao criar pagamento para cliente ${client.name}:`, error);
           }
         }
       }
-      
       toast({
         title: "Mês fechado com sucesso",
-        description: "Pagamentos do próximo mês foram gerados automaticamente.",
+        description: "Pagamentos do próximo mês foram gerados automaticamente."
       });
-      
+
       // Recarregar dados
       fetchPayments();
-      
     } catch (error: any) {
       toast({
         title: "Erro ao fechar mês",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
@@ -410,7 +329,6 @@ export default function Admin() {
       const matchesSearch = clientName.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || payment.status === statusFilter;
       const matchesClient = clientFilter === 'all' || payment.client_id === clientFilter;
-      
       let matchesValueRange = true;
       if (valueRangeFilter !== 'all') {
         switch (valueRangeFilter) {
@@ -425,28 +343,21 @@ export default function Admin() {
             break;
         }
       }
-      
       return matchesSearch && matchesStatus && matchesClient && matchesValueRange;
     });
   }, [payments, searchTerm, statusFilter, clientFilter, valueRangeFilter]);
-
   const filteredExpenses = useMemo(() => {
     return expenses.filter(expense => {
       const matchesSearch = expense.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || expense.status === statusFilter;
-      const matchesType = paymentTypeFilter === 'all' || 
-        (paymentTypeFilter === 'fixed' && expense.is_fixed) ||
-        (paymentTypeFilter === 'variable' && !expense.is_fixed);
-      
+      const matchesType = paymentTypeFilter === 'all' || paymentTypeFilter === 'fixed' && expense.is_fixed || paymentTypeFilter === 'variable' && !expense.is_fixed;
       return matchesSearch && matchesStatus && matchesType;
     });
   }, [expenses, searchTerm, statusFilter, paymentTypeFilter]);
-
   const filteredSalaries = useMemo(() => {
     return salaries.filter(salary => {
       const matchesSearch = salary.employee_name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || salary.status === statusFilter;
-      
       return matchesSearch && matchesStatus;
     });
   }, [salaries, searchTerm, statusFilter]);
@@ -456,37 +367,31 @@ export default function Admin() {
     const today = new Date();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
-    
+
     // Análise de pagamentos
     const paidPayments = filteredPayments.filter(p => p.status === 'paid');
     const pendingPayments = filteredPayments.filter(p => p.status === 'pending');
     const overduePayments = filteredPayments.filter(p => p.status === 'overdue');
-    
     const totalReceived = paidPayments.reduce((sum, p) => sum + p.amount, 0);
     const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
     const totalOverdue = overduePayments.reduce((sum, p) => sum + p.amount, 0);
-    
+
     // Análise de despesas
     const paidExpenses = filteredExpenses.filter(e => e.status === 'paid');
     const pendingExpenses = filteredExpenses.filter(e => e.status === 'pending');
     const fixedExpenses = filteredExpenses.filter(e => e.is_fixed);
     const variableExpenses = filteredExpenses.filter(e => !e.is_fixed);
-    
     const totalExpensesPaid = paidExpenses.reduce((sum, e) => sum + e.amount, 0);
     const totalExpensesPending = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
-    
+
     // Análise de clientes
     const activeClients = clients.filter(c => c.active);
     const inactiveClients = clients.filter(c => !c.active);
-    const avgClientValue = activeClients.length > 0 
-      ? activeClients.reduce((sum, c) => sum + (c.monthly_value || 0), 0) / activeClients.length 
-      : 0;
-    
+    const avgClientValue = activeClients.length > 0 ? activeClients.reduce((sum, c) => sum + (c.monthly_value || 0), 0) / activeClients.length : 0;
+
     // Taxa de conversão de pagamentos
-    const paymentConversionRate = filteredPayments.length > 0 
-      ? (paidPayments.length / filteredPayments.length) * 100 
-      : 0;
-    
+    const paymentConversionRate = filteredPayments.length > 0 ? paidPayments.length / filteredPayments.length * 100 : 0;
+
     // Insight automático
     let insights = [];
     if (overduePayments.length > 0) {
@@ -498,7 +403,6 @@ export default function Admin() {
     if (totalExpensesPending > totalPending) {
       insights.push('Despesas pendentes excedem receitas pendentes');
     }
-    
     return {
       totalReceived,
       totalPending,
@@ -534,7 +438,6 @@ export default function Admin() {
   const totalCosts = totalExpenses + totalSalaries;
   const monthlyRevenue = clients.filter(c => c.active).reduce((sum, c) => sum + (c.monthly_value || 0), 0);
   const netProfit = monthlyRevenue - totalCosts;
-
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
@@ -542,10 +445,8 @@ export default function Admin() {
     setPaymentTypeFilter("all");
     setValueRangeFilter("all");
   };
-
   if (!hasAccess) {
-    return (
-      <div className="flex items-center justify-center h-64">
+    return <div className="flex items-center justify-center h-64">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
@@ -555,20 +456,14 @@ export default function Admin() {
             </p>
           </CardContent>
         </Card>
-      </div>
-    );
+      </div>;
   }
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
+    return <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -585,25 +480,24 @@ export default function Admin() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Array.from({ length: 12 }, (_, i) => {
-                  const date = new Date();
-                  date.setMonth(date.getMonth() - i);
-                  const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                  const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-                  return (
-                    <SelectItem key={value} value={value}>
+                {Array.from({
+                length: 12
+              }, (_, i) => {
+                const date = new Date();
+                date.setMonth(date.getMonth() - i);
+                const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                const label = date.toLocaleDateString('pt-BR', {
+                  month: 'long',
+                  year: 'numeric'
+                });
+                return <SelectItem key={value} value={value}>
                       {label.charAt(0).toUpperCase() + label.slice(1)}
-                    </SelectItem>
-                  );
-                })}
+                    </SelectItem>;
+              })}
               </SelectContent>
             </Select>
           </div>
-          <Button 
-            onClick={closeMonth}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
+          <Button onClick={closeMonth} variant="outline" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             Fechar Mês
           </Button>
@@ -630,7 +524,9 @@ export default function Admin() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  R$ {monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {monthlyRevenue.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2
+                })}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {analytics.activeClients} contratos ativos
@@ -638,7 +534,9 @@ export default function Admin() {
                 <div className="mt-2">
                   <div className="text-xs text-muted-foreground">Ticket médio</div>
                   <div className="text-sm font-medium">
-                    R$ {analytics.avgClientValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {analytics.avgClientValue.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2
+                  })}
                   </div>
                 </div>
               </CardContent>
@@ -651,7 +549,9 @@ export default function Admin() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  R$ {analytics.totalReceived.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {analytics.totalReceived.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2
+                })}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {analytics.paymentStats.paid} pagamentos confirmados
@@ -672,19 +572,21 @@ export default function Admin() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">
-                  R$ {analytics.totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {analytics.totalPending.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2
+                })}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {analytics.paymentStats.pending} pagamentos pendentes
                 </p>
-                {analytics.totalOverdue > 0 && (
-                  <div className="mt-2">
+                {analytics.totalOverdue > 0 && <div className="mt-2">
                     <div className="text-xs text-red-600">Em atraso</div>
                     <div className="text-sm font-medium text-red-600">
-                      R$ {analytics.totalOverdue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      R$ {analytics.totalOverdue.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2
+                  })}
                     </div>
-                  </div>
-                )}
+                  </div>}
               </CardContent>
             </Card>
 
@@ -695,7 +597,9 @@ export default function Admin() {
               </CardHeader>
               <CardContent>
                 <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  R$ {netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {netProfit.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2
+                })}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   receita - custos
@@ -703,7 +607,7 @@ export default function Admin() {
                 <div className="mt-2">
                   <div className="text-xs text-muted-foreground">Margem</div>
                   <div className="text-sm font-medium">
-                    {monthlyRevenue > 0 ? ((netProfit / monthlyRevenue) * 100).toFixed(1) : 0}%
+                    {monthlyRevenue > 0 ? (netProfit / monthlyRevenue * 100).toFixed(1) : 0}%
                   </div>
                 </div>
               </CardContent>
@@ -728,7 +632,7 @@ export default function Admin() {
                     </span>
                     <span>{analytics.paymentStats.paid}</span>
                   </div>
-                  <Progress value={(analytics.paymentStats.paid / Math.max(1, analytics.paymentStats.paid + analytics.paymentStats.pending + analytics.paymentStats.overdue)) * 100} className="h-2" />
+                  <Progress value={analytics.paymentStats.paid / Math.max(1, analytics.paymentStats.paid + analytics.paymentStats.pending + analytics.paymentStats.overdue) * 100} className="h-2" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
@@ -738,7 +642,7 @@ export default function Admin() {
                     </span>
                     <span>{analytics.paymentStats.pending}</span>
                   </div>
-                  <Progress value={(analytics.paymentStats.pending / Math.max(1, analytics.paymentStats.paid + analytics.paymentStats.pending + analytics.paymentStats.overdue)) * 100} className="h-2" />
+                  <Progress value={analytics.paymentStats.pending / Math.max(1, analytics.paymentStats.paid + analytics.paymentStats.pending + analytics.paymentStats.overdue) * 100} className="h-2" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
@@ -748,7 +652,7 @@ export default function Admin() {
                     </span>
                     <span>{analytics.paymentStats.overdue}</span>
                   </div>
-                  <Progress value={(analytics.paymentStats.overdue / Math.max(1, analytics.paymentStats.paid + analytics.paymentStats.pending + analytics.paymentStats.overdue)) * 100} className="h-2" />
+                  <Progress value={analytics.paymentStats.overdue / Math.max(1, analytics.paymentStats.paid + analytics.paymentStats.pending + analytics.paymentStats.overdue) * 100} className="h-2" />
                 </div>
               </CardContent>
             </Card>
@@ -769,7 +673,7 @@ export default function Admin() {
                     </span>
                     <span>{analytics.fixedExpensesCount}</span>
                   </div>
-                  <Progress value={(analytics.fixedExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount)) * 100} className="h-2" />
+                  <Progress value={analytics.fixedExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount) * 100} className="h-2" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
@@ -779,12 +683,14 @@ export default function Admin() {
                     </span>
                     <span>{analytics.variableExpensesCount}</span>
                   </div>
-                  <Progress value={(analytics.variableExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount)) * 100} className="h-2" />
+                  <Progress value={analytics.variableExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount) * 100} className="h-2" />
                 </div>
                 <div className="mt-4 p-3 bg-muted/50 rounded-lg">
                   <div className="text-sm font-medium mb-1">Total de Despesas</div>
                   <div className="text-lg font-bold">
-                    R$ {(analytics.totalExpensesPaid + analytics.totalExpensesPending).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {(analytics.totalExpensesPaid + analytics.totalExpensesPending).toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2
+                  })}
                   </div>
                 </div>
               </CardContent>
@@ -792,8 +698,7 @@ export default function Admin() {
           </div>
 
           {/* Insights Automáticos */}
-          {analytics.insights.length > 0 && (
-            <Card>
+          {analytics.insights.length > 0 && <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5" />
@@ -802,16 +707,13 @@ export default function Admin() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {analytics.insights.map((insight, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-950 rounded-lg">
+                  {analytics.insights.map((insight, index) => <div key={index} className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-950 rounded-lg">
                       <AlertTriangle className="h-4 w-4 text-orange-600" />
                       <span className="text-sm">{insight}</span>
-                    </div>
-                  ))}
+                    </div>)}
                 </div>
               </CardContent>
-            </Card>
-          )}
+            </Card>}
         </TabsContent>
 
         <TabsContent value="clients" className="space-y-6">
@@ -827,12 +729,7 @@ export default function Admin() {
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar clientes..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
+                  <Input placeholder="Buscar clientes..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8" />
                 </div>
                 
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -856,21 +753,17 @@ export default function Admin() {
           {/* Lista de Clientes */}
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Clientes ({clients.length})</h3>
-            <Button 
-              onClick={() => {
-                setSelectedClient(null);
-                setClientFormOpen(true);
-              }}
-              className="flex items-center gap-2"
-            >
+            <Button onClick={() => {
+            setSelectedClient(null);
+            setClientFormOpen(true);
+          }} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Novo Cliente
             </Button>
           </div>
 
           <div className="grid gap-4">
-            {clients.map((client) => (
-              <Card key={client.id}>
+            {clients.map(client => <Card key={client.id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -883,7 +776,9 @@ export default function Admin() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm text-muted-foreground">
                         <div>
                           <span className="font-medium">Valor Mensal:</span>
-                          <div>R$ {(client.monthly_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                          <div>R$ {(client.monthly_value || 0).toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2
+                        })}</div>
                         </div>
                         <div>
                           <span className="font-medium">Serviço:</span>
@@ -914,10 +809,7 @@ export default function Admin() {
                           <Edit className="mr-2 h-4 w-4" />
                           Editar
                         </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDeleteClient(client)}
-                          className="text-red-600"
-                        >
+                        <DropdownMenuItem onClick={() => handleDeleteClient(client)} className="text-red-600">
                           <Trash2 className="mr-2 h-4 w-4" />
                           Excluir
                         </DropdownMenuItem>
@@ -925,8 +817,7 @@ export default function Admin() {
                     </DropdownMenu>
                   </div>
                 </CardContent>
-              </Card>
-            ))}
+              </Card>)}
           </div>
         </TabsContent>
 
@@ -943,12 +834,7 @@ export default function Admin() {
               <div className="grid gap-4 md:grid-cols-5">
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por cliente..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
+                  <Input placeholder="Buscar por cliente..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8" />
                 </div>
                 
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -969,11 +855,9 @@ export default function Admin() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os Clientes</SelectItem>
-                    {clients.filter(c => c.active).map(client => (
-                      <SelectItem key={client.id} value={client.id}>
+                    {clients.filter(c => c.active).map(client => <SelectItem key={client.id} value={client.id}>
                         {client.name}
-                      </SelectItem>
-                    ))}
+                      </SelectItem>)}
                   </SelectContent>
                 </Select>
 
@@ -999,18 +883,14 @@ export default function Admin() {
           {/* Lista de Pagamentos */}
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Pagamentos ({filteredPayments.length})</h3>
-            <Button 
-              onClick={() => setPaymentFormOpen(true)}
-              className="flex items-center gap-2"
-            >
+            <Button onClick={() => setPaymentFormOpen(true)} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Novo Pagamento
             </Button>
           </div>
 
           <div className="grid gap-4">
-            {filteredPayments.map((payment) => (
-              <Card key={payment.id}>
+            {filteredPayments.map(payment => <Card key={payment.id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -1023,7 +903,9 @@ export default function Admin() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm text-muted-foreground">
                         <div>
                           <span className="font-medium">Valor:</span>
-                          <div>R$ {payment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                          <div>R$ {payment.amount.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2
+                        })}</div>
                         </div>
                         <div>
                           <span className="font-medium">Vencimento:</span>
@@ -1062,8 +944,7 @@ export default function Admin() {
                     </DropdownMenu>
                   </div>
                 </CardContent>
-              </Card>
-            ))}
+              </Card>)}
           </div>
         </TabsContent>
 
@@ -1080,12 +961,7 @@ export default function Admin() {
               <div className="grid gap-4 md:grid-cols-4">
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar despesas..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
+                  <Input placeholder="Buscar despesas..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8" />
                 </div>
                 
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -1121,21 +997,14 @@ export default function Admin() {
           {/* Lista de Despesas */}
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Despesas ({filteredExpenses.length})</h3>
-            <Button 
-              onClick={() => {
-                setSelectedExpense(null);
-                setExpenseFormOpen(true);
-              }}
-              className="flex items-center gap-2"
-            >
+            <Button onClick={() => setExpenseFormOpen(true)} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Nova Despesa
             </Button>
           </div>
 
           <div className="grid gap-4">
-            {filteredExpenses.map((expense) => (
-              <Card key={expense.id}>
+            {filteredExpenses.map(expense => <Card key={expense.id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -1151,7 +1020,9 @@ export default function Admin() {
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2 text-sm text-muted-foreground">
                         <div>
                           <span className="font-medium">Valor:</span>
-                          <div>R$ {expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                          <div>R$ {expense.amount.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 2
+                        })}</div>
                         </div>
                         <div>
                           <span className="font-medium">Vencimento:</span>
@@ -1163,38 +1034,13 @@ export default function Admin() {
                         </div>
                       </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleViewExpense(expense)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Ver detalhes
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-destructive focus:text-destructive" 
-                          onClick={() => handleDeleteExpense(expense.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                   </div>
                 </CardContent>
-              </Card>
-            ))}
+              </Card>)}
           </div>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6">
+        <TabsContent value="analytics" className="space-y-6 bg-[7dafd8] bg-[#7dafd8]">
           {/* Métricas Detalhadas */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card>
@@ -1216,12 +1062,14 @@ export default function Admin() {
                 <div className="flex justify-between items-center">
                   <span>Ticket Médio</span>
                   <span className="font-bold">
-                    R$ {analytics.avgClientValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {analytics.avgClientValue.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2
+                  })}
                   </span>
                 </div>
-                <Progress value={(analytics.activeClients / (analytics.activeClients + analytics.inactiveClients)) * 100} className="h-2" />
+                <Progress value={analytics.activeClients / (analytics.activeClients + analytics.inactiveClients) * 100} className="h-2" />
                 <p className="text-xs text-muted-foreground">
-                  {((analytics.activeClients / (analytics.activeClients + analytics.inactiveClients)) * 100).toFixed(1)}% de retenção
+                  {(analytics.activeClients / (analytics.activeClients + analytics.inactiveClients) * 100).toFixed(1)}% de retenção
                 </p>
               </CardContent>
             </Card>
@@ -1241,13 +1089,13 @@ export default function Admin() {
                 <div className="flex justify-between items-center">
                   <span>Margem de Lucro</span>
                   <span className={`font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {monthlyRevenue > 0 ? ((netProfit / monthlyRevenue) * 100).toFixed(1) : 0}%
+                    {monthlyRevenue > 0 ? (netProfit / monthlyRevenue * 100).toFixed(1) : 0}%
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>ROI Mensal</span>
                   <span className="font-bold">
-                    {totalCosts > 0 ? ((netProfit / totalCosts) * 100).toFixed(1) : 0}%
+                    {totalCosts > 0 ? (netProfit / totalCosts * 100).toFixed(1) : 0}%
                   </span>
                 </div>
                 <Progress value={analytics.paymentConversionRate} className="h-2" />
@@ -1276,12 +1124,14 @@ export default function Admin() {
                 <div className="flex justify-between items-center">
                   <span>Total Despesas</span>
                   <span className="font-bold text-orange-600">
-                    R$ {(analytics.totalExpensesPaid + analytics.totalExpensesPending).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {(analytics.totalExpensesPaid + analytics.totalExpensesPending).toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2
+                  })}
                   </span>
                 </div>
-                <Progress value={(analytics.fixedExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount)) * 100} className="h-2" />
+                <Progress value={analytics.fixedExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount) * 100} className="h-2" />
                 <p className="text-xs text-muted-foreground">
-                  {((analytics.fixedExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount)) * 100).toFixed(1)}% custos fixos
+                  {(analytics.fixedExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount) * 100).toFixed(1)}% custos fixos
                 </p>
               </CardContent>
             </Card>
@@ -1302,20 +1152,28 @@ export default function Admin() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Pagamentos Recebidos</span>
-                      <span>R$ {analytics.totalReceived.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>R$ {analytics.totalReceived.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2
+                      })}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Pagamentos Pendentes</span>
-                      <span>R$ {analytics.totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>R$ {analytics.totalPending.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2
+                      })}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Pagamentos Atrasados</span>
-                      <span className="text-red-600">R$ {analytics.totalOverdue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span className="text-red-600">R$ {analytics.totalOverdue.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2
+                      })}</span>
                     </div>
                     <hr />
                     <div className="flex justify-between font-semibold">
                       <span>Total Esperado</span>
-                      <span>R$ {(analytics.totalReceived + analytics.totalPending + analytics.totalOverdue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>R$ {(analytics.totalReceived + analytics.totalPending + analytics.totalOverdue).toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2
+                      })}</span>
                     </div>
                   </div>
                 </div>
@@ -1325,20 +1183,28 @@ export default function Admin() {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>Despesas Pagas</span>
-                      <span>R$ {analytics.totalExpensesPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>R$ {analytics.totalExpensesPaid.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2
+                      })}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Despesas Pendentes</span>
-                      <span>R$ {analytics.totalExpensesPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>R$ {analytics.totalExpensesPending.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2
+                      })}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Salários</span>
-                      <span>R$ {totalSalaries.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>R$ {totalSalaries.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2
+                      })}</span>
                     </div>
                     <hr />
                     <div className="flex justify-between font-semibold">
                       <span>Total Custos</span>
-                      <span>R$ {(analytics.totalExpensesPaid + analytics.totalExpensesPending + totalSalaries).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <span>R$ {(analytics.totalExpensesPaid + analytics.totalExpensesPending + totalSalaries).toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2
+                      })}</span>
                     </div>
                   </div>
                 </div>
@@ -1348,7 +1214,9 @@ export default function Admin() {
                 <div className="flex justify-between items-center">
                   <span className="text-lg font-semibold">Resultado Líquido</span>
                   <span className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    R$ {netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {netProfit.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2
+                  })}
                   </span>
                 </div>
               </div>
@@ -1358,48 +1226,26 @@ export default function Admin() {
       </Tabs>
 
       {/* Dialogs */}
-      <ClientForm
-        open={clientFormOpen}
-        onOpenChange={setClientFormOpen}
-        client={selectedClient}
-        onSuccess={() => {
-          fetchData();
-          setClientFormOpen(false);
-          setSelectedClient(null);
-        }}
-      />
+      <ClientForm open={clientFormOpen} onOpenChange={setClientFormOpen} client={selectedClient} onSuccess={() => {
+      fetchData();
+      setClientFormOpen(false);
+      setSelectedClient(null);
+    }} />
 
-      <PaymentForm
-        open={paymentFormOpen}
-        onOpenChange={setPaymentFormOpen}
-        onSuccess={() => {
-          fetchData();
-          setPaymentFormOpen(false);
-        }}
-      />
+      <PaymentForm open={paymentFormOpen} onOpenChange={setPaymentFormOpen} onSuccess={() => {
+      fetchData();
+      setPaymentFormOpen(false);
+    }} />
 
-      <ExpenseForm
-        open={expenseFormOpen}
-        onOpenChange={(open) => {
-          setExpenseFormOpen(open);
-          if (!open) setSelectedExpense(null);
-        }}
-        onSuccess={() => {
-          fetchData();
-          setExpenseFormOpen(false);
-          setSelectedExpense(null);
-        }}
-        expense={selectedExpense}
-      />
+      <ExpenseForm open={expenseFormOpen} onOpenChange={setExpenseFormOpen} onSuccess={() => {
+      fetchData();
+      setExpenseFormOpen(false);
+    }} />
 
-      <SalaryForm
-        open={salaryFormOpen}
-        onOpenChange={setSalaryFormOpen}
-        onSuccess={() => {
-          fetchData();
-          setSalaryFormOpen(false);
-        }}
-      />
+      <SalaryForm open={salaryFormOpen} onOpenChange={setSalaryFormOpen} onSuccess={() => {
+      fetchData();
+      setSalaryFormOpen(false);
+    }} />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
@@ -1417,84 +1263,5 @@ export default function Admin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Expense Delete Confirmation Dialog */}
-      <AlertDialog open={!!expenseToDelete} onOpenChange={() => setExpenseToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir esta despesa? Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteExpense} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Expense Details Dialog */}
-      <Dialog open={expenseDetailsOpen} onOpenChange={setExpenseDetailsOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Detalhes da Despesa</DialogTitle>
-          </DialogHeader>
-          {selectedExpense && (
-            <div className="space-y-4">
-              <div className="grid gap-4">
-                <div>
-                  <Label>Nome</Label>
-                  <div className="text-sm font-medium">{selectedExpense.name}</div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Valor</Label>
-                    <div className="text-sm font-medium">
-                      R$ {selectedExpense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Tipo</Label>
-                    <div className="text-sm font-medium">
-                      {selectedExpense.is_fixed ? "Fixa" : "Variável"}
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Data de Vencimento</Label>
-                    <div className="text-sm font-medium">
-                      {new Date(selectedExpense.due_date).toLocaleDateString('pt-BR')}
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Status</Label>
-                    <Badge className={getStatusColor(selectedExpense.status)}>
-                      {getStatusLabel(selectedExpense.status)}
-                    </Badge>
-                  </div>
-                </div>
-                {selectedExpense.paid_date && (
-                  <div>
-                    <Label>Data de Pagamento</Label>
-                    <div className="text-sm font-medium">
-                      {new Date(selectedExpense.paid_date).toLocaleDateString('pt-BR')}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setExpenseDetailsOpen(false)}>
-              Fechar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
+    </div>;
 }
