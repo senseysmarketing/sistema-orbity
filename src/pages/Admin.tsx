@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
-import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal, Calendar, ArrowUpDown } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal, Calendar, ArrowUpDown, Search, BarChart3, Target, Activity, Timer, Users, CreditCard, Receipt, Wallet, PieChart, FileText, AlertTriangle, CheckCircle, TrendingUp as TrendingUpIcon, Settings, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,11 +77,18 @@ export default function Admin() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
   
+  // Filtros e busca
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
+  const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>("all");
+  const [valueRangeFilter, setValueRangeFilter] = useState<string>("all");
+  
   // Sort states
   const [clientSort, setClientSort] = useState<'name' | 'monthly_value' | 'start_date'>('name');
   const [paymentSort, setPaymentSort] = useState<'client' | 'amount' | 'due_date' | 'status'>('due_date');
   const [expenseSort, setExpenseSort] = useState<'name' | 'amount' | 'due_date' | 'status'>('due_date');
-  
+
   const { profile } = useAuth();
   const { toast } = useToast();
 
@@ -348,6 +357,129 @@ export default function Admin() {
     }
   };
 
+  // Dados filtrados
+  const filteredPayments = useMemo(() => {
+    return payments.filter(payment => {
+      const clientName = getClientName(payment.client_id).toLowerCase();
+      const matchesSearch = clientName.includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || payment.status === statusFilter;
+      const matchesClient = clientFilter === 'all' || payment.client_id === clientFilter;
+      
+      let matchesValueRange = true;
+      if (valueRangeFilter !== 'all') {
+        switch (valueRangeFilter) {
+          case 'low':
+            matchesValueRange = payment.amount < 1000;
+            break;
+          case 'medium':
+            matchesValueRange = payment.amount >= 1000 && payment.amount < 2000;
+            break;
+          case 'high':
+            matchesValueRange = payment.amount >= 2000;
+            break;
+        }
+      }
+      
+      return matchesSearch && matchesStatus && matchesClient && matchesValueRange;
+    });
+  }, [payments, searchTerm, statusFilter, clientFilter, valueRangeFilter]);
+
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter(expense => {
+      const matchesSearch = expense.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || expense.status === statusFilter;
+      const matchesType = paymentTypeFilter === 'all' || 
+        (paymentTypeFilter === 'fixed' && expense.is_fixed) ||
+        (paymentTypeFilter === 'variable' && !expense.is_fixed);
+      
+      return matchesSearch && matchesStatus && matchesType;
+    });
+  }, [expenses, searchTerm, statusFilter, paymentTypeFilter]);
+
+  const filteredSalaries = useMemo(() => {
+    return salaries.filter(salary => {
+      const matchesSearch = salary.employee_name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || salary.status === statusFilter;
+      
+      return matchesSearch && matchesStatus;
+    });
+  }, [salaries, searchTerm, statusFilter]);
+
+  // Análises e métricas avançadas
+  const analytics = useMemo(() => {
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    
+    // Análise de pagamentos
+    const paidPayments = filteredPayments.filter(p => p.status === 'paid');
+    const pendingPayments = filteredPayments.filter(p => p.status === 'pending');
+    const overduePayments = filteredPayments.filter(p => p.status === 'overdue');
+    
+    const totalReceived = paidPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalOverdue = overduePayments.reduce((sum, p) => sum + p.amount, 0);
+    
+    // Análise de despesas
+    const paidExpenses = filteredExpenses.filter(e => e.status === 'paid');
+    const pendingExpenses = filteredExpenses.filter(e => e.status === 'pending');
+    const fixedExpenses = filteredExpenses.filter(e => e.is_fixed);
+    const variableExpenses = filteredExpenses.filter(e => !e.is_fixed);
+    
+    const totalExpensesPaid = paidExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalExpensesPending = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
+    
+    // Análise de clientes
+    const activeClients = clients.filter(c => c.active);
+    const inactiveClients = clients.filter(c => !c.active);
+    const avgClientValue = activeClients.length > 0 
+      ? activeClients.reduce((sum, c) => sum + (c.monthly_value || 0), 0) / activeClients.length 
+      : 0;
+    
+    // Taxa de conversão de pagamentos
+    const paymentConversionRate = filteredPayments.length > 0 
+      ? (paidPayments.length / filteredPayments.length) * 100 
+      : 0;
+    
+    // Insight automático
+    let insights = [];
+    if (overduePayments.length > 0) {
+      insights.push(`${overduePayments.length} pagamento(s) em atraso precisam de atenção`);
+    }
+    if (paymentConversionRate < 80) {
+      insights.push(`Taxa de conversão de pagamentos em ${paymentConversionRate.toFixed(1)}% - abaixo do ideal`);
+    }
+    if (totalExpensesPending > totalPending) {
+      insights.push('Despesas pendentes excedem receitas pendentes');
+    }
+    
+    return {
+      totalReceived,
+      totalPending,
+      totalOverdue,
+      totalExpensesPaid,
+      totalExpensesPending,
+      activeClients: activeClients.length,
+      inactiveClients: inactiveClients.length,
+      avgClientValue,
+      paymentConversionRate,
+      fixedExpensesCount: fixedExpenses.length,
+      variableExpensesCount: variableExpenses.length,
+      insights,
+      paymentStats: {
+        paid: paidPayments.length,
+        pending: pendingPayments.length,
+        overdue: overduePayments.length
+      },
+      expenseStats: {
+        paid: paidExpenses.length,
+        pending: pendingExpenses.length,
+        fixed: fixedExpenses.length,
+        variable: variableExpenses.length
+      }
+    };
+  }, [filteredPayments, filteredExpenses, clients]);
+
   // Cálculos financeiros
   const totalReceivable = payments.filter(p => p.status !== 'paid').reduce((sum, p) => sum + p.amount, 0);
   const totalReceived = payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
@@ -356,6 +488,14 @@ export default function Admin() {
   const totalCosts = totalExpenses + totalSalaries;
   const monthlyRevenue = clients.filter(c => c.active).reduce((sum, c) => sum + (c.monthly_value || 0), 0);
   const netProfit = monthlyRevenue - totalCosts;
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setClientFilter("all");
+    setPaymentTypeFilter("all");
+    setValueRangeFilter("all");
+  };
 
   if (!hasAccess) {
     return (
@@ -383,11 +523,12 @@ export default function Admin() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Administrativo</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Painel Administrativo</h1>
           <p className="text-muted-foreground">
-            Gestão financeira e administrativa da empresa
+            Dashboard completo para gestão financeira e administrativa
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -423,164 +564,319 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* Resumo Financeiro */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita Mensal</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              R$ {monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              contratos ativos
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">A Receber</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              R$ {totalReceivable.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              pagamentos pendentes
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Custos Totais</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              R$ {totalCosts.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              despesas + salários
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Lucro Líquido</CardTitle>
-            <Banknote className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              R$ {netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              receita - custos
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs para diferentes seções */}
-      <Tabs defaultValue="clients" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+      {/* Tabs principais */}
+      <Tabs defaultValue="dashboard" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="clients">Clientes</TabsTrigger>
           <TabsTrigger value="payments">Pagamentos</TabsTrigger>
           <TabsTrigger value="expenses">Despesas</TabsTrigger>
-          <TabsTrigger value="salaries">Salários</TabsTrigger>
+          <TabsTrigger value="analytics">Análises</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="clients" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">Clientes</h3>
-            <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <ArrowUpDown className="h-4 w-4" />
-                    Ordenar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setClientSort('name')}>
-                    Por Nome
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setClientSort('monthly_value')}>
-                    Por Valor Mensal
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setClientSort('start_date')}>
-                    Por Data de Início
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button onClick={() => setClientFormOpen(true)} variant="create" className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Novo Cliente
-              </Button>
-            </div>
+        <TabsContent value="dashboard" className="space-y-6">
+          {/* Estatísticas Principais */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Receita Mensal</CardTitle>
+                <TrendingUpIcon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  R$ {monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {analytics.activeClients} contratos ativos
+                </p>
+                <div className="mt-2">
+                  <div className="text-xs text-muted-foreground">Ticket médio</div>
+                  <div className="text-sm font-medium">
+                    R$ {analytics.avgClientValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Recebido</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  R$ {analytics.totalReceived.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {analytics.paymentStats.paid} pagamentos confirmados
+                </p>
+                <div className="mt-2">
+                  <div className="text-xs text-muted-foreground">Taxa de conversão</div>
+                  <div className="text-sm font-medium">
+                    {analytics.paymentConversionRate.toFixed(1)}%
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">A Receber</CardTitle>
+                <Timer className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">
+                  R$ {analytics.totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {analytics.paymentStats.pending} pagamentos pendentes
+                </p>
+                {analytics.totalOverdue > 0 && (
+                  <div className="mt-2">
+                    <div className="text-xs text-red-600">Em atraso</div>
+                    <div className="text-sm font-medium text-red-600">
+                      R$ {analytics.totalOverdue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Lucro Líquido</CardTitle>
+                <Calculator className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  R$ {netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  receita - custos
+                </p>
+                <div className="mt-2">
+                  <div className="text-xs text-muted-foreground">Margem</div>
+                  <div className="text-sm font-medium">
+                    {monthlyRevenue > 0 ? ((netProfit / monthlyRevenue) * 100).toFixed(1) : 0}%
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
+
+          {/* Gráficos de Performance */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PieChart className="h-5 w-5" />
+                  Distribuição de Pagamentos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-green-500 rounded"></div>
+                      Pagos
+                    </span>
+                    <span>{analytics.paymentStats.paid}</span>
+                  </div>
+                  <Progress value={(analytics.paymentStats.paid / Math.max(1, analytics.paymentStats.paid + analytics.paymentStats.pending + analytics.paymentStats.overdue)) * 100} className="h-2" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                      Pendentes
+                    </span>
+                    <span>{analytics.paymentStats.pending}</span>
+                  </div>
+                  <Progress value={(analytics.paymentStats.pending / Math.max(1, analytics.paymentStats.paid + analytics.paymentStats.pending + analytics.paymentStats.overdue)) * 100} className="h-2" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-red-500 rounded"></div>
+                      Atrasados
+                    </span>
+                    <span>{analytics.paymentStats.overdue}</span>
+                  </div>
+                  <Progress value={(analytics.paymentStats.overdue / Math.max(1, analytics.paymentStats.paid + analytics.paymentStats.pending + analytics.paymentStats.overdue)) * 100} className="h-2" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Análise de Despesas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                      Fixas
+                    </span>
+                    <span>{analytics.fixedExpensesCount}</span>
+                  </div>
+                  <Progress value={(analytics.fixedExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount)) * 100} className="h-2" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-purple-500 rounded"></div>
+                      Variáveis
+                    </span>
+                    <span>{analytics.variableExpensesCount}</span>
+                  </div>
+                  <Progress value={(analytics.variableExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount)) * 100} className="h-2" />
+                </div>
+                <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                  <div className="text-sm font-medium mb-1">Total de Despesas</div>
+                  <div className="text-lg font-bold">
+                    R$ {(analytics.totalExpensesPaid + analytics.totalExpensesPending).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Insights Automáticos */}
+          {analytics.insights.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Insights & Alertas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {analytics.insights.map((insight, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-950 rounded-lg">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      <span className="text-sm">{insight}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="clients" className="space-y-6">
+          {/* Filtros para Clientes */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Filtros e Busca - Clientes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar clientes..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+                
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Status</SelectItem>
+                    <SelectItem value="active">Ativos</SelectItem>
+                    <SelectItem value="inactive">Inativos</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button variant="outline" onClick={clearFilters}>
+                  Limpar Filtros
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Lista de Clientes */}
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Clientes ({clients.length})</h3>
+            <Button 
+              onClick={() => {
+                setSelectedClient(null);
+                setClientFormOpen(true);
+              }}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Novo Cliente
+            </Button>
+          </div>
+
           <div className="grid gap-4">
             {clients.map((client) => (
               <Card key={client.id}>
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-lg">{client.name}</CardTitle>
-                      <CardDescription>
-                        {client.service || 'Serviço não especificado'}
-                      </CardDescription>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold">{client.name}</h4>
+                        <Badge variant={client.active ? "default" : "secondary"}>
+                          {client.active ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm text-muted-foreground">
+                        <div>
+                          <span className="font-medium">Valor Mensal:</span>
+                          <div>R$ {(client.monthly_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                        </div>
+                        <div>
+                          <span className="font-medium">Serviço:</span>
+                          <div>{client.service || 'Não especificado'}</div>
+                        </div>
+                        <div>
+                          <span className="font-medium">Vencimento:</span>
+                          <div>Dia {client.due_date}</div>
+                        </div>
+                        <div>
+                          <span className="font-medium">Contato:</span>
+                          <div>{client.contact || 'Não especificado'}</div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className={client.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                        {client.active ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewClient(client)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Visualizar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditClient(client)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => handleDeleteClient(client)}
-                            className="text-red-600 focus:text-red-600"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap items-center gap-6 text-sm">
-                    <span>
-                      <strong>Valor:</strong> {client.monthly_value 
-                        ? `R$ ${client.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                        : 'Não definido'}
-                    </span>
-                    <span>
-                      <strong>Contato:</strong> {client.contact || 'Não informado'}
-                    </span>
-                    <span>
-                      <strong>Início:</strong> {client.start_date 
-                        ? new Date(client.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
-                        : 'Não informado'}
-                    </span>
-                    <span>
-                      <strong>Vencimento:</strong> {client.due_date ? `Dia ${client.due_date}` : 'Não informado'}
-                    </span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleViewClient(client)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Ver detalhes
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEditClient(client)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDeleteClient(client)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </CardContent>
               </Card>
@@ -588,79 +884,136 @@ export default function Admin() {
           </div>
         </TabsContent>
 
-        <TabsContent value="payments" className="space-y-4">
+        <TabsContent value="payments" className="space-y-6">
+          {/* Filtros para Pagamentos */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Filtros e Busca - Pagamentos
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-5">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por cliente..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+                
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Status</SelectItem>
+                    <SelectItem value="paid">Pagos</SelectItem>
+                    <SelectItem value="pending">Pendentes</SelectItem>
+                    <SelectItem value="overdue">Atrasados</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={clientFilter} onValueChange={setClientFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Clientes</SelectItem>
+                    {clients.filter(c => c.active).map(client => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={valueRangeFilter} onValueChange={setValueRangeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Faixa de Valor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Faixas</SelectItem>
+                    <SelectItem value="low">Até R$ 1.000</SelectItem>
+                    <SelectItem value="medium">R$ 1.000 - R$ 2.000</SelectItem>
+                    <SelectItem value="high">Acima de R$ 2.000</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button variant="outline" onClick={clearFilters}>
+                  Limpar Filtros
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Lista de Pagamentos */}
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">Pagamentos de Clientes</h3>
-            <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <ArrowUpDown className="h-4 w-4" />
-                    Ordenar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setPaymentSort('due_date')}>
-                    Por Data de Vencimento
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setPaymentSort('amount')}>
-                    Por Valor
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setPaymentSort('status')}>
-                    Por Status
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button onClick={() => setPaymentFormOpen(true)} variant="create" className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Novo Pagamento
-              </Button>
-            </div>
+            <h3 className="text-lg font-semibold">Pagamentos ({filteredPayments.length})</h3>
+            <Button 
+              onClick={() => setPaymentFormOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Novo Pagamento
+            </Button>
           </div>
+
           <div className="grid gap-4">
-            {payments.map((payment) => (
+            {filteredPayments.map((payment) => (
               <Card key={payment.id}>
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2">
-                      <h4 className="font-medium">{getClientName(payment.client_id)}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Vencimento: {new Date(payment.due_date).toLocaleDateString('pt-BR')}
-                      </p>
-                      {payment.paid_date && (
-                        <p className="text-sm text-muted-foreground">
-                          Pago em: {new Date(payment.paid_date).toLocaleDateString('pt-BR')}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right space-y-2">
-                      <div className="text-lg font-semibold">
-                        R$ {payment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </div>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
                       <div className="flex items-center gap-2">
+                        <h4 className="font-semibold">{getClientName(payment.client_id)}</h4>
                         <Badge className={getStatusColor(payment.status)}>
                           {getStatusLabel(payment.status)}
                         </Badge>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'pending')}>
-                              Pendente
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'paid')}>
-                              Pago
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'overdue')}>
-                              Atrasado
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm text-muted-foreground">
+                        <div>
+                          <span className="font-medium">Valor:</span>
+                          <div>R$ {payment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                        </div>
+                        <div>
+                          <span className="font-medium">Vencimento:</span>
+                          <div>{new Date(payment.due_date).toLocaleDateString('pt-BR')}</div>
+                        </div>
+                        <div>
+                          <span className="font-medium">Pagamento:</span>
+                          <div>{payment.paid_date ? new Date(payment.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}</div>
+                        </div>
+                        <div>
+                          <span className="font-medium">Status:</span>
+                          <div>{getStatusLabel(payment.status)}</div>
+                        </div>
                       </div>
                     </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'paid')}>
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                          Marcar como Pago
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'pending')}>
+                          <Timer className="mr-2 h-4 w-4" />
+                          Marcar como Pendente
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'overdue')}>
+                          <AlertTriangle className="mr-2 h-4 w-4" />
+                          Marcar como Atrasado
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </CardContent>
               </Card>
@@ -668,103 +1021,98 @@ export default function Admin() {
           </div>
         </TabsContent>
 
-        <TabsContent value="expenses" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">Despesas</h3>
-            <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <ArrowUpDown className="h-4 w-4" />
-                    Ordenar
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setExpenseSort('name')}>
-                    Por Nome
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setExpenseSort('amount')}>
-                    Por Valor
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setExpenseSort('due_date')}>
-                    Por Data de Vencimento
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setExpenseSort('status')}>
-                    Por Status
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button onClick={() => setExpenseFormOpen(true)} variant="create" className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Nova Despesa
-              </Button>
-            </div>
-          </div>
-          <div className="grid gap-4">
-            {expenses.map((expense) => (
-              <Card key={expense.id}>
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2">
-                      <h4 className="font-medium">{expense.name}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Vencimento: {new Date(expense.due_date).toLocaleDateString('pt-BR')}
-                      </p>
-                      {expense.paid_date && (
-                        <p className="text-sm text-muted-foreground">
-                          Pago em: {new Date(expense.paid_date).toLocaleDateString('pt-BR')}
-                        </p>
-                      )}
-                      {expense.is_fixed && (
-                        <Badge variant="outline">Despesa Fixa</Badge>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-semibold">
-                        R$ {expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </div>
-                      <Badge className={getStatusColor(expense.status)}>
-                        {getStatusLabel(expense.status)}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
+        <TabsContent value="expenses" className="space-y-6">
+          {/* Filtros para Despesas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Filtros e Busca - Despesas
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar despesas..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+                
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Status</SelectItem>
+                    <SelectItem value="paid">Pagas</SelectItem>
+                    <SelectItem value="pending">Pendentes</SelectItem>
+                    <SelectItem value="overdue">Atrasadas</SelectItem>
+                  </SelectContent>
+                </Select>
 
-        <TabsContent value="salaries" className="space-y-4">
+                <Select value={paymentTypeFilter} onValueChange={setPaymentTypeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Tipos</SelectItem>
+                    <SelectItem value="fixed">Fixas</SelectItem>
+                    <SelectItem value="variable">Variáveis</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button variant="outline" onClick={clearFilters}>
+                  Limpar Filtros
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Lista de Despesas */}
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">Salários</h3>
-            <Button onClick={() => setSalaryFormOpen(true)} variant="create" className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold">Despesas ({filteredExpenses.length})</h3>
+            <Button 
+              onClick={() => setExpenseFormOpen(true)}
+              className="flex items-center gap-2"
+            >
               <Plus className="h-4 w-4" />
-              Novo Salário
+              Nova Despesa
             </Button>
           </div>
+
           <div className="grid gap-4">
-            {salaries.map((salary) => (
-              <Card key={salary.id}>
-                <CardContent className="pt-6">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-2">
-                      <h4 className="font-medium">{salary.employee_name}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Vencimento: {new Date(salary.due_date).toLocaleDateString('pt-BR')}
-                      </p>
-                      {salary.paid_date && (
-                        <p className="text-sm text-muted-foreground">
-                          Pago em: {new Date(salary.paid_date).toLocaleDateString('pt-BR')}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-semibold">
-                        R$ {salary.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            {filteredExpenses.map((expense) => (
+              <Card key={expense.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold">{expense.name}</h4>
+                        <Badge className={getStatusColor(expense.status)}>
+                          {getStatusLabel(expense.status)}
+                        </Badge>
+                        <Badge variant={expense.is_fixed ? "default" : "outline"}>
+                          {expense.is_fixed ? "Fixa" : "Variável"}
+                        </Badge>
                       </div>
-                      <Badge className={getStatusColor(salary.status)}>
-                        {getStatusLabel(salary.status)}
-                      </Badge>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2 text-sm text-muted-foreground">
+                        <div>
+                          <span className="font-medium">Valor:</span>
+                          <div>R$ {expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                        </div>
+                        <div>
+                          <span className="font-medium">Vencimento:</span>
+                          <div>{new Date(expense.due_date).toLocaleDateString('pt-BR')}</div>
+                        </div>
+                        <div>
+                          <span className="font-medium">Pagamento:</span>
+                          <div>{expense.paid_date ? new Date(expense.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -772,113 +1120,220 @@ export default function Admin() {
             ))}
           </div>
         </TabsContent>
-      </Tabs>
 
-      {/* Forms */}
-      <ClientForm 
-        open={clientFormOpen} 
-        onOpenChange={(open) => {
-          setClientFormOpen(open);
-          if (!open) setSelectedClient(null);
-        }}
-        onSuccess={fetchData}
-        client={selectedClient}
-      />
-      <PaymentForm 
-        open={paymentFormOpen} 
-        onOpenChange={setPaymentFormOpen} 
-        onSuccess={fetchData} 
-      />
-      <ExpenseForm 
-        open={expenseFormOpen} 
-        onOpenChange={setExpenseFormOpen} 
-        onSuccess={fetchData} 
-      />
-      <SalaryForm 
-        open={salaryFormOpen} 
-        onOpenChange={setSalaryFormOpen} 
-        onSuccess={fetchData} 
-      />
+        <TabsContent value="analytics" className="space-y-6">
+          {/* Métricas Detalhadas */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Análise de Clientes
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span>Clientes Ativos</span>
+                  <span className="font-bold text-green-600">{analytics.activeClients}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Clientes Inativos</span>
+                  <span className="font-bold text-red-600">{analytics.inactiveClients}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Ticket Médio</span>
+                  <span className="font-bold">
+                    R$ {analytics.avgClientValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <Progress value={(analytics.activeClients / (analytics.activeClients + analytics.inactiveClients)) * 100} className="h-2" />
+                <p className="text-xs text-muted-foreground">
+                  {((analytics.activeClients / (analytics.activeClients + analytics.inactiveClients)) * 100).toFixed(1)}% de retenção
+                </p>
+              </CardContent>
+            </Card>
 
-      {/* Client Details Dialog */}
-      {selectedClient && (
-        <AlertDialog open={clientDetailsOpen} onOpenChange={setClientDetailsOpen}>
-          <AlertDialogContent className="max-w-2xl">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Detalhes do Cliente</AlertDialogTitle>
-              <AlertDialogDescription asChild>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Performance Financeira
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span>Taxa de Conversão</span>
+                  <span className="font-bold text-blue-600">{analytics.paymentConversionRate.toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Margem de Lucro</span>
+                  <span className={`font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {monthlyRevenue > 0 ? ((netProfit / monthlyRevenue) * 100).toFixed(1) : 0}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>ROI Mensal</span>
+                  <span className="font-bold">
+                    {totalCosts > 0 ? ((netProfit / totalCosts) * 100).toFixed(1) : 0}%
+                  </span>
+                </div>
+                <Progress value={analytics.paymentConversionRate} className="h-2" />
+                <p className="text-xs text-muted-foreground">
+                  Eficiência de recebimento
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5" />
+                  Controle de Custos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span>Despesas Fixas</span>
+                  <span className="font-bold">{analytics.fixedExpensesCount}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Despesas Variáveis</span>
+                  <span className="font-bold">{analytics.variableExpensesCount}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Total Despesas</span>
+                  <span className="font-bold text-orange-600">
+                    R$ {(analytics.totalExpensesPaid + analytics.totalExpensesPending).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <Progress value={(analytics.fixedExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount)) * 100} className="h-2" />
+                <p className="text-xs text-muted-foreground">
+                  {((analytics.fixedExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount)) * 100).toFixed(1)}% custos fixos
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Resumo Detalhado */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Relatório Mensal Detalhado
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-medium text-foreground">Nome</h4>
-                      <p className="text-sm">{selectedClient.name}</p>
+                  <h4 className="font-semibold text-green-600">Receitas</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Pagamentos Recebidos</span>
+                      <span>R$ {analytics.totalReceived.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
-                    <div>
-                      <h4 className="font-medium text-foreground">Status</h4>
-                      <Badge className={selectedClient.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                        {selectedClient.active ? 'Ativo' : 'Inativo'}
-                      </Badge>
+                    <div className="flex justify-between">
+                      <span>Pagamentos Pendentes</span>
+                      <span>R$ {analytics.totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-medium text-foreground">Serviço</h4>
-                      <p className="text-sm">{selectedClient.service || 'Não especificado'}</p>
+                    <div className="flex justify-between">
+                      <span>Pagamentos Atrasados</span>
+                      <span className="text-red-600">R$ {analytics.totalOverdue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
-                    <div>
-                      <h4 className="font-medium text-foreground">Valor Mensal</h4>
-                      <p className="text-sm">
-                        {selectedClient.monthly_value 
-                          ? `R$ ${selectedClient.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                          : 'Não definido'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-medium text-foreground">Contato</h4>
-                      <p className="text-sm">{selectedClient.contact || 'Não informado'}</p>
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-foreground">Data de Início</h4>
-                      <p className="text-sm">
-                        {selectedClient.start_date 
-                          ? new Date(selectedClient.start_date + 'T12:00:00').toLocaleDateString('pt-BR')
-                          : 'Não informado'}
-                      </p>
+                    <hr />
+                    <div className="flex justify-between font-semibold">
+                      <span>Total Esperado</span>
+                      <span>R$ {(analytics.totalReceived + analytics.totalPending + analytics.totalOverdue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
                   </div>
                 </div>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Fechar</AlertDialogCancel>
-              <AlertDialogAction onClick={() => {
-                setClientDetailsOpen(false);
-                handleEditClient(selectedClient);
-              }}>
-                Editar Cliente
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
 
-      {/* Delete Confirmation Dialog */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-red-600">Despesas</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Despesas Pagas</span>
+                      <span>R$ {analytics.totalExpensesPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Despesas Pendentes</span>
+                      <span>R$ {analytics.totalExpensesPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Salários</span>
+                      <span>R$ {totalSalaries.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <hr />
+                    <div className="flex justify-between font-semibold">
+                      <span>Total Custos</span>
+                      <span>R$ {(analytics.totalExpensesPaid + analytics.totalExpensesPending + totalSalaries).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-semibold">Resultado Líquido</span>
+                  <span className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    R$ {netProfit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Dialogs */}
+      <ClientForm
+        open={clientFormOpen}
+        onOpenChange={setClientFormOpen}
+        client={selectedClient}
+        onSuccess={() => {
+          fetchData();
+          setClientFormOpen(false);
+          setSelectedClient(null);
+        }}
+      />
+
+      <PaymentForm
+        open={paymentFormOpen}
+        onOpenChange={setPaymentFormOpen}
+        onSuccess={() => {
+          fetchData();
+          setPaymentFormOpen(false);
+        }}
+      />
+
+      <ExpenseForm
+        open={expenseFormOpen}
+        onOpenChange={setExpenseFormOpen}
+        onSuccess={() => {
+          fetchData();
+          setExpenseFormOpen(false);
+        }}
+      />
+
+      <SalaryForm
+        open={salaryFormOpen}
+        onOpenChange={setSalaryFormOpen}
+        onSuccess={() => {
+          fetchData();
+          setSalaryFormOpen(false);
+        }}
+      />
+
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja excluir o cliente "{clientToDelete?.name}"? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={confirmDeleteClient}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={confirmDeleteClient}>
               Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
