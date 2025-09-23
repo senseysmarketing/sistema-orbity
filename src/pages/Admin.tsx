@@ -485,7 +485,7 @@ export default function Admin() {
 
       {/* Tabs para diferentes seções */}
       <Tabs defaultValue="clients" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="clients">Clientes</TabsTrigger>
           <TabsTrigger value="payments">Pagamentos</TabsTrigger>
           <TabsTrigger value="expenses">Despesas</TabsTrigger>
