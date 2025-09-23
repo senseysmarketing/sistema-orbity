@@ -419,7 +419,7 @@ export type Database = {
     Enums: {
       payment_status: "pending" | "paid" | "overdue"
       task_priority: "low" | "medium" | "high"
-      task_status: "todo" | "in_progress" | "done"
+      task_status: "todo" | "in_progress" | "done" | "em_revisao"
       traffic_result: "excellent" | "good" | "average" | "bad" | "terrible"
       traffic_situation: "stable" | "improving" | "worsening"
       user_role: "gestor_trafego" | "designer" | "administrador"
@@ -552,7 +552,7 @@ export const Constants = {
     Enums: {
       payment_status: ["pending", "paid", "overdue"],
       task_priority: ["low", "medium", "high"],
-      task_status: ["todo", "in_progress", "done"],
+      task_status: ["todo", "in_progress", "done", "em_revisao"],
       traffic_result: ["excellent", "good", "average", "bad", "terrible"],
       traffic_situation: ["stable", "improving", "worsening"],
       user_role: ["gestor_trafego", "designer", "administrador"],

@@ -20,7 +20,7 @@ interface Task {
   id: string;
   title: string;
   description: string;
-  status: 'todo' | 'in_progress' | 'done';
+  status: 'todo' | 'in_progress' | 'em_revisao' | 'done';
   priority: 'low' | 'medium' | 'high';
   assigned_to: string | null;
   client_id: string | null;
@@ -184,6 +184,7 @@ export default function Tasks() {
     const statusStats = {
       todo: filteredTasks.filter(t => t.status === 'todo').length,
       in_progress: filteredTasks.filter(t => t.status === 'in_progress').length,
+      em_revisao: filteredTasks.filter(t => t.status === 'em_revisao').length,
       done: filteredTasks.filter(t => t.status === 'done').length,
     };
     
@@ -254,6 +255,7 @@ export default function Tasks() {
     switch (status) {
       case 'todo': return 'bg-muted text-muted-foreground';
       case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'em_revisao': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
       case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
       default: return 'bg-muted text-muted-foreground';
     }
@@ -272,6 +274,7 @@ export default function Tasks() {
     switch (status) {
       case 'todo': return 'A Fazer';
       case 'in_progress': return 'Em Andamento';
+      case 'em_revisao': return 'Em Revisão';
       case 'done': return 'Concluída';
       default: return status;
     }
@@ -540,11 +543,12 @@ export default function Tasks() {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todo">A Fazer</SelectItem>
-                      <SelectItem value="in_progress">Em Andamento</SelectItem>
-                      <SelectItem value="done">Concluída</SelectItem>
-                    </SelectContent>
+                     <SelectContent>
+                       <SelectItem value="todo">A Fazer</SelectItem>
+                       <SelectItem value="in_progress">Em Andamento</SelectItem>
+                       <SelectItem value="em_revisao">Em Revisão</SelectItem>
+                       <SelectItem value="done">Concluída</SelectItem>
+                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-2">
@@ -701,26 +705,36 @@ export default function Tasks() {
                   </div>
                   <Progress value={(analytics.statusStats.todo / analytics.total) * 100} className="h-2" />
                 </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                      Em Andamento
-                    </span>
-                    <span>{analytics.statusStats.in_progress}</span>
-                  </div>
-                  <Progress value={(analytics.statusStats.in_progress / analytics.total) * 100} className="h-2" />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-green-500 rounded"></div>
-                      Concluídas
-                    </span>
-                    <span>{analytics.statusStats.done}</span>
-                  </div>
-                  <Progress value={(analytics.statusStats.done / analytics.total) * 100} className="h-2" />
-                </div>
+                 <div className="space-y-2">
+                   <div className="flex justify-between text-sm">
+                     <span className="flex items-center gap-2">
+                       <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                       Em Andamento
+                     </span>
+                     <span>{analytics.statusStats.in_progress}</span>
+                   </div>
+                   <Progress value={(analytics.statusStats.in_progress / analytics.total) * 100} className="h-2" />
+                 </div>
+                 <div className="space-y-2">
+                   <div className="flex justify-between text-sm">
+                     <span className="flex items-center gap-2">
+                       <div className="w-3 h-3 bg-purple-500 rounded"></div>
+                       Em Revisão
+                     </span>
+                     <span>{analytics.statusStats.em_revisao}</span>
+                   </div>
+                   <Progress value={(analytics.statusStats.em_revisao / analytics.total) * 100} className="h-2" />
+                 </div>
+                 <div className="space-y-2">
+                   <div className="flex justify-between text-sm">
+                     <span className="flex items-center gap-2">
+                       <div className="w-3 h-3 bg-green-500 rounded"></div>
+                       Concluídas
+                     </span>
+                     <span>{analytics.statusStats.done}</span>
+                   </div>
+                   <Progress value={(analytics.statusStats.done / analytics.total) * 100} className="h-2" />
+                 </div>
               </CardContent>
             </Card>
 
@@ -792,12 +806,13 @@ export default function Tasks() {
                   <SelectTrigger>
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os Status</SelectItem>
-                    <SelectItem value="todo">A Fazer</SelectItem>
-                    <SelectItem value="in_progress">Em Andamento</SelectItem>
-                    <SelectItem value="done">Concluída</SelectItem>
-                  </SelectContent>
+                   <SelectContent>
+                     <SelectItem value="all">Todos os Status</SelectItem>
+                     <SelectItem value="todo">A Fazer</SelectItem>
+                     <SelectItem value="in_progress">Em Andamento</SelectItem>
+                     <SelectItem value="em_revisao">Em Revisão</SelectItem>
+                     <SelectItem value="done">Concluída</SelectItem>
+                   </SelectContent>
                 </Select>
 
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
@@ -1153,11 +1168,12 @@ export default function Tasks() {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todo">A Fazer</SelectItem>
-                    <SelectItem value="in_progress">Em Andamento</SelectItem>
-                    <SelectItem value="done">Concluída</SelectItem>
-                  </SelectContent>
+                   <SelectContent>
+                     <SelectItem value="todo">A Fazer</SelectItem>
+                     <SelectItem value="in_progress">Em Andamento</SelectItem>
+                     <SelectItem value="em_revisao">Em Revisão</SelectItem>
+                     <SelectItem value="done">Concluída</SelectItem>
+                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
