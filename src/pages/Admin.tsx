@@ -283,33 +283,25 @@ export default function Admin() {
     setSelectedExpense(expense);
     setExpenseFormOpen(true);
   };
-
   const handleViewExpense = (expense: Expense) => {
     setSelectedExpense(expense);
     setExpenseDetailsOpen(true);
   };
-
   const handleDeleteExpense = (expense: Expense) => {
     setExpenseToDelete(expense);
     setExpenseDeleteDialogOpen(true);
   };
-
   const confirmDeleteExpense = async () => {
     if (!expenseToDelete) return;
-
     try {
-      const { error } = await supabase
-        .from('expenses')
-        .delete()
-        .eq('id', expenseToDelete.id);
-
+      const {
+        error
+      } = await supabase.from('expenses').delete().eq('id', expenseToDelete.id);
       if (error) throw error;
-
       toast({
         title: "Despesa excluída",
         description: "Despesa excluída com sucesso!"
       });
-      
       fetchData();
     } catch (error: any) {
       toast({
@@ -1101,10 +1093,7 @@ export default function Admin() {
                             <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => handleDeleteExpense(expense)}
-                            className="text-red-600 hover:text-red-700"
-                          >
+                          <DropdownMenuItem onClick={() => handleDeleteExpense(expense)} className="text-red-600 hover:text-red-700">
                             <Trash2 className="h-4 w-4 mr-2" />
                             Excluir
                           </DropdownMenuItem>
@@ -1117,7 +1106,7 @@ export default function Admin() {
           </div>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6 bg-[7dafd8] bg-[#7dafd8]">
+        <TabsContent value="analytics" className="space-y-6 bg-[7dafd8] bg-slate-50">
           {/* Métricas Detalhadas */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card>
@@ -1314,15 +1303,10 @@ export default function Admin() {
       setPaymentFormOpen(false);
     }} />
 
-      <ExpenseForm 
-        open={expenseFormOpen} 
-        onOpenChange={(open) => {
-          setExpenseFormOpen(open);
-          if (!open) setSelectedExpense(null);
-        }}
-        expense={selectedExpense}
-        onSuccess={fetchData}
-      />
+      <ExpenseForm open={expenseFormOpen} onOpenChange={open => {
+      setExpenseFormOpen(open);
+      if (!open) setSelectedExpense(null);
+    }} expense={selectedExpense} onSuccess={fetchData} />
 
       <SalaryForm open={salaryFormOpen} onOpenChange={setSalaryFormOpen} onSuccess={() => {
       fetchData();
@@ -1353,15 +1337,16 @@ export default function Admin() {
               <AlertDialogTitle>Detalhes da Despesa</AlertDialogTitle>
             </AlertDialogHeader>
             <div className="space-y-4">
-              {selectedExpense && (
-                <>
+              {selectedExpense && <>
                   <div>
                     <span className="font-medium">Nome:</span>
                     <p>{selectedExpense.name}</p>
                   </div>
                   <div>
                     <span className="font-medium">Valor:</span>
-                    <p>R$ {selectedExpense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p>R$ {selectedExpense.amount.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2
+                })}</p>
                   </div>
                   <div>
                     <span className="font-medium">Data de Vencimento:</span>
@@ -1379,8 +1364,7 @@ export default function Admin() {
                     <span className="font-medium">Data de Pagamento:</span>
                     <p>{selectedExpense.paid_date ? new Date(selectedExpense.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}</p>
                   </div>
-                </>
-              )}
+                </>}
             </div>
             <AlertDialogFooter>
               <AlertDialogCancel>Fechar</AlertDialogCancel>
@@ -1399,10 +1383,7 @@ export default function Admin() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={confirmDeleteExpense}
-                className="bg-red-600 hover:bg-red-700"
-              >
+              <AlertDialogAction onClick={confirmDeleteExpense} className="bg-red-600 hover:bg-red-700">
                 Excluir
               </AlertDialogAction>
             </AlertDialogFooter>
