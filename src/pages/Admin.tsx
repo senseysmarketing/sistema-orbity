@@ -72,6 +72,12 @@ export default function Admin() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
 
+  // Expense states
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [expenseDetailsOpen, setExpenseDetailsOpen] = useState(false);
+  const [expenseDeleteDialogOpen, setExpenseDeleteDialogOpen] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+
   // Filtros e busca
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -269,6 +275,51 @@ export default function Admin() {
         description: error.message,
         variant: "destructive"
       });
+    }
+  };
+
+  // Expense handlers
+  const handleEditExpense = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setExpenseFormOpen(true);
+  };
+
+  const handleViewExpense = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setExpenseDetailsOpen(true);
+  };
+
+  const handleDeleteExpense = (expense: Expense) => {
+    setExpenseToDelete(expense);
+    setExpenseDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteExpense = async () => {
+    if (!expenseToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', expenseToDelete.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Despesa excluída",
+        description: "Despesa excluída com sucesso!"
+      });
+      
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setExpenseDeleteDialogOpen(false);
+      setExpenseToDelete(null);
     }
   };
 
@@ -1034,6 +1085,32 @@ export default function Admin() {
                         </div>
                       </div>
                     </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewExpense(expense)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver Detalhes
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteExpense(expense)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 </CardContent>
               </Card>)}
@@ -1237,10 +1314,15 @@ export default function Admin() {
       setPaymentFormOpen(false);
     }} />
 
-      <ExpenseForm open={expenseFormOpen} onOpenChange={setExpenseFormOpen} onSuccess={() => {
-      fetchData();
-      setExpenseFormOpen(false);
-    }} />
+      <ExpenseForm 
+        open={expenseFormOpen} 
+        onOpenChange={(open) => {
+          setExpenseFormOpen(open);
+          if (!open) setSelectedExpense(null);
+        }}
+        expense={selectedExpense}
+        onSuccess={fetchData}
+      />
 
       <SalaryForm open={salaryFormOpen} onOpenChange={setSalaryFormOpen} onSuccess={() => {
       fetchData();
@@ -1262,6 +1344,69 @@ export default function Admin() {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+        </AlertDialog>
+
+        {/* Dialog de detalhes da despesa */}
+        <AlertDialog open={expenseDetailsOpen} onOpenChange={setExpenseDetailsOpen}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Detalhes da Despesa</AlertDialogTitle>
+            </AlertDialogHeader>
+            <div className="space-y-4">
+              {selectedExpense && (
+                <>
+                  <div>
+                    <span className="font-medium">Nome:</span>
+                    <p>{selectedExpense.name}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Valor:</span>
+                    <p>R$ {selectedExpense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Data de Vencimento:</span>
+                    <p>{new Date(selectedExpense.due_date).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Status:</span>
+                    <p>{getStatusLabel(selectedExpense.status)}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Tipo:</span>
+                    <p>{selectedExpense.is_fixed ? 'Fixa' : 'Variável'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Data de Pagamento:</span>
+                    <p>{selectedExpense.paid_date ? new Date(selectedExpense.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}</p>
+                  </div>
+                </>
+              )}
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Fechar</AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Dialog de confirmação de exclusão de despesa */}
+        <AlertDialog open={expenseDeleteDialogOpen} onOpenChange={setExpenseDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir a despesa "{expenseToDelete?.name}"? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmDeleteExpense}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
     </div>;
 }

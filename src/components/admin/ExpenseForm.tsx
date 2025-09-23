@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -19,13 +19,35 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense }: ExpenseF
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    name: expense?.name || '',
-    amount: expense?.amount || '',
-    due_date: expense?.due_date ? expense.due_date.split('T')[0] : '',
-    paid_date: expense?.paid_date ? expense.paid_date.split('T')[0] : '',
-    status: expense?.status || 'pending',
-    is_fixed: expense?.is_fixed ?? true,
+    name: '',
+    amount: '',
+    due_date: '',
+    paid_date: '',
+    status: 'pending' as 'pending' | 'paid' | 'overdue',
+    is_fixed: true,
   });
+
+  useEffect(() => {
+    if (expense) {
+      setFormData({
+        name: expense.name || '',
+        amount: expense.amount || '',
+        due_date: expense.due_date ? expense.due_date.split('T')[0] : '',
+        paid_date: expense.paid_date ? expense.paid_date.split('T')[0] : '',
+        status: (expense.status || 'pending') as 'pending' | 'paid' | 'overdue',
+        is_fixed: expense.is_fixed ?? true,
+      });
+    } else {
+      setFormData({
+        name: '',
+        amount: '',
+        due_date: '',
+        paid_date: '',
+        status: 'pending' as 'pending' | 'paid' | 'overdue',
+        is_fixed: true,
+      });
+    }
+  }, [expense, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,7 +136,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense }: ExpenseF
               <Label htmlFor="status">Status</Label>
               <Select
                 value={formData.status}
-                onValueChange={(value) => setFormData({ ...formData, status: value })}
+                onValueChange={(value) => setFormData({ ...formData, status: value as 'pending' | 'paid' | 'overdue' })}
               >
                 <SelectTrigger>
                   <SelectValue />
