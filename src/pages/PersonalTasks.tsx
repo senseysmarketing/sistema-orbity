@@ -1,19 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, Clock, AlertCircle, CheckCircle, Building, Calendar, KanbanSquare, List, Filter, Target, TrendingUp, Activity, Timer, BarChart3, Edit, Trash2, Eye, MoreHorizontal, AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { DatePickerDemo } from "@/components/ui/date-picker";
+import { Plus, Search, Clock, AlertCircle, CheckCircle, Building, Calendar, KanbanSquare, List, Filter, Target, TrendingUp, Activity, Timer, BarChart3, Edit, Trash2, Eye, MoreHorizontal, AlertTriangle, Users } from "lucide-react";
 import {
   DndContext,
   DragEndEvent,
@@ -28,6 +14,26 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PersonalKanbanColumn } from "@/components/ui/personal-kanban-column";
+import { SortablePersonalTaskCard } from "@/components/ui/sortable-personal-task-card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DatePickerDemo } from "@/components/ui/date-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +43,8 @@ interface PersonalTask {
   title: string;
   description: string | null;
   category: string;
+  status: 'pending' | 'today' | 'overdue' | 'done';
+  priority: 'low' | 'medium' | 'high';
   completed: boolean;
   is_routine: boolean;
   due_date: string | null;
@@ -69,7 +77,8 @@ export default function PersonalTasks() {
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [routineFilter, setRoutineFilter] = useState<string>("all");
   const [dueDateFilter, setDueDateFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("list");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<PersonalTask | null>(null);
   
   // Dialog states
@@ -98,6 +107,19 @@ export default function PersonalTasks() {
     })
   );
 
+  // Helper function moved here to be available early
+  const getTaskStatus = (task: any) => {
+    if (task.completed) return 'done';
+    
+    const today = new Date();
+    const dueDate = task.due_date ? new Date(task.due_date) : null;
+    
+    if (dueDate && dueDate < today) return 'overdue';
+    if (dueDate && dueDate.toDateString() === today.toDateString()) return 'today';
+    
+    return 'pending';
+  };
+
   useEffect(() => {
     if (profile) {
       fetchPersonalTasks();
@@ -114,7 +136,15 @@ export default function PersonalTasks() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTasks(data || []);
+      
+      // Mapear dados para incluir status e priority virtuais
+      const tasksWithVirtualFields = (data || []).map(task => ({
+        ...task,
+        status: getTaskStatus(task) as 'pending' | 'today' | 'overdue' | 'done',
+        priority: 'medium' as 'low' | 'medium' | 'high' // Prioridade padrão para tarefas pessoais
+      }));
+      
+      setTasks(tasksWithVirtualFields);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar tarefas pessoais",
@@ -322,16 +352,54 @@ export default function PersonalTasks() {
     }
   };
 
-  const getTaskStatus = (task: PersonalTask) => {
-    if (task.completed) return 'done';
-    
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'high': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'low': return 'Baixa';
+      case 'medium': return 'Média';
+      case 'high': return 'Alta';
+      default: return priority;
+    }
+  };
+
+  const getUrgencyLevel = (task: PersonalTask) => {
     const today = new Date();
     const dueDate = task.due_date ? new Date(task.due_date) : null;
     
-    if (dueDate && dueDate < today) return 'overdue';
-    if (dueDate && dueDate.toDateString() === today.toDateString()) return 'today';
+    if (task.completed) {
+      return { level: 'completed', label: 'Concluída', color: 'bg-green-500 text-white' };
+    }
     
-    return 'pending';
+    if (dueDate && dueDate < today) {
+      return { level: 'overdue', label: 'Atrasada', color: 'bg-red-500 text-white' };
+    }
+    
+    if (task.is_routine) {
+      return { level: 'routine', label: 'Rotina', color: 'bg-purple-500 text-white' };
+    }
+    
+    if (dueDate && dueDate.toDateString() === today.toDateString()) {
+      return { level: 'today', label: 'Hoje', color: 'bg-blue-500 text-white' };
+    }
+    
+    return { level: 'normal', label: 'Normal', color: 'bg-gray-500 text-white' };
+  };
+
+  const formatDateBR = (value: string | null) => {
+    if (!value) return '';
+    const s = String(value);
+    const date = s.includes('T') ? new Date(s) : new Date(`${s}T00:00:00`);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('pt-BR');
   };
 
   const getStatusColor = (status: string) => {
@@ -459,6 +527,64 @@ export default function PersonalTasks() {
     return statusGroups;
   }, [filteredTasks]);
 
+  // Drag and Drop handlers
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) return;
+
+    const taskId = active.id as string;
+    const newStatus = over.id as string;
+
+    // Mapear status do kanban para propriedades da tarefa
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    let newCompleted = task.completed;
+
+    if (newStatus === 'done') {
+      newCompleted = true;
+    } else if (['pending', 'today', 'overdue'].includes(newStatus)) {
+      newCompleted = false;
+    }
+
+    // Atualizar no banco de dados
+    updateTaskStatus(taskId, newCompleted);
+  };
+
+  const updateTaskStatus = async (taskId: string, completed: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('personal_tasks')
+        .update({ completed })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      setTasks(tasks.map(task => 
+        task.id === taskId ? { ...task, completed } : task
+      ));
+
+      toast({
+        title: completed ? "Tarefa concluída!" : "Tarefa reaberta",
+        description: completed 
+          ? "Parabéns por completar mais uma tarefa!" 
+          : "A tarefa foi marcada como pendente novamente.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar tarefa",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -484,7 +610,7 @@ export default function PersonalTasks() {
           </Button>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2">
+              <Button className="flex items-center gap-2" style={{ backgroundColor: '#7dafd8', borderColor: '#7dafd8' }}>
                 <Plus className="h-4 w-4" />
                 Nova Tarefa
               </Button>
@@ -880,57 +1006,148 @@ export default function PersonalTasks() {
             </div>
           ) : (
             // Kanban View
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { key: 'pending', title: 'Pendentes', color: 'border-yellow-200', count: tasksByStatus.pending.length },
-                { key: 'today', title: 'Hoje', color: 'border-blue-200', count: tasksByStatus.today.length },
-                { key: 'overdue', title: 'Atrasadas', color: 'border-red-200', count: tasksByStatus.overdue.length },
-                { key: 'done', title: 'Concluídas', color: 'border-green-200', count: tasksByStatus.done.length },
-              ].map((column) => (
-                <Card key={column.key} className={`${column.color}`}>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium flex justify-between">
-                      {column.title}
-                      <Badge variant="secondary">{column.count}</Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {tasksByStatus[column.key as keyof typeof tasksByStatus].map((task) => (
-                      <Card key={task.id} className="p-3 hover:shadow-sm transition-shadow">
-                        <div className="flex items-start gap-2">
-                          <Checkbox
-                            checked={task.completed}
-                            onCheckedChange={() => toggleTaskCompletion(task.id, task.completed)}
-                            className="mt-0.5"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm line-clamp-2">{task.title}</div>
-                            {task.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                                {task.description}
-                              </p>
-                            )}
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              <Badge variant="outline" className="text-xs">
-                                {task.category}
-                              </Badge>
-                              {task.is_routine && (
-                                <Badge variant="outline" className="text-xs">Rotina</Badge>
-                              )}
-                            </div>
-                            {task.due_date && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {new Date(task.due_date).toLocaleDateString('pt-BR')}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-sm text-muted-foreground">{filteredTasks.length} de {tasks.length} tarefas</span>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setCategoryFilter("all");
+                    setStatusFilter("all");
+                    setClientFilter("all");
+                    setRoutineFilter("all");
+                    setDueDateFilter("all");
+                  }}
+                >
+                  Limpar Filtros
+                </Button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <PersonalKanbanColumn
+                  id="pending"
+                  title="Pendentes"
+                  tasks={tasksByStatus.pending}
+                  color="bg-yellow-500"
+                  count={tasksByStatus.pending.length}
+                  onViewDetails={(task) => {
+                    setSelectedTask(task);
+                    setIsDetailDialogOpen(true);
+                  }}
+                  onEdit={handleEditTask}
+                  onDelete={(taskId) => {
+                    const task = tasks.find(t => t.id === taskId);
+                    if (task) {
+                      setSelectedTask(task);
+                      setIsDeleteDialogOpen(true);
+                    }
+                  }}
+                  getPriorityColor={getPriorityColor}
+                  getPriorityLabel={getPriorityLabel}
+                  getUrgencyLevel={getUrgencyLevel}
+                  getClientName={getClientName}
+                  formatDateBR={formatDateBR}
+                />
+                
+                <PersonalKanbanColumn
+                  id="today"
+                  title="Hoje"
+                  tasks={tasksByStatus.today}
+                  color="bg-blue-500"
+                  count={tasksByStatus.today.length}
+                  onViewDetails={(task) => {
+                    setSelectedTask(task);
+                    setIsDetailDialogOpen(true);
+                  }}
+                  onEdit={handleEditTask}
+                  onDelete={(taskId) => {
+                    const task = tasks.find(t => t.id === taskId);
+                    if (task) {
+                      setSelectedTask(task);
+                      setIsDeleteDialogOpen(true);
+                    }
+                  }}
+                  getPriorityColor={getPriorityColor}
+                  getPriorityLabel={getPriorityLabel}
+                  getUrgencyLevel={getUrgencyLevel}
+                  getClientName={getClientName}
+                  formatDateBR={formatDateBR}
+                />
+                
+                <PersonalKanbanColumn
+                  id="overdue"
+                  title="Atrasadas"
+                  tasks={tasksByStatus.overdue}
+                  color="bg-red-500"
+                  count={tasksByStatus.overdue.length}
+                  onViewDetails={(task) => {
+                    setSelectedTask(task);
+                    setIsDetailDialogOpen(true);
+                  }}
+                  onEdit={handleEditTask}
+                  onDelete={(taskId) => {
+                    const task = tasks.find(t => t.id === taskId);
+                    if (task) {
+                      setSelectedTask(task);
+                      setIsDeleteDialogOpen(true);
+                    }
+                  }}
+                  getPriorityColor={getPriorityColor}
+                  getPriorityLabel={getPriorityLabel}
+                  getUrgencyLevel={getUrgencyLevel}
+                  getClientName={getClientName}
+                  formatDateBR={formatDateBR}
+                />
+                
+                <PersonalKanbanColumn
+                  id="done"
+                  title="Concluídas"
+                  tasks={tasksByStatus.done}
+                  color="bg-green-500"
+                  count={tasksByStatus.done.length}
+                  onViewDetails={(task) => {
+                    setSelectedTask(task);
+                    setIsDetailDialogOpen(true);
+                  }}
+                  onEdit={handleEditTask}
+                  onDelete={(taskId) => {
+                    const task = tasks.find(t => t.id === taskId);
+                    if (task) {
+                      setSelectedTask(task);
+                      setIsDeleteDialogOpen(true);
+                    }
+                  }}
+                  getPriorityColor={getPriorityColor}
+                  getPriorityLabel={getPriorityLabel}
+                  getUrgencyLevel={getUrgencyLevel}
+                  getClientName={getClientName}
+                  formatDateBR={formatDateBR}
+                />
+              </div>
+              
+              <DragOverlay>
+                {activeId ? (
+                  <SortablePersonalTaskCard
+                    task={tasks.find(t => t.id === activeId)!}
+                    onViewDetails={() => {}}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    getPriorityColor={getPriorityColor}
+                    getPriorityLabel={getPriorityLabel}
+                    getUrgencyLevel={getUrgencyLevel}
+                    getClientName={getClientName}
+                    formatDateBR={formatDateBR}
+                  />
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           )}
         </TabsContent>
 
