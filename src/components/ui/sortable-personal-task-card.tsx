@@ -68,12 +68,19 @@ export function SortablePersonalTaskCard({
       style={style}
       {...attributes}
       {...listeners}
-      className="cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
+      className="cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow group"
     >
       <CardContent className="p-4">
-        <div className="space-y-3">
+        <div className="space-y-3"
+          onMouseDown={(e) => {
+            // Previne o drag quando clicando no dropdown
+            if ((e.target as Element).closest('[data-radix-popper-content-wrapper]')) {
+              e.stopPropagation();
+            }
+          }}
+        >
           {/* Header */}
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between group">
             <h4 className="font-medium text-sm line-clamp-2 flex-1 pr-2">
               {task.title}
             </h4>
@@ -82,7 +89,7 @@ export function SortablePersonalTaskCard({
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="h-6 w-6 p-0 opacity-70 hover:opacity-100 transition-opacity ml-1 shrink-0"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -91,13 +98,18 @@ export function SortablePersonalTaskCard({
                   <MoreHorizontal className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="z-50">
+              <DropdownMenuContent 
+                align="end" 
+                className="z-50 bg-background border shadow-md"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <DropdownMenuItem 
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     onViewDetails(task);
                   }}
+                  className="cursor-pointer"
                 >
                   <Eye className="h-4 w-4 mr-2" />
                   Ver detalhes
@@ -108,6 +120,7 @@ export function SortablePersonalTaskCard({
                     e.stopPropagation();
                     onEdit(task);
                   }}
+                  className="cursor-pointer"
                 >
                   <Edit className="h-4 w-4 mr-2" />
                   Editar
@@ -118,7 +131,7 @@ export function SortablePersonalTaskCard({
                     e.stopPropagation();
                     onDelete(task.id);
                   }}
-                  className="text-red-600"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 cursor-pointer"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Excluir
