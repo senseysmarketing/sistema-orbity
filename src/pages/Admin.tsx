@@ -1106,7 +1106,7 @@ export default function Admin() {
           </div>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-6 bg-[7dafd8] bg-slate-50">
+        <TabsContent value="analytics" className="space-y-6 bg-[7dafd8] bg-white">
           {/* Métricas Detalhadas */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card>
