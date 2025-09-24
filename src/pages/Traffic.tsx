@@ -306,7 +306,7 @@ export default function Traffic() {
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">Acesso Restrito</h3>
             <p className="text-muted-foreground text-center">
-              Esta página é restrita apenas para gestores de tráfego e administradores.
+              Esta página é acessível para todos os usuários da agência.
             </p>
           </CardContent>
         </Card>

@@ -55,12 +55,12 @@ export default function Settings() {
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'gestor_trafego':
-        return 'Gestor de Tráfego';
-      case 'designer':
-        return 'Designer';
-      case 'administrador':
+      case 'agency_admin':
         return 'Administrador';
+      case 'agency_user':
+        return 'Usuário';
+      case 'super_admin':
+        return 'Super Admin';
       default:
         return role;
     }
@@ -68,11 +68,11 @@ export default function Settings() {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'administrador':
+      case 'agency_admin':
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-      case 'gestor_trafego':
+      case 'agency_user':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-      case 'designer':
+      case 'super_admin':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';

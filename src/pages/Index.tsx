@@ -932,7 +932,7 @@ const Index = () => {
     );
   }
 
-  // Dashboard do Designer
+  // Dashboard do Usuário
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1053,7 +1053,7 @@ const Index = () => {
             </Card>
           </div>
 
-          {/* Alertas específicos do designer */}
+          {/* Alertas específicos do usuário */}
           {(metrics.overdueTasks > 0 || metrics.todayTasks > 0) && (
             <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
               <CardHeader>
