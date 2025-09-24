@@ -1101,7 +1101,13 @@ export type Database = {
       task_status: "todo" | "in_progress" | "done" | "em_revisao"
       traffic_result: "excellent" | "good" | "average" | "bad" | "terrible"
       traffic_situation: "stable" | "improving" | "worsening"
-      user_role: "gestor_trafego" | "designer" | "administrador"
+      user_role:
+        | "gestor_trafego"
+        | "designer"
+        | "administrador"
+        | "super_admin"
+        | "agency_admin"
+        | "agency_user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1235,7 +1241,14 @@ export const Constants = {
       task_status: ["todo", "in_progress", "done", "em_revisao"],
       traffic_result: ["excellent", "good", "average", "bad", "terrible"],
       traffic_situation: ["stable", "improving", "worsening"],
-      user_role: ["gestor_trafego", "designer", "administrador"],
+      user_role: [
+        "gestor_trafego",
+        "designer",
+        "administrador",
+        "super_admin",
+        "agency_admin",
+        "agency_user",
+      ],
     },
   },
 } as const
