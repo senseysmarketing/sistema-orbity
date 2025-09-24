@@ -48,8 +48,12 @@ serve(async (req) => {
       adminEmail: adminUser.email 
     });
 
-    // Step 1: Create admin user
-    logStep("Creating admin user");
+    // Step 1: Create or get admin user
+    logStep("Creating or getting admin user");
+    let userId: string;
+    let userExists = false;
+
+    // First try to create the user
     const { data: authData, error: authError } = await supabaseClient.auth.admin.createUser({
       email: adminUser.email,
       password: adminUser.password,
@@ -60,16 +64,66 @@ serve(async (req) => {
       }
     });
 
-    if (authError) throw new Error(`Failed to create user: ${authError.message}`);
-    if (!authData.user) throw new Error("User creation failed");
+    if (authError) {
+      // If user already exists, try to get the existing user
+      if (authError.message.includes('already been registered')) {
+        logStep("User already exists, checking existing user");
+        const { data: existingUser, error: getUserError } = await supabaseClient.auth.admin.listUsers();
+        
+        if (getUserError) throw new Error(`Failed to check existing users: ${getUserError.message}`);
+        
+        const foundUser = existingUser.users.find(u => u.email === adminUser.email);
+        if (!foundUser) throw new Error("User exists but couldn't be found");
+        
+        userId = foundUser.id;
+        userExists = true;
+        logStep("Found existing user", { userId });
+      } else {
+        throw new Error(`Failed to create user: ${authError.message}`);
+      }
+    } else {
+      if (!authData.user) throw new Error("User creation failed");
+      userId = authData.user.id;
+      logStep("New user created", { userId });
+    }
 
-    const userId = authData.user.id;
-    logStep("Admin user created", { userId });
+    // Step 2: Wait for profile creation trigger (only for new users)
+    if (!userExists) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
 
-    // Step 2: Wait for profile creation trigger (small delay)
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Step 3: Check if user already has an agency
+    if (userExists) {
+      logStep("Checking if user already has an agency");
+      const { data: existingUserAgency } = await supabaseClient
+        .from('agency_users')
+        .select('agency_id, agencies!inner(id, name, slug)')
+        .eq('user_id', userId)
+        .eq('role', 'owner')
+        .single();
 
-    // Step 3: Create agency
+      if (existingUserAgency) {
+        logStep("User already has an agency", { 
+          agencyId: existingUserAgency.agency_id,
+          agencyName: existingUserAgency.agencies.name 
+        });
+        
+        return new Response(JSON.stringify({
+          success: true,
+          data: {
+            userId,
+            agencyId: existingUserAgency.agency_id,
+            agencySlug: existingUserAgency.agencies.slug,
+            message: "User already has an agency"
+          }
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+    }
+
+    // Step 4: Create agency
     logStep("Creating agency");
     let agencySlug = companyData.name
       .toLowerCase()
@@ -106,28 +160,49 @@ serve(async (req) => {
     const agencyId = agencyData.id;
     logStep("Agency created", { agencyId, agencySlug });
 
-    // Step 4: Add user to agency as owner
+    // Step 5: Add user to agency as owner (check if not already added)
     logStep("Adding user to agency");
-    const { error: agencyUserError } = await supabaseClient
+    const { data: existingAgencyUser } = await supabaseClient
       .from('agency_users')
-      .insert({
-        user_id: userId,
-        agency_id: agencyId,
-        role: 'owner'
+      .select('id')
+      .eq('user_id', userId)
+      .eq('agency_id', agencyId)
+      .single();
+
+    if (!existingAgencyUser) {
+      const { error: agencyUserError } = await supabaseClient
+        .from('agency_users')
+        .insert({
+          user_id: userId,
+          agency_id: agencyId,
+          role: 'owner'
+        });
+
+      if (agencyUserError) throw new Error(`Failed to add user to agency: ${agencyUserError.message}`);
+    } else {
+      logStep("User already added to agency");
+    }
+
+    // Step 6: Start trial subscription (check if not already exists)
+    logStep("Starting trial subscription");
+    const { data: existingSubscription } = await supabaseClient
+      .from('agency_subscriptions')
+      .select('id')
+      .eq('agency_id', agencyId)
+      .single();
+
+    if (!existingSubscription) {
+      const { error: trialError } = await supabaseClient.rpc('start_agency_trial', {
+        p_agency_id: agencyId,
+        p_plan_slug: planSlug
       });
 
-    if (agencyUserError) throw new Error(`Failed to add user to agency: ${agencyUserError.message}`);
+      if (trialError) throw new Error(`Failed to start trial: ${trialError.message}`);
+    } else {
+      logStep("Subscription already exists for agency");
+    }
 
-    // Step 5: Start trial subscription
-    logStep("Starting trial subscription");
-    const { error: trialError } = await supabaseClient.rpc('start_agency_trial', {
-      p_agency_id: agencyId,
-      p_plan_slug: planSlug
-    });
-
-    if (trialError) throw new Error(`Failed to start trial: ${trialError.message}`);
-
-    // Step 6: Create onboarding record
+    // Step 7: Create onboarding record
     logStep("Creating onboarding record");
     const { error: onboardingError } = await supabaseClient
       .from('agency_onboarding')
