@@ -6,7 +6,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Shield } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { AgencySelector } from "@/components/agency/AgencySelector";
 import senseyLogo from "@/assets/senseys-logo.png";
 const menuItems = [{
   title: "Dashboard",
@@ -84,15 +83,13 @@ export function AppSidebar() {
   const filteredMenuItems = menuItems.filter(item => !profile?.role || item.roles.includes(profile.role));
   return <Sidebar className={`${collapsed ? "w-14" : "w-64"} bg-sidebar border-r-0`} collapsible="icon">
       {/* Header */}
-      <SidebarHeader className="border-b border-sidebar-border p-4 bg-sidebar space-y-4">
+      <SidebarHeader className="border-b border-sidebar-border p-4 bg-sidebar">
         {!collapsed && <div className="flex items-center">
             <img src={senseyLogo} alt="Senseys Logo" className="w-[122px] h-[32px] object-contain" />
           </div>}
         {collapsed && <div className="flex justify-center">
             <img src={senseyLogo} alt="Senseys Logo" className="h-6 w-6" />
           </div>}
-        
-        {!collapsed && <AgencySelector />}
       </SidebarHeader>
 
       <SidebarContent className="bg-sidebar">
