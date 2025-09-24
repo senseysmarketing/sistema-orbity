@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, UserPlus, MoreHorizontal, Trash2, Edit, Mail } from "lucide-react";
+import { Users, UserPlus, MoreHorizontal, Trash2, Edit, Mail, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,13 @@ export function UsersManagement() {
   const [loading, setLoading] = useState(true);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePassword, setInvitePassword] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
   const { currentAgency, isAgencyAdmin } = useAgency();
   const { toast } = useToast();
   const { planLimits } = usePaymentMiddleware();
@@ -147,58 +152,34 @@ export function UsersManagement() {
         return;
       }
       
-      // Primeiro, verificar se o email já existe nos profiles
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('email', inviteEmail)
-        .maybeSingle();
-
-      if (existingProfile) {
-        // Verificar se já é membro da agência
-        const { data: existingMember } = await supabase
-          .from('agency_users')
-          .select('id')
-          .eq('agency_id', currentAgency?.id)
-          .eq('user_id', existingProfile.user_id)
-          .maybeSingle();
-
-        if (existingMember) {
-          toast({
-            title: "Usuário já é membro",
-            description: "Este usuário já faz parte da agência.",
-            variant: "destructive",
-          });
-          return;
+      // Criar usuário usando edge function
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: {
+          email: inviteEmail,
+          password: invitePassword,
+          role: inviteRole,
+          agency_id: currentAgency?.id
         }
+      });
 
-        // Adicionar usuário existente à agência
-        const { error } = await supabase
-          .from('agency_users')
-          .insert({
-            agency_id: currentAgency?.id,
-            user_id: existingProfile.user_id,
-            role: inviteRole,
-          });
-
-        if (error) throw error;
-
-        toast({
-          title: "Usuário adicionado!",
-          description: `${inviteEmail} foi adicionado à agência como ${getRoleLabel(inviteRole)}.`,
-        });
-      } else {
-        // Implementar convite por email para novos usuários
-        toast({
-          title: "Funcionalidade em desenvolvimento",
-          description: "O convite para novos usuários será implementado em breve. Por enquanto, apenas usuários já cadastrados podem ser adicionados.",
-        });
-        return;
+      if (error) {
+        throw new Error(error.message);
       }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      toast({
+        title: "Usuário criado!",
+        description: `${inviteEmail} foi criado e adicionado à agência como ${getRoleLabel(inviteRole)}.`,
+      });
 
       setInviteDialogOpen(false);
       setInviteEmail("");
+      setInvitePassword("");
       setInviteRole("member");
+      fetchUsers();
       fetchUsers();
     } catch (error: any) {
       toast({
@@ -208,6 +189,45 @@ export function UsersManagement() {
       });
     } finally {
       setInviteLoading(false);
+    }
+  };
+
+  const updatePassword = async () => {
+    try {
+      setPasswordLoading(true);
+      
+      const { data, error } = await supabase.functions.invoke('update-user-password', {
+        body: {
+          target_user_id: selectedUserId,
+          new_password: newPassword,
+          agency_id: currentAgency?.id
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      toast({
+        title: "Senha alterada!",
+        description: "A senha do usuário foi alterada com sucesso.",
+      });
+
+      setPasswordDialogOpen(false);
+      setNewPassword("");
+      setSelectedUserId("");
+    } catch (error: any) {
+      toast({
+        title: "Erro ao alterar senha",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -307,14 +327,14 @@ export function UsersManagement() {
                     <DialogTrigger asChild>
                       <Button disabled={userLimitReached}>
                         <UserPlus className="h-4 w-4 mr-2" />
-                        Convidar Usuário
+                        Criar Usuário
                       </Button>
                     </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Convidar Novo Usuário</DialogTitle>
+                  <DialogTitle>Criar Novo Usuário</DialogTitle>
                   <DialogDescription>
-                    Adicione um novo membro à sua agência
+                    Crie um novo usuário para sua agência
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -326,6 +346,16 @@ export function UsersManagement() {
                       placeholder="usuario@exemplo.com"
                       value={inviteEmail}
                       onChange={(e) => setInviteEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="invite-password">Senha</Label>
+                    <Input
+                      id="invite-password"
+                      type="password"
+                      placeholder="Digite a senha"
+                      value={invitePassword}
+                      onChange={(e) => setInvitePassword(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
@@ -345,12 +375,12 @@ export function UsersManagement() {
                   <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button onClick={inviteUser} disabled={inviteLoading || !inviteEmail}>
-                    {inviteLoading ? "Enviando..." : "Convidar"}
+                  <Button onClick={inviteUser} disabled={inviteLoading || !inviteEmail || !invitePassword}>
+                    {inviteLoading ? "Criando..." : "Criar Usuário"}
                   </Button>
                 </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+              </DialogContent>
+            </Dialog>
                 
                 {userLimitReached && (
                   <div className="text-center">
@@ -421,6 +451,16 @@ export function UsersManagement() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setSelectedUserId(user.user_id);
+                              setPasswordDialogOpen(true);
+                            }}
+                          >
+                            <Key className="h-4 w-4 mr-2" />
+                            Alterar Senha
+                          </DropdownMenuItem>
+                          
                           <DropdownMenuItem asChild>
                             <Dialog>
                               <DialogTrigger className="w-full text-left">
@@ -502,12 +542,44 @@ export function UsersManagement() {
               </p>
               <Button onClick={() => setInviteDialogOpen(true)}>
                 <UserPlus className="h-4 w-4 mr-2" />
-                Convidar Primeiro Usuário
+                Criar Primeiro Usuário
               </Button>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Password Update Dialog */}
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Senha</DialogTitle>
+            <DialogDescription>
+              Digite uma nova senha para o usuário
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nova Senha</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="Digite a nova senha"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPasswordDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={updatePassword} disabled={passwordLoading || !newPassword}>
+              {passwordLoading ? "Alterando..." : "Alterar Senha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
