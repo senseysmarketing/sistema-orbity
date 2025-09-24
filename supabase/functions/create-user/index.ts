@@ -62,22 +62,30 @@ serve(async (req) => {
 
     logStep("Request data received", { email, role, agency_id });
 
-    // Verify the user is an admin of the agency using SECURITY DEFINER function
-    const { data: isAdmin, error: isAdminError } = await supabaseClient.rpc('is_agency_admin', {
-      agency_uuid: agency_id,
-    });
+    // Verify the user is an admin of the agency using direct query
+    const { data: adminCheck, error: adminError } = await supabaseAdmin
+      .from('agency_users')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('agency_id', agency_id)
+      .maybeSingle();
 
-    if (isAdminError) {
-      logStep("Error checking admin status (rpc)", { error: isAdminError });
-      throw new Error(`Failed to verify admin status: ${isAdminError.message}`);
+    if (adminError) {
+      logStep("Error checking admin status", { error: adminError });
+      throw new Error(`Failed to verify admin status: ${adminError.message}`);
     }
 
-    if (!isAdmin) {
-      logStep("Authorization failed", { userId: user.id, agencyId: agency_id });
+    if (!adminCheck || !['owner', 'admin'].includes(adminCheck.role)) {
+      logStep("Authorization failed", { 
+        userRole: adminCheck?.role, 
+        userId: user.id, 
+        agencyId: agency_id,
+        expectedRoles: ['owner', 'admin']
+      });
       throw new Error('Unauthorized: Only agency admins can create users');
     }
 
-    logStep("Admin verification passed");
+    logStep("Admin verification passed", { userRole: adminCheck.role });
 
     // Enforce plan user limit on backend as well
     const { count: currentCount, error: countError } = await supabaseAdmin
