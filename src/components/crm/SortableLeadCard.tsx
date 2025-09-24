@@ -70,106 +70,80 @@ export function SortableLeadCard({
     <Card
       ref={setNodeRef}
       style={style}
-      className={`cursor-grab active:cursor-grabbing ${
-        isDragging ? 'opacity-50 rotate-2 shadow-lg' : ''
+      className={`hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing ${
+        isDragging ? 'shadow-lg opacity-50' : ''
       }`}
       {...attributes}
       {...listeners}
     >
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1 flex-1 min-w-0">
-            <h4 className="font-semibold text-sm truncate">{lead.name}</h4>
+      <CardContent className="p-3">
+        <div className="space-y-2">
+          <div className="flex items-start justify-between">
+            <h4 className="font-medium text-sm leading-tight">{lead.name}</h4>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6">
+                  <MoreHorizontal className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => onEdit(lead)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  className="text-destructive focus:text-destructive" 
+                  onClick={() => onDelete(lead.id)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Excluir
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          
+          <div className="flex gap-1 flex-wrap">
+            <Badge className={getPriorityColor(lead.priority)} variant="secondary">
+              {getPriorityLabel(lead.priority)}
+            </Badge>
+            <Badge className={urgency.color} variant="secondary">
+              {urgency.label}
+            </Badge>
+          </div>
+          
+          <div className="text-xs text-muted-foreground space-y-1">
             {lead.company && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1">
                 <Building className="h-3 w-3 flex-shrink-0" />
                 <span className="truncate">{lead.company}</span>
               </div>
             )}
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                <MoreHorizontal className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(lead)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => onDelete(lead.id)}
-                className="text-destructive"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Excluir
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0 space-y-2">
-        <div className="flex flex-wrap gap-1">
-          <Badge 
-            variant="outline" 
-            className={`text-xs ${getPriorityColor(lead.priority)}`}
-          >
-            {getPriorityLabel(lead.priority)}
-          </Badge>
-          <Badge 
-            variant="outline" 
-            className={`text-xs ${urgency.color}`}
-          >
-            {urgency.label}
-          </Badge>
-        </div>
-
-        {lead.email && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Mail className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{lead.email}</span>
-          </div>
-        )}
-
-        {lead.phone && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Phone className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">{lead.phone}</span>
-          </div>
-        )}
-
-        {lead.value > 0 && (
-          <div className="flex items-center gap-1 text-xs font-medium text-green-600">
-            <DollarSign className="h-3 w-3 flex-shrink-0" />
-            <span>{formatCurrency(lead.value)}</span>
-          </div>
-        )}
-
-        {lead.next_contact && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Calendar className="h-3 w-3 flex-shrink-0" />
-            <span>Próximo: {formatDate(lead.next_contact)}</span>
-          </div>
-        )}
-
-        {lead.tags && lead.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {lead.tags.slice(0, 2).map((tag, index) => (
-              <Badge key={index} variant="secondary" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
-            {lead.tags.length > 2 && (
-              <Badge variant="secondary" className="text-xs">
-                +{lead.tags.length - 2}
-              </Badge>
+            {lead.email && (
+              <div className="flex items-center gap-1">
+                <Mail className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">{lead.email}</span>
+              </div>
             )}
+            {lead.phone && (
+              <div className="flex items-center gap-1">
+                <Phone className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">{lead.phone}</span>
+              </div>
+            )}
+            {lead.value > 0 && (
+              <div className="flex items-center gap-1 text-green-600 font-medium">
+                <DollarSign className="h-3 w-3 flex-shrink-0" />
+                <span>{formatCurrency(lead.value)}</span>
+              </div>
+            )}
+            {lead.next_contact && (
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3 flex-shrink-0" />
+                <span>📅 {formatDate(lead.next_contact)}</span>
+              </div>
+            )}
+            <div>🎯 {lead.source}</div>
           </div>
-        )}
-
-        <div className="text-xs text-muted-foreground">
-          Origem: {lead.source}
         </div>
       </CardContent>
     </Card>

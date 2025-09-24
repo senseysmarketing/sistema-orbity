@@ -1,17 +1,17 @@
-import { useState, useEffect } from "react";
-import { Plus, Filter, Search, Grid, List, Webhook, Settings } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Plus, Search, Filter, Users, ContactRound, Building, Phone, Mail, DollarSign, Target, TrendingUp, Calendar, Activity, Webhook, Grid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { LeadsKanban } from "@/components/crm/LeadsKanban";
 import { LeadsList } from "@/components/crm/LeadsList";
 import { LeadForm } from "@/components/crm/LeadForm";
 import { WebhooksManager } from "@/components/crm/WebhooksManager";
-import { CRMMetrics } from "@/components/crm/CRMMetrics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
@@ -48,6 +48,7 @@ export default function CRM() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showWebhooks, setShowWebhooks] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -77,17 +78,81 @@ export default function CRM() {
     fetchLeads();
   }, [currentAgency?.id]);
 
-  const filteredLeads = leads.filter(lead => {
-    const matchesSearch = searchQuery === '' || 
-      lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lead.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lead.company?.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredLeads = useMemo(() => {
+    return leads.filter(lead => {
+      const matchesSearch = searchQuery === '' || 
+        lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        lead.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        lead.company?.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
+      const matchesPriority = priorityFilter === 'all' || lead.priority === priorityFilter;
+      const matchesSource = sourceFilter === 'all' || lead.source === sourceFilter;
+      
+      return matchesSearch && matchesStatus && matchesPriority && matchesSource;
+    });
+  }, [leads, searchQuery, statusFilter, priorityFilter, sourceFilter]);
+
+  // Análises e métricas
+  const analytics = useMemo(() => {
+    const total = filteredLeads.length;
+    const newLeads = filteredLeads.filter(lead => lead.status === 'new').length;
+    const qualifiedLeads = filteredLeads.filter(lead => lead.status === 'qualified').length;
+    const wonLeads = filteredLeads.filter(lead => lead.status === 'won').length;
+    const lostLeads = filteredLeads.filter(lead => lead.status === 'lost').length;
     
-    const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || lead.priority === priorityFilter;
+    const totalValue = filteredLeads.reduce((sum, lead) => sum + (lead.value || 0), 0);
+    const wonValue = filteredLeads
+      .filter(lead => lead.status === 'won')
+      .reduce((sum, lead) => sum + (lead.value || 0), 0);
     
-    return matchesSearch && matchesStatus && matchesPriority;
-  });
+    const conversionRate = total > 0 ? Math.round((wonLeads / total) * 100) : 0;
+    const averageValue = total > 0 ? totalValue / total : 0;
+    
+    // Leads with follow-up needed (next_contact is today or past)
+    const today = new Date().toISOString().split('T')[0];
+    const followUpNeeded = filteredLeads.filter(lead => 
+      lead.next_contact && lead.next_contact <= today && 
+      !['won', 'lost'].includes(lead.status)
+    ).length;
+
+    const statusStats = {
+      new: newLeads,
+      contacted: filteredLeads.filter(l => l.status === 'contacted').length,
+      qualified: qualifiedLeads,
+      proposal: filteredLeads.filter(l => l.status === 'proposal').length,
+      negotiation: filteredLeads.filter(l => l.status === 'negotiation').length,
+      won: wonLeads,
+      lost: lostLeads,
+    };
+
+    const priorityStats = {
+      high: filteredLeads.filter(l => l.priority === 'high').length,
+      medium: filteredLeads.filter(l => l.priority === 'medium').length,
+      low: filteredLeads.filter(l => l.priority === 'low').length,
+    };
+
+    const sourceStats: { [key: string]: number } = {};
+    filteredLeads.forEach(lead => {
+      sourceStats[lead.source] = (sourceStats[lead.source] || 0) + 1;
+    });
+
+    return {
+      total,
+      newLeads,
+      qualifiedLeads,
+      wonLeads,
+      lostLeads,
+      totalValue,
+      wonValue,
+      conversionRate,
+      averageValue,
+      followUpNeeded,
+      statusStats,
+      priorityStats,
+      sourceStats
+    };
+  }, [filteredLeads]);
 
   const handleLeadSave = () => {
     fetchLeads();
@@ -119,7 +184,7 @@ export default function CRM() {
 
   if (loading) {
     return (
-      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex-1 space-y-4 p-8 pt-6">
         <div className="flex items-center justify-between space-y-2">
           <h2 className="text-3xl font-bold tracking-tight">CRM & Leads</h2>
         </div>
@@ -131,7 +196,8 @@ export default function CRM() {
   }
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+    <div className="flex-1 space-y-4 p-8 pt-6">
+      {/* Header */}
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">CRM & Leads</h2>
         <div className="flex items-center space-x-2">
@@ -182,91 +248,282 @@ export default function CRM() {
         </div>
       </div>
 
-      <CRMMetrics leads={leads} />
+      {/* Métricas */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics.total}</div>
+            <p className="text-xs text-muted-foreground">
+              +{analytics.newLeads} novos este período
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Taxa de Conversão</CardTitle>
+            <Target className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics.conversionRate}%</div>
+            <Progress value={analytics.conversionRate} className="mt-2" />
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              }).format(analytics.totalValue)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Pipeline total
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Follow-up Necessário</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{analytics.followUpNeeded}</div>
+            <p className="text-xs text-muted-foreground">
+              Requer atenção imediata
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Leads</CardTitle>
+      {/* Status Overview */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Distribuição por Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Novos</span>
+              <Badge variant="secondary">{analytics.statusStats.new}</Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Qualificados</span>
+              <Badge variant="secondary">{analytics.statusStats.qualified}</Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Ganhos</span>
+              <Badge className="bg-green-100 text-green-800">{analytics.statusStats.won}</Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Perdidos</span>
+              <Badge className="bg-red-100 text-red-800">{analytics.statusStats.lost}</Badge>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Por Prioridade</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Alta</span>
+              <Badge className="bg-red-100 text-red-800">{analytics.priorityStats.high}</Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Média</span>
+              <Badge className="bg-yellow-100 text-yellow-800">{analytics.priorityStats.medium}</Badge>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Baixa</span>
+              <Badge className="bg-green-100 text-green-800">{analytics.priorityStats.low}</Badge>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Principais Origens</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {Object.entries(analytics.sourceStats)
+              .sort(([,a], [,b]) => b - a)
+              .slice(0, 4)
+              .map(([source, count]) => (
+                <div key={source} className="flex justify-between items-center">
+                  <span className="text-sm capitalize">{source}</span>
+                  <Badge variant="secondary">{count}</Badge>
+                </div>
+              ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filtros e Leads */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+            <TabsTrigger value="leads">Leads</TabsTrigger>
+          </TabsList>
+        </div>
+        
+        <TabsContent value="overview" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pipeline de Vendas</CardTitle>
               <CardDescription>
-                Gerencie seus leads em formato kanban ou lista
+                Visão detalhada do funil de vendas e métricas de conversão
               </CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant={view === 'kanban' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setView('kanban')}
-              >
-                <Grid className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={view === 'list' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setView('list')}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Buscar leads..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="new">Novo</SelectItem>
-                <SelectItem value="contacted">Contatado</SelectItem>
-                <SelectItem value="qualified">Qualificado</SelectItem>
-                <SelectItem value="proposal">Proposta</SelectItem>
-                <SelectItem value="negotiation">Negociação</SelectItem>
-                <SelectItem value="won">Ganho</SelectItem>
-                <SelectItem value="lost">Perdido</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Prioridade" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as Prioridades</SelectItem>
-                <SelectItem value="high">Alta</SelectItem>
-                <SelectItem value="medium">Média</SelectItem>
-                <SelectItem value="low">Baixa</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <div className="text-center p-4 border rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">{analytics.statusStats.new}</div>
+                    <div className="text-sm text-muted-foreground">Novos Leads</div>
+                  </div>
+                  <div className="text-center p-4 border rounded-lg">
+                    <div className="text-2xl font-bold text-orange-600">{analytics.statusStats.qualified}</div>
+                    <div className="text-sm text-muted-foreground">Qualificados</div>
+                  </div>
+                  <div className="text-center p-4 border rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600">{analytics.statusStats.proposal}</div>
+                    <div className="text-sm text-muted-foreground">Em Proposta</div>
+                  </div>
+                  <div className="text-center p-4 border rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">{analytics.statusStats.won}</div>
+                    <div className="text-sm text-muted-foreground">Fechados</div>
+                  </div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="text-3xl font-bold">
+                    {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL'
+                    }).format(analytics.wonValue)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Receita Confirmada</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          {view === 'kanban' ? (
-            <LeadsKanban 
-              leads={filteredLeads} 
-              onEdit={handleLeadEdit}
-              onDelete={handleLeadDelete}
-              onUpdate={fetchLeads}
-            />
-          ) : (
-            <LeadsList 
-              leads={filteredLeads} 
-              onEdit={handleLeadEdit}
-              onDelete={handleLeadDelete}
-              onUpdate={fetchLeads}
-            />
-          )}
-        </CardContent>
-      </Card>
+        <TabsContent value="leads" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Leads</CardTitle>
+                  <CardDescription>
+                    Gerencie seus leads em formato kanban ou lista
+                  </CardDescription>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant={view === 'kanban' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setView('kanban')}
+                  >
+                    <Grid className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={view === 'list' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setView('list')}
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-4 mb-6">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Buscar leads..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Status</SelectItem>
+                    <SelectItem value="new">Novo</SelectItem>
+                    <SelectItem value="contacted">Contatado</SelectItem>
+                    <SelectItem value="qualified">Qualificado</SelectItem>
+                    <SelectItem value="proposal">Proposta</SelectItem>
+                    <SelectItem value="negotiation">Negociação</SelectItem>
+                    <SelectItem value="won">Ganho</SelectItem>
+                    <SelectItem value="lost">Perdido</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue placeholder="Prioridade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Prioridades</SelectItem>
+                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="medium">Média</SelectItem>
+                    <SelectItem value="low">Baixa</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                  <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue placeholder="Origem" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as Origens</SelectItem>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="website">Website</SelectItem>
+                    <SelectItem value="social_media">Redes Sociais</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="phone">Telefone</SelectItem>
+                    <SelectItem value="referral">Indicação</SelectItem>
+                    <SelectItem value="event">Evento</SelectItem>
+                    <SelectItem value="advertisement">Anúncio</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {view === 'kanban' ? (
+                <LeadsKanban 
+                  leads={filteredLeads} 
+                  onEdit={handleLeadEdit}
+                  onDelete={handleLeadDelete}
+                  onUpdate={fetchLeads}
+                />
+              ) : (
+                <LeadsList 
+                  leads={filteredLeads} 
+                  onEdit={handleLeadEdit}
+                  onDelete={handleLeadDelete}
+                  onUpdate={fetchLeads}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
