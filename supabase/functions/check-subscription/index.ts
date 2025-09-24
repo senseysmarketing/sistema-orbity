@@ -65,14 +65,20 @@ serve(async (req) => {
       .from('agency_subscriptions')
       .select(`
         *,
-        subscription_plans:plan_id (
+        subscription_plans!inner (
           name,
           slug,
           stripe_price_id_monthly
         )
       `)
       .eq('agency_id', agencyId)
-      .single();
+      .maybeSingle();
+
+    logStep("Local subscription query result", { 
+      found: !!localSubscription, 
+      error: localError?.message,
+      agencyId 
+    });
 
     if (localSubscription && localSubscription.subscription_plans) {
       const plan = localSubscription.subscription_plans;
