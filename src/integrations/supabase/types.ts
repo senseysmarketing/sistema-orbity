@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       admin_notes: {
         Row: {
+          agency_id: string | null
           content: string | null
           created_at: string
           created_by: string
@@ -24,6 +25,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agency_id?: string | null
           content?: string | null
           created_at?: string
           created_by: string
@@ -32,6 +34,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agency_id?: string | null
           content?: string | null
           created_at?: string
           created_by?: string
@@ -41,6 +44,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "admin_notes_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "admin_notes_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -49,8 +59,121 @@ export type Database = {
           },
         ]
       }
+      agencies: {
+        Row: {
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          logo_url: string | null
+          max_clients: number
+          max_leads: number
+          max_tasks: number
+          max_users: number
+          name: string
+          slug: string
+          subscription_expires_at: string | null
+          subscription_plan: Database["public"]["Enums"]["subscription_plan"]
+          updated_at: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          logo_url?: string | null
+          max_clients?: number
+          max_leads?: number
+          max_tasks?: number
+          max_users?: number
+          name: string
+          slug: string
+          subscription_expires_at?: string | null
+          subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
+          updated_at?: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          logo_url?: string | null
+          max_clients?: number
+          max_leads?: number
+          max_tasks?: number
+          max_users?: number
+          name?: string
+          slug?: string
+          subscription_expires_at?: string | null
+          subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      agency_users: {
+        Row: {
+          agency_id: string
+          created_at: string
+          id: string
+          invited_by: string | null
+          joined_at: string
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          joined_at?: string
+          role?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          joined_at?: string
+          role?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_users_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_users_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "agency_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       client_payments: {
         Row: {
+          agency_id: string | null
           amount: number
           client_id: string
           created_at: string
@@ -61,6 +184,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agency_id?: string | null
           amount: number
           client_id: string
           created_at?: string
@@ -71,6 +195,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agency_id?: string | null
           amount?: number
           client_id?: string
           created_at?: string
@@ -81,6 +206,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "client_payments_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "client_payments_client_id_fkey"
             columns: ["client_id"]
@@ -93,6 +225,7 @@ export type Database = {
       clients: {
         Row: {
           active: boolean
+          agency_id: string | null
           contact: string | null
           created_at: string
           due_date: number | null
@@ -106,6 +239,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          agency_id?: string | null
           contact?: string | null
           created_at?: string
           due_date?: number | null
@@ -119,6 +253,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          agency_id?: string | null
           contact?: string | null
           created_at?: string
           due_date?: number | null
@@ -130,10 +265,19 @@ export type Database = {
           start_date?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       expenses: {
         Row: {
+          agency_id: string | null
           amount: number
           created_at: string
           due_date: string
@@ -145,6 +289,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agency_id?: string | null
           amount: number
           created_at?: string
           due_date: string
@@ -156,6 +301,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agency_id?: string | null
           amount?: number
           created_at?: string
           due_date?: string
@@ -166,10 +312,19 @@ export type Database = {
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "expenses_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       personal_tasks: {
         Row: {
+          agency_id: string | null
           category: string | null
           client_id: string | null
           completed: boolean
@@ -183,6 +338,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          agency_id?: string | null
           category?: string | null
           client_id?: string | null
           completed?: boolean
@@ -196,6 +352,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          agency_id?: string | null
           category?: string | null
           client_id?: string | null
           completed?: boolean
@@ -209,6 +366,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "personal_tasks_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "personal_tasks_client_id_fkey"
             columns: ["client_id"]
@@ -260,6 +424,7 @@ export type Database = {
       }
       salaries: {
         Row: {
+          agency_id: string | null
           amount: number
           created_at: string
           due_date: string
@@ -270,6 +435,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agency_id?: string | null
           amount: number
           created_at?: string
           due_date: string
@@ -280,6 +446,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agency_id?: string | null
           amount?: number
           created_at?: string
           due_date?: string
@@ -289,10 +456,19 @@ export type Database = {
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "salaries_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tasks: {
         Row: {
+          agency_id: string | null
           archived: boolean
           assigned_to: string | null
           client_id: string | null
@@ -307,6 +483,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agency_id?: string | null
           archived?: boolean
           assigned_to?: string | null
           client_id?: string | null
@@ -321,6 +498,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agency_id?: string | null
           archived?: boolean
           assigned_to?: string | null
           client_id?: string | null
@@ -335,6 +513,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tasks_assigned_to_fkey"
             columns: ["assigned_to"]
@@ -360,6 +545,7 @@ export type Database = {
       }
       traffic_controls: {
         Row: {
+          agency_id: string | null
           client_id: string
           created_at: string
           daily_budget: number | null
@@ -372,6 +558,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          agency_id?: string | null
           client_id: string
           created_at?: string
           daily_budget?: number | null
@@ -384,6 +571,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          agency_id?: string | null
           client_id?: string
           created_at?: string
           daily_budget?: number | null
@@ -396,6 +584,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "traffic_controls_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "traffic_controls_client_id_fkey"
             columns: ["client_id"]
@@ -414,13 +609,26 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      get_user_agency_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_agency_admin: {
+        Args: { agency_uuid?: string }
+        Returns: boolean
+      }
+      user_belongs_to_agency: {
+        Args: { agency_uuid: string }
         Returns: boolean
       }
     }
     Enums: {
       payment_status: "pending" | "paid" | "overdue"
+      subscription_plan: "free" | "basic" | "pro" | "enterprise"
       task_priority: "low" | "medium" | "high"
       task_status: "todo" | "in_progress" | "done" | "em_revisao"
       traffic_result: "excellent" | "good" | "average" | "bad" | "terrible"
@@ -554,6 +762,7 @@ export const Constants = {
   public: {
     Enums: {
       payment_status: ["pending", "paid", "overdue"],
+      subscription_plan: ["free", "basic", "pro", "enterprise"],
       task_priority: ["low", "medium", "high"],
       task_status: ["todo", "in_progress", "done", "em_revisao"],
       traffic_result: ["excellent", "good", "average", "bad", "terrible"],
