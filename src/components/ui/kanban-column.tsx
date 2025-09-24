@@ -31,6 +31,7 @@ interface KanbanColumnProps {
   getAssignedUserName: (userId: string | null) => string;
   getClientName: (clientId: string | null) => string;
   formatDateBR: (date: string | null) => string;
+  getAssignedUsers: (taskId: string) => any[];
 }
 
 export function KanbanColumn({
@@ -48,6 +49,7 @@ export function KanbanColumn({
   getAssignedUserName,
   getClientName,
   formatDateBR,
+  getAssignedUsers,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: id,
@@ -80,6 +82,7 @@ export function KanbanColumn({
               getAssignedUserName={getAssignedUserName}
               getClientName={getClientName}
               formatDateBR={formatDateBR}
+              assignedUsers={getAssignedUsers(task.id)}
             />
           ))}
         </SortableContext>

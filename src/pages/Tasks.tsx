@@ -1115,6 +1115,7 @@ export default function Tasks() {
                   getAssignedUserName={getAssignedUserName}
                   getClientName={getClientName}
                   formatDateBR={formatDateBR}
+                  getAssignedUsers={getAssignedUsers}
                 />
                 
                 <KanbanColumn
@@ -1132,6 +1133,7 @@ export default function Tasks() {
                   getAssignedUserName={getAssignedUserName}
                   getClientName={getClientName}
                   formatDateBR={formatDateBR}
+                  getAssignedUsers={getAssignedUsers}
                 />
                 
                 <KanbanColumn
@@ -1149,7 +1151,8 @@ export default function Tasks() {
                   getAssignedUserName={getAssignedUserName}
                   getClientName={getClientName}
                   formatDateBR={formatDateBR}
-                />
+                  getAssignedUsers={getAssignedUsers}
+                 />
                 
                 <KanbanColumn
                   id="done"
@@ -1166,6 +1169,7 @@ export default function Tasks() {
                   getAssignedUserName={getAssignedUserName}
                   getClientName={getClientName}
                   formatDateBR={formatDateBR}
+                  getAssignedUsers={getAssignedUsers}
                 />
               </div>
               
@@ -1182,6 +1186,7 @@ export default function Tasks() {
                     getAssignedUserName={getAssignedUserName}
                     getClientName={getClientName}
                     formatDateBR={formatDateBR}
+                    assignedUsers={activeId ? getAssignedUsers(activeId) : []}
                   />
                 ) : null}
               </DragOverlay>
@@ -1243,10 +1248,10 @@ export default function Tasks() {
                         {/* Informações principais */}
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div>
-                            <span className="font-medium text-muted-foreground">Responsável:</span>
-                            <p className="font-semibold">
-                              {getAssignedUserName(task.assigned_to)}
-                            </p>
+                            <span className="font-medium text-muted-foreground">Responsáveis:</span>
+                            <div className="mt-1">
+                              <TaskAssignedUsers users={getAssignedUsers(task.id)} maxDisplay={4} size="sm" />
+                            </div>
                           </div>
                           <div>
                             <span className="font-medium text-muted-foreground">Cliente:</span>
