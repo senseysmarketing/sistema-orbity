@@ -153,10 +153,12 @@ export function UsersManagement() {
       }
       
       // Criar usuário usando edge function
+      const trimmedEmail = inviteEmail.trim().toLowerCase();
+      const trimmedPassword = invitePassword.trim();
       const { data, error } = await supabase.functions.invoke('create-user', {
         body: {
-          email: inviteEmail,
-          password: invitePassword,
+          email: trimmedEmail,
+          password: trimmedPassword,
           role: inviteRole,
           agency_id: currentAgency?.id
         }

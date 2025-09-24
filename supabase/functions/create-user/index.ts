@@ -126,13 +126,16 @@ serve(async (req) => {
     
     logStep("Email availability check passed");
 
+    // Map frontend role (member/admin) to valid profile enum values
+    const metadataRole = role === 'admin' ? 'agency_admin' : 'agency_user';
+
     // Create the user using admin API
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true, // Skip email confirmation
       user_metadata: {
-        role: role
+        role: metadataRole
       }
     });
 
