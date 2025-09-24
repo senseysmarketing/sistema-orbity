@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, Lock, Bell, Palette, Save, Shield, Mail, Phone, BarChart3, CreditCard } from "lucide-react";
+import { User, Lock, Bell, Palette, Save, Shield, Mail, Phone, BarChart3, CreditCard, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,10 +12,12 @@ import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/components/ui/theme-provider";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { PricingCards } from "@/components/subscription/PricingCards";
 import { SubscriptionStatus } from "@/components/subscription/SubscriptionStatus";
 import { PaymentStatusCard } from "@/components/payment/PaymentStatusCard";
+import { UsersManagement } from "@/components/admin/UsersManagement";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -32,6 +34,7 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
   const { theme, setTheme } = useTheme();
   const { profile: userProfile, signOut } = useAuth();
+  const { isAgencyAdmin } = useAgency();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -137,6 +140,7 @@ export default function Settings() {
         <TabsList>
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="subscription">Assinatura</TabsTrigger>
+          {isAgencyAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
           <TabsTrigger value="account">Conta</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="appearance">Aparência</TabsTrigger>
@@ -242,6 +246,23 @@ export default function Settings() {
             </div>
           </div>
         </TabsContent>
+
+        {isAgencyAdmin && (
+          <TabsContent value="users" className="space-y-4">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                  <Users className="h-6 w-6" />
+                  Gerenciar Usuários
+                </h2>
+                <p className="text-muted-foreground">
+                  Gerencie os membros da sua agência e suas permissões
+                </p>
+              </div>
+              <UsersManagement />
+            </div>
+          </TabsContent>
+        )}
 
         <TabsContent value="account" className="space-y-4">
           <Card>
