@@ -116,6 +116,7 @@ export function CRMAnalytics({ leads }: CRMAnalyticsProps) {
       conversionRate,
       lossRate,
       leadsThisMonth,
+      leadsLastMonth,
       leadsThisWeek,
       monthlyGrowth,
       totalValue,

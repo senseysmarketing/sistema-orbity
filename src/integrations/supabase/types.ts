@@ -665,6 +665,39 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_statuses: {
+        Row: {
+          agency_id: string
+          color: string
+          created_at: string
+          id: string
+          is_default: boolean
+          name: string
+          order_position: number
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          color?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          order_position?: number
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          color?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          order_position?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           agency_id: string

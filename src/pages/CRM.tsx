@@ -12,6 +12,10 @@ import { LeadsKanban } from "@/components/crm/LeadsKanban";
 import { LeadsList } from "@/components/crm/LeadsList";
 import { LeadForm } from "@/components/crm/LeadForm";
 import { WebhooksManager } from "@/components/crm/WebhooksManager";
+import { CRMAlerts } from "@/components/crm/CRMAlerts";
+import { CustomStatusManager } from "@/components/crm/CustomStatusManager";
+import { CRMAdvancedFilters } from "@/components/crm/CRMAdvancedFilters";
+import { CRMAnalytics } from "@/components/crm/CRMAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
@@ -52,6 +56,17 @@ export default function CRM() {
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showWebhooks, setShowWebhooks] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [advancedFilters, setAdvancedFilters] = useState({
+    status: [] as string[],
+    priority: [] as string[],
+    source: [] as string[],
+    assignedTo: [] as string[],
+    valueRange: { min: null as number | null, max: null as number | null },
+    dateRange: { from: null as Date | null, to: null as Date | null },
+    tags: [] as string[],
+    hasNextContact: null as boolean | null,
+    followUpOverdue: null as boolean | null,
+  });
 
   const fetchLeads = async () => {
     if (!currentAgency?.id) return;
@@ -88,10 +103,34 @@ export default function CRM() {
       const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
       const matchesPriority = priorityFilter === 'all' || lead.priority === priorityFilter;
       const matchesSource = sourceFilter === 'all' || lead.source === sourceFilter;
+
+      // Advanced filters
+      const matchesAdvancedStatus = advancedFilters.status.length === 0 || advancedFilters.status.includes(lead.status);
+      const matchesAdvancedPriority = advancedFilters.priority.length === 0 || advancedFilters.priority.includes(lead.priority);
+      const matchesAdvancedSource = advancedFilters.source.length === 0 || advancedFilters.source.includes(lead.source);
       
-      return matchesSearch && matchesStatus && matchesPriority && matchesSource;
+      const matchesValueRange = 
+        (advancedFilters.valueRange.min === null || lead.value >= advancedFilters.valueRange.min) &&
+        (advancedFilters.valueRange.max === null || lead.value <= advancedFilters.valueRange.max);
+
+      const matchesDateRange = 
+        (!advancedFilters.dateRange.from || new Date(lead.created_at) >= advancedFilters.dateRange.from) &&
+        (!advancedFilters.dateRange.to || new Date(lead.created_at) <= advancedFilters.dateRange.to);
+
+      const matchesFollowUp = 
+        advancedFilters.hasNextContact === null ||
+        (advancedFilters.hasNextContact === true && lead.next_contact !== null) ||
+        (advancedFilters.hasNextContact === false && lead.next_contact === null);
+
+      const matchesOverdue = 
+        advancedFilters.followUpOverdue === null ||
+        (advancedFilters.followUpOverdue === true && lead.next_contact && new Date(lead.next_contact) < new Date());
+      
+      return matchesSearch && matchesStatus && matchesPriority && matchesSource &&
+             matchesAdvancedStatus && matchesAdvancedPriority && matchesAdvancedSource &&
+             matchesValueRange && matchesDateRange && matchesFollowUp && matchesOverdue;
     });
-  }, [leads, searchQuery, statusFilter, priorityFilter, sourceFilter]);
+  }, [leads, searchQuery, statusFilter, priorityFilter, sourceFilter, advancedFilters]);
 
   // Análises e métricas
   const analytics = useMemo(() => {
@@ -370,12 +409,34 @@ export default function CRM() {
         </Card>
       </div>
 
+      {/* Alertas do CRM */}
+      <CRMAlerts leads={filteredLeads} onEdit={handleLeadEdit} />
+
+      {/* Filtros Avançados */}
+      <CRMAdvancedFilters 
+        filters={advancedFilters}
+        onFiltersChange={setAdvancedFilters}
+        onClearFilters={() => setAdvancedFilters({
+          status: [],
+          priority: [],
+          source: [],
+          assignedTo: [],
+          valueRange: { min: null, max: null },
+          dateRange: { from: null, to: null },
+          tags: [],
+          hasNextContact: null,
+          followUpOverdue: null,
+        })}
+      />
+
       {/* Filtros e Leads */}
       <Tabs defaultValue="overview" className="space-y-4">
         <div className="flex items-center justify-between">
           <TabsList>
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="leads">Leads</TabsTrigger>
+            <TabsTrigger value="analytics">Análises</TabsTrigger>
+            <TabsTrigger value="settings">Configurações</TabsTrigger>
           </TabsList>
         </div>
         
@@ -522,6 +583,14 @@ export default function CRM() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-4">
+          <CRMAnalytics leads={filteredLeads} />
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-4">
+          <CustomStatusManager onStatusUpdate={fetchLeads} />
         </TabsContent>
       </Tabs>
     </div>
