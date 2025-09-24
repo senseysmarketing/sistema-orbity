@@ -1,73 +1,79 @@
 import { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, MoreHorizontal, Edit, Trash2, Webhook, CheckCircle, XCircle, Activity } from "lucide-react";
+import { Copy, ExternalLink, Settings, CheckCircle2, AlertCircle, BarChart3, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 
-interface WebhookData {
+interface WebhookConfig {
   id: string;
   name: string;
   url: string;
   events: string[];
-  headers: any;
-  secret_token: string | null;
   is_active: boolean;
-  last_triggered: string | null;
+  headers: any;
   success_count: number;
   error_count: number;
-  created_at: string;
-  updated_at: string;
+  last_triggered: string | null;
 }
 
 export function WebhooksManager() {
-  const { profile } = useAuth();
   const { currentAgency } = useAgency();
-  const [webhooks, setWebhooks] = useState<WebhookData[]>([]);
+  const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [selectedWebhook, setSelectedWebhook] = useState<WebhookData | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    url: '',
-    events: [] as string[],
-    headers: '{}',
-    secret_token: '',
-    is_active: true,
+  const [fieldMapping, setFieldMapping] = useState({
+    name: 'name',
+    email: 'email',
+    phone: 'phone',
+    company: 'company',
+    position: 'position',
+    source: 'source',
+    notes: 'notes',
+    value: 'value'
+  });
+  const [defaultValues, setDefaultValues] = useState({
+    status: 'new',
+    priority: 'medium',
+    source: 'webhook'
   });
 
-  const availableEvents = [
-    { value: 'lead.created', label: 'Lead Criado' },
-    { value: 'lead.updated', label: 'Lead Atualizado' },
-    { value: 'lead.status_changed', label: 'Status do Lead Alterado' },
-    { value: 'lead.deleted', label: 'Lead Excluído' },
-    { value: 'activity.created', label: 'Atividade Criada' },
-    { value: 'activity.completed', label: 'Atividade Concluída' },
-  ];
+  const webhookUrl = `https://ovookkywclrqfmtumelw.supabase.co/functions/v1/capture-lead/${currentAgency?.id}`;
+
+  useEffect(() => {
+    if (currentAgency?.id) {
+      fetchWebhooks();
+    }
+  }, [currentAgency?.id]);
 
   const fetchWebhooks = async () => {
-    if (!currentAgency?.id) return;
-
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('agency_webhooks')
         .select('*')
-        .eq('agency_id', currentAgency.id)
+        .eq('agency_id', currentAgency?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setWebhooks(data || []);
+
+      // Load configuration for lead capture webhook
+      const leadWebhook = data?.find(w => w.events.includes('lead_capture'));
+      if (leadWebhook?.headers) {
+        const config = leadWebhook.headers as any;
+        if (config.field_mapping) {
+          setFieldMapping({ ...fieldMapping, ...config.field_mapping });
+        }
+        if (config.default_values) {
+          setDefaultValues({ ...defaultValues, ...config.default_values });
+        }
+      }
     } catch (error) {
       console.error('Error fetching webhooks:', error);
       toast.error('Erro ao carregar webhooks');
@@ -76,171 +82,204 @@ export function WebhooksManager() {
     }
   };
 
-  useEffect(() => {
-    fetchWebhooks();
-  }, [currentAgency?.id]);
-
-  useEffect(() => {
-    if (selectedWebhook) {
-      setFormData({
-        name: selectedWebhook.name,
-        url: selectedWebhook.url,
-        events: selectedWebhook.events,
-        headers: JSON.stringify(selectedWebhook.headers, null, 2),
-        secret_token: selectedWebhook.secret_token || '',
-        is_active: selectedWebhook.is_active,
-      });
-    } else {
-      setFormData({
-        name: '',
-        url: '',
-        events: [],
-        headers: '{}',
-        secret_token: '',
-        is_active: true,
-      });
-    }
-  }, [selectedWebhook]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!currentAgency?.id || !profile?.user_id) {
-      toast.error('Agência ou usuário não encontrado');
-      return;
-    }
-
+  const saveConfiguration = async () => {
     try {
-      let headers;
-      try {
-        headers = JSON.parse(formData.headers);
-      } catch {
-        toast.error('Headers deve ser um JSON válido');
-        return;
-      }
-
-      const webhookData = {
-        agency_id: currentAgency.id,
-        name: formData.name,
-        url: formData.url,
-        events: formData.events,
-        headers,
-        secret_token: formData.secret_token || null,
-        is_active: formData.is_active,
-        updated_at: new Date().toISOString(),
+      const config = {
+        field_mapping: fieldMapping,
+        default_values: defaultValues
       };
 
-      if (selectedWebhook) {
+      // Check if lead capture webhook exists
+      let leadWebhook = webhooks.find(w => w.events.includes('lead_capture'));
+
+      if (leadWebhook) {
+        // Update existing webhook
         const { error } = await supabase
           .from('agency_webhooks')
-          .update(webhookData)
-          .eq('id', selectedWebhook.id);
+          .update({
+            headers: config,
+            is_active: true
+          })
+          .eq('id', leadWebhook.id);
 
         if (error) throw error;
-        toast.success('Webhook atualizado com sucesso');
       } else {
+        // Create new webhook for lead capture
         const { error } = await supabase
           .from('agency_webhooks')
           .insert({
-            ...webhookData,
-            created_by: profile.user_id,
+            agency_id: currentAgency?.id,
+            name: 'Captura de Leads',
+            url: webhookUrl,
+            events: ['lead_capture'],
+            headers: config,
+            is_active: true,
+            created_by: currentAgency?.id // Using agency id as fallback
           });
 
         if (error) throw error;
-        toast.success('Webhook criado com sucesso');
       }
 
-      setShowForm(false);
-      setSelectedWebhook(null);
+      toast.success('Configuração salva com sucesso');
       fetchWebhooks();
     } catch (error) {
-      console.error('Error saving webhook:', error);
-      toast.error('Erro ao salvar webhook');
+      console.error('Error saving configuration:', error);
+      toast.error('Erro ao salvar configuração');
     }
   };
 
-  const handleDelete = async (webhookId: string) => {
-    try {
-      const { error } = await supabase
-        .from('agency_webhooks')
-        .delete()
-        .eq('id', webhookId);
-
-      if (error) throw error;
-      
-      setWebhooks(webhooks.filter(w => w.id !== webhookId));
-      toast.success('Webhook excluído com sucesso');
-    } catch (error) {
-      console.error('Error deleting webhook:', error);
-      toast.error('Erro ao excluir webhook');
-    }
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('URL copiada para área de transferência');
   };
 
   const toggleWebhook = async (webhookId: string, isActive: boolean) => {
     try {
       const { error } = await supabase
         .from('agency_webhooks')
-        .update({ 
-          is_active: !isActive,
-          updated_at: new Date().toISOString()
-        })
+        .update({ is_active: !isActive })
         .eq('id', webhookId);
 
       if (error) throw error;
       
+      toast.success(isActive ? 'Webhook desativado' : 'Webhook ativado');
       fetchWebhooks();
-      toast.success(`Webhook ${!isActive ? 'ativado' : 'desativado'} com sucesso`);
     } catch (error) {
       console.error('Error toggling webhook:', error);
       toast.error('Erro ao alterar status do webhook');
     }
   };
 
-  const testWebhook = async (webhook: WebhookData) => {
+  const testWebhook = async () => {
     try {
-      const testPayload = {
-        event: 'webhook.test',
-        timestamp: new Date().toISOString(),
-        data: {
-          message: 'Este é um teste do webhook',
-          webhook_id: webhook.id,
-        },
+      const testData = {
+        name: 'João Silva',
+        email: 'joao.teste@email.com',
+        phone: '11999999999',
+        company: 'Empresa Teste',
+        message: 'Lead de teste do sistema'
       };
 
-      const response = await fetch(webhook.url, {
+      const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          ...webhook.headers,
-          ...(webhook.secret_token && { 'X-Webhook-Secret': webhook.secret_token }),
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(testPayload),
+        body: JSON.stringify(testData)
       });
 
       if (response.ok) {
-        toast.success('Webhook testado com sucesso');
-        // Update success count
-        await supabase
-          .from('agency_webhooks')
-          .update({ 
-            success_count: webhook.success_count + 1,
-            last_triggered: new Date().toISOString()
-          })
-          .eq('id', webhook.id);
+        const result = await response.json();
+        toast.success(`Lead de teste criado com sucesso! ID: ${result.lead_id}`);
+        fetchWebhooks();
       } else {
-        toast.error(`Erro no teste: ${response.status} ${response.statusText}`);
-        // Update error count
-        await supabase
-          .from('agency_webhooks')
-          .update({ error_count: webhook.error_count + 1 })
-          .eq('id', webhook.id);
+        const error = await response.json();
+        toast.error(`Erro no teste: ${error.error || 'Falha na requisição'}`);
       }
-      
-      fetchWebhooks();
     } catch (error) {
       console.error('Error testing webhook:', error);
       toast.error('Erro ao testar webhook');
     }
+  };
+
+  const downloadIntegrationGuide = () => {
+    const guide = `# Guia de Integração - Webhook de Captura de Leads
+
+## URL do Webhook
+${webhookUrl}
+
+## Métodos Suportados
+- **POST**: Enviar dados via JSON no body da requisição
+- **GET**: Enviar dados via query parameters na URL
+
+## Campos Suportados
+${Object.entries(fieldMapping).map(([field, mapping]) => `- **${field}**: ${mapping}`).join('\n')}
+
+## Exemplos de Integração
+
+### JavaScript (POST)
+\`\`\`javascript
+fetch('${webhookUrl}', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: 'Nome do Lead',
+    email: 'email@exemplo.com',
+    phone: '11999999999',
+    company: 'Empresa ABC',
+    message: 'Mensagem do lead'
+  })
+});
+\`\`\`
+
+### cURL (POST)
+\`\`\`bash
+curl -X POST '${webhookUrl}' \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "name": "Nome do Lead",
+    "email": "email@exemplo.com",
+    "phone": "11999999999",
+    "company": "Empresa ABC"
+  }'
+\`\`\`
+
+### HTML Form (GET)
+\`\`\`html
+<form action="${webhookUrl}" method="GET">
+  <input type="text" name="name" placeholder="Nome" required>
+  <input type="email" name="email" placeholder="Email">
+  <input type="tel" name="phone" placeholder="Telefone">
+  <input type="text" name="company" placeholder="Empresa">
+  <textarea name="notes" placeholder="Mensagem"></textarea>
+  <button type="submit">Enviar</button>
+</form>
+\`\`\`
+
+## Validações
+- **Nome** é obrigatório
+- **Email** deve ter formato válido (se fornecido)
+- **Telefone** será automaticamente limpo (somente números e símbolos válidos)
+- **Valor** será convertido para número (se fornecido)
+
+## Resposta da API
+### Sucesso (200)
+\`\`\`json
+{
+  "success": true,
+  "lead_id": "uuid-do-lead",
+  "message": "Lead captured successfully"
+}
+\`\`\`
+
+### Erro (400/500)
+\`\`\`json
+{
+  "error": "Mensagem de erro"
+}
+\`\`\`
+
+## Valores Padrão Aplicados
+${Object.entries(defaultValues).map(([field, value]) => `- **${field}**: ${value}`).join('\n')}
+
+---
+Gerado automaticamente pelo sistema CRM
+Data: ${new Date().toLocaleString('pt-BR')}
+`;
+
+    const blob = new Blob([guide], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'guia-integracao-webhook.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast.success('Guia de integração baixado com sucesso');
   };
 
   if (loading) {
@@ -251,260 +290,259 @@ export function WebhooksManager() {
     );
   }
 
+  const leadWebhook = webhooks.find(w => w.events.includes('lead_capture'));
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium">Webhooks Personalizados</h3>
-          <p className="text-sm text-muted-foreground">
-            Configure webhooks para integrar com outras ferramentas e receber notificações em tempo real
-          </p>
-        </div>
-        <Dialog open={showForm} onOpenChange={setShowForm}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Webhook
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {selectedWebhook ? 'Editar Webhook' : 'Novo Webhook'}
-              </DialogTitle>
-              <DialogDescription>
-                Configure um webhook para receber notificações sobre eventos do CRM
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="url">URL *</Label>
-                  <Input
-                    id="url"
-                    type="url"
-                    value={formData.url}
-                    onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Eventos</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {availableEvents.map((event) => (
-                    <div key={event.value} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id={event.value}
-                        checked={formData.events.includes(event.value)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData({
-                              ...formData,
-                              events: [...formData.events, event.value]
-                            });
-                          } else {
-                            setFormData({
-                              ...formData,
-                              events: formData.events.filter(ev => ev !== event.value)
-                            });
-                          }
-                        }}
-                        className="rounded border-gray-300"
-                      />
-                      <Label htmlFor={event.value} className="text-sm">
-                        {event.label}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="headers">Headers (JSON)</Label>
-                <textarea
-                  id="headers"
-                  value={formData.headers}
-                  onChange={(e) => setFormData({ ...formData, headers: e.target.value })}
-                  rows={3}
-                  className="w-full p-2 border rounded-md font-mono text-sm"
-                  placeholder='{"Authorization": "Bearer your-token"}'
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="secret_token">Token Secreto (opcional)</Label>
-                <Input
-                  id="secret_token"
-                  value={formData.secret_token}
-                  onChange={(e) => setFormData({ ...formData, secret_token: e.target.value })}
-                  placeholder="Para validação de segurança"
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                />
-                <Label>Ativo</Label>
-              </div>
-
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => {
-                    setShowForm(false);
-                    setSelectedWebhook(null);
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit">
-                  {selectedWebhook ? 'Atualizar' : 'Criar'}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {webhooks.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Webhook className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Nenhum webhook configurado</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              Configure webhooks para integrar com outras ferramentas e automatizar processos
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ExternalLink className="h-5 w-5" />
+            Webhook de Captura de Leads
+          </CardTitle>
+          <CardDescription>
+            URL única para receber leads automaticamente de formulários externos, landing pages ou integrações
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* URL do Webhook */}
+          <div className="space-y-2">
+            <Label>URL do Webhook</Label>
+            <div className="flex gap-2">
+              <Input
+                value={webhookUrl}
+                readOnly
+                className="font-mono text-sm"
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => copyToClipboard(webhookUrl)}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Use esta URL para enviar dados via POST (JSON) ou GET (query parameters)
             </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>URL</TableHead>
-                  <TableHead>Eventos</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Estatísticas</TableHead>
-                  <TableHead>Último Trigger</TableHead>
-                  <TableHead className="w-[100px]">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {webhooks.map((webhook) => (
-                  <TableRow key={webhook.id}>
-                    <TableCell className="font-medium">{webhook.name}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{webhook.url}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {webhook.events.slice(0, 2).map((event, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {availableEvents.find(e => e.value === event)?.label || event}
-                          </Badge>
-                        ))}
-                        {webhook.events.length > 2 && (
-                          <Badge variant="secondary" className="text-xs">
-                            +{webhook.events.length - 2}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {webhook.is_active ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-red-500" />
-                        )}
-                        <span className="text-sm">
-                          {webhook.is_active ? 'Ativo' : 'Inativo'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm space-y-1">
-                        <div className="text-green-600">✓ {webhook.success_count}</div>
-                        <div className="text-red-600">✗ {webhook.error_count}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {webhook.last_triggered ? (
-                        <div className="text-sm">
-                          {new Date(webhook.last_triggered).toLocaleString('pt-BR')}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">Nunca</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => testWebhook(webhook)}>
-                            <Activity className="mr-2 h-4 w-4" />
-                            Testar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => toggleWebhook(webhook.id, webhook.is_active)}
-                          >
-                            {webhook.is_active ? (
-                              <>
-                                <XCircle className="mr-2 h-4 w-4" />
-                                Desativar
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                Ativar
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              setSelectedWebhook(webhook);
-                              setShowForm(true);
-                            }}
-                          >
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => handleDelete(webhook.id)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+
+          <Separator />
+
+          {/* Status e Estatísticas */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <div className="flex items-center gap-2">
+                {leadWebhook?.is_active ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span className="text-sm text-green-600">Ativo</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-4 w-4 text-orange-500" />
+                    <span className="text-sm text-orange-600">Inativo</span>
+                  </>
+                )}
+              </div>
+            </div>
+            
+            {leadWebhook && (
+              <>
+                <div className="space-y-2">
+                  <Label>Leads Capturados</Label>
+                  <div className="text-2xl font-bold text-green-600">
+                    {leadWebhook.success_count || 0}
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Erros</Label>
+                  <div className="text-2xl font-bold text-red-600">
+                    {leadWebhook.error_count || 0}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {leadWebhook?.last_triggered && (
+            <div className="space-y-2">
+              <Label>Última Atividade</Label>
+              <p className="text-sm text-muted-foreground">
+                {new Date(leadWebhook.last_triggered).toLocaleString('pt-BR')}
+              </p>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Mapeamento de Campos */}
+          <div className="space-y-4">
+            <Label className="text-base">Mapeamento de Campos</Label>
+            <p className="text-sm text-muted-foreground">
+              Configure como os campos do JSON recebido serão mapeados para os campos do CRM
+            </p>
+            
+            <div className="grid grid-cols-2 gap-4">
+              {Object.entries(fieldMapping).map(([crmField, sourceField]) => (
+                <div key={crmField} className="space-y-2">
+                  <Label className="text-sm">
+                    {crmField === 'name' ? 'Nome' : 
+                     crmField === 'email' ? 'Email' :
+                     crmField === 'phone' ? 'Telefone' :
+                     crmField === 'company' ? 'Empresa' :
+                     crmField === 'position' ? 'Cargo' :
+                     crmField === 'source' ? 'Origem' :
+                     crmField === 'notes' ? 'Observações' :
+                     crmField === 'value' ? 'Valor' : crmField}
+                    {crmField === 'name' && <span className="text-red-500">*</span>}
+                  </Label>
+                  <Input
+                    placeholder={`Campo JSON para ${crmField}`}
+                    value={sourceField}
+                    onChange={(e) => setFieldMapping(prev => ({
+                      ...prev,
+                      [crmField]: e.target.value
+                    }))}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Valores Padrão */}
+          <div className="space-y-4">
+            <Label className="text-base">Valores Padrão</Label>
+            <p className="text-sm text-muted-foreground">
+              Valores que serão aplicados automaticamente quando o lead for criado
+            </p>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Status Padrão</Label>
+                <Input
+                  value={defaultValues.status}
+                  onChange={(e) => setDefaultValues(prev => ({
+                    ...prev,
+                    status: e.target.value
+                  }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Prioridade Padrão</Label>
+                <Input
+                  value={defaultValues.priority}
+                  onChange={(e) => setDefaultValues(prev => ({
+                    ...prev,
+                    priority: e.target.value
+                  }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Origem Padrão</Label>
+                <Input
+                  value={defaultValues.source}
+                  onChange={(e) => setDefaultValues(prev => ({
+                    ...prev,
+                    source: e.target.value
+                  }))}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            <Button onClick={saveConfiguration} className="flex-1">
+              Salvar Configuração
+            </Button>
+            {leadWebhook && (
+              <Button
+                variant="outline"
+                onClick={() => toggleWebhook(leadWebhook.id, leadWebhook.is_active)}
+              >
+                {leadWebhook.is_active ? 'Desativar' : 'Ativar'}
+              </Button>
+            )}
+            <Button variant="outline" onClick={testWebhook}>
+              Testar Webhook
+            </Button>
+            <Button variant="outline" onClick={downloadIntegrationGuide}>
+              <Download className="h-4 w-4 mr-2" />
+              Guia de Integração
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Exemplo de Uso */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Exemplos de Uso</CardTitle>
+          <CardDescription>
+            Como enviar dados para o webhook
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Tabs defaultValue="javascript">
+            <TabsList>
+              <TabsTrigger value="javascript">JavaScript</TabsTrigger>
+              <TabsTrigger value="curl">cURL</TabsTrigger>
+              <TabsTrigger value="html">HTML Form</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="javascript" className="space-y-2">
+              <Label>Exemplo via JavaScript (POST)</Label>
+              <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
+                <code>{`fetch('${webhookUrl}', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: 'João Silva',
+    email: 'joao@email.com',
+    phone: '11999999999',
+    company: 'Empresa ABC',
+    message: 'Interessado no produto'
+  })
+});`}</code>
+              </pre>
+            </TabsContent>
+            
+            <TabsContent value="curl" className="space-y-2">
+              <Label>Exemplo via cURL</Label>
+              <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
+                <code>{`curl -X POST '${webhookUrl}' \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "name": "João Silva",
+    "email": "joao@email.com",
+    "phone": "11999999999",
+    "company": "Empresa ABC"
+  }'`}</code>
+              </pre>
+            </TabsContent>
+            
+            <TabsContent value="html" className="space-y-2">
+              <Label>Exemplo via HTML Form (GET)</Label>
+              <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
+                <code>{`<form action="${webhookUrl}" method="GET">
+  <input type="text" name="name" placeholder="Nome" required>
+  <input type="email" name="email" placeholder="Email">
+  <input type="tel" name="phone" placeholder="Telefone">
+  <input type="text" name="company" placeholder="Empresa">
+  <textarea name="notes" placeholder="Mensagem"></textarea>
+  <button type="submit">Enviar</button>
+</form>`}</code>
+              </pre>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }
