@@ -6,6 +6,7 @@ import { LeadKanbanColumn } from "./LeadKanbanColumn";
 import { SortableLeadCard } from "./SortableLeadCard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 
 interface Lead {
   id: string;
@@ -36,19 +37,12 @@ interface LeadsKanbanProps {
   onUpdate: () => void;
 }
 
-const statusConfig = {
-  new: { title: 'Novos', color: 'bg-blue-500', count: 0 },
-  contacted: { title: 'Contatados', color: 'bg-yellow-500', count: 0 },
-  qualified: { title: 'Qualificados', color: 'bg-orange-500', count: 0 },
-  proposal: { title: 'Proposta', color: 'bg-purple-500', count: 0 },
-  negotiation: { title: 'Negociação', color: 'bg-indigo-500', count: 0 },
-  won: { title: 'Ganhos', color: 'bg-green-500', count: 0 },
-  lost: { title: 'Perdidos', color: 'bg-red-500', count: 0 },
-};
-
 export function LeadsKanban({ leads, onEdit, onDelete, onUpdate }: LeadsKanbanProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
+  const { getStatusConfig, getStatusKey, getStatusName } = useLeadStatuses();
+
+  const statusConfig = getStatusConfig();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -137,10 +131,13 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate }: LeadsKanbanPr
     }
 
     try {
+      // Convert status key back to database format
+      const dbStatus = getStatusName(newStatus);
+      
       const { error } = await supabase
         .from('leads')
         .update({ 
-          status: newStatus,
+          status: dbStatus,
           updated_at: new Date().toISOString()
         })
         .eq('id', leadId);
@@ -158,8 +155,9 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate }: LeadsKanbanPr
     setDraggedLead(null);
   };
 
-  const groupedLeads = Object.keys(statusConfig).reduce((acc, status) => {
-    acc[status] = leads.filter(lead => lead.status === status);
+  const groupedLeads = Object.keys(statusConfig).reduce((acc, statusKey) => {
+    const statusName = getStatusName(statusKey);
+    acc[statusKey] = leads.filter(lead => lead.status === statusName);
     return acc;
   }, {} as Record<string, Lead[]>);
 
@@ -169,15 +167,15 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate }: LeadsKanbanPr
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-4 min-h-[600px]">
-        {Object.entries(statusConfig).map(([status, config]) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[600px]">
+        {Object.entries(statusConfig).map(([statusKey, config]) => (
           <LeadKanbanColumn
-            key={status}
-            id={status}
+            key={statusKey}
+            id={statusKey}
             title={config.title}
-            leads={groupedLeads[status] || []}
+            leads={groupedLeads[statusKey] || []}
             color={config.color}
-            count={groupedLeads[status]?.length || 0}
+            count={groupedLeads[statusKey]?.length || 0}
             onEdit={onEdit}
             onDelete={onDelete}
             getPriorityColor={getPriorityColor}

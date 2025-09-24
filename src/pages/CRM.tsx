@@ -19,6 +19,7 @@ import { CRMAnalytics } from "@/components/crm/CRMAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
+import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 import { toast } from "sonner";
 
 interface Lead {
@@ -46,6 +47,7 @@ interface Lead {
 export default function CRM() {
   const { profile } = useAuth();
   const { currentAgency } = useAgency();
+  const { refresh: refreshStatuses } = useLeadStatuses();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
@@ -599,7 +601,7 @@ export default function CRM() {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
-          <CustomStatusManager onStatusUpdate={fetchLeads} />
+          <CustomStatusManager onStatusUpdate={() => { fetchLeads(); refreshStatuses(); }} />
         </TabsContent>
       </Tabs>
     </div>
