@@ -238,7 +238,12 @@ export default function CRM() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">CRM & Leads</h2>
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">CRM & Leads</h2>
+          <p className="text-muted-foreground">
+            Sistema completo para gestão de relacionamento com clientes e leads
+          </p>
+        </div>
         <div className="flex items-center space-x-2">
           <Dialog open={showWebhooks} onOpenChange={setShowWebhooks}>
             <DialogTrigger asChild>
