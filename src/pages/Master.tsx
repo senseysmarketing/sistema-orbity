@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMaster } from '@/hooks/useMaster';
+import { useAuth } from '@/hooks/useAuth';
 import { MasterMetricsCards } from '@/components/master/MasterMetricsCards';
 import { AgenciesTable } from '@/components/master/AgenciesTable';
 import { SubscriptionPlansManager } from '@/components/master/SubscriptionPlansManager';
@@ -10,12 +11,13 @@ import { Shield, BarChart3, Building2, Settings } from 'lucide-react';
 export default function Master() {
   const navigate = useNavigate();
   const { isMasterUser, loading } = useMaster();
+  const { profile } = useAuth();
 
   useEffect(() => {
-    if (!loading && !isMasterUser) {
+    if (!loading && profile?.role !== 'super_admin') {
       navigate('/');
     }
-  }, [isMasterUser, loading, navigate]);
+  }, [profile?.role, loading, navigate]);
 
   if (loading) {
     return (
@@ -25,7 +27,7 @@ export default function Master() {
     );
   }
 
-  if (!isMasterUser) {
+  if (profile?.role !== 'super_admin') {
     return null;
   }
 

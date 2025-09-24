@@ -12,37 +12,37 @@ const menuItems = [{
   title: "Dashboard",
   url: "/",
   icon: LayoutDashboard,
-  roles: ["gestor_trafego", "designer", "administrador"]
+  roles: ["agency_admin", "agency_user"]
 }, {
   title: "Tarefas Gerais",
   url: "/tasks",
   icon: CheckSquare,
-  roles: ["gestor_trafego", "designer", "administrador"]
+  roles: ["agency_admin", "agency_user"]
 }, {
   title: "Tarefas Pessoais",
   url: "/personal-tasks",
   icon: User,
-  roles: ["gestor_trafego", "designer", "administrador"]
+  roles: ["agency_admin", "agency_user"]
 }, {
   title: "Controle de Tráfego",
   url: "/traffic",
   icon: TrendingUp,
-  roles: ["gestor_trafego", "administrador"]
+  roles: ["agency_admin", "agency_user"]
 }, {
   title: "Administrativo",
   url: "/admin",
   icon: DollarSign,
-  roles: ["administrador"]
+  roles: ["agency_admin"]
 }, {
   title: "Relatórios",
   url: "/reports",
   icon: BarChart3,
-  roles: ["gestor_trafego", "designer", "administrador"]
+  roles: ["agency_admin", "agency_user"]
 }, {
   title: "Configurações",
   url: "/settings",
   icon: Settings,
-  roles: ["gestor_trafego", "designer", "administrador"]
+  roles: ["agency_admin"]
 }];
 export function AppSidebar() {
   const {
@@ -68,16 +68,10 @@ export function AppSidebar() {
   }) => isActive ? "bg-sidebar-accent text-sidebar-foreground font-medium border-r-2 border-blue-400" : "hover:bg-sidebar-muted text-sidebar-foreground/80 hover:text-sidebar-foreground";
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'gestor_trafego':
-        return 'Gestor de Tráfego';
-      case 'designer':
-        return 'Designer';
-      case 'administrador':
-        return 'Administrador';
       case 'super_admin':
         return 'Super Admin';
       case 'agency_admin':
-        return 'Admin da Agência';
+        return 'Administrador';
       case 'agency_user':
         return 'Usuário';
       default:
@@ -122,8 +116,8 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Master Section - Only for administrators and super admins */}
-        {(profile?.role === 'administrador' || profile?.role === 'super_admin') && (
+        {/* Master Section - Only for super admin */}
+        {profile?.role === 'super_admin' && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-sidebar-foreground/70">Master</SidebarGroupLabel>
             <SidebarGroupContent>

@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { usePaymentMiddleware } from '@/hooks/usePaymentMiddleware';
+import { useAuth } from '@/hooks/useAuth';
 import { BlockedAccessScreen } from '@/components/payment/BlockedAccessScreen';
 
 interface PaymentMiddlewareWrapperProps {
@@ -8,6 +9,7 @@ interface PaymentMiddlewareWrapperProps {
 
 export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperProps) {
   const { paymentStatus, loading, isSuperAdmin } = usePaymentMiddleware();
+  const { profile } = useAuth();
 
   // Show loading spinner while checking payment status
   if (loading) {
@@ -19,7 +21,7 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
   }
 
   // Super admins bypass all checks
-  if (isSuperAdmin) {
+  if (profile?.role === 'super_admin') {
     return <>{children}</>;
   }
 

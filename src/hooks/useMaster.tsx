@@ -41,7 +41,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
   const [agencies, setAgencies] = useState<MasterAgencyOverview[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const isMasterUser = profile?.role === 'administrador';
+  const isMasterUser = profile?.role === 'super_admin';
 
   const fetchAgencies = async () => {
     if (!isMasterUser) {
