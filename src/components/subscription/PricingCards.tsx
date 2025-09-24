@@ -12,7 +12,7 @@ export function PricingCards() {
     switch (slug) {
       case 'free': return <Zap className="h-6 w-6" />;
       case 'basic': return <Building className="h-6 w-6" />;
-      case 'pro': return <Crown className="h-6 w-6" />;
+      case 'professional': return <Crown className="h-6 w-6" />;
       case 'enterprise': return <Crown className="h-6 w-6" />;
       default: return <Zap className="h-6 w-6" />;
     }
@@ -22,7 +22,7 @@ export function PricingCards() {
     switch (slug) {
       case 'free': return 'border-gray-200';
       case 'basic': return 'border-blue-200';
-      case 'pro': return 'border-purple-200';
+      case 'professional': return 'border-purple-200';
       case 'enterprise': return 'border-orange-200';
       default: return 'border-gray-200';
     }
@@ -63,7 +63,7 @@ export function PricingCards() {
   const getButtonVariant = (plan: any) => {
     if (isCurrentPlan(plan.name)) {
       return 'outline';
-    } else if (plan.slug === 'pro') {
+    } else if (plan.slug === 'professional') {
       return 'default';
     } else {
       return 'outline';
@@ -107,7 +107,7 @@ export function PricingCards() {
             isCurrentPlan(plan.name) && "ring-2 ring-primary ring-offset-2"
           )}
         >
-          {plan.slug === 'pro' && (
+          {plan.slug === 'professional' && (
             <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
               <Badge className="bg-primary text-primary-foreground">
                 Mais Popular
