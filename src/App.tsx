@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/ui/theme-provider";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AgencyProvider } from "@/hooks/useAgency";
 import { SubscriptionProvider } from "@/hooks/useSubscription";
+import { MasterProvider } from "@/hooks/useMaster";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -17,6 +18,7 @@ import Traffic from "./pages/Traffic";
 import Admin from "./pages/Admin";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import Master from "./pages/Master";
 import SubscriptionSuccess from "./pages/SubscriptionSuccess";
 import SubscriptionCanceled from "./pages/SubscriptionCanceled";
 
@@ -28,7 +30,8 @@ const App = () => (
       <AuthProvider>
         <AgencyProvider>
           <SubscriptionProvider>
-            <TooltipProvider>
+            <MasterProvider>
+              <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -42,13 +45,15 @@ const App = () => (
                 <Route path="admin" element={<Admin />} />
                 <Route path="reports" element={<Reports />} />
                 <Route path="settings" element={<Settings />} />
+                <Route path="master" element={<Master />} />
               </Route>
               <Route path="/subscription-success" element={<SubscriptionSuccess />} />
               <Route path="/subscription-canceled" element={<SubscriptionCanceled />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
             </BrowserRouter>
-          </TooltipProvider>
+              </TooltipProvider>
+            </MasterProvider>
           </SubscriptionProvider>
         </AgencyProvider>
       </AuthProvider>
