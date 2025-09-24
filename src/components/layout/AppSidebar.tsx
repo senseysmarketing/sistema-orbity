@@ -4,7 +4,7 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGrou
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Shield } from "lucide-react";
+import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Shield, ContactRound } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import senseyLogo from "@/assets/senseys-logo.png";
 const menuItems = [{
@@ -21,6 +21,11 @@ const menuItems = [{
   title: "Tarefas Pessoais",
   url: "/personal-tasks",
   icon: User,
+  roles: ["agency_admin", "agency_user"]
+}, {
+  title: "CRM & Leads",
+  url: "/crm",
+  icon: ContactRound,
   roles: ["agency_admin", "agency_user"]
 }, {
   title: "Controle de Tráfego",

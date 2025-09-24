@@ -327,6 +327,57 @@ export type Database = {
           },
         ]
       }
+      agency_webhooks: {
+        Row: {
+          agency_id: string
+          created_at: string
+          created_by: string
+          error_count: number | null
+          events: string[]
+          headers: Json | null
+          id: string
+          is_active: boolean | null
+          last_triggered: string | null
+          name: string
+          secret_token: string | null
+          success_count: number | null
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          created_by: string
+          error_count?: number | null
+          events: string[]
+          headers?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered?: string | null
+          name: string
+          secret_token?: string | null
+          success_count?: number | null
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          created_by?: string
+          error_count?: number | null
+          events?: string[]
+          headers?: Json | null
+          id?: string
+          is_active?: boolean | null
+          last_triggered?: string | null
+          name?: string
+          secret_token?: string | null
+          success_count?: number | null
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
       billing_history: {
         Row: {
           agency_id: string
@@ -571,6 +622,117 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
         ]
+      }
+      lead_activities: {
+        Row: {
+          agency_id: string
+          completed: boolean | null
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          lead_id: string
+          scheduled_at: string | null
+          title: string
+          type: string
+        }
+        Insert: {
+          agency_id: string
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          lead_id: string
+          scheduled_at?: string | null
+          title: string
+          type: string
+        }
+        Update: {
+          agency_id?: string
+          completed?: boolean | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          lead_id?: string
+          scheduled_at?: string | null
+          title?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          agency_id: string
+          assigned_to: string | null
+          company: string | null
+          created_at: string
+          created_by: string
+          custom_fields: Json | null
+          email: string | null
+          id: string
+          last_contact: string | null
+          name: string
+          next_contact: string | null
+          notes: string | null
+          phone: string | null
+          position: string | null
+          priority: string
+          source: string | null
+          status: string
+          tags: string[] | null
+          updated_at: string
+          value: number | null
+        }
+        Insert: {
+          agency_id: string
+          assigned_to?: string | null
+          company?: string | null
+          created_at?: string
+          created_by: string
+          custom_fields?: Json | null
+          email?: string | null
+          id?: string
+          last_contact?: string | null
+          name: string
+          next_contact?: string | null
+          notes?: string | null
+          phone?: string | null
+          position?: string | null
+          priority?: string
+          source?: string | null
+          status?: string
+          tags?: string[] | null
+          updated_at?: string
+          value?: number | null
+        }
+        Update: {
+          agency_id?: string
+          assigned_to?: string | null
+          company?: string | null
+          created_at?: string
+          created_by?: string
+          custom_fields?: Json | null
+          email?: string | null
+          id?: string
+          last_contact?: string | null
+          name?: string
+          next_contact?: string | null
+          notes?: string | null
+          phone?: string | null
+          position?: string | null
+          priority?: string
+          source?: string | null
+          status?: string
+          tags?: string[] | null
+          updated_at?: string
+          value?: number | null
+        }
+        Relationships: []
       }
       personal_tasks: {
         Row: {
