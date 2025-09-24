@@ -205,6 +205,16 @@ export default function Traffic() {
     }
   };
 
+  // Função para cor de fundo do card baseada na situação
+  const getCardBackgroundColor = (situation: string | null) => {
+    switch (situation) {
+      case 'stable': return 'bg-green-50/50 dark:bg-green-950/20';
+      case 'improving': return 'bg-blue-50/50 dark:bg-blue-950/20';
+      case 'worsening': return 'bg-red-50/50 dark:bg-red-950/20';
+      default: return 'bg-gray-50/50 dark:bg-gray-950/20';
+    }
+  };
+
   const getResultsColor = (results: string | null) => {
     switch (results) {
       case 'excellent': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300';
@@ -589,12 +599,7 @@ export default function Traffic() {
                 return (
                   <Card 
                     key={control.id} 
-                    className={`hover:shadow-lg transition-all duration-200 border-l-4 ${
-                      priority.level === 'critical' ? 'border-l-red-500' :
-                      priority.level === 'high' ? 'border-l-orange-500' :
-                      priority.level === 'medium' ? 'border-l-yellow-500' :
-                      'border-l-green-500'
-                    }`}
+                    className={`hover:shadow-lg transition-all duration-200 ${getCardBackgroundColor(control.situation)}`}
                   >
                     <CardHeader className="pb-3">
                       <div className="flex justify-between items-start">
@@ -610,11 +615,6 @@ export default function Traffic() {
                               <DollarSign className="h-3 w-3" />
                               <span className="font-medium">R$ {control.daily_budget?.toLocaleString('pt-BR') || '0'}/dia</span>
                             </div>
-                            {client?.monthly_value && (
-                              <div className="text-xs">
-                                Mensalidade: R$ {client.monthly_value.toLocaleString('pt-BR')}
-                              </div>
-                            )}
                           </div>
                         </div>
                         <DropdownMenu>
