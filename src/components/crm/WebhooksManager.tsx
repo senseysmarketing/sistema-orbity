@@ -151,34 +151,67 @@ export function WebhooksManager() {
   };
 
   const testWebhook = async () => {
+    // Verificar se o webhook está configurado
+    if (!leadWebhook) {
+      toast.error('Configure o webhook antes de testá-lo');
+      return;
+    }
+
+    if (!leadWebhook.is_active) {
+      toast.error('Ative o webhook antes de testá-lo');
+      return;
+    }
+
     try {
+      // Dados de teste baseados no mapeamento de campos configurado
       const testData = {
-        name: 'João Silva',
-        email: 'joao.teste@email.com',
-        phone: '11999999999',
-        company: 'Empresa Teste',
-        message: 'Lead de teste do sistema'
+        [fieldMapping.name]: 'João Silva - Teste',
+        [fieldMapping.email]: 'joao.teste@email.com',
+        [fieldMapping.phone]: '(11) 99999-9999',
+        [fieldMapping.company]: 'Empresa Teste Ltda',
+        [fieldMapping.position]: 'Diretor',
+        [fieldMapping.notes]: 'Lead de teste criado automaticamente pelo sistema CRM',
+        [fieldMapping.value]: '1500.00',
+        [fieldMapping.source]: 'teste_webhook',
+        timestamp: new Date().toISOString(),
+        test_mode: true
       };
+
+      toast.info('Enviando dados de teste...');
 
       const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'User-Agent': 'CRM-Webhook-Test/1.0'
         },
         body: JSON.stringify(testData)
       });
 
       if (response.ok) {
         const result = await response.json();
-        toast.success(`Lead de teste criado com sucesso! ID: ${result.lead_id}`);
-        fetchWebhooks();
+        toast.success(`✅ Teste realizado com sucesso! Lead ID: ${result.lead_id}`);
+        // Recarregar dados para mostrar estatísticas atualizadas
+        setTimeout(() => {
+          fetchWebhooks();
+        }, 1000);
       } else {
-        const error = await response.json();
-        toast.error(`Erro no teste: ${error.error || 'Falha na requisição'}`);
+        const errorText = await response.text();
+        let errorMessage = 'Falha na requisição';
+        
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorMessage;
+        } catch (e) {
+          errorMessage = errorText || errorMessage;
+        }
+        
+        console.error('Webhook test error:', { status: response.status, error: errorText });
+        toast.error(`❌ Erro no teste: ${errorMessage}`);
       }
     } catch (error) {
       console.error('Error testing webhook:', error);
-      toast.error('Erro ao testar webhook');
+      toast.error(`❌ Erro de conexão: ${error.message}`);
     }
   };
 
