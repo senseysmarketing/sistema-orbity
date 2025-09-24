@@ -145,7 +145,7 @@ export function SubscriptionStatus() {
         )}
 
         {!currentSubscription?.plan_name && (
-          <div className="p-3 bg-gray-50 rounded-lg border-l-4 border-gray-400">
+          <div className="p-3 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-600">
               Nenhum plano selecionado. Complete o onboarding para escolher um plano.
             </p>
