@@ -91,86 +91,26 @@ export default function Auth() {
           <CardHeader className="text-center">
             <CardTitle>Acesse sua conta</CardTitle>
             <CardDescription>
-              Entre com suas credenciais ou crie uma nova conta
+              Entre com suas credenciais para acessar o sistema
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="login" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Login</TabsTrigger>
-                <TabsTrigger value="signup">Cadastro</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="login">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input id="login-email" type="email" placeholder="seu@email.com" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Senha</Label>
-                    <Input id="login-password" type="password" placeholder="Sua senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
-                  </div>
-                  <Button type="submit" className="w-full gradient-primary" disabled={isLoading}>
-                    {isLoading ? <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Entrando...
-                      </> : 'Entrar'}
-                  </Button>
-                </form>
-              </TabsContent>
-              
-              <TabsContent value="signup">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Nome completo</Label>
-                    <Input id="signup-name" type="text" placeholder="Seu nome completo" value={signUpName} onChange={e => setSignUpName(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input id="signup-email" type="email" placeholder="seu@email.com" value={signUpEmail} onChange={e => setSignUpEmail(e.target.value)} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Senha</Label>
-                    <Input id="signup-password" type="password" placeholder="Crie uma senha forte" value={signUpPassword} onChange={e => setSignUpPassword(e.target.value)} required minLength={6} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-role">Função na agência</Label>
-                    <Select value={signUpRole} onValueChange={setSignUpRole} required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione sua função" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="gestor_trafego">
-                          <div className="flex items-center space-x-2">
-                            {getRoleIcon('gestor_trafego')}
-                            <span>Gestor de Tráfego</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="designer">
-                          <div className="flex items-center space-x-2">
-                            {getRoleIcon('designer')}
-                            <span>Designer</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="administrador">
-                          <div className="flex items-center space-x-2">
-                            {getRoleIcon('administrador')}
-                            <span>Administrador</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="submit" className="w-full gradient-primary" disabled={isLoading || !signUpRole}>
-                    {isLoading ? <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Criando conta...
-                      </> : 'Criar conta'}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="login-email">Email</Label>
+                <Input id="login-email" type="email" placeholder="seu@email.com" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Senha</Label>
+                <Input id="login-password" type="password" placeholder="Sua senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
+              </div>
+              <Button type="submit" className="w-full gradient-primary" disabled={isLoading}>
+                {isLoading ? <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Entrando...
+                  </> : 'Entrar'}
+              </Button>
+            </form>
           </CardContent>
         </Card>
 

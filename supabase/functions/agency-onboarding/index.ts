@@ -66,18 +66,7 @@ serve(async (req) => {
     const userId = authData.user.id;
     logStep("Admin user created", { userId });
 
-    // Step 2: Create user profile
-    logStep("Creating user profile");
-    const { error: profileError } = await supabaseClient
-      .from('profiles')
-      .insert({
-        user_id: userId,
-        name: adminUser.name,
-        email: adminUser.email,
-        role: 'administrador'
-      });
-
-    if (profileError) throw new Error(`Failed to create profile: ${profileError.message}`);
+    // Step 2: Profile is automatically created by trigger
 
     // Step 3: Create agency
     logStep("Creating agency");
