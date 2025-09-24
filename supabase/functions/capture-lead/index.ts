@@ -190,9 +190,29 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get agency owner/admin to set as created_by
+    const { data: agencyAdmin, error: adminError } = await supabase
+      .from('agency_users')
+      .select('user_id')
+      .eq('agency_id', agency_id)
+      .in('role', ['owner', 'admin'])
+      .limit(1)
+      .single();
+
+    if (adminError || !agencyAdmin) {
+      console.error('[CAPTURE-LEAD] No admin found for agency:', adminError);
+      return new Response(
+        JSON.stringify({ error: 'No admin found for agency' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
     // Add metadata
     mappedData.agency_id = agency_id;
-    mappedData.created_by = null; // System created
+    mappedData.created_by = agencyAdmin.user_id; // Use agency admin as creator
     mappedData.custom_fields = {
       webhook_source: true,
       original_data: incomingData,
@@ -210,8 +230,23 @@ Deno.serve(async (req) => {
 
     if (leadError) {
       console.error('[CAPTURE-LEAD] Error inserting lead:', leadError);
+      
+      // Update error count in webhook stats
+      if (webhookConfig) {
+        await supabase
+          .from('agency_webhooks')
+          .update({
+            error_count: (webhookConfig.error_count || 0) + 1
+          })
+          .eq('id', webhookConfig.id);
+      }
+      
       return new Response(
-        JSON.stringify({ error: 'Failed to create lead', details: leadError.message }),
+        JSON.stringify({ 
+          error: 'Failed to create lead', 
+          details: leadError.message,
+          code: leadError.code 
+        }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
