@@ -85,9 +85,9 @@ export function PlanSelectionStep() {
 
   const getPlanFeatures = (plan: SubscriptionPlan) => {
     const features = [
-      `${plan.max_users} usuários`,
-      `${plan.max_clients} clientes`,
-      `${plan.max_tasks} tarefas`,
+      plan.max_users >= 999999 ? 'Usuários ilimitados' : `${plan.max_users} usuários`,
+      plan.max_clients >= 999999 ? 'Clientes ilimitados' : `${plan.max_clients} clientes`,
+      plan.max_tasks >= 999999 ? 'Tarefas ilimitadas' : `${plan.max_tasks} tarefas`,
       `${plan.max_storage_gb}GB de armazenamento`,
     ];
 

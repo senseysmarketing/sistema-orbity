@@ -144,27 +144,27 @@ export function PricingCards() {
           <CardContent className="space-y-2">
             <div className="flex items-center gap-2">
               <Check className="h-4 w-4 text-green-500" />
-              <span className="text-sm">
-                {plan.max_users === 999 ? 'Usuários ilimitados' : `${plan.max_users} usuários`}
-              </span>
+               <span className="text-sm">
+                 {plan.max_users >= 999999 ? 'Usuários ilimitados' : `${plan.max_users} usuários`}
+               </span>
             </div>
             <div className="flex items-center gap-2">
               <Check className="h-4 w-4 text-green-500" />
-              <span className="text-sm">
-                {plan.max_clients === 999 ? 'Clientes ilimitados' : `${plan.max_clients} clientes`}
-              </span>
+               <span className="text-sm">
+                 {plan.max_clients >= 999999 ? 'Clientes ilimitados' : `${plan.max_clients} clientes`}
+               </span>
             </div>
             <div className="flex items-center gap-2">
               <Check className="h-4 w-4 text-green-500" />
-              <span className="text-sm">
-                {plan.max_leads === 9999 ? 'Leads ilimitados' : `${plan.max_leads} leads`}
-              </span>
+               <span className="text-sm">
+                 {plan.max_leads >= 999999 ? 'Leads ilimitados' : `${plan.max_leads} leads`}
+               </span>
             </div>
             <div className="flex items-center gap-2">
               <Check className="h-4 w-4 text-green-500" />
-              <span className="text-sm">
-                {plan.max_tasks === 9999 ? 'Tarefas ilimitadas' : `${plan.max_tasks} tarefas`}
-              </span>
+               <span className="text-sm">
+                 {plan.max_tasks >= 999999 ? 'Tarefas ilimitadas' : `${plan.max_tasks} tarefas`}
+               </span>
             </div>
             <div className="flex items-center gap-2">
               <Check className="h-4 w-4 text-green-500" />
