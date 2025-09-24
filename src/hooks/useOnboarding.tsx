@@ -83,7 +83,14 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Erro ao criar agência');
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Resposta inválida do servidor');
+      }
 
       toast.success('Agência criada com sucesso! Trial de 7 dias iniciado.');
       
@@ -96,12 +103,14 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       if (signInError) {
         console.error('Auto-login failed:', signInError);
         toast.error('Agência criada, mas falha no login automático. Tente fazer login manualmente.');
+        return false;
       }
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Onboarding error:', error);
-      toast.error('Erro ao criar agência. Tente novamente.');
+      const errorMessage = error.message || 'Erro desconhecido ao criar agência';
+      toast.error(`Erro ao criar agência: ${errorMessage}`);
       return false;
     } finally {
       setLoading(false);

@@ -66,15 +66,28 @@ serve(async (req) => {
     const userId = authData.user.id;
     logStep("Admin user created", { userId });
 
-    // Step 2: Profile is automatically created by trigger
+    // Step 2: Wait for profile creation trigger (small delay)
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Step 3: Create agency
     logStep("Creating agency");
-    const agencySlug = companyData.name
+    let agencySlug = companyData.name
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, '')
       .replace(/\s+/g, '-')
       .slice(0, 50);
+
+    // Check for existing slug and make it unique if necessary
+    const { data: existingAgency } = await supabaseClient
+      .from('agencies')
+      .select('id')
+      .eq('slug', agencySlug)
+      .single();
+
+    if (existingAgency) {
+      const timestamp = Date.now().toString().slice(-6);
+      agencySlug = `${agencySlug}-${timestamp}`;
+    }
 
     const { data: agencyData, error: agencyError } = await supabaseClient
       .from('agencies')

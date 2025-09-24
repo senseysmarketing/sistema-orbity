@@ -4,18 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2, User, Palette, TrendingUp, Building2, Sparkles } from 'lucide-react';
+import { Loader2, Building2, Sparkles } from 'lucide-react';
 import sensysLogo from '@/assets/senseys-logo-new.png';
 import authBackground from '@/assets/auth-background.jpg';
 export default function Auth() {
   const {
     user,
     loading,
-    signIn,
-    signUp
+    signIn
   } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -23,11 +20,6 @@ export default function Auth() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  // Sign up form state
-  const [signUpEmail, setSignUpEmail] = useState('');
-  const [signUpPassword, setSignUpPassword] = useState('');
-  const [signUpName, setSignUpName] = useState('');
-  const [signUpRole, setSignUpRole] = useState('');
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -41,36 +33,6 @@ export default function Auth() {
     setIsLoading(true);
     await signIn(loginEmail, loginPassword);
     setIsLoading(false);
-  };
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!signUpRole) {
-      return;
-    }
-    setIsLoading(true);
-    const {
-      error
-    } = await signUp(signUpEmail, signUpPassword, signUpName, signUpRole);
-    if (!error) {
-      // Reset form
-      setSignUpEmail('');
-      setSignUpPassword('');
-      setSignUpName('');
-      setSignUpRole('');
-    }
-    setIsLoading(false);
-  };
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'gestor_trafego':
-        return <TrendingUp className="h-4 w-4" />;
-      case 'designer':
-        return <Palette className="h-4 w-4" />;
-      case 'administrador':
-        return <User className="h-4 w-4" />;
-      default:
-        return <User className="h-4 w-4" />;
-    }
   };
   return <div className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative" style={{
     backgroundImage: `url(${authBackground})`
