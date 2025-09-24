@@ -169,8 +169,8 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate }: LeadsKanbanPr
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-4 min-h-[600px] w-max min-w-full">
+      <div className="overflow-x-auto">
+        <div className="flex gap-4 min-h-[600px]" style={{ width: 'max-content', minWidth: '100%' }}>
         {Object.entries(statusConfig).map(([status, config]) => (
           <LeadKanbanColumn
             key={status}
