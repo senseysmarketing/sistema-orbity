@@ -32,9 +32,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
+import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useTaskAssignments } from "@/hooks/useTaskAssignments";
 
 interface Task {
   id: string;
@@ -42,7 +45,7 @@ interface Task {
   description: string;
   status: 'todo' | 'in_progress' | 'em_revisao' | 'done';
   priority: 'low' | 'medium' | 'high';
-  assigned_to: string | null;
+  assigned_to: string | null; // Mantemos para compatibilidade
   client_id: string | null;
   due_date: string | null;
   created_at: string;
@@ -89,13 +92,24 @@ export default function Tasks() {
     description: "",
     status: "todo" as const,
     priority: "medium" as const,
-    assigned_to: "unassigned",
+    assigned_to: "unassigned", // Mantemos para compatibilidade
+    assigned_users: [] as string[], // Novo campo para múltiplos usuários
     client_id: "no-client",
     due_date: "",
   });
 
   const { profile } = useAuth();
   const { toast } = useToast();
+
+  // Hook para gerenciar atribuições
+  const { 
+    assignments, 
+    loading: assignmentsLoading, 
+    fetchAssignments, 
+    assignUsersToTask, 
+    getAssignedUsers,
+    getTasksForUser 
+  } = useTaskAssignments();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -109,6 +123,7 @@ export default function Tasks() {
     fetchTasks();
     fetchProfiles();
     fetchClients();
+    fetchAssignments();
   }, []);
 
   const fetchTasks = async () => {
@@ -399,7 +414,7 @@ export default function Tasks() {
     }
 
     try {
-      const { error } = await supabase
+      const { data: taskData, error } = await supabase
         .from('tasks')
         .insert({
           title: newTask.title,
@@ -410,9 +425,16 @@ export default function Tasks() {
           client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
           due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
           created_by: profile?.user_id,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Atribuir usuários à tarefa
+      if (newTask.assigned_users.length > 0 && taskData) {
+        await assignUsersToTask(taskData.id, newTask.assigned_users);
+      }
 
       toast({
         title: "Sucesso",
@@ -425,6 +447,7 @@ export default function Tasks() {
         status: "todo",
         priority: "medium",
         assigned_to: "unassigned",
+        assigned_users: [],
         client_id: "no-client",
         due_date: "",
       });
@@ -447,6 +470,7 @@ export default function Tasks() {
       status: task.status as any,
       priority: task.priority as any,
       assigned_to: task.assigned_to || "unassigned",
+      assigned_users: getAssignedUsers(task.id).map(u => u.user_id),
       client_id: task.client_id || "no-client",
       due_date: task.due_date ? task.due_date.split('T')[0] : "",
     });
@@ -478,6 +502,11 @@ export default function Tasks() {
         .eq('id', selectedTask.id);
 
       if (error) throw error;
+
+      // Atualizar usuários atribuídos à tarefa
+      if (selectedTask) {
+        await assignUsersToTask(selectedTask.id, newTask.assigned_users);
+      }
 
       toast({
         title: "Sucesso",
@@ -708,20 +737,14 @@ export default function Tasks() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="assigned_to">Atribuir a</Label>
-                  <Select value={newTask.assigned_to} onValueChange={(value) => setNewTask({ ...newTask, assigned_to: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar usuário" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Não atribuído</SelectItem>
-                      {profiles.map((profile) => (
-                        <SelectItem key={profile.id} value={profile.user_id}>
-                          {profile.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="assigned_users">Atribuir usuários</Label>
+                  <MultiUserSelector
+                    users={profiles}
+                    selectedUserIds={newTask.assigned_users}
+                    onSelectionChange={(userIds) => setNewTask({ ...newTask, assigned_users: userIds })}
+                    placeholder="Selecionar usuários..."
+                    emptyText="Nenhum usuário disponível."
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="client_id">Cliente</Label>
@@ -1457,20 +1480,14 @@ export default function Tasks() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="edit-assigned_to">Atribuir a</Label>
-                <Select value={newTask.assigned_to} onValueChange={(value) => setNewTask({ ...newTask, assigned_to: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecionar usuário" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Não atribuído</SelectItem>
-                    {profiles.map((profile) => (
-                      <SelectItem key={profile.id} value={profile.user_id}>
-                        {profile.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="edit-assigned_users">Atribuir usuários</Label>
+                <MultiUserSelector
+                  users={profiles}
+                  selectedUserIds={newTask.assigned_users}
+                  onSelectionChange={(userIds) => setNewTask({ ...newTask, assigned_users: userIds })}
+                  placeholder="Selecionar usuários..."
+                  emptyText="Nenhum usuário disponível."
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-client_id">Cliente</Label>
