@@ -105,7 +105,7 @@ serve(async (req) => {
       if (existingUserAgency) {
         logStep("User already has an agency", { 
           agencyId: existingUserAgency.agency_id,
-          agencyName: existingUserAgency.agencies.name 
+          agencyName: existingUserAgency.agencies[0].name 
         });
         
         return new Response(JSON.stringify({
@@ -113,7 +113,7 @@ serve(async (req) => {
           data: {
             userId,
             agencyId: existingUserAgency.agency_id,
-            agencySlug: existingUserAgency.agencies.slug,
+            agencySlug: existingUserAgency.agencies[0].slug,
             message: "User already has an agency"
           }
         }), {

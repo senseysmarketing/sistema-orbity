@@ -68,21 +68,30 @@ serve(async (req) => {
       .select('role')
       .eq('user_id', user.id)
       .eq('agency_id', agency_id)
-      .single();
+      .maybeSingle();
 
-    if (adminError || !adminCheck || !['owner', 'admin'].includes(adminCheck.role)) {
+    if (adminError) {
+      logStep("Error checking admin status", { error: adminError });
+      throw new Error(`Failed to verify admin status: ${adminError.message}`);
+    }
+
+    if (!adminCheck || !['owner', 'admin'].includes(adminCheck.role)) {
+      logStep("Authorization failed", { userRole: adminCheck?.role, userId: user.id, agencyId: agency_id });
       throw new Error('Unauthorized: Only agency admins can create users');
     }
 
-    logStep("Admin verification passed");
+    logStep("Admin verification passed", { userRole: adminCheck.role });
 
     // Check if email already exists
-    const { data: existingUser } = await supabaseAdmin.auth.admin.listUsers();
-    const emailExists = existingUser?.users?.some(u => u.email === email);
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const emailExists = existingUsers?.users?.some(u => u.email === email);
     
     if (emailExists) {
+      logStep("Email already exists", { email });
       throw new Error('Email already exists in the system');
     }
+    
+    logStep("Email availability check passed");
 
     // Create the user using admin API
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -103,10 +112,10 @@ serve(async (req) => {
       throw new Error('User creation failed - no user returned');
     }
 
-    logStep("User created successfully", { userId: newUser.user.id });
+    logStep("User created successfully", { userId: newUser.user.id, email: newUser.user.email });
 
     // Add user to agency
-    const { error: agencyError } = await supabaseClient
+    const { error: agencyError } = await supabaseAdmin
       .from('agency_users')
       .insert({
         user_id: newUser.user.id,

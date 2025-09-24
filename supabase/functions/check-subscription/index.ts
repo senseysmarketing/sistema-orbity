@@ -69,7 +69,7 @@ serve(async (req) => {
       limit: 10,
     });
 
-    const activeSubscription = subscriptions.data.find(sub => 
+    const activeSubscription = subscriptions.data.find((sub: any) => 
       ['active', 'trialing', 'past_due'].includes(sub.status)
     );
 
