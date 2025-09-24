@@ -1081,7 +1081,15 @@ export type Database = {
         Args: { agency_uuid?: string }
         Returns: boolean
       }
+      is_agency_subscription_valid: {
+        Args: { agency_uuid?: string }
+        Returns: boolean
+      }
       is_master_user: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_super_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
