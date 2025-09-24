@@ -123,6 +123,66 @@ export type Database = {
         }
         Relationships: []
       }
+      agency_onboarding: {
+        Row: {
+          agency_id: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          setup_data: Json | null
+          status: string
+          step_current: number
+          step_total: number
+          trial_end: string | null
+          trial_start: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          agency_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          setup_data?: Json | null
+          status?: string
+          step_current?: number
+          step_total?: number
+          trial_end?: string | null
+          trial_start?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          agency_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          setup_data?: Json | null
+          status?: string
+          step_current?: number
+          step_total?: number
+          trial_end?: string | null
+          trial_start?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_onboarding_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_onboarding_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       agency_subscriptions: {
         Row: {
           agency_id: string
@@ -1024,6 +1084,10 @@ export type Database = {
       is_master_user: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      start_agency_trial: {
+        Args: { p_agency_id: string; p_plan_slug?: string }
+        Returns: undefined
       }
       user_belongs_to_agency: {
         Args: { agency_uuid: string }

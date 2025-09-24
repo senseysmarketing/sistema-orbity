@@ -19,6 +19,7 @@ import Admin from "./pages/Admin";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Master from "./pages/Master";
+import Onboarding from "./pages/Onboarding";
 import SubscriptionSuccess from "./pages/SubscriptionSuccess";
 import SubscriptionCanceled from "./pages/SubscriptionCanceled";
 
@@ -37,6 +38,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/" element={<AppLayout />}>
                 <Route index element={<Index />} />
                 <Route path="tasks" element={<Tasks />} />

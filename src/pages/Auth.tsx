@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2, User, Palette, TrendingUp } from 'lucide-react';
+import { Loader2, User, Palette, TrendingUp, Building2, Sparkles } from 'lucide-react';
 import sensysLogo from '@/assets/senseys-logo-new.png';
 import authBackground from '@/assets/auth-background.jpg';
 export default function Auth() {
@@ -173,6 +173,27 @@ export default function Auth() {
             </Tabs>
           </CardContent>
         </Card>
+
+        {/* Onboarding CTA */}
+        <div className="text-center space-y-4">
+          <div className="flex items-center justify-center space-x-2 text-sm text-black">
+            <span>Ainda não tem uma agência?</span>
+          </div>
+          <Button 
+            asChild 
+            variant="outline" 
+            className="w-full bg-white/90 hover:bg-white border-primary/20 text-primary hover:text-primary/80"
+          >
+            <Link to="/onboarding" className="flex items-center space-x-2">
+              <Building2 className="h-4 w-4" />
+              <span>Criar Nova Agência</span>
+              <Sparkles className="h-4 w-4" />
+            </Link>
+          </Button>
+          <p className="text-xs text-black/70">
+            🚀 Setup automático • 7 dias grátis • Sem cartão de crédito
+          </p>
+        </div>
         
         <p className="text-center text-sm text-black">Sistema desenvolvido pelo BielzinDelas</p>
       </div>
