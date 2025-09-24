@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLimitEnforcement } from "@/hooks/useLimitEnforcement";
 
 interface ClientFormProps {
   open: boolean;
@@ -18,6 +19,7 @@ interface ClientFormProps {
 
 export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientFormProps) {
   const { toast } = useToast();
+  const { enforceLimitWithToast } = useLimitEnforcement();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: client?.name || '',
@@ -32,6 +34,13 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check limit only for new clients
+    if (!client) {
+      const canCreate = enforceLimitWithToast('clients', 'adicionar novo cliente');
+      if (!canCreate) return;
+    }
+    
     setLoading(true);
 
     try {

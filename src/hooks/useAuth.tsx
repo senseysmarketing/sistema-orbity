@@ -8,7 +8,7 @@ interface Profile {
   user_id: string;
   name: string;
   email: string;
-  role: 'gestor_trafego' | 'designer' | 'administrador';
+  role: 'gestor_trafego' | 'designer' | 'administrador' | 'super_admin' | 'agency_admin' | 'agency_user';
   avatar_url?: string;
 }
 

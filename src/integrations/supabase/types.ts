@@ -1039,6 +1039,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      enforce_plan_limits: {
+        Args: {
+          agency_uuid: string
+          current_count?: number
+          limit_type: string
+        }
+        Returns: boolean
+      }
       get_agency_subscription: {
         Args: { agency_uuid?: string }
         Returns: {

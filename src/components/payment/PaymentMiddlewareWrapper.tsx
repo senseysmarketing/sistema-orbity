@@ -1,0 +1,33 @@
+import { ReactNode } from 'react';
+import { usePaymentMiddleware } from '@/hooks/usePaymentMiddleware';
+import { BlockedAccessScreen } from '@/components/payment/BlockedAccessScreen';
+
+interface PaymentMiddlewareWrapperProps {
+  children: ReactNode;
+}
+
+export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperProps) {
+  const { paymentStatus, loading, isSuperAdmin } = usePaymentMiddleware();
+
+  // Show loading spinner while checking payment status
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Super admins bypass all checks
+  if (isSuperAdmin) {
+    return <>{children}</>;
+  }
+
+  // Show blocked screen if payment is invalid
+  if (paymentStatus.isBlocked || !paymentStatus.isValid) {
+    return <BlockedAccessScreen />;
+  }
+
+  // Normal access
+  return <>{children}</>;
+}

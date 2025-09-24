@@ -8,6 +8,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { AgencyProvider } from "@/hooks/useAgency";
 import { SubscriptionProvider } from "@/hooks/useSubscription";
 import { MasterProvider } from "@/hooks/useMaster";
+import { PaymentMiddlewareProvider } from "@/hooks/usePaymentMiddleware";
+import { PaymentMiddlewareWrapper } from "@/components/payment/PaymentMiddlewareWrapper";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -32,15 +34,20 @@ const App = () => (
         <AgencyProvider>
           <SubscriptionProvider>
             <MasterProvider>
-              <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/" element={<AppLayout />}>
-                <Route index element={<Index />} />
+              <PaymentMiddlewareProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter>
+                    <Routes>
+                      <Route path="/auth" element={<Auth />} />
+                      <Route path="/onboarding" element={<Onboarding />} />
+                      <Route path="/" element={
+                        <PaymentMiddlewareWrapper>
+                          <AppLayout />
+                        </PaymentMiddlewareWrapper>
+                      }>
+                        <Route index element={<Index />} />
                 <Route path="tasks" element={<Tasks />} />
                 <Route path="personal-tasks" element={<PersonalTasks />} />
                 <Route path="traffic" element={<Traffic />} />
@@ -55,10 +62,11 @@ const App = () => (
             </Routes>
             </BrowserRouter>
               </TooltipProvider>
-            </MasterProvider>
-          </SubscriptionProvider>
-        </AgencyProvider>
-      </AuthProvider>
+            </PaymentMiddlewareProvider>
+          </MasterProvider>
+        </SubscriptionProvider>
+      </AgencyProvider>
+    </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );

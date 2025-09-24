@@ -74,6 +74,12 @@ export function AppSidebar() {
         return 'Designer';
       case 'administrador':
         return 'Administrador';
+      case 'super_admin':
+        return 'Super Admin';
+      case 'agency_admin':
+        return 'Admin da Agência';
+      case 'agency_user':
+        return 'Usuário';
       default:
         return role;
     }
@@ -116,8 +122,8 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Master Section - Only for administrators */}
-        {profile?.role === 'administrador' && (
+        {/* Master Section - Only for administrators and super admins */}
+        {(profile?.role === 'administrador' || profile?.role === 'super_admin') && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-sidebar-foreground/70">Master</SidebarGroupLabel>
             <SidebarGroupContent>

@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { PricingCards } from "@/components/subscription/PricingCards";
 import { SubscriptionStatus } from "@/components/subscription/SubscriptionStatus";
+import { PaymentStatusCard } from "@/components/payment/PaymentStatusCard";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -226,7 +227,14 @@ export default function Settings() {
               </p>
             </div>
 
-            <SubscriptionStatus />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <SubscriptionStatus />
+              </div>
+              <div className="space-y-4">
+                <PaymentStatusCard />
+              </div>
+            </div>
 
             <div>
               <h3 className="text-lg font-semibold mb-4">Planos Disponíveis</h3>
