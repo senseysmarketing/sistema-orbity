@@ -473,9 +473,23 @@ export default function Traffic() {
           {/* Filtros e Busca */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Filtros e Busca
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Filter className="h-5 w-5" />
+                  Filtros e Busca ({filteredControls.length} clientes)
+                </span>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={clearFilters}>
+                    Limpar Filtros
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setViewMode(viewMode === "cards" ? "table" : "cards")}
+                  >
+                    {viewMode === "cards" ? "Tabela" : "Cards"}
+                  </Button>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -564,129 +578,239 @@ export default function Traffic() {
           </Card>
 
           {/* Lista de Controles */}
-          <div className="grid gap-4">
-            {filteredControls.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <TrendingUp className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">
-                    {trafficControls.length === 0 ? 'Nenhum controle de tráfego encontrado' : 'Nenhum resultado encontrado'}
-                  </h3>
-                  <p className="text-muted-foreground text-center">
-                    {trafficControls.length === 0 
-                      ? 'Comece criando o primeiro controle de tráfego para seus clientes.'
-                      : 'Tente ajustar os filtros para ver mais resultados.'}
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              filteredControls.map((control) => {
+          {viewMode === "cards" ? (
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              {filteredControls.map((control) => {
                 const priority = getPriorityLevel(control);
+                const client = clients.find(c => c.id === control.client_id);
+                
                 return (
-                  <Card key={control.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        {/* Header com prioridade */}
-                        <div className="flex justify-between items-start">
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-lg">{getClientName(control.client_id)}</h3>
-                              <Badge className={priority.color} variant="secondary">
-                                {priority.label}
-                              </Badge>
-                            </div>
-                            <div className="flex gap-2">
-                              <Badge className={getSituationColor(control.situation)}>
-                                {getSituationLabel(control.situation)}
-                              </Badge>
-                              <Badge className={getResultsColor(control.results)}>
-                                {getResultsLabel(control.results)}
-                              </Badge>
-                            </div>
+                  <Card 
+                    key={control.id} 
+                    className={`hover:shadow-lg transition-all duration-200 border-l-4 ${
+                      priority.level === 'critical' ? 'border-l-red-500' :
+                      priority.level === 'high' ? 'border-l-orange-500' :
+                      priority.level === 'medium' ? 'border-l-yellow-500' :
+                      'border-l-green-500'
+                    }`}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-lg leading-none">{getClientName(control.client_id)}</CardTitle>
+                            <Badge variant="outline" className={`${priority.color} text-xs px-2 py-1`}>
+                              {priority.label}
+                            </Badge>
                           </div>
-                          
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuItem onClick={() => handleViewDetails(control)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                Visualizar detalhes
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleEdit(control)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="text-destructive focus:text-destructive" 
-                                onClick={() => handleDeleteClick(control.id)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Excluir
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-
-                        {/* Informações principais */}
-                        <div className="grid grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <span className="font-medium text-muted-foreground">Budget Diário:</span>
-                            <p className="font-semibold">
-                              {control.daily_budget 
-                                ? `R$ ${control.daily_budget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                                : 'N/D'}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="font-medium text-muted-foreground">Última Otimização:</span>
-                            <p className="font-semibold">
-                              {control.last_optimization 
-                                ? (() => {
-                                    const days = Math.floor((Date.now() - new Date(control.last_optimization).getTime()) / (1000 * 60 * 60 * 24));
-                                    return `${days} dias atrás`;
-                                  })()
-                                : 'Nunca'}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="font-medium text-muted-foreground">Plataformas:</span>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {control.platforms && control.platforms.length > 0 ? (
-                                control.platforms.slice(0, 2).map((platform, index) => (
-                                  <Badge key={index} variant="outline" className="text-xs px-1.5 py-0.5">
-                                    {platform}
-                                  </Badge>
-                                ))
-                              ) : (
-                                <span className="text-xs text-muted-foreground">N/D</span>
-                              )}
-                              {control.platforms && control.platforms.length > 2 && (
-                                <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-                                  +{control.platforms.length - 2}
-                                </Badge>
-                              )}
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <DollarSign className="h-3 w-3" />
+                              <span className="font-medium">R$ {control.daily_budget?.toLocaleString('pt-BR') || '0'}/dia</span>
                             </div>
+                            {client?.monthly_value && (
+                              <div className="text-xs">
+                                Mensalidade: R$ {client.monthly_value.toLocaleString('pt-BR')}
+                              </div>
+                            )}
                           </div>
                         </div>
-                        
-                        {/* Observações */}
-                        {control.observations && (
-                          <div>
-                            <span className="font-medium text-muted-foreground text-sm">Observações:</span>
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{control.observations}</p>
-                          </div>
-                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-background border shadow-md z-50">
+                            <DropdownMenuItem onClick={() => handleViewDetails(control)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Visualizar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEdit(control)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteClick(control.id)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Plataformas */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Activity className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Plataformas</span>
+                        </div>
+                        <div className="flex gap-1 flex-wrap">
+                          {control.platforms?.map((platform, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs bg-secondary/70">
+                              {platform}
+                            </Badge>
+                          )) || <span className="text-sm text-muted-foreground">Nenhuma plataforma</span>}
+                        </div>
+                      </div>
+
+                      {/* Status em Grid Compacto */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Situação</span>
+                          </div>
+                          <Badge variant="outline" className={`w-full justify-center text-xs ${getSituationColor(control.situation)}`}>
+                            {getSituationLabel(control.situation)}
+                          </Badge>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <Target className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Resultados</span>
+                          </div>
+                          <Badge variant="outline" className={`w-full justify-center text-xs ${getResultsColor(control.results)}`}>
+                            {getResultsLabel(control.results)}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Última Otimização */}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Última Otimização</span>
+                        </div>
+                        <div className="text-sm font-medium">
+                          {control.last_optimization 
+                            ? new Date(control.last_optimization).toLocaleDateString('pt-BR')
+                            : 'Nunca otimizado'
+                          }
+                        </div>
+                      </div>
+
+                      {/* Observações (se houver) */}
+                      {control.observations && (
+                        <div className="space-y-1">
+                          <span className="text-xs text-muted-foreground">Observações</span>
+                          <p className="text-sm bg-muted/50 rounded p-2 line-clamp-2">{control.observations}</p>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
-              })
-            )}
-          </div>
+              })}
+            </div>
+          ) : (
+            /* Visualização em Tabela */
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b bg-muted/50">
+                      <tr>
+                        <th className="p-4 text-left font-medium">Cliente</th>
+                        <th className="p-4 text-left font-medium">Plataformas</th>
+                        <th className="p-4 text-left font-medium">Budget Diário</th>
+                        <th className="p-4 text-left font-medium">Situação</th>
+                        <th className="p-4 text-left font-medium">Resultados</th>
+                        <th className="p-4 text-left font-medium">Última Otimização</th>
+                        <th className="p-4 text-left font-medium">Prioridade</th>
+                        <th className="p-4 text-left font-medium">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredControls.map((control) => {
+                        const priority = getPriorityLevel(control);
+                        return (
+                          <tr key={control.id} className="border-b hover:bg-muted/25">
+                            <td className="p-4 font-medium">{getClientName(control.client_id)}</td>
+                            <td className="p-4">
+                              <div className="flex gap-1 flex-wrap max-w-xs">
+                                {control.platforms?.map((platform, index) => (
+                                  <Badge key={index} variant="secondary" className="text-xs">
+                                    {platform}
+                                  </Badge>
+                                )) || <span className="text-muted-foreground">-</span>}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              R$ {control.daily_budget?.toLocaleString('pt-BR') || '0'}
+                            </td>
+                            <td className="p-4">
+                              <Badge variant="outline" className={getSituationColor(control.situation)}>
+                                {getSituationLabel(control.situation)}
+                              </Badge>
+                            </td>
+                            <td className="p-4">
+                              <Badge variant="outline" className={getResultsColor(control.results)}>
+                                {getResultsLabel(control.results)}
+                              </Badge>
+                            </td>
+                            <td className="p-4">
+                              {control.last_optimization 
+                                ? new Date(control.last_optimization).toLocaleDateString('pt-BR')
+                                : 'Nunca'
+                              }
+                            </td>
+                            <td className="p-4">
+                              <Badge variant="outline" className={priority.color}>
+                                {priority.label}
+                              </Badge>
+                            </td>
+                            <td className="p-4">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="bg-background border shadow-md z-50">
+                                  <DropdownMenuItem onClick={() => handleViewDetails(control)}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    Visualizar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleEdit(control)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteClick(control.id)}
+                                    className="text-red-600"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Excluir
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {filteredControls.length === 0 && (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Target className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Nenhum controle encontrado</h3>
+                <p className="text-muted-foreground text-center">
+                  {searchTerm || situationFilter !== "all" || resultsFilter !== "all" || platformFilter !== "all" || budgetFilter !== "all"
+                    ? "Tente ajustar os filtros ou criar um novo controle."
+                    : "Você ainda não possui controles de tráfego. Crie o primeiro!"}
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
