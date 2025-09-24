@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, Lock, Bell, Palette, Save, Shield, Mail, Phone, BarChart3 } from "lucide-react";
+import { User, Lock, Bell, Palette, Save, Shield, Mail, Phone, BarChart3, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,8 @@ import { useTheme } from "@/components/ui/theme-provider";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { PricingCards } from "@/components/subscription/PricingCards";
+import { SubscriptionStatus } from "@/components/subscription/SubscriptionStatus";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -133,6 +135,7 @@ export default function Settings() {
       <Tabs defaultValue="profile" className="space-y-4">
         <TabsList>
           <TabsTrigger value="profile">Perfil</TabsTrigger>
+          <TabsTrigger value="subscription">Assinatura</TabsTrigger>
           <TabsTrigger value="account">Conta</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="appearance">Aparência</TabsTrigger>
@@ -209,6 +212,27 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="subscription" className="space-y-4">
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                <CreditCard className="h-6 w-6" />
+                Gerenciar Assinatura
+              </h2>
+              <p className="text-muted-foreground">
+                Visualize e gerencie seu plano de assinatura atual
+              </p>
+            </div>
+
+            <SubscriptionStatus />
+
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Planos Disponíveis</h3>
+              <PricingCards />
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="account" className="space-y-4">
@@ -361,7 +385,7 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                  <div className="space-y-4">
+              <div className="space-y-4">
                 <div>
                   <h4 className="font-medium mb-3 flex items-center gap-2">
                     <Palette className="h-4 w-4" />

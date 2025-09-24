@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AgencyProvider } from "@/hooks/useAgency";
+import { SubscriptionProvider } from "@/hooks/useSubscription";
 import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -16,6 +17,8 @@ import Traffic from "./pages/Traffic";
 import Admin from "./pages/Admin";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import SubscriptionSuccess from "./pages/SubscriptionSuccess";
+import SubscriptionCanceled from "./pages/SubscriptionCanceled";
 
 const queryClient = new QueryClient();
 
@@ -24,7 +27,8 @@ const App = () => (
     <ThemeProvider defaultTheme="light" storageKey="senseys-ui-theme">
       <AuthProvider>
         <AgencyProvider>
-          <TooltipProvider>
+          <SubscriptionProvider>
+            <TooltipProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
@@ -39,10 +43,13 @@ const App = () => (
                 <Route path="reports" element={<Reports />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
+              <Route path="/subscription-success" element={<SubscriptionSuccess />} />
+              <Route path="/subscription-canceled" element={<SubscriptionCanceled />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
+            </BrowserRouter>
+          </TooltipProvider>
+          </SubscriptionProvider>
         </AgencyProvider>
       </AuthProvider>
     </ThemeProvider>
