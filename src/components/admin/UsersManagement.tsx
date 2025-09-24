@@ -14,8 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
-import { useLimitEnforcement } from "@/hooks/useLimitEnforcement";
-import { useSubscription } from "@/hooks/useSubscription";
+import { usePaymentMiddleware } from "@/hooks/usePaymentMiddleware";
 
 interface AgencyUser {
   id: string;
@@ -34,12 +33,11 @@ export function UsersManagement() {
   const [loading, setLoading] = useState(true);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("agency_user");
+  const [inviteRole, setInviteRole] = useState("member");
   const [inviteLoading, setInviteLoading] = useState(false);
   const { currentAgency, isAgencyAdmin } = useAgency();
   const { toast } = useToast();
-  const { checkLimitWithWarning } = useLimitEnforcement();
-  const { currentSubscription, createCheckout } = useSubscription();
+  const { planLimits } = usePaymentMiddleware();
 
   useEffect(() => {
     if (currentAgency && isAgencyAdmin) {
@@ -138,11 +136,12 @@ export function UsersManagement() {
       
       // Verificar se ainda há limite de usuários disponível
       const currentUserCount = users.length;
-      const canAddUser = checkLimitWithWarning('users', currentUserCount + 1);
-      if (!canAddUser) {
+      const maxUsers = planLimits?.users || 5;
+      
+      if (currentUserCount >= maxUsers) {
         toast({
           title: "Limite de usuários atingido",
-          description: "Você atingiu o limite máximo de usuários do seu plano. Faça upgrade para adicionar mais usuários.",
+          description: `Você atingiu o limite máximo de ${maxUsers} usuários do seu plano. Faça upgrade para adicionar mais usuários.`,
           variant: "destructive",
         });
         return;
@@ -199,7 +198,7 @@ export function UsersManagement() {
 
       setInviteDialogOpen(false);
       setInviteEmail("");
-      setInviteRole("agency_user");
+      setInviteRole("member");
       fetchUsers();
     } catch (error: any) {
       toast({
@@ -290,31 +289,17 @@ export function UsersManagement() {
               </CardTitle>
               <CardDescription>
                 Gerencie os membros da sua agência, convide novos usuários e controle permissões
-                {currentSubscription && (
+                {planLimits && (
                   <span className="block text-sm mt-1">
-                    {users.length} de {(() => {
-                      const planLimits = {
-                        'Free': 5,
-                        'Basic': 10, 
-                        'Pro': 25,
-                        'Enterprise': 50
-                      };
-                      return planLimits[currentSubscription.plan_name as keyof typeof planLimits] || 5;
-                    })()} usuários utilizados
+                    {users.length} de {planLimits.users} usuários utilizados
                   </span>
                 )}
               </CardDescription>
             </div>
             {(() => {
               const currentUserCount = users.length;
-              const userLimitReached = !checkLimitWithWarning('users', currentUserCount + 1);
-              const planLimits = {
-                'Free': 5,
-                'Basic': 10,
-                'Pro': 25,
-                'Enterprise': 50
-              };
-              const maxUsers = planLimits[currentSubscription?.plan_name as keyof typeof planLimits] || 5;
+              const maxUsers = planLimits?.users || 5;
+              const userLimitReached = currentUserCount >= maxUsers;
               
               return (
                 <div className="flex flex-col gap-2">
@@ -375,7 +360,7 @@ export function UsersManagement() {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => createCheckout('basic')} // ou mostrar modal de planos
+                      onClick={() => window.open('/subscription', '_blank')}
                     >
                       Fazer Upgrade
                     </Button>
