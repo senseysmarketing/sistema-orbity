@@ -171,8 +171,10 @@ export default function Traffic() {
     
     const optimizationNeeded = filteredControls.filter(tc => {
       if (!tc.last_optimization) return true;
-      const lastOpt = new Date(tc.last_optimization);
-      const daysSince = Math.floor((Date.now() - lastOpt.getTime()) / (1000 * 60 * 60 * 24));
+      const lastOpt = new Date(tc.last_optimization + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const daysSince = Math.floor((today.getTime() - lastOpt.getTime()) / (1000 * 60 * 60 * 24));
       return daysSince > 7;
     }).length;
     
@@ -687,7 +689,10 @@ export default function Traffic() {
                         </div>
                         <div className="text-sm font-medium">
                           {control.last_optimization 
-                            ? new Date(control.last_optimization).toLocaleDateString('pt-BR')
+                            ? (() => {
+                                const date = new Date(control.last_optimization + 'T00:00:00');
+                                return date.toLocaleDateString('pt-BR');
+                              })()
                             : 'Nunca otimizado'
                           }
                         </div>
@@ -753,7 +758,10 @@ export default function Traffic() {
                             </td>
                             <td className="p-4">
                               {control.last_optimization 
-                                ? new Date(control.last_optimization).toLocaleDateString('pt-BR')
+                                ? (() => {
+                                    const date = new Date(control.last_optimization + 'T00:00:00');
+                                    return date.toLocaleDateString('pt-BR');
+                                  })()
                                 : 'Nunca'
                               }
                             </td>
@@ -992,7 +1000,10 @@ export default function Traffic() {
               {selectedControl.last_optimization && (
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Última Otimização</label>
-                  <p className="text-sm">{new Date(selectedControl.last_optimization).toLocaleDateString('pt-BR')}</p>
+                  <p className="text-sm">{(() => {
+                    const date = new Date(selectedControl.last_optimization + 'T00:00:00');
+                    return date.toLocaleDateString('pt-BR');
+                  })()}</p>
                 </div>
               )}
 
