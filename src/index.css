@@ -141,13 +141,13 @@ All colors MUST be HSL.
 
     --radius: 0.5rem;
 
-    --sidebar-background: 210 11% 35%;
+    --sidebar-background: 207 13% 31%; /* #4f5963 */
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 220 70% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 11% 40%;
+    --sidebar-accent: 207 13% 36%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 210 11% 30%;
+    --sidebar-border: 207 13% 26%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Create button color - #7dafd8 converted to HSL */
@@ -183,13 +183,13 @@ All colors MUST be HSL.
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 210 11% 35%;
+    --sidebar-background: 223 85% 5%; /* #020817 */
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 11% 40%;
+    --sidebar-accent: 223 85% 10%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 210 11% 30%;
+    --sidebar-border: 223 85% 8%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Create button color - #7dafd8 converted to HSL */
