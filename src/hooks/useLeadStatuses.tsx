@@ -82,6 +82,28 @@ export function useLeadStatuses() {
     return status?.name || key;
   };
 
+  // Map database status to display status (English to Portuguese)
+  const mapDatabaseStatusToDisplay = (dbStatus: string) => {
+    const statusMap: Record<string, string> = {
+      'new': 'Novo',
+      'qualified': 'Qualificado', 
+      'won': 'Ganho',
+      'lost': 'Perdido'
+    };
+    return statusMap[dbStatus] || dbStatus;
+  };
+
+  // Map display status to database status (Portuguese to English)
+  const mapDisplayStatusToDatabase = (displayStatus: string) => {
+    const statusMap: Record<string, string> = {
+      'Novo': 'new',
+      'Qualificado': 'qualified',
+      'Ganho': 'won', 
+      'Perdido': 'lost'
+    };
+    return statusMap[displayStatus] || displayStatus;
+  };
+
   return {
     statuses,
     loading,
@@ -89,6 +111,8 @@ export function useLeadStatuses() {
     getStatusConfig,
     getStatusKey,
     getStatusName,
+    mapDatabaseStatusToDisplay,
+    mapDisplayStatusToDatabase,
     refresh: fetchStatuses
   };
 }

@@ -40,7 +40,7 @@ interface LeadsKanbanProps {
 export function LeadsKanban({ leads, onEdit, onDelete, onUpdate }: LeadsKanbanProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
-  const { getStatusConfig, getStatusKey, getStatusName } = useLeadStatuses();
+  const { getStatusConfig, getStatusKey, mapDatabaseStatusToDisplay, mapDisplayStatusToDatabase } = useLeadStatuses();
 
   const statusConfig = getStatusConfig();
 
@@ -132,7 +132,8 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate }: LeadsKanbanPr
 
     try {
       // Convert status key back to database format
-      const dbStatus = getStatusName(newStatus);
+      const displayStatus = statusConfig[newStatus].title;
+      const dbStatus = mapDisplayStatusToDatabase(displayStatus);
       
       const { error } = await supabase
         .from('leads')
@@ -156,8 +157,9 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate }: LeadsKanbanPr
   };
 
   const groupedLeads = Object.keys(statusConfig).reduce((acc, statusKey) => {
-    const statusName = getStatusName(statusKey);
-    acc[statusKey] = leads.filter(lead => lead.status === statusName);
+    const displayStatus = statusConfig[statusKey].title;
+    const dbStatus = mapDisplayStatusToDatabase(displayStatus);
+    acc[statusKey] = leads.filter(lead => lead.status === dbStatus);
     return acc;
   }, {} as Record<string, Lead[]>);
 
