@@ -34,11 +34,11 @@ const App = () => (
         <AgencyProvider>
           <SubscriptionProvider>
             <MasterProvider>
-              <PaymentMiddlewareProvider>
-                <TooltipProvider>
-                  <Toaster />
-                  <Sonner />
-                  <BrowserRouter>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <PaymentMiddlewareProvider>
                     <Routes>
                       <Route path="/auth" element={<Auth />} />
                       <Route path="/onboarding" element={<Onboarding />} />
@@ -48,25 +48,25 @@ const App = () => (
                         </PaymentMiddlewareWrapper>
                       }>
                         <Route index element={<Index />} />
-                <Route path="tasks" element={<Tasks />} />
-                <Route path="personal-tasks" element={<PersonalTasks />} />
-                <Route path="traffic" element={<Traffic />} />
-                <Route path="admin" element={<Admin />} />
-                <Route path="reports" element={<Reports />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="master" element={<Master />} />
-              </Route>
-              <Route path="/subscription-success" element={<SubscriptionSuccess />} />
-              <Route path="/subscription-canceled" element={<SubscriptionCanceled />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            </BrowserRouter>
+                        <Route path="tasks" element={<Tasks />} />
+                        <Route path="personal-tasks" element={<PersonalTasks />} />
+                        <Route path="traffic" element={<Traffic />} />
+                        <Route path="admin" element={<Admin />} />
+                        <Route path="reports" element={<Reports />} />
+                        <Route path="settings" element={<Settings />} />
+                        <Route path="master" element={<Master />} />
+                      </Route>
+                      <Route path="/subscription-success" element={<SubscriptionSuccess />} />
+                      <Route path="/subscription-canceled" element={<SubscriptionCanceled />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </PaymentMiddlewareProvider>
+                </BrowserRouter>
               </TooltipProvider>
-            </PaymentMiddlewareProvider>
-          </MasterProvider>
-        </SubscriptionProvider>
-      </AgencyProvider>
-    </AuthProvider>
+            </MasterProvider>
+          </SubscriptionProvider>
+        </AgencyProvider>
+      </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );
