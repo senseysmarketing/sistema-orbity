@@ -26,10 +26,6 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
-    logStep("Stripe key verified");
-
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
     
@@ -39,6 +35,81 @@ serve(async (req) => {
     const user = userData.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
+
+    // Get user's agency
+    const { data: agencyUser, error: agencyError } = await supabaseClient
+      .from('agency_users')
+      .select('agency_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (agencyError || !agencyUser) {
+      logStep("No agency found for user");
+      return new Response(JSON.stringify({ 
+        subscribed: false,
+        subscription_status: 'none',
+        plan_name: null,
+        trial_end: null,
+        subscription_end: null 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    const agencyId = agencyUser.agency_id;
+    logStep("Found user agency", { agencyId });
+
+    // First check for local subscription (like Senseys plan)
+    const { data: localSubscription, error: localError } = await supabaseClient
+      .from('agency_subscriptions')
+      .select(`
+        *,
+        subscription_plans:plan_id (
+          name,
+          slug,
+          stripe_price_id_monthly
+        )
+      `)
+      .eq('agency_id', agencyId)
+      .single();
+
+    if (localSubscription && localSubscription.subscription_plans) {
+      const plan = localSubscription.subscription_plans;
+      logStep("Found local subscription", { 
+        planName: plan.name, 
+        status: localSubscription.status 
+      });
+
+      return new Response(JSON.stringify({
+        subscribed: localSubscription.status === 'active' || localSubscription.status === 'trial',
+        subscription_status: localSubscription.status,
+        plan_name: plan.name,
+        trial_end: localSubscription.trial_end,
+        subscription_end: localSubscription.current_period_end,
+        customer_id: localSubscription.stripe_customer_id,
+        subscription_id: localSubscription.stripe_subscription_id
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    // If no local subscription, check Stripe
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) {
+      logStep("No Stripe key available and no local subscription");
+      return new Response(JSON.stringify({ 
+        subscribed: false,
+        subscription_status: 'none',
+        plan_name: null,
+        trial_end: null,
+        subscription_end: null 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     
@@ -74,7 +145,7 @@ serve(async (req) => {
     );
 
     if (!activeSubscription) {
-      logStep("No active subscription found");
+      logStep("No active subscription found in Stripe");
       return new Response(JSON.stringify({ 
         subscribed: false,
         subscription_status: 'none',
@@ -87,7 +158,7 @@ serve(async (req) => {
       });
     }
 
-    logStep("Active subscription found", { 
+    logStep("Active subscription found in Stripe", { 
       subscriptionId: activeSubscription.id, 
       status: activeSubscription.status 
     });
@@ -106,7 +177,7 @@ serve(async (req) => {
 
     const planName = plan?.name || 'Unknown Plan';
 
-    logStep("Subscription details retrieved", { 
+    logStep("Subscription details retrieved from Stripe", { 
       priceId, 
       planName, 
       subscriptionEnd, 
@@ -116,7 +187,8 @@ serve(async (req) => {
     // Update agency subscription in our database
     const { error: updateError } = await supabaseClient
       .from('agency_subscriptions')
-      .update({
+      .upsert({
+        agency_id: agencyId,
         stripe_customer_id: customerId,
         stripe_subscription_id: activeSubscription.id,
         status: activeSubscription.status === 'trialing' ? 'trial' : 'active',
@@ -124,8 +196,7 @@ serve(async (req) => {
         current_period_end: subscriptionEnd,
         trial_end: trialEnd,
         updated_at: new Date().toISOString()
-      })
-      .eq('agency_id', user.id); // This should be the agency_id from user context
+      });
 
     if (updateError) {
       logStep("Warning: Could not update agency subscription", { error: updateError.message });
