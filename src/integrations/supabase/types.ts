@@ -1093,6 +1093,7 @@ export type Database = {
           id: string
           last_optimization: string | null
           observations: string | null
+          platform_data: Json | null
           platforms: string[] | null
           results: Database["public"]["Enums"]["traffic_result"] | null
           situation: Database["public"]["Enums"]["traffic_situation"] | null
@@ -1106,6 +1107,7 @@ export type Database = {
           id?: string
           last_optimization?: string | null
           observations?: string | null
+          platform_data?: Json | null
           platforms?: string[] | null
           results?: Database["public"]["Enums"]["traffic_result"] | null
           situation?: Database["public"]["Enums"]["traffic_situation"] | null
@@ -1119,6 +1121,7 @@ export type Database = {
           id?: string
           last_optimization?: string | null
           observations?: string | null
+          platform_data?: Json | null
           platforms?: string[] | null
           results?: Database["public"]["Enums"]["traffic_result"] | null
           situation?: Database["public"]["Enums"]["traffic_situation"] | null

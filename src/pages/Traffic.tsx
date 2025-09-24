@@ -13,13 +13,14 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { TrafficControlForm } from "@/components/admin/TrafficControlForm";
-import { TrafficControlEditForm } from "@/components/admin/TrafficControlEditForm";
+import { PlatformTrafficControlForm } from "@/components/admin/PlatformTrafficControlForm";
+import { PlatformTrafficControlEditForm } from "@/components/admin/PlatformTrafficControlEditForm";
 
 interface TrafficControl {
   id: string;
   client_id: string;
   platforms: string[] | null;
+  platform_data: any | null;
   daily_budget: number | null;
   situation: 'stable' | 'improving' | 'worsening' | null;
   results: 'excellent' | 'good' | 'average' | 'bad' | 'terrible' | null;
@@ -206,7 +207,8 @@ export default function Traffic() {
   };
 
   // Função para cor de fundo do card baseada na situação
-  const getCardBackgroundColor = (situation: string | null) => {
+  const getCardBackgroundColor = (control: TrafficControl) => {
+    const situation = control.platform_data ? getWorstSituation(control) : control.situation;
     switch (situation) {
       case 'stable': return 'bg-green-50/50 dark:bg-green-950/20';
       case 'improving': return 'bg-blue-50/50 dark:bg-blue-950/20';
@@ -246,14 +248,64 @@ export default function Traffic() {
     }
   };
 
+  // Funções para trabalhar com dados por plataforma
+  const getPlatformsData = (control: TrafficControl) => {
+    if (!control.platform_data || !control.platforms) {
+      return [];
+    }
+    
+    return control.platforms.map(platform => {
+      const platformInfo = control.platform_data[platform] || {};
+      return {
+        name: platform,
+        daily_budget: platformInfo.daily_budget || null,
+        situation: platformInfo.situation || null,
+        results: platformInfo.results || null,
+        last_optimization: platformInfo.last_optimization || null
+      };
+    });
+  };
+
+  const getTotalBudget = (control: TrafficControl) => {
+    const platforms = getPlatformsData(control);
+    return platforms.reduce((total, platform) => {
+      return total + (platform.daily_budget || 0);
+    }, 0);
+  };
+
+  const getWorstSituation = (control: TrafficControl) => {
+    const platforms = getPlatformsData(control);
+    const situations = platforms.map(p => p.situation).filter(Boolean);
+    
+    if (situations.includes('worsening')) return 'worsening';
+    if (situations.includes('improving')) return 'improving';
+    if (situations.includes('stable')) return 'stable';
+    return null;
+  };
+
+  const getWorstResults = (control: TrafficControl) => {
+    const platforms = getPlatformsData(control);
+    const results = platforms.map(p => p.results).filter(Boolean);
+    
+    if (results.includes('terrible')) return 'terrible';
+    if (results.includes('bad')) return 'bad';
+    if (results.includes('average')) return 'average';
+    if (results.includes('good')) return 'good';
+    if (results.includes('excellent')) return 'excellent';
+    return null;
+  };
+
   const getPriorityLevel = (control: TrafficControl) => {
-    if (control.situation === 'worsening' && (control.results === 'bad' || control.results === 'terrible')) {
+    const situation = control.platform_data ? getWorstSituation(control) : control.situation;
+    const results = control.platform_data ? getWorstResults(control) : control.results;
+    
+    if (situation === 'worsening' && (results === 'bad' || results === 'terrible')) {
       return { level: 'critical', label: 'Crítico', color: 'bg-red-500 text-white' };
     }
-    if (control.situation === 'worsening' || control.results === 'bad') {
+    if (situation === 'worsening' || results === 'bad') {
       return { level: 'high', label: 'Alto', color: 'bg-orange-500 text-white' };
     }
-    if (control.results === 'average' || !control.last_optimization) {
+    if (results === 'average' || !control.platform_data) {
       return { level: 'medium', label: 'Médio', color: 'bg-yellow-500 text-white' };
     }
     return { level: 'low', label: 'Baixo', color: 'bg-green-500 text-white' };
@@ -344,7 +396,7 @@ export default function Traffic() {
             Painel completo para monitoramento e gestão de campanhas
           </p>
         </div>
-        <TrafficControlForm onSuccess={fetchTrafficControls} />
+        <PlatformTrafficControlForm onSuccess={fetchTrafficControls} />
       </div>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
@@ -599,7 +651,7 @@ export default function Traffic() {
                 return (
                   <Card 
                     key={control.id} 
-                    className={`hover:shadow-lg transition-all duration-200 ${getCardBackgroundColor(control.situation)}`}
+                    className={`hover:shadow-lg transition-all duration-200 ${getCardBackgroundColor(control)}`}
                   >
                     <CardHeader className="pb-3">
                       <div className="flex justify-between items-start">
@@ -610,12 +662,14 @@ export default function Traffic() {
                               {priority.label}
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <DollarSign className="h-3 w-3" />
-                              <span className="font-medium">R$ {control.daily_budget?.toLocaleString('pt-BR') || '0'}/dia</span>
-                            </div>
-                          </div>
+                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                             <div className="flex items-center gap-1">
+                               <DollarSign className="h-3 w-3" />
+                               <span className="font-medium">
+                                 R$ {control.platform_data ? getTotalBudget(control).toLocaleString('pt-BR') : (control.daily_budget?.toLocaleString('pt-BR') || '0')}/dia
+                               </span>
+                             </div>
+                           </div>
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -644,69 +698,91 @@ export default function Traffic() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {/* Plataformas */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Activity className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">Plataformas</span>
-                        </div>
-                        <div className="flex gap-1 flex-wrap">
-                          {control.platforms?.map((platform, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs bg-secondary/70">
-                              {platform}
-                            </Badge>
-                          )) || <span className="text-sm text-muted-foreground">Nenhuma plataforma</span>}
-                        </div>
-                      </div>
+                       {/* Plataformas */}
+                       <div>
+                         <div className="flex items-center gap-2 mb-2">
+                           <Activity className="h-4 w-4 text-muted-foreground" />
+                           <span className="text-sm font-medium">Plataformas</span>
+                         </div>
+                         {control.platform_data ? (
+                           <div className="space-y-2">
+                             {getPlatformsData(control).map((platform, index) => (
+                               <div key={index} className="p-2 bg-secondary/30 rounded-md">
+                                 <div className="flex justify-between items-center mb-1">
+                                   <span className="text-sm font-medium">{platform.name}</span>
+                                   <span className="text-xs text-muted-foreground">
+                                     R$ {platform.daily_budget?.toLocaleString('pt-BR') || '0'}/dia
+                                   </span>
+                                 </div>
+                                 <div className="flex gap-2 text-xs">
+                                   {platform.situation && (
+                                     <Badge variant="outline" className={`${getSituationColor(platform.situation)} text-xs px-1`}>
+                                       {getSituationLabel(platform.situation)}
+                                     </Badge>
+                                   )}
+                                   {platform.results && (
+                                     <Badge variant="outline" className={`${getResultsColor(platform.results)} text-xs px-1`}>
+                                       {getResultsLabel(platform.results)}
+                                     </Badge>
+                                   )}
+                                 </div>
+                                 {platform.last_optimization && (
+                                   <div className="text-xs text-muted-foreground mt-1">
+                                     Otimização: {new Date(platform.last_optimization + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                   </div>
+                                 )}
+                               </div>
+                             ))}
+                           </div>
+                         ) : (
+                           <div className="flex gap-1 flex-wrap">
+                             {control.platforms?.map((platform, index) => (
+                               <Badge key={index} variant="secondary" className="text-xs bg-secondary/70">
+                                 {platform}
+                               </Badge>
+                             )) || <span className="text-sm text-muted-foreground">Nenhuma plataforma</span>}
+                           </div>
+                         )}
+                       </div>
 
-                      {/* Status em Grid Compacto */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1">
-                            <TrendingUp className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">Situação</span>
+                       {/* Status Geral - baseado na pior situação entre plataformas */}
+                       {!control.platform_data && (
+                         <div className="grid grid-cols-2 gap-3">
+                           <div className="space-y-1">
+                             <div className="flex items-center gap-1">
+                               <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                               <span className="text-xs text-muted-foreground">Situação</span>
+                             </div>
+                             <Badge variant="outline" className={`w-full justify-center text-xs ${getSituationColor(control.situation)}`}>
+                               {getSituationLabel(control.situation)}
+                             </Badge>
+                           </div>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1">
+                                <Target className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground">Resultados</span>
+                              </div>
+                              <Badge variant="outline" className={`w-full justify-center text-xs ${getResultsColor(control.results)}`}>
+                                {getResultsLabel(control.results)}
+                              </Badge>
+                            </div>
                           </div>
-                          <Badge variant="outline" className={`w-full justify-center text-xs ${getSituationColor(control.situation)}`}>
-                            {getSituationLabel(control.situation)}
-                          </Badge>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1">
-                            <Target className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">Resultados</span>
+                        )}
+
+                        {/* Observações (se houver) */}
+                        {control.observations && (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">Observações</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground bg-muted/30 rounded p-2 line-clamp-2">
+                              {control.observations}
+                            </p>
                           </div>
-                          <Badge variant="outline" className={`w-full justify-center text-xs ${getResultsColor(control.results)}`}>
-                            {getResultsLabel(control.results)}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      {/* Última Otimização */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">Última Otimização</span>
-                        </div>
-                        <div className="text-sm font-medium">
-                          {control.last_optimization 
-                            ? (() => {
-                                const date = new Date(control.last_optimization + 'T00:00:00');
-                                return date.toLocaleDateString('pt-BR');
-                              })()
-                            : 'Nunca otimizado'
-                          }
-                        </div>
-                      </div>
-
-                      {/* Observações (se houver) */}
-                      {control.observations && (
-                        <div className="space-y-1">
-                          <span className="text-xs text-muted-foreground">Observações</span>
-                          <p className="text-sm bg-muted/50 rounded p-2 line-clamp-2">{control.observations}</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                        )}
+                      </CardContent>
+                    </Card>
                 );
               })}
             </div>
@@ -1039,7 +1115,7 @@ export default function Traffic() {
             </DialogDescription>
           </DialogHeader>
           {selectedControl && (
-            <TrafficControlEditForm
+            <PlatformTrafficControlEditForm
               control={selectedControl}
               onSuccess={() => {
                 setIsEditOpen(false);
