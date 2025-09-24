@@ -152,6 +152,11 @@ export function WebhooksManager() {
 
   const testWebhook = async () => {
     // Verificar se o webhook está configurado
+    if (!currentAgency?.id) {
+      toast.error('Agência não encontrada');
+      return;
+    }
+
     if (!leadWebhook) {
       toast.error('Configure o webhook antes de testá-lo');
       return;
@@ -177,6 +182,9 @@ export function WebhooksManager() {
         test_mode: true
       };
 
+      console.log('Enviando dados de teste para:', webhookUrl);
+      console.log('Dados:', testData);
+
       toast.info('Enviando dados de teste...');
 
       const response = await fetch(webhookUrl, {
@@ -185,18 +193,26 @@ export function WebhooksManager() {
           'Content-Type': 'application/json',
           'User-Agent': 'CRM-Webhook-Test/1.0'
         },
-        body: JSON.stringify(testData)
+        body: JSON.stringify(testData),
+        mode: 'cors' // Explicitamente definir modo CORS
       });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (response.ok) {
         const result = await response.json();
+        console.log('Success result:', result);
         toast.success(`✅ Teste realizado com sucesso! Lead ID: ${result.lead_id}`);
+        
         // Recarregar dados para mostrar estatísticas atualizadas
         setTimeout(() => {
           fetchWebhooks();
         }, 1000);
       } else {
         const errorText = await response.text();
+        console.error('Error response:', { status: response.status, body: errorText });
+        
         let errorMessage = 'Falha na requisição';
         
         try {
@@ -206,11 +222,10 @@ export function WebhooksManager() {
           errorMessage = errorText || errorMessage;
         }
         
-        console.error('Webhook test error:', { status: response.status, error: errorText });
-        toast.error(`❌ Erro no teste: ${errorMessage}`);
+        toast.error(`❌ Erro no teste: ${errorMessage} (Status: ${response.status})`);
       }
     } catch (error) {
-      console.error('Error testing webhook:', error);
+      console.error('Network error testing webhook:', error);
       toast.error(`❌ Erro de conexão: ${error.message}`);
     }
   };

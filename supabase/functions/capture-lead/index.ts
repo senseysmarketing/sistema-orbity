@@ -12,8 +12,11 @@ interface WebhookConfig {
 }
 
 Deno.serve(async (req) => {
+  console.log(`[CAPTURE-LEAD] New request: ${req.method} ${req.url}`);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('[CAPTURE-LEAD] Handling OPTIONS request');
     return new Response(null, { headers: corsHeaders });
   }
 
