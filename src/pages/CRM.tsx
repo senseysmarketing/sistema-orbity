@@ -252,14 +252,16 @@ export default function CRM() {
                 Webhooks
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl">
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
               <DialogHeader>
                 <DialogTitle>Gerenciar Webhooks</DialogTitle>
                 <DialogDescription>
                   Configure webhooks personalizados para integrar com outras ferramentas
                 </DialogDescription>
               </DialogHeader>
-              <WebhooksManager />
+              <div className="overflow-y-auto overflow-x-auto max-h-[calc(90vh-120px)] pr-2">
+                <WebhooksManager />
+              </div>
             </DialogContent>
           </Dialog>
           
