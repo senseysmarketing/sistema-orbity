@@ -60,7 +60,7 @@ serve(async (req) => {
       email_confirm: true,
       user_metadata: {
         name: adminUser.name,
-        role: 'administrador'
+        role: 'agency_admin'
       }
     });
 

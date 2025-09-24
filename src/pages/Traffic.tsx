@@ -58,7 +58,7 @@ export default function Traffic() {
   const { toast } = useToast();
 
   // Verifica se o usuário tem permissão para acessar a página
-  const hasAccess = profile?.role === 'gestor_trafego' || profile?.role === 'administrador';
+  const hasAccess = profile?.role === 'agency_user' || profile?.role === 'agency_admin';
 
   useEffect(() => {
     if (hasAccess) {

@@ -70,7 +70,7 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
   const [loading, setLoading] = useState(true);
 
   const isSuperAdmin = profile?.role === 'super_admin';
-  const isAgencyAdmin = profile?.role === 'agency_admin' || profile?.role === 'administrador';
+  const isAgencyAdmin = profile?.role === 'agency_admin';
 
   const checkPaymentStatus = async () => {
     if (!user || !currentAgency || isSuperAdmin) {

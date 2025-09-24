@@ -79,15 +79,11 @@ const Index = () => {
       );
 
       // Dados específicos por role
-      if (profile.role === 'administrador') {
+      if (profile.role === 'agency_admin') {
         promises.push(
           supabase.from('client_payments').select('*'),
           supabase.from('expenses').select('*'),
           supabase.from('salaries').select('*'),
-          supabase.from('traffic_controls').select('*')
-        );
-      } else if (profile.role === 'gestor_trafego') {
-        promises.push(
           supabase.from('traffic_controls').select('*')
         );
       }
@@ -99,11 +95,11 @@ const Index = () => {
         clients: results[1]?.data || [],
         profiles: results[2]?.data || [],
         personalTasks: results[3]?.data || [],
-        clientPayments: profile.role === 'administrador' ? (results[4]?.data || []) : [],
-        expenses: profile.role === 'administrador' ? (results[5]?.data || []) : [],
-        salaries: profile.role === 'administrador' ? (results[6]?.data || []) : [],
-        trafficControls: (profile.role === 'administrador' || profile.role === 'gestor_trafego') ? 
-          (results[profile.role === 'administrador' ? 7 : 4]?.data || []) : []
+        clientPayments: profile.role === 'agency_admin' ? (results[4]?.data || []) : [],
+        expenses: profile.role === 'agency_admin' ? (results[5]?.data || []) : [],
+        salaries: profile.role === 'agency_admin' ? (results[6]?.data || []) : [],
+        trafficControls: profile.role === 'agency_admin' ? 
+          (results[7]?.data || []) : []
       });
 
     } catch (error: any) {
@@ -224,12 +220,12 @@ const Index = () => {
   const getRoleGreeting = () => {
     if (!profile) return "Bem-vindo";
     switch (profile.role) {
-      case 'gestor_trafego':
-        return `Bem-vindo, ${profile.name.split(' ')[0]}! 📊`;
-      case 'designer':
-        return `Bem-vindo, ${profile.name.split(' ')[0]}! 🎨`;
-      case 'administrador':
+      case 'agency_admin':
         return `Bem-vindo, ${profile.name.split(' ')[0]}! 👑`;
+      case 'agency_user':
+        return `Bem-vindo, ${profile.name.split(' ')[0]}! 📊`;
+      case 'super_admin':
+        return `Bem-vindo, ${profile.name.split(' ')[0]}! 🚀`;
       default:
         return `Bem-vindo, ${profile.name.split(' ')[0]}!`;
     }
@@ -251,7 +247,7 @@ const Index = () => {
   }
 
   // Dashboard do Administrador
-  if (profile?.role === 'administrador') {
+  if (profile?.role === 'agency_admin') {
     return (
       <div className="space-y-6">
         {/* Header */}
@@ -677,7 +673,7 @@ const Index = () => {
   }
 
   // Dashboard do Gestor de Tráfego
-  if (profile?.role === 'gestor_trafego') {
+  if (profile?.role === 'agency_user') {
     return (
       <div className="space-y-6">
         {/* Header */}

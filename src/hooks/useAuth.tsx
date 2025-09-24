@@ -48,7 +48,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .single();
             
             if (profileData) {
-              setProfile(profileData);
+              // Map old roles to new ones for backward compatibility
+              const mappedProfile = {
+                ...profileData,
+                role: profileData.role === 'administrador' ? 'agency_admin' :
+                      profileData.role === 'gestor_trafego' ? 'agency_user' :
+                      profileData.role === 'designer' ? 'agency_user' :
+                      profileData.role as 'super_admin' | 'agency_admin' | 'agency_user'
+              };
+              setProfile(mappedProfile);
             }
           }, 0);
         } else {
@@ -72,7 +80,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single()
           .then(({ data: profileData }) => {
             if (profileData) {
-              setProfile(profileData);
+              // Map old roles to new ones for backward compatibility
+              const mappedProfile = {
+                ...profileData,
+                role: profileData.role === 'administrador' ? 'agency_admin' :
+                      profileData.role === 'gestor_trafego' ? 'agency_user' :
+                      profileData.role === 'designer' ? 'agency_user' :
+                      profileData.role as 'super_admin' | 'agency_admin' | 'agency_user'
+              };
+              setProfile(mappedProfile);
             }
             setLoading(false);
           });
