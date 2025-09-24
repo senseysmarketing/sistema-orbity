@@ -51,6 +51,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "admin_notes_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "admin_notes_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -183,6 +190,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "agency_subscriptions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "agency_subscriptions_plan_id_fkey"
             columns: ["plan_id"]
             isOneToOne: false
@@ -229,6 +243,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "agencies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_users_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
           },
           {
             foreignKeyName: "agency_users_invited_by_fkey"
@@ -304,6 +325,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "billing_history_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "billing_history_subscription_id_fkey"
             columns: ["subscription_id"]
             isOneToOne: false
@@ -353,6 +381,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "agencies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_payments_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
           },
           {
             foreignKeyName: "client_payments_client_id_fkey"
@@ -414,6 +449,13 @@ export type Database = {
             referencedRelation: "agencies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "clients_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
       expenses: {
@@ -460,6 +502,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "agencies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
           },
         ]
       }
@@ -513,6 +562,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "agencies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personal_tasks_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
           },
           {
             foreignKeyName: "personal_tasks_client_id_fkey"
@@ -604,6 +660,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "agencies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salaries_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
           },
         ]
       }
@@ -737,6 +800,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tasks_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "tasks_assigned_to_fkey"
             columns: ["assigned_to"]
             isOneToOne: false
@@ -808,6 +878,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "traffic_controls_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "traffic_controls_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -864,11 +941,34 @@ export type Database = {
             referencedRelation: "agencies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "usage_metrics_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
     }
     Views: {
-      [_ in never]: never
+      master_agency_overview: {
+        Row: {
+          agency_id: string | null
+          agency_name: string | null
+          client_count: number | null
+          created_at: string | null
+          current_period_end: string | null
+          is_active: boolean | null
+          stripe_customer_id: string | null
+          subscription_plan: string | null
+          subscription_status: string | null
+          task_count: number | null
+          total_revenue: number | null
+          user_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       check_agency_limits: {
