@@ -81,9 +81,9 @@ export function AppSidebar() {
     return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
   };
   const filteredMenuItems = menuItems.filter(item => !profile?.role || item.roles.includes(profile.role));
-  return <Sidebar className={`${collapsed ? "w-14" : "w-64"} bg-[#5a636c] border-r-0`} collapsible="icon">
+  return <Sidebar className={`${collapsed ? "w-14" : "w-64"} bg-sidebar border-r-0`} collapsible="icon">
       {/* Header */}
-      <SidebarHeader className="border-b border-sidebar-muted p-4 bg-[#5a636c]">
+      <SidebarHeader className="border-b border-sidebar-border p-4 bg-sidebar">
         {!collapsed && <div className="flex items-center">
             <img src={senseyLogo} alt="Senseys Logo" className="w-[122px] h-[32px] object-contain" />
           </div>}
@@ -92,7 +92,7 @@ export function AppSidebar() {
           </div>}
       </SidebarHeader>
 
-      <SidebarContent className="bg-[#5a636c]">
+      <SidebarContent className="bg-sidebar">
         <SidebarGroup>
           <SidebarGroupLabel className="text-sidebar-foreground/70">Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -115,7 +115,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* Footer with user info */}
-      <SidebarFooter className="border-t border-sidebar-muted p-4 bg-[#5a636c]">
+      <SidebarFooter className="border-t border-sidebar-border p-4 bg-sidebar">
         {!collapsed && profile && <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="w-full justify-start p-2 h-auto hover:bg-sidebar-muted text-sidebar-foreground">

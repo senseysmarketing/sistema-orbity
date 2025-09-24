@@ -361,42 +361,61 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
+                  <div className="space-y-4">
                 <div>
                   <h4 className="font-medium mb-3 flex items-center gap-2">
                     <Palette className="h-4 w-4" />
                     Tema
                   </h4>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Escolha o tema que será aplicado em todo o sistema, incluindo o menu lateral.
+                  </p>
                   <div className="grid grid-cols-3 gap-3">
                     <button
                       onClick={() => setTheme('light')}
-                      className={`p-3 border rounded-lg text-center hover:bg-muted/50 transition-colors ${
-                        theme === 'light' ? 'border-primary bg-primary/5' : ''
+                      className={`p-4 border rounded-lg text-center hover:bg-muted/50 transition-all duration-200 ${
+                        theme === 'light' ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : 'border-border'
                       }`}
                     >
-                      <div className="w-full h-8 bg-white border rounded mb-2"></div>
-                      <span className="text-sm">Claro</span>
+                      <div className="w-full h-12 bg-background border border-border rounded mb-3 flex items-center justify-center">
+                        <div className="w-2 h-2 bg-foreground rounded-full"></div>
+                      </div>
+                      <span className="text-sm font-medium">Claro</span>
+                      <p className="text-xs text-muted-foreground mt-1">Tema claro para uso diurno</p>
                     </button>
                     
                     <button
                       onClick={() => setTheme('dark')}
-                      className={`p-3 border rounded-lg text-center hover:bg-muted/50 transition-colors ${
-                        theme === 'dark' ? 'border-primary bg-primary/5' : ''
+                      className={`p-4 border rounded-lg text-center hover:bg-muted/50 transition-all duration-200 ${
+                        theme === 'dark' ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : 'border-border'
                       }`}
                     >
-                      <div className="w-full h-8 bg-gray-800 border rounded mb-2"></div>
-                      <span className="text-sm">Escuro</span>
+                      <div className="w-full h-12 bg-slate-800 border border-slate-600 rounded mb-3 flex items-center justify-center">
+                        <div className="w-2 h-2 bg-slate-100 rounded-full"></div>
+                      </div>
+                      <span className="text-sm font-medium">Escuro</span>
+                      <p className="text-xs text-muted-foreground mt-1">Tema escuro para baixa luminosidade</p>
                     </button>
                     
                     <button
                       onClick={() => setTheme('system')}
-                      className={`p-3 border rounded-lg text-center hover:bg-muted/50 transition-colors ${
-                        theme === 'system' ? 'border-primary bg-primary/5' : ''
+                      className={`p-4 border rounded-lg text-center hover:bg-muted/50 transition-all duration-200 ${
+                        theme === 'system' ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : 'border-border'
                       }`}
                     >
-                      <div className="w-full h-8 bg-gradient-to-r from-white to-gray-800 border rounded mb-2"></div>
-                      <span className="text-sm">Sistema</span>
+                      <div className="w-full h-12 bg-gradient-to-r from-background via-muted to-slate-800 border border-border rounded mb-3 flex items-center justify-center">
+                        <div className="w-2 h-2 bg-primary rounded-full"></div>
+                      </div>
+                      <span className="text-sm font-medium">Sistema</span>
+                      <p className="text-xs text-muted-foreground mt-1">Segue configuração do sistema</p>
                     </button>
+                  </div>
+                  
+                  <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Tema atual:</strong> {theme === 'light' ? 'Claro' : theme === 'dark' ? 'Escuro' : 'Sistema'} 
+                      {theme === 'system' && ` (${window.matchMedia('(prefers-color-scheme: dark)').matches ? 'Escuro' : 'Claro'} detectado)`}
+                    </p>
                   </div>
                 </div>
 
