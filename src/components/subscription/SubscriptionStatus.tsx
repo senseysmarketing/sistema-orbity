@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CalendarDays, CreditCard, RefreshCw } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
+import { ManageSubscriptionDialog } from './ManageSubscriptionDialog';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export function SubscriptionStatus() {
   const { currentSubscription, loading, refreshing, checkSubscription, openCustomerPortal } = useSubscription();
+  const [showManageDialog, setShowManageDialog] = useState(false);
 
   if (loading) {
     return (
@@ -163,7 +166,15 @@ export function SubscriptionStatus() {
 
         {isSubscriptionActive && (
           <Button
-            onClick={openCustomerPortal}
+            onClick={() => {
+              // Para planos locais (sem customer_id), usar dialog personalizado
+              if (!currentSubscription?.customer_id) {
+                setShowManageDialog(true);
+              } else {
+                // Para planos do Stripe, usar customer portal
+                openCustomerPortal();
+              }
+            }}
             className="w-full"
             variant="outline"
           >
@@ -171,6 +182,11 @@ export function SubscriptionStatus() {
           </Button>
         )}
       </CardContent>
+
+      <ManageSubscriptionDialog 
+        open={showManageDialog} 
+        onOpenChange={setShowManageDialog} 
+      />
     </Card>
   );
 }
