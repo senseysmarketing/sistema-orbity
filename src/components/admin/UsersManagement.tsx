@@ -137,7 +137,8 @@ export function UsersManagement() {
       setInviteLoading(true);
       
       // Verificar se ainda há limite de usuários disponível
-      const canAddUser = checkLimitWithWarning('users', users.length + 1);
+      const currentUserCount = users.length;
+      const canAddUser = checkLimitWithWarning('users', currentUserCount + 1);
       if (!canAddUser) {
         toast({
           title: "Limite de usuários atingido",
@@ -152,7 +153,7 @@ export function UsersManagement() {
         .from('profiles')
         .select('user_id')
         .eq('email', inviteEmail)
-        .single();
+        .maybeSingle();
 
       if (existingProfile) {
         // Verificar se já é membro da agência
@@ -161,7 +162,7 @@ export function UsersManagement() {
           .select('id')
           .eq('agency_id', currentAgency?.id)
           .eq('user_id', existingProfile.user_id)
-          .single();
+          .maybeSingle();
 
         if (existingMember) {
           toast({
@@ -291,15 +292,22 @@ export function UsersManagement() {
                 Gerencie os membros da sua agência, convide novos usuários e controle permissões
                 {currentSubscription && (
                   <span className="block text-sm mt-1">
-                    {users.length} de {currentSubscription.plan_name === 'Free' ? 5 : 
-                     currentSubscription.plan_name === 'Basic' ? 10 : 
-                     currentSubscription.plan_name === 'Pro' ? 25 : 50} usuários utilizados
+                    {users.length} de {(() => {
+                      const planLimits = {
+                        'Free': 5,
+                        'Basic': 10, 
+                        'Pro': 25,
+                        'Enterprise': 50
+                      };
+                      return planLimits[currentSubscription.plan_name as keyof typeof planLimits] || 5;
+                    })()} usuários utilizados
                   </span>
                 )}
               </CardDescription>
             </div>
             {(() => {
-              const userLimitReached = !checkLimitWithWarning('users', users.length + 1);
+              const currentUserCount = users.length;
+              const userLimitReached = !checkLimitWithWarning('users', currentUserCount + 1);
               const planLimits = {
                 'Free': 5,
                 'Basic': 10,
