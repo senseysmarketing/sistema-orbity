@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useTaskAssignments } from "@/hooks/useTaskAssignments";
 
 interface ReportData {
   totalTasks: number;
@@ -31,10 +32,11 @@ export default function Reports() {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>();
   const { profile } = useAuth();
   const { toast } = useToast();
+  const { assignments, fetchAssignments } = useTaskAssignments();
 
   useEffect(() => {
     fetchReportData();
-  }, [profile]);
+  }, [profile, assignments]);
 
   const fetchReportData = async () => {
     try {
@@ -47,21 +49,32 @@ export default function Reports() {
         { data: clients },
         { data: payments }
       ] = await Promise.all([
-        supabase.from('tasks').select('status'),
+        supabase.from('tasks').select('*'),
         supabase.from('personal_tasks').select('completed, user_id').eq('user_id', profile?.user_id || ''),
         supabase.from('clients').select('active, monthly_value'),
         supabase.from('client_payments').select('status, amount')
       ]);
 
+      // Buscar atribuições de tarefas
+      await fetchAssignments();
+
       const totalTasks = tasks?.length || 0;
-      const completedTasks = tasks?.filter(t => t.status === 'done').length || 0;
+      
+      // Calcular tarefas do usuário baseado nas atribuições
+      const myTaskIds = assignments
+        .filter(a => a.user_id === profile?.user_id)
+        .map(a => a.task_id);
+      
+      const myTasks = tasks?.filter(t => myTaskIds.includes(t.id)) || [];
+      const completedTasks = myTasks.filter(t => t.status === 'done').length;
+      
       const personalTasksCompleted = personalTasks?.filter(t => t.completed).length || 0;
       const activeClients = clients?.filter(c => c.active).length || 0;
       const monthlyRevenue = clients?.filter(c => c.active).reduce((sum, c) => sum + (c.monthly_value || 0), 0) || 0;
       const pendingPayments = payments?.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0) || 0;
 
       setReportData({
-        totalTasks,
+        totalTasks: myTasks.length,
         completedTasks,
         personalTasksCompleted,
         activeClients,

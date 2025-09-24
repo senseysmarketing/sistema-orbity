@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Eye, Edit, Trash2, MoreHorizontal } from "lucide-react";
+import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
 
 interface Task {
   id: string;
@@ -30,6 +31,7 @@ interface SortableTaskCardProps {
   getAssignedUserName: (userId: string | null) => string;
   getClientName: (clientId: string | null) => string;
   formatDateBR: (date: string | null) => string;
+  assignedUsers?: any[];
 }
 
 export function SortableTaskCard({
@@ -43,6 +45,7 @@ export function SortableTaskCard({
   getAssignedUserName,
   getClientName,
   formatDateBR,
+  assignedUsers = [],
 }: SortableTaskCardProps) {
   const {
     attributes,
@@ -111,7 +114,7 @@ export function SortableTaskCard({
           </div>
           
           <div className="text-xs text-muted-foreground space-y-1">
-            <div>📋 {getAssignedUserName(task.assigned_to)}</div>
+            <TaskAssignedUsers users={assignedUsers} maxDisplay={2} size="sm" />
             <div>🏢 {getClientName(task.client_id)}</div>
             {task.due_date && <div>📅 {formatDateBR(task.due_date)}</div>}
           </div>

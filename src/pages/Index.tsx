@@ -17,6 +17,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useTaskAssignments } from '@/hooks/useTaskAssignments';
 
 interface DashboardData {
   tasks: any[];
@@ -32,6 +33,7 @@ interface DashboardData {
 const Index = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
+  const { assignments, fetchAssignments, getAssignedUsers } = useTaskAssignments();
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState("week");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -50,6 +52,14 @@ const Index = () => {
   useEffect(() => {
     fetchDashboardData();
   }, [profile]);
+
+  // Métricas calculadas com base nas atribuições
+  const myTasks = useMemo(() => {
+    return data.tasks.filter(task => {
+      const taskAssignments = assignments.filter(a => a.task_id === task.id);
+      return taskAssignments.some(a => a.user_id === profile?.user_id);
+    });
+  }, [data.tasks, assignments, profile?.user_id]);
 
   const fetchDashboardData = async () => {
     if (!profile) return;
@@ -102,6 +112,9 @@ const Index = () => {
           (results[7]?.data || []) : []
       });
 
+      // Buscar atribuições de tarefas
+      await fetchAssignments();
+
     } catch (error: any) {
       toast({
         title: "Erro ao carregar dados",
@@ -119,8 +132,11 @@ const Index = () => {
     const thisWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
     const thisMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-    // Tarefas
-    const myTasks = data.tasks.filter(t => t.assigned_to === profile?.user_id);
+    // Tarefas - usando sistema de múltiplas atribuições
+    const myTasks = data.tasks.filter(t => {
+      const taskAssignments = assignments.filter(a => a.task_id === t.id);
+      return taskAssignments.some(a => a.user_id === profile?.user_id);
+    });
     const overdueTasks = myTasks.filter(t => {
       const dueDate = t.due_date ? new Date(t.due_date) : null;
       return dueDate && dueDate < today && t.status !== 'done';
@@ -548,7 +564,10 @@ const Index = () => {
               <CardContent>
                 <div className="space-y-4">
                   {data.profiles.map((member) => {
-                    const memberTasks = data.tasks.filter(t => t.assigned_to === member.user_id);
+                    const memberTasks = data.tasks.filter(task => {
+                      const taskAssignments = assignments.filter(a => a.task_id === task.id);
+                      return taskAssignments.some(a => a.user_id === member.user_id);
+                    });
                     const completedTasks = memberTasks.filter(t => t.status === 'done').length;
                     const completionRate = memberTasks.length > 0 ? Math.round((completedTasks / memberTasks.length) * 100) : 0;
                     
@@ -621,7 +640,10 @@ const Index = () => {
           <TabsContent value="team" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3">
               {data.profiles.map((member) => {
-                const memberTasks = data.tasks.filter(t => t.assigned_to === member.user_id);
+                const memberTasks = data.tasks.filter(task => {
+                  const taskAssignments = assignments.filter(a => a.task_id === task.id);
+                  return taskAssignments.some(a => a.user_id === member.user_id);
+                });
                 const completedTasks = memberTasks.filter(t => t.status === 'done').length;
                 const overdueTasks = memberTasks.filter(t => {
                   const dueDate = t.due_date ? new Date(t.due_date) : null;
@@ -1035,15 +1057,15 @@ const Index = () => {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Projetos Concluídos</span>
-                  <span className="font-medium text-green-600">{data.tasks.filter(t => t.assigned_to === profile?.user_id && t.status === 'done').length}</span>
+                  <span className="font-medium text-green-600">{myTasks.filter(t => t.status === 'done').length}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Em Andamento</span>
-                  <span className="font-medium text-blue-600">{data.tasks.filter(t => t.assigned_to === profile?.user_id && t.status === 'in_progress').length}</span>
+                  <span className="font-medium text-blue-600">{myTasks.filter(t => t.status === 'in_progress').length}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Aguardando Revisão</span>
-                  <span className="font-medium text-orange-600">{data.tasks.filter(t => t.assigned_to === profile?.user_id && t.status === 'em_revisao').length}</span>
+                  <span className="font-medium text-orange-600">{myTasks.filter(t => t.status === 'em_revisao').length}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Em Atraso</span>
@@ -1087,7 +1109,7 @@ const Index = () => {
                 <CardTitle className="text-sm">A Fazer</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{data.tasks.filter(t => t.assigned_to === profile?.user_id && t.status === 'todo').length}</div>
+                <div className="text-2xl font-bold">{myTasks.filter(t => t.status === 'todo').length}</div>
                 <p className="text-xs text-muted-foreground">Projetos novos</p>
               </CardContent>
             </Card>
@@ -1097,7 +1119,7 @@ const Index = () => {
                 <CardTitle className="text-sm">Em Andamento</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{data.tasks.filter(t => t.assigned_to === profile?.user_id && t.status === 'in_progress').length}</div>
+                <div className="text-2xl font-bold text-blue-600">{myTasks.filter(t => t.status === 'in_progress').length}</div>
                 <p className="text-xs text-muted-foreground">Em desenvolvimento</p>
               </CardContent>
             </Card>
@@ -1107,7 +1129,7 @@ const Index = () => {
                 <CardTitle className="text-sm">Em Revisão</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{data.tasks.filter(t => t.assigned_to === profile?.user_id && t.status === 'em_revisao').length}</div>
+                <div className="text-2xl font-bold text-orange-600">{myTasks.filter(t => t.status === 'em_revisao').length}</div>
                 <p className="text-xs text-muted-foreground">Aguardando aprovação</p>
               </CardContent>
             </Card>
@@ -1117,7 +1139,7 @@ const Index = () => {
                 <CardTitle className="text-sm">Concluídas</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{data.tasks.filter(t => t.assigned_to === profile?.user_id && t.status === 'done').length}</div>
+                <div className="text-2xl font-bold text-green-600">{myTasks.filter(t => t.status === 'done').length}</div>
                 <p className="text-xs text-muted-foreground">Entregues</p>
               </CardContent>
             </Card>

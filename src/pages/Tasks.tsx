@@ -1560,7 +1560,9 @@ export default function Tasks() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Responsável</label>
-                  <p className="text-sm mt-1">{getAssignedUserName(selectedTask.assigned_to)}</p>
+                  <div className="mt-1">
+                    <TaskAssignedUsers users={getAssignedUsers(selectedTask.id)} showNames maxDisplay={5} />
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Cliente</label>
