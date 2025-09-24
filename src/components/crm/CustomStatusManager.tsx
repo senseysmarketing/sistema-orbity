@@ -16,6 +16,7 @@ interface CustomStatus {
   color: string;
   order_position: number;
   is_default: boolean;
+  is_system?: boolean; // Status do sistema que não podem ser editados/deletados
   agency_id: string;
   created_at: string;
   updated_at: string;
@@ -38,14 +39,12 @@ const defaultColors = [
   { name: 'Cinza', value: 'bg-gray-500' },
 ];
 
+// Status padrão obrigatórios para relatórios e análises - NÃO PODEM SER EDITADOS/DELETADOS
 const defaultStatuses = [
-  { name: 'Novo', color: 'bg-blue-500', is_default: true, order_position: 1 },
-  { name: 'Contatado', color: 'bg-yellow-500', is_default: true, order_position: 2 },
-  { name: 'Qualificado', color: 'bg-orange-500', is_default: true, order_position: 3 },
-  { name: 'Proposta', color: 'bg-purple-500', is_default: true, order_position: 4 },
-  { name: 'Negociação', color: 'bg-indigo-500', is_default: true, order_position: 5 },
-  { name: 'Ganho', color: 'bg-green-500', is_default: true, order_position: 6 },
-  { name: 'Perdido', color: 'bg-red-500', is_default: true, order_position: 7 },
+  { name: 'Novo', color: 'bg-blue-500', is_default: true, is_system: true, order_position: 1 },
+  { name: 'Qualificado', color: 'bg-orange-500', is_default: true, is_system: true, order_position: 2 },
+  { name: 'Ganho', color: 'bg-green-500', is_default: true, is_system: true, order_position: 3 },
+  { name: 'Perdido', color: 'bg-red-500', is_default: true, is_system: true, order_position: 4 },
 ];
 
 export function CustomStatusManager({ onStatusUpdate }: CustomStatusManagerProps) {
@@ -233,22 +232,29 @@ export function CustomStatusManager({ onStatusUpdate }: CustomStatusManagerProps
                 <div className={`w-4 h-4 rounded-full ${status.color}`}></div>
                 <div>
                   <span className="font-medium">{status.name}</span>
-                  {status.is_default && (
+                  {status.is_system && (
                     <Badge variant="secondary" className="ml-2 text-xs">
+                      Sistema
+                    </Badge>
+                  )}
+                  {status.is_default && !status.is_system && (
+                    <Badge variant="outline" className="ml-2 text-xs">
                       Padrão
                     </Badge>
                   )}
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleEdit(status)}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-                {!status.is_default && (
+                {!status.is_system && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEdit(status)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                )}
+                {!status.is_system && !status.is_default && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -257,6 +263,11 @@ export function CustomStatusManager({ onStatusUpdate }: CustomStatusManagerProps
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
+                )}
+                {status.is_system && (
+                  <span className="text-xs text-muted-foreground px-2">
+                    Necessário para relatórios
+                  </span>
                 )}
               </div>
             </div>
