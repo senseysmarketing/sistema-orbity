@@ -62,25 +62,50 @@ serve(async (req) => {
 
     logStep("Request data received", { email, role, agency_id });
 
-    // Verify the user is an admin of the agency
-    const { data: adminCheck, error: adminError } = await supabaseClient
-      .from('agency_users')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('agency_id', agency_id)
-      .maybeSingle();
+    // Verify the user is an admin of the agency using SECURITY DEFINER function
+    const { data: isAdmin, error: isAdminError } = await supabaseClient.rpc('is_agency_admin', {
+      agency_uuid: agency_id,
+    });
 
-    if (adminError) {
-      logStep("Error checking admin status", { error: adminError });
-      throw new Error(`Failed to verify admin status: ${adminError.message}`);
+    if (isAdminError) {
+      logStep("Error checking admin status (rpc)", { error: isAdminError });
+      throw new Error(`Failed to verify admin status: ${isAdminError.message}`);
     }
 
-    if (!adminCheck || !['owner', 'admin'].includes(adminCheck.role)) {
-      logStep("Authorization failed", { userRole: adminCheck?.role, userId: user.id, agencyId: agency_id });
+    if (!isAdmin) {
+      logStep("Authorization failed", { userId: user.id, agencyId: agency_id });
       throw new Error('Unauthorized: Only agency admins can create users');
     }
 
-    logStep("Admin verification passed", { userRole: adminCheck.role });
+    logStep("Admin verification passed");
+
+    // Enforce plan user limit on backend as well
+    const { count: currentCount, error: countError } = await supabaseAdmin
+      .from('agency_users')
+      .select('id', { count: 'exact', head: true })
+      .eq('agency_id', agency_id);
+
+    if (countError) {
+      logStep("Error counting users", { error: countError });
+      throw new Error(`Failed to verify current user count: ${countError.message}`);
+    }
+
+    const newCount = (currentCount ?? 0) + 1;
+    const { data: withinLimit, error: limitError } = await supabaseAdmin.rpc('enforce_plan_limits', {
+      agency_uuid: agency_id,
+      limit_type: 'users',
+      current_count: newCount
+    });
+
+    if (limitError) {
+      logStep("Error enforcing plan limits", { error: limitError });
+      throw new Error(`Failed to validate plan limits: ${limitError.message}`);
+    }
+
+    if (!withinLimit) {
+      logStep("Plan limit reached", { currentCount, newCount });
+      throw new Error('User limit reached for current plan');
+    }
 
     // Check if email already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
