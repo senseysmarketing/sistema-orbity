@@ -37,7 +37,10 @@ export function useTaskAssignments() {
 
       const { data: assignmentData, error: assignmentError } = await query;
 
-      if (assignmentError) throw assignmentError;
+      if (assignmentError) {
+        console.error('Error fetching assignments:', assignmentError);
+        throw assignmentError;
+      }
 
       // Buscar os perfis dos usuários
       if (assignmentData && assignmentData.length > 0) {

@@ -17,12 +17,13 @@ interface TaskAssignedUsersProps {
 }
 
 export function TaskAssignedUsers({ 
-  users, 
+  users = [], 
   maxDisplay = 3, 
   size = 'md',
   showNames = false 
 }: TaskAssignedUsersProps) {
   const getUserInitials = (name: string) => {
+    if (!name || typeof name !== 'string') return '??';
     return name
       .split(' ')
       .map(word => word.charAt(0))
@@ -42,7 +43,7 @@ export function TaskAssignedUsers({
     }
   };
 
-  if (users.length === 0) {
+  if (!users || users.length === 0) {
     return (
       <div className="flex items-center gap-1 text-muted-foreground">
         <Users className="h-4 w-4" />
