@@ -440,6 +440,35 @@ export default function Admin() {
     });
   }, [salaries, searchTerm, statusFilter]);
 
+  // Lista combinada de despesas e salários para exibição na aba de despesas
+  const combinedExpensesAndSalaries = useMemo(() => {
+    const mappedExpenses = expenses.map(expense => ({
+      ...expense,
+      type: 'expense' as const,
+      employee_name: undefined
+    }));
+    
+    const mappedSalaries = salaries.map(salary => ({
+      ...salary,
+      type: 'salary' as const,
+      name: `Salário - ${salary.employee_name}`,
+      is_fixed: true
+    }));
+    
+    const combined = [...mappedExpenses, ...mappedSalaries];
+    
+    return combined.filter(item => {
+      const itemName = item.type === 'salary' ? item.employee_name || '' : item.name;
+      const matchesSearch = itemName.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
+      const matchesType = paymentTypeFilter === 'all' || 
+        (paymentTypeFilter === 'fixed' && item.is_fixed) || 
+        (paymentTypeFilter === 'variable' && !item.is_fixed) ||
+        (paymentTypeFilter === 'salary' && item.type === 'salary');
+      return matchesSearch && matchesStatus && matchesType;
+    }).sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime());
+  }, [expenses, salaries, searchTerm, statusFilter, paymentTypeFilter]);
+
   // Análises e métricas avançadas
   const analytics = useMemo(() => {
     const today = new Date();
@@ -1269,7 +1298,7 @@ export default function Admin() {
                   <SelectContent>
                     <SelectItem value="all">Todos os Tipos</SelectItem>
                     <SelectItem value="fixed">Fixas</SelectItem>
-                    <SelectItem value="variable">Variáveis</SelectItem>
+                    <SelectItem value="salary">Salários</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -1282,7 +1311,7 @@ export default function Admin() {
 
           {/* Lista de Despesas */}
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Despesas ({filteredExpenses.length})</h3>
+            <h3 className="text-lg font-semibold">Despesas e Salários ({combinedExpensesAndSalaries.length})</h3>
             <div className="flex gap-2">
               <div className="flex gap-1">
                 <Button
@@ -1314,26 +1343,28 @@ export default function Admin() {
           {/* Visualização Cards vs Tabela */}
           {expenseViewMode === "cards" ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {filteredExpenses.map(expense => (
-                <Card key={expense.id} className={`hover:shadow-lg transition-all duration-200 ${getExpenseCardBackgroundColor(expense.status)}`}>
+              {combinedExpensesAndSalaries.map(item => (
+                <Card key={`${item.type}-${item.id}`} className={`hover:shadow-lg transition-all duration-200 ${getExpenseCardBackgroundColor(item.status)}`}>
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
                       <div className="space-y-2 flex-1">
                         <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg leading-none">{expense.name}</CardTitle>
-                          <Badge className={getStatusColor(expense.status)}>
-                            {getStatusLabel(expense.status)}
+                          <CardTitle className="text-lg leading-none">
+                            {item.type === 'salary' ? `Salário - ${item.employee_name}` : item.name}
+                          </CardTitle>
+                          <Badge className={getStatusColor(item.status)}>
+                            {getStatusLabel(item.status)}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <DollarSign className="h-3 w-3" />
                             <span className="font-medium">
-                              R$ {expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              R$ {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
-                          <Badge variant={expense.is_fixed ? "default" : "outline"} className="text-xs">
-                            {expense.is_fixed ? "Fixa" : "Variável"}
+                          <Badge variant={item.type === 'salary' ? "default" : item.is_fixed ? "default" : "outline"} className="text-xs">
+                            {item.type === 'salary' ? "Salário" : item.is_fixed ? "Fixa" : "Variável"}
                           </Badge>
                         </div>
                       </div>
@@ -1344,18 +1375,27 @@ export default function Admin() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewExpense(expense)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver Detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteExpense(expense)} className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir
-                          </DropdownMenuItem>
+                          {item.type === 'expense' ? (
+                            <>
+                              <DropdownMenuItem onClick={() => handleViewExpense(item as Expense)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver Detalhes
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditExpense(item as Expense)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDeleteExpense(item as Expense)} className="text-red-600">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <DropdownMenuItem disabled>
+                              <Users className="mr-2 h-4 w-4" />
+                              Salário
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -1367,7 +1407,7 @@ export default function Admin() {
                           <Calendar className="h-3 w-3 text-muted-foreground" />
                           <span className="text-xs text-muted-foreground">Vencimento</span>
                         </div>
-                        <p className="text-sm font-medium">{new Date(expense.due_date).toLocaleDateString('pt-BR')}</p>
+                        <p className="text-sm font-medium">{new Date(item.due_date).toLocaleDateString('pt-BR')}</p>
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center gap-1">
@@ -1375,7 +1415,7 @@ export default function Admin() {
                           <span className="text-xs text-muted-foreground">Pagamento</span>
                         </div>
                         <p className="text-sm font-medium">
-                          {expense.paid_date ? new Date(expense.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}
+                          {item.paid_date ? new Date(item.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}
                         </p>
                       </div>
                     </div>
@@ -1391,9 +1431,9 @@ export default function Admin() {
                   <table className="w-full">
                     <thead className="border-b bg-muted/50">
                       <tr>
-                        <th className="p-4 text-left font-medium">Despesa</th>
-                        <th className="p-4 text-left font-medium">Status</th>
+                        <th className="p-4 text-left font-medium">Nome</th>
                         <th className="p-4 text-left font-medium">Tipo</th>
+                        <th className="p-4 text-left font-medium">Status</th>
                         <th className="p-4 text-left font-medium">Valor</th>
                         <th className="p-4 text-left font-medium">Vencimento</th>
                         <th className="p-4 text-left font-medium">Data Pagamento</th>
@@ -1401,25 +1441,27 @@ export default function Admin() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredExpenses.map((expense, index) => (
-                        <tr key={expense.id} className={index % 2 === 0 ? "bg-muted/20" : ""}>
-                          <td className="p-4 font-medium">{expense.name}</td>
+                      {combinedExpensesAndSalaries.map((item, index) => (
+                        <tr key={`${item.type}-${item.id}`} className={index % 2 === 0 ? "bg-muted/20" : ""}>
+                          <td className="p-4 font-medium">
+                            {item.type === 'salary' ? `Salário - ${item.employee_name}` : item.name}
+                          </td>
                           <td className="p-4">
-                            <Badge className={getStatusColor(expense.status)}>
-                              {getStatusLabel(expense.status)}
+                            <Badge variant={item.type === 'salary' ? "default" : item.is_fixed ? "default" : "outline"}>
+                              {item.type === 'salary' ? "Salário" : item.is_fixed ? "Fixa" : "Variável"}
                             </Badge>
                           </td>
                           <td className="p-4">
-                            <Badge variant={expense.is_fixed ? "default" : "outline"}>
-                              {expense.is_fixed ? "Fixa" : "Variável"}
+                            <Badge className={getStatusColor(item.status)}>
+                              {getStatusLabel(item.status)}
                             </Badge>
                           </td>
                           <td className="p-4">
-                            R$ {expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </td>
-                          <td className="p-4">{new Date(expense.due_date).toLocaleDateString('pt-BR')}</td>
+                          <td className="p-4">{new Date(item.due_date).toLocaleDateString('pt-BR')}</td>
                           <td className="p-4 text-muted-foreground">
-                            {expense.paid_date ? new Date(expense.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}
+                            {item.paid_date ? new Date(item.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}
                           </td>
                           <td className="p-4">
                             <DropdownMenu>
@@ -1429,18 +1471,27 @@ export default function Admin() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleViewExpense(expense)}>
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  Ver Detalhes
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteExpense(expense)} className="text-red-600">
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Excluir
-                                </DropdownMenuItem>
+                                {item.type === 'expense' ? (
+                                  <>
+                                    <DropdownMenuItem onClick={() => handleViewExpense(item as Expense)}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Ver Detalhes
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleEditExpense(item as Expense)}>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDeleteExpense(item as Expense)} className="text-red-600">
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Excluir
+                                    </DropdownMenuItem>
+                                  </>
+                                ) : (
+                                  <DropdownMenuItem disabled>
+                                    <Users className="mr-2 h-4 w-4" />
+                                    Salário
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </td>
