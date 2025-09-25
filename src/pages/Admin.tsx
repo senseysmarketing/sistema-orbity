@@ -91,9 +91,10 @@ export default function Admin() {
   const [paymentSort, setPaymentSort] = useState<'client' | 'amount' | 'due_date' | 'status'>('due_date');
   const [expenseSort, setExpenseSort] = useState<'name' | 'amount' | 'due_date' | 'status'>('due_date');
   
-  // View mode for clients and payments
+  // View mode for clients, payments and expenses
   const [clientViewMode, setClientViewMode] = useState<"cards" | "table">("cards");
   const [paymentViewMode, setPaymentViewMode] = useState<"cards" | "table">("cards");
+  const [expenseViewMode, setExpenseViewMode] = useState<"cards" | "table">("cards");
   const {
     profile
   } = useAuth();
@@ -224,6 +225,20 @@ export default function Admin() {
   
   // Função para cor de fundo do card baseada no status do pagamento
   const getPaymentCardBackgroundColor = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return 'bg-green-50/50 dark:bg-green-950/20';
+      case 'pending':
+        return 'bg-yellow-50/50 dark:bg-yellow-950/20';
+      case 'overdue':
+        return 'bg-red-50/50 dark:bg-red-950/20';
+      default:
+        return 'bg-gray-50/50 dark:bg-gray-950/20';
+    }
+  };
+  
+  // Função para cor de fundo do card baseada no status da despesa
+  const getExpenseCardBackgroundColor = (status: string) => {
     switch (status) {
       case 'paid':
         return 'bg-green-50/50 dark:bg-green-950/20';
@@ -1268,70 +1283,175 @@ export default function Admin() {
           {/* Lista de Despesas */}
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Despesas ({filteredExpenses.length})</h3>
-            <Button onClick={() => setExpenseFormOpen(true)} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Nova Despesa
-            </Button>
+            <div className="flex gap-2">
+              <div className="flex gap-1">
+                <Button
+                  variant={expenseViewMode === 'cards' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setExpenseViewMode('cards')}
+                >
+                  Cards
+                </Button>
+                <Button
+                  variant={expenseViewMode === 'table' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setExpenseViewMode('table')}
+                >
+                  Tabela
+                </Button>
+              </div>
+              <Button onClick={() => setExpenseFormOpen(true)} className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Nova Despesa
+              </Button>
+              <Button onClick={() => setSalaryFormOpen(true)} className="flex items-center gap-2" variant="outline">
+                <Users className="h-4 w-4" />
+                Salário
+              </Button>
+            </div>
           </div>
 
-          <div className="grid gap-4">
-            {filteredExpenses.map(expense => <Card key={expense.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">{expense.name}</h4>
-                        <Badge className={getStatusColor(expense.status)}>
-                          {getStatusLabel(expense.status)}
-                        </Badge>
-                        <Badge variant={expense.is_fixed ? "default" : "outline"}>
-                          {expense.is_fixed ? "Fixa" : "Variável"}
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-2 text-sm text-muted-foreground">
-                        <div>
-                          <span className="font-medium">Valor:</span>
-                          <div>R$ {expense.amount.toLocaleString('pt-BR', {
-                          minimumFractionDigits: 2
-                        })}</div>
+          {/* Visualização Cards vs Tabela */}
+          {expenseViewMode === "cards" ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {filteredExpenses.map(expense => (
+                <Card key={expense.id} className={`hover:shadow-lg transition-all duration-200 ${getExpenseCardBackgroundColor(expense.status)}`}>
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg leading-none">{expense.name}</CardTitle>
+                          <Badge className={getStatusColor(expense.status)}>
+                            {getStatusLabel(expense.status)}
+                          </Badge>
                         </div>
-                        <div>
-                          <span className="font-medium">Vencimento:</span>
-                          <div>{new Date(expense.due_date).toLocaleDateString('pt-BR')}</div>
-                        </div>
-                        <div>
-                          <span className="font-medium">Pagamento:</span>
-                          <div>{expense.paid_date ? new Date(expense.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}</div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" />
+                            <span className="font-medium">
+                              R$ {expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <Badge variant={expense.is_fixed ? "default" : "outline"} className="text-xs">
+                            {expense.is_fixed ? "Fixa" : "Variável"}
+                          </Badge>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleViewExpense(expense)}>
-                            <Eye className="h-4 w-4 mr-2" />
+                            <Eye className="mr-2 h-4 w-4" />
                             Ver Detalhes
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
-                            <Edit className="h-4 w-4 mr-2" />
+                            <Edit className="mr-2 h-4 w-4" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteExpense(expense)} className="text-red-600 hover:text-red-700">
-                            <Trash2 className="h-4 w-4 mr-2" />
+                          <DropdownMenuItem onClick={() => handleDeleteExpense(expense)} className="text-red-600">
+                            <Trash2 className="mr-2 h-4 w-4" />
                             Excluir
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>)}
-          </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Vencimento</span>
+                        </div>
+                        <p className="text-sm font-medium">{new Date(expense.due_date).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Receipt className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Pagamento</span>
+                        </div>
+                        <p className="text-sm font-medium">
+                          {expense.paid_date ? new Date(expense.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            /* Visualização em Tabela */
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b bg-muted/50">
+                      <tr>
+                        <th className="p-4 text-left font-medium">Despesa</th>
+                        <th className="p-4 text-left font-medium">Status</th>
+                        <th className="p-4 text-left font-medium">Tipo</th>
+                        <th className="p-4 text-left font-medium">Valor</th>
+                        <th className="p-4 text-left font-medium">Vencimento</th>
+                        <th className="p-4 text-left font-medium">Data Pagamento</th>
+                        <th className="p-4 text-center font-medium">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredExpenses.map((expense, index) => (
+                        <tr key={expense.id} className={index % 2 === 0 ? "bg-muted/20" : ""}>
+                          <td className="p-4 font-medium">{expense.name}</td>
+                          <td className="p-4">
+                            <Badge className={getStatusColor(expense.status)}>
+                              {getStatusLabel(expense.status)}
+                            </Badge>
+                          </td>
+                          <td className="p-4">
+                            <Badge variant={expense.is_fixed ? "default" : "outline"}>
+                              {expense.is_fixed ? "Fixa" : "Variável"}
+                            </Badge>
+                          </td>
+                          <td className="p-4">
+                            R$ {expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-4">{new Date(expense.due_date).toLocaleDateString('pt-BR')}</td>
+                          <td className="p-4 text-muted-foreground">
+                            {expense.paid_date ? new Date(expense.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}
+                          </td>
+                          <td className="p-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleViewExpense(expense)}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Ver Detalhes
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteExpense(expense)} className="text-red-600">
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6 bg-[7dafd8] bg-white">
