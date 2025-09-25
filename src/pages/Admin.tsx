@@ -73,6 +73,12 @@ export default function Admin() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
 
+  // Payment states
+  const [selectedPayment, setSelectedPayment] = useState<ClientPayment | null>(null);
+  const [paymentDetailsOpen, setPaymentDetailsOpen] = useState(false);
+  const [paymentDeleteDialogOpen, setPaymentDeleteDialogOpen] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<ClientPayment | null>(null);
+
   // Expense states
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [expenseDetailsOpen, setExpenseDetailsOpen] = useState(false);
@@ -313,6 +319,47 @@ export default function Admin() {
     }
   };
 
+  // Payment handlers
+  const handleViewPayment = (payment: ClientPayment) => {
+    setSelectedPayment(payment);
+    setPaymentDetailsOpen(true);
+  };
+  
+  const handleEditPayment = (payment: ClientPayment) => {
+    setSelectedPayment(payment);
+    setPaymentFormOpen(true);
+  };
+  
+  const handleDeletePayment = (payment: ClientPayment) => {
+    setPaymentToDelete(payment);
+    setPaymentDeleteDialogOpen(true);
+  };
+  
+  const confirmDeletePayment = async () => {
+    if (!paymentToDelete) return;
+    try {
+      const { error } = await supabase
+        .from('client_payments')
+        .delete()
+        .eq('id', paymentToDelete.id);
+      if (error) throw error;
+      toast({
+        title: "Pagamento excluído",
+        description: "Pagamento excluído com sucesso!"
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setPaymentDeleteDialogOpen(false);
+      setPaymentToDelete(null);
+    }
+  };
+
   // Expense handlers
   const handleEditExpense = (expense: Expense) => {
     setSelectedExpense(expense);
@@ -394,6 +441,36 @@ export default function Admin() {
     } catch (error: any) {
       toast({
         title: "Erro ao fechar mês",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+  
+  // Função para atualizar status das despesas
+  const handleUpdateExpenseStatus = async (expenseId: string, newStatus: 'pending' | 'paid' | 'overdue') => {
+    try {
+      const updateData: any = {
+        status: newStatus
+      };
+      if (newStatus === 'paid') {
+        updateData.paid_date = new Date().toISOString().split('T')[0];
+      } else {
+        updateData.paid_date = null;
+      }
+      const { error } = await supabase
+        .from('expenses')
+        .update(updateData)
+        .eq('id', expenseId);
+      if (error) throw error;
+      toast({
+        title: "Status atualizado",
+        description: "Status da despesa foi atualizado com sucesso"
+      });
+      fetchExpenses();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar status",
         description: error.message,
         variant: "destructive"
       });
@@ -1159,6 +1236,14 @@ export default function Admin() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewPayment(payment)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver Detalhes
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditPayment(payment)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar Pagamento
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'paid')}>
                             <CheckCircle className="mr-2 h-4 w-4" />
                             Marcar como Pago
@@ -1170,6 +1255,10 @@ export default function Admin() {
                           <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'overdue')}>
                             <AlertTriangle className="mr-2 h-4 w-4" />
                             Marcar como Atrasado
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeletePayment(payment)} className="text-red-600">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1238,6 +1327,14 @@ export default function Admin() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleViewPayment(payment)}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Ver Detalhes
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditPayment(payment)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Editar Pagamento
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'paid')}>
                                   <CheckCircle className="mr-2 h-4 w-4" />
                                   Marcar como Pago
@@ -1249,6 +1346,10 @@ export default function Admin() {
                                 <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'overdue')}>
                                   <AlertTriangle className="mr-2 h-4 w-4" />
                                   Marcar como Atrasado
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeletePayment(payment)} className="text-red-600">
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Excluir
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -1385,6 +1486,18 @@ export default function Admin() {
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(item.id, 'paid')}>
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Marcar como Pago
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(item.id, 'pending')}>
+                                <Timer className="mr-2 h-4 w-4" />
+                                Marcar como Pendente
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(item.id, 'overdue')}>
+                                <AlertTriangle className="mr-2 h-4 w-4" />
+                                Marcar como Atrasado
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDeleteExpense(item as Expense)} className="text-red-600">
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Excluir
@@ -1480,6 +1593,18 @@ export default function Admin() {
                                     <DropdownMenuItem onClick={() => handleEditExpense(item as Expense)}>
                                       <Edit className="mr-2 h-4 w-4" />
                                       Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(item.id, 'paid')}>
+                                      <CheckCircle className="mr-2 h-4 w-4" />
+                                      Marcar como Pago
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(item.id, 'pending')}>
+                                      <Timer className="mr-2 h-4 w-4" />
+                                      Marcar como Pendente
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(item.id, 'overdue')}>
+                                      <AlertTriangle className="mr-2 h-4 w-4" />
+                                      Marcar como Atrasado
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleDeleteExpense(item as Expense)} className="text-red-600">
                                       <Trash2 className="mr-2 h-4 w-4" />
@@ -1697,10 +1822,66 @@ export default function Admin() {
       setSelectedClient(null);
     }} />
 
-      <PaymentForm open={paymentFormOpen} onOpenChange={setPaymentFormOpen} onSuccess={() => {
-      fetchData();
-      setPaymentFormOpen(false);
-    }} />
+        {/* Dialog de detalhes do pagamento */}
+        <AlertDialog open={paymentDetailsOpen} onOpenChange={setPaymentDetailsOpen}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Detalhes do Pagamento</AlertDialogTitle>
+            </AlertDialogHeader>
+            <div className="space-y-4">
+              {selectedPayment && (
+                <>
+                  <div>
+                    <span className="font-medium">Cliente:</span>
+                    <p>{getClientName(selectedPayment.client_id)}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Valor:</span>
+                    <p>R$ {selectedPayment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Data de Vencimento:</span>
+                    <p>{new Date(selectedPayment.due_date).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Status:</span>
+                    <p>{getStatusLabel(selectedPayment.status)}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Data de Pagamento:</span>
+                    <p>{selectedPayment.paid_date ? new Date(selectedPayment.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}</p>
+                  </div>
+                </>
+              )}
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Fechar</AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Dialog de confirmação de exclusão de pagamento */}
+        <AlertDialog open={paymentDeleteDialogOpen} onOpenChange={setPaymentDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir este pagamento? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeletePayment} className="bg-red-600 hover:bg-red-700">
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+      <PaymentForm open={paymentFormOpen} onOpenChange={open => {
+        setPaymentFormOpen(open);
+        if (!open) setSelectedPayment(null);
+      }} payment={selectedPayment} onSuccess={fetchData} />
 
       <ExpenseForm open={expenseFormOpen} onOpenChange={open => {
       setExpenseFormOpen(open);
