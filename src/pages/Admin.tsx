@@ -845,7 +845,8 @@ export default function Admin() {
                       <div className="space-y-2 flex-1">
                         <div className="flex items-center gap-2">
                           <CardTitle className="text-lg leading-none">{client.name}</CardTitle>
-                          <Badge variant={client.active ? "default" : "secondary"}>
+                          <Badge variant={client.active ? "default" : "secondary"} 
+                                 className={client.active ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"}>
                             {client.active ? "Ativo" : "Inativo"}
                           </Badge>
                         </div>
@@ -935,7 +936,8 @@ export default function Admin() {
                         <tr key={client.id} className={index % 2 === 0 ? "bg-muted/20" : ""}>
                           <td className="p-4 font-medium">{client.name}</td>
                           <td className="p-4">
-                            <Badge variant={client.active ? "default" : "secondary"}>
+                            <Badge variant={client.active ? "default" : "secondary"}
+                                   className={client.active ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"}>
                               {client.active ? "Ativo" : "Inativo"}
                             </Badge>
                           </td>
