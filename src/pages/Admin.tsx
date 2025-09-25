@@ -91,8 +91,9 @@ export default function Admin() {
   const [paymentSort, setPaymentSort] = useState<'client' | 'amount' | 'due_date' | 'status'>('due_date');
   const [expenseSort, setExpenseSort] = useState<'name' | 'amount' | 'due_date' | 'status'>('due_date');
   
-  // View mode for clients
+  // View mode for clients and payments
   const [clientViewMode, setClientViewMode] = useState<"cards" | "table">("cards");
+  const [paymentViewMode, setPaymentViewMode] = useState<"cards" | "table">("cards");
   const {
     profile
   } = useAuth();
@@ -218,6 +219,20 @@ export default function Admin() {
         return 'Atrasado';
       default:
         return status;
+    }
+  };
+  
+  // Função para cor de fundo do card baseada no status do pagamento
+  const getPaymentCardBackgroundColor = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return 'bg-green-50/50 dark:bg-green-950/20';
+      case 'pending':
+        return 'bg-yellow-50/50 dark:bg-yellow-950/20';
+      case 'overdue':
+        return 'bg-red-50/50 dark:bg-red-950/20';
+      default:
+        return 'bg-gray-50/50 dark:bg-gray-950/20';
     }
   };
   const handleEditClient = (client: Client) => {
@@ -1046,69 +1061,162 @@ export default function Admin() {
           {/* Lista de Pagamentos */}
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Pagamentos ({filteredPayments.length})</h3>
-            <Button onClick={() => setPaymentFormOpen(true)} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Novo Pagamento
-            </Button>
+            <div className="flex gap-2">
+              <div className="flex gap-1">
+                <Button
+                  variant={paymentViewMode === 'cards' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPaymentViewMode('cards')}
+                >
+                  Cards
+                </Button>
+                <Button
+                  variant={paymentViewMode === 'table' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setPaymentViewMode('table')}
+                >
+                  Tabela
+                </Button>
+              </div>
+              <Button onClick={() => setPaymentFormOpen(true)} className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Novo Pagamento
+              </Button>
+            </div>
           </div>
 
-          <div className="grid gap-4">
-            {filteredPayments.map(payment => <Card key={payment.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">{getClientName(payment.client_id)}</h4>
-                        <Badge className={getStatusColor(payment.status)}>
-                          {getStatusLabel(payment.status)}
-                        </Badge>
+          {/* Visualização Cards vs Tabela */}
+          {paymentViewMode === "cards" ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {filteredPayments.map(payment => (
+                <Card key={payment.id} className={`hover:shadow-lg transition-all duration-200 ${getPaymentCardBackgroundColor(payment.status)}`}>
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg leading-none">{getClientName(payment.client_id)}</CardTitle>
+                          <Badge className={getStatusColor(payment.status)}>
+                            {getStatusLabel(payment.status)}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" />
+                            <span className="font-medium">
+                              R$ {payment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm text-muted-foreground">
-                        <div>
-                          <span className="font-medium">Valor:</span>
-                          <div>R$ {payment.amount.toLocaleString('pt-BR', {
-                          minimumFractionDigits: 2
-                        })}</div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'paid')}>
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Marcar como Pago
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'pending')}>
+                            <Timer className="mr-2 h-4 w-4" />
+                            Marcar como Pendente
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'overdue')}>
+                            <AlertTriangle className="mr-2 h-4 w-4" />
+                            Marcar como Atrasado
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Vencimento</span>
                         </div>
-                        <div>
-                          <span className="font-medium">Vencimento:</span>
-                          <div>{new Date(payment.due_date).toLocaleDateString('pt-BR')}</div>
+                        <p className="text-sm font-medium">{new Date(payment.due_date).toLocaleDateString('pt-BR')}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Receipt className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Pagamento</span>
                         </div>
-                        <div>
-                          <span className="font-medium">Pagamento:</span>
-                          <div>{payment.paid_date ? new Date(payment.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}</div>
-                        </div>
-                        <div>
-                          <span className="font-medium">Status:</span>
-                          <div>{getStatusLabel(payment.status)}</div>
-                        </div>
+                        <p className="text-sm font-medium">
+                          {payment.paid_date ? new Date(payment.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}
+                        </p>
                       </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'paid')}>
-                          <CheckCircle className="mr-2 h-4 w-4" />
-                          Marcar como Pago
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'pending')}>
-                          <Timer className="mr-2 h-4 w-4" />
-                          Marcar como Pendente
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'overdue')}>
-                          <AlertTriangle className="mr-2 h-4 w-4" />
-                          Marcar como Atrasado
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardContent>
-              </Card>)}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            /* Visualização em Tabela */
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b bg-muted/50">
+                      <tr>
+                        <th className="p-4 text-left font-medium">Cliente</th>
+                        <th className="p-4 text-left font-medium">Status</th>
+                        <th className="p-4 text-left font-medium">Valor</th>
+                        <th className="p-4 text-left font-medium">Vencimento</th>
+                        <th className="p-4 text-left font-medium">Data Pagamento</th>
+                        <th className="p-4 text-center font-medium">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredPayments.map((payment, index) => (
+                        <tr key={payment.id} className={index % 2 === 0 ? "bg-muted/20" : ""}>
+                          <td className="p-4 font-medium">{getClientName(payment.client_id)}</td>
+                          <td className="p-4">
+                            <Badge className={getStatusColor(payment.status)}>
+                              {getStatusLabel(payment.status)}
+                            </Badge>
+                          </td>
+                          <td className="p-4">
+                            R$ {payment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-4">{new Date(payment.due_date).toLocaleDateString('pt-BR')}</td>
+                          <td className="p-4 text-muted-foreground">
+                            {payment.paid_date ? new Date(payment.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}
+                          </td>
+                          <td className="p-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'paid')}>
+                                  <CheckCircle className="mr-2 h-4 w-4" />
+                                  Marcar como Pago
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'pending')}>
+                                  <Timer className="mr-2 h-4 w-4" />
+                                  Marcar como Pendente
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleUpdatePaymentStatus(payment.id, 'overdue')}>
+                                  <AlertTriangle className="mr-2 h-4 w-4" />
+                                  Marcar como Atrasado
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="expenses" className="space-y-6">
