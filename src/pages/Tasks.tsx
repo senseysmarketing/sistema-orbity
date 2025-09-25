@@ -36,6 +36,7 @@ import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
 import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useTaskAssignments } from "@/hooks/useTaskAssignments";
 
@@ -99,6 +100,7 @@ export default function Tasks() {
   });
 
   const { profile } = useAuth();
+  const { currentAgency } = useAgency();
   const { toast } = useToast();
 
   // Hook para gerenciar atribuições
@@ -426,6 +428,7 @@ export default function Tasks() {
           client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
           due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
           created_by: profile?.user_id,
+          agency_id: currentAgency?.id,
         })
         .select()
         .single();
