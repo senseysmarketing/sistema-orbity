@@ -2,6 +2,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Badge } from "@/components/ui/badge";
 import { SortableLeadCard } from './SortableLeadCard';
+import { DropZoneIndicator } from '@/components/ui/drop-zone-indicator';
 
 interface Lead {
   id: string;
@@ -67,24 +68,30 @@ export function LeadKanbanColumn({
       </div>
       <div
         ref={setNodeRef}
-        className={`space-y-3 min-h-32 max-h-[70vh] overflow-y-auto p-2 rounded-lg transition-colors ${
-          isOver ? 'bg-muted/50' : ''
+        className={`space-y-3 min-h-[400px] max-h-[70vh] overflow-y-auto p-4 rounded-xl border-2 border-dashed transition-all duration-200 ${
+          isOver 
+            ? 'bg-primary/10 border-primary/50 shadow-lg scale-[1.02]' 
+            : 'bg-muted/20 border-transparent hover:border-muted-foreground/20 hover:bg-muted/30'
         }`}
       >
         <SortableContext items={leads.map(lead => lead.id)} strategy={verticalListSortingStrategy}>
-          {leads.map((lead) => (
-            <SortableLeadCard
-              key={lead.id}
-              lead={lead}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              getPriorityColor={getPriorityColor}
-              getPriorityLabel={getPriorityLabel}
-              getUrgencyLevel={getUrgencyLevel}
-              formatCurrency={formatCurrency}
-              formatDate={formatDate}
-            />
-          ))}
+          {leads.length === 0 ? (
+            <DropZoneIndicator isActive={isOver} isEmpty={true} title={title} />
+          ) : (
+            leads.map((lead) => (
+              <SortableLeadCard
+                key={lead.id}
+                lead={lead}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                getPriorityColor={getPriorityColor}
+                getPriorityLabel={getPriorityLabel}
+                getUrgencyLevel={getUrgencyLevel}
+                formatCurrency={formatCurrency}
+                formatDate={formatDate}
+              />
+            ))
+          )}
         </SortableContext>
       </div>
     </div>

@@ -114,7 +114,8 @@ export default function Tasks() {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 3,
+        tolerance: 5,
       },
     })
   );

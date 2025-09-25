@@ -2,6 +2,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Badge } from "@/components/ui/badge";
 import { SortablePersonalTaskCard } from './sortable-personal-task-card';
+import { DropZoneIndicator } from './drop-zone-indicator';
 
 interface PersonalTask {
   id: string;
@@ -62,25 +63,31 @@ export function PersonalKanbanColumn({
       </div>
       <div
         ref={setNodeRef}
-        className={`space-y-3 min-h-32 max-h-[70vh] overflow-y-auto p-2 rounded-lg transition-colors ${
-          isOver ? 'bg-muted/50' : ''
+        className={`space-y-3 min-h-[400px] max-h-[70vh] overflow-y-auto p-4 rounded-xl border-2 border-dashed transition-all duration-200 ${
+          isOver 
+            ? 'bg-primary/10 border-primary/50 shadow-lg scale-[1.02]' 
+            : 'bg-muted/20 border-transparent hover:border-muted-foreground/20 hover:bg-muted/30'
         }`}
       >
         <SortableContext items={tasks.map(task => task.id)} strategy={verticalListSortingStrategy}>
-          {tasks.map((task) => (
-            <SortablePersonalTaskCard
-              key={task.id}
-              task={task}
-              onViewDetails={onViewDetails}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              getPriorityColor={getPriorityColor}
-              getPriorityLabel={getPriorityLabel}
-              getUrgencyLevel={getUrgencyLevel}
-              getClientName={getClientName}
-              formatDateBR={formatDateBR}
-            />
-          ))}
+          {tasks.length === 0 ? (
+            <DropZoneIndicator isActive={isOver} isEmpty={true} title={title} />
+          ) : (
+            tasks.map((task) => (
+              <SortablePersonalTaskCard
+                key={task.id}
+                task={task}
+                onViewDetails={onViewDetails}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                getPriorityColor={getPriorityColor}
+                getPriorityLabel={getPriorityLabel}
+                getUrgencyLevel={getUrgencyLevel}
+                getClientName={getClientName}
+                formatDateBR={formatDateBR}
+              />
+            ))
+          )}
         </SortableContext>
       </div>
     </div>

@@ -59,7 +59,9 @@ export function SortableTaskCard({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.8 : 1,
+    scale: isDragging ? '1.05' : '1',
+    zIndex: isDragging ? 999 : 1,
   };
 
   const urgency = getUrgencyLevel(task);
@@ -70,8 +72,10 @@ export function SortableTaskCard({
       style={style}
       {...attributes}
       {...listeners}
-      className={`hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing ${
-        isDragging ? 'shadow-lg' : ''
+      className={`transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${
+        isDragging 
+          ? 'shadow-2xl border-primary/50 bg-background/95 rotate-3' 
+          : 'hover:shadow-lg hover:scale-[1.02] hover:border-border/50'
       }`}
     >
       <CardContent className="p-3">

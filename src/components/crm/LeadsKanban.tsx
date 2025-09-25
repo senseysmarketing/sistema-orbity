@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Badge } from "@/components/ui/badge";
 import { LeadKanbanColumn } from "./LeadKanbanColumn";
@@ -47,7 +47,8 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate }: LeadsKanbanPr
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 3,
+        tolerance: 5,
       },
     })
   );
@@ -168,6 +169,7 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate }: LeadsKanbanPr
       sensors={sensors}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      collisionDetection={closestCenter}
     >
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[600px]">
         {Object.entries(statusConfig).map(([statusKey, config]) => (
