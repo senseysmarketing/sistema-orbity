@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useLimitEnforcement } from "@/hooks/useLimitEnforcement";
 import { ClientForm } from "@/components/admin/ClientForm";
 import { PaymentForm } from "@/components/admin/PaymentForm";
 import { ExpenseForm } from "@/components/admin/ExpenseForm";
@@ -89,12 +90,16 @@ export default function Admin() {
   const [clientSort, setClientSort] = useState<'name' | 'monthly_value' | 'start_date'>('name');
   const [paymentSort, setPaymentSort] = useState<'client' | 'amount' | 'due_date' | 'status'>('due_date');
   const [expenseSort, setExpenseSort] = useState<'name' | 'amount' | 'due_date' | 'status'>('due_date');
+  
+  // View mode for clients
+  const [clientViewMode, setClientViewMode] = useState<"cards" | "table">("cards");
   const {
     profile
   } = useAuth();
   const {
     toast
   } = useToast();
+  const { checkLimitWithWarning } = useLimitEnforcement();
 
   // Verifica se o usuário tem permissão para acessar a página
   const hasAccess = profile?.role === 'agency_admin';
@@ -796,72 +801,185 @@ export default function Admin() {
           {/* Lista de Clientes */}
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Clientes ({clients.length})</h3>
-            <Button onClick={() => {
-            setSelectedClient(null);
-            setClientFormOpen(true);
-          }} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Novo Cliente
-            </Button>
+            <div className="flex gap-2">
+              <div className="flex gap-1">
+                <Button
+                  variant={clientViewMode === 'cards' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setClientViewMode('cards')}
+                >
+                  Cards
+                </Button>
+                <Button
+                  variant={clientViewMode === 'table' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setClientViewMode('table')}
+                >
+                  Tabela
+                </Button>
+              </div>
+              <Button 
+                onClick={() => {
+                  const canAdd = checkLimitWithWarning('clients', clients.length + 1);
+                  if (canAdd) {
+                    setSelectedClient(null);
+                    setClientFormOpen(true);
+                  }
+                }} 
+                className="flex items-center gap-2"
+                disabled={!checkLimitWithWarning('clients', clients.length + 1)}
+              >
+                <Plus className="h-4 w-4" />
+                Novo Cliente
+              </Button>
+            </div>
           </div>
 
-          <div className="grid gap-4">
-            {clients.map(client => <Card key={client.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">{client.name}</h4>
-                        <Badge variant={client.active ? "default" : "secondary"}>
-                          {client.active ? "Ativo" : "Inativo"}
-                        </Badge>
+          {/* Visualização Cards vs Tabela */}
+          {clientViewMode === "cards" ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {clients.map(client => (
+                <Card key={client.id} className="hover:shadow-lg transition-all duration-200">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg leading-none">{client.name}</CardTitle>
+                          <Badge variant={client.active ? "default" : "secondary"}>
+                            {client.active ? "Ativo" : "Inativo"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-3 w-3" />
+                            <span className="font-medium">
+                              R$ {(client.monthly_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm text-muted-foreground">
-                        <div>
-                          <span className="font-medium">Valor Mensal:</span>
-                          <div>R$ {(client.monthly_value || 0).toLocaleString('pt-BR', {
-                          minimumFractionDigits: 2
-                        })}</div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewClient(client)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver detalhes
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditClient(client)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteClient(client)} className="text-red-600">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Building className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Serviço</span>
                         </div>
-                        <div>
-                          <span className="font-medium">Serviço:</span>
-                          <div>{client.service || 'Não especificado'}</div>
+                        <p className="text-sm font-medium">{client.service || 'Não especificado'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Vencimento</span>
                         </div>
-                        <div>
-                          <span className="font-medium">Vencimento:</span>
-                          <div>Dia {client.due_date}</div>
-                        </div>
-                        <div>
-                          <span className="font-medium">Contato:</span>
-                          <div>{client.contact || 'Não especificado'}</div>
-                        </div>
+                        <p className="text-sm font-medium">Dia {client.due_date}</p>
                       </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleViewClient(client)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Ver detalhes
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEditClient(client)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteClient(client)} className="text-red-600">
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardContent>
-              </Card>)}
-          </div>
+                    {client.contact && (
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">Contato</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground bg-muted/30 rounded p-2">
+                          {client.contact}
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            /* Visualização em Tabela */
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b bg-muted/50">
+                      <tr>
+                        <th className="p-4 text-left font-medium">Cliente</th>
+                        <th className="p-4 text-left font-medium">Status</th>
+                        <th className="p-4 text-left font-medium">Valor Mensal</th>
+                        <th className="p-4 text-left font-medium">Serviço</th>
+                        <th className="p-4 text-left font-medium">Vencimento</th>
+                        <th className="p-4 text-left font-medium">Contato</th>
+                        <th className="p-4 text-center font-medium">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {clients.map((client, index) => (
+                        <tr key={client.id} className={index % 2 === 0 ? "bg-muted/20" : ""}>
+                          <td className="p-4 font-medium">{client.name}</td>
+                          <td className="p-4">
+                            <Badge variant={client.active ? "default" : "secondary"}>
+                              {client.active ? "Ativo" : "Inativo"}
+                            </Badge>
+                          </td>
+                          <td className="p-4">
+                            R$ {(client.monthly_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-4 text-muted-foreground">
+                            {client.service || 'Não especificado'}
+                          </td>
+                          <td className="p-4">Dia {client.due_date}</td>
+                          <td className="p-4 text-muted-foreground max-w-32 truncate">
+                            {client.contact || 'Não especificado'}
+                          </td>
+                          <td className="p-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleViewClient(client)}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Ver detalhes
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditClient(client)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteClient(client)} className="text-red-600">
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="payments" className="space-y-6">
