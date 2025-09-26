@@ -1,6 +1,6 @@
 import * as React from "react"
 import { format } from "date-fns"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, Check } from "lucide-react"
 import { DateRange } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
@@ -23,9 +23,26 @@ export function DateRangePicker({
   onDateChange,
   className,
 }: DateRangePickerProps) {
+  const [tempDate, setTempDate] = React.useState<DateRange | undefined>(date)
+  const [isOpen, setIsOpen] = React.useState(false)
+
+  React.useEffect(() => {
+    setTempDate(date)
+  }, [date])
+
+  const handleConfirm = () => {
+    onDateChange(tempDate)
+    setIsOpen(false)
+  }
+
+  const handleCancel = () => {
+    setTempDate(date)
+    setIsOpen(false)
+  }
+
   return (
     <div className={cn("grid gap-2", className)}>
-      <Popover>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
             id="date"
@@ -51,15 +68,34 @@ export function DateRangePicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={date?.from}
-            selected={date}
-            onSelect={onDateChange}
-            numberOfMonths={2}
-            className="pointer-events-auto"
-          />
+          <div className="space-y-3">
+            <Calendar
+              initialFocus
+              mode="range"
+              defaultMonth={tempDate?.from}
+              selected={tempDate}
+              onSelect={setTempDate}
+              numberOfMonths={2}
+              className="pointer-events-auto"
+            />
+            <div className="flex justify-end gap-2 p-3 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancel}
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirm}
+                disabled={!tempDate?.from}
+              >
+                <Check className="mr-2 h-4 w-4" />
+                Confirmar
+              </Button>
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
     </div>
