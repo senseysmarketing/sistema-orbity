@@ -4,10 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// import { DatePickerWithRange } from "@/components/ui/date-picker";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { DateRange } from "react-day-picker";
 
 interface SelectedAdAccount {
   id: string;
@@ -61,7 +62,7 @@ export function TrafficDashboard({ selectedAdAccounts }: TrafficDashboardProps) 
       setSelectedAccount(selectedAdAccounts[0].ad_account_id);
     }
   }, [selectedAdAccounts, selectedAccount]);
-  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 dias atrás
     to: new Date()
   });
@@ -73,7 +74,7 @@ export function TrafficDashboard({ selectedAdAccounts }: TrafficDashboardProps) 
   }, [selectedAdAccounts, selectedAccount, dateRange]);
 
   const fetchDashboardData = async () => {
-    if (selectedAdAccounts.length === 0 || !selectedAccount) {
+    if (selectedAdAccounts.length === 0 || !selectedAccount || !dateRange?.from || !dateRange?.to) {
       setLoading(false);
       return;
     }
@@ -113,7 +114,8 @@ export function TrafficDashboard({ selectedAdAccounts }: TrafficDashboardProps) 
         setMetricsData(mockMetrics);
 
         const mockChartData = [];
-        for (let i = 0; i < 30; i++) {
+        const daysDiff = Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24));
+        for (let i = 0; i < daysDiff; i++) {
           const date = new Date(dateRange.from.getTime() + i * 24 * 60 * 60 * 1000);
           mockChartData.push({
             date: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
@@ -143,8 +145,12 @@ export function TrafficDashboard({ selectedAdAccounts }: TrafficDashboardProps) 
       setMetricsData(mockMetrics);
 
       const mockChartData = [];
-      for (let i = 0; i < 30; i++) {
-        const date = new Date(dateRange.from.getTime() + i * 24 * 60 * 60 * 1000);
+      const daysDiff = dateRange?.from && dateRange?.to ? 
+        Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)) : 30;
+      
+      for (let i = 0; i < daysDiff; i++) {
+        const baseDate = dateRange?.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const date = new Date(baseDate.getTime() + i * 24 * 60 * 60 * 1000);
         mockChartData.push({
           date: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
           spend: Math.random() * 200 + 50,
@@ -173,10 +179,10 @@ export function TrafficDashboard({ selectedAdAccounts }: TrafficDashboardProps) 
         body: { 
           action: 'sync_metrics',
           accountIds: selectedAccount ? [selectedAccount] : [],
-          dateRange: {
+          dateRange: dateRange?.from && dateRange?.to ? {
             from: dateRange.from.toISOString().split('T')[0],
             to: dateRange.to.toISOString().split('T')[0]
-          }
+          } : undefined
         }
       });
 
@@ -262,14 +268,10 @@ export function TrafficDashboard({ selectedAdAccounts }: TrafficDashboardProps) 
             </SelectContent>
           </Select>
 
-          {/* <DatePickerWithRange 
+          <DateRangePicker 
             date={dateRange}
-            onDateChange={(range) => range && setDateRange(range)}
-          /> */}
-          <Button variant="outline">
-            <Calendar className="mr-2 h-4 w-4" />
-            {dateRange.from.toLocaleDateString('pt-BR')} - {dateRange.to.toLocaleDateString('pt-BR')}
-          </Button>
+            onDateChange={setDateRange}
+          />
         </div>
 
         <div className="flex gap-2">
@@ -303,7 +305,8 @@ export function TrafficDashboard({ selectedAdAccounts }: TrafficDashboardProps) 
               }).format(metricsData.spend)}
             </div>
             <p className="text-xs text-muted-foreground">
-              nos últimos {Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24))} dias
+              nos últimos {dateRange?.from && dateRange?.to ? 
+                Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)) : 30} dias
             </p>
           </CardContent>
         </Card>

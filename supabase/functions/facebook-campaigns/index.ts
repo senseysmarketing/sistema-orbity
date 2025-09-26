@@ -18,10 +18,10 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { action, accountIds } = await req.json()
+    const { action, accountIds, dateRange } = await req.json()
 
     if (action === 'list_campaigns') {
-      console.log('Fetching campaigns for accounts:', accountIds)
+      console.log('Fetching campaigns for accounts:', accountIds, 'Date range:', dateRange)
 
       if (!accountIds || accountIds.length === 0) {
         return new Response(

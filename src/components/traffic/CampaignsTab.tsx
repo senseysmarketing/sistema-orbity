@@ -7,8 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { DateRange } from "react-day-picker";
 
 interface SelectedAdAccount {
   id: string;
@@ -43,6 +45,10 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [weeklyAnalysis, setWeeklyAnalysis] = useState<any[]>([]);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 dias atrás
+    to: new Date()
+  });
   
   const { toast } = useToast();
 
@@ -55,7 +61,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
 
   useEffect(() => {
     fetchCampaigns();
-  }, [selectedAdAccounts, selectedAccount]);
+  }, [selectedAdAccounts, selectedAccount, dateRange]);
 
   const fetchCampaigns = async () => {
     if (selectedAdAccounts.length === 0) {
@@ -68,7 +74,11 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
       const { data, error } = await supabase.functions.invoke('facebook-campaigns', {
         body: { 
           action: 'list_campaigns',
-          accountIds: selectedAccount ? [selectedAccount] : []
+          accountIds: selectedAccount ? [selectedAccount] : [],
+          dateRange: dateRange?.from && dateRange?.to ? {
+            from: dateRange.from.toISOString().split('T')[0],
+            to: dateRange.to.toISOString().split('T')[0]
+          } : undefined
         }
       });
 
@@ -189,7 +199,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
   return (
     <div className="space-y-6">
       {/* Filtros */}
-      <div className="flex gap-4 items-center">
+      <div className="flex gap-4 items-center flex-wrap">
         <Select value={selectedAccount} onValueChange={setSelectedAccount}>
           <SelectTrigger className="w-[250px]">
             <SelectValue placeholder="Selecionar conta" />
@@ -202,6 +212,11 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
             ))}
           </SelectContent>
         </Select>
+        
+        <DateRangePicker 
+          date={dateRange}
+          onDateChange={setDateRange}
+        />
       </div>
 
       {/* Resumo */}
