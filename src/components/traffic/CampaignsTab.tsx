@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,16 +22,55 @@ interface Campaign {
 }
 
 interface CampaignsTabProps {
-  campaigns: Campaign[];
-  accounts: any[];
+  campaigns?: Campaign[];
+  accounts?: any[];
   selectedAdAccounts?: any[];
 }
 
-export function CampaignsTab({ campaigns, accounts, selectedAdAccounts }: CampaignsTabProps) {
+export function CampaignsTab({ campaigns: propCampaigns = [], accounts = [], selectedAdAccounts = [] }: CampaignsTabProps) {
+  const [campaigns, setCampaigns] = useState<Campaign[]>(propCampaigns);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [weeklyAnalysis, setWeeklyAnalysis] = useState<any[]>([]);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const { toast } = useToast();
+
+  // Buscar campanhas quando o componente carregar
+  useEffect(() => {
+    if (selectedAdAccounts.length > 0) {
+      fetchCampaigns();
+    }
+  }, [selectedAdAccounts]);
+
+  const fetchCampaigns = async () => {
+    setLoadingCampaigns(true);
+    try {
+      const accountIds = selectedAdAccounts.map(acc => acc.ad_account_id);
+      
+      const { data, error } = await supabase.functions.invoke('facebook-campaigns', {
+        body: { 
+          accounts: accountIds,
+          date_range: {
+            from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            to: new Date().toISOString().split('T')[0]
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      setCampaigns(data?.campaigns || []);
+    } catch (error) {
+      console.error('Erro ao carregar campanhas:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar as campanhas.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingCampaigns(false);
+    }
+  };
 
   const truncateText = (text: string, limit: number = 35) => {
     if (text.length <= limit) return text;
@@ -81,7 +120,7 @@ export function CampaignsTab({ campaigns, accounts, selectedAdAccounts }: Campai
       const { data, error } = await supabase.functions.invoke('facebook-analysis', {
         body: { 
           campaign_id: campaignId,
-          accounts: accounts.filter(acc => acc.selected).map(acc => acc.id)
+          accounts: selectedAdAccounts.map(acc => acc.ad_account_id)
         }
       });
 
@@ -118,12 +157,29 @@ export function CampaignsTab({ campaigns, accounts, selectedAdAccounts }: Campai
     }
   };
 
+  if (loadingCampaigns) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+        <p className="text-muted-foreground mt-2">Carregando campanhas...</p>
+      </div>
+    );
+  }
+
   if (!campaigns || campaigns.length === 0) {
     return (
       <div className="text-center py-8">
         <p className="text-muted-foreground">
-          Nenhuma campanha encontrada. Selecione uma conta de anúncios para ver as campanhas.
+          {selectedAdAccounts.length === 0 
+            ? "Selecione uma conta de anúncios para ver as campanhas."
+            : "Nenhuma campanha encontrada para as contas selecionadas."
+          }
         </p>
+        {selectedAdAccounts.length > 0 && (
+          <Button onClick={fetchCampaigns} className="mt-4">
+            Tentar novamente
+          </Button>
+        )}
       </div>
     );
   }
