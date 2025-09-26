@@ -348,10 +348,10 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
       {viewMode === 'cards' ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {balances.map((balance) => (
-            <Card key={balance.ad_account_id} className={`border-l-4 ${
-              balance.status === 'critical' ? 'border-l-red-500' :
-              balance.status === 'warning' ? 'border-l-yellow-500' :
-              'border-l-green-500'
+            <Card key={balance.ad_account_id} className={`${
+              balance.status === 'critical' ? 'bg-red-50 dark:bg-red-950/20' :
+              balance.status === 'warning' ? 'bg-yellow-50 dark:bg-yellow-950/20' :
+              'bg-green-50 dark:bg-green-950/20'
             }`}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -435,10 +435,10 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
       ) : (
         <div className="space-y-4">
           {balances.map((balance) => (
-            <Card key={balance.ad_account_id} className={`border-l-4 ${
-              balance.status === 'critical' ? 'border-l-red-500' :
-              balance.status === 'warning' ? 'border-l-yellow-500' :
-              'border-l-green-500'
+            <Card key={balance.ad_account_id} className={`${
+              balance.status === 'critical' ? 'bg-red-50 dark:bg-red-950/20' :
+              balance.status === 'warning' ? 'bg-yellow-50 dark:bg-yellow-950/20' :
+              'bg-green-50 dark:bg-green-950/20'
             }`}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
