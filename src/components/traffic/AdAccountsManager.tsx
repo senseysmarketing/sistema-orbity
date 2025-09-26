@@ -189,11 +189,15 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
         <div>
           <h3 className="text-lg font-semibold">Selecionar Contas de Anúncios</h3>
           <p className="text-sm text-muted-foreground">
-            Escolha até {maxAccounts} contas para monitorar
+            {isUnlimited
+              ? 'Escolha contas de anúncios para monitorar (ilimitado)'
+              : `Escolha até ${maxAccounts} contas para monitorar`}
           </p>
         </div>
         <Badge variant="outline">
-          {tempSelectedIds.length}/{maxAccounts} selecionadas
+          {isUnlimited
+            ? `${tempSelectedIds.length} selecionadas`
+            : `${tempSelectedIds.length}/${maxAccounts} selecionadas`}
         </Badge>
       </div>
 
@@ -235,6 +239,7 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
                       handleAccountToggle(account.id, checked as boolean)
                     }
                     disabled={
+                      !isUnlimited &&
                       !tempSelectedIds.includes(account.id) && 
                       tempSelectedIds.length >= maxAccounts
                     }

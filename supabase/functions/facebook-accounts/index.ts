@@ -63,13 +63,13 @@ serve(async (req) => {
         const allAccounts: any[] = [];
 
         while (url) {
-          const fbResponse = await fetch(url);
+          const fbResponse: Response = await fetch(url);
           if (!fbResponse.ok) {
             const errorText = await fbResponse.text();
             console.error('[FACEBOOK-ACCOUNTS] Facebook API error:', errorText);
             throw new Error(`Facebook API error: ${fbResponse.status}`);
           }
-          const fbData = await fbResponse.json();
+          const fbData: any = await fbResponse.json();
           console.log('[FACEBOOK-ACCOUNTS] Facebook API response page size:', (fbData?.data || []).length);
           if (fbData.error) {
             console.error('[FACEBOOK-ACCOUNTS] Facebook API returned error:', fbData.error);
