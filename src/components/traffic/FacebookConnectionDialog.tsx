@@ -75,22 +75,43 @@ export function FacebookConnectionDialog({ onSuccess, onClose }: FacebookConnect
     }
 
     try {
-      console.log('Saving Facebook token...');
       setProgress(75);
-      const { error: saveError } = await supabase.functions.invoke('facebook-auth', {
-        body: { 
-          action: 'save_token', 
-          access_token: payload.access_token, 
-          expires_in: payload.expires_in 
-        }
+      // First verify on server (token may have been saved during callback)
+      const { data: verifyData, error: verifyErr } = await supabase.functions.invoke('facebook-auth', {
+        body: { action: 'verify_connection' }
       });
-      
-      if (saveError) {
-        console.error('Save token error:', saveError);
-        throw saveError;
+      if (verifyErr) {
+        console.warn('verify_connection error:', verifyErr);
+      }
+      let connected = Boolean(verifyData?.connected);
+
+      // Fallback: if not connected yet, try saving via API using the received token
+      if (!connected && payload.access_token) {
+        console.log('Server not yet connected. Saving token as fallback...');
+        const { error: saveError } = await supabase.functions.invoke('facebook-auth', {
+          body: {
+            action: 'save_token',
+            access_token: payload.access_token,
+            expires_in: payload.expires_in
+          }
+        });
+        if (saveError) {
+          console.error('Save token error:', saveError);
+          throw saveError;
+        }
+        const { data: verifyData2, error: verifyErr2 } = await supabase.functions.invoke('facebook-auth', {
+          body: { action: 'verify_connection' }
+        });
+        if (verifyErr2) {
+          console.warn('verify_connection (after save) error:', verifyErr2);
+        }
+        connected = Boolean(verifyData2?.connected);
       }
 
-      console.log('Facebook token saved successfully');
+      if (!connected) {
+        throw new Error('Não foi possível verificar a conexão do Facebook.');
+      }
+
       setProgress(100);
       toast({
         title: 'Conectado com sucesso!',
@@ -98,11 +119,11 @@ export function FacebookConnectionDialog({ onSuccess, onClose }: FacebookConnect
       });
       onSuccess();
     } catch (e: any) {
-      console.error('Erro ao salvar token do Facebook:', e);
-      setError(e.message || 'Erro ao salvar conexão do Facebook');
+      console.error('Erro ao concluir conexão do Facebook:', e);
+      setError(e.message || 'Erro ao concluir conexão do Facebook');
       toast({
-        title: 'Erro ao salvar',
-        description: 'Não foi possível salvar a conexão do Facebook.',
+        title: 'Erro na conexão',
+        description: 'Não foi possível concluir a conexão do Facebook.',
         variant: 'destructive',
       });
     } finally {

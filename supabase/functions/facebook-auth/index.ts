@@ -63,12 +63,66 @@ serve(async (req) => {
         return new Response(html, { headers: { 'Content-Type': 'text/html', ...corsHeaders } });
       }
 
+      // Try to persist the token server-side using state-supplied Supabase JWT
+      let saved = false;
+      try {
+        const urlState = url.searchParams.get('state') || '';
+        let supabaseJwt = '';
+        if (urlState) {
+          try {
+            const parsed = JSON.parse(atob(urlState));
+            supabaseJwt = parsed?.supabase_jwt || '';
+          } catch (e) {
+            console.warn('Invalid state payload:', e);
+          }
+        }
+        if (supabaseJwt) {
+          const supabaseClientForCallback = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+            { global: { headers: { Authorization: `Bearer ${supabaseJwt}` } } }
+          );
+          const { data: userData } = await supabaseClientForCallback.auth.getUser();
+          if (userData?.user) {
+            // Resolve agency
+            const { data: agencyId } = await supabaseClientForCallback.rpc('get_user_agency_id');
+            if (agencyId) {
+              // Fetch FB user id
+              let fbUserId = 'unknown';
+              try {
+                const meResp = await fetch(`https://graph.facebook.com/v19.0/me?fields=id,name&access_token=${encodeURIComponent(tokenData.access_token)}`);
+                const me = await meResp.json();
+                if (me?.id) fbUserId = String(me.id);
+              } catch (_e) {}
+              const tokenExpiresAt = tokenData.expires_in ? new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString() : null;
+              const { error: insertErr } = await supabaseClientForCallback
+                .from('facebook_connections')
+                .insert({
+                  user_id: userData.user.id,
+                  agency_id: agencyId,
+                  access_token: tokenData.access_token,
+                  token_expires_at: tokenExpiresAt,
+                  facebook_user_id: fbUserId,
+                  is_active: true,
+                });
+              if (!insertErr) saved = true;
+              else console.warn('Error saving connection during callback:', insertErr);
+            }
+          }
+        } else {
+          console.log('No Supabase JWT in state; skipping server-side save.');
+        }
+      } catch (e) {
+        console.warn('Saving token during callback failed:', e);
+      }
+
       const payload = {
         type: 'facebook_oauth',
         success: true,
         access_token: tokenData.access_token,
         expires_in: tokenData.expires_in || 0,
         token_type: tokenData.token_type || 'bearer',
+        saved,
       };
 
       const html = `<!doctype html><html><body><script>
@@ -106,7 +160,10 @@ serve(async (req) => {
         }
         const redirectUri = getRedirectUri(req);
         const scope = 'ads_management,ads_read,business_management';
-        const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}`;
+        const authHeader = req.headers.get('Authorization') || '';
+        const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+        const state = token ? btoa(JSON.stringify({ supabase_jwt: token })) : '';
+        const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(state)}`;
 
         return new Response(JSON.stringify({ success: true, authUrl }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
