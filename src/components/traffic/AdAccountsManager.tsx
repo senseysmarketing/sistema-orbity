@@ -39,11 +39,12 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
   const [searchTerm, setSearchTerm] = useState("");
   
   const { toast } = useToast();
-  const { getMaxFacebookAdAccounts } = useSubscription();
-  
+  const { getMaxFacebookAdAccounts, loading: subLoading, currentSubscription } = useSubscription();
+
   // Sincronizar com o limite do plano atual
   const maxAccounts = getMaxFacebookAdAccounts();
-  const isUnlimited = !Number.isFinite(maxAccounts) || maxAccounts >= 999999;
+  const senseysUnlimited = (currentSubscription?.plan_name || '').trim().toLowerCase().includes('senseys');
+  const isUnlimited = senseysUnlimited || !Number.isFinite(maxAccounts) || maxAccounts >= 999999;
 
   useEffect(() => {
     fetchAvailableAccounts();
@@ -90,7 +91,7 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
 
   const handleAccountToggle = (accountId: string, checked: boolean) => {
     if (checked) {
-      if (!isUnlimited && tempSelectedIds.length >= maxAccounts) {
+      if (!isUnlimited && !subLoading && Number.isFinite(maxAccounts) && tempSelectedIds.length >= maxAccounts) {
         toast({
           title: "Limite atingido",
           description: `Você pode selecionar no máximo ${maxAccounts} contas de anúncios.`,
@@ -218,7 +219,7 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
           </Button>
         </div>
 
-        {!isUnlimited && tempSelectedIds.length >= maxAccounts && (
+        {!isUnlimited && !subLoading && Number.isFinite(maxAccounts) && tempSelectedIds.length >= maxAccounts && (
           <Alert>
             <AlertDescription>
               Você atingiu o limite de {maxAccounts} contas de anúncios para seu plano. 
@@ -240,7 +241,9 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
                     }
                     disabled={
                       !isUnlimited &&
+                      !subLoading &&
                       !tempSelectedIds.includes(account.id) && 
+                      Number.isFinite(maxAccounts) &&
                       tempSelectedIds.length >= maxAccounts
                     }
                   />
