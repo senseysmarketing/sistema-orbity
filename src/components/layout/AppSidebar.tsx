@@ -90,7 +90,7 @@ export function AppSidebar() {
       {/* Header */}
       <SidebarHeader className="border-b border-sidebar-border p-4 bg-sidebar">
         {!collapsed && <div className="flex items-left justify-start">
-            <img src={logoNew} alt="Logo" className="w-[122px] h-[32px] object-contain ml-2" />
+            <img src={logoNew} alt="Logo" className="w-[122px] h-[32px] object-contain" />
           </div>}
         {collapsed && <div className="flex justify-center">
             <img src={logoNew} alt="Logo" className="h-6 w-6" />
