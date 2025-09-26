@@ -174,62 +174,93 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{client ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
           <DialogDescription>
             {client ? 'Edite as informações do cliente.' : 'Adicione um novo cliente ao sistema.'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Nome *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="grid gap-4 py-4 overflow-y-auto flex-1 px-1">
+            {/* Linha 1: Nome e Contato */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="name">Nome *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="contact">Contato</Label>
+                <Input
+                  id="contact"
+                  value={formData.contact}
+                  onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                  placeholder="Email, telefone, etc."
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="contact">Contato</Label>
-              <Input
-                id="contact"
-                value={formData.contact}
-                onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                placeholder="Email, telefone, etc."
-              />
+
+            {/* Linha 2: Serviço e Valor Mensal */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="service">Serviço</Label>
+                <Input
+                  id="service"
+                  value={formData.service}
+                  onChange={(e) => setFormData({ ...formData, service: e.target.value })}
+                  placeholder="Tipo de serviço prestado"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="monthly_value">Valor Mensal</Label>
+                <Input
+                  id="monthly_value"
+                  type="number"
+                  step="0.01"
+                  value={formData.monthly_value}
+                  onChange={(e) => setFormData({ ...formData, monthly_value: e.target.value })}
+                  placeholder="0,00"
+                />
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="service">Serviço</Label>
-              <Input
-                id="service"
-                value={formData.service}
-                onChange={(e) => setFormData({ ...formData, service: e.target.value })}
-                placeholder="Tipo de serviço prestado"
-              />
+
+            {/* Linha 3: Data de Início e Dia de Vencimento */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="start_date">Data de Início</Label>
+                <Input
+                  id="start_date"
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="due_date">Dia de Vencimento *</Label>
+                <Select 
+                  value={formData.due_date.toString()} 
+                  onValueChange={(value) => setFormData({ ...formData, due_date: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o dia" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                      <SelectItem key={day} value={day.toString()}>
+                        Dia {day}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="monthly_value">Valor Mensal</Label>
-              <Input
-                id="monthly_value"
-                type="number"
-                step="0.01"
-                value={formData.monthly_value}
-                onChange={(e) => setFormData({ ...formData, monthly_value: e.target.value })}
-                placeholder="0,00"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="start_date">Data de Início</Label>
-              <Input
-                id="start_date"
-                type="date"
-                value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-              />
-            </div>
+
+            {/* Fidelidade */}
             <div className="grid gap-2">
               <Label>Fidelidade</Label>
               <div className="flex items-center space-x-2">
@@ -241,8 +272,10 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
                 <Label htmlFor="has_loyalty">Cliente tem fidelidade</Label>
               </div>
             </div>
+
+            {/* Datas de Contrato (quando tem fidelidade) */}
             {formData.has_loyalty && (
-              <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>Início do Contrato *</Label>
                   <DatePickerDemo
@@ -283,25 +316,29 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
                     placeholder="Selecione a data de fim"
                   />
                 </div>
-              </>
+              </div>
             )}
+
+            {/* Observações */}
             <div className="grid gap-2">
-              <Label htmlFor="due_date">Dia de Vencimento *</Label>
-              <Select 
-                value={formData.due_date.toString()} 
-                onValueChange={(value) => setFormData({ ...formData, due_date: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o dia" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                    <SelectItem key={day} value={day.toString()}>
-                      Dia {day}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="observations">Observações</Label>
+              <Textarea
+                id="observations"
+                value={formData.observations}
+                onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                placeholder="Observações adicionais"
+                rows={3}
+              />
+            </div>
+
+            {/* Status do Cliente */}
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="active"
+                checked={formData.active}
+                onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
+              />
+              <Label htmlFor="active">Cliente Ativo</Label>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="observations">Observações</Label>
@@ -321,7 +358,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
               <Label htmlFor="active">Cliente Ativo</Label>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-4 pt-4 border-t bg-background">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
