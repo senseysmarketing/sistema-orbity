@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -23,18 +23,52 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
   const { enforceLimitWithToast } = useLimitEnforcement();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    name: client?.name || '',
-    contact: client?.contact || '',
-    service: client?.service || '',
-    monthly_value: client?.monthly_value || '',
-    active: client?.active ?? true,
-    start_date: client?.start_date || '',
-    due_date: client?.due_date || 1,
-    observations: client?.observations || '',
-    contract_start_date: client?.contract_start_date || null,
-    contract_end_date: client?.contract_end_date || null,
-    has_loyalty: client?.has_loyalty ?? true,
+    name: '',
+    contact: '',
+    service: '',
+    monthly_value: '',
+    active: true,
+    start_date: '',
+    due_date: '1',
+    observations: '',
+    contract_start_date: null,
+    contract_end_date: null,
+    has_loyalty: true,
   });
+
+  // Atualizar formulário quando cliente mudar
+  useEffect(() => {
+    if (client) {
+      setFormData({
+        name: client.name || '',
+        contact: client.contact || '',
+        service: client.service || '',
+        monthly_value: client.monthly_value?.toString() || '',
+        active: client.active ?? true,
+        start_date: client.start_date || '',
+        due_date: client.due_date?.toString() || '1',
+        observations: client.observations || '',
+        contract_start_date: client.contract_start_date || null,
+        contract_end_date: client.contract_end_date || null,
+        has_loyalty: client.has_loyalty ?? true,
+      });
+    } else {
+      // Resetar formulário para novo cliente
+      setFormData({
+        name: '',
+        contact: '',
+        service: '',
+        monthly_value: '',
+        active: true,
+        start_date: '',
+        due_date: '1',
+        observations: '',
+        contract_start_date: null,
+        contract_end_date: null,
+        has_loyalty: true,
+      });
+    }
+  }, [client]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,9 +94,9 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
     try {
       const data = {
         ...formData,
-        monthly_value: formData.monthly_value ? parseFloat(formData.monthly_value as string) : null,
+        monthly_value: formData.monthly_value ? parseFloat(formData.monthly_value) : null,
         start_date: formData.start_date || null,
-        due_date: parseInt(formData.due_date as string),
+        due_date: parseInt(formData.due_date),
         contract_start_date: formData.contract_start_date,
         contract_end_date: formData.contract_end_date,
         has_loyalty: formData.has_loyalty,
@@ -90,13 +124,13 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
           const currentMonth = currentDate.getMonth();
           
           // Calcular a data de vencimento para o mês atual
-          const dueDate = new Date(currentYear, currentMonth, parseInt(formData.due_date as string));
+          const dueDate = new Date(currentYear, currentMonth, parseInt(formData.due_date));
           
           const { error: paymentError } = await supabase
             .from('client_payments')
             .insert([{
               client_id: clientData.id,
-              amount: parseFloat(formData.monthly_value as string),
+              amount: parseFloat(formData.monthly_value),
               due_date: dueDate.toISOString().split('T')[0],
               status: 'pending'
             }]);
@@ -121,7 +155,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         monthly_value: '',
         active: true,
         start_date: '',
-        due_date: 1,
+        due_date: '1',
         observations: '',
         contract_start_date: null,
         contract_end_date: null,
@@ -237,7 +271,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
               <Label htmlFor="due_date">Dia de Vencimento *</Label>
               <Select 
                 value={formData.due_date.toString()} 
-                onValueChange={(value) => setFormData({ ...formData, due_date: parseInt(value) })}
+                onValueChange={(value) => setFormData({ ...formData, due_date: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o dia" />
