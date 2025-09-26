@@ -42,7 +42,9 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
   }, [selectedAdAccounts, selectedAccount]);
 
   useEffect(() => {
-    generateReport();
+    if (selectedAdAccounts.length > 0 && selectedAccount && dateRange?.from && dateRange?.to) {
+      generateReport();
+    }
   }, [selectedAdAccounts, selectedAccount, dateRange]);
 
   const generateReport = async () => {
@@ -68,7 +70,7 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
       if (error) throw error;
       
       if (data?.metrics) {
-        const metrics = data.metrics[0] || {};
+        const metrics = data.metrics;
         setReportData({
           summary: {
             totalSpend: metrics.spend || 0,
@@ -82,12 +84,36 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
             accountName: selectedAdAccounts.find(acc => acc.ad_account_id === selectedAccount)?.ad_account_name || 'Conta Selecionada'
           }
         });
+        
+        toast({
+          title: "✅ Dados carregados",
+          description: "Relatório atualizado com dados reais do Facebook",
+        });
+      } else {
+        throw new Error("Dados não encontrados na resposta");
       }
     } catch (error: any) {
       console.error('Erro ao gerar relatório:', error);
+      
+      // Fallback com dados mock para demonstração
+      const mockData = {
+        summary: {
+          totalSpend: 1250.50,
+          totalImpressions: 45000,
+          totalClicks: 890,
+          totalConversions: 24,
+          avgCTR: 1.98,
+          avgCPC: 1.40,
+          avgCPM: 27.67,
+          period: `${dateRange.from.toLocaleDateString('pt-BR')} - ${dateRange.to.toLocaleDateString('pt-BR')}`,
+          accountName: selectedAdAccounts.find(acc => acc.ad_account_id === selectedAccount)?.ad_account_name || 'Conta Selecionada'
+        }
+      };
+      setReportData(mockData);
+      
       toast({
-        title: "Erro ao carregar dados",
-        description: "Verifique a conexão com o Facebook.",
+        title: "⚠️ Usando dados de exemplo",
+        description: "Não foi possível carregar dados reais. Verifique a conexão com o Facebook.",
         variant: "destructive"
       });
     } finally {
@@ -289,12 +315,12 @@ Estratégia + Otimização = RESULTADOS! ✨
               onDateChange={setDateRange}
             />
 
-            <Button onClick={generateReport} disabled={loading}>
+            <Button onClick={generateReport} disabled={loading || !selectedAccount}>
               <TrendingUp className="h-4 w-4 mr-2" />
-              Carregar Dados
+              {loading ? "Carregando..." : "Carregar Dados"}
             </Button>
             
-            <Button onClick={generateReport} disabled={loading} variant="outline">
+            <Button onClick={generateReport} disabled={loading || !selectedAccount} variant="outline">
               <RefreshCw className="h-4 w-4 mr-2" />
               Atualizar
             </Button>
