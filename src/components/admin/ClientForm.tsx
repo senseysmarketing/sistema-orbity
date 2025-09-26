@@ -246,22 +246,40 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
                 <div className="grid gap-2">
                   <Label>Início do Contrato *</Label>
                   <DatePickerDemo
-                    date={formData.contract_start_date ? new Date(formData.contract_start_date) : undefined}
-                    onDateChange={(date) => setFormData({ 
-                      ...formData, 
-                      contract_start_date: date ? date.toISOString().split('T')[0] : null 
-                    })}
+                    date={formData.contract_start_date ? new Date(formData.contract_start_date + 'T00:00:00') : undefined}
+                    onDateChange={(date) => {
+                      if (date) {
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        setFormData({ 
+                          ...formData, 
+                          contract_start_date: `${year}-${month}-${day}`
+                        });
+                      } else {
+                        setFormData({ ...formData, contract_start_date: null });
+                      }
+                    }}
                     placeholder="Selecione a data de início"
                   />
                 </div>
                 <div className="grid gap-2">
                   <Label>Fim do Contrato *</Label>
                   <DatePickerDemo
-                    date={formData.contract_end_date ? new Date(formData.contract_end_date) : undefined}
-                    onDateChange={(date) => setFormData({ 
-                      ...formData, 
-                      contract_end_date: date ? date.toISOString().split('T')[0] : null 
-                    })}
+                    date={formData.contract_end_date ? new Date(formData.contract_end_date + 'T00:00:00') : undefined}
+                    onDateChange={(date) => {
+                      if (date) {
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        setFormData({ 
+                          ...formData, 
+                          contract_end_date: `${year}-${month}-${day}`
+                        });
+                      } else {
+                        setFormData({ ...formData, contract_end_date: null });
+                      }
+                    }}
                     placeholder="Selecione a data de fim"
                   />
                 </div>
