@@ -106,13 +106,12 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
     setSaving(true);
     
     try {
-      // Primeiro, deletar todas as contas atuais da agência
-      const { error: deleteError } = await supabase
+      // Primeiro, desativar todas as contas atuais ativas desta agência
+      const { error: deactivateError } = await supabase
         .from('selected_ad_accounts')
-        .delete()
-        .eq('is_active', true);
+        .update({ is_active: false });
 
-      if (deleteError) throw deleteError;
+      if (deactivateError) throw deactivateError;
 
       // Adicionar as novas seleções apenas se tiver alguma selecionada
       if (tempSelectedIds.length > 0) {
@@ -124,17 +123,20 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
             currency: account?.currency || 'USD',
             timezone: account?.timezone || null,
             is_active: true,
-            // Campos obrigatórios - serão substituídos pelo trigger
+            // Campos obrigatórios para tipos TS; serão substituídos pelo trigger
             agency_id: '00000000-0000-0000-0000-000000000000',
             connection_id: '00000000-0000-0000-0000-000000000000'
           };
         });
 
-        const { error: insertError } = await supabase
+        const { error: upsertError } = await supabase
           .from('selected_ad_accounts')
-          .insert(accountsToInsert);
+          .upsert(accountsToInsert, {
+            onConflict: 'agency_id,ad_account_id',
+            ignoreDuplicates: false,
+          });
 
-        if (insertError) throw insertError;
+        if (upsertError) throw upsertError;
       }
 
       toast({
