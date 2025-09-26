@@ -52,3 +52,6 @@ enable_confirmations = false
 
 [functions.capture-lead]
 verify_jwt = false
+
+[functions.facebook-auth]
+verify_jwt = false

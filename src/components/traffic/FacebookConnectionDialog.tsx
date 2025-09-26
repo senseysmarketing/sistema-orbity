@@ -23,43 +23,94 @@ export function FacebookConnectionDialog({ onSuccess, onClose }: FacebookConnect
     setProgress(10);
     setError(null);
 
+    let popup: Window | null = null;
+    let pollId: number | undefined;
+
+    const messageHandler = async (event: MessageEvent) => {
+      const payload = (event.data || {}) as any;
+      if (payload?.type !== 'facebook_oauth') return;
+
+      window.removeEventListener('message', messageHandler);
+      if (popup && !popup.closed) popup.close();
+      if (pollId) window.clearInterval(pollId);
+
+      if (!payload.success) {
+        setError(payload.error || 'Falha na autenticação do Facebook');
+        toast({
+          title: 'Erro na autenticação',
+          description: 'Não foi possível autenticar no Facebook. Tente novamente.',
+          variant: 'destructive',
+        });
+        setIsConnecting(false);
+        setProgress(0);
+        return;
+      }
+
+      try {
+        setProgress(75);
+        const { error: saveError } = await supabase.functions.invoke('facebook-auth', {
+          body: { action: 'save_token', access_token: payload.access_token, expires_in: payload.expires_in }
+        });
+        if (saveError) throw saveError;
+
+        setProgress(100);
+        toast({
+          title: 'Conectado com sucesso!',
+          description: 'Sua conta do Facebook foi conectada. Agora você pode selecionar suas contas de anúncios.',
+        });
+        onSuccess();
+      } catch (e: any) {
+        console.error('Erro ao salvar token do Facebook:', e);
+        setError(e.message || 'Erro ao salvar conexão do Facebook');
+        toast({
+          title: 'Erro ao salvar',
+          description: 'Não foi possível salvar a conexão do Facebook.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsConnecting(false);
+        setProgress(0);
+      }
+    };
+
     try {
-      // Simular progresso
       setProgress(30);
-      
-      // Aqui será implementada a integração real com Facebook
-      // Por enquanto, simular o processo
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setProgress(60);
-      
-      // Chamar edge function para autenticação Facebook
       const { data, error } = await supabase.functions.invoke('facebook-auth', {
         body: { action: 'initiate_auth' }
       });
-
       if (error) throw error;
-      
-      setProgress(90);
-      
-      // Simular conclusão
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setProgress(100);
-      
+
+      const authUrl = data?.authUrl as string | undefined;
+      if (!authUrl) throw new Error('URL de autenticação não recebida');
+
+      setProgress(50);
+      window.addEventListener('message', messageHandler);
+      popup = window.open(authUrl, 'fb_oauth', 'width=600,height=700');
+      if (!popup) throw new Error('Não foi possível abrir a janela de autenticação');
+
+      // Detect user closing the popup before completion
+      pollId = window.setInterval(() => {
+        if (popup && popup.closed) {
+          window.removeEventListener('message', messageHandler);
+          if (pollId) window.clearInterval(pollId);
+          setIsConnecting(false);
+          setProgress(0);
+          setError('Janela de autenticação foi fechada antes de concluir.');
+          toast({
+            title: 'Autenticação cancelada',
+            description: 'Você fechou a janela antes de concluir o login.',
+            variant: 'destructive',
+          });
+        }
+      }, 500);
+    } catch (e: any) {
+      console.error('Erro ao conectar Facebook:', e);
+      setError(e.message || 'Erro ao iniciar autenticação com o Facebook');
       toast({
-        title: "Conectado com sucesso!",
-        description: "Sua conta do Facebook foi conectada. Agora você pode selecionar suas contas de anúncios.",
+        title: 'Erro na conexão',
+        description: 'Não foi possível iniciar a autenticação. Tente novamente.',
+        variant: 'destructive',
       });
-      
-      onSuccess();
-    } catch (error: any) {
-      console.error('Erro ao conectar Facebook:', error);
-      setError(error.message || 'Erro ao conectar com o Facebook');
-      toast({
-        title: "Erro na conexão",
-        description: "Não foi possível conectar com o Facebook. Tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
       setIsConnecting(false);
       setProgress(0);
     }
