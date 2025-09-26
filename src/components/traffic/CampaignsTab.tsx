@@ -351,29 +351,29 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                               <div className="text-center py-4">
                                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto" />
                               </div>
-                            ) : (
+                            ) : weeklyAnalysis && weeklyAnalysis.length > 0 ? (
                               <div className="space-y-4">
                                 <div className="grid gap-4 md:grid-cols-4">
-                                  {weeklyAnalysis.map((week, index) => {
+                                  {weeklyAnalysis.filter(week => week && typeof week === 'object').map((week, index) => {
                                     const prevWeek = weeklyAnalysis[index - 1];
                                     const getPercentageChange = (current: number, previous: number) => {
                                       if (!previous) return 0;
                                       return ((current - previous) / previous) * 100;
                                     };
 
-                                    const spendChange = prevWeek ? getPercentageChange(week.spend, prevWeek.spend) : 0;
-                                    const conversionsChange = prevWeek ? getPercentageChange(week.conversions, prevWeek.conversions) : 0;
-                                    const cpcChange = prevWeek ? getPercentageChange(week.cpc, prevWeek.cpc) : 0;
-                                    const ctrChange = prevWeek ? getPercentageChange(week.ctr, prevWeek.ctr) : 0;
+                                    const spendChange = prevWeek && prevWeek.spend ? getPercentageChange(week.spend || 0, prevWeek.spend) : 0;
+                                    const conversionsChange = prevWeek && prevWeek.conversions ? getPercentageChange(week.conversions || 0, prevWeek.conversions) : 0;
+                                    const cpcChange = prevWeek && prevWeek.cpc ? getPercentageChange(week.cpc || 0, prevWeek.cpc) : 0;
+                                    const ctrChange = prevWeek && prevWeek.ctr ? getPercentageChange(week.ctr || 0, prevWeek.ctr) : 0;
 
                                     return (
                                       <Card key={index} className="border">
                                         <CardHeader className="pb-2">
-                                          <CardTitle className="text-sm">{week.week}</CardTitle>
+                                          <CardTitle className="text-sm">{week.week || `Semana ${index + 1}`}</CardTitle>
                                         </CardHeader>
                                         <CardContent className="space-y-2">
                                           <div className="text-sm flex items-center justify-between">
-                                            <span><span className="font-medium">Gasto:</span> R$ {week.spend.toFixed(2)}</span>
+                                            <span><span className="font-medium">Gasto:</span> R$ {(week.spend || 0).toFixed(2)}</span>
                                             {prevWeek && (
                                               <span className={`text-xs ${spendChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
                                                 {spendChange > 0 ? '+' : ''}{spendChange.toFixed(1)}%
@@ -381,7 +381,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                                             )}
                                           </div>
                                           <div className="text-sm flex items-center justify-between">
-                                            <span><span className="font-medium">Conversões:</span> {week.conversions}</span>
+                                            <span><span className="font-medium">Conversões:</span> {week.conversions || 0}</span>
                                             {prevWeek && (
                                               <span className={`text-xs ${conversionsChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
                                                 {conversionsChange > 0 ? '+' : ''}{conversionsChange.toFixed(1)}%
@@ -389,7 +389,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                                             )}
                                           </div>
                                           <div className="text-sm flex items-center justify-between">
-                                            <span><span className="font-medium">CPC:</span> R$ {week.cpc.toFixed(2)}</span>
+                                            <span><span className="font-medium">CPC:</span> R$ {(week.cpc || 0).toFixed(2)}</span>
                                             {prevWeek && (
                                               <span className={`text-xs ${cpcChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
                                                 {cpcChange > 0 ? '+' : ''}{cpcChange.toFixed(1)}%
@@ -397,7 +397,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                                             )}
                                           </div>
                                           <div className="text-sm flex items-center justify-between">
-                                            <span><span className="font-medium">CTR:</span> {week.ctr.toFixed(2)}%</span>
+                                            <span><span className="font-medium">CTR:</span> {(week.ctr || 0).toFixed(2)}%</span>
                                             {prevWeek && (
                                               <span className={`text-xs ${ctrChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
                                                 {ctrChange > 0 ? '+' : ''}{ctrChange.toFixed(1)}%
@@ -418,38 +418,48 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                                   <CardContent>
                                     <div className="text-sm space-y-2">
                                       {(() => {
-                                        const bestWeek = weeklyAnalysis.reduce((best, current, index) => {
+                                        if (!weeklyAnalysis || weeklyAnalysis.length === 0) {
+                                          return <p>Não há dados suficientes para análise.</p>;
+                                        }
+                                        
+                                        const validWeeks = weeklyAnalysis.filter(week => week && typeof week === 'object' && week.spend && week.conversions);
+                                        
+                                        if (validWeeks.length === 0) {
+                                          return <p>Não há dados válidos para análise.</p>;
+                                        }
+
+                                        const bestWeek = validWeeks.reduce((best, current, index) => {
                                           const efficiency = current.conversions / current.spend;
-                                          const bestEfficiency = weeklyAnalysis[best].conversions / weeklyAnalysis[best].spend;
+                                          const bestEfficiency = validWeeks[best].conversions / validWeeks[best].spend;
                                           return efficiency > bestEfficiency ? index : best;
                                         }, 0);
 
-                                        const worstWeek = weeklyAnalysis.reduce((worst, current, index) => {
+                                        const worstWeek = validWeeks.reduce((worst, current, index) => {
                                           const efficiency = current.conversions / current.spend;
-                                          const worstEfficiency = weeklyAnalysis[worst].conversions / weeklyAnalysis[worst].spend;
+                                          const worstEfficiency = validWeeks[worst].conversions / validWeeks[worst].spend;
                                           return efficiency < worstEfficiency ? index : worst;
                                         }, 0);
 
-                                        const totalSpend = weeklyAnalysis.reduce((sum, week) => sum + week.spend, 0);
-                                        const totalConversions = weeklyAnalysis.reduce((sum, week) => sum + week.conversions, 0);
-                                        const avgCPC = weeklyAnalysis.reduce((sum, week) => sum + week.cpc, 0) / weeklyAnalysis.length;
+                                        const totalSpend = validWeeks.reduce((sum, week) => sum + (week.spend || 0), 0);
+                                        const totalConversions = validWeeks.reduce((sum, week) => sum + (week.conversions || 0), 0);
+                                        const avgCPC = validWeeks.reduce((sum, week) => sum + (week.cpc || 0), 0) / validWeeks.length;
 
                                         return (
                                           <>
                                             <p>
-                                              <strong className="text-green-600">🏆 Melhor semana:</strong> {weeklyAnalysis[bestWeek].week} com {weeklyAnalysis[bestWeek].conversions} conversões 
-                                              por R$ {weeklyAnalysis[bestWeek].spend.toFixed(2)} 
-                                              (custo por conversão: R$ {(weeklyAnalysis[bestWeek].spend / weeklyAnalysis[bestWeek].conversions).toFixed(2)})
+                                              <strong className="text-green-600">🏆 Melhor semana:</strong> {validWeeks[bestWeek]?.week || `Semana ${bestWeek + 1}`} com {validWeeks[bestWeek]?.conversions || 0} conversões 
+                                              por R$ {(validWeeks[bestWeek]?.spend || 0).toFixed(2)} 
+                                              (custo por conversão: R$ {((validWeeks[bestWeek]?.spend || 0) / (validWeeks[bestWeek]?.conversions || 1)).toFixed(2)})
                                             </p>
                                             <p>
-                                              <strong className="text-red-600">⚠️ Pior performance:</strong> {weeklyAnalysis[worstWeek].week} com maior custo por conversão 
-                                              (R$ {(weeklyAnalysis[worstWeek].spend / weeklyAnalysis[worstWeek].conversions).toFixed(2)})
+                                              <strong className="text-red-600">⚠️ Pior performance:</strong> {validWeeks[worstWeek]?.week || `Semana ${worstWeek + 1}`} com maior custo por conversão 
+                                              (R$ {((validWeeks[worstWeek]?.spend || 0) / (validWeeks[worstWeek]?.conversions || 1)).toFixed(2)})
                                             </p>
                                             <p>
                                               <strong className="text-blue-600">📈 Resumo:</strong> Total investido: R$ {totalSpend.toFixed(2)} | 
                                               Total conversões: {totalConversions} | 
                                               CPC médio: R$ {avgCPC.toFixed(2)} | 
-                                              Custo médio por conversão: R$ {(totalSpend / totalConversions).toFixed(2)}
+                                              Custo médio por conversão: R$ {totalConversions > 0 ? (totalSpend / totalConversions).toFixed(2) : '0.00'}
                                             </p>
                                           </>
                                         );
@@ -457,6 +467,10 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                                     </div>
                                   </CardContent>
                                 </Card>
+                              </div>
+                            ) : (
+                              <div className="text-center py-4">
+                                <p className="text-muted-foreground">Nenhum dado disponível para análise.</p>
                               </div>
                             )}
                           </div>
