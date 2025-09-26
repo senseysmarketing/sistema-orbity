@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Shield, ContactRound } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import senseyLogo from "@/assets/senseys-logo.png";
+import logoNew from "@/assets/logo-new.png";
 const menuItems = [{
   title: "Dashboard",
   url: "/",
@@ -90,10 +90,10 @@ export function AppSidebar() {
       {/* Header */}
       <SidebarHeader className="border-b border-sidebar-border p-4 bg-sidebar">
         {!collapsed && <div className="flex items-center">
-            <img src={senseyLogo} alt="Senseys Logo" className="w-[122px] h-[32px] object-contain" />
+            <img src={logoNew} alt="Logo" className="w-[122px] h-[32px] object-contain" />
           </div>}
         {collapsed && <div className="flex justify-center">
-            <img src={senseyLogo} alt="Senseys Logo" className="h-6 w-6" />
+            <img src={logoNew} alt="Logo" className="h-6 w-6" />
           </div>}
       </SidebarHeader>
 

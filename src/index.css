@@ -141,13 +141,13 @@ All colors MUST be HSL.
 
     --radius: 0.5rem;
 
-    --sidebar-background: 207 13% 31%; /* #4f5963 */
+    --sidebar-background: 266 62% 12%; /* #1c102f */
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 220 70% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 207 13% 36%;
+    --sidebar-accent: 266 62% 17%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 207 13% 26%;
+    --sidebar-border: 266 62% 8%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* Create button color - #7dafd8 converted to HSL */
