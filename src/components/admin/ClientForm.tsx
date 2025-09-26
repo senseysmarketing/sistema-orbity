@@ -340,23 +340,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
               />
               <Label htmlFor="active">Cliente Ativo</Label>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="observations">Observações</Label>
-              <Textarea
-                id="observations"
-                value={formData.observations}
-                onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
-                placeholder="Observações adicionais"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="active"
-                checked={formData.active}
-                onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
-              />
-              <Label htmlFor="active">Cliente Ativo</Label>
-            </div>
           </div>
           <DialogFooter className="mt-4 pt-4 border-t bg-background">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
