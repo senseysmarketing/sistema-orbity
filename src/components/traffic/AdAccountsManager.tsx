@@ -43,6 +43,7 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
   
   // Sincronizar com o limite do plano atual
   const maxAccounts = getMaxFacebookAdAccounts();
+  const isUnlimited = !Number.isFinite(maxAccounts) || maxAccounts >= 999999;
 
   useEffect(() => {
     fetchAvailableAccounts();
@@ -89,7 +90,7 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
 
   const handleAccountToggle = (accountId: string, checked: boolean) => {
     if (checked) {
-      if (tempSelectedIds.length >= maxAccounts) {
+      if (!isUnlimited && tempSelectedIds.length >= maxAccounts) {
         toast({
           title: "Limite atingido",
           description: `Você pode selecionar no máximo ${maxAccounts} contas de anúncios.`,
@@ -213,7 +214,7 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
           </Button>
         </div>
 
-        {tempSelectedIds.length >= maxAccounts && (
+        {!isUnlimited && tempSelectedIds.length >= maxAccounts && (
           <Alert>
             <AlertDescription>
               Você atingiu o limite de {maxAccounts} contas de anúncios para seu plano. 

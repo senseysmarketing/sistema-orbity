@@ -213,13 +213,13 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   };
 
   const getMaxFacebookAdAccounts = (): number => {
-    if (!currentAgency) return 10; // Valor padrão
-
     const currentPlan = currentSubscription?.subscribed 
       ? plans.find(p => p.name === currentSubscription.plan_name)
       : plans.find(p => p.slug === 'free');
 
-    return currentPlan?.max_facebook_ad_accounts || 10;
+    const max = currentPlan?.max_facebook_ad_accounts;
+    if (!max || isNaN(max as any)) return 10; // fallback
+    return max >= 999999 ? Number.POSITIVE_INFINITY : max;
   };
 
   useEffect(() => {
