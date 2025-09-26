@@ -106,58 +106,65 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
     setSaving(true);
     
     try {
-      // Primeiro, desativar todas as contas atuais ativas desta agência
-      const { error: deactivateError } = await supabase
-        .from('selected_ad_accounts')
-        .update({ is_active: false });
+      const selectedIds = [...tempSelectedIds];
 
-      if (deactivateError) throw deactivateError;
-
-      // Adicionar as novas seleções apenas se tiver alguma selecionada
-      if (tempSelectedIds.length > 0) {
-        const accountsToInsert = tempSelectedIds.map(accountId => {
-          const account = availableAccounts.find(acc => acc.id === accountId);
+      if (selectedIds.length > 0) {
+        // 1) Upsert das contas selecionadas (evita duplicatas)
+        const accountsToUpsert = selectedIds.map((accountId) => {
+          const account = availableAccounts.find((acc) => acc.id === accountId);
           return {
             ad_account_id: accountId,
             ad_account_name: account?.name || '',
             currency: account?.currency || 'USD',
             timezone: account?.timezone || null,
             is_active: true,
-            // Campos obrigatórios para tipos TS; serão substituídos pelo trigger
+            // Placeholders apenas para satisfazer TS; o trigger define os valores corretos
             agency_id: '00000000-0000-0000-0000-000000000000',
-            connection_id: '00000000-0000-0000-0000-000000000000'
+            connection_id: '00000000-0000-0000-0000-000000000000',
           };
         });
 
         const { error: upsertError } = await supabase
           .from('selected_ad_accounts')
-          .upsert(accountsToInsert, {
+          .upsert(accountsToUpsert, {
             onConflict: 'agency_id,ad_account_id',
             ignoreDuplicates: false,
           });
-
         if (upsertError) throw upsertError;
+
+        // 2) Desativar as que não foram selecionadas
+        const notIn = `(${selectedIds.map((id) => `"${id}"`).join(',')})`;
+        const { error: deactivateOthersError } = await supabase
+          .from('selected_ad_accounts')
+          .update({ is_active: false })
+          .not('ad_account_id', 'in', notIn);
+        if (deactivateOthersError) throw deactivateOthersError;
+      } else {
+        // Nenhuma selecionada: desativar todas
+        const { error: deactivateAllError } = await supabase
+          .from('selected_ad_accounts')
+          .update({ is_active: false });
+        if (deactivateAllError) throw deactivateAllError;
       }
 
       toast({
-        title: "Contas atualizadas!",
-        description: `${tempSelectedIds.length} contas de anúncios selecionadas.`,
+        title: 'Contas atualizadas!',
+        description: `${selectedIds.length} contas de anúncios selecionadas.`,
       });
 
-      await fetchSelectedAccounts(); // Recarregar dados
+      await fetchSelectedAccounts();
       onAccountsSelected();
     } catch (error: any) {
-      console.error('Erro ao salvar seleção:', error);
+      console.error('Erro ao salvar seleção:', error?.message || error, error);
       toast({
-        title: "Erro ao salvar",
-        description: "Não foi possível salvar a seleção de contas.",
-        variant: "destructive",
+        title: 'Erro ao salvar',
+        description: error?.message || 'Não foi possível salvar a seleção de contas.',
+        variant: 'destructive',
       });
     } finally {
       setSaving(false);
     }
   };
-
   const filteredAccounts = availableAccounts.filter(account =>
     account.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     account.id.toLowerCase().includes(searchTerm.toLowerCase())
