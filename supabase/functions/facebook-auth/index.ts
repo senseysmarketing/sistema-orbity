@@ -7,9 +7,17 @@ const corsHeaders = {
 };
 
 function getRedirectUri(req: Request) {
+  // Always return the public Functions domain callback URL
+  // This avoids variants like http or missing "/functions/v1"
   const url = new URL(req.url);
-  // Must match exactly in Facebook App settings
-  return `${url.origin}${url.pathname}`;
+  const forwardedHost = req.headers.get('x-forwarded-host') || url.host;
+  let host = forwardedHost;
+  if (!host.includes('functions.supabase.co')) {
+    // Convert project base domain to functions domain
+    const projectRef = host.split('.')[0];
+    host = `${projectRef}.functions.supabase.co`;
+  }
+  return `https://${host}/facebook-auth`;
 }
 
 serve(async (req) => {
