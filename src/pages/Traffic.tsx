@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AlertCircle, Facebook, Plus, Play, Settings, BarChart, FileText, DollarSign, Activity, ExternalLink } from "lucide-react";
+import { AlertCircle, Facebook, Plus, Play, Settings, BarChart, FileText, DollarSign, Activity, ExternalLink, Eye } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { ReportsTab } from "@/components/traffic/ReportsTab";
 import { BalanceCheckerTab } from "@/components/traffic/BalanceCheckerTab";
 import { FacebookConnectionDialog } from "@/components/traffic/FacebookConnectionDialog";
 import { AdAccountsManager } from "@/components/traffic/AdAccountsManager";
+import { OverviewTab } from "@/components/traffic/OverviewTab";
 
 interface FacebookConnection {
   id: string;
@@ -344,10 +345,14 @@ export default function Traffic() {
 
       {/* Abas principais */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <BarChart className="h-4 w-4" />
             Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <Eye className="h-4 w-4" />
+            Overview
           </TabsTrigger>
           <TabsTrigger value="campaigns" className="flex items-center gap-2">
             <Play className="h-4 w-4" />
@@ -365,6 +370,10 @@ export default function Traffic() {
 
         <TabsContent value="dashboard" className="space-y-6">
           <TrafficDashboard selectedAdAccounts={selectedAdAccounts} />
+        </TabsContent>
+
+        <TabsContent value="overview" className="space-y-6">
+          <OverviewTab selectedAdAccounts={selectedAdAccounts} />
         </TabsContent>
 
         <TabsContent value="campaigns" className="space-y-6">
