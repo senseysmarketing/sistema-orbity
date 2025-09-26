@@ -577,6 +577,33 @@ export default function Admin() {
     const inactiveClients = clients.filter(c => !c.active);
     const avgClientValue = activeClients.length > 0 ? activeClients.reduce((sum, c) => sum + (c.monthly_value || 0), 0) / activeClients.length : 0;
 
+    
+    // Análise de fidelidade
+    const loyaltyClients = clients.filter(c => c.has_loyalty && c.contract_end_date);
+    const nonLoyaltyClients = clients.filter(c => !c.has_loyalty);
+    
+    // Alertas de fidelidade próxima do fim
+    const loyaltyAlerts = {
+      ending7Days: [],
+      ending30Days: [],
+      expired: []
+    };
+
+    loyaltyClients.forEach(client => {
+      if (client.contract_end_date) {
+        const endDate = new Date(client.contract_end_date);
+        const daysUntilEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntilEnd < 0) {
+          loyaltyAlerts.expired.push(client);
+        } else if (daysUntilEnd <= 7) {
+          loyaltyAlerts.ending7Days.push(client);
+        } else if (daysUntilEnd <= 30) {
+          loyaltyAlerts.ending30Days.push(client);
+        }
+      }
+    });
+
     // Taxa de conversão de pagamentos
     const paymentConversionRate = filteredPayments.length > 0 ? paidPayments.length / filteredPayments.length * 100 : 0;
 
@@ -591,6 +618,17 @@ export default function Admin() {
     if (totalExpensesPending > totalPending) {
       insights.push('Despesas pendentes excedem receitas pendentes');
     }
+    
+    // Insights de fidelidade
+    if (loyaltyAlerts.expired.length > 0) {
+      insights.push(`${loyaltyAlerts.expired.length} contrato(s) de fidelidade vencido(s)`);
+    }
+    if (loyaltyAlerts.ending7Days.length > 0) {
+      insights.push(`${loyaltyAlerts.ending7Days.length} contrato(s) vencendo em 7 dias`);
+    }
+    if (loyaltyAlerts.ending30Days.length > 0) {
+      insights.push(`${loyaltyAlerts.ending30Days.length} contrato(s) vencendo em 30 dias`);
+    }
     return {
       totalReceived,
       totalPending,
@@ -603,6 +641,9 @@ export default function Admin() {
       paymentConversionRate,
       fixedExpensesCount: fixedExpenses.length,
       variableExpensesCount: variableExpenses.length,
+      loyaltyClients: loyaltyClients.length,
+      nonLoyaltyClients: nonLoyaltyClients.length,
+      loyaltyAlerts,
       insights,
       paymentStats: {
         paid: paidPayments.length,
@@ -704,7 +745,7 @@ export default function Admin() {
 
         <TabsContent value="dashboard" className="space-y-6">
           {/* Estatísticas Principais */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Receita Mensal</CardTitle>
@@ -797,6 +838,38 @@ export default function Admin() {
                   <div className="text-sm font-medium">
                     {monthlyRevenue > 0 ? (netProfit / monthlyRevenue * 100).toFixed(1) : 0}%
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Fidelidade</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-600">
+                  {analytics.loyaltyClients}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  clientes com fidelidade
+                </p>
+                <div className="mt-2 space-y-1">
+                  {analytics.loyaltyAlerts.ending7Days.length > 0 && (
+                    <div className="text-xs text-red-600">
+                      {analytics.loyaltyAlerts.ending7Days.length} vencendo em 7 dias
+                    </div>
+                  )}
+                  {analytics.loyaltyAlerts.ending30Days.length > 0 && (
+                    <div className="text-xs text-orange-600">
+                      {analytics.loyaltyAlerts.ending30Days.length} vencendo em 30 dias
+                    </div>
+                  )}
+                  {analytics.loyaltyAlerts.expired.length > 0 && (
+                    <div className="text-xs text-red-700 font-medium">
+                      {analytics.loyaltyAlerts.expired.length} vencido(s)
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -902,6 +975,80 @@ export default function Admin() {
                 </div>
               </CardContent>
             </Card>}
+
+          {/* Alertas de Fidelidade */}
+          {(analytics.loyaltyAlerts.ending7Days.length > 0 || 
+            analytics.loyaltyAlerts.ending30Days.length > 0 || 
+            analytics.loyaltyAlerts.expired.length > 0) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Timer className="h-5 w-5" />
+                  Alertas de Fidelidade
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {analytics.loyaltyAlerts.expired.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-red-700 flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        Contratos Vencidos ({analytics.loyaltyAlerts.expired.length})
+                      </h4>
+                      <div className="space-y-1">
+                        {analytics.loyaltyAlerts.expired.map((client) => (
+                          <div key={client.id} className="flex items-center justify-between p-2 bg-red-50 dark:bg-red-950 rounded-lg">
+                            <span className="text-sm font-medium">{client.name}</span>
+                            <span className="text-xs text-red-600">
+                              Venceu em {client.contract_end_date ? new Date(client.contract_end_date).toLocaleDateString('pt-BR') : ''}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {analytics.loyaltyAlerts.ending7Days.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-orange-700 flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        Vencendo em 7 dias ({analytics.loyaltyAlerts.ending7Days.length})
+                      </h4>
+                      <div className="space-y-1">
+                        {analytics.loyaltyAlerts.ending7Days.map((client) => (
+                          <div key={client.id} className="flex items-center justify-between p-2 bg-red-50 dark:bg-red-950 rounded-lg">
+                            <span className="text-sm font-medium">{client.name}</span>
+                            <span className="text-xs text-orange-600">
+                              Vence em {client.contract_end_date ? new Date(client.contract_end_date).toLocaleDateString('pt-BR') : ''}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {analytics.loyaltyAlerts.ending30Days.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-yellow-700 flex items-center gap-2">
+                        <Timer className="h-4 w-4" />
+                        Vencendo em 30 dias ({analytics.loyaltyAlerts.ending30Days.length})
+                      </h4>
+                      <div className="space-y-1">
+                        {analytics.loyaltyAlerts.ending30Days.map((client) => (
+                          <div key={client.id} className="flex items-center justify-between p-2 bg-yellow-50 dark:bg-yellow-950 rounded-lg">
+                            <span className="text-sm font-medium">{client.name}</span>
+                            <span className="text-xs text-yellow-600">
+                              Vence em {client.contract_end_date ? new Date(client.contract_end_date).toLocaleDateString('pt-BR') : ''}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="clients" className="space-y-6">
