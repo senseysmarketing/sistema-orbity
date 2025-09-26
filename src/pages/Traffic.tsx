@@ -39,6 +39,10 @@ export default function Traffic() {
   const [loading, setLoading] = useState(true);
   const [isConnectionDialogOpen, setIsConnectionDialogOpen] = useState(false);
   const [isManageAccountsOpen, setIsManageAccountsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState(() => {
+    // Restaurar aba ativa do localStorage
+    return localStorage.getItem('traffic-active-tab') || 'dashboard';
+  });
   
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -55,6 +59,11 @@ export default function Traffic() {
       setLoading(false);
     }
   }, [hasAccess]);
+
+  // Salvar aba ativa no localStorage quando mudar
+  useEffect(() => {
+    localStorage.setItem('traffic-active-tab', activeTab);
+  }, [activeTab]);
 
   const fetchConnections = async () => {
     try {
@@ -334,7 +343,7 @@ export default function Traffic() {
       </div>
 
       {/* Abas principais */}
-      <Tabs defaultValue="dashboard" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <BarChart className="h-4 w-4" />

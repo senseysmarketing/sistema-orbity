@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Download, TrendingUp, TrendingDown, Calendar, FileText, BarChart3 } from "lucide-react";
+import { Download, TrendingUp, TrendingDown, Calendar, FileText, BarChart3, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -175,6 +175,11 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
         <Button onClick={generateReport} disabled={loading}>
           <BarChart3 className="h-4 w-4 mr-2" />
           Gerar Relatório
+        </Button>
+        
+        <Button onClick={generateReport} disabled={loading} variant="outline">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Atualizar
         </Button>
       </div>
 
