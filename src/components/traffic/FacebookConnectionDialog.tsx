@@ -26,52 +26,88 @@ export function FacebookConnectionDialog({ onSuccess, onClose }: FacebookConnect
     let popup: Window | null = null;
     let pollId: number | undefined;
 
-    const messageHandler = async (event: MessageEvent) => {
-      const payload = (event.data || {}) as any;
-      if (payload?.type !== 'facebook_oauth') return;
+  const messageHandler = async (event: MessageEvent) => {
+    console.log('Message received:', event);
+    
+    // Parse the payload safely
+    let payload;
+    try {
+      payload = event.data;
+      if (typeof payload === 'string') {
+        payload = JSON.parse(payload);
+      }
+    } catch (e) {
+      console.warn('Failed to parse message data:', e);
+      return;
+    }
 
-      window.removeEventListener('message', messageHandler);
-      if (popup && !popup.closed) popup.close();
-      if (pollId) window.clearInterval(pollId);
+    if (!payload || payload.type !== 'facebook_oauth') {
+      console.log('Ignoring non-facebook message:', payload);
+      return;
+    }
 
-      if (!payload.success) {
-        setError(payload.error || 'Falha na autenticação do Facebook');
-        toast({
-          title: 'Erro na autenticação',
-          description: 'Não foi possível autenticar no Facebook. Tente novamente.',
-          variant: 'destructive',
-        });
-        setIsConnecting(false);
-        setProgress(0);
-        return;
+    console.log('Facebook OAuth message received:', payload);
+
+    // Clean up listeners and popup
+    window.removeEventListener('message', messageHandler);
+    if (popup && !popup.closed) {
+      popup.close();
+      console.log('Popup closed');
+    }
+    if (pollId) {
+      window.clearInterval(pollId);
+      console.log('Polling stopped');
+    }
+
+    if (!payload.success) {
+      console.error('Facebook OAuth failed:', payload.error);
+      setError(payload.error || 'Falha na autenticação do Facebook');
+      toast({
+        title: 'Erro na autenticação',
+        description: 'Não foi possível autenticar no Facebook. Tente novamente.',
+        variant: 'destructive',
+      });
+      setIsConnecting(false);
+      setProgress(0);
+      return;
+    }
+
+    try {
+      console.log('Saving Facebook token...');
+      setProgress(75);
+      const { error: saveError } = await supabase.functions.invoke('facebook-auth', {
+        body: { 
+          action: 'save_token', 
+          access_token: payload.access_token, 
+          expires_in: payload.expires_in 
+        }
+      });
+      
+      if (saveError) {
+        console.error('Save token error:', saveError);
+        throw saveError;
       }
 
-      try {
-        setProgress(75);
-        const { error: saveError } = await supabase.functions.invoke('facebook-auth', {
-          body: { action: 'save_token', access_token: payload.access_token, expires_in: payload.expires_in }
-        });
-        if (saveError) throw saveError;
-
-        setProgress(100);
-        toast({
-          title: 'Conectado com sucesso!',
-          description: 'Sua conta do Facebook foi conectada. Agora você pode selecionar suas contas de anúncios.',
-        });
-        onSuccess();
-      } catch (e: any) {
-        console.error('Erro ao salvar token do Facebook:', e);
-        setError(e.message || 'Erro ao salvar conexão do Facebook');
-        toast({
-          title: 'Erro ao salvar',
-          description: 'Não foi possível salvar a conexão do Facebook.',
-          variant: 'destructive',
-        });
-      } finally {
-        setIsConnecting(false);
-        setProgress(0);
-      }
-    };
+      console.log('Facebook token saved successfully');
+      setProgress(100);
+      toast({
+        title: 'Conectado com sucesso!',
+        description: 'Sua conta do Facebook foi conectada. Agora você pode selecionar suas contas de anúncios.',
+      });
+      onSuccess();
+    } catch (e: any) {
+      console.error('Erro ao salvar token do Facebook:', e);
+      setError(e.message || 'Erro ao salvar conexão do Facebook');
+      toast({
+        title: 'Erro ao salvar',
+        description: 'Não foi possível salvar a conexão do Facebook.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsConnecting(false);
+      setProgress(0);
+    }
+  };
 
     try {
       setProgress(30);

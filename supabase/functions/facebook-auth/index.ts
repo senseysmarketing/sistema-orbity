@@ -71,7 +71,19 @@ serve(async (req) => {
         token_type: tokenData.token_type || 'bearer',
       };
 
-      const html = `<!doctype html><html><body><script>window.opener && window.opener.postMessage(${JSON.stringify(payload)}, '*'); window.close();</script>Autenticação concluída. Você pode fechar esta janela.</body></html>`;
+      const html = `<!doctype html><html><body><script>
+        console.log('Sending Facebook OAuth message:', ${JSON.stringify(payload)});
+        if (window.opener) {
+          window.opener.postMessage(${JSON.stringify(payload)}, '*');
+          setTimeout(() => window.close(), 1000);
+        } else {
+          console.error('No window.opener found');
+          window.close();
+        }
+      </script><div style="padding: 20px; text-align: center; font-family: Arial, sans-serif;">
+        <h2>✅ Autenticação concluída!</h2>
+        <p>Você pode fechar esta janela.</p>
+      </div></body></html>`;
       return new Response(html, { headers: { 'Content-Type': 'text/html', ...corsHeaders } });
     }
 
