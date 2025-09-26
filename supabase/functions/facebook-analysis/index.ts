@@ -18,10 +18,19 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { action, campaignId } = await req.json()
+    const { action, campaign_id, campaignId, accounts } = await req.json()
 
-    if (action === 'weekly_analysis') {
-      console.log('Generating weekly analysis for campaign:', campaignId)
+    // Aceitar tanto 'weekly_analysis' quanto falta de action para compatibilidade
+    if (action === 'weekly_analysis' || !action) {
+      const finalCampaignId = campaign_id || campaignId
+      console.log('Generating weekly analysis for campaign:', finalCampaignId)
+
+      if (!finalCampaignId) {
+        return new Response(
+          JSON.stringify({ error: 'Campaign ID is required' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        )
+      }
 
       // Buscar conexão Facebook ativa do usuário
       const { data: authUser, error: authError } = await supabaseClient.auth.getUser(
@@ -56,7 +65,7 @@ serve(async (req) => {
         const endDate = new Date()
         const startDate = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000) // 4 semanas atrás
 
-        const analysisUrl = `https://graph.facebook.com/v18.0/${campaignId}/insights?fields=spend,impressions,clicks,actions,cost_per_action_type,cpm,cpc,ctr&time_range={"since":"${startDate.toISOString().split('T')[0]}","until":"${endDate.toISOString().split('T')[0]}"}&time_increment=7&access_token=${connection.access_token}`
+        const analysisUrl = `https://graph.facebook.com/v18.0/${finalCampaignId}/insights?fields=spend,impressions,clicks,actions,cost_per_action_type,cpm,cpc,ctr&time_range={"since":"${startDate.toISOString().split('T')[0]}","until":"${endDate.toISOString().split('T')[0]}"}&time_increment=7&access_token=${connection.access_token}`
         
         const analysisResponse = await fetch(analysisUrl)
         const analysisData = await analysisResponse.json()
@@ -115,7 +124,7 @@ serve(async (req) => {
         console.log(`Generated analysis with ${weeklyData.length} weeks of data`)
 
         return new Response(
-          JSON.stringify({ analysis: weeklyData }),
+          JSON.stringify({ weekly_data: weeklyData }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
 
@@ -138,7 +147,7 @@ serve(async (req) => {
         }
 
         return new Response(
-          JSON.stringify({ analysis: mockAnalysis }),
+          JSON.stringify({ weekly_data: mockAnalysis }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
