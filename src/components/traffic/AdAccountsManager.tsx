@@ -106,33 +106,35 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
     setSaving(true);
     
     try {
-      // Desativar todas as contas atuais
-      await supabase
+      // Primeiro, deletar todas as contas atuais da agência
+      const { error: deleteError } = await supabase
         .from('selected_ad_accounts')
-        .update({ is_active: false })
+        .delete()
         .eq('is_active', true);
 
-      // Adicionar as novas seleções
-      const accountsToInsert = tempSelectedIds.map(accountId => {
-        const account = availableAccounts.find(acc => acc.id === accountId);
-        return {
-          ad_account_id: accountId,
-          ad_account_name: account?.name || '',
-          currency: account?.currency || 'USD',
-          timezone: account?.timezone || null,
-          is_active: true,
-          // Campos obrigatórios - serão substituídos pelo trigger
-          agency_id: '00000000-0000-0000-0000-000000000000',
-          connection_id: '00000000-0000-0000-0000-000000000000'
-        };
-      });
+      if (deleteError) throw deleteError;
 
-      if (accountsToInsert.length > 0) {
-        const { error } = await supabase
+      // Adicionar as novas seleções apenas se tiver alguma selecionada
+      if (tempSelectedIds.length > 0) {
+        const accountsToInsert = tempSelectedIds.map(accountId => {
+          const account = availableAccounts.find(acc => acc.id === accountId);
+          return {
+            ad_account_id: accountId,
+            ad_account_name: account?.name || '',
+            currency: account?.currency || 'USD',
+            timezone: account?.timezone || null,
+            is_active: true,
+            // Campos obrigatórios - serão substituídos pelo trigger
+            agency_id: '00000000-0000-0000-0000-000000000000',
+            connection_id: '00000000-0000-0000-0000-000000000000'
+          };
+        });
+
+        const { error: insertError } = await supabase
           .from('selected_ad_accounts')
           .insert(accountsToInsert);
 
-        if (error) throw error;
+        if (insertError) throw insertError;
       }
 
       toast({
