@@ -175,6 +175,41 @@ serve(async (req) => {
         });
       }
 
+      case 'verify_connection': {
+        const { data: userData, error: userErr } = await supabaseClient.auth.getUser();
+        if (userErr || !userData?.user) {
+          return new Response(JSON.stringify({ connected: false, error: 'Not authenticated' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const { data: rows, error: selErr } = await supabaseClient
+          .from('facebook_connections')
+          .select('id, token_expires_at, is_active')
+          .eq('user_id', userData.user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (selErr) {
+          console.warn('verify_connection select error:', selErr);
+          return new Response(JSON.stringify({ connected: false }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        let connected = false;
+        if (rows && rows.length > 0) {
+          const r = rows[0] as { token_expires_at: string | null; is_active: boolean | null };
+          const notExpired = !r.token_expires_at || new Date(r.token_expires_at).getTime() > Date.now();
+          connected = Boolean(notExpired && (r?.is_active ?? true));
+        }
+
+        return new Response(JSON.stringify({ connected }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       default:
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           status: 400,

@@ -127,26 +127,50 @@ export function FacebookConnectionDialog({ onSuccess, onClose }: FacebookConnect
       if (!popup) throw new Error('Não foi possível abrir a janela de autenticação');
 
       // Detect user closing the popup before completion
-      pollId = window.setInterval(() => {
+      pollId = window.setInterval(async () => {
         if (!popup) return;
         if (popup.closed) {
           if (pollId) window.clearInterval(pollId);
           pollId = undefined;
 
+          // If we already handled auth success, just return.
           if (authCompleted) {
             console.log('Popup closed after completion');
             return; // Do nothing, flow already finished
           }
 
-          window.removeEventListener('message', messageHandler);
-          setIsConnecting(false);
-          setProgress(0);
-          setError('Janela de autenticação foi fechada antes de concluir.');
-          toast({
-            title: 'Autenticação cancelada',
-            description: 'Você fechou a janela antes de concluir o login.',
-            variant: 'destructive',
-          });
+          // Try to verify on the server if the connection was saved
+          try {
+            console.log('Popup closed before message. Verifying connection on server...');
+            setProgress(85);
+            const { data: verifyData, error: verifyError } = await supabase.functions.invoke('facebook-auth', {
+              body: { action: 'verify_connection' }
+            });
+
+            if (verifyError) {
+              console.warn('Verify connection error:', verifyError);
+            }
+
+            if (verifyData?.connected) {
+              console.log('Connection verified on server after popup close.');
+              authCompleted = true;
+              setProgress(100);
+              toast({
+                title: 'Conectado com sucesso!',
+                description: 'Sua conta do Facebook foi conectada.',
+              });
+              onSuccess();
+            } else {
+              console.log('Connection not verified; keeping dialog open for retry.');
+              // Do not show cancellation warning as requested
+            }
+          } catch (err) {
+            console.warn('Error verifying connection:', err);
+          } finally {
+            setIsConnecting(false);
+            setProgress(0);
+            window.removeEventListener('message', messageHandler);
+          }
         }
       }, 500);
     } catch (e: any) {
