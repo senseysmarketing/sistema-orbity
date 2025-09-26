@@ -36,6 +36,21 @@ serve(async (req) => {
         )
       }
 
+      // Buscar agency_id do usuário
+      const { data: agencyUser, error: agencyError } = await supabaseClient
+        .from('agency_users')
+        .select('agency_id')
+        .eq('user_id', authUser.user.id)
+        .single()
+
+      if (agencyError || !agencyUser) {
+        console.error('Agency error:', agencyError)
+        return new Response(
+          JSON.stringify({ error: 'User not associated with any agency' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        )
+      }
+
       if (action === 'get_metrics') {
         // Buscar dados reais das métricas do banco de dados
         let realMetrics = null;
@@ -49,11 +64,11 @@ serve(async (req) => {
         }
 
         try {
-          // Buscar conexão Facebook ativa
+          // Buscar conexão Facebook ativa da agência
           const { data: connection, error: connectionError } = await supabaseClient
             .from('facebook_connections')
             .select('access_token')
-            .eq('user_id', authUser.user.id)
+            .eq('agency_id', agencyUser.agency_id)
             .eq('is_active', true)
             .single()
 
@@ -308,10 +323,11 @@ serve(async (req) => {
           )
         }
 
+        // Buscar conexão Facebook ativa da agência  
         const { data: connection, error: connectionError } = await supabaseClient
           .from('facebook_connections')
           .select('access_token')
-          .eq('user_id', authUser.user.id)
+          .eq('agency_id', agencyUser.agency_id)
           .eq('is_active', true)
           .single()
 
