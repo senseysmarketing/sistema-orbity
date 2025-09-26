@@ -65,7 +65,7 @@ serve(async (req) => {
       try {
         console.log(`Checking balance for account: ${accountId}`)
         
-        const balanceUrl = `https://graph.facebook.com/v18.0/${accountId}?fields=account_status,balance,account_currency&access_token=${connection.access_token}`
+        const balanceUrl = `https://graph.facebook.com/v18.0/${accountId}?fields=account_status,balance,currency&access_token=${connection.access_token}`
         
         const balanceResponse = await fetch(balanceUrl)
         const balanceData = await balanceResponse.json()
@@ -76,7 +76,7 @@ serve(async (req) => {
         }
 
         const balance = balanceData.balance ? parseFloat(balanceData.balance) / 100 : 0 // Convert from cents
-        const accountCurrency = balanceData.account_currency || 'BRL'
+        const accountCurrency = balanceData.currency || 'BRL'
         
         balances.push({
           accountId: accountId,
