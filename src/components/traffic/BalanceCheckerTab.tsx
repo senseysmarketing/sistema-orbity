@@ -54,31 +54,30 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
       // Chamar edge function para verificar saldos
       const { data, error } = await supabase.functions.invoke('facebook-balance', {
         body: { 
-          action: 'check_all_balances',
           accountIds: selectedAdAccounts.map(acc => acc.ad_account_id)
         }
       });
 
       if (error) throw error;
       
-      // Processar dados dos saldos
+      // Processar dados dos saldos reais
       const balanceData = selectedAdAccounts.map(account => {
-        // Mock data para desenvolvimento
-        const mockBalance = Math.random() * 1000;
+        const accountBalance = data?.balances?.find((b: any) => b.accountId === account.ad_account_id);
+        const balance = accountBalance?.balance || 0;
         const threshold = globalMinThreshold;
         
         let status: 'healthy' | 'warning' | 'critical' = 'healthy';
-        if (mockBalance <= threshold * 0.5) {
+        if (balance <= threshold * 0.5) {
           status = 'critical';
-        } else if (mockBalance <= threshold) {
+        } else if (balance <= threshold) {
           status = 'warning';
         }
 
         return {
           ad_account_id: account.ad_account_id,
           ad_account_name: account.ad_account_name,
-          currency: account.currency,
-          balance: mockBalance,
+          currency: accountBalance?.currency || account.currency,
+          balance: balance,
           minThreshold: threshold,
           status,
           lastUpdated: new Date().toISOString()

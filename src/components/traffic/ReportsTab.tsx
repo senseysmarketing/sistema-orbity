@@ -28,13 +28,20 @@ interface ReportTemplate {
 }
 
 export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
-  const [selectedAccount, setSelectedAccount] = useState<string>("all");
+  const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [customMessage, setCustomMessage] = useState("");
   const [generatedReport, setGeneratedReport] = useState("");
   const [loading, setLoading] = useState(false);
   const [metricsData, setMetricsData] = useState<any>(null);
   
   const { toast } = useToast();
+
+  // Selecionar primeira conta automaticamente
+  useEffect(() => {
+    if (selectedAdAccounts.length > 0 && !selectedAccount) {
+      setSelectedAccount(selectedAdAccounts[0].ad_account_id);
+    }
+  }, [selectedAdAccounts, selectedAccount]);
 
   // Templates predefinidos
   const reportTemplates: ReportTemplate[] = [
@@ -91,11 +98,8 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
         .gte('date_start', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
         .lte('date_end', new Date().toISOString().split('T')[0]);
 
-      if (selectedAccount !== "all") {
+      if (selectedAccount) {
         query = query.eq('ad_account_id', selectedAccount);
-      } else {
-        const accountIds = selectedAdAccounts.map(acc => acc.ad_account_id);
-        query = query.in('ad_account_id', accountIds);
       }
 
       const { data, error } = await query;
@@ -153,9 +157,9 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
       return;
     }
 
-    const accountName = selectedAccount === "all" 
-      ? "Todas as Contas" 
-      : selectedAdAccounts.find(acc => acc.ad_account_id === selectedAccount)?.ad_account_name || "Conta Selecionada";
+    const accountName = selectedAccount 
+      ? selectedAdAccounts.find(acc => acc.ad_account_id === selectedAccount)?.ad_account_name || "Conta Selecionada"
+      : "Nenhuma Conta";
 
     const variables = {
       accountName,
@@ -216,9 +220,9 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
         body: { 
           customMessage,
           metricsData,
-          accountName: selectedAccount === "all" 
-            ? "Todas as Contas" 
-            : selectedAdAccounts.find(acc => acc.ad_account_id === selectedAccount)?.ad_account_name
+          accountName: selectedAccount 
+            ? selectedAdAccounts.find(acc => acc.ad_account_id === selectedAccount)?.ad_account_name
+            : "Nenhuma Conta"
         }
       });
 
@@ -244,7 +248,6 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
             <SelectValue placeholder="Selecionar conta" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas as contas</SelectItem>
             {selectedAdAccounts.map((account) => (
               <SelectItem key={account.ad_account_id} value={account.ad_account_id}>
                 {account.ad_account_name}

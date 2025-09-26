@@ -39,12 +39,19 @@ interface CampaignsTabProps {
 export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedAccount, setSelectedAccount] = useState<string>("all");
+  const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [weeklyAnalysis, setWeeklyAnalysis] = useState<any[]>([]);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   
   const { toast } = useToast();
+
+  // Selecionar primeira conta automaticamente
+  useEffect(() => {
+    if (selectedAdAccounts.length > 0 && !selectedAccount) {
+      setSelectedAccount(selectedAdAccounts[0].ad_account_id);
+    }
+  }, [selectedAdAccounts, selectedAccount]);
 
   useEffect(() => {
     fetchCampaigns();
@@ -61,9 +68,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
       const { data, error } = await supabase.functions.invoke('facebook-campaigns', {
         body: { 
           action: 'list_campaigns',
-          accountIds: selectedAccount === "all" 
-            ? selectedAdAccounts.map(acc => acc.ad_account_id)
-            : [selectedAccount]
+          accountIds: selectedAccount ? [selectedAccount] : []
         }
       });
 
@@ -190,7 +195,6 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
             <SelectValue placeholder="Selecionar conta" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas as contas</SelectItem>
             {selectedAdAccounts.map((account) => (
               <SelectItem key={account.ad_account_id} value={account.ad_account_id}>
                 {account.ad_account_name}
