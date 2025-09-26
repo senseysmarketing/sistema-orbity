@@ -25,6 +25,7 @@ export function FacebookConnectionDialog({ onSuccess, onClose }: FacebookConnect
 
     let popup: Window | null = null;
     let pollId: number | undefined;
+    let authCompleted = false;
 
   const messageHandler = async (event: MessageEvent) => {
     console.log('Message received:', event);
@@ -126,9 +127,17 @@ export function FacebookConnectionDialog({ onSuccess, onClose }: FacebookConnect
 
       // Detect user closing the popup before completion
       pollId = window.setInterval(() => {
-        if (popup && popup.closed) {
-          window.removeEventListener('message', messageHandler);
+        if (!popup) return;
+        if (popup.closed) {
           if (pollId) window.clearInterval(pollId);
+          pollId = undefined;
+
+          if (authCompleted) {
+            console.log('Popup closed after completion');
+            return; // Do nothing, flow already finished
+          }
+
+          window.removeEventListener('message', messageHandler);
           setIsConnecting(false);
           setProgress(0);
           setError('Janela de autenticação foi fechada antes de concluir.');
