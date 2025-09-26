@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_account_metrics: {
+        Row: {
+          account_balance: number | null
+          ad_account_id: string
+          agency_id: string
+          clicks: number | null
+          conversion_rate: number | null
+          conversions: number | null
+          cpc: number | null
+          cpm: number | null
+          created_at: string
+          ctr: number | null
+          date_end: string
+          date_start: string
+          id: string
+          impressions: number | null
+          raw_data: Json | null
+          spend: number | null
+          updated_at: string
+        }
+        Insert: {
+          account_balance?: number | null
+          ad_account_id: string
+          agency_id: string
+          clicks?: number | null
+          conversion_rate?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr?: number | null
+          date_end: string
+          date_start: string
+          id?: string
+          impressions?: number | null
+          raw_data?: Json | null
+          spend?: number | null
+          updated_at?: string
+        }
+        Update: {
+          account_balance?: number | null
+          ad_account_id?: string
+          agency_id?: string
+          clicks?: number | null
+          conversion_rate?: number | null
+          conversions?: number | null
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr?: number | null
+          date_end?: string
+          date_start?: string
+          id?: string
+          impressions?: number | null
+          raw_data?: Json | null
+          spend?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       admin_notes: {
         Row: {
           agency_id: string | null
@@ -632,6 +692,48 @@ export type Database = {
           },
         ]
       }
+      facebook_connections: {
+        Row: {
+          access_token: string
+          agency_id: string
+          business_id: string | null
+          business_name: string | null
+          created_at: string
+          facebook_user_id: string
+          id: string
+          is_active: boolean
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          agency_id: string
+          business_id?: string | null
+          business_name?: string | null
+          created_at?: string
+          facebook_user_id: string
+          id?: string
+          is_active?: boolean
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          agency_id?: string
+          business_id?: string | null
+          business_name?: string | null
+          created_at?: string
+          facebook_user_id?: string
+          id?: string
+          is_active?: boolean
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       lead_activities: {
         Row: {
           agency_id: string
@@ -934,6 +1036,56 @@ export type Database = {
           },
         ]
       }
+      selected_ad_accounts: {
+        Row: {
+          ad_account_id: string
+          ad_account_name: string
+          agency_id: string
+          connection_id: string
+          created_at: string
+          currency: string
+          id: string
+          is_active: boolean
+          last_sync: string | null
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          ad_account_id: string
+          ad_account_name: string
+          agency_id: string
+          connection_id: string
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          last_sync?: string | null
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ad_account_id?: string
+          ad_account_name?: string
+          agency_id?: string
+          connection_id?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          is_active?: boolean
+          last_sync?: string | null
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "selected_ad_accounts_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "facebook_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_plans: {
         Row: {
           created_at: string
@@ -946,6 +1098,7 @@ export type Database = {
           id: string
           is_active: boolean
           max_clients: number
+          max_facebook_ad_accounts: number
           max_leads: number
           max_storage_gb: number
           max_tasks: number
@@ -970,6 +1123,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           max_clients?: number
+          max_facebook_ad_accounts?: number
           max_leads?: number
           max_storage_gb?: number
           max_tasks?: number
@@ -994,6 +1148,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           max_clients?: number
+          max_facebook_ad_accounts?: number
           max_leads?: number
           max_storage_gb?: number
           max_tasks?: number
