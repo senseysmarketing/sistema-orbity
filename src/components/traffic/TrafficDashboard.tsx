@@ -53,7 +53,14 @@ export function TrafficDashboard({ selectedAdAccounts }: TrafficDashboardProps) 
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<string>("all");
+  const [selectedAccount, setSelectedAccount] = useState<string>("");
+
+  // Selecionar primeira conta automaticamente
+  useEffect(() => {
+    if (selectedAdAccounts.length > 0 && !selectedAccount) {
+      setSelectedAccount(selectedAdAccounts[0].ad_account_id);
+    }
+  }, [selectedAdAccounts, selectedAccount]);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 dias atrás
     to: new Date()
@@ -81,11 +88,9 @@ export function TrafficDashboard({ selectedAdAccounts }: TrafficDashboardProps) 
         .gte('date_start', dateRange.from.toISOString().split('T')[0])
         .lte('date_end', dateRange.to.toISOString().split('T')[0]);
 
-      if (selectedAccount !== "all") {
+      // Filtrar apenas pela conta selecionada
+      if (selectedAccount) {
         query = query.eq('ad_account_id', selectedAccount);
-      } else {
-        const accountIds = selectedAdAccounts.map(acc => acc.ad_account_id);
-        query = query.in('ad_account_id', accountIds);
       }
 
       const { data: metrics, error } = await query.order('date_start', { ascending: true });
@@ -152,9 +157,7 @@ export function TrafficDashboard({ selectedAdAccounts }: TrafficDashboardProps) 
       const { error } = await supabase.functions.invoke('facebook-sync', {
         body: { 
           action: 'sync_metrics',
-          accountIds: selectedAccount === "all" 
-            ? selectedAdAccounts.map(acc => acc.ad_account_id)
-            : [selectedAccount],
+          accountIds: selectedAccount ? [selectedAccount] : [],
           dateRange: {
             from: dateRange.from.toISOString().split('T')[0],
             to: dateRange.to.toISOString().split('T')[0]
@@ -187,9 +190,7 @@ export function TrafficDashboard({ selectedAdAccounts }: TrafficDashboardProps) 
     try {
       const { data, error } = await supabase.functions.invoke('facebook-balance', {
         body: { 
-          accountIds: selectedAccount === "all" 
-            ? selectedAdAccounts.map(acc => acc.ad_account_id)
-            : [selectedAccount]
+          accountIds: selectedAccount ? [selectedAccount] : []
         }
       });
 
@@ -238,7 +239,6 @@ export function TrafficDashboard({ selectedAdAccounts }: TrafficDashboardProps) 
               <SelectValue placeholder="Selecionar conta" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas as contas</SelectItem>
               {selectedAdAccounts.map((account) => (
                 <SelectItem key={account.ad_account_id} value={account.ad_account_id}>
                   {account.ad_account_name}

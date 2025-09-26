@@ -190,8 +190,9 @@ export default function Traffic() {
     );
   }
 
-  // Se não há contas selecionadas, mostrar gerenciador
-  if (selectedAdAccounts.length === 0) {
+  // Se não há contas selecionadas E não há conexões, mostrar gerenciador
+  // (ou seja, só mostrar se o usuário acabou de conectar o Facebook)
+  if (selectedAdAccounts.length === 0 && facebookConnections.length > 0) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -206,6 +207,54 @@ export default function Traffic() {
         <AdAccountsManager
           onAccountsSelected={fetchSelectedAdAccounts}
         />
+      </div>
+    );
+  }
+
+  // Se tem conexões mas não tem contas selecionadas, mostrar dashboard vazio
+  if (selectedAdAccounts.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Controle de Tráfego</h1>
+            <p className="text-muted-foreground">
+              Nenhuma conta de anúncios selecionada
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Dialog open={isManageAccountsOpen} onOpenChange={setIsManageAccountsOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Adicionar Contas
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>Gerenciar Contas de Anúncios</DialogTitle>
+                  <DialogDescription>
+                    Adicione, remova ou configure suas contas de anúncios conectadas
+                  </DialogDescription>
+                </DialogHeader>
+                <AdAccountsManager
+                  onAccountsSelected={() => {
+                    fetchSelectedAdAccounts();
+                    setIsManageAccountsOpen(false);
+                  }}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        <div className="text-center py-12">
+          <BarChart className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Nenhuma conta selecionada</h3>
+          <p className="text-muted-foreground mb-4">
+            Adicione contas de anúncios para começar a monitorar suas campanhas
+          </p>
+        </div>
       </div>
     );
   }
