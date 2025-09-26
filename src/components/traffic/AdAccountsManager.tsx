@@ -119,19 +119,18 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
           ad_account_id: accountId,
           ad_account_name: account?.name || '',
           currency: account?.currency || 'USD',
+          timezone: account?.timezone || null,
           is_active: true,
-          agency_id: '', // Will be set by RLS
-          connection_id: '' // Will be set by backend
+          // Campos obrigatórios - serão substituídos pelo trigger
+          agency_id: '00000000-0000-0000-0000-000000000000',
+          connection_id: '00000000-0000-0000-0000-000000000000'
         };
       });
 
       if (accountsToInsert.length > 0) {
         const { error } = await supabase
           .from('selected_ad_accounts')
-          .upsert(accountsToInsert, {
-            onConflict: 'ad_account_id',
-            ignoreDuplicates: false
-          });
+          .insert(accountsToInsert);
 
         if (error) throw error;
       }
@@ -141,6 +140,7 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
         description: `${tempSelectedIds.length} contas de anúncios selecionadas.`,
       });
 
+      await fetchSelectedAccounts(); // Recarregar dados
       onAccountsSelected();
     } catch (error: any) {
       console.error('Erro ao salvar seleção:', error);
