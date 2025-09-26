@@ -359,7 +359,11 @@ export default function Traffic() {
         </TabsContent>
 
         <TabsContent value="campaigns" className="space-y-6">
-          <CampaignsTab selectedAdAccounts={selectedAdAccounts} />
+          <CampaignsTab 
+            campaigns={[]} 
+            accounts={selectedAdAccounts} 
+            selectedAdAccounts={selectedAdAccounts} 
+          />
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-6">
