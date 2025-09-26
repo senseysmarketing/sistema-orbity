@@ -3,10 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BarChart } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { BarChart, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Collapsible, CollapsibleContent } from '@radix-ui/react-collapsible';
+import { DateRange } from "react-day-picker";
 
 interface Campaign {
   id: string;
@@ -21,39 +24,58 @@ interface Campaign {
   cpc: number;
 }
 
-interface CampaignsTabProps {
-  campaigns?: Campaign[];
-  accounts?: any[];
-  selectedAdAccounts?: any[];
+interface SelectedAdAccount {
+  id: string;
+  ad_account_id: string;
+  ad_account_name: string;
+  currency: string;
 }
 
-export function CampaignsTab({ campaigns: propCampaigns = [], accounts = [], selectedAdAccounts = [] }: CampaignsTabProps) {
-  const [campaigns, setCampaigns] = useState<Campaign[]>(propCampaigns);
+interface CampaignsTabProps {
+  selectedAdAccounts: SelectedAdAccount[];
+}
+
+export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [weeklyAnalysis, setWeeklyAnalysis] = useState<any[]>([]);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<string>("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 dias atrás
+    to: new Date()
+  });
   const { toast } = useToast();
 
-  // Buscar campanhas quando o componente carregar
+  // Selecionar primeira conta automaticamente
   useEffect(() => {
-    if (selectedAdAccounts.length > 0) {
-      fetchCampaigns();
+    if (selectedAdAccounts.length > 0 && !selectedAccount) {
+      setSelectedAccount(selectedAdAccounts[0].ad_account_id);
     }
-  }, [selectedAdAccounts]);
+  }, [selectedAdAccounts, selectedAccount]);
+
+  // Buscar campanhas quando a conta selecionada ou período mudar
+  useEffect(() => {
+    fetchCampaigns();
+  }, [selectedAccount, dateRange]);
 
   const fetchCampaigns = async () => {
+    if (!selectedAccount || !dateRange?.from || !dateRange?.to) {
+      setCampaigns([]);
+      setLoadingCampaigns(false);
+      return;
+    }
+
     setLoadingCampaigns(true);
     try {
-      const accountIds = selectedAdAccounts.map(acc => acc.ad_account_id);
-      
       const { data, error } = await supabase.functions.invoke('facebook-campaigns', {
         body: { 
           action: 'list_campaigns',
-          accountIds: accountIds,
+          accountIds: [selectedAccount],
           dateRange: {
-            from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            to: new Date().toISOString().split('T')[0]
+            from: dateRange.from.toISOString().split('T')[0],
+            to: dateRange.to.toISOString().split('T')[0]
           }
         }
       });
@@ -121,7 +143,7 @@ export function CampaignsTab({ campaigns: propCampaigns = [], accounts = [], sel
       const { data, error } = await supabase.functions.invoke('facebook-analysis', {
         body: { 
           campaign_id: campaignId,
-          accounts: selectedAdAccounts.map(acc => acc.ad_account_id)
+          accounts: [selectedAccount]
         }
       });
 
@@ -171,12 +193,12 @@ export function CampaignsTab({ campaigns: propCampaigns = [], accounts = [], sel
     return (
       <div className="text-center py-8">
         <p className="text-muted-foreground">
-          {selectedAdAccounts.length === 0 
+          {!selectedAccount 
             ? "Selecione uma conta de anúncios para ver as campanhas."
-            : "Nenhuma campanha encontrada para as contas selecionadas."
+            : "Nenhuma campanha encontrada para a conta e período selecionados."
           }
         </p>
-        {selectedAdAccounts.length > 0 && (
+        {selectedAccount && (
           <Button onClick={fetchCampaigns} className="mt-4">
             Tentar novamente
           </Button>
@@ -189,6 +211,36 @@ export function CampaignsTab({ campaigns: propCampaigns = [], accounts = [], sel
 
   return (
     <div className="space-y-6">
+      {/* Filtros e Controles */}
+      <div className="flex flex-wrap gap-4 items-center justify-between">
+        <div className="flex flex-wrap gap-4 items-center">
+          <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+            <SelectTrigger className="w-[250px]">
+              <SelectValue placeholder="Selecionar conta" />
+            </SelectTrigger>
+            <SelectContent>
+              {selectedAdAccounts.map((account) => (
+                <SelectItem key={account.ad_account_id} value={account.ad_account_id}>
+                  {account.ad_account_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <DateRangePicker 
+            date={dateRange}
+            onDateChange={setDateRange}
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <Button onClick={fetchCampaigns} disabled={loadingCampaigns} variant="outline">
+            <RefreshCw className={`h-4 w-4 mr-2 ${loadingCampaigns ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
+        </div>
+      </div>
+
       {/* Cards de métricas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
