@@ -147,13 +147,27 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
         setWeeklyAnalysis(data?.analysis || []);
       } catch (error: any) {
         console.error('Erro ao buscar análise:', error);
-        // Mock data for development
-        setWeeklyAnalysis([
-          { week: 'Semana 1', spend: 300, conversions: 12, cpc: 1.25, ctr: 2.1 },
-          { week: 'Semana 2', spend: 350, conversions: 15, cpc: 1.33, ctr: 2.4 },
-          { week: 'Semana 3', spend: 320, conversions: 10, cpc: 1.60, ctr: 1.8 },
-          { week: 'Semana 4', spend: 280, conversions: 8, cpc: 1.75, ctr: 1.6 }
-        ]);
+        // Mock data for development - com datas das últimas 4 semanas
+        const mockAnalysis = [];
+        for (let i = 3; i >= 0; i--) {
+          const endDate = new Date();
+          endDate.setDate(endDate.getDate() - (i * 7));
+          const startDate = new Date(endDate);
+          startDate.setDate(startDate.getDate() - 6);
+          
+          mockAnalysis.push({
+            week: `Semana ${4 - i}`,
+            weekPeriod: `${startDate.getDate().toString().padStart(2, '0')}/${(startDate.getMonth() + 1).toString().padStart(2, '0')} a ${endDate.getDate().toString().padStart(2, '0')}/${(endDate.getMonth() + 1).toString().padStart(2, '0')}`,
+            spend: Math.random() * 500 + 200,
+            conversions: Math.floor(Math.random() * 20) + 5,
+            cpc: Math.random() * 2 + 1,
+            ctr: Math.random() * 3 + 1,
+            impressions: Math.floor(Math.random() * 10000) + 5000,
+            clicks: Math.floor(Math.random() * 500) + 100,
+            cpm: Math.random() * 30 + 20
+          });
+        }
+        setWeeklyAnalysis(mockAnalysis);
       }
     }
     
@@ -358,7 +372,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                               </div>
                             ) : weeklyAnalysis && weeklyAnalysis.length > 0 ? (
                               <div className="space-y-4">
-                                <div className="grid gap-4 md:grid-cols-4">
+                                <div className="flex flex-col xl:flex-row gap-6">
                                   {weeklyAnalysis.filter(week => week && typeof week === 'object').map((week, index) => {
                                     const prevWeek = weeklyAnalysis[index - 1];
                                     const getPercentageChange = (current: number, previous: number) => {
@@ -371,107 +385,123 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                                     const cpcChange = prevWeek && prevWeek.cpc ? getPercentageChange(week.cpc || 0, prevWeek.cpc) : 0;
                                     const ctrChange = prevWeek && prevWeek.ctr ? getPercentageChange(week.ctr || 0, prevWeek.ctr) : 0;
 
-                                    return (
-                                      <Card key={index} className="border">
-                                        <CardHeader className="pb-2">
-                                          <CardTitle className="text-sm">{week.week || `Semana ${index + 1}`}</CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-2">
-                                          <div className="text-sm flex items-center justify-between">
-                                            <span><span className="font-medium">Gasto:</span> R$ {(week.spend || 0).toFixed(2)}</span>
-                                            {prevWeek && (
-                                              <span className={`text-xs ${spendChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
-                                                {spendChange > 0 ? '+' : ''}{spendChange.toFixed(1)}%
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div className="text-sm flex items-center justify-between">
-                                            <span><span className="font-medium">Conversões:</span> {week.conversions || 0}</span>
-                                            {prevWeek && (
-                                              <span className={`text-xs ${conversionsChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                                {conversionsChange > 0 ? '+' : ''}{conversionsChange.toFixed(1)}%
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div className="text-sm flex items-center justify-between">
-                                            <span><span className="font-medium">CPC:</span> R$ {(week.cpc || 0).toFixed(2)}</span>
-                                            {prevWeek && (
-                                              <span className={`text-xs ${cpcChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
-                                                {cpcChange > 0 ? '+' : ''}{cpcChange.toFixed(1)}%
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div className="text-sm flex items-center justify-between">
-                                            <span><span className="font-medium">CTR:</span> {(week.ctr || 0).toFixed(2)}%</span>
-                                            {prevWeek && (
-                                              <span className={`text-xs ${ctrChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                                {ctrChange > 0 ? '+' : ''}{ctrChange.toFixed(1)}%
-                                              </span>
-                                            )}
-                                          </div>
-                                        </CardContent>
-                                      </Card>
-                                    );
-                                  })}
-                                </div>
-
-                                {/* Análise Textual */}
-                                <Card className="bg-muted/30">
-                                  <CardHeader>
-                                    <CardTitle className="text-sm">📊 Análise de Performance</CardTitle>
-                                  </CardHeader>
-                                  <CardContent>
-                                    <div className="text-sm space-y-2">
-                                      {(() => {
-                                        if (!weeklyAnalysis || weeklyAnalysis.length === 0) {
-                                          return <p>Não há dados suficientes para análise.</p>;
-                                        }
-                                        
-                                        const validWeeks = weeklyAnalysis.filter(week => week && typeof week === 'object' && week.spend && week.conversions);
-                                        
-                                        if (validWeeks.length === 0) {
-                                          return <p>Não há dados válidos para análise.</p>;
-                                        }
-
-                                        const bestWeek = validWeeks.reduce((best, current, index) => {
-                                          const efficiency = current.conversions / current.spend;
-                                          const bestEfficiency = validWeeks[best].conversions / validWeeks[best].spend;
-                                          return efficiency > bestEfficiency ? index : best;
-                                        }, 0);
-
-                                        const worstWeek = validWeeks.reduce((worst, current, index) => {
-                                          const efficiency = current.conversions / current.spend;
-                                          const worstEfficiency = validWeeks[worst].conversions / validWeeks[worst].spend;
-                                          return efficiency < worstEfficiency ? index : worst;
-                                        }, 0);
-
-                                        const totalSpend = validWeeks.reduce((sum, week) => sum + (week.spend || 0), 0);
-                                        const totalConversions = validWeeks.reduce((sum, week) => sum + (week.conversions || 0), 0);
-                                        const avgCPC = validWeeks.reduce((sum, week) => sum + (week.cpc || 0), 0) / validWeeks.length;
-
                                         return (
-                                          <>
-                                            <p>
-                                              <strong className="text-green-600">🏆 Melhor semana:</strong> {validWeeks[bestWeek]?.week || `Semana ${bestWeek + 1}`} com {validWeeks[bestWeek]?.conversions || 0} conversões 
-                                              por R$ {(validWeeks[bestWeek]?.spend || 0).toFixed(2)} 
-                                              (custo por conversão: R$ {((validWeeks[bestWeek]?.spend || 0) / (validWeeks[bestWeek]?.conversions || 1)).toFixed(2)})
-                                            </p>
-                                            <p>
-                                              <strong className="text-red-600">⚠️ Pior performance:</strong> {validWeeks[worstWeek]?.week || `Semana ${worstWeek + 1}`} com maior custo por conversão 
-                                              (R$ {((validWeeks[worstWeek]?.spend || 0) / (validWeeks[worstWeek]?.conversions || 1)).toFixed(2)})
-                                            </p>
-                                            <p>
-                                              <strong className="text-blue-600">📈 Resumo:</strong> Total investido: R$ {totalSpend.toFixed(2)} | 
-                                              Total conversões: {totalConversions} | 
-                                              CPC médio: R$ {avgCPC.toFixed(2)} | 
-                                              Custo médio por conversão: R$ {totalConversions > 0 ? (totalSpend / totalConversions).toFixed(2) : '0.00'}
-                                            </p>
-                                          </>
+                                          <Card key={index} className="border">
+                                            <CardHeader className="pb-2">
+                                              <CardTitle className="text-xs sm:text-sm leading-tight">
+                                                <div className="font-semibold">{week.week || `Semana ${index + 1}`}</div>
+                                                <div className="text-xs text-muted-foreground font-normal">
+                                                  {week.weekPeriod || 'Período não definido'}
+                                                </div>
+                                              </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="space-y-2">
+                                              <div className="text-xs sm:text-sm flex items-center justify-between">
+                                                <span><span className="font-medium">Gasto:</span> R$ {(week.spend || 0).toFixed(2)}</span>
+                                                {prevWeek && (
+                                                  <span className={`text-xs ${spendChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                    {spendChange > 0 ? '+' : ''}{spendChange.toFixed(1)}%
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="text-xs sm:text-sm flex items-center justify-between">
+                                                <span><span className="font-medium">Conversões:</span> {week.conversions || 0}</span>
+                                                {prevWeek && (
+                                                  <span className={`text-xs ${conversionsChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                    {conversionsChange > 0 ? '+' : ''}{conversionsChange.toFixed(1)}%
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="text-xs sm:text-sm flex items-center justify-between">
+                                                <span><span className="font-medium">CPC:</span> R$ {(week.cpc || 0).toFixed(2)}</span>
+                                                {prevWeek && (
+                                                  <span className={`text-xs ${cpcChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                    {cpcChange > 0 ? '+' : ''}{cpcChange.toFixed(1)}%
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="text-xs sm:text-sm flex items-center justify-between">
+                                                <span><span className="font-medium">CTR:</span> {(week.ctr || 0).toFixed(2)}%</span>
+                                                {prevWeek && (
+                                                  <span className={`text-xs ${ctrChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                    {ctrChange > 0 ? '+' : ''}{ctrChange.toFixed(1)}%
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </CardContent>
+                                          </Card>
                                         );
-                                      })()}
+                                      })}
                                     </div>
-                                  </CardContent>
-                                </Card>
+                                  </div>
+                                  {/* Análise de Performance */}
+                                  <div className="xl:w-80 xl:flex-shrink-0">
+                                    <Card className="bg-muted/30">
+                                      <CardHeader className="pb-3">
+                                        <CardTitle className="text-sm">📊 Análise de Performance</CardTitle>
+                                      </CardHeader>
+                                      <CardContent>
+                                        <div className="text-xs sm:text-sm space-y-2">
+                                          {(() => {
+                                            if (!weeklyAnalysis || weeklyAnalysis.length === 0) {
+                                              return <p>Não há dados suficientes para análise.</p>;
+                                            }
+                                            
+                                            const validWeeks = weeklyAnalysis.filter(week => week && typeof week === 'object' && week.spend && week.conversions);
+                                            
+                                            if (validWeeks.length === 0) {
+                                              return <p>Não há dados válidos para análise.</p>;
+                                            }
+
+                                            const bestWeek = validWeeks.reduce((best, current, index) => {
+                                              const efficiency = current.conversions / current.spend;
+                                              const bestEfficiency = validWeeks[best].conversions / validWeeks[best].spend;
+                                              return efficiency > bestEfficiency ? index : best;
+                                            }, 0);
+
+                                            const worstWeek = validWeeks.reduce((worst, current, index) => {
+                                              const efficiency = current.conversions / current.spend;
+                                              const worstEfficiency = validWeeks[worst].conversions / validWeeks[worst].spend;
+                                              return efficiency < worstEfficiency ? index : worst;
+                                            }, 0);
+
+                                            const totalSpend = validWeeks.reduce((sum, week) => sum + (week.spend || 0), 0);
+                                            const totalConversions = validWeeks.reduce((sum, week) => sum + (week.conversions || 0), 0);
+                                            const avgCPC = validWeeks.reduce((sum, week) => sum + (week.cpc || 0), 0) / validWeeks.length;
+
+                                            return (
+                                              <div className="space-y-3">
+                                                <div>
+                                                  <strong className="text-green-600">🏆 Melhor semana:</strong>
+                                                  <div className="text-xs text-muted-foreground mt-1">
+                                                    {validWeeks[bestWeek]?.week || `Semana ${bestWeek + 1}`} com {validWeeks[bestWeek]?.conversions || 0} conversões 
+                                                    por R$ {(validWeeks[bestWeek]?.spend || 0).toFixed(2)}
+                                                  </div>
+                                                </div>
+                                                <div>
+                                                  <strong className="text-red-600">⚠️ Pior performance:</strong>
+                                                  <div className="text-xs text-muted-foreground mt-1">
+                                                    {validWeeks[worstWeek]?.week || `Semana ${worstWeek + 1}`} com maior custo por conversão 
+                                                    (R$ {((validWeeks[worstWeek]?.spend || 0) / (validWeeks[worstWeek]?.conversions || 1)).toFixed(2)})
+                                                  </div>
+                                                </div>
+                                                <div>
+                                                  <strong className="text-blue-600">📈 Resumo:</strong>
+                                                  <div className="text-xs text-muted-foreground mt-1 space-y-1">
+                                                    <div>Total investido: R$ {totalSpend.toFixed(2)}</div>
+                                                    <div>Total conversões: {totalConversions}</div>
+                                                    <div>CPC médio: R$ {avgCPC.toFixed(2)}</div>
+                                                    <div>Custo médio por conversão: R$ {totalConversions > 0 ? (totalSpend / totalConversions).toFixed(2) : '0.00'}</div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            );
+                                          })()}
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  </div>
+                                </div>
                               </div>
                             ) : (
                               <div className="text-center py-4">
