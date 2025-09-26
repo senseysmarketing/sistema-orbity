@@ -377,83 +377,80 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                               </div>
                             ) : weeklyAnalysis && weeklyAnalysis.length > 0 ? (
                               <div className="space-y-4">
-                                <div className="flex flex-col xl:flex-row gap-6">
-                                  <div className="flex-1 space-y-3">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                      {weeklyAnalysis.filter(week => week && typeof week === 'object').map((week, index) => {
-                                        const prevWeek = weeklyAnalysis[index - 1];
-                                        const getPercentageChange = (current: number, previous: number) => {
-                                          if (!previous) return 0;
-                                          return ((current - previous) / previous) * 100;
-                                        };
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                  {weeklyAnalysis.filter(week => week && typeof week === 'object').map((week, index) => {
+                                    const prevWeek = weeklyAnalysis[index - 1];
+                                    const getPercentageChange = (current: number, previous: number) => {
+                                      if (!previous) return 0;
+                                      return ((current - previous) / previous) * 100;
+                                    };
 
-                                        const spendChange = prevWeek && prevWeek.spend ? getPercentageChange(week.spend || 0, prevWeek.spend) : 0;
-                                        const conversionsChange = prevWeek && prevWeek.conversions ? getPercentageChange(week.conversions || 0, prevWeek.conversions) : 0;
-                                        const cpcChange = prevWeek && prevWeek.cpc ? getPercentageChange(week.cpc || 0, prevWeek.cpc) : 0;
-                                        const ctrChange = prevWeek && prevWeek.ctr ? getPercentageChange(week.ctr || 0, prevWeek.ctr) : 0;
+                                    const spendChange = prevWeek && prevWeek.spend ? getPercentageChange(week.spend || 0, prevWeek.spend) : 0;
+                                    const conversionsChange = prevWeek && prevWeek.conversions ? getPercentageChange(week.conversions || 0, prevWeek.conversions) : 0;
+                                    const cpcChange = prevWeek && prevWeek.cpc ? getPercentageChange(week.cpc || 0, prevWeek.cpc) : 0;
+                                    const ctrChange = prevWeek && prevWeek.ctr ? getPercentageChange(week.ctr || 0, prevWeek.ctr) : 0;
 
-                                        return (
-                                          <Card key={index} className="border">
-                                            <CardHeader className="pb-2">
-                                              <CardTitle className="text-xs sm:text-sm leading-tight">
-                                                <div className="font-semibold">{week.week || `Semana ${index + 1}`}</div>
-                                                <div className="text-xs text-muted-foreground font-normal">
-                                                  {week.weekPeriod || 'Período não definido'}
-                                                </div>
-                                              </CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="space-y-2">
-                                              <div className="text-xs sm:text-sm flex items-center justify-between">
-                                                <span><span className="font-medium">Gasto:</span> R$ {(week.spend || 0).toFixed(2)}</span>
-                                                {prevWeek && (
-                                                  <span className={`text-xs ${spendChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
-                                                    {spendChange > 0 ? '+' : ''}{spendChange.toFixed(1)}%
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <div className="text-xs sm:text-sm flex items-center justify-between">
-                                                <span><span className="font-medium">Conversões:</span> {week.conversions || 0}</span>
-                                                {prevWeek && (
-                                                  <span className={`text-xs ${conversionsChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                                    {conversionsChange > 0 ? '+' : ''}{conversionsChange.toFixed(1)}%
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <div className="text-xs sm:text-sm flex items-center justify-between">
-                                                <span><span className="font-medium">CPC:</span> R$ {(week.cpc || 0).toFixed(2)}</span>
-                                                {prevWeek && (
-                                                  <span className={`text-xs ${cpcChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
-                                                    {cpcChange > 0 ? '+' : ''}{cpcChange.toFixed(1)}%
-                                                  </span>
-                                                )}
-                                              </div>
-                                              <div className="text-xs sm:text-sm flex items-center justify-between">
-                                                <span><span className="font-medium">CTR:</span> {(week.ctr || 0).toFixed(2)}%</span>
-                                                {prevWeek && (
-                                                  <span className={`text-xs ${ctrChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                                    {ctrChange > 0 ? '+' : ''}{ctrChange.toFixed(1)}%
-                                                  </span>
-                                                )}
-                                              </div>
-                                            </CardContent>
-                                          </Card>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Análise de Performance */}
-                                  <div className="xl:w-80 xl:flex-shrink-0">
-                                    <Card className="bg-muted/30">
-                                      <CardHeader className="pb-3">
-                                        <CardTitle className="text-sm">📊 Análise de Performance</CardTitle>
-                                      </CardHeader>
-                                      <CardContent>
-                                        <div className="text-xs sm:text-sm space-y-2">
-                                          {(() => {
-                                            if (!weeklyAnalysis || weeklyAnalysis.length === 0) {
-                                              return <p>Não há dados suficientes para análise.</p>;
-                                            }
+                                    return (
+                                      <Card key={index} className="border">
+                                        <CardHeader className="pb-3">
+                                          <CardTitle className="text-sm leading-tight">
+                                            <div className="font-semibold">{week.week || `Semana ${index + 1}`}</div>
+                                            <div className="text-xs text-muted-foreground font-normal">
+                                              {week.weekPeriod || 'Período não definido'}
+                                            </div>
+                                          </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-3">
+                                          <div className="text-sm flex items-center justify-between">
+                                            <span><span className="font-medium">Gasto:</span> R$ {(week.spend || 0).toFixed(2)}</span>
+                                            {prevWeek && (
+                                              <span className={`text-xs ${spendChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                {spendChange > 0 ? '+' : ''}{spendChange.toFixed(1)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-sm flex items-center justify-between">
+                                            <span><span className="font-medium">Conversões:</span> {week.conversions || 0}</span>
+                                            {prevWeek && (
+                                              <span className={`text-xs ${conversionsChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                {conversionsChange > 0 ? '+' : ''}{conversionsChange.toFixed(1)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-sm flex items-center justify-between">
+                                            <span><span className="font-medium">CPC:</span> R$ {(week.cpc || 0).toFixed(2)}</span>
+                                            {prevWeek && (
+                                              <span className={`text-xs ${cpcChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                {cpcChange > 0 ? '+' : ''}{cpcChange.toFixed(1)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-sm flex items-center justify-between">
+                                            <span><span className="font-medium">CTR:</span> {(week.ctr || 0).toFixed(2)}%</span>
+                                            {prevWeek && (
+                                              <span className={`text-xs ${ctrChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                {ctrChange > 0 ? '+' : ''}{ctrChange.toFixed(1)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                        </CardContent>
+                                      </Card>
+                                    );
+                                  })}
+                                </div>
+                                
+                                {/* Análise de Performance em toda largura */}
+                                <Card className="bg-muted/30">
+                                  <CardHeader className="pb-3">
+                                    <CardTitle className="text-base">📊 Análise de Performance</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="text-sm space-y-2">
+                                      {(() => {
+                                        if (!weeklyAnalysis || weeklyAnalysis.length === 0) {
+                                          return <p>Não há dados suficientes para análise.</p>;
+                                        }
                                             
                                             const validWeeks = weeklyAnalysis.filter(week => week && typeof week === 'object' && week.spend && week.conversions);
                                             
@@ -503,24 +500,23 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                                                   </div>
                                                 </div>
                                               </div>
-                                            );
+                                             );
                                           })()}
                                         </div>
                                       </CardContent>
                                     </Card>
                                   </div>
                                 </div>
-                              </div>
-                            ) : (
-                              <div className="text-center py-4">
-                                <p className="text-muted-foreground">Nenhum dado disponível para análise.</p>
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    </CollapsibleContent>
-                  </Collapsible>
+                              ) : (
+                                <div className="text-center py-4">
+                                  <p className="text-muted-foreground">Nenhum dado disponível para análise.</p>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      </CollapsibleContent>
+                    </Collapsible>
                 </>
               ))}
             </TableBody>
