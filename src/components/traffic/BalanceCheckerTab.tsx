@@ -367,7 +367,11 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
                   {getStatusBadge(balance.status)}
                 </div>
                 <CardDescription className="text-xs">
-                  {balance.isPrepaidAccount ? 'Conta Pré-paga' : 'Conta Mensal'} • ID: {balance.ad_account_id}
+                  <div className="flex items-center gap-2">
+                    <span>{balance.isPrepaidAccount ? 'Conta Pré-paga' : 'Conta Mensal'}</span>
+                    <span>•</span>
+                    <span>ID: {balance.ad_account_id}</span>
+                  </div>
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -450,9 +454,13 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
                       )}
                       <div>
                         <h4 className="font-medium">{balance.ad_account_name}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {balance.isPrepaidAccount ? 'Conta Pré-paga' : 'Conta Mensal'} • ID: {balance.ad_account_id}
-                        </p>
+                        <div className="text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <span>{balance.isPrepaidAccount ? 'Conta Pré-paga' : 'Conta Mensal'}</span>
+                            <span>•</span>
+                            <span>ID: {balance.ad_account_id}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
