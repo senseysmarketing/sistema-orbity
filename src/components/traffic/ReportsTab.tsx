@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { Download, TrendingUp, TrendingDown, Calendar, FileText, BarChart3, RefreshCw } from "lucide-react";
+import { Copy, CheckCircle, Sparkles, TrendingUp, Calendar, RefreshCw, Edit3 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { DateRange } from "react-day-picker";
@@ -28,6 +29,8 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 dias atrás
     to: new Date()
   });
+  const [copiedTemplate, setCopiedTemplate] = useState<number | null>(null);
+  const [customMessage, setCustomMessage] = useState("");
   
   const { toast } = useToast();
 
@@ -51,10 +54,9 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
     try {
       setLoading(true);
       
-      // Chamar edge function para gerar relatório
       const { data, error } = await supabase.functions.invoke('facebook-sync', {
         body: { 
-          action: 'generate_report',
+          action: 'get_metrics',
           accountIds: [selectedAccount],
           dateRange: {
             from: dateRange.from.toISOString().split('T')[0],
@@ -65,78 +67,180 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
 
       if (error) throw error;
       
-      if (data?.report) {
-        setReportData(data.report);
-      } else {
-        // Dados mock para relatório
-        const mockReportData = {
+      if (data?.metrics) {
+        const metrics = data.metrics[0] || {};
+        setReportData({
           summary: {
-            totalSpend: 12450.50,
-            totalImpressions: 450000,
-            totalClicks: 8900,
-            totalConversions: 245,
-            avgCTR: 1.98,
-            avgCPC: 1.40,
-            avgCPM: 27.67,
-            period: `${dateRange.from.toLocaleDateString('pt-BR')} - ${dateRange.to.toLocaleDateString('pt-BR')}`
-          },
-          dailyData: Array.from({ length: dateRange?.from && dateRange?.to ? 
-            Math.ceil((dateRange.to.getTime() - dateRange.from.getTime()) / (1000 * 60 * 60 * 24)) : 30 
-          }, (_, i) => {
-            const date = new Date((dateRange?.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).getTime() + i * 24 * 60 * 60 * 1000);
-            return {
-              date: date.toLocaleDateString('pt-BR'),
-              spend: Math.random() * 800 + 200,
-              impressions: Math.floor(Math.random() * 15000) + 5000,
-              clicks: Math.floor(Math.random() * 400) + 100,
-              conversions: Math.floor(Math.random() * 15) + 3,
-              ctr: Math.random() * 2 + 1,
-              cpc: Math.random() * 2 + 0.5
-            };
-          }),
-          campaignData: [
-            { name: 'Campanha Black Friday', spend: 4500, conversions: 89, ctr: 2.1, cpc: 1.2 },
-            { name: 'Tráfego Landing Page', spend: 3200, conversions: 67, ctr: 3.4, cpc: 0.8 },
-            { name: 'Remarketing Audience', spend: 2800, conversions: 45, ctr: 1.8, cpc: 1.5 },
-            { name: 'Lookalike Expansion', spend: 2100, conversions: 32, ctr: 1.6, cpc: 1.8 }
-          ],
-          platformData: [
-            { name: 'Facebook Feed', value: 45, color: '#1877F2' },
-            { name: 'Instagram Stories', value: 25, color: '#E4405F' },
-            { name: 'Instagram Feed', value: 20, color: '#405DE6' },
-            { name: 'Audience Network', value: 10, color: '#42B883' }
-          ]
-        };
-        setReportData(mockReportData);
+            totalSpend: metrics.spend || 0,
+            totalImpressions: metrics.impressions || 0,
+            totalClicks: metrics.clicks || 0,
+            totalConversions: metrics.conversions || 0,
+            avgCTR: metrics.ctr || 0,
+            avgCPC: metrics.cpc || 0,
+            avgCPM: metrics.cpm || 0,
+            period: `${dateRange.from.toLocaleDateString('pt-BR')} - ${dateRange.to.toLocaleDateString('pt-BR')}`,
+            accountName: selectedAdAccounts.find(acc => acc.ad_account_id === selectedAccount)?.ad_account_name || 'Conta Selecionada'
+          }
+        });
       }
     } catch (error: any) {
       console.error('Erro ao gerar relatório:', error);
-      // Dados mock em caso de erro
-      const fallbackData = {
-        summary: {
-          totalSpend: 12450.50,
-          period: dateRange?.from && dateRange?.to ? 
-            `${dateRange.from.toLocaleDateString('pt-BR')} - ${dateRange.to.toLocaleDateString('pt-BR')}` :
-            'Período não definido'
-        }
-      };
-      setReportData(fallbackData);
-      
       toast({
-        title: "Dados carregados offline",
-        description: "Exibindo dados de exemplo. Clique em 'Gerar Relatório' para sincronizar.",
+        title: "Erro ao carregar dados",
+        description: "Verifique a conexão com o Facebook.",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const exportToPDF = () => {
-    toast({
-      title: "Exportando relatório...",
-      description: "O PDF será gerado em breve.",
-    });
-    // TODO: Implementar exportação real
+  const copyToClipboard = async (text: string, templateIndex: number) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedTemplate(templateIndex);
+      toast({
+        title: "✅ Copiado!",
+        description: "Mensagem copiada para a área de transferência",
+      });
+      
+      // Reset icon after 2 seconds
+      setTimeout(() => setCopiedTemplate(null), 2000);
+    } catch (error) {
+      toast({
+        title: "Erro ao copiar",
+        description: "Não foi possível copiar a mensagem",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { 
+      style: 'currency', 
+      currency: 'BRL' 
+    }).format(value);
+  };
+
+  const formatNumber = (value: number) => {
+    return new Intl.NumberFormat('pt-BR').format(value);
+  };
+
+  const getMessageTemplates = () => {
+    if (!reportData?.summary) return [];
+
+    const { totalSpend, totalImpressions, totalClicks, totalConversions, avgCTR, avgCPC, period, accountName } = reportData.summary;
+
+    return [
+      {
+        title: "📊 Relatório de Performance Geral",
+        category: "Resumo Executivo",
+        message: `🚀 *RELATÓRIO DE TRÁFEGO PAGO*
+
+📅 *Período:* ${period}
+🎯 *Conta:* ${accountName}
+
+💰 *INVESTIMENTO:* ${formatCurrency(totalSpend)}
+👁️ *IMPRESSÕES:* ${formatNumber(totalImpressions)}
+🖱️ *CLIQUES:* ${formatNumber(totalClicks)}
+🎯 *CONVERSÕES:* ${totalConversions}
+
+📈 *MÉTRICAS PRINCIPAIS:*
+• CTR: ${avgCTR?.toFixed(2)}%
+• CPC: ${formatCurrency(avgCPC)}
+
+✨ Campanha otimizada e acompanhada diariamente para máxima performance!`
+      },
+      {
+        title: "🎯 Foco em Resultados",
+        category: "Conversões",
+        message: `🎯 *RESULTADOS DO PERÍODO*
+
+${totalConversions} conversões geradas! 🔥
+
+💡 *Destaques:*
+📍 Investimento de ${formatCurrency(totalSpend)}
+📍 ${formatNumber(totalClicks)} cliques qualificados
+📍 CTR de ${avgCTR?.toFixed(2)}% (acima da média do mercado)
+
+🚀 *Próximos passos:* Escalar as campanhas que estão performando melhor e otimizar as demais para aumentar ainda mais os resultados!
+
+#TrafegoOtimizado #ResultadosReais`
+      },
+      {
+        title: "📈 Análise de Crescimento",
+        category: "Performance",
+        message: `📊 *ANÁLISE DE PERFORMANCE - ${period}*
+
+🔥 *INDICADORES PRINCIPAIS:*
+
+💰 Investimento: ${formatCurrency(totalSpend)}
+👥 Alcance: ${formatNumber(totalImpressions)} impressões
+🎯 Engajamento: ${formatNumber(totalClicks)} cliques
+✅ Conversões: ${totalConversions}
+
+📈 *EFICIÊNCIA:*
+• CPC: ${formatCurrency(avgCPC)}
+• CTR: ${avgCTR?.toFixed(2)}%
+
+🎯 Campanhas monitoradas 24/7 para garantir máximo ROI!`
+      },
+      {
+        title: "💎 Relatório Premium",
+        category: "Completo",
+        message: `💎 *RELATÓRIO EXECUTIVO DE TRÁFEGO*
+
+📊 *OVERVIEW - ${period}*
+🏢 Conta: ${accountName}
+
+💰 *FINANCEIRO:*
+Total Investido: ${formatCurrency(totalSpend)}
+CPC Médio: ${formatCurrency(avgCPC)}
+
+🎯 *PERFORMANCE:*
+✨ ${formatNumber(totalImpressions)} impressões
+🖱️ ${formatNumber(totalClicks)} cliques
+🎯 ${totalConversions} conversões
+📊 CTR: ${avgCTR?.toFixed(2)}%
+
+🚀 *Status:* Campanhas otimizadas e performando dentro do esperado!
+
+#MarketingDigital #TrafegoOtimizado`
+      },
+      {
+        title: "🔥 Relatório Motivacional",
+        category: "Inspiracional",
+        message: `🔥 *MAIS UM MÊS DE SUCESSO!*
+
+🎉 Conseguimos ${totalConversions} conversões com um investimento estratégico de ${formatCurrency(totalSpend)}!
+
+🚀 *O que conquistamos:*
+• ${formatNumber(totalImpressions)} pessoas impactadas
+• ${formatNumber(totalClicks)} interessados que clicaram
+• CTR de ${avgCTR?.toFixed(2)}% (excelente performance!)
+• CPC otimizado de ${formatCurrency(avgCPC)}
+
+✨ A estratégia está funcionando perfeitamente! Vamos continuar escalando para resultados ainda maiores! 💪
+
+#VamosQueVamos #ResultadosReais #SucessoColetivo`
+      },
+      {
+        title: "📱 Para Stories/Social",
+        category: "Redes Sociais",
+        message: `📊 RESULTADOS DO MÊS 📊
+
+${totalConversions} CONVERSÕES! 🎯
+
+💰 ${formatCurrency(totalSpend)} investidos
+👥 ${formatNumber(totalImpressions)} pessoas alcançadas
+🖱️ ${formatNumber(totalClicks)} cliques
+📈 ${avgCTR?.toFixed(2)}% de CTR
+
+Estratégia + Otimização = RESULTADOS! ✨
+
+#TrafegoOtimizado #MarketingDigital #Resultados`
+      }
+    ];
   };
 
   if (loading) {
@@ -144,210 +248,207 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
       <div className="flex items-center justify-center p-8">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-          <p className="text-muted-foreground">Gerando relatório...</p>
+          <p className="text-muted-foreground">Carregando dados...</p>
         </div>
       </div>
     );
   }
 
+  const messageTemplates = getMessageTemplates();
+
   return (
     <div className="space-y-6">
       {/* Filtros */}
-      <div className="flex gap-4 items-center flex-wrap">
-        <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-          <SelectTrigger className="w-[250px]">
-            <SelectValue placeholder="Selecionar conta" />
-          </SelectTrigger>
-          <SelectContent>
-            {selectedAdAccounts.map((account) => (
-              <SelectItem key={account.ad_account_id} value={account.ad_account_id}>
-                {account.ad_account_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            Gerador de Relatórios
+          </CardTitle>
+          <CardDescription>
+            Gere mensagens profissionais com dados reais das suas campanhas
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-4 items-center flex-wrap">
+            <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+              <SelectTrigger className="w-[280px]">
+                <SelectValue placeholder="Selecionar conta de anúncios" />
+              </SelectTrigger>
+              <SelectContent>
+                {selectedAdAccounts.map((account) => (
+                  <SelectItem key={account.ad_account_id} value={account.ad_account_id}>
+                    {account.ad_account_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <DateRangePicker 
-          date={dateRange}
-          onDateChange={setDateRange}
-        />
+            <DateRangePicker 
+              date={dateRange}
+              onDateChange={setDateRange}
+            />
 
-        <Button onClick={generateReport} disabled={loading}>
-          <BarChart3 className="h-4 w-4 mr-2" />
-          Gerar Relatório
-        </Button>
-        
-        <Button onClick={generateReport} disabled={loading} variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Atualizar
-        </Button>
-      </div>
+            <Button onClick={generateReport} disabled={loading}>
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Carregar Dados
+            </Button>
+            
+            <Button onClick={generateReport} disabled={loading} variant="outline">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Atualizar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {reportData && (
         <>
-          {/* Resumo Executivo */}
+          {/* Templates de Mensagens */}
+          <div className="grid gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Templates de Mensagens</h3>
+              <Badge variant="outline">{messageTemplates.length} templates disponíveis</Badge>
+            </div>
+            
+            <div className="grid gap-4 md:grid-cols-2">
+              {messageTemplates.map((template, index) => (
+                <Card key={index} className="relative group">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">{template.title}</CardTitle>
+                      <Badge variant="secondary" className="text-xs">
+                        {template.category}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">
+                        {template.message}
+                      </pre>
+                    </div>
+                    <Button 
+                      onClick={() => copyToClipboard(template.message, index)}
+                      className="w-full"
+                      variant={copiedTemplate === index ? "default" : "outline"}
+                    >
+                      {copiedTemplate === index ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Copiado!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copiar Mensagem
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Editor de Mensagem Personalizada */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Resumo Executivo</span>
-                <Button onClick={exportToPDF} variant="outline" size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar PDF
-                </Button>
+              <CardTitle className="flex items-center gap-2">
+                <Edit3 className="h-5 w-5" />
+                Mensagem Personalizada
               </CardTitle>
               <CardDescription>
-                Período: {reportData.summary?.period}
+                Crie sua própria mensagem usando os dados da campanha
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Textarea
+                placeholder="Digite sua mensagem personalizada aqui... 
+
+💡 Dica: Use os dados das métricas:
+• Investimento: {formatCurrency(totalSpend)}
+• Impressões: {formatNumber(totalImpressions)}
+• Cliques: {formatNumber(totalClicks)}
+• Conversões: {totalConversions}
+• CTR: {avgCTR?.toFixed(2)}%
+• CPC: {formatCurrency(avgCPC)}"
+                value={customMessage}
+                onChange={(e) => setCustomMessage(e.target.value)}
+                className="min-h-[150px] font-mono"
+              />
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => copyToClipboard(customMessage, -1)}
+                  disabled={!customMessage.trim()}
+                  variant="default"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copiar Mensagem
+                </Button>
+                <Button 
+                  onClick={() => setCustomMessage("")}
+                  variant="outline"
+                  disabled={!customMessage.trim()}
+                >
+                  Limpar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Resumo dos Dados */}
+          <Card>
+            <CardHeader>
+              <CardTitle>📊 Dados da Campanha</CardTitle>
+              <CardDescription>
+                Métricas utilizadas nos templates • {reportData.summary?.period}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-4">
-                <div className="text-center p-4 border rounded">
-                  <div className="text-2xl font-bold">
-                    {new Intl.NumberFormat('pt-BR', { 
-                      style: 'currency', 
-                      currency: 'BRL' 
-                    }).format(reportData.summary?.totalSpend || 0)}
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 rounded-lg">
+                  <div className="text-xl font-bold text-blue-700 dark:text-blue-300">
+                    {formatCurrency(reportData.summary?.totalSpend || 0)}
                   </div>
-                  <div className="text-sm text-muted-foreground">Investimento Total</div>
+                  <div className="text-sm text-blue-600 dark:text-blue-400">Investimento Total</div>
                 </div>
-                <div className="text-center p-4 border rounded">
-                  <div className="text-2xl font-bold">
-                    {new Intl.NumberFormat('pt-BR').format(reportData.summary?.totalImpressions || 0)}
+                <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 rounded-lg">
+                  <div className="text-xl font-bold text-green-700 dark:text-green-300">
+                    {formatNumber(reportData.summary?.totalImpressions || 0)}
                   </div>
-                  <div className="text-sm text-muted-foreground">Impressões</div>
+                  <div className="text-sm text-green-600 dark:text-green-400">Impressões</div>
                 </div>
-                <div className="text-center p-4 border rounded">
-                  <div className="text-2xl font-bold">
-                    {new Intl.NumberFormat('pt-BR').format(reportData.summary?.totalClicks || 0)}
+                <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 rounded-lg">
+                  <div className="text-xl font-bold text-purple-700 dark:text-purple-300">
+                    {formatNumber(reportData.summary?.totalClicks || 0)}
                   </div>
-                  <div className="text-sm text-muted-foreground">Cliques</div>
+                  <div className="text-sm text-purple-600 dark:text-purple-400">Cliques</div>
                 </div>
-                <div className="text-center p-4 border rounded">
-                  <div className="text-2xl font-bold">
+                <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 rounded-lg">
+                  <div className="text-xl font-bold text-orange-700 dark:text-orange-300">
                     {reportData.summary?.totalConversions || 0}
                   </div>
-                  <div className="text-sm text-muted-foreground">Conversões</div>
+                  <div className="text-sm text-orange-600 dark:text-orange-400">Conversões</div>
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3 mt-4">
-                <div className="text-center p-3 bg-muted/50 rounded">
+              <div className="grid gap-3 md:grid-cols-3 mt-4">
+                <div className="text-center p-3 bg-muted/50 rounded-lg">
                   <div className="text-lg font-semibold">{reportData.summary?.avgCTR?.toFixed(2) || 0}%</div>
                   <div className="text-xs text-muted-foreground">CTR Médio</div>
                 </div>
-                <div className="text-center p-3 bg-muted/50 rounded">
-                  <div className="text-lg font-semibold">R$ {reportData.summary?.avgCPC?.toFixed(2) || 0}</div>
+                <div className="text-center p-3 bg-muted/50 rounded-lg">
+                  <div className="text-lg font-semibold">{formatCurrency(reportData.summary?.avgCPC || 0)}</div>
                   <div className="text-xs text-muted-foreground">CPC Médio</div>
                 </div>
-                <div className="text-center p-3 bg-muted/50 rounded">
-                  <div className="text-lg font-semibold">R$ {reportData.summary?.avgCPM?.toFixed(2) || 0}</div>
+                <div className="text-center p-3 bg-muted/50 rounded-lg">
+                  <div className="text-lg font-semibold">{formatCurrency(reportData.summary?.avgCPM || 0)}</div>
                   <div className="text-xs text-muted-foreground">CPM Médio</div>
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          {/* Gráficos de Performance */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Investimento Diário</CardTitle>
-                <CardDescription>Evolução do gasto por dia</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={reportData.dailyData || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value) => [
-                        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value)),
-                        'Gasto'
-                      ]}
-                    />
-                    <Area type="monotone" dataKey="spend" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Conversões por Dia</CardTitle>
-                <CardDescription>Performance de conversões</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={reportData.dailyData || []}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [value, 'Conversões']} />
-                    <Bar dataKey="conversions" fill="#82ca9d" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Performance por Campanha */}
-          {reportData.campaignData && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Performance por Campanha</CardTitle>
-                <CardDescription>Comparativo de resultados entre campanhas</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={reportData.campaignData} layout="horizontal">
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="name" type="category" width={120} />
-                    <Tooltip 
-                      formatter={(value, name) => [
-                        name === 'spend' ? `R$ ${Number(value).toFixed(2)}` : value,
-                        name === 'spend' ? 'Gasto' : name === 'conversions' ? 'Conversões' : 'CTR'
-                      ]}
-                    />
-                    <Bar dataKey="spend" fill="#8884d8" name="spend" />
-                    <Bar dataKey="conversions" fill="#82ca9d" name="conversions" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Distribuição por Plataforma */}
-          {reportData.platformData && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Distribuição por Posicionamento</CardTitle>
-                <CardDescription>Onde seus anúncios estão sendo exibidos</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={reportData.platformData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {reportData.platformData.map((entry: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
         </>
       )}
     </div>
