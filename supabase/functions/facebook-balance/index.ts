@@ -65,7 +65,7 @@ serve(async (req) => {
       try {
         console.log(`Checking balance for account: ${accountId}`)
         
-        const balanceUrl = `https://graph.facebook.com/v18.0/${accountId}?fields=account_status,balance,currency&access_token=${connection.access_token}`
+        const balanceUrl = `https://graph.facebook.com/v18.0/${accountId}?fields=account_status,balance,currency,is_prepay_account,spend_cap,amount_spent&access_token=${connection.access_token}`
         
         const balanceResponse = await fetch(balanceUrl)
         const balanceData = await balanceResponse.json()
@@ -75,17 +75,32 @@ serve(async (req) => {
           continue
         }
 
-        const balance = balanceData.balance ? parseFloat(balanceData.balance) / 100 : 0 // Convert from cents
+        const isPrepaidAccount = balanceData.is_prepay_account || false
         const accountCurrency = balanceData.currency || 'BRL'
+        
+        let availableBalance = 0
+        
+        if (isPrepaidAccount) {
+          // Para contas pré-pagas: saldo disponível = spend_cap - amount_spent
+          const spendCap = balanceData.spend_cap ? parseFloat(balanceData.spend_cap) / 100 : 0
+          const amountSpent = balanceData.amount_spent ? parseFloat(balanceData.amount_spent) / 100 : 0
+          availableBalance = Math.max(0, spendCap - amountSpent)
+        } else {
+          // Para contas mensais: usar balance tradicional
+          availableBalance = balanceData.balance ? parseFloat(balanceData.balance) / 100 : 0
+        }
         
         balances.push({
           accountId: accountId,
-          balance: balance,
+          balance: availableBalance,
           currency: accountCurrency,
-          status: balanceData.account_status
+          status: balanceData.account_status,
+          isPrepaidAccount: isPrepaidAccount,
+          spendCap: balanceData.spend_cap ? parseFloat(balanceData.spend_cap) / 100 : null,
+          amountSpent: balanceData.amount_spent ? parseFloat(balanceData.amount_spent) / 100 : null
         })
 
-        totalBalance += balance
+        totalBalance += availableBalance
         currency = accountCurrency
 
       } catch (error) {

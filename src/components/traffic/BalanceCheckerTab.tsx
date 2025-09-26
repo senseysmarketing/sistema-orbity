@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { DollarSign, RefreshCw, AlertTriangle, CheckCircle, Settings } from "lucide-react";
+import { DollarSign, RefreshCw, AlertTriangle, CheckCircle, Settings, Grid, List, CreditCard } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,9 @@ interface AccountBalance {
   minThreshold: number;
   status: 'healthy' | 'warning' | 'critical';
   lastUpdated: string;
+  isPrepaidAccount: boolean;
+  spendCap?: number;
+  amountSpent?: number;
 }
 
 interface BalanceCheckerTabProps {
@@ -38,6 +41,7 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
   const [lastCheck, setLastCheck] = useState<Date | null>(null);
   const [globalMinThreshold, setGlobalMinThreshold] = useState(100);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   
   const { toast } = useToast();
 
@@ -65,6 +69,7 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
         const accountBalance = data?.balances?.find((b: any) => b.accountId === account.ad_account_id);
         const balance = accountBalance?.balance || 0;
         const threshold = globalMinThreshold;
+        const isPrepaid = accountBalance?.isPrepaidAccount || false;
         
         let status: 'healthy' | 'warning' | 'critical' = 'healthy';
         if (balance <= threshold * 0.5) {
@@ -80,7 +85,10 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
           balance: balance,
           minThreshold: threshold,
           status,
-          lastUpdated: new Date().toISOString()
+          lastUpdated: new Date().toISOString(),
+          isPrepaidAccount: isPrepaid,
+          spendCap: accountBalance?.spendCap,
+          amountSpent: accountBalance?.amountSpent
         };
       });
 
@@ -213,6 +221,25 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
           </p>
         </div>
         <div className="flex gap-2">
+          <div className="flex border rounded-md">
+            <Button
+              variant={viewMode === 'cards' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('cards')}
+              className="rounded-r-none"
+            >
+              <Grid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className="rounded-l-none"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+
           <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -224,12 +251,12 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
               <DialogHeader>
                 <DialogTitle>Configurações de Saldo</DialogTitle>
                 <DialogDescription>
-                  Configure o limite mínimo padrão para todas as contas
+                  Configure o limite mínimo padrão para recarga (contas pré-pagas)
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="threshold">Limite Mínimo Padrão (R$)</Label>
+                  <Label htmlFor="threshold">Limite Mínimo para Recarga (R$)</Label>
                   <Input
                     id="threshold"
                     type="number"
@@ -243,7 +270,7 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
                     setIsSettingsOpen(false);
                     toast({
                       title: "Configurações salvas",
-                      description: "Limite mínimo padrão atualizado.",
+                      description: "Limite mínimo para recarga atualizado.",
                     });
                   }}
                   className="w-full"
@@ -317,86 +344,179 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
         </Alert>
       )}
 
-      {/* Lista de Contas */}
-      <div className="space-y-4">
-        {balances.map((balance) => (
-          <Card key={balance.ad_account_id} className={`border-l-4 ${
-            balance.status === 'critical' ? 'border-l-red-500' :
-            balance.status === 'warning' ? 'border-l-yellow-500' :
-            'border-l-green-500'
-          }`}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {getStatusIcon(balance.status)}
-                  <div>
-                    <h4 className="font-medium">{balance.ad_account_name}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      ID: {balance.ad_account_id}
-                    </p>
+      {/* Contas */}
+      {viewMode === 'cards' ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {balances.map((balance) => (
+            <Card key={balance.ad_account_id} className={`border-l-4 ${
+              balance.status === 'critical' ? 'border-l-red-500' :
+              balance.status === 'warning' ? 'border-l-yellow-500' :
+              'border-l-green-500'
+            }`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(balance.status)}
+                    <div className="flex items-center gap-2">
+                      {balance.isPrepaidAccount && (
+                        <CreditCard className="h-4 w-4 text-blue-600" />
+                      )}
+                      <CardTitle className="text-sm">{balance.ad_account_name}</CardTitle>
+                    </div>
+                  </div>
+                  {getStatusBadge(balance.status)}
+                </div>
+                <CardDescription className="text-xs">
+                  {balance.isPrepaidAccount ? 'Conta Pré-paga' : 'Conta Mensal'} • ID: {balance.ad_account_id}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-center">
+                  <div className="text-2xl font-bold">
+                    {new Intl.NumberFormat('pt-BR', { 
+                      style: 'currency', 
+                      currency: balance.currency === 'USD' ? 'USD' : 'BRL'
+                    }).format(balance.balance)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {balance.isPrepaidAccount ? 'Saldo Disponível' : 'Saldo Atual'}
+                  </div>
+                </div>
+
+                {balance.isPrepaidAccount && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Label className="text-xs">Limite para recarga:</Label>
+                    <Input
+                      type="number"
+                      value={balance.minThreshold}
+                      onChange={(e) => updateThreshold(balance.ad_account_id, Number(e.target.value))}
+                      className="w-20 h-6 text-xs"
+                    />
+                    <span className="text-xs text-muted-foreground">{balance.currency}</span>
+                  </div>
+                )}
+
+                {!balance.isPrepaidAccount && (
+                  <>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span>Uso do orçamento</span>
+                        <span>{getUsagePercentage(balance.balance, balance.minThreshold).toFixed(1)}%</span>
+                      </div>
+                      <Progress value={getUsagePercentage(balance.balance, balance.minThreshold)} className="h-1" />
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-sm">
+                      <Label className="text-xs">Limite mínimo:</Label>
+                      <Input
+                        type="number"
+                        value={balance.minThreshold}
+                        onChange={(e) => updateThreshold(balance.ad_account_id, Number(e.target.value))}
+                        className="w-20 h-6 text-xs"
+                      />
+                      <span className="text-xs text-muted-foreground">{balance.currency}</span>
+                    </div>
+                  </>
+                )}
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => checkSingleBalance(balance.ad_account_id)}
+                  className="w-full"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Atualizar
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {balances.map((balance) => (
+            <Card key={balance.ad_account_id} className={`border-l-4 ${
+              balance.status === 'critical' ? 'border-l-red-500' :
+              balance.status === 'warning' ? 'border-l-yellow-500' :
+              'border-l-green-500'
+            }`}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {getStatusIcon(balance.status)}
+                    <div className="flex items-center gap-2">
+                      {balance.isPrepaidAccount && (
+                        <CreditCard className="h-4 w-4 text-blue-600" />
+                      )}
+                      <div>
+                        <h4 className="font-medium">{balance.ad_account_name}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {balance.isPrepaidAccount ? 'Conta Pré-paga' : 'Conta Mensal'} • ID: {balance.ad_account_id}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <div className="text-lg font-bold">
+                        {new Intl.NumberFormat('pt-BR', { 
+                          style: 'currency', 
+                          currency: balance.currency === 'USD' ? 'USD' : 'BRL'
+                        }).format(balance.balance)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {balance.isPrepaidAccount ? 'Saldo Disponível' : 'Saldo Atual'}
+                      </div>
+                    </div>
+                    
+                    {getStatusBadge(balance.status)}
+                    
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => checkSingleBalance(balance.ad_account_id)}
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <div className="text-lg font-bold">
-                      {new Intl.NumberFormat('pt-BR', { 
-                        style: 'currency', 
-                        currency: balance.currency === 'USD' ? 'USD' : 'BRL'
-                      }).format(balance.balance)}
+                {!balance.isPrepaidAccount && (
+                  <div className="mt-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Uso do orçamento</span>
+                      <span>{getUsagePercentage(balance.balance, balance.minThreshold).toFixed(1)}%</span>
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      Limite: {new Intl.NumberFormat('pt-BR', { 
-                        style: 'currency', 
-                        currency: balance.currency === 'USD' ? 'USD' : 'BRL'
-                      }).format(balance.minThreshold)}
-                    </div>
+                    <Progress 
+                      value={getUsagePercentage(balance.balance, balance.minThreshold)} 
+                      className={`h-2 ${
+                        balance.status === 'critical' ? 'bg-red-100' :
+                        balance.status === 'warning' ? 'bg-yellow-100' :
+                        'bg-green-100'
+                      }`}
+                    />
                   </div>
-                  
-                  {getStatusBadge(balance.status)}
-                  
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => checkSingleBalance(balance.ad_account_id)}
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="mt-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Uso do orçamento</span>
-                  <span>{getUsagePercentage(balance.balance, balance.minThreshold).toFixed(1)}%</span>
-                </div>
-                <Progress 
-                  value={getUsagePercentage(balance.balance, balance.minThreshold)} 
-                  className={`h-2 ${
-                    balance.status === 'critical' ? 'bg-red-100' :
-                    balance.status === 'warning' ? 'bg-yellow-100' :
-                    'bg-green-100'
-                  }`}
-                />
-              </div>
+                )}
 
-              <div className="mt-3 flex items-center gap-2">
-                <Label htmlFor={`threshold-${balance.ad_account_id}`} className="text-sm">
-                  Limite mínimo:
-                </Label>
-                <Input
-                  id={`threshold-${balance.ad_account_id}`}
-                  type="number"
-                  value={balance.minThreshold}
-                  onChange={(e) => updateThreshold(balance.ad_account_id, Number(e.target.value))}
-                  className="w-24 h-8"
-                />
-                <span className="text-sm text-muted-foreground">{balance.currency}</span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <Label htmlFor={`threshold-${balance.ad_account_id}`} className="text-sm">
+                    {balance.isPrepaidAccount ? 'Limite para recarga:' : 'Limite mínimo:'}
+                  </Label>
+                  <Input
+                    id={`threshold-${balance.ad_account_id}`}
+                    type="number"
+                    value={balance.minThreshold}
+                    onChange={(e) => updateThreshold(balance.ad_account_id, Number(e.target.value))}
+                    className="w-24 h-8"
+                  />
+                  <span className="text-sm text-muted-foreground">{balance.currency}</span>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {balances.length === 0 && !loading && (
         <div className="text-center py-8">
