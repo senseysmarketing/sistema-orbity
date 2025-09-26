@@ -235,7 +235,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
               {new Intl.NumberFormat('pt-BR', { 
                 style: 'currency', 
                 currency: 'BRL' 
-              }).format(campaigns.reduce((sum, c) => sum + c.spend, 0))}
+              }).format(campaigns.filter(c => c.status === 'ACTIVE').reduce((sum, c) => sum + c.spend, 0))}
             </div>
           </CardContent>
         </Card>
@@ -246,7 +246,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {campaigns.reduce((sum, c) => sum + c.conversions, 0)}
+              {campaigns.filter(c => c.status === 'ACTIVE').reduce((sum, c) => sum + c.conversions, 0)}
             </div>
           </CardContent>
         </Card>
@@ -277,7 +277,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {campaigns.map((campaign) => (
+            {campaigns.filter(campaign => campaign.status === 'ACTIVE').map((campaign) => (
                 <>
                   <TableRow key={campaign.id}>
                     <TableCell className="font-medium">
@@ -311,19 +311,17 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                       R$ {campaign.cpc.toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleWeeklyAnalysis(campaign.id)}>
-                            <BarChart className="mr-2 h-4 w-4" />
-                            Análise 4 Semanas
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={() => handleWeeklyAnalysis(campaign.id)}
+                          variant="outline" 
+                          size="sm"
+                          className="text-xs"
+                        >
+                          <BarChart className="mr-1 h-3 w-3" />
+                          Análise 4 Semanas
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                   
@@ -339,28 +337,111 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto" />
                               </div>
                             ) : (
-                              <div className="grid gap-4 md:grid-cols-4">
-                                {weeklyAnalysis.map((week, index) => (
-                                  <Card key={index} className="border">
-                                    <CardHeader className="pb-2">
-                                      <CardTitle className="text-sm">{week.week}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-2">
-                                      <div className="text-sm">
-                                        <span className="font-medium">Gasto:</span> R$ {week.spend}
-                                      </div>
-                                      <div className="text-sm">
-                                        <span className="font-medium">Conversões:</span> {week.conversions}
-                                      </div>
-                                      <div className="text-sm">
-                                        <span className="font-medium">CPC:</span> R$ {week.cpc}
-                                      </div>
-                                      <div className="text-sm">
-                                        <span className="font-medium">CTR:</span> {week.ctr}%
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                ))}
+                              <div className="space-y-4">
+                                <div className="grid gap-4 md:grid-cols-4">
+                                  {weeklyAnalysis.map((week, index) => {
+                                    const prevWeek = weeklyAnalysis[index - 1];
+                                    const getPercentageChange = (current: number, previous: number) => {
+                                      if (!previous) return 0;
+                                      return ((current - previous) / previous) * 100;
+                                    };
+
+                                    const spendChange = prevWeek ? getPercentageChange(week.spend, prevWeek.spend) : 0;
+                                    const conversionsChange = prevWeek ? getPercentageChange(week.conversions, prevWeek.conversions) : 0;
+                                    const cpcChange = prevWeek ? getPercentageChange(week.cpc, prevWeek.cpc) : 0;
+                                    const ctrChange = prevWeek ? getPercentageChange(week.ctr, prevWeek.ctr) : 0;
+
+                                    return (
+                                      <Card key={index} className="border">
+                                        <CardHeader className="pb-2">
+                                          <CardTitle className="text-sm">{week.week}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2">
+                                          <div className="text-sm flex items-center justify-between">
+                                            <span><span className="font-medium">Gasto:</span> R$ {week.spend.toFixed(2)}</span>
+                                            {prevWeek && (
+                                              <span className={`text-xs ${spendChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                {spendChange > 0 ? '+' : ''}{spendChange.toFixed(1)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-sm flex items-center justify-between">
+                                            <span><span className="font-medium">Conversões:</span> {week.conversions}</span>
+                                            {prevWeek && (
+                                              <span className={`text-xs ${conversionsChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                {conversionsChange > 0 ? '+' : ''}{conversionsChange.toFixed(1)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-sm flex items-center justify-between">
+                                            <span><span className="font-medium">CPC:</span> R$ {week.cpc.toFixed(2)}</span>
+                                            {prevWeek && (
+                                              <span className={`text-xs ${cpcChange > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                                {cpcChange > 0 ? '+' : ''}{cpcChange.toFixed(1)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-sm flex items-center justify-between">
+                                            <span><span className="font-medium">CTR:</span> {week.ctr.toFixed(2)}%</span>
+                                            {prevWeek && (
+                                              <span className={`text-xs ${ctrChange > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                {ctrChange > 0 ? '+' : ''}{ctrChange.toFixed(1)}%
+                                              </span>
+                                            )}
+                                          </div>
+                                        </CardContent>
+                                      </Card>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Análise Textual */}
+                                <Card className="bg-muted/30">
+                                  <CardHeader>
+                                    <CardTitle className="text-sm">📊 Análise de Performance</CardTitle>
+                                  </CardHeader>
+                                  <CardContent>
+                                    <div className="text-sm space-y-2">
+                                      {(() => {
+                                        const bestWeek = weeklyAnalysis.reduce((best, current, index) => {
+                                          const efficiency = current.conversions / current.spend;
+                                          const bestEfficiency = weeklyAnalysis[best].conversions / weeklyAnalysis[best].spend;
+                                          return efficiency > bestEfficiency ? index : best;
+                                        }, 0);
+
+                                        const worstWeek = weeklyAnalysis.reduce((worst, current, index) => {
+                                          const efficiency = current.conversions / current.spend;
+                                          const worstEfficiency = weeklyAnalysis[worst].conversions / weeklyAnalysis[worst].spend;
+                                          return efficiency < worstEfficiency ? index : worst;
+                                        }, 0);
+
+                                        const totalSpend = weeklyAnalysis.reduce((sum, week) => sum + week.spend, 0);
+                                        const totalConversions = weeklyAnalysis.reduce((sum, week) => sum + week.conversions, 0);
+                                        const avgCPC = weeklyAnalysis.reduce((sum, week) => sum + week.cpc, 0) / weeklyAnalysis.length;
+
+                                        return (
+                                          <>
+                                            <p>
+                                              <strong className="text-green-600">🏆 Melhor semana:</strong> {weeklyAnalysis[bestWeek].week} com {weeklyAnalysis[bestWeek].conversions} conversões 
+                                              por R$ {weeklyAnalysis[bestWeek].spend.toFixed(2)} 
+                                              (custo por conversão: R$ {(weeklyAnalysis[bestWeek].spend / weeklyAnalysis[bestWeek].conversions).toFixed(2)})
+                                            </p>
+                                            <p>
+                                              <strong className="text-red-600">⚠️ Pior performance:</strong> {weeklyAnalysis[worstWeek].week} com maior custo por conversão 
+                                              (R$ {(weeklyAnalysis[worstWeek].spend / weeklyAnalysis[worstWeek].conversions).toFixed(2)})
+                                            </p>
+                                            <p>
+                                              <strong className="text-blue-600">📈 Resumo:</strong> Total investido: R$ {totalSpend.toFixed(2)} | 
+                                              Total conversões: {totalConversions} | 
+                                              CPC médio: R$ {avgCPC.toFixed(2)} | 
+                                              Custo médio por conversão: R$ {(totalSpend / totalConversions).toFixed(2)}
+                                            </p>
+                                          </>
+                                        );
+                                      })()}
+                                    </div>
+                                  </CardContent>
+                                </Card>
                               </div>
                             )}
                           </div>
@@ -373,10 +454,10 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
             </TableBody>
           </Table>
           
-          {campaigns.length === 0 && (
+          {campaigns.filter(c => c.status === 'ACTIVE').length === 0 && (
             <div className="text-center py-8">
               <p className="text-muted-foreground">
-                Nenhuma campanha encontrada para as contas selecionadas.
+                Nenhuma campanha ativa encontrada para as contas selecionadas.
               </p>
             </div>
           )}
