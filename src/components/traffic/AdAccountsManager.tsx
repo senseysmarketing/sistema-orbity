@@ -39,9 +39,10 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
   const [searchTerm, setSearchTerm] = useState("");
   
   const { toast } = useToast();
-  const { currentSubscription } = useSubscription();
-  // TODO: Add maxFacebookAdAccounts to subscription type
-  const maxAccounts = 10; // Placeholder until subscription type is updated
+  const { getMaxFacebookAdAccounts } = useSubscription();
+  
+  // Sincronizar com o limite do plano atual
+  const maxAccounts = getMaxFacebookAdAccounts();
 
   useEffect(() => {
     fetchAvailableAccounts();

@@ -23,6 +23,7 @@ interface SubscriptionPlan {
   has_api_access: boolean;
   has_white_label: boolean;
   has_priority_support: boolean;
+  max_facebook_ad_accounts: number;
   sort_order: number;
 }
 
@@ -48,6 +49,7 @@ interface SubscriptionContextType {
   refreshPlans: () => Promise<void>;
   isFeatureAvailable: (feature: string) => boolean;
   hasReachedLimit: (limitType: string, currentCount: number) => boolean;
+  getMaxFacebookAdAccounts: () => number;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -203,9 +205,21 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         return currentCount >= currentPlan.max_tasks;
       case 'storage':
         return currentCount >= currentPlan.max_storage_gb;
+      case 'facebook_ad_accounts':
+        return currentCount >= currentPlan.max_facebook_ad_accounts;
       default:
         return false;
     }
+  };
+
+  const getMaxFacebookAdAccounts = (): number => {
+    if (!currentAgency) return 10; // Valor padrão
+
+    const currentPlan = currentSubscription?.subscribed 
+      ? plans.find(p => p.name === currentSubscription.plan_name)
+      : plans.find(p => p.slug === 'free');
+
+    return currentPlan?.max_facebook_ad_accounts || 10;
   };
 
   useEffect(() => {
@@ -242,6 +256,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         refreshPlans,
         isFeatureAvailable,
         hasReachedLimit,
+        getMaxFacebookAdAccounts,
       }}
     >
       {children}
