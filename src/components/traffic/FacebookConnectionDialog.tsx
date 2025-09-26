@@ -48,6 +48,7 @@ export function FacebookConnectionDialog({ onSuccess, onClose }: FacebookConnect
     }
 
     console.log('Facebook OAuth message received:', payload);
+    authCompleted = true; // Mark as completed before any async work
 
     // Clean up listeners and popup
     window.removeEventListener('message', messageHandler);
