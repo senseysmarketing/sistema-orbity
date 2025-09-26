@@ -1,261 +1,157 @@
-import { useState, useEffect } from "react";
-import { Play, Pause, TrendingUp, TrendingDown, MoreVertical, Calendar, BarChart } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { DateRange } from "react-day-picker";
-
-interface SelectedAdAccount {
-  id: string;
-  ad_account_id: string;
-  ad_account_name: string;
-  currency: string;
-}
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { BarChart } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Collapsible, CollapsibleContent } from '@radix-ui/react-collapsible';
 
 interface Campaign {
   id: string;
   name: string;
-  status: string;
+  status: 'ACTIVE' | 'PAUSED' | 'DELETED';
   objective: string;
   spend: number;
   impressions: number;
   clicks: number;
   conversions: number;
-  cpm: number;
-  cpc: number;
   ctr: number;
-  account_id: string;
+  cpc: number;
 }
 
 interface CampaignsTabProps {
-  selectedAdAccounts: SelectedAdAccount[];
+  campaigns: Campaign[];
+  accounts: any[];
+  selectedAdAccounts?: any[];
 }
 
-export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedAccount, setSelectedAccount] = useState<string>("");
+export function CampaignsTab({ campaigns, accounts, selectedAdAccounts }: CampaignsTabProps) {
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [weeklyAnalysis, setWeeklyAnalysis] = useState<any[]>([]);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 dias atrás
-    to: new Date()
-  });
-  
   const { toast } = useToast();
 
-  // Selecionar primeira conta automaticamente
-  useEffect(() => {
-    if (selectedAdAccounts.length > 0 && !selectedAccount) {
-      setSelectedAccount(selectedAdAccounts[0].ad_account_id);
-    }
-  }, [selectedAdAccounts, selectedAccount]);
-
-  useEffect(() => {
-    fetchCampaigns();
-  }, [selectedAdAccounts, selectedAccount, dateRange]);
-
-  const fetchCampaigns = async () => {
-    if (selectedAdAccounts.length === 0) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      // Chamar edge function para buscar campanhas
-      const { data, error } = await supabase.functions.invoke('facebook-campaigns', {
-        body: { 
-          action: 'list_campaigns',
-          accountIds: selectedAccount ? [selectedAccount] : [],
-          dateRange: dateRange?.from && dateRange?.to ? {
-            from: dateRange.from.toISOString().split('T')[0],
-            to: dateRange.to.toISOString().split('T')[0]
-          } : undefined
-        }
-      });
-
-      if (error) throw error;
-      
-      setCampaigns(data?.campaigns || []);
-    } catch (error: any) {
-      console.error('Erro ao buscar campanhas:', error);
-      toast({
-        title: "Erro ao carregar campanhas",
-        description: "Não foi possível carregar as campanhas.",
-        variant: "destructive",
-      });
-      // Mock data for development
-      setCampaigns([
-        {
-          id: '1',
-          name: 'Campanha de Conversão - Black Friday',
-          status: 'ACTIVE',
-          objective: 'CONVERSIONS',
-          spend: 1250.50,
-          impressions: 45000,
-          clicks: 890,
-          conversions: 45,
-          cpm: 27.79,
-          cpc: 1.40,
-          ctr: 1.98,
-          account_id: selectedAdAccounts[0]?.ad_account_id || ''
-        },
-        {
-          id: '2',
-          name: 'Tráfego para Landing Page',
-          status: 'ACTIVE',
-          objective: 'TRAFFIC',
-          spend: 850.00,
-          impressions: 32000,
-          clicks: 1200,
-          conversions: 28,
-          cpm: 26.56,
-          cpc: 0.71,
-          ctr: 3.75,
-          account_id: selectedAdAccounts[0]?.ad_account_id || ''
-        }
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleWeeklyAnalysis = async (campaignId: string) => {
-    setLoadingAnalysis(true);
-    setExpandedCampaign(expandedCampaign === campaignId ? null : campaignId);
-    
-    if (expandedCampaign !== campaignId) {
-      try {
-        // Chamar edge function para análise semanal
-        const { data, error } = await supabase.functions.invoke('facebook-analysis', {
-          body: { 
-            action: 'weekly_analysis',
-            campaignId: campaignId
-          }
-        });
-
-        if (error) throw error;
-        
-        setWeeklyAnalysis(data?.analysis || []);
-      } catch (error: any) {
-        console.error('Erro ao buscar análise:', error);
-        // Mock data for development - com datas das últimas 4 semanas
-        const mockAnalysis = [];
-        for (let i = 3; i >= 0; i--) {
-          const endDate = new Date();
-          endDate.setDate(endDate.getDate() - (i * 7));
-          const startDate = new Date(endDate);
-          startDate.setDate(startDate.getDate() - 6);
-          
-          mockAnalysis.push({
-            week: `Semana ${4 - i}`,
-            weekPeriod: `${startDate.getDate().toString().padStart(2, '0')}/${(startDate.getMonth() + 1).toString().padStart(2, '0')} a ${endDate.getDate().toString().padStart(2, '0')}/${(endDate.getMonth() + 1).toString().padStart(2, '0')}`,
-            spend: Math.random() * 500 + 200,
-            conversions: Math.floor(Math.random() * 20) + 5,
-            cpc: Math.random() * 2 + 1,
-            ctr: Math.random() * 3 + 1,
-            impressions: Math.floor(Math.random() * 10000) + 5000,
-            clicks: Math.floor(Math.random() * 500) + 100,
-            cpm: Math.random() * 30 + 20
-          });
-        }
-        setWeeklyAnalysis(mockAnalysis);
-      }
-    }
-    
-    setLoadingAnalysis(false);
+  const truncateText = (text: string, limit: number = 35) => {
+    if (text.length <= limit) return text;
+    return text.substring(0, limit) + '...';
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return <Badge className="bg-green-100 text-green-800">Ativa</Badge>;
-      case 'PAUSED':
-        return <Badge className="bg-yellow-100 text-yellow-800">Pausada</Badge>;
-      case 'COMPLETED':
-        return <Badge className="bg-blue-100 text-blue-800">Finalizada</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
+    const statusConfig = {
+      ACTIVE: { label: 'Ativo', variant: 'default' as const },
+      PAUSED: { label: 'Pausado', variant: 'secondary' as const },
+      DELETED: { label: 'Excluído', variant: 'destructive' as const }
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.ACTIVE;
+    
+    return (
+      <Badge variant={config.variant}>
+        {config.label}
+      </Badge>
+    );
   };
 
   const getObjectiveLabel = (objective: string) => {
     const objectives: { [key: string]: string } = {
-      'CONVERSIONS': 'Conversões',
-      'TRAFFIC': 'Tráfego',
-      'AWARENESS': 'Reconhecimento',
-      'ENGAGEMENT': 'Engajamento',
-      'APP_INSTALLS': 'Instalações',
-      'LEAD_GENERATION': 'Geração de Leads'
+      'OUTCOME_LEADS': 'Leads',
+      'OUTCOME_SALES': 'Vendas',
+      'OUTCOME_TRAFFIC': 'Tráfego',
+      'OUTCOME_ENGAGEMENT': 'Engajamento',
+      'OUTCOME_APP_PROMOTION': 'App',
+      'OUTCOME_AWARENESS': 'Reconhecimento',
+      'OUTCOME_STORE_VISITS': 'Visitas à Loja'
     };
+    
     return objectives[objective] || objective;
   };
 
-  const truncateText = (text: string, maxLength: number = 35) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + "...";
+  const handleWeeklyAnalysis = async (campaignId: string) => {
+    if (expandedCampaign === campaignId) {
+      setExpandedCampaign(null);
+      return;
+    }
+
+    setExpandedCampaign(campaignId);
+    setLoadingAnalysis(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('facebook-analysis', {
+        body: { 
+          campaign_id: campaignId,
+          accounts: accounts.filter(acc => acc.selected).map(acc => acc.id)
+        }
+      });
+
+      if (error) throw error;
+
+      // Processar dados da análise semanal
+      const processedData = data?.weekly_data?.map((week: any, index: number) => {
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - (index * 7) - 6);
+        const weekEnd = new Date();
+        weekEnd.setDate(weekEnd.getDate() - (index * 7));
+        
+        const formatDate = (date: Date) => {
+          return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        };
+        
+        return {
+          ...week,
+          week: `Semana ${index + 1}`,
+          weekPeriod: `${formatDate(weekStart)} a ${formatDate(weekEnd)}`
+        };
+      }) || [];
+
+      setWeeklyAnalysis(processedData);
+    } catch (error) {
+      console.error('Erro ao carregar análise semanal:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar a análise semanal.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingAnalysis(false);
+    }
   };
 
-  if (loading) {
+  if (!campaigns || campaigns.length === 0) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-          <p className="text-muted-foreground">Carregando campanhas...</p>
-        </div>
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">
+          Nenhuma campanha encontrada. Selecione uma conta de anúncios para ver as campanhas.
+        </p>
       </div>
     );
   }
 
+  const activeCampaigns = campaigns.filter(c => c.status === 'ACTIVE');
+
   return (
     <div className="space-y-6">
-      {/* Filtros */}
-      <div className="flex gap-4 items-center flex-wrap">
-        <Select value={selectedAccount} onValueChange={setSelectedAccount}>
-          <SelectTrigger className="w-[250px]">
-            <SelectValue placeholder="Selecionar conta" />
-          </SelectTrigger>
-          <SelectContent>
-            {selectedAdAccounts.map((account) => (
-              <SelectItem key={account.ad_account_id} value={account.ad_account_id}>
-                {account.ad_account_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        <DateRangePicker 
-          date={dateRange}
-          onDateChange={setDateRange}
-        />
-      </div>
-
-      {/* Resumo */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total de Campanhas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{campaigns.length}</div>
-          </CardContent>
-        </Card>
-        
+      {/* Cards de métricas */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Campanhas Ativas</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {campaigns.filter(c => c.status === 'ACTIVE').length}
+            <div className="text-2xl font-bold">
+              {activeCampaigns.length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total de Cliques</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {new Intl.NumberFormat('pt-BR').format(activeCampaigns.reduce((sum, c) => sum + c.clicks, 0))}
             </div>
           </CardContent>
         </Card>
@@ -269,7 +165,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
               {new Intl.NumberFormat('pt-BR', { 
                 style: 'currency', 
                 currency: 'BRL' 
-              }).format(campaigns.filter(c => c.status === 'ACTIVE').reduce((sum, c) => sum + c.spend, 0))}
+              }).format(activeCampaigns.reduce((sum, c) => sum + c.spend, 0))}
             </div>
           </CardContent>
         </Card>
@@ -280,7 +176,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {campaigns.filter(c => c.status === 'ACTIVE').reduce((sum, c) => sum + c.conversions, 0)}
+              {activeCampaigns.reduce((sum, c) => sum + c.conversions, 0)}
             </div>
           </CardContent>
         </Card>
@@ -311,7 +207,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-            {campaigns.filter(campaign => campaign.status === 'ACTIVE').map((campaign) => (
+              {activeCampaigns.map((campaign) => (
                 <>
                   <TableRow key={campaign.id}>
                     <TableCell className="font-medium" title={campaign.name}>
@@ -373,17 +269,19 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                             ) : weeklyAnalysis && weeklyAnalysis.length > 0 ? (
                               <div className="space-y-4">
                                 <div className="flex flex-col xl:flex-row gap-6">
-                                  {weeklyAnalysis.filter(week => week && typeof week === 'object').map((week, index) => {
-                                    const prevWeek = weeklyAnalysis[index - 1];
-                                    const getPercentageChange = (current: number, previous: number) => {
-                                      if (!previous) return 0;
-                                      return ((current - previous) / previous) * 100;
-                                    };
+                                  <div className="flex-1 space-y-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                      {weeklyAnalysis.filter(week => week && typeof week === 'object').map((week, index) => {
+                                        const prevWeek = weeklyAnalysis[index - 1];
+                                        const getPercentageChange = (current: number, previous: number) => {
+                                          if (!previous) return 0;
+                                          return ((current - previous) / previous) * 100;
+                                        };
 
-                                    const spendChange = prevWeek && prevWeek.spend ? getPercentageChange(week.spend || 0, prevWeek.spend) : 0;
-                                    const conversionsChange = prevWeek && prevWeek.conversions ? getPercentageChange(week.conversions || 0, prevWeek.conversions) : 0;
-                                    const cpcChange = prevWeek && prevWeek.cpc ? getPercentageChange(week.cpc || 0, prevWeek.cpc) : 0;
-                                    const ctrChange = prevWeek && prevWeek.ctr ? getPercentageChange(week.ctr || 0, prevWeek.ctr) : 0;
+                                        const spendChange = prevWeek && prevWeek.spend ? getPercentageChange(week.spend || 0, prevWeek.spend) : 0;
+                                        const conversionsChange = prevWeek && prevWeek.conversions ? getPercentageChange(week.conversions || 0, prevWeek.conversions) : 0;
+                                        const cpcChange = prevWeek && prevWeek.cpc ? getPercentageChange(week.cpc || 0, prevWeek.cpc) : 0;
+                                        const ctrChange = prevWeek && prevWeek.ctr ? getPercentageChange(week.ctr || 0, prevWeek.ctr) : 0;
 
                                         return (
                                           <Card key={index} className="border">
@@ -434,6 +332,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
                                       })}
                                     </div>
                                   </div>
+                                  
                                   {/* Análise de Performance */}
                                   <div className="xl:w-80 xl:flex-shrink-0">
                                     <Card className="bg-muted/30">
@@ -518,7 +417,7 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
             </TableBody>
           </Table>
           
-          {campaigns.filter(c => c.status === 'ACTIVE').length === 0 && (
+          {activeCampaigns.length === 0 && (
             <div className="text-center py-8">
               <p className="text-muted-foreground">
                 Nenhuma campanha ativa encontrada para as contas selecionadas.
