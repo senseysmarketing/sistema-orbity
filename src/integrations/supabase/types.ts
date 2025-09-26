@@ -514,8 +514,11 @@ export type Database = {
           active: boolean
           agency_id: string | null
           contact: string | null
+          contract_end_date: string | null
+          contract_start_date: string | null
           created_at: string
           due_date: number | null
+          has_loyalty: boolean
           id: string
           monthly_value: number | null
           name: string
@@ -528,8 +531,11 @@ export type Database = {
           active?: boolean
           agency_id?: string | null
           contact?: string | null
+          contract_end_date?: string | null
+          contract_start_date?: string | null
           created_at?: string
           due_date?: number | null
+          has_loyalty?: boolean
           id?: string
           monthly_value?: number | null
           name: string
@@ -542,8 +548,11 @@ export type Database = {
           active?: boolean
           agency_id?: string | null
           contact?: string | null
+          contract_end_date?: string | null
+          contract_start_date?: string | null
           created_at?: string
           due_date?: number | null
+          has_loyalty?: boolean
           id?: string
           monthly_value?: number | null
           name?: string

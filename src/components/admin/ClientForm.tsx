@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DatePickerDemo } from "@/components/ui/date-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useLimitEnforcement } from "@/hooks/useLimitEnforcement";
@@ -30,10 +31,23 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
     start_date: client?.start_date || '',
     due_date: client?.due_date || 1,
     observations: client?.observations || '',
+    contract_start_date: client?.contract_start_date || null,
+    contract_end_date: client?.contract_end_date || null,
+    has_loyalty: client?.has_loyalty ?? true,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields for loyalty clients
+    if (formData.has_loyalty && (!formData.contract_start_date || !formData.contract_end_date)) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Para clientes com fidelidade, as datas de início e fim do contrato são obrigatórias.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Check limit only for new clients
     if (!client) {
@@ -49,6 +63,9 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         monthly_value: formData.monthly_value ? parseFloat(formData.monthly_value as string) : null,
         start_date: formData.start_date || null,
         due_date: parseInt(formData.due_date as string),
+        contract_start_date: formData.contract_start_date,
+        contract_end_date: formData.contract_end_date,
+        has_loyalty: formData.has_loyalty,
       };
 
       if (client) {
@@ -106,6 +123,9 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         start_date: '',
         due_date: 1,
         observations: '',
+        contract_start_date: null,
+        contract_end_date: null,
+        has_loyalty: true,
       });
     } catch (error: any) {
       toast({
@@ -176,6 +196,43 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
                 onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
               />
             </div>
+            <div className="grid gap-2">
+              <Label>Fidelidade</Label>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="has_loyalty"
+                  checked={formData.has_loyalty}
+                  onCheckedChange={(checked) => setFormData({ ...formData, has_loyalty: checked })}
+                />
+                <Label htmlFor="has_loyalty">Cliente tem fidelidade</Label>
+              </div>
+            </div>
+            {formData.has_loyalty && (
+              <>
+                <div className="grid gap-2">
+                  <Label>Início do Contrato *</Label>
+                  <DatePickerDemo
+                    date={formData.contract_start_date ? new Date(formData.contract_start_date) : undefined}
+                    onDateChange={(date) => setFormData({ 
+                      ...formData, 
+                      contract_start_date: date ? date.toISOString().split('T')[0] : null 
+                    })}
+                    placeholder="Selecione a data de início"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Fim do Contrato *</Label>
+                  <DatePickerDemo
+                    date={formData.contract_end_date ? new Date(formData.contract_end_date) : undefined}
+                    onDateChange={(date) => setFormData({ 
+                      ...formData, 
+                      contract_end_date: date ? date.toISOString().split('T')[0] : null 
+                    })}
+                    placeholder="Selecione a data de fim"
+                  />
+                </div>
+              </>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="due_date">Dia de Vencimento *</Label>
               <Select 

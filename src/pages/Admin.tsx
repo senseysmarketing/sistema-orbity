@@ -26,6 +26,10 @@ interface Client {
   contact: string | null;
   service: string | null;
   due_date: number;
+  observations: string | null;
+  contract_start_date: string | null;
+  contract_end_date: string | null;
+  has_loyalty: boolean;
 }
 interface ClientPayment {
   id: string;
@@ -135,7 +139,7 @@ export default function Admin() {
     const {
       data,
       error
-    } = await supabase.from('clients').select('*').order(clientSort);
+    } = await supabase.from('clients').select('id, name, monthly_value, active, start_date, contact, service, due_date, observations, contract_start_date, contract_end_date, has_loyalty').order(clientSort);
     if (error) throw error;
     setClients(data || []);
   };
@@ -1035,6 +1039,27 @@ export default function Admin() {
                         <p className="text-sm font-medium">Dia {client.due_date}</p>
                       </div>
                     </div>
+                    
+                    {/* Informações de fidelidade */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={client.has_loyalty ? "default" : "outline"} className="text-xs">
+                          {client.has_loyalty ? "Com Fidelidade" : "Sem Fidelidade"}
+                        </Badge>
+                      </div>
+                      {client.has_loyalty && client.contract_end_date && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <Timer className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Fim da Fidelidade</span>
+                          </div>
+                          <p className="text-sm font-medium">
+                            {new Date(client.contract_end_date).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
                     {client.contact && (
                       <div className="space-y-1">
                         <div className="flex items-center gap-1">
@@ -1821,6 +1846,79 @@ export default function Admin() {
       setClientFormOpen(false);
       setSelectedClient(null);
     }} />
+
+    {/* Dialog de detalhes do cliente */}
+    <AlertDialog open={clientDetailsOpen} onOpenChange={setClientDetailsOpen}>
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Detalhes do Cliente</AlertDialogTitle>
+        </AlertDialogHeader>
+        <div className="space-y-4">
+          {selectedClient && (
+            <>
+              <div>
+                <span className="font-medium">Nome:</span>
+                <p>{selectedClient.name}</p>
+              </div>
+              <div>
+                <span className="font-medium">Contato:</span>
+                <p>{selectedClient.contact || 'Não informado'}</p>
+              </div>
+              <div>
+                <span className="font-medium">Serviço:</span>
+                <p>{selectedClient.service || 'Não informado'}</p>
+              </div>
+              <div>
+                <span className="font-medium">Valor Mensal:</span>
+                <p>
+                  {selectedClient.monthly_value 
+                    ? `R$ ${selectedClient.monthly_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                    : 'Não informado'
+                  }
+                </p>
+              </div>
+              <div>
+                <span className="font-medium">Data de Início:</span>
+                <p>{selectedClient.start_date ? new Date(selectedClient.start_date).toLocaleDateString('pt-BR') : 'Não informado'}</p>
+              </div>
+              <div>
+                <span className="font-medium">Dia de Vencimento:</span>
+                <p>Dia {selectedClient.due_date}</p>
+              </div>
+              <div>
+                <span className="font-medium">Fidelidade:</span>
+                <p>{selectedClient.has_loyalty ? 'Sim' : 'Não'}</p>
+              </div>
+              {selectedClient.has_loyalty && (
+                <>
+                  <div>
+                    <span className="font-medium">Início do Contrato:</span>
+                    <p>{selectedClient.contract_start_date ? new Date(selectedClient.contract_start_date).toLocaleDateString('pt-BR') : 'Não informado'}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Fim do Contrato:</span>
+                    <p>{selectedClient.contract_end_date ? new Date(selectedClient.contract_end_date).toLocaleDateString('pt-BR') : 'Não informado'}</p>
+                  </div>
+                </>
+              )}
+              <div>
+                <span className="font-medium">Status:</span>
+                <p>{selectedClient.active ? 'Ativo' : 'Inativo'}</p>
+              </div>
+              {selectedClient.observations && (
+                <div>
+                  <span className="font-medium">Observações:</span>
+                  <p>{selectedClient.observations}</p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Fechar</AlertDialogCancel>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
         {/* Dialog de detalhes do pagamento */}
         <AlertDialog open={paymentDetailsOpen} onOpenChange={setPaymentDetailsOpen}>
