@@ -49,8 +49,9 @@ export function CampaignsTab({ campaigns: propCampaigns = [], accounts = [], sel
       
       const { data, error } = await supabase.functions.invoke('facebook-campaigns', {
         body: { 
-          accounts: accountIds,
-          date_range: {
+          action: 'list_campaigns',
+          accountIds: accountIds,
+          dateRange: {
             from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             to: new Date().toISOString().split('T')[0]
           }

@@ -18,12 +18,16 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { action, accountIds, dateRange } = await req.json()
+    const { action, accountIds, accounts, dateRange, date_range } = await req.json()
 
-    if (action === 'list_campaigns') {
-      console.log('Fetching campaigns for accounts:', accountIds, 'Date range:', dateRange)
+    // Aceitar tanto 'list_campaigns' quanto a falta do parâmetro action para compatibilidade
+    if (action === 'list_campaigns' || !action) {
+      const finalAccountIds = accountIds || accounts || []
+      const finalDateRange = dateRange || date_range
+      
+      console.log('Fetching campaigns for accounts:', finalAccountIds, 'Date range:', finalDateRange)
 
-      if (!accountIds || accountIds.length === 0) {
+      if (!finalAccountIds || finalAccountIds.length === 0) {
         return new Response(
           JSON.stringify({ error: 'No account IDs provided' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
@@ -60,12 +64,20 @@ serve(async (req) => {
 
       const campaigns = []
 
-      for (const accountId of accountIds) {
+      for (const accountId of finalAccountIds) {
         try {
           console.log(`Fetching campaigns for account: ${accountId}`)
           
-          // Fetch campaigns from Facebook API
-          const campaignsUrl = `https://graph.facebook.com/v18.0/${accountId}/campaigns?fields=id,name,status,objective,insights{spend,impressions,clicks,actions,cost_per_action_type,cpm,cpc,ctr}&access_token=${connection.access_token}`
+          // Construir URL com filtros de data se fornecidos
+          let campaignsUrl = `https://graph.facebook.com/v18.0/${accountId}/campaigns?fields=id,name,status,objective`
+          
+          if (finalDateRange) {
+            campaignsUrl += `,insights.time_range({'since':'${finalDateRange.from}','until':'${finalDateRange.to}'}){spend,impressions,clicks,actions,cost_per_action_type,cpm,cpc,ctr}`
+          } else {
+            campaignsUrl += `,insights{spend,impressions,clicks,actions,cost_per_action_type,cpm,cpc,ctr}`
+          }
+          
+          campaignsUrl += `&access_token=${connection.access_token}`
           
           const campaignsResponse = await fetch(campaignsUrl)
           const campaignsData = await campaignsResponse.json()
