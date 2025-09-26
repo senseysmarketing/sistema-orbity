@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, AlertTriangle, TrendingUp, TrendingDown, Minus, DollarSign, Edit3 } from "lucide-react";
+import { Calendar, AlertTriangle, TrendingUp, TrendingDown, Minus, DollarSign, Edit3, RefreshCw, BarChart3, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,16 @@ interface ClientOverview {
   last_optimization: string | null;
   results: 'good' | 'average' | 'bad' | 'excellent' | 'terrible' | null;
   client_notes: string | null;
-  daily_spend: number | null;
+  average_daily_spend: number | null;
+}
+
+interface OverviewSummary {
+  total_accounts: number;
+  needs_optimization: number;
+  average_result_score: number;
+  total_daily_budget: number;
+  total_daily_spend: number;
+  performance_distribution: Record<string, number>;
 }
 
 interface OverviewTabProps {
@@ -44,6 +53,7 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
   const [loading, setLoading] = useState(true);
   const [editingClient, setEditingClient] = useState<ClientOverview | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [overviewSummary, setOverviewSummary] = useState<OverviewSummary | null>(null);
   const { profile } = useAuth();
   const { toast } = useToast();
 
@@ -55,8 +65,11 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
     try {
       setLoading(true);
       
-      // Buscar dados dos clientes ou criar registros padrão baseados nas contas selecionadas
       const overviewData: ClientOverview[] = [];
+      let totalBudget = 0;
+      let totalSpend = 0;
+      let needsOptimization = 0;
+      const performanceDistribution: Record<string, number> = {};
       
       for (const account of selectedAdAccounts) {
         // Tentar buscar dados existentes de client overview
@@ -66,30 +79,66 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
           .eq('client_id', account.id)
           .single();
 
-        // Buscar métricas recentes para gasto diário
+        // Buscar orçamento da conta via Facebook API se disponível
+        let dailyBudget = existingData?.daily_budget || null;
+        
+        // Buscar métricas dos últimos 7 dias para calcular média de gasto
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
         const { data: metricsData } = await supabase
           .from('ad_account_metrics')
-          .select('spend, date_start')
+          .select('spend')
           .eq('ad_account_id', account.ad_account_id)
-          .order('date_start', { ascending: false })
-          .limit(1)
-          .single();
+          .gte('date_start', sevenDaysAgo.toISOString().split('T')[0])
+          .order('date_start', { ascending: false });
+
+        // Calcular média de gasto diário dos últimos 7 dias
+        const averageDailySpend = metricsData && metricsData.length > 0
+          ? metricsData.reduce((sum, record) => sum + (Number(record.spend) || 0), 0) / metricsData.length
+          : null;
 
         const clientOverview: ClientOverview = {
           ad_account_id: account.ad_account_id,
           ad_account_name: account.ad_account_name,
           currency: account.currency,
-          daily_budget: existingData?.daily_budget || null,
+          daily_budget: dailyBudget,
           last_optimization: existingData?.last_optimization || null,
           results: existingData?.results || null,
           client_notes: existingData?.observations || null,
-          daily_spend: metricsData?.spend || null,
+          average_daily_spend: averageDailySpend,
         };
+
+        // Calcular estatísticas para o resumo
+        if (dailyBudget) totalBudget += dailyBudget;
+        if (averageDailySpend) totalSpend += averageDailySpend;
+        
+        if (clientOverview.last_optimization) {
+          const daysSince = differenceInDays(new Date(), new Date(clientOverview.last_optimization));
+          if (daysSince > 7) needsOptimization++;
+        } else {
+          needsOptimization++;
+        }
+
+        if (clientOverview.results) {
+          performanceDistribution[clientOverview.results] = (performanceDistribution[clientOverview.results] || 0) + 1;
+        }
 
         overviewData.push(clientOverview);
       }
 
+      // Calcular resumo
+      const summary: OverviewSummary = {
+        total_accounts: selectedAdAccounts.length,
+        needs_optimization: needsOptimization,
+        average_result_score: calculateAverageScore(performanceDistribution),
+        total_daily_budget: totalBudget,
+        total_daily_spend: totalSpend,
+        performance_distribution: performanceDistribution,
+      };
+
       setClientsOverview(overviewData);
+      setOverviewSummary(summary);
     } catch (error) {
       console.error('Erro ao carregar overview dos clientes:', error);
       toast({
@@ -100,6 +149,20 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const calculateAverageScore = (distribution: Record<string, number>) => {
+    const scoreMap = { terrible: 1, bad: 2, average: 3, good: 4, excellent: 5 };
+    let totalScore = 0;
+    let totalAccounts = 0;
+    
+    Object.entries(distribution).forEach(([result, count]) => {
+      const score = scoreMap[result as keyof typeof scoreMap] || 0;
+      totalScore += score * count;
+      totalAccounts += count;
+    });
+    
+    return totalAccounts > 0 ? totalScore / totalAccounts : 0;
   };
 
   const handleEditClient = (client: ClientOverview) => {
@@ -206,6 +269,56 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
     }).format(value);
   };
 
+  const getCardBackgroundColor = (results: string | null) => {
+    switch (results) {
+      case 'excellent':
+        return 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800';
+      case 'good':
+        return 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800';
+      case 'average':
+        return 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800';
+      case 'bad':
+        return 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800';
+      case 'terrible':
+        return 'bg-red-100 border-red-300 dark:bg-red-900 dark:border-red-700';
+      default:
+        return 'bg-card border-border';
+    }
+  };
+
+  const getPerformanceInsight = () => {
+    if (!overviewSummary) return null;
+    
+    const { average_result_score, needs_optimization, total_accounts } = overviewSummary;
+    const optimizationPercentage = (needs_optimization / total_accounts) * 100;
+    
+    if (optimizationPercentage > 50) {
+      return {
+        type: 'warning',
+        message: `${optimizationPercentage.toFixed(0)}% das contas precisam de otimização urgente`,
+        icon: AlertTriangle,
+      };
+    } else if (average_result_score >= 4) {
+      return {
+        type: 'success',
+        message: 'Performance geral excelente em todas as contas',
+        icon: TrendingUp,
+      };
+    } else if (average_result_score <= 2) {
+      return {
+        type: 'danger',
+        message: 'Performance geral abaixo do esperado - ação necessária',
+        icon: TrendingDown,
+      };
+    }
+    
+    return {
+      type: 'info',
+      message: 'Performance moderada - oportunidades de melhoria',
+      icon: BarChart3,
+    };
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -214,20 +327,110 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
     );
   }
 
+  const insight = getPerformanceInsight();
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Overview dos Clientes</h2>
-          <p className="text-muted-foreground">
-            Visão geral das contas de anúncios e performance dos clientes
-          </p>
+      {/* Header com Resumo e Insights */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">Overview dos Clientes</h2>
+            <p className="text-muted-foreground">
+              Visão geral das contas de anúncios e performance dos clientes
+            </p>
+          </div>
+          <Button 
+            onClick={fetchClientsOverview} 
+            variant="outline" 
+            size="sm"
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
         </div>
+
+        {/* Cards de Resumo */}
+        {overviewSummary && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Total de Contas</span>
+                </div>
+                <p className="text-2xl font-bold">{overviewSummary.total_accounts}</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Orçamento Total</span>
+                </div>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(overviewSummary.total_daily_budget, 'USD')}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Gasto Médio Total</span>
+                </div>
+                <p className="text-2xl font-bold">
+                  {formatCurrency(overviewSummary.total_daily_spend, 'USD')}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Precisam Otimização</span>
+                </div>
+                <p className="text-2xl font-bold text-orange-600">
+                  {overviewSummary.needs_optimization}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Insight Principal */}
+        {insight && (
+          <Alert className={`${
+            insight.type === 'warning' ? 'border-orange-200 bg-orange-50 dark:bg-orange-950' :
+            insight.type === 'success' ? 'border-green-200 bg-green-50 dark:bg-green-950' :
+            insight.type === 'danger' ? 'border-red-200 bg-red-50 dark:bg-red-950' :
+            'border-blue-200 bg-blue-50 dark:bg-blue-950'
+          }`}>
+            <insight.icon className={`h-4 w-4 ${
+              insight.type === 'warning' ? 'text-orange-600' :
+              insight.type === 'success' ? 'text-green-600' :
+              insight.type === 'danger' ? 'text-red-600' :
+              'text-blue-600'
+            }`} />
+            <AlertDescription className={
+              insight.type === 'warning' ? 'text-orange-800 dark:text-orange-200' :
+              insight.type === 'success' ? 'text-green-800 dark:text-green-200' :
+              insight.type === 'danger' ? 'text-red-800 dark:text-red-200' :
+              'text-blue-800 dark:text-blue-200'
+            }>
+              <strong>Insight:</strong> {insight.message}
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {clientsOverview.map((client) => (
-          <Card key={client.ad_account_id} className="relative">
+          <Card key={client.ad_account_id} className={`relative ${getCardBackgroundColor(client.results)}`}>
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
                 <div>
@@ -258,14 +461,14 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
                 </span>
               </div>
 
-              {/* Gasto Diário */}
+              {/* Gasto Diário Médio */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Gasto Diário</span>
+                  <span className="text-sm font-medium">Gasto Diário Médio (7d)</span>
                 </div>
                 <span className="text-sm">
-                  {formatCurrency(client.daily_spend, client.currency)}
+                  {formatCurrency(client.average_daily_spend, client.currency)}
                 </span>
               </div>
 
