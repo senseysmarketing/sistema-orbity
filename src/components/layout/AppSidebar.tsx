@@ -89,8 +89,8 @@ export function AppSidebar() {
   return <Sidebar className={`${collapsed ? "w-14" : "w-64"} bg-sidebar border-r-0`} collapsible="icon">
       {/* Header */}
       <SidebarHeader className="border-b border-sidebar-border p-4 bg-sidebar">
-        {!collapsed && <div className="flex items-center">
-            <img src={logoNew} alt="Logo" className="w-[122px] h-[32px] object-contain" />
+        {!collapsed && <div className="flex items-center justify-start">
+            <img src={logoNew} alt="Logo" className="w-[122px] h-[32px] object-contain ml-2" />
           </div>}
         {collapsed && <div className="flex justify-center">
             <img src={logoNew} alt="Logo" className="h-6 w-6" />
