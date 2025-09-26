@@ -213,9 +213,26 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   };
 
   const getMaxFacebookAdAccounts = (): number => {
-    const currentPlan = currentSubscription?.subscribed 
-      ? plans.find(p => p.name === currentSubscription.plan_name)
+    // Try to match plan by name (case-insensitive) first
+    let currentPlan = currentSubscription?.subscribed 
+      ? plans.find(p => p.name.trim().toLowerCase() === (currentSubscription.plan_name || '').trim().toLowerCase())
       : plans.find(p => p.slug === 'free');
+
+    // Fallbacks if exact match not found
+    if (!currentPlan && currentSubscription?.plan_name) {
+      const planNameLc = currentSubscription.plan_name.trim().toLowerCase();
+      // partial match
+      currentPlan = plans.find(p => p.name.trim().toLowerCase().includes(planNameLc) || planNameLc.includes(p.name.trim().toLowerCase())) || undefined;
+      // explicit Senseys fallback by slug if user plan mentions it
+      if (!currentPlan && planNameLc.includes('senseys')) {
+        currentPlan = plans.find(p => p.slug === 'senseys') || currentPlan;
+      }
+    }
+
+    // If still not found, keep free as the minimal fallback
+    if (!currentPlan) {
+      currentPlan = plans.find(p => p.slug === 'free');
+    }
 
     const max = currentPlan?.max_facebook_ad_accounts;
     if (!max || isNaN(max as any)) return 10; // fallback
