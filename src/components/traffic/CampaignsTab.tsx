@@ -185,6 +185,11 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
     return objectives[objective] || objective;
   };
 
+  const truncateText = (text: string, maxLength: number = 35) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -295,8 +300,8 @@ export function CampaignsTab({ selectedAdAccounts }: CampaignsTabProps) {
             {campaigns.filter(campaign => campaign.status === 'ACTIVE').map((campaign) => (
                 <>
                   <TableRow key={campaign.id}>
-                    <TableCell className="font-medium">
-                      {campaign.name}
+                    <TableCell className="font-medium" title={campaign.name}>
+                      {truncateText(campaign.name)}
                     </TableCell>
                     <TableCell>
                       {getStatusBadge(campaign.status)}
