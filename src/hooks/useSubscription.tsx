@@ -2,6 +2,9 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useAgency } from './useAgency';
+import { useCache } from './useCache';
+import { usePageVisibility } from './usePageVisibility';
+import { SessionAlert } from '@/components/ui/session-alert';
 import { toast } from 'sonner';
 
 interface SubscriptionPlan {
@@ -43,6 +46,7 @@ interface SubscriptionContextType {
   currentSubscription: SubscriptionStatus | null;
   loading: boolean;
   refreshing: boolean;
+  showRefreshAlert: boolean;
   checkSubscription: () => Promise<void>;
   createCheckout: (priceId: string) => Promise<void>;
   openCustomerPortal: () => Promise<void>;
@@ -50,6 +54,7 @@ interface SubscriptionContextType {
   isFeatureAvailable: (feature: string) => boolean;
   hasReachedLimit: (limitType: string, currentCount: number) => boolean;
   getMaxFacebookAdAccounts: () => number;
+  dismissRefreshAlert: () => void;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -57,12 +62,26 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { currentAgency } = useAgency();
+  const { isVisible, getTimeAway } = usePageVisibility();
+  const cache = useCache<SubscriptionStatus>(5 * 60 * 1000); // 5 minutes cache
+  const plansCache = useCache<SubscriptionPlan[]>(10 * 60 * 1000); // 10 minutes cache
+  
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [currentSubscription, setCurrentSubscription] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showRefreshAlert, setShowRefreshAlert] = useState(false);
+  const [lastCheckTime, setLastCheckTime] = useState(0);
 
-  const fetchPlans = async () => {
+  const fetchPlans = async (forceRefresh = false) => {
+    if (!forceRefresh) {
+      const cached = plansCache.get('plans');
+      if (cached.exists && !cached.isStale) {
+        setPlans(cached.data || []);
+        return;
+      }
+    }
+
     try {
       const { data, error } = await supabase
         .from('subscription_plans')
@@ -71,15 +90,29 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         .order('sort_order');
 
       if (error) throw error;
-      setPlans(data || []);
+      const planData = data || [];
+      setPlans(planData);
+      plansCache.set('plans', planData);
     } catch (error) {
       console.error('Error fetching plans:', error);
       toast.error('Erro ao carregar planos');
     }
   };
 
-  const checkSubscription = async () => {
+  const checkSubscription = async (forceRefresh = false) => {
     if (!user) return;
+
+    const cacheKey = `subscription_${user.id}_${currentAgency?.id}`;
+    
+    // Check cache first unless forcing refresh
+    if (!forceRefresh) {
+      const cached = cache.get(cacheKey);
+      if (cached.exists && !cached.isStale) {
+        setCurrentSubscription(cached.data);
+        if (loading) setLoading(false);
+        return;
+      }
+    }
 
     const isRefreshing = refreshing;
     if (!isRefreshing) setRefreshing(true);
@@ -94,12 +127,16 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       if (error) throw error;
       
       setCurrentSubscription(data);
+      cache.set(cacheKey, data);
+      setLastCheckTime(Date.now());
     } catch (error) {
       console.error('Error checking subscription:', error);
-      setCurrentSubscription({
+      const fallbackData = {
         subscribed: false,
         subscription_status: 'none',
-      });
+      };
+      setCurrentSubscription(fallbackData);
+      cache.set(cacheKey, fallbackData, { ttl: 30000 }); // Short cache for errors
     } finally {
       if (!isRefreshing) setRefreshing(false);
       if (loading) setLoading(false);
@@ -157,7 +194,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshPlans = async () => {
-    await fetchPlans();
+    await fetchPlans(true);
+  };
+
+  const dismissRefreshAlert = () => {
+    setShowRefreshAlert(false);
   };
 
   const isFeatureAvailable = (feature: string): boolean => {
@@ -239,19 +280,40 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     return max >= 999999 ? Number.POSITIVE_INFINITY : max;
   };
 
+  // Check if user has been away for too long when page becomes visible
+  useEffect(() => {
+    if (isVisible && user) {
+      const timeAway = getTimeAway();
+      const AWAY_THRESHOLD = 10 * 60 * 1000; // 10 minutes
+      
+      if (timeAway > AWAY_THRESHOLD) {
+        setShowRefreshAlert(true);
+      }
+    }
+  }, [isVisible, user, getTimeAway]);
+
   useEffect(() => {
     if (user) {
       fetchPlans();
       checkSubscription();
 
-      // Set up periodic check every 30 seconds
-      const interval = setInterval(checkSubscription, 30000);
+      // Reduced frequency: check every 5 minutes instead of 30 seconds
+      const interval = setInterval(() => {
+        // Only check if page is visible and user is active
+        if (isVisible) {
+          const timeSinceLastCheck = Date.now() - lastCheckTime;
+          if (timeSinceLastCheck > 5 * 60 * 1000) { // 5 minutes
+            checkSubscription();
+          }
+        }
+      }, 5 * 60 * 1000);
+      
       return () => clearInterval(interval);
     } else {
       setCurrentSubscription(null);
       setLoading(false);
     }
-  }, [user]);
+  }, [user, isVisible]);
 
   // Check subscription when user changes agency
   useEffect(() => {
@@ -267,6 +329,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         currentSubscription,
         loading,
         refreshing,
+        showRefreshAlert,
         checkSubscription,
         createCheckout,
         openCustomerPortal,
@@ -274,9 +337,21 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         isFeatureAvailable,
         hasReachedLimit,
         getMaxFacebookAdAccounts,
+        dismissRefreshAlert,
       }}
     >
       {children}
+      <SessionAlert
+        show={showRefreshAlert}
+        title="Dados Desatualizados"
+        message="Você ficou muito tempo fora do sistema. Recomendamos atualizar os dados."
+        onRefresh={() => {
+          checkSubscription(true);
+          dismissRefreshAlert();
+        }}
+        onDismiss={dismissRefreshAlert}
+        autoHide={15000} // Auto hide after 15 seconds
+      />
     </SubscriptionContext.Provider>
   );
 }

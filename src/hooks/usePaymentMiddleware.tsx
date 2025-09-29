@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useAgency } from './useAgency';
+import { useCache } from './useCache';
+import { usePageVisibility } from './usePageVisibility';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
@@ -47,6 +49,8 @@ const PaymentMiddlewareContext = createContext<PaymentMiddlewareContextType | un
 export function PaymentMiddlewareProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
   const { currentAgency } = useAgency();
+  const { isVisible } = usePageVisibility();
+  const cache = useCache<PaymentStatus>(3 * 60 * 1000); // 3 minutes cache
   const navigate = useNavigate();
   
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>({
@@ -68,14 +72,27 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
     storage: 0
   });
   const [loading, setLoading] = useState(true);
+  const [lastCheckTime, setLastCheckTime] = useState(0);
 
   const isSuperAdmin = profile?.role === 'super_admin';
   const isAgencyAdmin = profile?.role === 'agency_admin';
 
-  const checkPaymentStatus = async () => {
+  const checkPaymentStatus = async (forceRefresh = false) => {
     if (!user || !currentAgency || isSuperAdmin) {
       setLoading(false);
       return;
+    }
+
+    const cacheKey = `payment_${currentAgency.id}`;
+    
+    // Check cache first unless forcing refresh
+    if (!forceRefresh) {
+      const cached = cache.get(cacheKey);
+      if (cached.exists && !cached.isStale) {
+        setPaymentStatus(cached.data || { isValid: false, isBlocked: true });
+        setLoading(false);
+        return;
+      }
     }
 
     try {
@@ -86,12 +103,15 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
 
       if (error) throw error;
 
+      const status: PaymentStatus = {
+        isValid: !!isValid,
+        isBlocked: !isValid,
+        reason: !isValid ? 'Subscription expired or payment overdue' : undefined
+      };
+
       if (!isValid) {
-        setPaymentStatus({
-          isValid: false,
-          isBlocked: true,
-          reason: 'Subscription expired or payment overdue'
-        });
+        setPaymentStatus(status);
+        cache.set(cacheKey, status, { ttl: 60000 }); // Short cache for invalid status
         return;
       }
 
@@ -105,12 +125,15 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
       if (subscription && subscription.length > 0) {
         const sub = subscription[0];
         
-        setPaymentStatus({
+        const fullStatus: PaymentStatus = {
           isValid: true,
           isBlocked: false,
           trialEnd: sub.trial_end,
           subscriptionEnd: sub.current_period_end
-        });
+        };
+
+        setPaymentStatus(fullStatus);
+        cache.set(cacheKey, fullStatus);
 
         setPlanLimits({
           users: sub.max_users,
@@ -120,13 +143,17 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
           storage: sub.max_storage_gb
         });
       }
+      
+      setLastCheckTime(Date.now());
     } catch (error) {
       console.error('Error checking payment status:', error);
-      setPaymentStatus({
+      const errorStatus: PaymentStatus = {
         isValid: false,
         isBlocked: true,
         reason: 'Unable to verify payment status'
-      });
+      };
+      setPaymentStatus(errorStatus);
+      cache.set(cacheKey, errorStatus, { ttl: 30000 }); // Short cache for errors
     } finally {
       setLoading(false);
     }
@@ -157,7 +184,7 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
 
   const refreshPaymentStatus = async () => {
     setLoading(true);
-    await Promise.all([checkPaymentStatus(), refreshUsageCounts()]);
+    await Promise.all([checkPaymentStatus(true), refreshUsageCounts()]);
   };
 
   const checkLimit = (type: keyof PlanLimits, newCount?: number): boolean => {
@@ -204,24 +231,43 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
     return Math.round((usageCounts[type] / planLimits[type]) * 100);
   };
 
-  // Check payment status when user or agency changes
+  // Check payment status when user or agency changes with intelligent caching
   useEffect(() => {
     if (user && currentAgency) {
-      refreshPaymentStatus();
+      // Only check immediately if we don't have cached data
+      const cacheKey = `payment_${currentAgency.id}`;
+      const cached = cache.get(cacheKey);
+      
+      if (!cached.exists) {
+        checkPaymentStatus();
+        refreshUsageCounts();
+      } else {
+        setPaymentStatus(cached.data || { isValid: false, isBlocked: true });
+        setLoading(false);
+        
+        // Schedule a background refresh if data is getting stale
+        if (cached.isStale) {
+          setTimeout(() => {
+            if (isVisible) {
+              checkPaymentStatus(true);
+              refreshUsageCounts();
+            }
+          }, 1000);
+        }
+      }
     } else {
       setLoading(false);
     }
   }, [user, currentAgency]);
 
-  // Block access for agencies with invalid subscriptions
+  // Remove automatic blocking - just show warning toasts instead
   useEffect(() => {
     if (!loading && !isSuperAdmin && paymentStatus.isBlocked) {
-      // Redirect to payment page or show blocked screen
-      toast.error('Acesso bloqueado: ' + (paymentStatus.reason || 'Subscription invalid'));
-      // You can redirect to a payment page here
-      // navigate('/subscription-expired');
+      // Show warning toast instead of blocking access
+      toast.error('Atenção: ' + (paymentStatus.reason || 'Subscription invalid'));
+      // Don't redirect automatically - let user choose when to act
     }
-  }, [paymentStatus.isBlocked, loading, isSuperAdmin, navigate]);
+  }, [paymentStatus.isBlocked, loading, isSuperAdmin]);
 
   return (
     <PaymentMiddlewareContext.Provider

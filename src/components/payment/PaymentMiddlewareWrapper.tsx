@@ -25,11 +25,7 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
     return <>{children}</>;
   }
 
-  // Show blocked screen if payment is invalid
-  if (paymentStatus.isBlocked || !paymentStatus.isValid) {
-    return <BlockedAccessScreen />;
-  }
-
-  // Normal access
+  // Don't block automatically anymore - just show the content
+  // Users will get toast notifications about payment issues
   return <>{children}</>;
 }
