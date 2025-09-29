@@ -65,7 +65,7 @@ export default function Auth() {
                 <Label htmlFor="login-password">Senha</Label>
                 <Input id="login-password" type="password" placeholder="Sua senha" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
               </div>
-              <Button type="submit" className="w-full gradient-primary" disabled={isLoading}>
+              <Button type="submit" disabled={isLoading} className="w-full gradient-primary text-white w-full ">
                 {isLoading ? <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Entrando...
