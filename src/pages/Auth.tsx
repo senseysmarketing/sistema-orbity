@@ -19,7 +19,6 @@ export default function Auth() {
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -51,8 +50,8 @@ export default function Auth() {
         {/* Auth Forms */}
         <Card className="backdrop-blur-lg bg-white/10 border-white/20 shadow-2xl">
           <CardHeader className="text-center">
-            <CardTitle>Acesse sua conta</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-white">Acesse sua conta</CardTitle>
+            <CardDescription className="text-white">
               Entre com suas credenciais para acessar o sistema
             </CardDescription>
           </CardHeader>
@@ -81,11 +80,7 @@ export default function Auth() {
           <div className="flex items-center justify-center space-x-2 text-sm text-white">
             <span>Ainda não tem uma agência?</span>
           </div>
-          <Button 
-            asChild 
-            variant="outline" 
-            className="w-full bg-white/20 hover:bg-white/30 border-white/30 text-white hover:text-white backdrop-blur-sm"
-          >
+          <Button asChild variant="outline" className="w-full bg-white/20 hover:bg-white/30 border-white/30 text-white hover:text-white backdrop-blur-sm">
             <Link to="/onboarding" className="flex items-center space-x-2">
               <Building2 className="h-4 w-4" />
               <span>Criar Nova Agência</span>
