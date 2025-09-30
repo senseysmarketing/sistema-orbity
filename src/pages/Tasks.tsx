@@ -1,22 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Search, Filter, Users, Clock, AlertCircle, Building, Eye, Edit, Trash2, MoreHorizontal, CheckCircle, AlertTriangle, TrendingUp, Calendar, Target, BarChart3, Activity, Timer, UserCheck, Zap, ArrowUpDown, Archive } from "lucide-react";
-import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import {
-  useSortable,
-} from '@dnd-kit/sortable';
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +25,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useTaskAssignments } from "@/hooks/useTaskAssignments";
-
 interface Task {
   id: string;
   title: string;
@@ -53,19 +38,16 @@ interface Task {
   created_by: string;
   archived?: boolean;
 }
-
 interface Profile {
   id: string;
   user_id: string;
   name: string;
   role: string;
 }
-
 interface Client {
   id: string;
   name: string;
 }
-
 export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -75,7 +57,7 @@ export default function Tasks() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  
+
   // Filtros e busca
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -87,86 +69,85 @@ export default function Tasks() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<"due_date" | "priority">("due_date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-
   const [newTask, setNewTask] = useState({
     title: "",
     description: "",
     status: "todo" as const,
     priority: "medium" as const,
-    assigned_to: "unassigned", // Mantemos para compatibilidade
-    assigned_users: [] as string[], // Novo campo para múltiplos usuários
+    assigned_to: "unassigned",
+    // Mantemos para compatibilidade
+    assigned_users: [] as string[],
+    // Novo campo para múltiplos usuários
     client_id: "no-client",
-    due_date: "",
+    due_date: ""
   });
-
-  const { profile } = useAuth();
-  const { currentAgency } = useAgency();
-  const { toast } = useToast();
+  const {
+    profile
+  } = useAuth();
+  const {
+    currentAgency
+  } = useAgency();
+  const {
+    toast
+  } = useToast();
 
   // Hook para gerenciar atribuições
-  const { 
-    assignments, 
-    loading: assignmentsLoading, 
-    fetchAssignments, 
-    assignUsersToTask, 
+  const {
+    assignments,
+    loading: assignmentsLoading,
+    fetchAssignments,
+    assignUsersToTask,
     getAssignedUsers,
-    getTasksForUser 
+    getTasksForUser
   } = useTaskAssignments();
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 3,
-        tolerance: 5,
-      },
-    })
-  );
-
+  const sensors = useSensors(useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 3,
+      tolerance: 5
+    }
+  }));
   useEffect(() => {
     fetchTasks();
     fetchProfiles();
     fetchClients();
     fetchAssignments();
   }, []);
-
   const fetchTasks = async () => {
     try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('archived', false)
-        .order('created_at', { ascending: false });
-
+      const {
+        data,
+        error
+      } = await supabase.from('tasks').select('*').eq('archived', false).order('created_at', {
+        ascending: false
+      });
       if (error) throw error;
       setTasks(data || []);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar tarefas",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const fetchProfiles = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, user_id, name, role');
-
+      const {
+        data,
+        error
+      } = await supabase.from('profiles').select('id, user_id, name, role');
       if (error) throw error;
       setProfiles(data || []);
     } catch (error: any) {
       console.error('Erro ao carregar perfis:', error);
     }
   };
-
   const fetchClients = async () => {
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('id, name');
-
+      const {
+        data,
+        error
+      } = await supabase.from('clients').select('id, name');
       if (error) throw error;
       setClients(data || []);
     } catch (error: any) {
@@ -180,38 +161,31 @@ export default function Tasks() {
   const filteredTasks = useMemo(() => {
     let filtered = tasks.filter(task => {
       // Filtro de busca
-      const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           task.description?.toLowerCase().includes(searchTerm.toLowerCase());
-      
+      const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) || task.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
       // Filtro de status
       const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-      
+
       // Filtro de prioridade
       const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
-      
+
       // Filtro de responsável
-      const matchesAssigned = assignedFilter === 'all' || 
-        (assignedFilter === 'unassigned' && !task.assigned_to) ||
-        task.assigned_to === assignedFilter;
-      
+      const matchesAssigned = assignedFilter === 'all' || assignedFilter === 'unassigned' && !task.assigned_to || task.assigned_to === assignedFilter;
+
       // Filtro de cliente
-      const matchesClient = clientFilter === 'all' || 
-        (clientFilter === 'no-client' && !task.client_id) ||
-        task.client_id === clientFilter;
-      
+      const matchesClient = clientFilter === 'all' || clientFilter === 'no-client' && !task.client_id || task.client_id === clientFilter;
+
       // Filtro de data de vencimento
       let matchesDueDate = true;
       if (dueDateFilter !== 'all') {
         const today = new Date();
         const taskDueDate = task.due_date ? new Date(task.due_date) : null;
-        
         switch (dueDateFilter) {
           case 'overdue':
             matchesDueDate = taskDueDate && taskDueDate < today && task.status !== 'done';
             break;
           case 'today':
-            matchesDueDate = taskDueDate && 
-              taskDueDate.toDateString() === today.toDateString();
+            matchesDueDate = taskDueDate && taskDueDate.toDateString() === today.toDateString();
             break;
           case 'week':
             const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -222,7 +196,6 @@ export default function Tasks() {
             break;
         }
       }
-      
       return matchesSearch && matchesStatus && matchesPriority && matchesAssigned && matchesClient && matchesDueDate;
     });
 
@@ -233,14 +206,17 @@ export default function Tasks() {
         const dateB = b.due_date ? new Date(b.due_date).getTime() : Infinity;
         return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
       } else if (sortBy === 'priority') {
-        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        const priorityOrder = {
+          high: 3,
+          medium: 2,
+          low: 1
+        };
         const priorityA = priorityOrder[a.priority];
         const priorityB = priorityOrder[b.priority];
         return sortOrder === 'asc' ? priorityA - priorityB : priorityB - priorityA;
       }
       return 0;
     });
-
     return filtered;
   }, [tasks, searchTerm, statusFilter, priorityFilter, assignedFilter, clientFilter, dueDateFilter, sortBy, sortOrder]);
 
@@ -248,42 +224,41 @@ export default function Tasks() {
   const analytics = useMemo(() => {
     const today = new Date();
     const thisWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-    
     const statusStats = {
       todo: filteredTasks.filter(t => t.status === 'todo').length,
       in_progress: filteredTasks.filter(t => t.status === 'in_progress').length,
       em_revisao: filteredTasks.filter(t => t.status === 'em_revisao').length,
-      done: filteredTasks.filter(t => t.status === 'done').length,
+      done: filteredTasks.filter(t => t.status === 'done').length
     };
-    
     const priorityStats = {
       high: filteredTasks.filter(t => t.priority === 'high').length,
       medium: filteredTasks.filter(t => t.priority === 'medium').length,
-      low: filteredTasks.filter(t => t.priority === 'low').length,
+      low: filteredTasks.filter(t => t.priority === 'low').length
     };
-    
     const overdueTasks = filteredTasks.filter(t => {
       const dueDate = t.due_date ? new Date(t.due_date) : null;
       return dueDate && dueDate < today && t.status !== 'done';
     }).length;
-    
     const dueTodayTasks = filteredTasks.filter(t => {
       const dueDate = t.due_date ? new Date(t.due_date) : null;
       return dueDate && dueDate.toDateString() === today.toDateString();
     }).length;
-    
     const dueThisWeekTasks = filteredTasks.filter(t => {
       const dueDate = t.due_date ? new Date(t.due_date) : null;
       return dueDate && dueDate <= thisWeek && dueDate >= today;
     }).length;
-    
     const unassignedTasks = filteredTasks.filter(t => !t.assigned_to).length;
-    
-    const completionRate = filteredTasks.length > 0 ? 
-      Math.round((statusStats.done / filteredTasks.length) * 100) : 0;
-    
+    const completionRate = filteredTasks.length > 0 ? Math.round(statusStats.done / filteredTasks.length * 100) : 0;
+
     // Análise por usuário
-    const userStats: { [key: string]: { name: string; total: number; completed: number; pending: number } } = {};
+    const userStats: {
+      [key: string]: {
+        name: string;
+        total: number;
+        completed: number;
+        pending: number;
+      };
+    } = {};
     profiles.forEach(profile => {
       const userTasks = filteredTasks.filter(t => t.assigned_to === profile.user_id);
       if (userTasks.length > 0) {
@@ -291,20 +266,21 @@ export default function Tasks() {
           name: profile.name,
           total: userTasks.length,
           completed: userTasks.filter(t => t.status === 'done').length,
-          pending: userTasks.filter(t => t.status !== 'done').length,
+          pending: userTasks.filter(t => t.status !== 'done').length
         };
       }
     });
-    
+
     // Análise por cliente
-    const clientStats: { [key: string]: number } = {};
+    const clientStats: {
+      [key: string]: number;
+    } = {};
     clients.forEach(client => {
       const clientTasks = filteredTasks.filter(t => t.client_id === client.id);
       if (clientTasks.length > 0) {
         clientStats[client.id] = clientTasks.length;
       }
     });
-    
     return {
       total: filteredTasks.length,
       statusStats,
@@ -318,57 +294,68 @@ export default function Tasks() {
       clientStats
     };
   }, [filteredTasks, profiles, clients]);
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'todo': return 'bg-muted text-muted-foreground';
-      case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-      case 'em_revisao': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
-      case 'done': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-      default: return 'bg-muted text-muted-foreground';
+      case 'todo':
+        return 'bg-muted text-muted-foreground';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'em_revisao':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+      case 'done':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      default:
+        return 'bg-muted text-muted-foreground';
     }
   };
-
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-      case 'high': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-      default: return 'bg-muted text-muted-foreground';
+      case 'low':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'high':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      default:
+        return 'bg-muted text-muted-foreground';
     }
   };
-
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'todo': return 'A Fazer';
-      case 'in_progress': return 'Em Andamento';
-      case 'em_revisao': return 'Em Revisão';
-      case 'done': return 'Concluída';
-      default: return status;
+      case 'todo':
+        return 'A Fazer';
+      case 'in_progress':
+        return 'Em Andamento';
+      case 'em_revisao':
+        return 'Em Revisão';
+      case 'done':
+        return 'Concluída';
+      default:
+        return status;
     }
   };
-
   const getPriorityLabel = (priority: string) => {
     switch (priority) {
-      case 'low': return 'Baixa';
-      case 'medium': return 'Média';
-      case 'high': return 'Alta';
-      default: return priority;
+      case 'low':
+        return 'Baixa';
+      case 'medium':
+        return 'Média';
+      case 'high':
+        return 'Alta';
+      default:
+        return priority;
     }
   };
-
   const getAssignedUserName = (userId: string | null) => {
     if (!userId) return 'Não atribuído';
     const user = profiles.find(p => p.user_id === userId);
     return user?.name || 'Usuário desconhecido';
   };
-
   const getClientName = (clientId: string | null) => {
     if (!clientId) return 'Sem cliente';
     const client = clients.find(c => c.id === clientId);
     return client?.name || 'Cliente desconhecido';
   };
-
   const formatDateBR = (value: string | null) => {
     if (!value) return '';
     const s = String(value);
@@ -376,75 +363,82 @@ export default function Tasks() {
     if (isNaN(date.getTime())) return '';
     return date.toLocaleDateString('pt-BR');
   };
-
   const getUrgencyLevel = (task: Task) => {
     const today = new Date();
     const dueDate = task.due_date ? new Date(task.due_date) : null;
-    
     if (task.status === 'done') {
-      return { level: 'completed', label: 'Concluída', color: 'bg-green-500 text-white' };
+      return {
+        level: 'completed',
+        label: 'Concluída',
+        color: 'bg-green-500 text-white'
+      };
     }
-    
     if (dueDate && dueDate < today) {
-      return { level: 'overdue', label: 'Atrasada', color: 'bg-red-500 text-white' };
+      return {
+        level: 'overdue',
+        label: 'Atrasada',
+        color: 'bg-red-500 text-white'
+      };
     }
-    
     if (task.priority === 'high') {
-      return { level: 'urgent', label: 'Urgente', color: 'bg-orange-500 text-white' };
+      return {
+        level: 'urgent',
+        label: 'Urgente',
+        color: 'bg-orange-500 text-white'
+      };
     }
-    
     if (dueDate && dueDate.toDateString() === today.toDateString()) {
-      return { level: 'today', label: 'Hoje', color: 'bg-blue-500 text-white' };
+      return {
+        level: 'today',
+        label: 'Hoje',
+        color: 'bg-blue-500 text-white'
+      };
     }
-    
-    return { level: 'normal', label: 'Normal', color: 'bg-gray-500 text-white' };
+    return {
+      level: 'normal',
+      label: 'Normal',
+      color: 'bg-gray-500 text-white'
+    };
   };
-
   const dateOnlyToISO = (dateStr: string) => {
     const [y, m, d] = dateStr.split('-').map(Number);
     const ts = Date.UTC(y, (m || 1) - 1, d || 1, 12, 0, 0);
     return new Date(ts).toISOString();
   };
-
   const handleCreateTask = async () => {
     if (!newTask.title.trim()) {
       toast({
         title: "Erro",
         description: "O título da tarefa é obrigatório.",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     try {
-      const { data: taskData, error } = await supabase
-        .from('tasks')
-        .insert({
-          title: newTask.title,
-          description: newTask.description,
-          status: newTask.status,
-          priority: newTask.priority,
-          assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
-          client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
-          due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
-          created_by: profile?.user_id,
-          agency_id: currentAgency?.id,
-        })
-        .select()
-        .single();
-
+      const {
+        data: taskData,
+        error
+      } = await supabase.from('tasks').insert({
+        title: newTask.title,
+        description: newTask.description,
+        status: newTask.status,
+        priority: newTask.priority,
+        assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
+        client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
+        due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
+        created_by: profile?.user_id,
+        agency_id: currentAgency?.id
+      }).select().single();
       if (error) throw error;
 
       // Atribuir usuários à tarefa
       if (newTask.assigned_users.length > 0 && taskData) {
         await assignUsersToTask(taskData.id, newTask.assigned_users);
       }
-
       toast({
         title: "Sucesso",
-        description: "Tarefa criada com sucesso!",
+        description: "Tarefa criada com sucesso!"
       });
-
       setNewTask({
         title: "",
         description: "",
@@ -453,7 +447,7 @@ export default function Tasks() {
         assigned_to: "unassigned",
         assigned_users: [],
         client_id: "no-client",
-        due_date: "",
+        due_date: ""
       });
       setIsDialogOpen(false);
       fetchTasks();
@@ -461,11 +455,10 @@ export default function Tasks() {
       toast({
         title: "Erro ao criar tarefa",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const handleEditTask = (task: Task) => {
     setSelectedTask(task);
     setNewTask({
@@ -476,47 +469,41 @@ export default function Tasks() {
       assigned_to: task.assigned_to || "unassigned",
       assigned_users: getAssignedUsers(task.id).map(u => u.user_id),
       client_id: task.client_id || "no-client",
-      due_date: task.due_date ? task.due_date.split('T')[0] : "",
+      due_date: task.due_date ? task.due_date.split('T')[0] : ""
     });
     setIsEditDialogOpen(true);
   };
-
   const handleUpdateTask = async () => {
     if (!selectedTask || !newTask.title.trim()) {
       toast({
         title: "Erro",
         description: "O título da tarefa é obrigatório.",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({
-          title: newTask.title,
-          description: newTask.description,
-          status: newTask.status,
-          priority: newTask.priority,
-          assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
-          client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
-          due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
-        })
-        .eq('id', selectedTask.id);
-
+      const {
+        error
+      } = await supabase.from('tasks').update({
+        title: newTask.title,
+        description: newTask.description,
+        status: newTask.status,
+        priority: newTask.priority,
+        assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
+        client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
+        due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null
+      }).eq('id', selectedTask.id);
       if (error) throw error;
 
       // Atualizar usuários atribuídos à tarefa
       if (selectedTask) {
         await assignUsersToTask(selectedTask.id, newTask.assigned_users);
       }
-
       toast({
         title: "Sucesso",
-        description: "Tarefa atualizada com sucesso!",
+        description: "Tarefa atualizada com sucesso!"
       });
-
       setIsEditDialogOpen(false);
       setSelectedTask(null);
       fetchTasks();
@@ -524,40 +511,33 @@ export default function Tasks() {
       toast({
         title: "Erro ao atualizar tarefa",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const handleDeleteTask = async (taskId: string) => {
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .delete()
-        .eq('id', taskId);
-
+      const {
+        error
+      } = await supabase.from('tasks').delete().eq('id', taskId);
       if (error) throw error;
-
       toast({
         title: "Sucesso",
-        description: "Tarefa excluída com sucesso!",
+        description: "Tarefa excluída com sucesso!"
       });
-
       fetchTasks();
     } catch (error: any) {
       toast({
         title: "Erro ao excluir tarefa",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const handleViewDetails = (task: Task) => {
     setSelectedTask(task);
     setIsDetailDialogOpen(true);
   };
-
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
@@ -566,17 +546,16 @@ export default function Tasks() {
     setClientFilter("all");
     setDueDateFilter("all");
   };
-
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
   };
-
   const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
+    const {
+      active,
+      over
+    } = event;
     setActiveId(null);
-
     if (!over) return;
-
     const taskId = active.id as string;
     const newStatus = over.id as string;
 
@@ -589,85 +568,73 @@ export default function Tasks() {
     if (!task || task.status === newStatus) return;
 
     // Atualizar localmente primeiro para feedback imediato
-    setTasks(prev => prev.map(t => 
-      t.id === taskId ? { ...t, status: newStatus as 'todo' | 'in_progress' | 'em_revisao' | 'done' } : t
-    ));
-
+    setTasks(prev => prev.map(t => t.id === taskId ? {
+      ...t,
+      status: newStatus as 'todo' | 'in_progress' | 'em_revisao' | 'done'
+    } : t));
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ status: newStatus as 'todo' | 'in_progress' | 'em_revisao' | 'done' })
-        .eq('id', taskId);
-
+      const {
+        error
+      } = await supabase.from('tasks').update({
+        status: newStatus as 'todo' | 'in_progress' | 'em_revisao' | 'done'
+      }).eq('id', taskId);
       if (error) throw error;
-
       toast({
         title: "Sucesso",
-        description: `Tarefa movida para ${getStatusLabel(newStatus)}!`,
+        description: `Tarefa movida para ${getStatusLabel(newStatus)}!`
       });
     } catch (error: any) {
       // Reverter mudança em caso de erro
-      setTasks(prev => prev.map(t => 
-        t.id === taskId ? { ...t, status: task.status as 'todo' | 'in_progress' | 'em_revisao' | 'done' } : t
-      ));
-      
+      setTasks(prev => prev.map(t => t.id === taskId ? {
+        ...t,
+        status: task.status as 'todo' | 'in_progress' | 'em_revisao' | 'done'
+      } : t));
       toast({
         title: "Erro ao mover tarefa",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const handleArchiveCompleted = async () => {
     const completedTasks = tasks.filter(task => task.status === 'done');
-    
     if (completedTasks.length === 0) {
       toast({
         title: "Nenhuma tarefa para arquivar",
         description: "Não há tarefas concluídas para arquivar.",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
-
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ archived: true })
-        .eq('status', 'done');
-
+      const {
+        error
+      } = await supabase.from('tasks').update({
+        archived: true
+      }).eq('status', 'done');
       if (error) throw error;
-
       toast({
         title: "Sucesso",
-        description: `${completedTasks.length} tarefas concluídas foram arquivadas!`,
+        description: `${completedTasks.length} tarefas concluídas foram arquivadas!`
       });
-
       fetchTasks();
     } catch (error: any) {
       toast({
         title: "Erro ao arquivar tarefas",
         description: error.message,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const sortedTasksByStatus = (status: string) => {
     return filteredTasks.filter(task => task.status === status);
   };
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
+    return <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -678,7 +645,7 @@ export default function Tasks() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="create" className="flex items-center gap-2">
+            <Button variant="create" className="flex items-center gap-2 bg-[#1c102f]">
               <Plus className="h-4 w-4" />
               Nova Tarefa
             </Button>
@@ -693,27 +660,25 @@ export default function Tasks() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="title">Título *</Label>
-                <Input
-                  id="title"
-                  value={newTask.title}
-                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                  placeholder="Digite o título da tarefa"
-                />
+                <Input id="title" value={newTask.title} onChange={e => setNewTask({
+                ...newTask,
+                title: e.target.value
+              })} placeholder="Digite o título da tarefa" />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="description">Descrição</Label>
-                <Textarea
-                  id="description"
-                  value={newTask.description}
-                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                  placeholder="Digite a descrição da tarefa"
-                  rows={3}
-                />
+                <Textarea id="description" value={newTask.description} onChange={e => setNewTask({
+                ...newTask,
+                description: e.target.value
+              })} placeholder="Digite a descrição da tarefa" rows={3} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="status">Status</Label>
-                  <Select value={newTask.status} onValueChange={(value: any) => setNewTask({ ...newTask, status: value })}>
+                  <Select value={newTask.status} onValueChange={(value: any) => setNewTask({
+                  ...newTask,
+                  status: value
+                })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -727,7 +692,10 @@ export default function Tasks() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="priority">Prioridade</Label>
-                  <Select value={newTask.priority} onValueChange={(value: any) => setNewTask({ ...newTask, priority: value })}>
+                  <Select value={newTask.priority} onValueChange={(value: any) => setNewTask({
+                  ...newTask,
+                  priority: value
+                })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -742,39 +710,35 @@ export default function Tasks() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="assigned_users">Atribuir usuários</Label>
-                  <MultiUserSelector
-                    users={profiles}
-                    selectedUserIds={newTask.assigned_users}
-                    onSelectionChange={(userIds) => setNewTask({ ...newTask, assigned_users: userIds })}
-                    placeholder="Selecionar usuários..."
-                    emptyText="Nenhum usuário disponível."
-                  />
+                  <MultiUserSelector users={profiles} selectedUserIds={newTask.assigned_users} onSelectionChange={userIds => setNewTask({
+                  ...newTask,
+                  assigned_users: userIds
+                })} placeholder="Selecionar usuários..." emptyText="Nenhum usuário disponível." />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="client_id">Cliente</Label>
-                  <Select value={newTask.client_id} onValueChange={(value) => setNewTask({ ...newTask, client_id: value })}>
+                  <Select value={newTask.client_id} onValueChange={value => setNewTask({
+                  ...newTask,
+                  client_id: value
+                })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecionar cliente" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="no-client">Sem cliente</SelectItem>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
+                      {clients.map(client => <SelectItem key={client.id} value={client.id}>
                           {client.name}
-                        </SelectItem>
-                      ))}
+                        </SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="due_date">Data de Vencimento</Label>
-                <Input
-                  id="due_date"
-                  type="date"
-                  value={newTask.due_date}
-                  onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-                />
+                <Input id="due_date" type="date" value={newTask.due_date} onChange={e => setNewTask({
+                ...newTask,
+                due_date: e.target.value
+              })} />
               </div>
             </div>
             <DialogFooter>
@@ -871,7 +835,7 @@ export default function Tasks() {
                     </span>
                     <span>{analytics.statusStats.todo}</span>
                   </div>
-                  <Progress value={(analytics.statusStats.todo / analytics.total) * 100} className="h-2" />
+                  <Progress value={analytics.statusStats.todo / analytics.total * 100} className="h-2" />
                 </div>
                  <div className="space-y-2">
                    <div className="flex justify-between text-sm">
@@ -881,7 +845,7 @@ export default function Tasks() {
                      </span>
                      <span>{analytics.statusStats.in_progress}</span>
                    </div>
-                   <Progress value={(analytics.statusStats.in_progress / analytics.total) * 100} className="h-2" />
+                   <Progress value={analytics.statusStats.in_progress / analytics.total * 100} className="h-2" />
                  </div>
                  <div className="space-y-2">
                    <div className="flex justify-between text-sm">
@@ -891,7 +855,7 @@ export default function Tasks() {
                      </span>
                      <span>{analytics.statusStats.em_revisao}</span>
                    </div>
-                   <Progress value={(analytics.statusStats.em_revisao / analytics.total) * 100} className="h-2" />
+                   <Progress value={analytics.statusStats.em_revisao / analytics.total * 100} className="h-2" />
                  </div>
                  <div className="space-y-2">
                    <div className="flex justify-between text-sm">
@@ -901,7 +865,7 @@ export default function Tasks() {
                      </span>
                      <span>{analytics.statusStats.done}</span>
                    </div>
-                   <Progress value={(analytics.statusStats.done / analytics.total) * 100} className="h-2" />
+                   <Progress value={analytics.statusStats.done / analytics.total * 100} className="h-2" />
                  </div>
               </CardContent>
             </Card>
@@ -922,7 +886,7 @@ export default function Tasks() {
                     </span>
                     <span>{analytics.priorityStats.high}</span>
                   </div>
-                  <Progress value={(analytics.priorityStats.high / analytics.total) * 100} className="h-2" />
+                  <Progress value={analytics.priorityStats.high / analytics.total * 100} className="h-2" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
@@ -932,7 +896,7 @@ export default function Tasks() {
                     </span>
                     <span>{analytics.priorityStats.medium}</span>
                   </div>
-                  <Progress value={(analytics.priorityStats.medium / analytics.total) * 100} className="h-2" />
+                  <Progress value={analytics.priorityStats.medium / analytics.total * 100} className="h-2" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
@@ -942,7 +906,7 @@ export default function Tasks() {
                     </span>
                     <span>{analytics.priorityStats.low}</span>
                   </div>
-                  <Progress value={(analytics.priorityStats.low / analytics.total) * 100} className="h-2" />
+                  <Progress value={analytics.priorityStats.low / analytics.total * 100} className="h-2" />
                 </div>
               </CardContent>
             </Card>
@@ -962,12 +926,7 @@ export default function Tasks() {
               <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar tarefas..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
-                  />
+                  <Input placeholder="Buscar tarefas..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8" />
                 </div>
                 
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -1002,11 +961,9 @@ export default function Tasks() {
                   <SelectContent>
                     <SelectItem value="all">Todos os Responsáveis</SelectItem>
                     <SelectItem value="unassigned">Não atribuído</SelectItem>
-                    {profiles.map((profile) => (
-                      <SelectItem key={profile.id} value={profile.user_id}>
+                    {profiles.map(profile => <SelectItem key={profile.id} value={profile.user_id}>
                         {profile.name}
-                      </SelectItem>
-                    ))}
+                      </SelectItem>)}
                   </SelectContent>
                 </Select>
 
@@ -1043,36 +1000,19 @@ export default function Tasks() {
                     </SelectContent>
                   </Select>
                   
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}>
                     <ArrowUpDown className="h-4 w-4" />
                   </Button>
                   
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleArchiveCompleted}
-                    className="flex items-center gap-2"
-                  >
+                  <Button variant="outline" size="sm" onClick={handleArchiveCompleted} className="flex items-center gap-2">
                     <Archive className="h-4 w-4" />
                     Arquivar
                   </Button>
                   
-                  <Button
-                    variant={viewMode === 'kanban' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setViewMode('kanban')}
-                  >
+                  <Button variant={viewMode === 'kanban' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('kanban')}>
                     Kanban
                   </Button>
-                  <Button
-                    variant={viewMode === 'list' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setViewMode('list')}
-                  >
+                  <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('list')}>
                     Lista
                   </Button>
                 </div>
@@ -1081,127 +1021,36 @@ export default function Tasks() {
           </Card>
 
           {/* Visualizações das Tarefas */}
-          {filteredTasks.length === 0 ? (
-            <Card>
+          {filteredTasks.length === 0 ? <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Activity className="h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">
                   {tasks.length === 0 ? 'Nenhuma tarefa encontrada' : 'Nenhum resultado encontrado'}
                 </h3>
                 <p className="text-muted-foreground text-center">
-                  {tasks.length === 0 
-                    ? 'Comece criando a primeira tarefa para sua equipe.'
-                    : 'Tente ajustar os filtros para ver mais resultados.'}
+                  {tasks.length === 0 ? 'Comece criando a primeira tarefa para sua equipe.' : 'Tente ajustar os filtros para ver mais resultados.'}
                 </p>
               </CardContent>
-            </Card>
-          ) : viewMode === 'kanban' ? (
-            /* Visualização Kanban */
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
+            </Card> : viewMode === 'kanban' ? (/* Visualização Kanban */
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <KanbanColumn
-                  id="todo"
-                  title="A Fazer"
-                  tasks={sortedTasksByStatus('todo')}
-                  color="bg-gray-500"
-                  count={analytics.statusStats.todo}
-                  onViewDetails={handleViewDetails}
-                  onEdit={handleEditTask}
-                  onDelete={handleDeleteTask}
-                  getPriorityColor={getPriorityColor}
-                  getPriorityLabel={getPriorityLabel}
-                  getUrgencyLevel={getUrgencyLevel}
-                  getAssignedUserName={getAssignedUserName}
-                  getClientName={getClientName}
-                  formatDateBR={formatDateBR}
-                  getAssignedUsers={getAssignedUsers}
-                />
+                <KanbanColumn id="todo" title="A Fazer" tasks={sortedTasksByStatus('todo')} color="bg-gray-500" count={analytics.statusStats.todo} onViewDetails={handleViewDetails} onEdit={handleEditTask} onDelete={handleDeleteTask} getPriorityColor={getPriorityColor} getPriorityLabel={getPriorityLabel} getUrgencyLevel={getUrgencyLevel} getAssignedUserName={getAssignedUserName} getClientName={getClientName} formatDateBR={formatDateBR} getAssignedUsers={getAssignedUsers} />
                 
-                <KanbanColumn
-                  id="in_progress"
-                  title="Em Andamento"
-                  tasks={sortedTasksByStatus('in_progress')}
-                  color="bg-blue-500"
-                  count={analytics.statusStats.in_progress}
-                  onViewDetails={handleViewDetails}
-                  onEdit={handleEditTask}
-                  onDelete={handleDeleteTask}
-                  getPriorityColor={getPriorityColor}
-                  getPriorityLabel={getPriorityLabel}
-                  getUrgencyLevel={getUrgencyLevel}
-                  getAssignedUserName={getAssignedUserName}
-                  getClientName={getClientName}
-                  formatDateBR={formatDateBR}
-                  getAssignedUsers={getAssignedUsers}
-                />
+                <KanbanColumn id="in_progress" title="Em Andamento" tasks={sortedTasksByStatus('in_progress')} color="bg-blue-500" count={analytics.statusStats.in_progress} onViewDetails={handleViewDetails} onEdit={handleEditTask} onDelete={handleDeleteTask} getPriorityColor={getPriorityColor} getPriorityLabel={getPriorityLabel} getUrgencyLevel={getUrgencyLevel} getAssignedUserName={getAssignedUserName} getClientName={getClientName} formatDateBR={formatDateBR} getAssignedUsers={getAssignedUsers} />
                 
-                <KanbanColumn
-                  id="em_revisao"
-                  title="Em Revisão"
-                  tasks={sortedTasksByStatus('em_revisao')}
-                  color="bg-purple-500"
-                  count={analytics.statusStats.em_revisao}
-                  onViewDetails={handleViewDetails}
-                  onEdit={handleEditTask}
-                  onDelete={handleDeleteTask}
-                  getPriorityColor={getPriorityColor}
-                  getPriorityLabel={getPriorityLabel}
-                  getUrgencyLevel={getUrgencyLevel}
-                  getAssignedUserName={getAssignedUserName}
-                  getClientName={getClientName}
-                  formatDateBR={formatDateBR}
-                  getAssignedUsers={getAssignedUsers}
-                 />
+                <KanbanColumn id="em_revisao" title="Em Revisão" tasks={sortedTasksByStatus('em_revisao')} color="bg-purple-500" count={analytics.statusStats.em_revisao} onViewDetails={handleViewDetails} onEdit={handleEditTask} onDelete={handleDeleteTask} getPriorityColor={getPriorityColor} getPriorityLabel={getPriorityLabel} getUrgencyLevel={getUrgencyLevel} getAssignedUserName={getAssignedUserName} getClientName={getClientName} formatDateBR={formatDateBR} getAssignedUsers={getAssignedUsers} />
                 
-                <KanbanColumn
-                  id="done"
-                  title="Concluídas"
-                  tasks={sortedTasksByStatus('done')}
-                  color="bg-green-500"
-                  count={analytics.statusStats.done}
-                  onViewDetails={handleViewDetails}
-                  onEdit={handleEditTask}
-                  onDelete={handleDeleteTask}
-                  getPriorityColor={getPriorityColor}
-                  getPriorityLabel={getPriorityLabel}
-                  getUrgencyLevel={getUrgencyLevel}
-                  getAssignedUserName={getAssignedUserName}
-                  getClientName={getClientName}
-                  formatDateBR={formatDateBR}
-                  getAssignedUsers={getAssignedUsers}
-                />
+                <KanbanColumn id="done" title="Concluídas" tasks={sortedTasksByStatus('done')} color="bg-green-500" count={analytics.statusStats.done} onViewDetails={handleViewDetails} onEdit={handleEditTask} onDelete={handleDeleteTask} getPriorityColor={getPriorityColor} getPriorityLabel={getPriorityLabel} getUrgencyLevel={getUrgencyLevel} getAssignedUserName={getAssignedUserName} getClientName={getClientName} formatDateBR={formatDateBR} getAssignedUsers={getAssignedUsers} />
               </div>
               
               <DragOverlay>
-                {activeId ? (
-                  <SortableTaskCard
-                    task={tasks.find(task => task.id === activeId)!}
-                    onViewDetails={() => {}}
-                    onEdit={() => {}}
-                    onDelete={() => {}}
-                    getPriorityColor={getPriorityColor}
-                    getPriorityLabel={getPriorityLabel}
-                    getUrgencyLevel={getUrgencyLevel}
-                    getAssignedUserName={getAssignedUserName}
-                    getClientName={getClientName}
-                    formatDateBR={formatDateBR}
-                    assignedUsers={activeId ? getAssignedUsers(activeId) : []}
-                  />
-                ) : null}
+                {activeId ? <SortableTaskCard task={tasks.find(task => task.id === activeId)!} onViewDetails={() => {}} onEdit={() => {}} onDelete={() => {}} getPriorityColor={getPriorityColor} getPriorityLabel={getPriorityLabel} getUrgencyLevel={getUrgencyLevel} getAssignedUserName={getAssignedUserName} getClientName={getClientName} formatDateBR={formatDateBR} assignedUsers={activeId ? getAssignedUsers(activeId) : []} /> : null}
               </DragOverlay>
-            </DndContext>
-          ) : (
-            /* Visualização Lista */
-            <div className="grid gap-4">
-              {filteredTasks.map((task) => {
-                const urgency = getUrgencyLevel(task);
-                return (
-                  <Card key={task.id} className="hover:shadow-md transition-shadow">
+            </DndContext>) : (/* Visualização Lista */
+        <div className="grid gap-4">
+              {filteredTasks.map(task => {
+            const urgency = getUrgencyLevel(task);
+            return <Card key={task.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
                       <div className="space-y-3">
                         {/* Header com título e urgência */}
@@ -1238,10 +1087,7 @@ export default function Tasks() {
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar
                               </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="text-destructive focus:text-destructive" 
-                                onClick={() => handleDeleteTask(task.id)}
-                              >
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDeleteTask(task.id)}>
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Excluir
                               </DropdownMenuItem>
@@ -1272,19 +1118,15 @@ export default function Tasks() {
                         </div>
                         
                         {/* Descrição */}
-                        {task.description && (
-                          <div>
+                        {task.description && <div>
                             <span className="font-medium text-muted-foreground text-sm">Descrição:</span>
                             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
-                          </div>
-                        )}
+                          </div>}
                       </div>
                     </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+                  </Card>;
+          })}
+            </div>)}
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
@@ -1295,8 +1137,7 @@ export default function Tasks() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
-                  {analytics.overdueTasks > 0 && (
-                    <div className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  {analytics.overdueTasks > 0 && <div className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                       <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
                       <div>
                         <p className="font-medium text-red-700 dark:text-red-300">Tarefas Atrasadas</p>
@@ -1304,11 +1145,9 @@ export default function Tasks() {
                           {analytics.overdueTasks} tarefas estão atrasadas e precisam de atenção imediata.
                         </p>
                       </div>
-                    </div>
-                  )}
+                    </div>}
                   
-                  {analytics.dueTodayTasks > 0 && (
-                    <div className="flex items-start gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                  {analytics.dueTodayTasks > 0 && <div className="flex items-start gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                       <Clock className="h-5 w-5 text-orange-500 mt-0.5" />
                       <div>
                         <p className="font-medium text-orange-700 dark:text-orange-300">Vencendo Hoje</p>
@@ -1316,11 +1155,9 @@ export default function Tasks() {
                           {analytics.dueTodayTasks} tarefas vencem hoje e precisam ser priorizadas.
                         </p>
                       </div>
-                    </div>
-                  )}
+                    </div>}
                   
-                  {analytics.unassignedTasks > 0 && (
-                    <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  {analytics.unassignedTasks > 0 && <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                       <Users className="h-5 w-5 text-blue-500 mt-0.5" />
                       <div>
                         <p className="font-medium text-blue-700 dark:text-blue-300">Sem Responsável</p>
@@ -1328,11 +1165,9 @@ export default function Tasks() {
                           {analytics.unassignedTasks} tarefas ainda não foram atribuídas a ninguém.
                         </p>
                       </div>
-                    </div>
-                  )}
+                    </div>}
                   
-                  {analytics.completionRate >= 70 && (
-                    <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  {analytics.completionRate >= 70 && <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                       <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
                       <div>
                         <p className="font-medium text-green-700 dark:text-green-300">Ótimo Progresso!</p>
@@ -1340,8 +1175,7 @@ export default function Tasks() {
                           Taxa de conclusão de {analytics.completionRate}%. A equipe está performando bem!
                         </p>
                       </div>
-                    </div>
-                  )}
+                    </div>}
                 </div>
               </CardContent>
             </Card>
@@ -1351,14 +1185,9 @@ export default function Tasks() {
                 <CardTitle>Próximos Vencimentos</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {filteredTasks
-                  .filter(task => task.due_date && task.status !== 'done')
-                  .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
-                  .slice(0, 5)
-                  .map(task => {
-                    const urgency = getUrgencyLevel(task);
-                    return (
-                      <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg">
+                {filteredTasks.filter(task => task.due_date && task.status !== 'done').sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime()).slice(0, 5).map(task => {
+                const urgency = getUrgencyLevel(task);
+                return <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className={`w-2 h-2 rounded-full ${urgency.level === 'overdue' ? 'bg-red-500' : urgency.level === 'today' ? 'bg-orange-500' : 'bg-blue-500'}`}></div>
                           <div>
@@ -1371,19 +1200,16 @@ export default function Tasks() {
                         <Badge className={getPriorityColor(task.priority)} variant="outline">
                           {getPriorityLabel(task.priority)}
                         </Badge>
-                      </div>
-                    );
-                  })}
+                      </div>;
+              })}
                 
-                {filteredTasks.filter(task => task.due_date && task.status !== 'done').length === 0 && (
-                  <div className="text-center py-8">
+                {filteredTasks.filter(task => task.due_date && task.status !== 'done').length === 0 && <div className="text-center py-8">
                     <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold mb-2">Nenhuma tarefa pendente</h3>
                     <p className="text-muted-foreground">
                       Todas as tarefas com prazo estão concluídas!
                     </p>
-                  </div>
-                )}
+                  </div>}
               </CardContent>
             </Card>
           </div>
@@ -1398,32 +1224,28 @@ export default function Tasks() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {Object.entries(analytics.userStats).map(([userId, stats]) => (
-                <div key={userId} className="space-y-2">
+              {Object.entries(analytics.userStats).map(([userId, stats]) => <div key={userId} className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="font-medium">{stats.name}</span>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <span>{stats.completed}/{stats.total} concluídas</span>
-                      <span>({stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%)</span>
+                      <span>({stats.total > 0 ? Math.round(stats.completed / stats.total * 100) : 0}%)</span>
                     </div>
                   </div>
-                  <Progress value={stats.total > 0 ? (stats.completed / stats.total) * 100 : 0} className="h-2" />
+                  <Progress value={stats.total > 0 ? stats.completed / stats.total * 100 : 0} className="h-2" />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{stats.pending} pendentes</span>
                     <span>{stats.completed} finalizadas</span>
                   </div>
-                </div>
-              ))}
+                </div>)}
               
-              {Object.keys(analytics.userStats).length === 0 && (
-                <div className="text-center py-8">
+              {Object.keys(analytics.userStats).length === 0 && <div className="text-center py-8">
                   <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Nenhuma tarefa atribuída</h3>
                   <p className="text-muted-foreground">
                     Comece atribuindo tarefas aos membros da equipe.
                   </p>
-                </div>
-              )}
+                </div>}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1441,27 +1263,25 @@ export default function Tasks() {
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="edit-title">Título *</Label>
-              <Input
-                id="edit-title"
-                value={newTask.title}
-                onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                placeholder="Digite o título da tarefa"
-              />
+              <Input id="edit-title" value={newTask.title} onChange={e => setNewTask({
+              ...newTask,
+              title: e.target.value
+            })} placeholder="Digite o título da tarefa" />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-description">Descrição</Label>
-              <Textarea
-                id="edit-description"
-                value={newTask.description}
-                onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                placeholder="Digite a descrição da tarefa"
-                rows={3}
-              />
+              <Textarea id="edit-description" value={newTask.description} onChange={e => setNewTask({
+              ...newTask,
+              description: e.target.value
+            })} placeholder="Digite a descrição da tarefa" rows={3} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="edit-status">Status</Label>
-                <Select value={newTask.status} onValueChange={(value: any) => setNewTask({ ...newTask, status: value })}>
+                <Select value={newTask.status} onValueChange={(value: any) => setNewTask({
+                ...newTask,
+                status: value
+              })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -1475,7 +1295,10 @@ export default function Tasks() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-priority">Prioridade</Label>
-                <Select value={newTask.priority} onValueChange={(value: any) => setNewTask({ ...newTask, priority: value })}>
+                <Select value={newTask.priority} onValueChange={(value: any) => setNewTask({
+                ...newTask,
+                priority: value
+              })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -1490,39 +1313,35 @@ export default function Tasks() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="edit-assigned_users">Atribuir usuários</Label>
-                <MultiUserSelector
-                  users={profiles}
-                  selectedUserIds={newTask.assigned_users}
-                  onSelectionChange={(userIds) => setNewTask({ ...newTask, assigned_users: userIds })}
-                  placeholder="Selecionar usuários..."
-                  emptyText="Nenhum usuário disponível."
-                />
+                <MultiUserSelector users={profiles} selectedUserIds={newTask.assigned_users} onSelectionChange={userIds => setNewTask({
+                ...newTask,
+                assigned_users: userIds
+              })} placeholder="Selecionar usuários..." emptyText="Nenhum usuário disponível." />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-client_id">Cliente</Label>
-                <Select value={newTask.client_id} onValueChange={(value) => setNewTask({ ...newTask, client_id: value })}>
+                <Select value={newTask.client_id} onValueChange={value => setNewTask({
+                ...newTask,
+                client_id: value
+              })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecionar cliente" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="no-client">Sem cliente</SelectItem>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
+                    {clients.map(client => <SelectItem key={client.id} value={client.id}>
                         {client.name}
-                      </SelectItem>
-                    ))}
+                      </SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-due_date">Data de Vencimento</Label>
-              <Input
-                id="edit-due_date"
-                type="date"
-                value={newTask.due_date}
-                onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-              />
+              <Input id="edit-due_date" type="date" value={newTask.due_date} onChange={e => setNewTask({
+              ...newTask,
+              due_date: e.target.value
+            })} />
             </div>
           </div>
           <DialogFooter>
@@ -1545,8 +1364,7 @@ export default function Tasks() {
               Informações completas sobre a tarefa
             </DialogDescription>
           </DialogHeader>
-          {selectedTask && (
-            <div className="space-y-4">
+          {selectedTask && <div className="space-y-4">
               <div>
                 <h3 className="text-lg font-semibold">{selectedTask.title}</h3>
                 <div className="flex gap-2 mt-2">
@@ -1559,12 +1377,10 @@ export default function Tasks() {
                 </div>
               </div>
 
-              {selectedTask.description && (
-                <div>
+              {selectedTask.description && <div>
                   <label className="text-sm font-medium text-muted-foreground">Descrição</label>
                   <p className="text-sm mt-1">{selectedTask.description}</p>
-                </div>
-              )}
+                </div>}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1589,10 +1405,8 @@ export default function Tasks() {
                   <p className="text-sm mt-1">{formatDateBR(selectedTask.created_at)}</p>
                 </div>
               </div>
-            </div>
-          )}
+            </div>}
         </DialogContent>
       </Dialog>
-    </div>
-  );
+    </div>;
 }
