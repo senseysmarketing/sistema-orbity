@@ -72,12 +72,12 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
       const performanceDistribution: Record<string, number> = {};
       
       for (const account of selectedAdAccounts) {
-        // Tentar buscar dados existentes de client overview
+        // Tentar buscar dados existentes usando ad_account_id na plataforma data
         const { data: existingData } = await supabase
           .from('traffic_controls')
           .select('*')
-          .eq('client_id', account.id)
-          .single();
+          .contains('platform_data', { ad_account_id: account.ad_account_id })
+          .maybeSingle();
 
         // Buscar orçamento da conta via Facebook API se disponível
         let dailyBudget = existingData?.daily_budget || null;
@@ -174,18 +174,23 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
     if (!editingClient) return;
 
     try {
-      // Buscar se já existe um registro para esta conta
+      // Buscar se já existe um registro para esta conta usando platform_data
       const { data: existingRecord } = await supabase
         .from('traffic_controls')
-        .select('id')
-        .eq('client_id', editingClient.ad_account_id)
-        .single();
+        .select('id, client_id')
+        .contains('platform_data', { ad_account_id: editingClient.ad_account_id })
+        .maybeSingle();
 
       const updateData = {
         daily_budget: editingClient.daily_budget,
         last_optimization: editingClient.last_optimization,
         results: editingClient.results,
         observations: editingClient.client_notes,
+        platform_data: {
+          ad_account_id: editingClient.ad_account_id,
+          ad_account_name: editingClient.ad_account_name,
+          currency: editingClient.currency,
+        }
       };
 
       if (existingRecord) {
@@ -197,12 +202,25 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
 
         if (error) throw error;
       } else {
+        // Criar cliente dummy se necessário e depois criar traffic control
+        const { data: dummyClient, error: clientError } = await supabase
+          .from('clients')
+          .insert({
+            name: editingClient.ad_account_name,
+            active: true,
+            service: 'Facebook Ads'
+          })
+          .select('id')
+          .single();
+
+        if (clientError) throw clientError;
+
         // Criar novo registro
         const { error } = await supabase
           .from('traffic_controls')
           .insert({
             ...updateData,
-            client_id: editingClient.ad_account_id,
+            client_id: dummyClient.id,
             platforms: ['facebook'],
           });
 
