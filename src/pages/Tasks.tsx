@@ -645,7 +645,7 @@ export default function Tasks() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="create" className="flex items-center gap-2 bg-[#1c102f]">
+            <Button variant="action" className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
               Nova Tarefa
             </Button>
@@ -1009,10 +1009,10 @@ export default function Tasks() {
                     Arquivar
                   </Button>
                   
-                  <Button variant={viewMode === 'kanban' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('kanban')}>
+                  <Button variant={viewMode === 'kanban' ? 'action' : 'outline'} size="sm" onClick={() => setViewMode('kanban')}>
                     Kanban
                   </Button>
-                  <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('list')}>
+                  <Button variant={viewMode === 'list' ? 'action' : 'outline'} size="sm" onClick={() => setViewMode('list')}>
                     Lista
                   </Button>
                 </div>

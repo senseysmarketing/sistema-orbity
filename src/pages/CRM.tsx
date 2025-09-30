@@ -269,7 +269,7 @@ export default function CRM() {
           
           <Dialog open={showLeadForm} onOpenChange={setShowLeadForm}>
             <DialogTrigger asChild>
-              <Button>
+              <Button variant="action">
                 <Plus className="mr-2 h-4 w-4" />
                 Novo Lead
               </Button>
@@ -504,14 +504,14 @@ export default function CRM() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <Button
-                    variant={view === 'kanban' ? 'default' : 'outline'}
+                    variant={view === 'kanban' ? 'action' : 'outline'}
                     size="sm"
                     onClick={() => setView('kanban')}
                   >
                     <Grid className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant={view === 'list' ? 'default' : 'outline'}
+                    variant={view === 'list' ? 'action' : 'outline'}
                     size="sm"
                     onClick={() => setView('list')}
                   >

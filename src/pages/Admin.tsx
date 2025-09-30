@@ -1091,14 +1091,14 @@ export default function Admin() {
             <div className="flex gap-2">
               <div className="flex gap-1">
                 <Button
-                  variant={clientViewMode === 'cards' ? 'default' : 'outline'}
+                  variant={clientViewMode === 'cards' ? 'action' : 'outline'}
                   size="sm"
                   onClick={() => setClientViewMode('cards')}
                 >
                   Cards
                 </Button>
                 <Button
-                  variant={clientViewMode === 'table' ? 'default' : 'outline'}
+                  variant={clientViewMode === 'table' ? 'action' : 'outline'}
                   size="sm"
                   onClick={() => setClientViewMode('table')}
                 >
@@ -1106,6 +1106,7 @@ export default function Admin() {
                 </Button>
               </div>
               <Button 
+                variant="action"
                 onClick={() => {
                   const canAdd = checkLimitWithWarning('clients', clients.length + 1);
                   if (canAdd) {
@@ -1357,21 +1358,21 @@ export default function Admin() {
             <div className="flex gap-2">
               <div className="flex gap-1">
                 <Button
-                  variant={paymentViewMode === 'cards' ? 'default' : 'outline'}
+                  variant={paymentViewMode === 'cards' ? 'action' : 'outline'}
                   size="sm"
                   onClick={() => setPaymentViewMode('cards')}
                 >
                   Cards
                 </Button>
                 <Button
-                  variant={paymentViewMode === 'table' ? 'default' : 'outline'}
+                  variant={paymentViewMode === 'table' ? 'action' : 'outline'}
                   size="sm"
                   onClick={() => setPaymentViewMode('table')}
                 >
                   Tabela
                 </Button>
               </div>
-              <Button onClick={() => setPaymentFormOpen(true)} className="flex items-center gap-2">
+              <Button variant="action" onClick={() => setPaymentFormOpen(true)} className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 Novo Pagamento
               </Button>
@@ -1588,25 +1589,25 @@ export default function Admin() {
             <div className="flex gap-2">
               <div className="flex gap-1">
                 <Button
-                  variant={expenseViewMode === 'cards' ? 'default' : 'outline'}
+                  variant={expenseViewMode === 'cards' ? 'action' : 'outline'}
                   size="sm"
                   onClick={() => setExpenseViewMode('cards')}
                 >
                   Cards
                 </Button>
                 <Button
-                  variant={expenseViewMode === 'table' ? 'default' : 'outline'}
+                  variant={expenseViewMode === 'table' ? 'action' : 'outline'}
                   size="sm"
                   onClick={() => setExpenseViewMode('table')}
                 >
                   Tabela
                 </Button>
               </div>
-              <Button onClick={() => setExpenseFormOpen(true)} className="flex items-center gap-2">
+              <Button variant="action" onClick={() => setExpenseFormOpen(true)} className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 Nova Despesa
               </Button>
-              <Button onClick={() => setSalaryFormOpen(true)} className="flex items-center gap-2" variant="outline">
+              <Button variant="action" onClick={() => setSalaryFormOpen(true)} className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 Salário
               </Button>

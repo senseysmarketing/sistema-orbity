@@ -161,7 +161,7 @@ export function CustomStatusManager({ onStatusUpdate }: CustomStatusManagerProps
           </CardTitle>
           <Dialog open={showForm} onOpenChange={setShowForm}>
             <DialogTrigger asChild>
-              <Button size="sm">
+              <Button variant="action" size="sm">
                 <Plus className="h-4 w-4 mr-1" />
                 Novo Status
               </Button>

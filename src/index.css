@@ -155,6 +155,10 @@ All colors MUST be HSL.
     /* Create button color - #7dafd8 converted to HSL */
     --create-button: 203 58% 67%;
     --create-button-foreground: 0 0% 100%;
+
+    /* Action button color - #1c102f converted to HSL */
+    --action-button: 266 62% 12%;
+    --action-button-foreground: 0 0% 100%;
   }
 
   .dark {
@@ -197,6 +201,10 @@ All colors MUST be HSL.
     /* Create button color - #7dafd8 converted to HSL */
     --create-button: 203 58% 67%;
     --create-button-foreground: 0 0% 100%;
+
+    /* Action button color - #1c102f converted to HSL */
+    --action-button: 266 62% 12%;
+    --action-button-foreground: 0 0% 100%;
   }
 }
 

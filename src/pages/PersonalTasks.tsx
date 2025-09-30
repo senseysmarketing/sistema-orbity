@@ -605,13 +605,13 @@ export default function PersonalTasks() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setViewMode(viewMode === "list" ? "kanban" : "list")}>
+          <Button variant={viewMode === "kanban" ? "action" : "outline"} size="sm" onClick={() => setViewMode(viewMode === "list" ? "kanban" : "list")}>
             {viewMode === "list" ? <KanbanSquare className="h-4 w-4" /> : <List className="h-4 w-4" />}
             {viewMode === "list" ? "Kanban" : "Lista"}
           </Button>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2" style={{ backgroundColor: '#7dafd8', borderColor: '#7dafd8' }}>
+              <Button variant="action" className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 Nova Tarefa
               </Button>
