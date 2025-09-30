@@ -499,7 +499,7 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
                   </div>
                   <span className="text-sm">
                     {client.last_optimization 
-                      ? format(new Date(client.last_optimization), 'dd/MM/yyyy', { locale: ptBR })
+                      ? format(new Date(client.last_optimization + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })
                       : 'Não registrada'
                     }
                   </span>
