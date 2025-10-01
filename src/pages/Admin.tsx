@@ -435,13 +435,53 @@ export default function Admin() {
           }
         }
       }
+
+      // Gerar despesas fixas para o próximo mês
+      const fixedExpenses = expenses.filter(expense => expense.is_fixed);
+      for (const expense of fixedExpenses) {
+        // Calcular próximo mês
+        const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+        const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+
+        // Calcular data de vencimento para o próximo mês (manter o mesmo dia)
+        const currentDueDate = new Date(expense.due_date);
+        const dueDay = currentDueDate.getDate();
+        const dueDate = new Date(nextYear, nextMonth, dueDay);
+
+        // Verificar se já existe despesa fixa com o mesmo nome para o próximo mês
+        const { data: existingExpense } = await supabase
+          .from('expenses')
+          .select('id')
+          .eq('name', expense.name)
+          .eq('is_fixed', true)
+          .gte('due_date', `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-01`)
+          .lt('due_date', `${nextYear}-${String(nextMonth + 2).padStart(2, '0')}-01`)
+          .maybeSingle();
+
+        if (!existingExpense) {
+          const { error } = await supabase
+            .from('expenses')
+            .insert([{
+              name: expense.name,
+              amount: expense.amount,
+              due_date: dueDate.toISOString().split('T')[0],
+              status: 'pending',
+              is_fixed: true
+            }]);
+          if (error) {
+            console.error(`Erro ao criar despesa fixa ${expense.name}:`, error);
+          }
+        }
+      }
+
       toast({
         title: "Mês fechado com sucesso",
-        description: "Pagamentos do próximo mês foram gerados automaticamente."
+        description: "Pagamentos e despesas fixas do próximo mês foram gerados automaticamente."
       });
 
       // Recarregar dados
       fetchPayments();
+      fetchExpenses();
     } catch (error: any) {
       toast({
         title: "Erro ao fechar mês",
