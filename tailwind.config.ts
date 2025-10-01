@@ -61,6 +61,10 @@ export default {
           DEFAULT: "hsl(var(--create-button))",
           foreground: "hsl(var(--create-button-foreground))",
         },
+        "action-button": {
+          DEFAULT: "hsl(var(--action-button))",
+          foreground: "hsl(var(--action-button-foreground))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
