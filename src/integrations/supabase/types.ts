@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_account_balance_settings: {
+        Row: {
+          ad_account_id: string
+          agency_id: string
+          created_at: string
+          id: string
+          min_threshold: number
+          updated_at: string
+        }
+        Insert: {
+          ad_account_id: string
+          agency_id: string
+          created_at?: string
+          id?: string
+          min_threshold?: number
+          updated_at?: string
+        }
+        Update: {
+          ad_account_id?: string
+          agency_id?: string
+          created_at?: string
+          id?: string
+          min_threshold?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ad_account_metrics: {
         Row: {
           account_balance: number | null

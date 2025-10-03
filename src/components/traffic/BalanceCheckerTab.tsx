@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAgency } from "@/hooks/useAgency";
 
 interface SelectedAdAccount {
   id: string;
@@ -44,6 +45,14 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   
   const { toast } = useToast();
+  const { currentAgency } = useAgency();
+
+  // Carregar configurações salvas ao montar o componente
+  useEffect(() => {
+    if (currentAgency?.id) {
+      loadBalanceSettings();
+    }
+  }, [currentAgency?.id]);
 
   useEffect(() => {
     if (selectedAdAccounts.length > 0) {
@@ -51,10 +60,49 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
     }
   }, [selectedAdAccounts]);
 
+  const loadBalanceSettings = async () => {
+    if (!currentAgency?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('ad_account_balance_settings')
+        .select('*')
+        .eq('agency_id', currentAgency.id);
+
+      if (error) throw error;
+
+      // Criar um mapa de configurações
+      const settingsMap = new Map(
+        data?.map(setting => [setting.ad_account_id, setting.min_threshold]) || []
+      );
+
+      // Atualizar balances com os limites salvos
+      setBalances(prev => prev.map(balance => ({
+        ...balance,
+        minThreshold: settingsMap.get(balance.ad_account_id) || globalMinThreshold
+      })));
+    } catch (error) {
+      console.error('Erro ao carregar configurações:', error);
+    }
+  };
+
   const checkAllBalances = async () => {
     setLoading(true);
     
     try {
+      // Carregar configurações salvas do banco
+      let settingsMap = new Map<string, number>();
+      if (currentAgency?.id) {
+        const { data: settingsData } = await supabase
+          .from('ad_account_balance_settings')
+          .select('*')
+          .eq('agency_id', currentAgency.id);
+        
+        settingsMap = new Map(
+          settingsData?.map(setting => [setting.ad_account_id, setting.min_threshold]) || []
+        );
+      }
+
       // Chamar edge function para verificar saldos
       const { data, error } = await supabase.functions.invoke('facebook-balance', {
         body: { 
@@ -68,7 +116,7 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
       const balanceData = selectedAdAccounts.map(account => {
         const accountBalance = data?.balances?.find((b: any) => b.accountId === account.ad_account_id);
         const balance = accountBalance?.balance || 0;
-        const threshold = globalMinThreshold;
+        const threshold = settingsMap.get(account.ad_account_id) || globalMinThreshold;
         const isPrepaid = accountBalance?.isPrepaidAccount || false;
         
         let status: 'healthy' | 'warning' | 'critical' = 'healthy';
@@ -161,7 +209,10 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
     }
   };
 
-  const updateThreshold = (accountId: string, newThreshold: number) => {
+  const updateThreshold = async (accountId: string, newThreshold: number) => {
+    if (!currentAgency?.id) return;
+
+    // Atualizar estado local
     setBalances(prev => prev.map(balance => {
       if (balance.ad_account_id === accountId) {
         const updatedBalance = { ...balance, minThreshold: newThreshold };
@@ -178,6 +229,33 @@ export function BalanceCheckerTab({ selectedAdAccounts }: BalanceCheckerTabProps
       }
       return balance;
     }));
+
+    // Salvar no banco de dados
+    try {
+      const { error } = await supabase
+        .from('ad_account_balance_settings')
+        .upsert({
+          agency_id: currentAgency.id,
+          ad_account_id: accountId,
+          min_threshold: newThreshold
+        }, {
+          onConflict: 'agency_id,ad_account_id'
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Limite salvo",
+        description: "O limite para recarga foi atualizado com sucesso.",
+      });
+    } catch (error) {
+      console.error('Erro ao salvar limite:', error);
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar o limite. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusIcon = (status: string) => {
