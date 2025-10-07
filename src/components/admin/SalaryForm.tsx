@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAgency } from "@/hooks/useAgency";
 
 interface SalaryFormProps {
   open: boolean;
@@ -16,6 +17,7 @@ interface SalaryFormProps {
 
 export function SalaryForm({ open, onOpenChange, onSuccess, salary }: SalaryFormProps) {
   const { toast } = useToast();
+  const { currentAgency } = useAgency();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     employee_name: salary?.employee_name || '',
@@ -34,6 +36,7 @@ export function SalaryForm({ open, onOpenChange, onSuccess, salary }: SalaryForm
         ...formData,
         amount: parseFloat(formData.amount as string),
         paid_date: formData.paid_date || null,
+        agency_id: currentAgency?.id,
       };
 
       if (salary) {

@@ -15,6 +15,7 @@ import {
   MessageSquare, Coffee, Star, Layers, Banknote, Wallet
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useAgency } from '@/hooks/useAgency';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useTaskAssignments } from '@/hooks/useTaskAssignments';
@@ -32,6 +33,7 @@ interface DashboardData {
 
 const Index = () => {
   const { profile } = useAuth();
+  const { currentAgency } = useAgency();
   const { toast } = useToast();
   const { assignments, fetchAssignments, getAssignedUsers } = useTaskAssignments();
   const [loading, setLoading] = useState(true);
@@ -76,25 +78,42 @@ const Index = () => {
       // Buscar dados com base no role
       const promises = [];
 
-      // Dados comuns para todos os roles
-      promises.push(
-        supabase.from('tasks').select('*').order('created_at', { ascending: false }),
-        supabase.from('clients').select('*'),
-        supabase.from('profiles').select('*')
-      );
+      // Dados comuns para todos os roles - filtrados por agência
+      if (currentAgency) {
+        promises.push(
+          supabase.from('tasks').select('*').eq('agency_id', currentAgency.id).order('created_at', { ascending: false }),
+          supabase.from('clients').select('*').eq('agency_id', currentAgency.id)
+        );
+        
+        // Buscar apenas usuários da agência atual
+        const { data: agencyUsers } = await supabase
+          .from('agency_users')
+          .select('user_id')
+          .eq('agency_id', currentAgency.id);
+        
+        const userIds = agencyUsers?.map(au => au.user_id) || [];
+        
+        if (userIds.length > 0) {
+          promises.push(
+            supabase.from('profiles').select('*').in('user_id', userIds)
+          );
+        } else {
+          promises.push(Promise.resolve({ data: [] }));
+        }
+      }
 
       // Tarefas pessoais (todos podem ver as próprias)
       promises.push(
         supabase.from('personal_tasks').select('*').eq('user_id', profile.user_id)
       );
 
-      // Dados específicos por role
-      if (profile.role === 'agency_admin') {
+      // Dados específicos por role - filtrados por agência
+      if (profile.role === 'agency_admin' && currentAgency) {
         promises.push(
-          supabase.from('client_payments').select('*'),
-          supabase.from('expenses').select('*'),
-          supabase.from('salaries').select('*'),
-          supabase.from('traffic_controls').select('*')
+          supabase.from('client_payments').select('*').eq('agency_id', currentAgency.id),
+          supabase.from('expenses').select('*').eq('agency_id', currentAgency.id),
+          supabase.from('salaries').select('*').eq('agency_id', currentAgency.id),
+          supabase.from('traffic_controls').select('*').eq('agency_id', currentAgency.id)
         );
       }
 

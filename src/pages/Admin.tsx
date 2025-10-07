@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useLimitEnforcement } from "@/hooks/useLimitEnforcement";
 import { ClientForm } from "@/components/admin/ClientForm";
@@ -105,12 +106,9 @@ export default function Admin() {
   const [clientViewMode, setClientViewMode] = useState<"cards" | "table">("cards");
   const [paymentViewMode, setPaymentViewMode] = useState<"cards" | "table">("cards");
   const [expenseViewMode, setExpenseViewMode] = useState<"cards" | "table">("cards");
-  const {
-    profile
-  } = useAuth();
-  const {
-    toast
-  } = useToast();
+  const { profile } = useAuth();
+  const { currentAgency } = useAgency();
+  const { toast } = useToast();
   const { checkLimitWithWarning } = useLimitEnforcement();
 
   // Verifica se o usuário tem permissão para acessar a página
@@ -136,10 +134,14 @@ export default function Admin() {
     }
   };
   const fetchClients = async () => {
-    const {
-      data,
-      error
-    } = await supabase.from('clients').select('id, name, monthly_value, active, start_date, contact, service, due_date, observations, contract_start_date, contract_end_date, has_loyalty').order(clientSort);
+    if (!currentAgency) return;
+    
+    const { data, error } = await supabase
+      .from('clients')
+      .select('id, name, monthly_value, active, start_date, contact, service, due_date, observations, contract_start_date, contract_end_date, has_loyalty')
+      .eq('agency_id', currentAgency.id)
+      .order(clientSort);
+    
     if (error) throw error;
     setClients(data || []);
   };
@@ -161,46 +163,58 @@ export default function Admin() {
     }
   };
   const fetchPayments = async () => {
+    if (!currentAgency) return;
+    
     const [year, month] = selectedMonth.split('-').map(Number);
     const startDate = `${selectedMonth}-01`;
-    const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // último dia do mês
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-    // Primeiro atualizar os status automáticamente
     await updatePaymentStatuses();
-    const {
-      data,
-      error
-    } = await supabase.from('client_payments').select('*').gte('due_date', startDate).lte('due_date', endDate).order(paymentSort, {
-      ascending: paymentSort === 'status' ? true : false
-    });
+    
+    const { data, error } = await supabase
+      .from('client_payments')
+      .select('*')
+      .eq('agency_id', currentAgency.id)
+      .gte('due_date', startDate)
+      .lte('due_date', endDate)
+      .order(paymentSort, { ascending: paymentSort === 'status' ? true : false });
+    
     if (error) throw error;
     setPayments(data || []);
   };
   const fetchExpenses = async () => {
+    if (!currentAgency) return;
+    
     const [year, month] = selectedMonth.split('-').map(Number);
     const startDate = `${selectedMonth}-01`;
-    const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // último dia do mês
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-    const {
-      data,
-      error
-    } = await supabase.from('expenses').select('*').gte('due_date', startDate).lte('due_date', endDate).order(expenseSort, {
-      ascending: expenseSort === 'status' ? true : false
-    });
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('agency_id', currentAgency.id)
+      .gte('due_date', startDate)
+      .lte('due_date', endDate)
+      .order(expenseSort, { ascending: expenseSort === 'status' ? true : false });
+    
     if (error) throw error;
     setExpenses(data || []);
   };
   const fetchSalaries = async () => {
+    if (!currentAgency) return;
+    
     const [year, month] = selectedMonth.split('-').map(Number);
     const startDate = `${selectedMonth}-01`;
-    const endDate = new Date(year, month, 0).toISOString().split('T')[0]; // último dia do mês
+    const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
-    const {
-      data,
-      error
-    } = await supabase.from('salaries').select('*').gte('due_date', startDate).lte('due_date', endDate).order('due_date', {
-      ascending: false
-    });
+    const { data, error } = await supabase
+      .from('salaries')
+      .select('*')
+      .eq('agency_id', currentAgency.id)
+      .gte('due_date', startDate)
+      .lte('due_date', endDate)
+      .order('due_date', { ascending: false });
+    
     if (error) throw error;
     setSalaries(data || []);
   };
@@ -422,14 +436,15 @@ export default function Admin() {
           data: existingPayment
         } = await supabase.from('client_payments').select('id').eq('client_id', client.id).gte('due_date', `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-01`).lt('due_date', `${nextYear}-${String(nextMonth + 2).padStart(2, '0')}-01`).single();
         if (!existingPayment) {
-          const {
-            error
-          } = await supabase.from('client_payments').insert([{
-            client_id: client.id,
-            amount: client.monthly_value,
-            due_date: dueDate.toISOString().split('T')[0],
-            status: 'pending'
-          }]);
+          const { error } = await supabase
+            .from('client_payments')
+            .insert([{
+              client_id: client.id,
+              amount: client.monthly_value,
+              due_date: dueDate.toISOString().split('T')[0],
+              status: 'pending',
+              agency_id: currentAgency.id
+            }]);
           if (error) {
             console.error(`Erro ao criar pagamento para cliente ${client.name}:`, error);
           }

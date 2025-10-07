@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 // import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useTaskAssignments } from "@/hooks/useTaskAssignments";
 
@@ -31,6 +32,7 @@ export default function Reports() {
   const [reportType, setReportType] = useState("general");
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>();
   const { profile } = useAuth();
+  const { currentAgency } = useAgency();
   const { toast } = useToast();
   const { assignments, fetchAssignments } = useTaskAssignments();
 
@@ -42,17 +44,19 @@ export default function Reports() {
     try {
       setLoading(true);
       
-      // Buscar dados gerais
+      // Buscar dados gerais - filtrados por agência
+      if (!currentAgency) return;
+      
       const [
         { data: tasks },
         { data: personalTasks },
         { data: clients },
         { data: payments }
       ] = await Promise.all([
-        supabase.from('tasks').select('*'),
+        supabase.from('tasks').select('*').eq('agency_id', currentAgency.id),
         supabase.from('personal_tasks').select('completed, user_id').eq('user_id', profile?.user_id || ''),
-        supabase.from('clients').select('active, monthly_value'),
-        supabase.from('client_payments').select('status, amount')
+        supabase.from('clients').select('active, monthly_value').eq('agency_id', currentAgency.id),
+        supabase.from('client_payments').select('status, amount').eq('agency_id', currentAgency.id)
       ]);
 
       // Buscar atribuições de tarefas

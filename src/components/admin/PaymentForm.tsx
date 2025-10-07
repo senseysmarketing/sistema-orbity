@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAgency } from "@/hooks/useAgency";
 
 interface PaymentFormProps {
   open: boolean;
@@ -16,6 +17,7 @@ interface PaymentFormProps {
 
 export function PaymentForm({ open, onOpenChange, onSuccess, payment }: PaymentFormProps) {
   const { toast } = useToast();
+  const { currentAgency } = useAgency();
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [formData, setFormData] = useState({
@@ -31,9 +33,12 @@ export function PaymentForm({ open, onOpenChange, onSuccess, payment }: PaymentF
   }, []);
 
   const fetchClients = async () => {
+    if (!currentAgency) return;
+    
     const { data } = await supabase
       .from('clients')
       .select('id, name')
+      .eq('agency_id', currentAgency.id)
       .eq('active', true)
       .order('name');
     setClients(data || []);
@@ -48,6 +53,7 @@ export function PaymentForm({ open, onOpenChange, onSuccess, payment }: PaymentF
         ...formData,
         amount: parseFloat(formData.amount as string),
         paid_date: formData.paid_date || null,
+        agency_id: currentAgency?.id,
       };
 
       if (payment) {

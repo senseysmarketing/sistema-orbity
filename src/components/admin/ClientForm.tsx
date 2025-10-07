@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DatePickerDemo } from "@/components/ui/date-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAgency } from "@/hooks/useAgency";
 import { useLimitEnforcement } from "@/hooks/useLimitEnforcement";
 
 interface ClientFormProps {
@@ -20,6 +21,7 @@ interface ClientFormProps {
 
 export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientFormProps) {
   const { toast } = useToast();
+  const { currentAgency } = useAgency();
   const { enforceLimitWithToast } = useLimitEnforcement();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -100,6 +102,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         contract_start_date: formData.contract_start_date,
         contract_end_date: formData.contract_end_date,
         has_loyalty: formData.has_loyalty,
+        agency_id: currentAgency?.id,
       };
 
       if (client) {
@@ -132,7 +135,8 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
               client_id: clientData.id,
               amount: parseFloat(formData.monthly_value),
               due_date: dueDate.toISOString().split('T')[0],
-              status: 'pending'
+              status: 'pending',
+              agency_id: currentAgency?.id
             }]);
           
           if (paymentError) {

@@ -113,13 +113,16 @@ export default function Tasks() {
     fetchAssignments();
   }, []);
   const fetchTasks = async () => {
+    if (!currentAgency) return;
+    
     try {
-      const {
-        data,
-        error
-      } = await supabase.from('tasks').select('*').eq('archived', false).order('created_at', {
-        ascending: false
-      });
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('agency_id', currentAgency.id)
+        .eq('archived', false)
+        .order('created_at', { ascending: false });
+      
       if (error) throw error;
       setTasks(data || []);
     } catch (error: any) {
@@ -131,11 +134,29 @@ export default function Tasks() {
     }
   };
   const fetchProfiles = async () => {
+    if (!currentAgency) return;
+    
     try {
-      const {
-        data,
-        error
-      } = await supabase.from('profiles').select('id, user_id, name, role');
+      // Buscar apenas usuários da agência atual através da tabela agency_users
+      const { data: agencyUsers, error: agencyUsersError } = await supabase
+        .from('agency_users')
+        .select('user_id')
+        .eq('agency_id', currentAgency.id);
+      
+      if (agencyUsersError) throw agencyUsersError;
+      
+      const userIds = agencyUsers?.map(au => au.user_id) || [];
+      
+      if (userIds.length === 0) {
+        setProfiles([]);
+        return;
+      }
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, user_id, name, role')
+        .in('user_id', userIds);
+      
       if (error) throw error;
       setProfiles(data || []);
     } catch (error: any) {
@@ -143,11 +164,17 @@ export default function Tasks() {
     }
   };
   const fetchClients = async () => {
+    if (!currentAgency) {
+      setLoading(false);
+      return;
+    }
+    
     try {
-      const {
-        data,
-        error
-      } = await supabase.from('clients').select('id, name');
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name')
+        .eq('agency_id', currentAgency.id);
+      
       if (error) throw error;
       setClients(data || []);
     } catch (error: any) {
