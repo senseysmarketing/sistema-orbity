@@ -665,40 +665,91 @@ export type Database = {
           },
         ]
       }
+      expense_categories: {
+        Row: {
+          agency_id: string
+          color: string | null
+          created_at: string | null
+          icon: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          agency_id: string
+          color?: string | null
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          agency_id?: string
+          color?: string | null
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           agency_id: string | null
           amount: number
+          category: string | null
           created_at: string
+          description: string | null
           due_date: string
+          expense_type: Database["public"]["Enums"]["expense_type"] | null
           id: string
+          installment_current: number | null
+          installment_total: number | null
           is_fixed: boolean
           name: string
           paid_date: string | null
+          parent_expense_id: string | null
+          recurrence_day: number | null
           status: Database["public"]["Enums"]["payment_status"]
           updated_at: string
         }
         Insert: {
           agency_id?: string | null
           amount: number
+          category?: string | null
           created_at?: string
+          description?: string | null
           due_date: string
+          expense_type?: Database["public"]["Enums"]["expense_type"] | null
           id?: string
+          installment_current?: number | null
+          installment_total?: number | null
           is_fixed?: boolean
           name: string
           paid_date?: string | null
+          parent_expense_id?: string | null
+          recurrence_day?: number | null
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
         }
         Update: {
           agency_id?: string | null
           amount?: number
+          category?: string | null
           created_at?: string
+          description?: string | null
           due_date?: string
+          expense_type?: Database["public"]["Enums"]["expense_type"] | null
           id?: string
+          installment_current?: number | null
+          installment_total?: number | null
           is_fixed?: boolean
           name?: string
           paid_date?: string | null
+          parent_expense_id?: string | null
+          recurrence_day?: number | null
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
         }
@@ -716,6 +767,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "expenses_parent_expense_id_fkey"
+            columns: ["parent_expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -902,6 +960,99 @@ export type Database = {
           tags?: string[] | null
           updated_at?: string
           value?: number | null
+        }
+        Relationships: []
+      }
+      monthly_closures: {
+        Row: {
+          agency_id: string
+          closure_month: string
+          executed_at: string | null
+          execution_details: Json | null
+          id: string
+          installments_generated: number | null
+          payments_generated: number | null
+          recurring_expenses_generated: number | null
+          salaries_generated: number | null
+        }
+        Insert: {
+          agency_id: string
+          closure_month: string
+          executed_at?: string | null
+          execution_details?: Json | null
+          id?: string
+          installments_generated?: number | null
+          payments_generated?: number | null
+          recurring_expenses_generated?: number | null
+          salaries_generated?: number | null
+        }
+        Update: {
+          agency_id?: string
+          closure_month?: string
+          executed_at?: string | null
+          execution_details?: Json | null
+          id?: string
+          installments_generated?: number | null
+          payments_generated?: number | null
+          recurring_expenses_generated?: number | null
+          salaries_generated?: number | null
+        }
+        Relationships: []
+      }
+      monthly_snapshots: {
+        Row: {
+          active_clients_count: number | null
+          agency_id: string
+          created_at: string | null
+          id: string
+          net_profit: number | null
+          overdue_payments_count: number | null
+          paid_expenses_count: number | null
+          paid_payments_count: number | null
+          paid_salaries_count: number | null
+          pending_expenses_count: number | null
+          pending_payments_count: number | null
+          pending_salaries_count: number | null
+          snapshot_month: string
+          total_expenses: number | null
+          total_revenue: number | null
+          total_salaries: number | null
+        }
+        Insert: {
+          active_clients_count?: number | null
+          agency_id: string
+          created_at?: string | null
+          id?: string
+          net_profit?: number | null
+          overdue_payments_count?: number | null
+          paid_expenses_count?: number | null
+          paid_payments_count?: number | null
+          paid_salaries_count?: number | null
+          pending_expenses_count?: number | null
+          pending_payments_count?: number | null
+          pending_salaries_count?: number | null
+          snapshot_month: string
+          total_expenses?: number | null
+          total_revenue?: number | null
+          total_salaries?: number | null
+        }
+        Update: {
+          active_clients_count?: number | null
+          agency_id?: string
+          created_at?: string | null
+          id?: string
+          net_profit?: number | null
+          overdue_payments_count?: number | null
+          paid_expenses_count?: number | null
+          paid_payments_count?: number | null
+          paid_salaries_count?: number | null
+          pending_expenses_count?: number | null
+          pending_payments_count?: number | null
+          pending_salaries_count?: number | null
+          snapshot_month?: string
+          total_expenses?: number | null
+          total_revenue?: number | null
+          total_salaries?: number | null
         }
         Relationships: []
       }
@@ -1538,6 +1689,7 @@ export type Database = {
       }
     }
     Enums: {
+      expense_type: "avulsa" | "recorrente" | "parcelada"
       payment_status: "pending" | "paid" | "overdue"
       subscription_plan: "free" | "basic" | "pro" | "enterprise"
       task_priority: "low" | "medium" | "high"
@@ -1678,6 +1830,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      expense_type: ["avulsa", "recorrente", "parcelada"],
       payment_status: ["pending", "paid", "overdue"],
       subscription_plan: ["free", "basic", "pro", "enterprise"],
       task_priority: ["low", "medium", "high"],

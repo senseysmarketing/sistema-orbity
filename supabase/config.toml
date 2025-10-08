@@ -55,3 +55,6 @@ verify_jwt = false
 
 [functions.facebook-auth]
 verify_jwt = false
+
+[functions.monthly-closure]
+verify_jwt = false
