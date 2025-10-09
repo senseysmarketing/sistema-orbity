@@ -244,38 +244,42 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense }: ExpenseF
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             {/* Tipo de Despesa */}
-            {!expense && (
-              <div className="grid gap-3">
-                <Label>Tipo de Despesa *</Label>
-                <RadioGroup
-                  value={formData.expense_type}
-                  onValueChange={(value) => setFormData({ ...formData, expense_type: value as any })}
-                  className="grid grid-cols-3 gap-4"
-                >
-                  <div className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-accent cursor-pointer">
-                    <RadioGroupItem value="avulsa" id="avulsa" />
-                    <Label htmlFor="avulsa" className="flex items-center gap-2 cursor-pointer flex-1">
-                      <Package className="h-4 w-4" />
-                      <span>Avulsa</span>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-accent cursor-pointer">
-                    <RadioGroupItem value="recorrente" id="recorrente" />
-                    <Label htmlFor="recorrente" className="flex items-center gap-2 cursor-pointer flex-1">
-                      <Repeat className="h-4 w-4" />
-                      <span>Recorrente</span>
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-accent cursor-pointer">
-                    <RadioGroupItem value="parcelada" id="parcelada" />
-                    <Label htmlFor="parcelada" className="flex items-center gap-2 cursor-pointer flex-1">
-                      <CreditCard className="h-4 w-4" />
-                      <span>Parcelada</span>
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </div>
-            )}
+            <div className="grid gap-3">
+              <Label>Tipo de Despesa *</Label>
+              <RadioGroup
+                value={formData.expense_type}
+                onValueChange={(value) => setFormData({ ...formData, expense_type: value as any })}
+                className="grid grid-cols-3 gap-4"
+                disabled={!!expense}
+              >
+                <div className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-accent cursor-pointer">
+                  <RadioGroupItem value="avulsa" id="avulsa" disabled={!!expense} />
+                  <Label htmlFor="avulsa" className="flex items-center gap-2 cursor-pointer flex-1">
+                    <Package className="h-4 w-4" />
+                    <span>Avulsa</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-accent cursor-pointer">
+                  <RadioGroupItem value="recorrente" id="recorrente" disabled={!!expense} />
+                  <Label htmlFor="recorrente" className="flex items-center gap-2 cursor-pointer flex-1">
+                    <Repeat className="h-4 w-4" />
+                    <span>Recorrente</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 border rounded-lg p-3 hover:bg-accent cursor-pointer">
+                  <RadioGroupItem value="parcelada" id="parcelada" disabled={!!expense} />
+                  <Label htmlFor="parcelada" className="flex items-center gap-2 cursor-pointer flex-1">
+                    <CreditCard className="h-4 w-4" />
+                    <span>Parcelada</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+              {expense && (
+                <p className="text-sm text-muted-foreground">
+                  O tipo de despesa não pode ser alterado após a criação.
+                </p>
+              )}
+            </div>
 
             {/* Nome */}
             <div className="grid gap-2">

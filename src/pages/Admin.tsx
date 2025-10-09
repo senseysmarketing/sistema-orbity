@@ -414,97 +414,6 @@ export default function Admin() {
       setExpenseToDelete(null);
     }
   };
-
-  // Função para fechar o mês
-  const closeMonth = async () => {
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth();
-    try {
-      // Gerar pagamentos para o próximo mês para todos os clientes ativos
-      const activeClients = clients.filter(client => client.active && client.monthly_value);
-      for (const client of activeClients) {
-        // Calcular próximo mês
-        const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
-        const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
-
-        // Calcular data de vencimento para o próximo mês
-        const dueDate = new Date(nextYear, nextMonth, client.due_date || 1);
-
-        // Verificar se já existe pagamento para este mês
-        const {
-          data: existingPayment
-        } = await supabase.from('client_payments').select('id').eq('client_id', client.id).gte('due_date', `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-01`).lt('due_date', `${nextYear}-${String(nextMonth + 2).padStart(2, '0')}-01`).single();
-        if (!existingPayment) {
-          const { error } = await supabase
-            .from('client_payments')
-            .insert([{
-              client_id: client.id,
-              amount: client.monthly_value,
-              due_date: dueDate.toISOString().split('T')[0],
-              status: 'pending',
-              agency_id: currentAgency.id
-            }]);
-          if (error) {
-            console.error(`Erro ao criar pagamento para cliente ${client.name}:`, error);
-          }
-        }
-      }
-
-      // Gerar despesas fixas para o próximo mês
-      const fixedExpenses = expenses.filter(expense => expense.is_fixed);
-      for (const expense of fixedExpenses) {
-        // Calcular próximo mês
-        const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
-        const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
-
-        // Calcular data de vencimento para o próximo mês (manter o mesmo dia)
-        const currentDueDate = new Date(expense.due_date);
-        const dueDay = currentDueDate.getDate();
-        const dueDate = new Date(nextYear, nextMonth, dueDay);
-
-        // Verificar se já existe despesa fixa com o mesmo nome para o próximo mês
-        const { data: existingExpense } = await supabase
-          .from('expenses')
-          .select('id')
-          .eq('name', expense.name)
-          .eq('is_fixed', true)
-          .gte('due_date', `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-01`)
-          .lt('due_date', `${nextYear}-${String(nextMonth + 2).padStart(2, '0')}-01`)
-          .maybeSingle();
-
-        if (!existingExpense) {
-          const { error } = await supabase
-            .from('expenses')
-            .insert([{
-              name: expense.name,
-              amount: expense.amount,
-              due_date: dueDate.toISOString().split('T')[0],
-              status: 'pending',
-              is_fixed: true
-            }]);
-          if (error) {
-            console.error(`Erro ao criar despesa fixa ${expense.name}:`, error);
-          }
-        }
-      }
-
-      toast({
-        title: "Mês fechado com sucesso",
-        description: "Pagamentos e despesas fixas do próximo mês foram gerados automaticamente."
-      });
-
-      // Recarregar dados
-      fetchPayments();
-      fetchExpenses();
-    } catch (error: any) {
-      toast({
-        title: "Erro ao fechar mês",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
   
   // Função para atualizar status das despesas
   const handleUpdateExpenseStatus = async (expenseId: string, newStatus: 'pending' | 'paid' | 'overdue') => {
@@ -781,10 +690,6 @@ export default function Admin() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={closeMonth} variant="outline" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Fechar Mês
-          </Button>
         </div>
       </div>
 
