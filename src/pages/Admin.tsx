@@ -537,10 +537,14 @@ export default function Admin() {
     // Análise de despesas
     const paidExpenses = filteredExpenses.filter(e => e.status === 'paid');
     const pendingExpenses = filteredExpenses.filter(e => e.status === 'pending');
-    const fixedExpenses = filteredExpenses.filter(e => e.is_fixed);
-    const variableExpenses = filteredExpenses.filter(e => !e.is_fixed);
+    const avulsaExpenses = filteredExpenses.filter(e => e.expense_type === 'avulsa');
+    const recorrenteExpenses = filteredExpenses.filter(e => e.expense_type === 'recorrente');
+    const parceladaExpenses = filteredExpenses.filter(e => e.expense_type === 'parcelada');
     const totalExpensesPaid = paidExpenses.reduce((sum, e) => sum + e.amount, 0);
     const totalExpensesPending = pendingExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalAvulsa = avulsaExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalRecorrente = recorrenteExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalParcelada = parceladaExpenses.reduce((sum, e) => sum + e.amount, 0);
 
     // Análise de clientes
     const activeClients = clients.filter(c => c.active);
@@ -609,8 +613,6 @@ export default function Admin() {
       inactiveClients: inactiveClients.length,
       avgClientValue,
       paymentConversionRate,
-      fixedExpensesCount: fixedExpenses.length,
-      variableExpensesCount: variableExpenses.length,
       loyaltyClients: loyaltyClients.length,
       nonLoyaltyClients: nonLoyaltyClients.length,
       loyaltyAlerts,
@@ -623,11 +625,17 @@ export default function Admin() {
       expenseStats: {
         paid: paidExpenses.length,
         pending: pendingExpenses.length,
-        fixed: fixedExpenses.length,
-        variable: variableExpenses.length
+        avulsa: avulsaExpenses.length,
+        recorrente: recorrenteExpenses.length,
+        parcelada: parceladaExpenses.length
+      },
+      expenseValues: {
+        avulsa: totalAvulsa,
+        recorrente: totalRecorrente,
+        parcelada: totalParcelada
       }
     };
-  }, [filteredPayments, filteredExpenses, clients]);
+  }, [filteredPayments, filteredExpenses, clients, expenses]);
 
   // Cálculos financeiros
   const totalReceivable = payments.filter(p => p.status !== 'paid').reduce((sum, p) => sum + p.amount, 0);
@@ -888,7 +896,7 @@ export default function Admin() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5" />
-                  Análise de Despesas
+                  Análise de Despesas por Tipo
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -896,21 +904,66 @@ export default function Admin() {
                   <div className="flex justify-between text-sm">
                     <span className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                      Fixas
+                      Avulsas
                     </span>
-                    <span>{analytics.fixedExpensesCount}</span>
+                    <div className="text-right">
+                      <div className="font-medium">{analytics.expenseStats.avulsa}</div>
+                      <div className="text-xs text-muted-foreground">
+                        R$ {analytics.expenseValues.avulsa.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
                   </div>
-                  <Progress value={analytics.fixedExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount) * 100} className="h-2" />
+                  <Progress value={analytics.expenseStats.avulsa / Math.max(1, expenses.length) * 100} className="h-2" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="flex items-center gap-2">
                       <div className="w-3 h-3 bg-purple-500 rounded"></div>
-                      Variáveis
+                      Recorrentes
                     </span>
-                    <span>{analytics.variableExpensesCount}</span>
+                    <div className="text-right">
+                      <div className="font-medium">{analytics.expenseStats.recorrente}</div>
+                      <div className="text-xs text-muted-foreground">
+                        R$ {analytics.expenseValues.recorrente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
                   </div>
-                  <Progress value={analytics.variableExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount) * 100} className="h-2" />
+                  <Progress value={analytics.expenseStats.recorrente / Math.max(1, expenses.length) * 100} className="h-2" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-orange-500 rounded"></div>
+                      Parceladas
+                    </span>
+                    <div className="text-right">
+                      <div className="font-medium">{analytics.expenseStats.parcelada}</div>
+                      <div className="text-xs text-muted-foreground">
+                        R$ {analytics.expenseValues.parcelada.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
+                  <Progress value={analytics.expenseStats.parcelada / Math.max(1, expenses.length) * 100} className="h-2" />
+                </div>
+                <div className="pt-3 border-t space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-green-500 rounded"></div>
+                      Pagas
+                    </span>
+                    <span>{analytics.expenseStats.paid}</span>
+                  </div>
+                  <Progress value={analytics.expenseStats.paid / Math.max(1, expenses.length) * 100} className="h-2" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                      Pendentes
+                    </span>
+                    <span>{analytics.expenseStats.pending}</span>
+                  </div>
+                  <Progress value={analytics.expenseStats.pending / Math.max(1, expenses.length) * 100} className="h-2" />
                 </div>
                 <div className="mt-4 p-3 bg-muted/50 rounded-lg">
                   <div className="text-sm font-medium mb-1">Total de Despesas</div>
@@ -1888,14 +1941,18 @@ export default function Admin() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span>Despesas Fixas</span>
-                  <span className="font-bold">{analytics.fixedExpensesCount}</span>
+                  <span>Despesas Avulsas</span>
+                  <span className="font-bold">{analytics.expenseStats.avulsa}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span>Despesas Variáveis</span>
-                  <span className="font-bold">{analytics.variableExpensesCount}</span>
+                  <span>Despesas Recorrentes</span>
+                  <span className="font-bold">{analytics.expenseStats.recorrente}</span>
                 </div>
                 <div className="flex justify-between items-center">
+                  <span>Despesas Parceladas</span>
+                  <span className="font-bold">{analytics.expenseStats.parcelada}</span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t">
                   <span>Total Despesas</span>
                   <span className="font-bold text-orange-600">
                     R$ {(analytics.totalExpensesPaid + analytics.totalExpensesPending).toLocaleString('pt-BR', {
@@ -1903,9 +1960,9 @@ export default function Admin() {
                   })}
                   </span>
                 </div>
-                <Progress value={analytics.fixedExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount) * 100} className="h-2" />
+                <Progress value={analytics.expenseStats.paid / Math.max(1, expenses.length) * 100} className="h-2" />
                 <p className="text-xs text-muted-foreground">
-                  {(analytics.fixedExpensesCount / Math.max(1, analytics.fixedExpensesCount + analytics.variableExpensesCount) * 100).toFixed(1)}% custos fixos
+                  {(analytics.expenseStats.paid / Math.max(1, expenses.length) * 100).toFixed(1)}% despesas pagas
                 </p>
               </CardContent>
             </Card>
