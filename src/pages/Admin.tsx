@@ -48,6 +48,12 @@ interface Expense {
   paid_date: string | null;
   status: 'pending' | 'paid' | 'overdue';
   is_fixed: boolean;
+  expense_type?: 'avulsa' | 'recorrente' | 'parcelada';
+  category?: string;
+  installment_total?: number;
+  installment_current?: number;
+  recurrence_day?: number;
+  description?: string;
 }
 interface Salary {
   id: string;
@@ -1597,9 +1603,15 @@ export default function Admin() {
                               R$ {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
-                          <Badge variant={item.type === 'salary' ? "default" : item.is_fixed ? "default" : "outline"} className="text-xs">
-                            {item.type === 'salary' ? "Salário" : item.is_fixed ? "Fixa" : "Variável"}
-                          </Badge>
+                          {item.type === 'salary' ? (
+                            <Badge variant="default" className="text-xs">Salário</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              {item.expense_type === 'avulsa' ? 'Avulsa' : 
+                               item.expense_type === 'recorrente' ? 'Recorrente' : 
+                               item.expense_type === 'parcelada' ? 'Parcelada' : 'Despesa'}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       <DropdownMenu>
@@ -1665,6 +1677,39 @@ export default function Admin() {
                         </p>
                       </div>
                     </div>
+
+                    {/* Informações adicionais das despesas */}
+                    {item.type === 'expense' && (
+                      <div className="pt-2 border-t space-y-2">
+                        {item.category && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <Building className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">Categoria:</span>
+                            <span className="font-medium">{item.category}</span>
+                          </div>
+                        )}
+                        {item.expense_type === 'parcelada' && item.installment_total && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <CreditCard className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">Parcela:</span>
+                            <span className="font-medium">{item.installment_current}/{item.installment_total}</span>
+                          </div>
+                        )}
+                        {item.expense_type === 'recorrente' && item.recurrence_day && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <Timer className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">Recorrência:</span>
+                            <span className="font-medium">Todo dia {item.recurrence_day}</span>
+                          </div>
+                        )}
+                        {item.description && (
+                          <div className="space-y-1">
+                            <span className="text-xs text-muted-foreground">Descrição:</span>
+                            <p className="text-xs bg-muted/30 rounded p-2">{item.description}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -1693,9 +1738,15 @@ export default function Admin() {
                             {item.type === 'salary' ? `Salário - ${item.employee_name}` : item.name}
                           </td>
                           <td className="p-4">
-                            <Badge variant={item.type === 'salary' ? "default" : item.is_fixed ? "default" : "outline"}>
-                              {item.type === 'salary' ? "Salário" : item.is_fixed ? "Fixa" : "Variável"}
-                            </Badge>
+                            {item.type === 'salary' ? (
+                              <Badge variant="default">Salário</Badge>
+                            ) : (
+                              <Badge variant="outline">
+                                {item.expense_type === 'avulsa' ? 'Avulsa' : 
+                                 item.expense_type === 'recorrente' ? 'Recorrente' : 
+                                 item.expense_type === 'parcelada' ? 'Parcelada' : 'Despesa'}
+                              </Badge>
+                            )}
                           </td>
                           <td className="p-4">
                             <Badge className={getStatusColor(item.status)}>
