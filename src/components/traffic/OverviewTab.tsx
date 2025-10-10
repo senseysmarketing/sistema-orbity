@@ -174,14 +174,15 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
     if (!editingClient) return;
 
     try {
-      // Buscar se já existe um registro para esta conta usando platform_data
+      // Buscar se já existe um registro para esta conta usando ad_account_id
       const { data: existingRecord } = await supabase
         .from('traffic_controls')
-        .select('id, client_id')
-        .contains('platform_data', { ad_account_id: editingClient.ad_account_id })
+        .select('id')
+        .eq('ad_account_id', editingClient.ad_account_id)
         .maybeSingle();
 
       const updateData = {
+        ad_account_id: editingClient.ad_account_id,
         daily_budget: editingClient.daily_budget,
         last_optimization: editingClient.last_optimization,
         results: editingClient.results,
@@ -202,61 +203,11 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
 
         if (error) throw error;
       } else {
-        // Buscar ou criar cliente usando UPSERT para evitar duplicações
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-          .single();
-
-        const agencyId = profile ? 
-          (await supabase
-            .from('agency_users')
-            .select('agency_id')
-            .eq('user_id', profile.user_id)
-            .single()).data?.agency_id : null;
-
-        if (!agencyId) {
-          throw new Error('Agência não encontrada');
-        }
-
-        // Tentar buscar cliente existente primeiro
-        const { data: existingClient } = await supabase
-          .from('clients')
-          .select('id')
-          .eq('agency_id', agencyId)
-          .eq('name', editingClient.ad_account_name)
-          .maybeSingle();
-
-        let clientId: string;
-
-        if (existingClient) {
-          // Cliente já existe, usar o ID existente
-          clientId = existingClient.id;
-        } else {
-          // Criar novo cliente apenas se não existir
-          const { data: newClient, error: clientError } = await supabase
-            .from('clients')
-            .insert({
-              name: editingClient.ad_account_name,
-              agency_id: agencyId,
-              active: true,
-              service: 'Facebook Ads'
-            })
-            .select('id')
-            .single();
-
-          if (clientError) throw clientError;
-          clientId = newClient.id;
-        }
-
-        // Criar novo registro traffic_controls
+        // Criar novo registro traffic_controls diretamente com ad_account_id
         const { error } = await supabase
           .from('traffic_controls')
           .insert({
             ...updateData,
-            client_id: clientId,
-            agency_id: agencyId,
             platforms: ['facebook'],
           });
 

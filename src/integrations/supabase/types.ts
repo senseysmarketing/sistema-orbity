@@ -1466,8 +1466,8 @@ export type Database = {
       }
       traffic_controls: {
         Row: {
+          ad_account_id: string | null
           agency_id: string | null
-          client_id: string
           created_at: string
           daily_budget: number | null
           id: string
@@ -1480,8 +1480,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ad_account_id?: string | null
           agency_id?: string | null
-          client_id: string
           created_at?: string
           daily_budget?: number | null
           id?: string
@@ -1494,8 +1494,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ad_account_id?: string | null
           agency_id?: string | null
-          client_id?: string
           created_at?: string
           daily_budget?: number | null
           id?: string
@@ -1521,13 +1521,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
-          },
-          {
-            foreignKeyName: "traffic_controls_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
           },
         ]
       }

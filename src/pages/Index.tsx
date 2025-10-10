@@ -28,7 +28,6 @@ interface DashboardData {
   clientPayments: any[];
   expenses: any[];
   salaries: any[];
-  trafficControls: any[];
 }
 
 const Index = () => {
@@ -47,8 +46,7 @@ const Index = () => {
     profiles: [],
     clientPayments: [],
     expenses: [],
-    salaries: [],
-    trafficControls: []
+    salaries: []
   });
 
   useEffect(() => {
@@ -112,8 +110,7 @@ const Index = () => {
         promises.push(
           supabase.from('client_payments').select('*').eq('agency_id', currentAgency.id),
           supabase.from('expenses').select('*').eq('agency_id', currentAgency.id),
-          supabase.from('salaries').select('*').eq('agency_id', currentAgency.id),
-          supabase.from('traffic_controls').select('*').eq('agency_id', currentAgency.id)
+          supabase.from('salaries').select('*').eq('agency_id', currentAgency.id)
         );
       }
 
@@ -126,9 +123,7 @@ const Index = () => {
         personalTasks: results[3]?.data || [],
         clientPayments: profile.role === 'agency_admin' ? (results[4]?.data || []) : [],
         expenses: profile.role === 'agency_admin' ? (results[5]?.data || []) : [],
-        salaries: profile.role === 'agency_admin' ? (results[6]?.data || []) : [],
-        trafficControls: profile.role === 'agency_admin' ? 
-          (results[7]?.data || []) : []
+        salaries: profile.role === 'agency_admin' ? (results[6]?.data || []) : []
       });
 
       // Buscar atribuições de tarefas
@@ -205,10 +200,6 @@ const Index = () => {
     });
     const totalSalaries = thisMonthSalaries.reduce((sum, s) => sum + parseFloat(s.amount), 0);
 
-    // Tráfego
-    const activeTrafficControls = data.trafficControls.length;
-    const totalBudget = data.trafficControls.reduce((sum, tc) => sum + (tc.daily_budget || 0), 0);
-
     // Performance
     const completedTasks = myTasks.filter(t => t.status === 'done').length;
     const taskCompletionRate = myTasks.length > 0 ? Math.round((completedTasks / myTasks.length) * 100) : 0;
@@ -242,10 +233,6 @@ const Index = () => {
       pendingThisMonth: pendingThisMonth.length,
       totalExpenses,
       totalSalaries,
-      
-      // Tráfego
-      activeTrafficControls,
-      totalBudget,
       
       // Alertas
       totalAlerts: overdueTasks.length + overduePersonalTasks.length + overduePayments.length
@@ -360,18 +347,6 @@ const Index = () => {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Campanhas Ativas</CardTitle>
-                  <Target className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{metrics.activeTrafficControls}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {formatCurrency(metrics.totalBudget)}/dia budget
-                  </p>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Gráficos e Métricas */}
@@ -741,31 +716,11 @@ const Index = () => {
             <div className="grid gap-4 md:grid-cols-4">
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Campanhas Ativas</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{metrics.activeTrafficControls}</div>
-                  <p className="text-xs text-muted-foreground">Em execução</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Budget Diário</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{formatCurrency(metrics.totalBudget)}</div>
-                  <p className="text-xs text-muted-foreground">Total investido/dia</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
                   <CardTitle className="text-sm">Clientes Ativos</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{metrics.activeClients}</div>
-                  <p className="text-xs text-muted-foreground">Com campanhas</p>
+                  <p className="text-xs text-muted-foreground">Total de clientes ativos</p>
                 </CardContent>
               </Card>
 
@@ -780,46 +735,6 @@ const Index = () => {
               </Card>
             </div>
 
-            {/* Lista de Campanhas */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Campanhas em Andamento</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {data.trafficControls.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>Nenhuma campanha cadastrada</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {data.trafficControls.map((campaign) => {
-                      const client = data.clients.find(c => c.id === campaign.client_id);
-                      return (
-                        <div key={campaign.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex-1">
-                            <h3 className="font-semibold">{client?.name}</h3>
-                            <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
-                              <span>Budget: {formatCurrency(campaign.daily_budget || 0)}/dia</span>
-                              <span>Plataformas: {campaign.platforms?.join(', ') || 'Não informado'}</span>
-                              <span>Status: {campaign.situation || 'N/A'}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={campaign.results === 'good' ? 'default' : campaign.results === 'average' ? 'secondary' : 'destructive'}>
-                              {campaign.results === 'good' ? 'Bom' : campaign.results === 'average' ? 'Médio' : campaign.results === 'poor' ? 'Ruim' : 'N/A'}
-                            </Badge>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="tasks" className="space-y-4">
@@ -939,33 +854,6 @@ const Index = () => {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Campanhas por Resultado</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {['good', 'average', 'poor'].map(result => {
-                      const count = data.trafficControls.filter(tc => tc.results === result).length;
-                      const percentage = data.trafficControls.length > 0 ? (count / data.trafficControls.length) * 100 : 0;
-                      return (
-                        <div key={result} className="flex justify-between items-center">
-                          <span className="text-sm capitalize">{result === 'good' ? 'Bom' : result === 'average' ? 'Médio' : 'Ruim'}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">{count}</span>
-                            <div className="w-20 bg-muted rounded-full h-2">
-                              <div 
-                                className={`h-2 rounded-full ${result === 'good' ? 'bg-green-500' : result === 'average' ? 'bg-yellow-500' : 'bg-red-500'}`}
-                                style={{ width: `${percentage}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
         </Tabs>
