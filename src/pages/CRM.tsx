@@ -195,8 +195,8 @@ export default function CRM() {
     };
   }, [filteredLeads]);
 
-  const handleLeadSave = () => {
-    fetchLeads();
+  const handleLeadSave = async () => {
+    await fetchLeads();
     setShowLeadForm(false);
     setSelectedLead(null);
   };

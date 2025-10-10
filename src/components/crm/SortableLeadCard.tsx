@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, DollarSign } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, DollarSign, Clock } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface Lead {
   id: string;
@@ -147,6 +149,10 @@ export function SortableLeadCard({
                 <span>📅 {formatDate(lead.next_contact)}</span>
               </div>
             )}
+            <div className="flex items-center gap-1 text-muted-foreground/70">
+              <Clock className="h-3 w-3 flex-shrink-0" />
+              <span>{format(new Date(lead.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+            </div>
             <div>🎯 {lead.source}</div>
           </div>
         </div>
