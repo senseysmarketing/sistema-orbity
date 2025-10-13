@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -55,6 +56,7 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [overviewSummary, setOverviewSummary] = useState<OverviewSummary | null>(null);
   const { profile } = useAuth();
+  const { currentAgency } = useAgency();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -62,6 +64,8 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
   }, [selectedAdAccounts]);
 
   const fetchClientsOverview = async () => {
+    if (!currentAgency) return;
+    
     try {
       setLoading(true);
       
@@ -72,11 +76,12 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
       const performanceDistribution: Record<string, number> = {};
       
       for (const account of selectedAdAccounts) {
-        // Tentar buscar dados existentes usando ad_account_id na plataforma data
+        // Tentar buscar dados existentes usando ad_account_id e agency_id
         const { data: existingData } = await supabase
           .from('traffic_controls')
           .select('*')
-          .contains('platform_data', { ad_account_id: account.ad_account_id })
+          .eq('ad_account_id', account.ad_account_id)
+          .eq('agency_id', currentAgency.id)
           .maybeSingle();
 
         // Buscar orçamento da conta via Facebook API se disponível
@@ -171,17 +176,19 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
   };
 
   const handleSaveClient = async () => {
-    if (!editingClient) return;
+    if (!editingClient || !currentAgency) return;
 
     try {
-      // Buscar se já existe um registro para esta conta usando ad_account_id
+      // Buscar se já existe um registro para esta conta usando ad_account_id e agency_id
       const { data: existingRecord } = await supabase
         .from('traffic_controls')
         .select('id')
         .eq('ad_account_id', editingClient.ad_account_id)
+        .eq('agency_id', currentAgency.id)
         .maybeSingle();
 
       const updateData = {
+        agency_id: currentAgency.id,
         ad_account_id: editingClient.ad_account_id,
         daily_budget: editingClient.daily_budget,
         last_optimization: editingClient.last_optimization,
