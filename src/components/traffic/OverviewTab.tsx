@@ -214,6 +214,13 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
         if (error) throw error;
       }
 
+      // Update local state immediately for better UX
+      setClientsOverview(prev => prev.map(client => 
+        client.ad_account_id === editingClient.ad_account_id 
+          ? editingClient 
+          : client
+      ));
+
       toast({
         title: "Sucesso",
         description: "Dados do cliente atualizados com sucesso.",
@@ -221,7 +228,6 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
 
       setIsEditDialogOpen(false);
       setEditingClient(null);
-      fetchClientsOverview();
     } catch (error) {
       console.error('Erro ao salvar dados do cliente:', error);
       toast({
@@ -229,6 +235,8 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
         description: "Não foi possível salvar os dados do cliente.",
         variant: "destructive",
       });
+      // On error, refresh to get correct state
+      fetchClientsOverview();
     }
   };
 
