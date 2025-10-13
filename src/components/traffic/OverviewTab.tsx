@@ -384,7 +384,7 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
                   <span className="text-sm font-medium">Orçamento Total</span>
                 </div>
                 <p className="text-2xl font-bold">
-                  {formatCurrency(overviewSummary.total_daily_budget, 'USD')}
+                  {formatCurrency(overviewSummary.total_daily_budget, 'BRL')}
                 </p>
               </CardContent>
             </Card>
@@ -396,7 +396,7 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
                   <span className="text-sm font-medium">Gasto Médio Total</span>
                 </div>
                 <p className="text-2xl font-bold">
-                  {formatCurrency(overviewSummary.total_daily_spend, 'USD')}
+                  {formatCurrency(overviewSummary.total_daily_spend, 'BRL')}
                 </p>
               </CardContent>
             </Card>
