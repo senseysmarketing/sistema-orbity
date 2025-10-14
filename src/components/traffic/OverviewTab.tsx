@@ -60,8 +60,10 @@ export function OverviewTab({ selectedAdAccounts }: OverviewTabProps) {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchClientsOverview();
-  }, [selectedAdAccounts]);
+    if (currentAgency) {
+      fetchClientsOverview();
+    }
+  }, [selectedAdAccounts, currentAgency?.id]);
 
   const fetchClientsOverview = async () => {
     if (!currentAgency) return;

@@ -51,7 +51,7 @@ const Index = () => {
 
   useEffect(() => {
     fetchDashboardData();
-  }, [profile]);
+  }, [profile, currentAgency?.id]);
 
   // Métricas calculadas com base nas atribuições
   const myTasks = useMemo(() => {
@@ -62,68 +62,81 @@ const Index = () => {
   }, [data.tasks, assignments, profile?.user_id]);
 
   const fetchDashboardData = async () => {
-    if (!profile) return;
+    if (!profile || !currentAgency) {
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
-      
-      const today = new Date();
-      const startOfWeek = new Date(today.setDate(today.getDate() - today.getDay()));
-      const endOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 6));
-      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-      // Buscar dados com base no role
-      const promises = [];
+      // Buscar dados comuns - filtrados por agência
+      const tasksPromise = supabase
+        .from('tasks')
+        .select('*')
+        .eq('agency_id', currentAgency.id)
+        .order('created_at', { ascending: false });
 
-      // Dados comuns para todos os roles - filtrados por agência
-      if (currentAgency) {
-        promises.push(
-          supabase.from('tasks').select('*').eq('agency_id', currentAgency.id).order('created_at', { ascending: false }),
-          supabase.from('clients').select('*').eq('agency_id', currentAgency.id)
-        );
-        
-        // Buscar apenas usuários da agência atual
-        const { data: agencyUsers } = await supabase
-          .from('agency_users')
-          .select('user_id')
-          .eq('agency_id', currentAgency.id);
-        
-        const userIds = agencyUsers?.map(au => au.user_id) || [];
-        
-        if (userIds.length > 0) {
-          promises.push(
-            supabase.from('profiles').select('*').in('user_id', userIds)
-          );
-        } else {
-          promises.push(Promise.resolve({ data: [] }));
-        }
+      const clientsPromise = supabase
+        .from('clients')
+        .select('*')
+        .eq('agency_id', currentAgency.id);
+
+      const personalTasksPromise = supabase
+        .from('personal_tasks')
+        .select('*')
+        .eq('user_id', profile.user_id);
+
+      // Buscar apenas usuários da agência atual
+      const agencyUsersPromise = supabase
+        .from('agency_users')
+        .select('user_id')
+        .eq('agency_id', currentAgency.id);
+
+      // Aguardar tarefas, clientes, tarefas pessoais e usuários da agência
+      const [tasksResult, clientsResult, personalTasksResult, agencyUsersResult] = await Promise.all([
+        tasksPromise,
+        clientsPromise,
+        personalTasksPromise,
+        agencyUsersPromise
+      ]);
+
+      // Buscar perfis dos usuários da agência
+      const userIds = agencyUsersResult.data?.map(au => au.user_id) || [];
+      let profilesData = [];
+      if (userIds.length > 0) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('user_id', userIds);
+        profilesData = data || [];
       }
 
-      // Tarefas pessoais (todos podem ver as próprias)
-      promises.push(
-        supabase.from('personal_tasks').select('*').eq('user_id', profile.user_id)
-      );
+      // Dados específicos para admin
+      let clientPaymentsData = [];
+      let expensesData = [];
+      let salariesData = [];
 
-      // Dados específicos por role - filtrados por agência
-      if (profile.role === 'agency_admin' && currentAgency) {
-        promises.push(
+      if (profile.role === 'agency_admin') {
+        const [paymentsResult, expensesResult, salariesResult] = await Promise.all([
           supabase.from('client_payments').select('*').eq('agency_id', currentAgency.id),
           supabase.from('expenses').select('*').eq('agency_id', currentAgency.id),
           supabase.from('salaries').select('*').eq('agency_id', currentAgency.id)
-        );
+        ]);
+
+        clientPaymentsData = paymentsResult.data || [];
+        expensesData = expensesResult.data || [];
+        salariesData = salariesResult.data || [];
       }
 
-      const results = await Promise.all(promises);
-      
       setData({
-        tasks: results[0]?.data || [],
-        clients: results[1]?.data || [],
-        profiles: results[2]?.data || [],
-        personalTasks: results[3]?.data || [],
-        clientPayments: profile.role === 'agency_admin' ? (results[4]?.data || []) : [],
-        expenses: profile.role === 'agency_admin' ? (results[5]?.data || []) : [],
-        salaries: profile.role === 'agency_admin' ? (results[6]?.data || []) : []
+        tasks: tasksResult.data || [],
+        clients: clientsResult.data || [],
+        profiles: profilesData,
+        personalTasks: personalTasksResult.data || [],
+        clientPayments: clientPaymentsData,
+        expenses: expensesData,
+        salaries: salariesData
       });
 
       // Buscar atribuições de tarefas

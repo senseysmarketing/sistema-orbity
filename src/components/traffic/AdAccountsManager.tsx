@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/hooks/useSubscription";
 
@@ -38,6 +39,7 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   
+  const { currentAgency } = useAgency();
   const { toast } = useToast();
   const { getMaxFacebookAdAccounts, loading: subLoading, currentSubscription } = useSubscription();
 
@@ -74,10 +76,13 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
   };
 
   const fetchSelectedAccounts = async () => {
+    if (!currentAgency) return;
+    
     try {
       const { data, error } = await supabase
         .from('selected_ad_accounts')
         .select('*')
+        .eq('agency_id', currentAgency.id)
         .eq('is_active', true);
 
       if (error) throw error;
@@ -135,19 +140,25 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
           });
         if (upsertError) throw upsertError;
 
-        // 2) Desativar as que não foram selecionadas
-        const notIn = `(${selectedIds.map((id) => `"${id}"`).join(',')})`;
-        const { error: deactivateOthersError } = await supabase
-          .from('selected_ad_accounts')
-          .update({ is_active: false })
-          .not('ad_account_id', 'in', notIn);
-        if (deactivateOthersError) throw deactivateOthersError;
+        // 2) Desativar as que não foram selecionadas (apenas desta agência)
+        if (currentAgency) {
+          const notIn = `(${selectedIds.map((id) => `"${id}"`).join(',')})`;
+          const { error: deactivateOthersError } = await supabase
+            .from('selected_ad_accounts')
+            .update({ is_active: false })
+            .eq('agency_id', currentAgency.id)
+            .not('ad_account_id', 'in', notIn);
+          if (deactivateOthersError) throw deactivateOthersError;
+        }
       } else {
-        // Nenhuma selecionada: desativar todas
-        const { error: deactivateAllError } = await supabase
-          .from('selected_ad_accounts')
-          .update({ is_active: false });
-        if (deactivateAllError) throw deactivateAllError;
+        // Nenhuma selecionada: desativar todas (apenas desta agência)
+        if (currentAgency) {
+          const { error: deactivateAllError } = await supabase
+            .from('selected_ad_accounts')
+            .update({ is_active: false })
+            .eq('agency_id', currentAgency.id);
+          if (deactivateAllError) throw deactivateAllError;
+        }
       }
 
       toast({

@@ -120,12 +120,12 @@ export default function Admin() {
   // Verifica se o usuário tem permissão para acessar a página
   const hasAccess = profile?.role === 'agency_admin';
   useEffect(() => {
-    if (hasAccess) {
+    if (hasAccess && currentAgency) {
       fetchData();
     } else {
       setLoading(false);
     }
-  }, [hasAccess, selectedMonth, clientSort, paymentSort, expenseSort]);
+  }, [hasAccess, currentAgency?.id, selectedMonth, clientSort, paymentSort, expenseSort]);
   const fetchData = async () => {
     try {
       await Promise.all([fetchClients(), fetchPayments(), fetchExpenses(), fetchSalaries()]);

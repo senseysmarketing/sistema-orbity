@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/hooks/useSubscription";
 import { TrafficDashboard } from "@/components/traffic/TrafficDashboard";
@@ -46,6 +47,7 @@ export default function Traffic() {
   });
   
   const { profile } = useAuth();
+  const { currentAgency } = useAgency();
   const { toast } = useToast();
   const { currentSubscription } = useSubscription();
 
@@ -53,13 +55,13 @@ export default function Traffic() {
   const hasAccess = profile?.role === 'agency_user' || profile?.role === 'agency_admin';
 
   useEffect(() => {
-    if (hasAccess) {
+    if (hasAccess && currentAgency) {
       fetchConnections();
       fetchSelectedAdAccounts();
     } else {
       setLoading(false);
     }
-  }, [hasAccess]);
+  }, [hasAccess, currentAgency?.id]);
 
   // Salvar aba ativa no localStorage quando mudar
   useEffect(() => {
@@ -67,10 +69,13 @@ export default function Traffic() {
   }, [activeTab]);
 
   const fetchConnections = async () => {
+    if (!currentAgency) return;
+    
     try {
       const { data, error } = await supabase
         .from('facebook_connections')
         .select('*')
+        .eq('agency_id', currentAgency.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
@@ -82,10 +87,13 @@ export default function Traffic() {
   };
 
   const fetchSelectedAdAccounts = async () => {
+    if (!currentAgency) return;
+    
     try {
       const { data, error } = await supabase
         .from('selected_ad_accounts')
         .select('*')
+        .eq('agency_id', currentAgency.id)
         .eq('is_active', true)
         .order('ad_account_name');
 
