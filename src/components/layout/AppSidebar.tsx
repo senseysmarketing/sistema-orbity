@@ -4,7 +4,7 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGrou
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Shield, ContactRound } from "lucide-react";
+import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Shield, ContactRound, FileText } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import logoNew from "@/assets/logo-new.png";
 const menuItems = [{
@@ -37,6 +37,11 @@ const menuItems = [{
   url: "/admin",
   icon: DollarSign,
   roles: ["agency_admin"]
+}, {
+  title: "Contratos",
+  url: "/contracts",
+  icon: FileText,
+  roles: ["agency_admin", "agency_user"]
 }, {
   title: "Relatórios",
   url: "/reports",

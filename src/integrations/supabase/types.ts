@@ -665,6 +665,179 @@ export type Database = {
           },
         ]
       }
+      contract_services_templates: {
+        Row: {
+          agency_id: string
+          created_at: string | null
+          default_value: number | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string | null
+          default_value?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string | null
+          default_value?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_services_templates_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_services_templates_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      contracts: {
+        Row: {
+          agency_address: string | null
+          agency_cnpj: string | null
+          agency_id: string
+          agency_name: string
+          agency_representative: string | null
+          client_address: string | null
+          client_city: string | null
+          client_cpf_cnpj: string | null
+          client_email: string | null
+          client_id: string | null
+          client_name: string
+          client_phone: string | null
+          client_state: string | null
+          contract_date: string
+          created_at: string | null
+          created_by: string | null
+          custom_clauses: string | null
+          end_date: string | null
+          id: string
+          payment_terms: string | null
+          services: Json
+          start_date: string
+          status: string | null
+          total_value: number
+          updated_at: string | null
+          witness1_cpf: string | null
+          witness1_name: string | null
+          witness2_cpf: string | null
+          witness2_name: string | null
+        }
+        Insert: {
+          agency_address?: string | null
+          agency_cnpj?: string | null
+          agency_id: string
+          agency_name: string
+          agency_representative?: string | null
+          client_address?: string | null
+          client_city?: string | null
+          client_cpf_cnpj?: string | null
+          client_email?: string | null
+          client_id?: string | null
+          client_name: string
+          client_phone?: string | null
+          client_state?: string | null
+          contract_date: string
+          created_at?: string | null
+          created_by?: string | null
+          custom_clauses?: string | null
+          end_date?: string | null
+          id?: string
+          payment_terms?: string | null
+          services?: Json
+          start_date: string
+          status?: string | null
+          total_value?: number
+          updated_at?: string | null
+          witness1_cpf?: string | null
+          witness1_name?: string | null
+          witness2_cpf?: string | null
+          witness2_name?: string | null
+        }
+        Update: {
+          agency_address?: string | null
+          agency_cnpj?: string | null
+          agency_id?: string
+          agency_name?: string
+          agency_representative?: string | null
+          client_address?: string | null
+          client_city?: string | null
+          client_cpf_cnpj?: string | null
+          client_email?: string | null
+          client_id?: string | null
+          client_name?: string
+          client_phone?: string | null
+          client_state?: string | null
+          contract_date?: string
+          created_at?: string | null
+          created_by?: string | null
+          custom_clauses?: string | null
+          end_date?: string | null
+          id?: string
+          payment_terms?: string | null
+          services?: Json
+          start_date?: string
+          status?: string | null
+          total_value?: number
+          updated_at?: string | null
+          witness1_cpf?: string | null
+          witness1_name?: string | null
+          witness2_cpf?: string | null
+          witness2_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contracts_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "contracts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       expense_categories: {
         Row: {
           agency_id: string
