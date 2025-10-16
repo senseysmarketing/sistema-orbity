@@ -60,14 +60,14 @@ export default function ContractPreview({ data, onComplete }: ContractPreviewPro
           <Text style={styles.sectionTitle}>1. DAS PARTES</Text>
           <Text style={styles.text}>
             <Text style={styles.bold}>CONTRATANTE: </Text>
-            {currentAgency?.name}, com sede em {currentAgency?.description || "___________"}, 
-            doravante denominada CONTRATANTE.
+            {data.client_name}, {data.client_cpf_cnpj && `CPF/CNPJ ${data.client_cpf_cnpj}, `}
+            {data.client_address && `residente/estabelecido em ${data.client_address}, ${data.client_city} - ${data.client_state}`}, 
+            doravante denominado CONTRATANTE.
           </Text>
           <Text style={[styles.text, { marginTop: 10 }]}>
             <Text style={styles.bold}>CONTRATADO: </Text>
-            {data.client_name}, {data.client_cpf_cnpj && `CPF/CNPJ ${data.client_cpf_cnpj}, `}
-            {data.client_address && `residente/estabelecido em ${data.client_address}, ${data.client_city} - ${data.client_state}`}, 
-            doravante denominado CONTRATADO.
+            {currentAgency?.name}, com sede em {currentAgency?.description || "___________"}, 
+            doravante denominada CONTRATADO.
           </Text>
         </View>
 
@@ -144,11 +144,11 @@ export default function ContractPreview({ data, onComplete }: ContractPreviewPro
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 40 }}>
             <View style={{ width: '45%' }}>
               <Text style={styles.signatureLine}>CONTRATANTE</Text>
-              <Text style={{ textAlign: 'center', marginTop: 5, fontSize: 9 }}>{currentAgency?.name}</Text>
+              <Text style={{ textAlign: 'center', marginTop: 5, fontSize: 9 }}>{data.client_name}</Text>
             </View>
             <View style={{ width: '45%' }}>
               <Text style={styles.signatureLine}>CONTRATADO</Text>
-              <Text style={{ textAlign: 'center', marginTop: 5, fontSize: 9 }}>{data.client_name}</Text>
+              <Text style={{ textAlign: 'center', marginTop: 5, fontSize: 9 }}>{currentAgency?.name}</Text>
             </View>
           </View>
 
