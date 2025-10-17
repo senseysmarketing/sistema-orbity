@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal, Calendar, ArrowUpDown, Search, BarChart3, Target, Activity, Timer, Users, CreditCard, Receipt, Wallet, PieChart, FileText, AlertTriangle, CheckCircle, TrendingUp as TrendingUpIcon, Settings, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,6 +117,7 @@ export default function Admin() {
   const { currentAgency } = useAgency();
   const { toast } = useToast();
   const { checkLimitWithWarning } = useLimitEnforcement();
+  const navigate = useNavigate();
 
   // Verifica se o usuário tem permissão para acessar a página
   const hasAccess = profile?.role === 'agency_admin';
@@ -1180,6 +1182,10 @@ export default function Admin() {
                           <DropdownMenuItem onClick={() => handleEditClient(client)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/contracts?clientId=${client.id}`)}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Gerar Contrato
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDeleteClient(client)} className="text-red-600">
                             <Trash2 className="mr-2 h-4 w-4" />

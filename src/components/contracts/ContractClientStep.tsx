@@ -29,6 +29,13 @@ export default function ContractClientStep({ data, onUpdate }: ContractClientSte
     }
   }, [currentAgency?.id]);
 
+  // Pré-preencher se client_id veio da URL
+  useEffect(() => {
+    if (data.client_id && clients.length > 0) {
+      handleClientSelect(data.client_id);
+    }
+  }, [data.client_id, clients]);
+
   const fetchClients = async () => {
     if (!currentAgency?.id) return;
 

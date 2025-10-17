@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePickerDemo } from "@/components/ui/date-picker";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +25,9 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
   const { toast } = useToast();
   const { currentAgency } = useAgency();
   const { enforceLimitWithToast } = useLimitEnforcement();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [generateContract, setGenerateContract] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     contact: '',
@@ -105,23 +109,27 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         agency_id: currentAgency?.id,
       };
 
+      let savedClientId: string | undefined;
+
       if (client) {
         const { error } = await supabase
           .from('clients')
           .update(data)
           .eq('id', client.id);
         if (error) throw error;
+        savedClientId = client.id;
       } else {
-        const { data: clientData, error: clientError } = await supabase
+        const { data: newClientData, error: clientError } = await supabase
           .from('clients')
           .insert([data])
           .select()
           .single();
         
         if (clientError) throw clientError;
+        savedClientId = newClientData?.id;
 
         // Criar pagamento automático para o cliente
-        if (clientData && formData.monthly_value) {
+        if (newClientData && formData.monthly_value) {
           const currentDate = new Date();
           const currentYear = currentDate.getFullYear();
           const currentMonth = currentDate.getMonth();
@@ -132,7 +140,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
           const { error: paymentError } = await supabase
             .from('client_payments')
             .insert([{
-              client_id: clientData.id,
+              client_id: newClientData.id,
               amount: parseFloat(formData.monthly_value),
               due_date: dueDate.toISOString().split('T')[0],
               status: 'pending',
@@ -152,6 +160,12 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
 
       onSuccess();
       onOpenChange(false);
+      
+      // Redirecionar para gerador de contrato se checkbox marcado
+      if (generateContract && !client && savedClientId) {
+        navigate(`/contracts?clientId=${savedClientId}`);
+      }
+      
       setFormData({
         name: '',
         contact: '',
@@ -334,6 +348,20 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
                 rows={3}
               />
             </div>
+
+            {/* Checkbox para gerar contrato (apenas para novos clientes) */}
+            {!client && (
+              <div className="flex items-center space-x-2 p-4 border rounded-lg bg-muted/50">
+                <Checkbox
+                  id="generate-contract"
+                  checked={generateContract}
+                  onCheckedChange={(checked) => setGenerateContract(checked as boolean)}
+                />
+                <Label htmlFor="generate-contract" className="cursor-pointer">
+                  Gerar contrato após cadastro
+                </Label>
+              </div>
+            )}
 
             {/* Status do Cliente */}
             <div className="flex items-center space-x-2">

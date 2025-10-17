@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ArrowRight, FileDown } from "lucide-react";
@@ -44,6 +45,7 @@ interface ContractGeneratorProps {
 }
 
 export default function ContractGenerator({ onCancel, onComplete }: ContractGeneratorProps) {
+  const [searchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
   const [contractData, setContractData] = useState<Partial<ContractData>>({
     services: [],
@@ -51,6 +53,14 @@ export default function ContractGenerator({ onCancel, onComplete }: ContractGene
     contract_date: new Date().toISOString().split('T')[0],
     start_date: new Date().toISOString().split('T')[0],
   });
+
+  // Detectar clientId da URL
+  useEffect(() => {
+    const clientId = searchParams.get("clientId");
+    if (clientId) {
+      setContractData(prev => ({ ...prev, client_id: clientId }));
+    }
+  }, [searchParams]);
 
   const totalSteps = 4;
   const progress = (currentStep / totalSteps) * 100;

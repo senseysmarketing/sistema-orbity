@@ -177,7 +177,8 @@ export default function ContractPreview({ data, onComplete }: ContractPreviewPro
 
     setSaving(true);
     try {
-      const { error } = await supabase.from("contracts").insert({
+      // Salvar contrato
+      const { data: savedContract, error } = await supabase.from("contracts").insert({
         agency_id: currentAgency.id,
         client_id: data.client_id,
         client_name: data.client_name,
@@ -203,11 +204,89 @@ export default function ContractPreview({ data, onComplete }: ContractPreviewPro
         custom_clauses: data.custom_clauses,
         payment_terms: data.payment_terms,
         created_by: profile.user_id,
-      });
+        status: "active",
+      }).select().single();
 
       if (error) throw error;
 
-      toast.success("Contrato salvo com sucesso!");
+      // Sincronizar com cliente
+      let clientId = data.client_id;
+      const monthlyValue = data.services.reduce((sum: number, s: any) => sum + s.value, 0);
+
+      if (!clientId) {
+        // Criar novo cliente
+        const { data: newClient, error: clientError } = await supabase
+          .from("clients")
+          .insert({
+            agency_id: currentAgency.id,
+            name: data.client_name,
+            contact: data.client_phone,
+            monthly_value: monthlyValue,
+            start_date: data.start_date,
+            contract_start_date: data.start_date,
+            contract_end_date: data.end_date,
+            has_loyalty: true,
+            active: true,
+          })
+          .select()
+          .single();
+
+        if (clientError) throw clientError;
+        clientId = newClient.id;
+
+        // Atualizar contrato com client_id
+        await supabase
+          .from("contracts")
+          .update({ client_id: clientId })
+          .eq("id", savedContract.id);
+      } else {
+        // Atualizar cliente existente
+        const { error: updateError } = await supabase
+          .from("clients")
+          .update({
+            monthly_value: monthlyValue,
+            contract_start_date: data.start_date,
+            contract_end_date: data.end_date,
+            has_loyalty: true,
+          })
+          .eq("id", clientId);
+
+        if (updateError) throw updateError;
+      }
+
+      // Gerar pagamentos mensais recorrentes
+      const payments = [];
+      const startDate = new Date(data.start_date);
+      const endDate = data.end_date ? new Date(data.end_date) : null;
+      let currentDate = new Date(startDate);
+
+      while (!endDate || currentDate <= endDate) {
+        const dueDate = new Date(currentDate);
+        dueDate.setDate(5); // Vencimento sempre dia 5
+
+        payments.push({
+          agency_id: currentAgency.id,
+          client_id: clientId,
+          amount: monthlyValue,
+          due_date: dueDate.toISOString().split("T")[0],
+          status: "pending",
+        });
+
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        
+        // Limitar a 24 meses se não houver data final
+        if (!endDate && payments.length >= 24) break;
+      }
+
+      if (payments.length > 0) {
+        const { error: paymentsError } = await supabase
+          .from("client_payments")
+          .insert(payments);
+
+        if (paymentsError) throw paymentsError;
+      }
+
+      toast.success(`Contrato salvo! Cliente ${data.client_id ? 'atualizado' : 'criado'} e ${payments.length} pagamentos gerados.`);
       onComplete();
     } catch (error) {
       console.error("Error saving contract:", error);
