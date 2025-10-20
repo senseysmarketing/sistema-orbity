@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { AlertCircle, Facebook, Plus, Play, Settings, BarChart, FileText, DollarSign, Activity, ExternalLink, Eye } from "lucide-react";
+import { AlertCircle, Facebook, Plus, Play, Settings, BarChart, FileText, DollarSign, Activity, ExternalLink, Eye, LogOut } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
@@ -41,6 +42,7 @@ export default function Traffic() {
   const [loading, setLoading] = useState(true);
   const [isConnectionDialogOpen, setIsConnectionDialogOpen] = useState(false);
   const [isManageAccountsOpen, setIsManageAccountsOpen] = useState(false);
+  const [isDisconnectDialogOpen, setIsDisconnectDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
     // Restaurar aba ativa do localStorage
     return localStorage.getItem('traffic-active-tab') || 'dashboard';
@@ -114,6 +116,47 @@ export default function Traffic() {
       title: "Conexão estabelecida!",
       description: "Facebook conectado com sucesso. Agora selecione suas contas de anúncios.",
     });
+  };
+
+  const handleDisconnectFacebook = async () => {
+    if (!currentAgency) return;
+    
+    try {
+      // Desativar todas as conexões do Facebook da agência
+      const { error: connectionError } = await supabase
+        .from('facebook_connections')
+        .update({ is_active: false })
+        .eq('agency_id', currentAgency.id)
+        .eq('is_active', true);
+
+      if (connectionError) throw connectionError;
+
+      // Desativar todas as contas de anúncios selecionadas
+      const { error: accountsError } = await supabase
+        .from('selected_ad_accounts')
+        .update({ is_active: false })
+        .eq('agency_id', currentAgency.id)
+        .eq('is_active', true);
+
+      if (accountsError) throw accountsError;
+
+      // Atualizar estados locais
+      setFacebookConnections([]);
+      setSelectedAdAccounts([]);
+      setIsDisconnectDialogOpen(false);
+
+      toast({
+        title: "Desconectado com sucesso!",
+        description: "Sua conta do Facebook foi desconectada. Você pode reconectar a qualquer momento.",
+      });
+    } catch (error: any) {
+      console.error('Erro ao desconectar Facebook:', error);
+      toast({
+        title: "Erro ao desconectar",
+        description: "Não foi possível desconectar sua conta do Facebook. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (!hasAccess) {
@@ -289,6 +332,33 @@ export default function Traffic() {
           </p>
         </div>
         <div className="flex gap-2">
+          <AlertDialog open={isDisconnectDialogOpen} onOpenChange={setIsDisconnectDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground">
+                <LogOut className="mr-2 h-4 w-4" />
+                Desconectar Facebook
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Desconectar conta do Facebook?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta ação irá desconectar sua conta do Facebook e remover todas as contas de anúncios selecionadas.
+                  Você poderá reconectar ou conectar uma nova conta a qualquer momento.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDisconnectFacebook}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Desconectar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <Dialog open={isManageAccountsOpen} onOpenChange={setIsManageAccountsOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
