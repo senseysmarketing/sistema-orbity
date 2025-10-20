@@ -196,8 +196,16 @@ export default function Tasks() {
       // Filtro de prioridade
       const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
 
-      // Filtro de responsável
-      const matchesAssigned = assignedFilter === 'all' || assignedFilter === 'unassigned' && !task.assigned_to || task.assigned_to === assignedFilter;
+      // Filtro de responsável - usar task_assignments
+      let matchesAssigned = true;
+      if (assignedFilter !== 'all') {
+        const taskAssignedUsers = getAssignedUsers(task.id);
+        if (assignedFilter === 'unassigned') {
+          matchesAssigned = taskAssignedUsers.length === 0;
+        } else {
+          matchesAssigned = taskAssignedUsers.some(u => u.user_id === assignedFilter);
+        }
+      }
 
       // Filtro de cliente
       const matchesClient = clientFilter === 'all' || clientFilter === 'no-client' && !task.client_id || task.client_id === clientFilter;
@@ -274,10 +282,11 @@ export default function Tasks() {
       const dueDate = t.due_date ? new Date(t.due_date) : null;
       return dueDate && dueDate <= thisWeek && dueDate >= today;
     }).length;
-    const unassignedTasks = filteredTasks.filter(t => !t.assigned_to).length;
+    // Contar tarefas sem atribuição usando task_assignments
+    const unassignedTasks = filteredTasks.filter(t => getAssignedUsers(t.id).length === 0).length;
     const completionRate = filteredTasks.length > 0 ? Math.round(statusStats.done / filteredTasks.length * 100) : 0;
 
-    // Análise por usuário
+    // Análise por usuário - usar task_assignments
     const userStats: {
       [key: string]: {
         name: string;
@@ -287,7 +296,12 @@ export default function Tasks() {
       };
     } = {};
     profiles.forEach(profile => {
-      const userTasks = filteredTasks.filter(t => t.assigned_to === profile.user_id);
+      // Filtrar tarefas onde este usuário está atribuído via task_assignments
+      const userTasks = filteredTasks.filter(t => {
+        const assignedUsers = getAssignedUsers(t.id);
+        return assignedUsers.some(u => u.user_id === profile.user_id);
+      });
+      
       if (userTasks.length > 0) {
         userStats[profile.user_id] = {
           name: profile.name,
