@@ -21,7 +21,7 @@ export function SalaryForm({ open, onOpenChange, onSuccess, salary }: SalaryForm
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     employee_name: salary?.employee_name || '',
-    amount: salary?.amount || '',
+    amount: salary?.amount?.toString() || '',
     due_date: salary?.due_date ? salary.due_date.split('T')[0] : '',
     paid_date: salary?.paid_date ? salary.paid_date.split('T')[0] : '',
     status: salary?.status || 'pending',

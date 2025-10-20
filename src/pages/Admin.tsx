@@ -97,6 +97,12 @@ export default function Admin() {
   const [expenseDeleteDialogOpen, setExpenseDeleteDialogOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
+  // Salary states
+  const [selectedSalary, setSelectedSalary] = useState<Salary | null>(null);
+  const [salaryDetailsOpen, setSalaryDetailsOpen] = useState(false);
+  const [salaryDeleteDialogOpen, setSalaryDeleteDialogOpen] = useState(false);
+  const [salaryToDelete, setSalaryToDelete] = useState<Salary | null>(null);
+
   // Filtros e busca
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -444,6 +450,76 @@ export default function Admin() {
         description: "Status da despesa foi atualizado com sucesso"
       });
       fetchExpenses();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar status",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Salary handlers
+  const handleViewSalary = (salary: Salary) => {
+    setSelectedSalary(salary);
+    setSalaryDetailsOpen(true);
+  };
+  
+  const handleEditSalary = (salary: Salary) => {
+    setSelectedSalary(salary);
+    setSalaryFormOpen(true);
+  };
+  
+  const handleDeleteSalary = (salary: Salary) => {
+    setSalaryToDelete(salary);
+    setSalaryDeleteDialogOpen(true);
+  };
+  
+  const confirmDeleteSalary = async () => {
+    if (!salaryToDelete) return;
+    try {
+      const { error } = await supabase
+        .from('salaries')
+        .delete()
+        .eq('id', salaryToDelete.id);
+      if (error) throw error;
+      toast({
+        title: "Salário excluído",
+        description: "Salário excluído com sucesso!"
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSalaryDeleteDialogOpen(false);
+      setSalaryToDelete(null);
+    }
+  };
+
+  const handleUpdateSalaryStatus = async (salaryId: string, newStatus: 'pending' | 'paid' | 'overdue') => {
+    try {
+      const updateData: any = {
+        status: newStatus
+      };
+      if (newStatus === 'paid') {
+        updateData.paid_date = new Date().toISOString().split('T')[0];
+      } else {
+        updateData.paid_date = null;
+      }
+      const { error } = await supabase
+        .from('salaries')
+        .update(updateData)
+        .eq('id', salaryId);
+      if (error) throw error;
+      toast({
+        title: "Status atualizado",
+        description: "Status do salário foi atualizado com sucesso"
+      });
+      fetchSalaries();
     } catch (error: any) {
       toast({
         title: "Erro ao atualizar status",
@@ -1708,10 +1784,32 @@ export default function Admin() {
                               </DropdownMenuItem>
                             </>
                           ) : (
-                            <DropdownMenuItem disabled>
-                              <Users className="mr-2 h-4 w-4" />
-                              Salário
-                            </DropdownMenuItem>
+                            <>
+                              <DropdownMenuItem onClick={() => handleViewSalary(item as Salary)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver Detalhes
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditSalary(item as Salary)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleUpdateSalaryStatus(item.id, 'paid')}>
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Marcar como Pago
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleUpdateSalaryStatus(item.id, 'pending')}>
+                                <Timer className="mr-2 h-4 w-4" />
+                                Marcar como Pendente
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleUpdateSalaryStatus(item.id, 'overdue')}>
+                                <AlertTriangle className="mr-2 h-4 w-4" />
+                                Marcar como Atrasado
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDeleteSalary(item as Salary)} className="text-red-600">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </>
                           )}
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1855,10 +1953,32 @@ export default function Admin() {
                                     </DropdownMenuItem>
                                   </>
                                 ) : (
-                                  <DropdownMenuItem disabled>
-                                    <Users className="mr-2 h-4 w-4" />
-                                    Salário
-                                  </DropdownMenuItem>
+                                  <>
+                                    <DropdownMenuItem onClick={() => handleViewSalary(item as Salary)}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Ver Detalhes
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleEditSalary(item as Salary)}>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleUpdateSalaryStatus(item.id, 'paid')}>
+                                      <CheckCircle className="mr-2 h-4 w-4" />
+                                      Marcar como Pago
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleUpdateSalaryStatus(item.id, 'pending')}>
+                                      <Timer className="mr-2 h-4 w-4" />
+                                      Marcar como Pendente
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleUpdateSalaryStatus(item.id, 'overdue')}>
+                                      <AlertTriangle className="mr-2 h-4 w-4" />
+                                      Marcar como Atrasado
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDeleteSalary(item as Salary)} className="text-red-600">
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Excluir
+                                    </DropdownMenuItem>
+                                  </>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -2208,10 +2328,10 @@ export default function Admin() {
       if (!open) setSelectedExpense(null);
     }} expense={selectedExpense} onSuccess={fetchData} />
 
-      <SalaryForm open={salaryFormOpen} onOpenChange={setSalaryFormOpen} onSuccess={() => {
-      fetchData();
-      setSalaryFormOpen(false);
-    }} />
+      <SalaryForm open={salaryFormOpen} onOpenChange={open => {
+        setSalaryFormOpen(open);
+        if (!open) setSelectedSalary(null);
+      }} salary={selectedSalary} onSuccess={fetchData} />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
@@ -2284,6 +2404,62 @@ export default function Admin() {
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction onClick={confirmDeleteExpense} className="bg-red-600 hover:bg-red-700">
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Dialog de detalhes do salário */}
+        <AlertDialog open={salaryDetailsOpen} onOpenChange={setSalaryDetailsOpen}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Detalhes do Salário</AlertDialogTitle>
+            </AlertDialogHeader>
+            <div className="space-y-4">
+              {selectedSalary && (
+                <>
+                  <div>
+                    <span className="font-medium">Funcionário:</span>
+                    <p>{selectedSalary.employee_name}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Valor:</span>
+                    <p>R$ {selectedSalary.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Data de Vencimento:</span>
+                    <p>{new Date(selectedSalary.due_date).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Status:</span>
+                    <p>{getStatusLabel(selectedSalary.status)}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Data de Pagamento:</span>
+                    <p>{selectedSalary.paid_date ? new Date(selectedSalary.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}</p>
+                  </div>
+                </>
+              )}
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Fechar</AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Dialog de confirmação de exclusão de salário */}
+        <AlertDialog open={salaryDeleteDialogOpen} onOpenChange={setSalaryDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir o salário de "{salaryToDelete?.employee_name}"? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeleteSalary} className="bg-red-600 hover:bg-red-700">
                 Excluir
               </AlertDialogAction>
             </AlertDialogFooter>
