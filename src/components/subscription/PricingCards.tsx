@@ -163,6 +163,12 @@ export function PricingCards() {
             <div className="flex items-center gap-2">
               <Check className="h-4 w-4 text-green-500" />
                <span className="text-sm">
+                 {plan.max_facebook_ad_accounts >= 999999 ? 'Contas de anúncios ilimitadas' : `${plan.max_facebook_ad_accounts} contas de anúncios`}
+               </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-green-500" />
+               <span className="text-sm">
                  {plan.max_tasks >= 999999 ? 'Tarefas ilimitadas' : `${plan.max_tasks} tarefas`}
                </span>
             </div>
