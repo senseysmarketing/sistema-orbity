@@ -26,6 +26,7 @@ import Onboarding from "./pages/Onboarding";
 import SubscriptionSuccess from "./pages/SubscriptionSuccess";
 import SubscriptionCanceled from "./pages/SubscriptionCanceled";
 import Contracts from "./pages/Contracts";
+import SocialMedia from "./pages/SocialMedia";
 
 const queryClient = new QueryClient();
 
@@ -59,6 +60,7 @@ const App = () => (
                         <Route path="traffic" element={<Traffic />} />
                         <Route path="admin" element={<Admin />} />
                         <Route path="contracts" element={<Contracts />} />
+                        <Route path="social-media" element={<SocialMedia />} />
                         <Route path="reports" element={<Reports />} />
                         <Route path="settings" element={<Settings />} />
                         <Route path="master" element={<Master />} />

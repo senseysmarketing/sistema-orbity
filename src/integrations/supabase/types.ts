@@ -538,6 +538,70 @@ export type Database = {
           },
         ]
       }
+      campaigns: {
+        Row: {
+          agency_id: string
+          budget: number | null
+          client_id: string | null
+          created_at: string | null
+          end_date: string
+          goal: string | null
+          id: string
+          name: string
+          start_date: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          agency_id: string
+          budget?: number | null
+          client_id?: string | null
+          created_at?: string | null
+          end_date: string
+          goal?: string | null
+          id?: string
+          name: string
+          start_date: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          agency_id?: string
+          budget?: number | null
+          client_id?: string | null
+          created_at?: string | null
+          end_date?: string
+          goal?: string | null
+          id?: string
+          name?: string
+          start_date?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_payments: {
         Row: {
           agency_id: string | null
@@ -662,6 +726,83 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      content_library: {
+        Row: {
+          agency_id: string
+          campaign_id: string | null
+          client_id: string | null
+          created_at: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string
+          file_url: string
+          id: string
+          is_favorite: boolean | null
+          tags: string[] | null
+          updated_at: string | null
+          uploaded_by: string
+        }
+        Insert: {
+          agency_id: string
+          campaign_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type: string
+          file_url: string
+          id?: string
+          is_favorite?: boolean | null
+          tags?: string[] | null
+          updated_at?: string | null
+          uploaded_by: string
+        }
+        Update: {
+          agency_id?: string
+          campaign_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string
+          file_url?: string
+          id?: string
+          is_favorite?: boolean | null
+          tags?: string[] | null
+          updated_at?: string | null
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_library_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_library_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "content_library_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_library_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1437,6 +1578,177 @@ export type Database = {
           },
         ]
       }
+      social_media_assignments: {
+        Row: {
+          assigned_at: string | null
+          created_at: string | null
+          id: string
+          post_id: string | null
+          role: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          created_at?: string | null
+          id?: string
+          post_id?: string | null
+          role: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string | null
+          created_at?: string | null
+          id?: string
+          post_id?: string | null
+          role?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_assignments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "social_media_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_media_notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          post_id: string | null
+          read: boolean | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          post_id?: string | null
+          read?: boolean | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          post_id?: string | null
+          read?: boolean | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_notifications_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "social_media_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_media_posts: {
+        Row: {
+          agency_id: string
+          approval_history: Json | null
+          attachments: Json | null
+          campaign_id: string | null
+          client_id: string | null
+          created_at: string | null
+          created_by: string
+          description: string | null
+          hashtags: string[] | null
+          id: string
+          mentions: string[] | null
+          notes: string | null
+          platform: string
+          post_type: string
+          priority: string
+          scheduled_date: string
+          status: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          agency_id: string
+          approval_history?: Json | null
+          attachments?: Json | null
+          campaign_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          hashtags?: string[] | null
+          id?: string
+          mentions?: string[] | null
+          notes?: string | null
+          platform: string
+          post_type: string
+          priority?: string
+          scheduled_date: string
+          status?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          agency_id?: string
+          approval_history?: Json | null
+          attachments?: Json | null
+          campaign_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          hashtags?: string[] | null
+          id?: string
+          mentions?: string[] | null
+          notes?: string | null
+          platform?: string
+          post_type?: string
+          priority?: string
+          scheduled_date?: string
+          status?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_posts_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_posts_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "social_media_posts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_plans: {
         Row: {
           created_at: string
@@ -1448,9 +1760,12 @@ export type Database = {
           has_white_label: boolean
           id: string
           is_active: boolean
+          max_campaigns: number | null
           max_clients: number
+          max_content_storage_gb: number | null
           max_facebook_ad_accounts: number
           max_leads: number
+          max_social_media_posts: number | null
           max_storage_gb: number
           max_tasks: number
           max_users: number
@@ -1473,9 +1788,12 @@ export type Database = {
           has_white_label?: boolean
           id?: string
           is_active?: boolean
+          max_campaigns?: number | null
           max_clients?: number
+          max_content_storage_gb?: number | null
           max_facebook_ad_accounts?: number
           max_leads?: number
+          max_social_media_posts?: number | null
           max_storage_gb?: number
           max_tasks?: number
           max_users?: number
@@ -1498,9 +1816,12 @@ export type Database = {
           has_white_label?: boolean
           id?: string
           is_active?: boolean
+          max_campaigns?: number | null
           max_clients?: number
+          max_content_storage_gb?: number | null
           max_facebook_ad_accounts?: number
           max_leads?: number
+          max_social_media_posts?: number | null
           max_storage_gb?: number
           max_tasks?: number
           max_users?: number
