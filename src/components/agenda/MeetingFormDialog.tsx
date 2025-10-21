@@ -9,17 +9,49 @@ import { Meeting, useMeetings } from "@/hooks/useMeetings";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
-import { format } from "date-fns";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Plus, X } from "lucide-react";
+import { toast } from "sonner";
+import { z } from "zod";
 
 interface MeetingFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   meeting?: Meeting;
 }
+
+// Validation schemas
+const externalParticipantSchema = z.object({
+  name: z.string().min(2, "Nome muito curto").max(100, "Nome muito longo"),
+  email: z.string().email("Email inválido").max(255, "Email muito longo"),
+});
+
+const meetingSchema = z.object({
+  title: z.string()
+    .min(3, "Título deve ter pelo menos 3 caracteres")
+    .max(200, "Título deve ter no máximo 200 caracteres"),
+  description: z.string()
+    .max(2000, "Descrição muito longa")
+    .optional(),
+  meeting_type: z.string(),
+  start_time: z.string().min(1, "Data/hora de início obrigatória"),
+  end_time: z.string().min(1, "Data/hora de término obrigatória"),
+  location: z.string().max(500, "Localização muito longa").optional(),
+  google_meet_link: z.string()
+    .max(500, "Link muito longo")
+    .refine((val) => !val || val.startsWith("http://") || val.startsWith("https://"), {
+      message: "Link deve começar com http:// ou https://",
+    })
+    .optional(),
+  client_id: z.string().optional(),
+  lead_id: z.string().optional(),
+}).refine((data) => {
+  const start = new Date(data.start_time);
+  const end = new Date(data.end_time);
+  return end > start;
+}, {
+  message: "Horário de término deve ser após o início",
+  path: ["end_time"],
+});
 
 export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDialogProps) => {
   const { createMeeting, updateMeeting } = useMeetings();
@@ -86,9 +118,27 @@ export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDi
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate form data
+    const validation = meetingSchema.safeParse(formData);
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
+    // Validate external participants
+    for (const participant of externalParticipants) {
+      if (participant.name || participant.email) {
+        const participantValidation = externalParticipantSchema.safeParse(participant);
+        if (!participantValidation.success) {
+          toast.error(`Participante externo: ${participantValidation.error.errors[0].message}`);
+          return;
+        }
+      }
+    }
+
     const meetingData = {
       ...formData,
-      external_participants: externalParticipants,
+      external_participants: externalParticipants.filter(p => p.name && p.email),
       client_id: formData.client_id || null,
       lead_id: formData.lead_id || null,
     };
@@ -147,6 +197,7 @@ export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDi
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               required
+              maxLength={200}
             />
           </div>
 
@@ -203,6 +254,7 @@ export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDi
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={3}
+              maxLength={2000}
             />
           </div>
 
@@ -256,6 +308,7 @@ export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDi
                 value={formData.location}
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 placeholder="Endereço ou sala"
+                maxLength={500}
               />
             </div>
 
@@ -266,6 +319,7 @@ export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDi
                 value={formData.google_meet_link}
                 onChange={(e) => setFormData({ ...formData, google_meet_link: e.target.value })}
                 placeholder="https://meet.google.com/..."
+                maxLength={500}
               />
             </div>
           </div>
@@ -290,12 +344,14 @@ export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDi
                   placeholder="Nome"
                   value={participant.name}
                   onChange={(e) => updateExternalParticipant(index, "name", e.target.value)}
+                  maxLength={100}
                 />
                 <Input
                   placeholder="Email"
                   type="email"
                   value={participant.email}
                   onChange={(e) => updateExternalParticipant(index, "email", e.target.value)}
+                  maxLength={255}
                 />
                 <Button
                   type="button"

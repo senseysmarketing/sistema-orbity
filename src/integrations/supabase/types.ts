@@ -347,6 +347,13 @@ export type Database = {
             foreignKeyName: "agency_subscriptions_plan_id_fkey"
             columns: ["plan_id"]
             isOneToOne: false
+            referencedRelation: "public_pricing_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
             referencedRelation: "subscription_plans"
             referencedColumns: ["id"]
           },
@@ -2594,6 +2601,33 @@ export type Database = {
           task_count: number | null
           total_revenue: number | null
           user_count: number | null
+        }
+        Relationships: []
+      }
+      public_pricing_plans: {
+        Row: {
+          description: string | null
+          id: string | null
+          is_active: boolean | null
+          name: string | null
+          price_monthly: number | null
+          price_yearly: number | null
+        }
+        Insert: {
+          description?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          price_monthly?: number | null
+          price_yearly?: number | null
+        }
+        Update: {
+          description?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          price_monthly?: number | null
+          price_yearly?: number | null
         }
         Relationships: []
       }
