@@ -42,7 +42,7 @@ export function SortablePostCard({ post, onClick }: SortablePostCardProps) {
       <button
         type="button"
         aria-label="Arrastar"
-        className="absolute left-2 top-2 z-10 rounded p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
         {...listeners}
         onClick={(e) => e.stopPropagation()}
       >
