@@ -2,6 +2,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { PostCard } from "./PostCard";
 import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
+import { GripVertical } from "lucide-react";
 
 interface SortablePostCardProps {
   post: SocialMediaPost;
@@ -32,7 +33,21 @@ export function SortablePostCard({ post, onClick }: SortablePostCardProps) {
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      className="relative"
+    >
+      <button
+        type="button"
+        aria-label="Arrastar"
+        className="absolute left-2 top-2 z-10 rounded p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
       <PostCard post={post} onClick={handleClick} />
     </div>
   );
