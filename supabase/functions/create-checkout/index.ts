@@ -25,7 +25,8 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const { priceId } = await req.json();
+    // Parse body safely to allow optional email fallback
+    const { priceId, email: bodyEmail } = await req.json().catch(() => ({}));
     if (!priceId) {
       throw new Error("Price ID is required");
     }
@@ -34,20 +35,42 @@ serve(async (req) => {
     if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
     logStep("Stripe key verified");
 
+    // Try to resolve the user via Authorization header; if missing, fallback to body email
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header provided");
-    
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
-    const user = userData.user;
-    if (!user?.email) throw new Error("User not authenticated or email not available");
-    logStep("User authenticated", { userId: user.id, email: user.email });
+    let userEmail: string | null = null;
+    let userId: string | null = null;
+
+    if (authHeader) {
+      try {
+        const token = authHeader.replace("Bearer ", "");
+        const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+        if (userError) throw new Error(`Authentication error: ${userError.message}`);
+        const user = userData.user;
+        if (user?.email) {
+          userEmail = user.email;
+          userId = user.id;
+          logStep("User authenticated", { userId, email: userEmail });
+        }
+      } catch (e) {
+        logStep("Auth via token failed, will try email fallback", { message: e instanceof Error ? e.message : String(e) });
+      }
+    } else {
+      logStep("No authorization header provided, will try email fallback");
+    }
+
+    if (!userEmail && bodyEmail) {
+      userEmail = bodyEmail;
+      logStep("Using email from request body as fallback", { email: userEmail });
+    }
+
+    if (!userEmail) {
+      throw new Error("Authentication error: Auth session missing and no email provided");
+    }
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     
     // Check if customer exists
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    const customers = await stripe.customers.list({ email: userEmail, limit: 1 });
     let customerId;
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
@@ -60,7 +83,7 @@ serve(async (req) => {
     
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      customer_email: customerId ? undefined : user.email,
+      customer_email: customerId ? undefined : userEmail!,
       line_items: [
         {
           price: priceId,
@@ -72,8 +95,8 @@ serve(async (req) => {
       cancel_url: `${origin}/subscription-canceled`,
       allow_promotion_codes: true,
       metadata: {
-        user_id: user.id,
-        user_email: user.email,
+        user_id: userId ?? 'unknown',
+        user_email: userEmail!,
       },
     });
 

@@ -9,7 +9,7 @@ interface PaymentMiddlewareWrapperProps {
 
 export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperProps) {
   const { paymentStatus, loading, isSuperAdmin } = usePaymentMiddleware();
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
 
   // Show loading spinner while checking payment status
   if (loading) {
@@ -22,6 +22,11 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
 
   // Super admins bypass all checks
   if (profile?.role === 'super_admin') {
+    return <>{children}</>;
+  }
+
+  // If not authenticated, don't block (allow auth/public routes)
+  if (!session) {
     return <>{children}</>;
   }
 
