@@ -95,7 +95,6 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
       >
         <div className="flex items-center gap-1">
           <ContentTypeIcon className="h-3 w-3" />
-          <PlatformIcon className="h-3 w-3 opacity-60" />
           <span className="truncate flex-1">{post.title}</span>
           <div className={`h-2 w-2 rounded-full ${statusInfo.color}`} />
         </div>
@@ -113,10 +112,7 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            <ContentTypeIcon className="h-5 w-5" />
-            <PlatformIcon className="h-4 w-4 opacity-60" />
-          </div>
+          <ContentTypeIcon className="h-5 w-5" />
           <h3 className="font-semibold">{post.title}</h3>
         </div>
         <div className="flex gap-1 flex-wrap">
