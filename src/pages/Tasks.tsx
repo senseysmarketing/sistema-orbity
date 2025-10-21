@@ -966,6 +966,7 @@ export default function Tasks() {
         onEdit={handleEditTask}
         onDelete={handleDeleteTask}
         getClientName={getClientName}
+        getAssignedUsers={getAssignedUsers}
       />
     </div>
   );

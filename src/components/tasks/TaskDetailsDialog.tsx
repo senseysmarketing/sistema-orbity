@@ -7,9 +7,7 @@ import { ptBR } from "date-fns/locale";
 import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
-import { useTaskAssignments } from "@/hooks/useTaskAssignments";
 
 interface Task {
   id: string;
@@ -38,6 +36,7 @@ interface TaskDetailsDialogProps {
   onEdit: (task: Task) => void;
   onDelete: (taskId: string) => void;
   getClientName: (clientId: string | null) => string;
+  getAssignedUsers: (taskId: string) => any[];
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -53,10 +52,9 @@ const priorityConfig: Record<string, { label: string; color: string }> = {
   high: { label: "Alta", color: "bg-red-500" },
 };
 
-export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, getClientName }: TaskDetailsDialogProps) {
+export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, getClientName, getAssignedUsers }: TaskDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
-  const { getAssignedUsers } = useTaskAssignments();
 
   useEffect(() => {
     // Histórico virá do campo history da tarefa quando implementado
