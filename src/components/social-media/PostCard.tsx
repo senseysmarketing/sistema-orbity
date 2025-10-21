@@ -28,7 +28,7 @@ const contentTypeIcons = {
 const statusConfig = {
   draft: { label: "Briefing", color: "bg-gray-500" },
   in_creation: { label: "Em Criação", color: "bg-blue-500" },
-  pending_approval: { label: "Aguardando Aprovação", color: "bg-yellow-500" },
+  pending_approval: { label: "Aguardando", color: "bg-yellow-500" },
   approved: { label: "Aprovado", color: "bg-green-500" },
   published: { label: "Publicado", color: "bg-purple-500" },
   rejected: { label: "Rejeitado", color: "bg-red-500" },
