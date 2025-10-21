@@ -47,7 +47,7 @@ interface SubscriptionContextType {
   loading: boolean;
   refreshing: boolean;
   showRefreshAlert: boolean;
-  checkSubscription: () => Promise<void>;
+  checkSubscription: (forceRefresh?: boolean) => Promise<void>;
   createCheckout: (priceId: string) => Promise<void>;
   openCustomerPortal: () => Promise<void>;
   refreshPlans: () => Promise<void>;

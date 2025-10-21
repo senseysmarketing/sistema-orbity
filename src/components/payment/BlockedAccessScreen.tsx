@@ -13,11 +13,14 @@ interface BlockedAccessScreenProps {
 
 export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
   const { paymentStatus, refreshPaymentStatus } = usePaymentMiddleware();
-  const { openCustomerPortal, currentSubscription } = useSubscription();
+  const { openCustomerPortal, currentSubscription, checkSubscription } = useSubscription();
   const { signOut } = useAuth();
   const [showPlans, setShowPlans] = useState(false);
 
   const handleRetry = async () => {
+    // First, sync with Stripe -> local via check-subscription
+    await checkSubscription(true);
+    // Then, refresh middleware status based on local DB/RPC
     await refreshPaymentStatus();
     onRetry?.();
   };

@@ -78,7 +78,7 @@ export function SubscriptionStatus() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={checkSubscription}
+            onClick={() => checkSubscription(true)}
             disabled={refreshing}
             className="ml-auto"
           >
