@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
-import { Instagram, Facebook, Linkedin, Twitter, Youtube } from "lucide-react";
-import { format } from "date-fns";
+import { Instagram, Facebook, Linkedin, Twitter, Youtube, Image, Film, LayoutGrid, Zap, Clock, AlertCircle } from "lucide-react";
+import { format, isToday, isBefore, startOfDay, addDays, isBefore as isBeforeDate } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface PostCardProps {
@@ -18,55 +18,117 @@ const platformIcons = {
   youtube: Youtube,
 };
 
-const statusColors = {
-  draft: "bg-gray-500",
-  pending_approval: "bg-yellow-500",
-  approved: "bg-green-500",
-  published: "bg-blue-500",
-  rejected: "bg-red-500",
+const contentTypeIcons = {
+  feed: Image,
+  stories: Zap,
+  reels: Film,
+  carrossel: LayoutGrid,
 };
 
-const priorityColors = {
-  low: "bg-blue-500",
-  medium: "bg-yellow-500",
-  high: "bg-red-500",
+const statusConfig = {
+  draft: { label: "Rascunho", color: "bg-gray-500" },
+  pending_approval: { label: "Pendente", color: "bg-yellow-500" },
+  approved: { label: "Aprovado", color: "bg-green-500" },
+  published: { label: "Publicado", color: "bg-blue-500" },
+  rejected: { label: "Rejeitado", color: "bg-red-500" },
+};
+
+// Gera uma cor consistente baseada no client_id
+const getClientColor = (clientId?: string | null): string => {
+  if (!clientId) return "hsl(var(--muted))";
+  
+  const colors = [
+    "hsl(220, 70%, 50%)", // Azul
+    "hsl(340, 75%, 50%)", // Rosa
+    "hsl(160, 60%, 45%)", // Verde
+    "hsl(280, 65%, 55%)", // Roxo
+    "hsl(30, 80%, 55%)",  // Laranja
+    "hsl(190, 70%, 50%)", // Ciano
+    "hsl(45, 90%, 55%)",  // Amarelo
+    "hsl(300, 65%, 50%)", // Magenta
+    "hsl(120, 60%, 45%)", // Verde claro
+    "hsl(10, 75%, 55%)",  // Vermelho
+  ];
+  
+  // Gera um índice consistente baseado no clientId
+  let hash = 0;
+  for (let i = 0; i < clientId.length; i++) {
+    hash = clientId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  return colors[Math.abs(hash) % colors.length];
+};
+
+const getUrgencyBadge = (scheduledDate: string) => {
+  const now = startOfDay(new Date());
+  const postDate = startOfDay(new Date(scheduledDate));
+  
+  if (isBefore(postDate, now)) {
+    return { label: "Atrasado", color: "bg-red-500", icon: AlertCircle };
+  }
+  
+  if (isToday(new Date(scheduledDate))) {
+    return { label: "Hoje", color: "bg-orange-500", icon: Clock };
+  }
+  
+  const weekFromNow = addDays(now, 7);
+  if (isBefore(postDate, weekFromNow)) {
+    return { label: "Esta semana", color: "bg-blue-500", icon: Clock };
+  }
+  
+  return null;
 };
 
 export function PostCard({ post, compact = false, onClick }: PostCardProps) {
   const PlatformIcon = platformIcons[post.platform as keyof typeof platformIcons] || Instagram;
+  const ContentTypeIcon = contentTypeIcons[post.post_type as keyof typeof contentTypeIcons] || Image;
+  const clientColor = getClientColor(post.client_id);
+  const statusInfo = statusConfig[post.status as keyof typeof statusConfig] || statusConfig.draft;
+  const urgencyBadge = getUrgencyBadge(post.scheduled_date);
 
   if (compact) {
     return (
       <div 
-        className="text-xs p-1 rounded border cursor-pointer hover:bg-accent transition-colors"
+        className="text-xs p-1.5 rounded border cursor-pointer hover:bg-accent transition-colors"
         onClick={onClick}
+        style={{ borderLeftColor: clientColor, borderLeftWidth: '3px' }}
       >
         <div className="flex items-center gap-1">
-          <PlatformIcon className="h-3 w-3" />
+          <ContentTypeIcon className="h-3 w-3" />
+          <PlatformIcon className="h-3 w-3 opacity-60" />
           <span className="truncate flex-1">{post.title}</span>
-          <div className={`h-2 w-2 rounded-full ${statusColors[post.status as keyof typeof statusColors]}`} />
+          <div className={`h-2 w-2 rounded-full ${statusInfo.color}`} />
         </div>
       </div>
     );
   }
 
+  const UrgencyIcon = urgencyBadge?.icon;
+
   return (
     <div 
       className="p-4 rounded-lg border bg-card cursor-pointer hover:shadow-md transition-all"
       onClick={onClick}
+      style={{ borderLeftColor: clientColor, borderLeftWidth: '4px' }}
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
-          <PlatformIcon className="h-5 w-5" />
+          <div className="flex items-center gap-1">
+            <ContentTypeIcon className="h-5 w-5" />
+            <PlatformIcon className="h-4 w-4 opacity-60" />
+          </div>
           <h3 className="font-semibold">{post.title}</h3>
         </div>
-        <div className="flex gap-1">
-          <Badge variant="outline" className={`${statusColors[post.status as keyof typeof statusColors]} text-white`}>
-            {post.status}
+        <div className="flex gap-1 flex-wrap">
+          <Badge variant="outline" className={`${statusInfo.color} text-white text-xs`}>
+            {statusInfo.label}
           </Badge>
-          <Badge variant="outline" className={`${priorityColors[post.priority as keyof typeof priorityColors]} text-white`}>
-            {post.priority}
-          </Badge>
+          {urgencyBadge && UrgencyIcon && (
+            <Badge variant="outline" className={`${urgencyBadge.color} text-white text-xs flex items-center gap-1`}>
+              <UrgencyIcon className="h-3 w-3" />
+              {urgencyBadge.label}
+            </Badge>
+          )}
         </div>
       </div>
       
@@ -81,7 +143,12 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
           {format(new Date(post.scheduled_date), "dd MMM yyyy 'às' HH:mm", { locale: ptBR })}
         </span>
         {post.clients && (
-          <span className="font-medium">{post.clients.name}</span>
+          <span 
+            className="font-medium px-2 py-0.5 rounded"
+            style={{ backgroundColor: clientColor, color: 'white' }}
+          >
+            {post.clients.name}
+          </span>
         )}
       </div>
 
