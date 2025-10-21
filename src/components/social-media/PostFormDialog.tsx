@@ -123,7 +123,28 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     enabled: !!currentAgency?.id,
   });
 
-  const allContentTypes = [...defaultContentTypes, ...customContentTypes];
+  // Buscar configurações de tipos de conteúdo padrão desativados
+  const { data: disabledDefaultTypes = [] } = useQuery({
+    queryKey: ['disabled-content-types', currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data, error } = await supabase
+        .from('social_media_content_types')
+        .select('slug')
+        .eq('agency_id', currentAgency.id)
+        .eq('is_active', false)
+        .eq('is_default', true);
+      if (error) throw error;
+      return (data || []).map(p => p.slug);
+    },
+    enabled: !!currentAgency?.id,
+  });
+
+  // Filtrar tipos de conteúdo padrão ativos e combinar com customizados
+  const allContentTypes = [
+    ...defaultContentTypes.filter(t => !disabledDefaultTypes.includes(t.slug)),
+    ...customContentTypes
+  ];
 
   // Buscar plataformas ativas customizadas e combinar com padrões
   const { data: customPlatforms = [] } = useQuery({

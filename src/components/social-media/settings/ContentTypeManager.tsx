@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
@@ -15,13 +15,23 @@ export function ContentTypeManager() {
   const queryClient = useQueryClient();
   const [newType, setNewType] = useState({ name: "", icon: "📄" });
 
-  const { data: types = [] } = useQuery({
+  // Tipos de conteúdo padrão do sistema
+  const defaultContentTypes = [
+    { slug: 'feed', name: 'Feed', icon: '📱', is_default: true },
+    { slug: 'stories', name: 'Stories', icon: '📖', is_default: true },
+    { slug: 'reels', name: 'Reels', icon: '🎬', is_default: true },
+    { slug: 'carrossel', name: 'Carrossel', icon: '🎠', is_default: true },
+    { slug: 'video', name: 'Vídeo', icon: '🎥', is_default: true },
+  ];
+
+  const { data: customTypes = [] } = useQuery({
     queryKey: ["content-types", currentAgency?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("social_media_content_types")
         .select("*")
         .eq("agency_id", currentAgency?.id)
+        .eq("is_default", false)
         .order("name");
       
       if (error) throw error;
@@ -29,6 +39,36 @@ export function ContentTypeManager() {
     },
     enabled: !!currentAgency?.id,
   });
+
+  // Buscar configurações de tipos padrão
+  const { data: defaultTypeSettings = [] } = useQuery({
+    queryKey: ["default-content-type-settings", currentAgency?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("social_media_content_types")
+        .select("*")
+        .eq("agency_id", currentAgency?.id)
+        .eq("is_default", true);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentAgency?.id,
+  });
+
+  // Combinar tipos padrão com configurações
+  const allContentTypes = useMemo(() => {
+    const typesWithSettings = defaultContentTypes.map(defaultType => {
+      const setting = defaultTypeSettings.find((s: any) => s.slug === defaultType.slug);
+      return {
+        ...defaultType,
+        id: setting?.id,
+        is_active: setting?.is_active ?? true,
+        agency_id: currentAgency?.id,
+      };
+    });
+    return [...typesWithSettings, ...customTypes];
+  }, [defaultTypeSettings, customTypes, currentAgency?.id]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -66,16 +106,37 @@ export function ContentTypeManager() {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      const { error } = await supabase
-        .from("social_media_content_types")
-        .update({ is_active: isActive })
-        .eq("id", id);
-      
-      if (error) throw error;
+    mutationFn: async ({ id, slug, isActive, isDefault }: { id?: string; slug: string; isActive: boolean; isDefault: boolean }) => {
+      if (id) {
+        // Atualizar configuração existente
+        const { error } = await supabase
+          .from("social_media_content_types")
+          .update({ is_active: isActive })
+          .eq("id", id);
+        
+        if (error) throw error;
+      } else {
+        // Criar nova configuração para tipo padrão
+        const defaultType = defaultContentTypes.find(p => p.slug === slug);
+        if (!defaultType || !currentAgency?.id) return;
+        
+        const { error } = await supabase
+          .from("social_media_content_types")
+          .insert({
+            agency_id: currentAgency.id,
+            slug: defaultType.slug,
+            name: defaultType.name,
+            icon: defaultType.icon,
+            is_default: true,
+            is_active: isActive,
+          });
+        
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["content-types"] });
+      queryClient.invalidateQueries({ queryKey: ["default-content-type-settings"] });
     },
   });
 
@@ -84,7 +145,7 @@ export function ContentTypeManager() {
       <CardHeader>
         <CardTitle>Tipos de Conteúdo</CardTitle>
         <CardDescription>
-          Adicione novos formatos além dos padrão (Feed, Stories, Reels, Carrossel)
+          Ative/desative tipos de conteúdo padrão ou adicione novos formatos personalizados
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -119,9 +180,9 @@ export function ContentTypeManager() {
         </div>
 
         <div className="space-y-2">
-          {types.map((type: any) => (
+          {allContentTypes.map((type: any) => (
             <div
-              key={type.id}
+              key={type.slug}
               className="flex items-center justify-between p-3 border rounded-lg"
             >
               <div className="flex items-center gap-3">
@@ -135,10 +196,15 @@ export function ContentTypeManager() {
                 <Switch
                   checked={type.is_active}
                   onCheckedChange={(checked) =>
-                    toggleMutation.mutate({ id: type.id, isActive: checked })
+                    toggleMutation.mutate({ 
+                      id: type.id, 
+                      slug: type.slug,
+                      isActive: checked,
+                      isDefault: type.is_default 
+                    })
                   }
                 />
-                {!type.is_default && (
+                {!type.is_default && type.id && (
                   <Button
                     variant="ghost"
                     size="sm"
