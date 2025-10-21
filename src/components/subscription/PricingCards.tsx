@@ -36,9 +36,14 @@ export function PricingCards() {
   };
 
   const isCurrentPlan = (planName: string) => {
-    // Only consider it current plan if subscribed or customer_id exists (meaning they've paid before)
-    return currentSubscription?.plan_name === planName && 
-           (currentSubscription?.subscribed || currentSubscription?.customer_id);
+    if (currentSubscription?.plan_name !== planName) return false;
+    
+    // Check if trial is expired
+    const isTrialExpired = currentSubscription?.subscription_end && 
+      new Date(currentSubscription.subscription_end) <= new Date();
+    
+    // Only consider current if subscribed AND (not in trial OR trial not expired)
+    return currentSubscription?.subscribed && !isTrialExpired;
   };
 
   const handlePlanAction = async (plan: any) => {
@@ -57,12 +62,18 @@ export function PricingCards() {
   };
 
   const getButtonText = (plan: any) => {
+    // Check if trial is expired
+    const isTrialExpired = currentSubscription?.subscription_end && 
+      new Date(currentSubscription.subscription_end) <= new Date();
+    
     if (isCurrentPlan(plan.name)) {
-      return currentSubscription?.subscribed ? 'Gerenciar Plano' : 'Assinar Plano';
+      return 'Gerenciar Plano';
     } else if (plan.slug === 'free') {
-      return currentSubscription?.subscribed ? 'Plano Atual' : 'Plano Gratuito';
+      return 'Plano Gratuito';
+    } else if (isTrialExpired || !currentSubscription?.subscribed) {
+      return 'Assinar Plano';
     } else {
-      return currentSubscription?.subscribed ? 'Fazer Upgrade' : 'Escolher Plano';
+      return 'Fazer Upgrade';
     }
   };
 
