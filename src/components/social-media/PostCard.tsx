@@ -7,7 +7,7 @@ import { ptBR } from "date-fns/locale";
 interface PostCardProps {
   post: SocialMediaPost;
   compact?: boolean;
-  onClick?: () => void;
+  onClick?: (e?: React.MouseEvent) => void;
 }
 
 const platformIcons = {
@@ -90,7 +90,7 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
     return (
       <div 
         className="text-xs p-1.5 rounded border cursor-pointer hover:brightness-95 transition-all"
-        onClick={onClick}
+        onClick={(e) => onClick?.(e)}
         style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
       >
         <div className="flex items-center gap-1">
@@ -107,7 +107,7 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
   return (
     <div 
       className="p-4 rounded-lg border cursor-pointer hover:shadow-md hover:brightness-95 transition-all"
-      onClick={onClick}
+      onClick={(e) => onClick?.(e)}
       style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
     >
       <div className="flex items-start justify-between mb-2">
