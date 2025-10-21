@@ -22,7 +22,13 @@ export function PaymentStatusCard() {
     isSuperAdmin,
     getUsagePercentage 
   } = usePaymentMiddleware();
-  const { openCustomerPortal } = useSubscription();
+  const { openCustomerPortal, currentSubscription } = useSubscription();
+
+  // Consider subscription context as source of truth
+  const subscriptionActive = !!(currentSubscription?.subscribed &&
+    ['active', 'trial', 'trialing', 'past_due'].includes(currentSubscription?.subscription_status || ''));
+  
+  const isBlocked = !paymentStatus.isValid && !subscriptionActive;
 
   if (isSuperAdmin) {
     return (
@@ -50,26 +56,26 @@ export function PaymentStatusCard() {
   return (
     <div className="space-y-4">
       {/* Payment Status */}
-      <Card className={paymentStatus.isBlocked ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}>
+      <Card className={isBlocked ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              {paymentStatus.isBlocked ? (
+              {isBlocked ? (
                 <AlertTriangle className="h-5 w-5 text-red-600" />
               ) : (
                 <CheckCircle className="h-5 w-5 text-green-600" />
               )}
-              <CardTitle className={`text-lg ${paymentStatus.isBlocked ? 'text-red-800' : 'text-green-800'}`}>
+              <CardTitle className={`text-lg ${isBlocked ? 'text-red-800' : 'text-green-800'}`}>
                 Status da Assinatura
               </CardTitle>
             </div>
-            <Badge variant={paymentStatus.isBlocked ? 'destructive' : 'default'}>
-              {paymentStatus.isBlocked ? 'Bloqueado' : 'Ativo'}
+            <Badge variant={isBlocked ? 'destructive' : 'default'}>
+              {isBlocked ? 'Bloqueado' : 'Ativo'}
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
-          {paymentStatus.isBlocked ? (
+          {isBlocked ? (
             <div className="space-y-3">
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
@@ -106,7 +112,7 @@ export function PaymentStatusCard() {
       </Card>
 
       {/* Usage Limits */}
-      {!paymentStatus.isBlocked && (
+      {!isBlocked && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Uso do Plano</CardTitle>
