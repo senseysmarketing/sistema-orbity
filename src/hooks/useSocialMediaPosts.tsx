@@ -30,6 +30,8 @@ export interface SocialMediaPost {
     name: string;
   } | null;
 }
+const POSTS_UPDATED_EVENT = 'social-media-posts-updated';
+const postsCache: Record<string, SocialMediaPost[]> = {};
 
 export function useSocialMediaPosts() {
   const { currentAgency } = useAgency();
@@ -53,7 +55,10 @@ export function useSocialMediaPosts() {
         .order('scheduled_date', { ascending: true });
 
       if (error) throw error;
-      setPosts((data || []) as SocialMediaPost[]);
+setPosts((data || []) as SocialMediaPost[]);
+if (currentAgency?.id) {
+  postsCache[currentAgency.id] = (data || []) as SocialMediaPost[];
+}
     } catch (error: any) {
       toast.error('Erro ao carregar postagens: ' + error.message);
     } finally {
@@ -63,6 +68,29 @@ export function useSocialMediaPosts() {
 
   useEffect(() => {
     fetchPosts();
+  }, [currentAgency?.id]);
+
+  // Sync posts across components using a lightweight in-memory cache and custom event
+  useEffect(() => {
+    if (!currentAgency?.id) return;
+
+    const handler = (e: CustomEvent<{ agencyId: string }>) => {
+      if (e.detail?.agencyId === currentAgency.id) {
+        const cached = postsCache[currentAgency.id];
+        if (cached) setPosts(cached);
+      }
+    };
+
+    // Prefill from cache immediately (no flicker)
+    const cached = postsCache[currentAgency.id];
+    if (cached && cached.length > 0) {
+      setPosts(cached);
+      setLoading(false);
+    }
+
+    const listener = (ev: Event) => handler(ev as CustomEvent<{ agencyId: string }>);
+    window.addEventListener(POSTS_UPDATED_EVENT, listener as EventListener);
+    return () => window.removeEventListener(POSTS_UPDATED_EVENT, listener as EventListener);
   }, [currentAgency?.id]);
 
   const createPost = async (postData: Partial<SocialMediaPost>) => {
@@ -92,21 +120,38 @@ export function useSocialMediaPosts() {
       
       // Atualização otimista - adiciona imediatamente ao estado local
       setPosts(prev => [...prev, data as SocialMediaPost]);
-      
+
+      // Atualiza cache global e notifica outras instâncias
+      const agencyId = currentAgency.id;
+      const prevCache = postsCache[agencyId] || [];
+      postsCache[agencyId] = [...prevCache, data as SocialMediaPost];
+      window.dispatchEvent(new CustomEvent(POSTS_UPDATED_EVENT, { detail: { agencyId } }));
+
       toast.success('Postagem criada com sucesso');
       return data;
     } catch (error: any) {
       toast.error('Erro ao criar postagem: ' + error.message);
       throw error;
     }
+
   };
 
   const updatePost = async (id: string, updates: Partial<SocialMediaPost>) => {
     try {
       // Atualização otimista - atualiza imediatamente no estado local
-      setPosts(prev => prev.map(post => 
+      setPosts(prev => prev.map(post =>
         post.id === id ? { ...post, ...updates } : post
       ));
+
+      // Atualiza cache global e notifica outras instâncias
+      if (currentAgency?.id) {
+        const agencyId = currentAgency.id;
+        const source = postsCache[agencyId] || [];
+        postsCache[agencyId] = source.map(post =>
+          post.id === id ? { ...post, ...updates } as SocialMediaPost : post
+        );
+        window.dispatchEvent(new CustomEvent(POSTS_UPDATED_EVENT, { detail: { agencyId } }));
+      }
 
       const { error } = await supabase
         .from('social_media_posts')
@@ -130,6 +175,14 @@ export function useSocialMediaPosts() {
     try {
       // Atualização otimista - remove imediatamente do estado local
       setPosts(prev => prev.filter(post => post.id !== id));
+
+      // Atualiza cache global e notifica outras instâncias
+      if (currentAgency?.id) {
+        const agencyId = currentAgency.id;
+        const source = postsCache[agencyId] || [];
+        postsCache[agencyId] = source.filter(post => post.id !== id);
+        window.dispatchEvent(new CustomEvent(POSTS_UPDATED_EVENT, { detail: { agencyId } }));
+      }
 
       const { error } = await supabase
         .from('social_media_posts')
