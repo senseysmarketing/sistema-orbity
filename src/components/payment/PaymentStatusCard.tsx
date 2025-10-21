@@ -20,7 +20,8 @@ export function PaymentStatusCard() {
     planLimits, 
     usageCounts, 
     isSuperAdmin,
-    getUsagePercentage 
+    getUsagePercentage,
+    refreshPaymentStatus
   } = usePaymentMiddleware();
   const { openCustomerPortal, currentSubscription } = useSubscription();
 
@@ -29,6 +30,9 @@ export function PaymentStatusCard() {
     ['active', 'trial', 'trialing', 'past_due'].includes(currentSubscription?.subscription_status || ''));
   
   const isBlocked = !paymentStatus.isValid && !subscriptionActive;
+
+  // Check if we have valid plan data to show
+  const hasLimitData = Object.values(planLimits).some(limit => limit > 0);
 
   if (isSuperAdmin) {
     return (
@@ -90,6 +94,16 @@ export function PaymentStatusCard() {
             </div>
           ) : (
             <div className="space-y-2">
+              {!hasLimitData && (
+                <Button 
+                  onClick={refreshPaymentStatus} 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full mb-2"
+                >
+                  Carregar dados do plano
+                </Button>
+              )}
               {paymentStatus.trialEnd && (
                 <div className="flex items-center space-x-2 text-sm">
                   <Clock className="h-4 w-4 text-blue-600" />
@@ -112,7 +126,7 @@ export function PaymentStatusCard() {
       </Card>
 
       {/* Usage Limits */}
-      {!isBlocked && (
+      {!isBlocked && hasLimitData && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Uso do Plano</CardTitle>
