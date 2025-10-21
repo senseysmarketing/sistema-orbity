@@ -1928,6 +1928,8 @@ export type Database = {
         Row: {
           agency_id: string
           approval_history: Json | null
+          archived: boolean | null
+          archived_at: string | null
           attachments: Json | null
           campaign_id: string | null
           client_id: string | null
@@ -1949,6 +1951,8 @@ export type Database = {
         Insert: {
           agency_id: string
           approval_history?: Json | null
+          archived?: boolean | null
+          archived_at?: string | null
           attachments?: Json | null
           campaign_id?: string | null
           client_id?: string | null
@@ -1970,6 +1974,8 @@ export type Database = {
         Update: {
           agency_id?: string
           approval_history?: Json | null
+          archived?: boolean | null
+          archived_at?: string | null
           attachments?: Json | null
           campaign_id?: string | null
           client_id?: string | null
@@ -2424,6 +2430,10 @@ export type Database = {
       }
     }
     Functions: {
+      archive_old_approved_posts: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       check_agency_limits: {
         Args: {
           agency_uuid: string

@@ -49,6 +49,7 @@ export function useSocialMediaPosts() {
           campaigns(name)
         `)
         .eq('agency_id', currentAgency.id)
+        .eq('archived', false)
         .order('scheduled_date', { ascending: true });
 
       if (error) throw error;

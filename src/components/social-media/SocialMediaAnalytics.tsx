@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useSocialMediaPosts } from "@/hooks/useSocialMediaPosts";
 import { useAgency } from "@/hooks/useAgency";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -15,12 +16,42 @@ import {
   Target,
   Activity,
   Zap,
-  AlertTriangle
+  AlertTriangle,
+  Archive
 } from "lucide-react";
 
 export function SocialMediaAnalytics() {
   const { posts } = useSocialMediaPosts();
   const { currentAgency } = useAgency();
+  const [yesterdayArchivedCount, setYesterdayArchivedCount] = useState(0);
+
+  // Buscar posts arquivados no dia anterior
+  useEffect(() => {
+    const fetchArchivedYesterday = async () => {
+      if (!currentAgency?.id) return;
+
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const { data, error } = await supabase
+        .from('social_media_posts')
+        .select('id')
+        .eq('agency_id', currentAgency.id)
+        .eq('archived', true)
+        .gte('archived_at', yesterday.toISOString())
+        .lt('archived_at', today.toISOString());
+
+      if (!error && data) {
+        setYesterdayArchivedCount(data.length);
+      }
+    };
+
+    fetchArchivedYesterday();
+  }, [currentAgency?.id]);
 
   const analytics = useMemo(() => {
     const today = new Date();
@@ -434,6 +465,18 @@ export function SocialMediaAnalytics() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {yesterdayArchivedCount > 0 && (
+            <div className="flex items-start gap-3 p-3 border rounded-lg bg-blue-500/10">
+              <Archive className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-sm">Posts Arquivados Automaticamente</p>
+                <p className="text-sm text-muted-foreground">
+                  {yesterdayArchivedCount} postagem(ns) foi(ram) arquivada(s) ontem automaticamente. 
+                  Posts aprovados ou publicados há mais de 7 dias são arquivados automaticamente para manter o sistema organizado.
+                </p>
+              </div>
+            </div>
+          )}
           {analytics.overduePosts.length > 0 && (
             <div className="flex items-start gap-3 p-3 border rounded-lg bg-destructive/10">
               <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
