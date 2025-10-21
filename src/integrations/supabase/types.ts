@@ -1277,6 +1277,133 @@ export type Database = {
         }
         Relationships: []
       }
+      meetings: {
+        Row: {
+          action_items: Json | null
+          agency_id: string
+          cancelled_reason: string | null
+          client_id: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          end_time: string
+          external_participants: Json | null
+          follow_up_date: string | null
+          google_calendar_event_id: string | null
+          google_meet_link: string | null
+          id: string
+          lead_id: string | null
+          location: string | null
+          meeting_notes: string | null
+          meeting_type: Database["public"]["Enums"]["meeting_type"]
+          next_steps: string | null
+          organizer_id: string
+          outcome: Database["public"]["Enums"]["meeting_outcome"] | null
+          participants: Json | null
+          start_time: string
+          status: Database["public"]["Enums"]["meeting_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          action_items?: Json | null
+          agency_id: string
+          cancelled_reason?: string | null
+          client_id?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          end_time: string
+          external_participants?: Json | null
+          follow_up_date?: string | null
+          google_calendar_event_id?: string | null
+          google_meet_link?: string | null
+          id?: string
+          lead_id?: string | null
+          location?: string | null
+          meeting_notes?: string | null
+          meeting_type?: Database["public"]["Enums"]["meeting_type"]
+          next_steps?: string | null
+          organizer_id: string
+          outcome?: Database["public"]["Enums"]["meeting_outcome"] | null
+          participants?: Json | null
+          start_time: string
+          status?: Database["public"]["Enums"]["meeting_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          action_items?: Json | null
+          agency_id?: string
+          cancelled_reason?: string | null
+          client_id?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          end_time?: string
+          external_participants?: Json | null
+          follow_up_date?: string | null
+          google_calendar_event_id?: string | null
+          google_meet_link?: string | null
+          id?: string
+          lead_id?: string | null
+          location?: string | null
+          meeting_notes?: string | null
+          meeting_type?: Database["public"]["Enums"]["meeting_type"]
+          next_steps?: string | null
+          organizer_id?: string
+          outcome?: Database["public"]["Enums"]["meeting_outcome"] | null
+          participants?: Json | null
+          start_time?: string
+          status?: Database["public"]["Enums"]["meeting_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meetings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meetings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "meetings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meetings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "meetings_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meetings_organizer_id_fkey"
+            columns: ["organizer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       monthly_closures: {
         Row: {
           agency_id: string
@@ -2557,6 +2684,15 @@ export type Database = {
     }
     Enums: {
       expense_type: "avulsa" | "recorrente" | "parcelada"
+      meeting_outcome: "win" | "loss" | "follow_up_needed" | "pending"
+      meeting_status: "scheduled" | "completed" | "cancelled" | "no_show"
+      meeting_type:
+        | "commercial"
+        | "client"
+        | "internal"
+        | "quick_call"
+        | "workshop"
+        | "results"
       payment_status: "pending" | "paid" | "overdue"
       subscription_plan: "free" | "basic" | "pro" | "enterprise"
       task_priority: "low" | "medium" | "high"
@@ -2698,6 +2834,16 @@ export const Constants = {
   public: {
     Enums: {
       expense_type: ["avulsa", "recorrente", "parcelada"],
+      meeting_outcome: ["win", "loss", "follow_up_needed", "pending"],
+      meeting_status: ["scheduled", "completed", "cancelled", "no_show"],
+      meeting_type: [
+        "commercial",
+        "client",
+        "internal",
+        "quick_call",
+        "workshop",
+        "results",
+      ],
       payment_status: ["pending", "paid", "overdue"],
       subscription_plan: ["free", "basic", "pro", "enterprise"],
       task_priority: ["low", "medium", "high"],

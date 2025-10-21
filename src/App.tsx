@@ -17,6 +17,7 @@ import NotFound from "./pages/NotFound";
 import Tasks from "./pages/Tasks";
 import PersonalTasks from "./pages/PersonalTasks";
 import CRM from "./pages/CRM";
+import Agenda from "./pages/Agenda";
 import Traffic from "./pages/Traffic";
 import Admin from "./pages/Admin";
 import Reports from "./pages/Reports";
@@ -57,6 +58,7 @@ const App = () => (
                         <Route path="tasks" element={<Tasks />} />
                         <Route path="personal-tasks" element={<PersonalTasks />} />
                         <Route path="crm" element={<CRM />} />
+                        <Route path="agenda" element={<Agenda />} />
                         <Route path="traffic" element={<Traffic />} />
                         <Route path="admin" element={<Admin />} />
                         <Route path="contracts" element={<Contracts />} />

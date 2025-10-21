@@ -4,9 +4,10 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGrou
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Shield, ContactRound, FileText, Instagram } from "lucide-react";
+import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Shield, ContactRound, FileText, Instagram, Calendar } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import logoNew from "@/assets/logo-new.png";
+
 const menuItems = [{
   title: "Dashboard",
   url: "/",
@@ -26,6 +27,11 @@ const menuItems = [{
   title: "CRM & Leads",
   url: "/crm",
   icon: ContactRound,
+  roles: ["agency_admin", "agency_user"]
+}, {
+  title: "Agenda",
+  url: "/agenda",
+  icon: Calendar,
   roles: ["agency_admin", "agency_user"]
 }, {
   title: "Controle de Tráfego",
@@ -58,6 +64,7 @@ const menuItems = [{
   icon: Settings,
   roles: ["agency_admin"]
 }];
+
 export function AppSidebar() {
   const {
     state
