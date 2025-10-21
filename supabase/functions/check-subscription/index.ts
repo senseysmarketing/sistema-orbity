@@ -141,14 +141,26 @@ serve(async (req) => {
       if (localSubscription && localSubscription.subscription_plans) {
         const plan = localSubscription.subscription_plans;
         const isValidTrial = localSubscription.status === 'trial' && 
+          localSubscription.trial_end &&
           new Date(localSubscription.trial_end) > new Date();
         
+        const isActive = localSubscription.status === 'active';
+        
+        logStep("Local subscription found", {
+          status: localSubscription.status,
+          isActive,
+          isValidTrial,
+          planName: plan.name
+        });
+        
         return new Response(JSON.stringify({
-          subscribed: localSubscription.status === 'active' || isValidTrial,
+          subscribed: isActive || isValidTrial,
           subscription_status: localSubscription.status,
           plan_name: plan.name,
           trial_end: localSubscription.trial_end,
           subscription_end: localSubscription.current_period_end,
+          customer_id: localSubscription.stripe_customer_id,
+          subscription_id: localSubscription.stripe_subscription_id,
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
@@ -197,13 +209,26 @@ serve(async (req) => {
       if (localSubscription && localSubscription.subscription_plans) {
         const plan = localSubscription.subscription_plans;
         const isValidTrial = localSubscription.status === 'trial' && 
+          localSubscription.trial_end &&
           new Date(localSubscription.trial_end) > new Date();
         
+        const isActive = localSubscription.status === 'active';
+        
+        logStep("Local subscription found (no Stripe active)", {
+          status: localSubscription.status,
+          isActive,
+          isValidTrial,
+          planName: plan.name
+        });
+        
         return new Response(JSON.stringify({
-          subscribed: isValidTrial,
+          subscribed: isActive || isValidTrial,
           subscription_status: localSubscription.status,
           plan_name: plan.name,
           trial_end: localSubscription.trial_end,
+          subscription_end: localSubscription.current_period_end,
+          customer_id: localSubscription.stripe_customer_id,
+          subscription_id: localSubscription.stripe_subscription_id,
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,

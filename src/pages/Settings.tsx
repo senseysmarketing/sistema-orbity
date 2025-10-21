@@ -230,12 +230,13 @@ export default function Settings() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <SubscriptionDetails />
               <BillingHistory />
             </div>
             <div>
+              <h3 className="text-lg font-semibold mb-4">Planos Disponíveis</h3>
               <PricingCards />
             </div>
           </div>
