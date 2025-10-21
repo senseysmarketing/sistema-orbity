@@ -24,6 +24,9 @@ export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
 
   const isTrialExpired = currentSubscription?.subscription_end && 
     new Date(currentSubscription.subscription_end) <= new Date();
+  
+  // Only show manage payment if user has a Stripe customer ID (meaning they've subscribed before)
+  const hasStripeCustomer = !!currentSubscription?.customer_id;
 
   if (showPlans) {
     return (
@@ -94,7 +97,7 @@ export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
                   {isTrialExpired ? 'Escolher Plano' : 'Ver Planos'}
                 </Button>
 
-                {!isTrialExpired && (
+                {!isTrialExpired && hasStripeCustomer && (
                   <Button 
                     onClick={openCustomerPortal} 
                     className="w-full bg-red-600 hover:bg-red-700"
