@@ -182,10 +182,20 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // If user doesn't have a Stripe customer yet, show helpful message
+        const errorMsg = error.message || '';
+        if (errorMsg.includes('No Stripe customer found')) {
+          toast.error('Você ainda não tem uma assinatura. Por favor, escolha um plano primeiro.');
+          return;
+        }
+        throw error;
+      }
 
-      if (data.url) {
+      if (data?.url) {
         window.open(data.url, '_blank');
+      } else {
+        toast.error('Não foi possível gerar o link do portal.');
       }
     } catch (error) {
       console.error('Error opening customer portal:', error);
