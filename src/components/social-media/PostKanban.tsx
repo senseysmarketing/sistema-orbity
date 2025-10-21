@@ -99,7 +99,7 @@ export function PostKanban() {
 
   const allContentTypes = [...defaultContentTypes, ...customContentTypes];
 
-  // Filtrar e ordenar posts
+  // Filtrar posts
   const filteredPosts = useMemo(() => {
     let filtered = posts;
 
@@ -111,10 +111,7 @@ export function PostKanban() {
       filtered = filtered.filter(post => post.post_type === filterContentType);
     }
 
-    // Ordenar por data mais recente primeiro
-    return filtered.sort((a, b) => 
-      new Date(b.scheduled_date).getTime() - new Date(a.scheduled_date).getTime()
-    );
+    return filtered;
   }, [posts, filterClient, filterContentType]);
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -163,7 +160,9 @@ export function PostKanban() {
   };
 
   const getPostsByStatus = (status: string) => {
-    return filteredPosts.filter(post => post.status === status);
+    return filteredPosts
+      .filter(post => post.status === status)
+      .sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime());
   };
 
   const handlePostClick = (post: SocialMediaPost) => {

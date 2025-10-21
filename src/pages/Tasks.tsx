@@ -554,7 +554,16 @@ export default function Tasks() {
   };
 
   const sortedTasksByStatus = (status: string) => {
-    return filteredTasks.filter((task) => task.status === status);
+    return filteredTasks
+      .filter((task) => task.status === status)
+      .sort((a, b) => {
+        // Ordenar por data de vencimento, mais recente primeiro
+        // Se não tiver data, vai para o final
+        if (!a.due_date && !b.due_date) return 0;
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      });
   };
 
   const clearFilters = () => {
