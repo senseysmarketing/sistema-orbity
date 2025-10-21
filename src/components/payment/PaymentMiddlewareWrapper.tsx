@@ -25,7 +25,12 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
     return <>{children}</>;
   }
 
-  // Don't block automatically anymore - just show the content
-  // Users will get toast notifications about payment issues
+  // Block access if trial expired or subscription is not active
+  const isBlocked = !paymentStatus?.isValid && !isSuperAdmin;
+  
+  if (isBlocked) {
+    return <BlockedAccessScreen />;
+  }
+
   return <>{children}</>;
 }
