@@ -137,7 +137,7 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
       
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
-          {format(new Date(post.scheduled_date), "dd MMM yyyy 'às' HH:mm", { locale: ptBR })}
+          {format(new Date(post.scheduled_date), "dd/MM/yyyy", { locale: ptBR })}
         </span>
         {post.clients && (
           <span 
