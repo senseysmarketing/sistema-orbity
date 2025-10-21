@@ -471,8 +471,8 @@ export function SocialMediaAnalytics() {
               <div className="flex-1">
                 <p className="font-medium text-sm">Posts Arquivados Automaticamente</p>
                 <p className="text-sm text-muted-foreground">
-                  {yesterdayArchivedCount} postagem(ns) foi(ram) arquivada(s) ontem automaticamente. 
-                  Posts aprovados ou publicados há mais de 7 dias são arquivados automaticamente para manter o sistema organizado.
+                  {yesterdayArchivedCount} postagem(ns) publicada(s) foi(ram) arquivada(s) ontem automaticamente. 
+                  Posts publicados há mais de 7 dias são arquivados automaticamente para manter o sistema organizado.
                 </p>
               </div>
             </div>
