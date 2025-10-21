@@ -131,6 +131,25 @@ export function TaskAnalytics({ tasks, profiles, clients }: TaskAnalyticsProps) 
       }
     });
 
+    // Estatísticas por usuário
+    const userStats: { [key: string]: { name: string; count: number } } = {};
+    tasks.forEach(task => {
+      const assignedUsers = getAssignedUsers(task.id);
+      assignedUsers.forEach(assignment => {
+        const userId = assignment.user_id;
+        const profile = profiles.find(p => p.user_id === userId);
+        if (profile) {
+          if (!userStats[userId]) {
+            userStats[userId] = {
+              name: profile.name,
+              count: 0
+            };
+          }
+          userStats[userId].count++;
+        }
+      });
+    });
+
     return {
       total,
       statusStats,
@@ -142,8 +161,9 @@ export function TaskAnalytics({ tasks, profiles, clients }: TaskAnalyticsProps) 
       unassignedTasks,
       completionRate,
       clientStats,
+      userStats,
     };
-  }, [tasks, clients, getAssignedUsers]);
+  }, [tasks, clients, profiles, getAssignedUsers]);
 
   return (
     <div className="space-y-6">
@@ -325,7 +345,7 @@ export function TaskAnalytics({ tasks, profiles, clients }: TaskAnalyticsProps) 
       </div>
 
       {/* Estatísticas detalhadas */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -395,6 +415,29 @@ export function TaskAnalytics({ tasks, profiles, clients }: TaskAnalyticsProps) 
               ))}
             {Object.keys(analytics.clientStats).length === 0 && (
               <p className="text-sm text-muted-foreground">Nenhuma tarefa com cliente</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Por Usuário
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {Object.entries(analytics.userStats)
+              .sort(([, a], [, b]) => b.count - a.count)
+              .slice(0, 5)
+              .map(([userId, data]) => (
+                <div key={userId} className="flex items-center justify-between">
+                  <span className="text-sm truncate">{data.name}</span>
+                  <Badge variant="outline">{data.count}</Badge>
+                </div>
+              ))}
+            {Object.keys(analytics.userStats).length === 0 && (
+              <p className="text-sm text-muted-foreground">Nenhuma tarefa atribuída</p>
             )}
           </CardContent>
         </Card>

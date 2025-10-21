@@ -83,17 +83,15 @@ export function TaskCard({
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex flex-col gap-2 flex-1 min-w-0 overflow-hidden">
-          <PriorityIcon className="h-5 w-5 flex-shrink-0" />
           <h3 className="font-semibold line-clamp-2">{task.title}</h3>
         </div>
         <div className="flex gap-1 flex-wrap flex-shrink-0 ml-2">
-          <Badge variant="outline" className={`${getPriorityColor(task.priority)} text-xs`}>
-            {getPriorityLabel(task.priority)}
-          </Badge>
-          <Badge variant="outline" className={`${urgency.color} text-xs flex items-center gap-1`}>
-            <UrgencyIcon className="h-3 w-3" />
-            {urgency.label}
-          </Badge>
+          {urgency.level !== 'normal' && (
+            <Badge variant="outline" className={`${urgency.color} text-xs flex items-center gap-1`}>
+              <UrgencyIcon className="h-3 w-3" />
+              {urgency.label}
+            </Badge>
+          )}
         </div>
       </div>
       

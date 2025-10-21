@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, LayoutGrid, TrendingUp, List } from "lucide-react";
+import { Plus, Search, LayoutGrid, TrendingUp, Settings } from "lucide-react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
 import { TaskAnalytics } from "@/components/tasks/TaskAnalytics";
 import { TaskDetailsDialog } from "@/components/tasks/TaskDetailsDialog";
+import { TaskStatusManager } from "@/components/tasks/TaskStatusManager";
 import { SortableTaskCard } from "@/components/ui/sortable-task-card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -649,7 +650,7 @@ export default function Tasks() {
       </div>
 
       <Tabs defaultValue="tasks" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
           <TabsTrigger value="tasks" className="flex items-center gap-2">
             <LayoutGrid className="h-4 w-4" />
             <span className="hidden sm:inline">Tarefas</span>
@@ -657,6 +658,10 @@ export default function Tasks() {
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             <span className="hidden sm:inline">Análises</span>
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            <span className="hidden sm:inline">Configurações</span>
           </TabsTrigger>
         </TabsList>
 
@@ -823,6 +828,10 @@ export default function Tasks() {
 
         <TabsContent value="analytics" className="space-y-4">
           <TaskAnalytics tasks={filteredTasks} profiles={profiles} clients={clients} />
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-4">
+          <TaskStatusManager />
         </TabsContent>
       </Tabs>
 
