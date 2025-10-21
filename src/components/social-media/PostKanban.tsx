@@ -82,12 +82,24 @@ export function PostKanban() {
       const post = posts.find(p => p.id === postId);
       
       if (post) {
+        // Buscar dados do usuário
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData.user?.id;
+        
+        // Buscar nome do usuário do perfil
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('user_id', userId)
+          .single();
+        
         // Adicionar entrada ao histórico
         const approvalHistory = post.approval_history || [];
         const newEntry = {
           status: newStatus,
           timestamp: new Date().toISOString(),
-          user_id: (await supabase.auth.getUser()).data.user?.id,
+          user_id: userId,
+          user_name: profileData?.name || 'Usuário desconhecido',
           action: `Status alterado para: ${defaultColumns.find(c => c.id === newStatus)?.title || newStatus}`
         };
         

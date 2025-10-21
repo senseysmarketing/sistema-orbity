@@ -188,9 +188,15 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete }
                       <div key={index} className="flex items-start gap-2 p-2 rounded-md bg-muted/50">
                         <div className="flex-1">
                           <p className="text-sm">{entry.action || `Status: ${entry.status}`}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(entry.timestamp), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                          </p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{format(new Date(entry.timestamp), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+                            {entry.user_name && (
+                              <>
+                                <span>•</span>
+                                <span>por {entry.user_name}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
