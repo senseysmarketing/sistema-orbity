@@ -121,7 +121,9 @@ export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
 
                 <Button 
                   variant="outline" 
-                  onClick={signOut}
+                  onClick={async () => {
+                    await signOut();
+                  }}
                   className="w-full border-red-300 text-red-600 hover:bg-red-50"
                 >
                   <LogOut className="mr-2 h-4 w-4" />

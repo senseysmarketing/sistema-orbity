@@ -236,27 +236,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
-      // Always clear local state first
+      // Clear local state first
       setUser(null);
       setSession(null);
       setProfile(null);
       setSessionExpired(false);
       setShowSessionAlert(false);
+      setLoading(false);
 
-      // Try to sign out from Supabase, but don't fail if session is already invalid
-      await supabase.auth.signOut();
+      // Sign out from Supabase (ignore errors for invalid sessions)
+      await supabase.auth.signOut({ scope: 'local' });
 
       toast({
         title: "Logout realizado",
         description: "Você foi desconectado com sucesso.",
       });
-
-      // Force redirect to auth page
-      window.location.href = '/auth';
     } catch (error) {
       console.error('Error during sign out:', error);
-      // Even if there's an error, we've cleared local state, so just redirect
-      window.location.href = '/auth';
+    } finally {
+      // Always redirect to auth page, regardless of errors
+      setTimeout(() => {
+        window.location.href = '/auth';
+      }, 100);
     }
   };
 
