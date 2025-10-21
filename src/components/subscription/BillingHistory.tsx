@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Download, ExternalLink } from 'lucide-react';
+import { FileText, Download, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAgency } from '@/hooks/useAgency';
 import { format } from 'date-fns';
@@ -24,6 +24,7 @@ interface BillingRecord {
 export function BillingHistory() {
   const [billingHistory, setBillingHistory] = useState<BillingRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const { currentAgency } = useAgency();
   const { toast } = useToast();
 
@@ -32,6 +33,31 @@ export function BillingHistory() {
       fetchBillingHistory();
     }
   }, [currentAgency?.id]);
+
+  const syncInvoices = async () => {
+    try {
+      setSyncing(true);
+      const { data, error } = await supabase.functions.invoke('sync-invoices');
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Faturas sincronizadas!",
+        description: data.message || "Faturas atualizadas com sucesso.",
+      });
+      
+      // Refresh the list
+      await fetchBillingHistory();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao sincronizar faturas",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const fetchBillingHistory = async () => {
     try {
@@ -111,13 +137,26 @@ export function BillingHistory() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          Histórico de Faturas
-        </CardTitle>
-        <CardDescription>
-          Visualize suas faturas recentes
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Histórico de Faturas
+            </CardTitle>
+            <CardDescription>
+              Visualize suas faturas recentes
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={syncInvoices}
+            disabled={syncing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            Sincronizar
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {billingHistory.length === 0 ? (
@@ -162,7 +201,7 @@ export function BillingHistory() {
                     onClick={() => window.open(bill.invoice_url, '_blank')}
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    Baixar
+                    Ver PDF
                   </Button>
                 )}
               </div>
