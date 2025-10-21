@@ -210,14 +210,14 @@ export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDi
             <div className="space-y-2">
               <Label htmlFor="client_id">Cliente</Label>
               <Select
-                value={formData.client_id}
-                onValueChange={(value) => setFormData({ ...formData, client_id: value, lead_id: "" })}
+                value={formData.client_id || "none"}
+                onValueChange={(value) => setFormData({ ...formData, client_id: value === "none" ? "" : value, lead_id: "" })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {clients.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
                       {client.name}
@@ -230,14 +230,14 @@ export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDi
             <div className="space-y-2">
               <Label htmlFor="lead_id">Lead</Label>
               <Select
-                value={formData.lead_id}
-                onValueChange={(value) => setFormData({ ...formData, lead_id: value, client_id: "" })}
+                value={formData.lead_id || "none"}
+                onValueChange={(value) => setFormData({ ...formData, lead_id: value === "none" ? "" : value, client_id: "" })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um lead" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {leads.map((lead) => (
                     <SelectItem key={lead.id} value={lead.id}>
                       {lead.name}

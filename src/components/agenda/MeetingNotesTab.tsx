@@ -151,12 +151,12 @@ export const MeetingNotesTab = ({ meeting }: MeetingNotesTabProps) => {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="outcome">Resultado</Label>
-          <Select value={outcome} onValueChange={setOutcome}>
+          <Select value={outcome || "none"} onValueChange={(value) => setOutcome(value === "none" ? "" : value)}>
             <SelectTrigger>
               <SelectValue placeholder="Selecione o resultado" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Pendente</SelectItem>
+              <SelectItem value="none">Nenhum</SelectItem>
               <SelectItem value="win">Ganho</SelectItem>
               <SelectItem value="loss">Perda</SelectItem>
               <SelectItem value="follow_up_needed">Precisa Follow-up</SelectItem>
