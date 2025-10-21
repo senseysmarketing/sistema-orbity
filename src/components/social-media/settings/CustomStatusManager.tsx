@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
@@ -26,13 +26,23 @@ export function CustomStatusManager() {
   const queryClient = useQueryClient();
   const [newStatus, setNewStatus] = useState({ name: "", slug: "", color: "bg-blue-500" });
 
-  const { data: statuses = [] } = useQuery({
+  // Status padrão do sistema
+  const defaultStatuses = [
+    { id: 'default-1', slug: "draft", name: "Briefing", color: "bg-gray-500", is_default: true, order_position: 0 },
+    { id: 'default-2', slug: "in_creation", name: "Em Criação", color: "bg-blue-500", is_default: true, order_position: 1 },
+    { id: 'default-3', slug: "pending_approval", name: "Aguardando Aprovação", color: "bg-yellow-500", is_default: true, order_position: 2 },
+    { id: 'default-4', slug: "approved", name: "Aprovado", color: "bg-green-500", is_default: true, order_position: 3 },
+    { id: 'default-5', slug: "published", name: "Publicado", color: "bg-purple-500", is_default: true, order_position: 4 },
+  ];
+
+  const { data: customStatuses = [] } = useQuery({
     queryKey: ["custom-statuses", currentAgency?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("social_media_custom_statuses")
         .select("*")
         .eq("agency_id", currentAgency?.id)
+        .eq("is_default", false)
         .order("order_position");
       
       if (error) throw error;
@@ -40,6 +50,11 @@ export function CustomStatusManager() {
     },
     enabled: !!currentAgency?.id,
   });
+
+  // Combinar status padrão com customizados
+  const allStatuses = useMemo(() => {
+    return [...defaultStatuses, ...customStatuses];
+  }, [customStatuses]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -50,7 +65,7 @@ export function CustomStatusManager() {
           name: newStatus.name,
           slug: newStatus.slug || newStatus.name.toLowerCase().replace(/\s+/g, "_"),
           color: newStatus.color,
-          order_position: statuses.length,
+          order_position: allStatuses.length,
         });
       
       if (error) throw error;
@@ -97,9 +112,9 @@ export function CustomStatusManager() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Status Customizados do Kanban</CardTitle>
+        <CardTitle>Status do Kanban</CardTitle>
         <CardDescription>
-          Crie colunas personalizadas para seu fluxo de trabalho
+          Visualize os status padrão e adicione status personalizados ao fluxo
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -137,13 +152,15 @@ export function CustomStatusManager() {
         </div>
 
         <div className="space-y-2">
-          {statuses.map((status: any) => (
+          {allStatuses.map((status: any) => (
             <div
               key={status.id}
               className="flex items-center justify-between p-3 border rounded-lg"
             >
               <div className="flex items-center gap-3">
-                <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                {!status.is_default && (
+                  <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                )}
                 <div className={`h-3 w-3 rounded-full ${status.color}`} />
                 <span className="font-medium">{status.name}</span>
                 {status.is_default && (
@@ -151,20 +168,22 @@ export function CustomStatusManager() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Switch
-                  checked={status.is_active}
-                  onCheckedChange={(checked) =>
-                    toggleMutation.mutate({ id: status.id, isActive: checked })
-                  }
-                />
                 {!status.is_default && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteMutation.mutate(status.id)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <>
+                    <Switch
+                      checked={status.is_active}
+                      onCheckedChange={(checked) =>
+                        toggleMutation.mutate({ id: status.id, isActive: checked })
+                      }
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteMutation.mutate(status.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
