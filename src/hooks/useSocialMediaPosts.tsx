@@ -81,13 +81,19 @@ export function useSocialMediaPosts() {
       const { data, error } = await supabase
         .from('social_media_posts')
         .insert(payload)
-        .select()
+        .select(`
+          *,
+          clients(name),
+          campaigns(name)
+        `)
         .single();
 
       if (error) throw error;
       
+      // Atualização otimista - adiciona imediatamente ao estado local
+      setPosts(prev => [...prev, data as SocialMediaPost]);
+      
       toast.success('Postagem criada com sucesso');
-      fetchPosts();
       return data;
     } catch (error: any) {
       toast.error('Erro ao criar postagem: ' + error.message);
@@ -97,15 +103,23 @@ export function useSocialMediaPosts() {
 
   const updatePost = async (id: string, updates: Partial<SocialMediaPost>) => {
     try {
+      // Atualização otimista - atualiza imediatamente no estado local
+      setPosts(prev => prev.map(post => 
+        post.id === id ? { ...post, ...updates } : post
+      ));
+
       const { error } = await supabase
         .from('social_media_posts')
         .update(updates)
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        // Reverte a atualização otimista em caso de erro
+        fetchPosts();
+        throw error;
+      }
       
       toast.success('Postagem atualizada');
-      fetchPosts();
     } catch (error: any) {
       toast.error('Erro ao atualizar postagem: ' + error.message);
       throw error;
@@ -114,15 +128,21 @@ export function useSocialMediaPosts() {
 
   const deletePost = async (id: string) => {
     try {
+      // Atualização otimista - remove imediatamente do estado local
+      setPosts(prev => prev.filter(post => post.id !== id));
+
       const { error } = await supabase
         .from('social_media_posts')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        // Reverte a remoção otimista em caso de erro
+        fetchPosts();
+        throw error;
+      }
       
       toast.success('Postagem excluída');
-      fetchPosts();
     } catch (error: any) {
       toast.error('Erro ao excluir postagem: ' + error.message);
       throw error;
