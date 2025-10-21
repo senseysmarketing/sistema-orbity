@@ -59,6 +59,13 @@ const priorityIcons = {
   high: AlertCircle,
 };
 
+const statusConfig: Record<string, { label: string; color: string }> = {
+  todo: { label: "A Fazer", color: "bg-gray-500" },
+  in_progress: { label: "Em Andamento", color: "bg-blue-500" },
+  em_revisao: { label: "Em Revisão", color: "bg-purple-500" },
+  done: { label: "Concluída", color: "bg-green-500" },
+};
+
 export function TaskCard({
   task,
   getPriorityColor,
@@ -86,6 +93,9 @@ export function TaskCard({
           <h3 className="font-semibold line-clamp-2">{task.title}</h3>
         </div>
         <div className="flex gap-1 flex-wrap flex-shrink-0 ml-2">
+          <Badge variant="outline" className={`${statusConfig[task.status]?.color || "bg-gray-500"} text-white text-xs`}>
+            {statusConfig[task.status]?.label || task.status}
+          </Badge>
           {urgency.level !== 'normal' && (
             <Badge variant="outline" className={`${urgency.color} text-xs flex items-center gap-1`}>
               <UrgencyIcon className="h-3 w-3" />
