@@ -24,16 +24,13 @@ export function SortablePostCard({ post, onClick }: SortablePostCardProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleClick = (e: React.MouseEvent) => {
-    // Só chama onClick se não estiver arrastando
-    if (!isDragging) {
-      onClick?.(post);
-    }
+  const handleClick = () => {
+    onClick?.(post);
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <PostCard post={post} onClick={handleClick} />
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="group">
+      <PostCard post={post} onClick={handleClick} showViewButton={true} />
     </div>
   );
 }

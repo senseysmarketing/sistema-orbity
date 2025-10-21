@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
-import { Instagram, Facebook, Linkedin, Twitter, Youtube, Image, Film, LayoutGrid, Zap, Clock, AlertCircle } from "lucide-react";
+import { Instagram, Facebook, Linkedin, Twitter, Youtube, Image, Film, LayoutGrid, Zap, Clock, AlertCircle, Eye } from "lucide-react";
 import { format, isToday, isBefore, startOfDay, addDays, isBefore as isBeforeDate } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -8,6 +9,7 @@ interface PostCardProps {
   post: SocialMediaPost;
   compact?: boolean;
   onClick?: (e?: React.MouseEvent) => void;
+  showViewButton?: boolean;
 }
 
 const platformIcons = {
@@ -79,7 +81,7 @@ const getUrgencyBadge = (scheduledDate: string) => {
   return null;
 };
 
-export function PostCard({ post, compact = false, onClick }: PostCardProps) {
+export function PostCard({ post, compact = false, onClick, showViewButton = false }: PostCardProps) {
   const PlatformIcon = platformIcons[post.platform as keyof typeof platformIcons] || Instagram;
   const ContentTypeIcon = contentTypeIcons[post.post_type as keyof typeof contentTypeIcons] || Image;
   const clientColor = getClientColor(post.client_id);
@@ -106,12 +108,24 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
 
   return (
     <div 
-      className="p-4 rounded-lg border cursor-pointer hover:shadow-md hover:brightness-95 transition-all"
-      onClick={(e) => onClick?.(e)}
+      className="p-4 rounded-lg border hover:shadow-md hover:brightness-95 transition-all relative"
       style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
     >
+      {showViewButton && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background/80"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick?.(e);
+          }}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+      )}
       <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 pr-8">
           <ContentTypeIcon className="h-5 w-5" />
           <h3 className="font-semibold">{post.title}</h3>
         </div>
