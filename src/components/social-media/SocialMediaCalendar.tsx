@@ -6,7 +6,7 @@ import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSocialMediaPosts } from "@/hooks/useSocialMediaPosts";
 import { PostFormDialog } from "./PostFormDialog";
 import { PostCard } from "./PostCard";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export function SocialMediaCalendar() {
@@ -17,7 +17,9 @@ export function SocialMediaCalendar() {
 
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const calendarStart = startOfWeek(monthStart, { locale: ptBR });
+  const calendarEnd = endOfWeek(monthEnd, { locale: ptBR });
+  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   const getPostsForDate = (date: Date) => {
     return posts.filter(post => 
@@ -86,14 +88,15 @@ export function SocialMediaCalendar() {
             </div>
           ))}
           
-          {daysInMonth.map(day => {
+          {calendarDays.map(day => {
             const dayPosts = getPostsForDate(day);
             const isToday = isSameDay(day, new Date());
+            const isCurrentMonth = isSameMonth(day, selectedDate);
             
             return (
               <Card 
                 key={day.toISOString()} 
-                className={`min-h-[120px] ${isToday ? 'border-primary' : ''}`}
+                className={`min-h-[120px] ${isToday ? 'border-primary' : ''} ${!isCurrentMonth ? 'opacity-50' : ''}`}
               >
                 <CardHeader className="p-2">
                   <CardTitle className="text-sm">{format(day, "d")}</CardTitle>
