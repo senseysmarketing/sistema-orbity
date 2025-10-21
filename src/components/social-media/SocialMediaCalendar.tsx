@@ -7,7 +7,7 @@ import { useSocialMediaPosts, SocialMediaPost } from "@/hooks/useSocialMediaPost
 import { PostFormDialog } from "./PostFormDialog";
 import { PostCard } from "./PostCard";
 import { PostDetailsDialog } from "./PostDetailsDialog";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export function SocialMediaCalendar() {
@@ -24,6 +24,10 @@ export function SocialMediaCalendar() {
   const calendarStart = startOfWeek(monthStart, { locale: ptBR });
   const calendarEnd = endOfWeek(monthEnd, { locale: ptBR });
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+
+  const weekStart = startOfWeek(selectedDate, { locale: ptBR });
+  const weekEnd = endOfWeek(selectedDate, { locale: ptBR });
+  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
   const getPostsForDate = (date: Date) => {
     return posts.filter(post => 
@@ -145,6 +149,86 @@ export function SocialMediaCalendar() {
         </div>
       )}
 
+      {viewMode === "week" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-7 gap-2">
+            {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(day => (
+              <div key={day} className="text-center font-semibold text-sm p-2">
+                {day}
+              </div>
+            ))}
+            
+            {weekDays.map(day => {
+              const dayPosts = getPostsForDate(day);
+              const isToday = isSameDay(day, new Date());
+              
+              return (
+                <Card 
+                  key={day.toISOString()} 
+                  className={`min-h-[200px] ${isToday ? 'border-primary border-2' : ''}`}
+                >
+                  <CardHeader className="p-3">
+                    <CardTitle className="text-lg">{format(day, "d")}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 space-y-2">
+                    {dayPosts.map(post => (
+                      <PostCard 
+                        key={post.id} 
+                        post={post} 
+                        compact 
+                        onClick={() => handlePostClick(post)}
+                      />
+                    ))}
+                    {dayPosts.length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-4">
+                        Nenhuma postagem
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {viewMode === "day" && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl">
+                {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {getPostsForDate(selectedDate).length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {getPostsForDate(selectedDate).map(post => (
+                    <PostCard 
+                      key={post.id} 
+                      post={post} 
+                      onClick={() => handlePostClick(post)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground text-lg">
+                    Nenhuma postagem agendada para este dia
+                  </p>
+                  <Button 
+                    className="mt-4"
+                    onClick={() => setIsCreateDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Criar Postagem
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
       <PostFormDialog 
         open={isCreateDialogOpen}
         onOpenChange={handleDialogClose}
