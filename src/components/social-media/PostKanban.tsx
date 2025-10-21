@@ -225,22 +225,19 @@ export function PostKanban() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-auto">
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="overflow-x-auto h-full pb-4">
-            <div className="inline-flex gap-4 h-full">
-              {allColumns.map(column => (
-                <div key={column.id} className="w-80 flex-shrink-0">
-                  <PostKanbanColumn
-                    id={column.id}
-                    title={column.title}
-                    color={column.color}
-                    posts={getPostsByStatus(column.id)}
-                    onPostClick={handlePostClick}
-                  />
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 pb-4">
+            {allColumns.map(column => (
+              <PostKanbanColumn
+                key={column.id}
+                id={column.id}
+                title={column.title}
+                color={column.color}
+                posts={getPostsByStatus(column.id)}
+                onPostClick={handlePostClick}
+              />
+            ))}
           </div>
 
           <DragOverlay>
