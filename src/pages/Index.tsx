@@ -298,25 +298,25 @@ const Index = () => {
       {/* Conteúdo por Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <LayoutDashboard className="h-4 w-4" />
-            <span>Visão Geral</span>
+          <TabsTrigger value="overview">
+            <LayoutDashboard className="h-4 w-4 mr-2" />
+            Visão Geral
           </TabsTrigger>
-          <TabsTrigger value="tasks" className="flex items-center gap-2">
-            <CheckSquare className="h-4 w-4" />
-            <span>Tarefas</span>
+          <TabsTrigger value="tasks">
+            <CheckSquare className="h-4 w-4 mr-2" />
+            Tarefas
           </TabsTrigger>
-          <TabsTrigger value="crm" className="flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            <span>CRM</span>
+          <TabsTrigger value="crm">
+            <Target className="h-4 w-4 mr-2" />
+            CRM
           </TabsTrigger>
-          <TabsTrigger value="social" className="flex items-center gap-2">
-            <Share2 className="h-4 w-4" />
-            <span>Social</span>
+          <TabsTrigger value="social">
+            <Share2 className="h-4 w-4 mr-2" />
+            Social
           </TabsTrigger>
-          <TabsTrigger value="performance" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span>Performance</span>
+          <TabsTrigger value="performance">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Performance
           </TabsTrigger>
         </TabsList>
 
