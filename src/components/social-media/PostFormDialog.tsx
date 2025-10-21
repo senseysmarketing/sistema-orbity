@@ -30,6 +30,13 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Helper para converter Date para formato datetime-local mantendo fuso horário local
+  const toLocalDatetimeString = (date: Date) => {
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - offset * 60 * 1000);
+    return localDate.toISOString().slice(0, 16);
+  };
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -346,8 +353,12 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
               <Input
                 id="scheduled_date"
                 type="datetime-local"
-                value={formData.scheduled_date.slice(0, 16)}
-                onChange={(e) => setFormData({ ...formData, scheduled_date: new Date(e.target.value).toISOString() })}
+                value={toLocalDatetimeString(new Date(formData.scheduled_date))}
+                onChange={(e) => {
+                  // Converter o valor local para ISO mantendo o fuso horário correto
+                  const localDateTime = new Date(e.target.value);
+                  setFormData({ ...formData, scheduled_date: localDateTime.toISOString() });
+                }}
                 required
               />
             </div>
