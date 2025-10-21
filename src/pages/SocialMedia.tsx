@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, LayoutGrid, BarChart3, Settings } from "lucide-react";
+import { Calendar, LayoutGrid, BarChart3, Settings, TrendingUp } from "lucide-react";
 import { SocialMediaCalendar } from "@/components/social-media/SocialMediaCalendar";
 import { PostKanban } from "@/components/social-media/PostKanban";
 import { SocialMediaDashboard } from "@/components/social-media/SocialMediaDashboard";
 import { SocialMediaSettings } from "@/components/social-media/SocialMediaSettings";
+import { SocialMediaAnalytics } from "@/components/social-media/SocialMediaAnalytics";
 
 export default function SocialMedia() {
   const [activeTab, setActiveTab] = useState("calendar");
@@ -19,7 +20,7 @@ export default function SocialMedia() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto">
           <TabsTrigger value="calendar" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             <span className="hidden sm:inline">Calendário</span>
@@ -27,6 +28,10 @@ export default function SocialMedia() {
           <TabsTrigger value="kanban" className="flex items-center gap-2">
             <LayoutGrid className="h-4 w-4" />
             <span className="hidden sm:inline">Kanban</span>
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Análises</span>
           </TabsTrigger>
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
@@ -44,6 +49,10 @@ export default function SocialMedia() {
 
         <TabsContent value="kanban" className="space-y-4">
           <PostKanban />
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-4">
+          <SocialMediaAnalytics />
         </TabsContent>
 
         <TabsContent value="dashboard" className="space-y-4">
