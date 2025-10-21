@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
@@ -15,13 +15,24 @@ export function PlatformManager() {
   const queryClient = useQueryClient();
   const [newPlatform, setNewPlatform] = useState({ name: "", icon: "📱" });
 
-  const { data: platforms = [] } = useQuery({
+  // Plataformas padrão do sistema
+  const defaultPlatforms = [
+    { slug: 'instagram', name: 'Instagram', icon: '📷', is_default: true },
+    { slug: 'facebook', name: 'Facebook', icon: '👥', is_default: true },
+    { slug: 'linkedin', name: 'LinkedIn', icon: '💼', is_default: true },
+    { slug: 'twitter', name: 'Twitter', icon: '🐦', is_default: true },
+    { slug: 'tiktok', name: 'TikTok', icon: '🎵', is_default: true },
+    { slug: 'youtube', name: 'YouTube', icon: '📺', is_default: true },
+  ];
+
+  const { data: customPlatforms = [] } = useQuery({
     queryKey: ["social-platforms", currentAgency?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("social_media_platforms")
         .select("*")
         .eq("agency_id", currentAgency?.id)
+        .eq("is_default", false)
         .order("name");
       
       if (error) throw error;
@@ -29,6 +40,36 @@ export function PlatformManager() {
     },
     enabled: !!currentAgency?.id,
   });
+
+  // Buscar configurações de plataformas padrão
+  const { data: defaultPlatformSettings = [] } = useQuery({
+    queryKey: ["default-platform-settings", currentAgency?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("social_media_platforms")
+        .select("*")
+        .eq("agency_id", currentAgency?.id)
+        .eq("is_default", true);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentAgency?.id,
+  });
+
+  // Combinar plataformas padrão com configurações
+  const allPlatforms = useMemo(() => {
+    const platformsWithSettings = defaultPlatforms.map(defaultPlatform => {
+      const setting = defaultPlatformSettings.find((s: any) => s.slug === defaultPlatform.slug);
+      return {
+        ...defaultPlatform,
+        id: setting?.id,
+        is_active: setting?.is_active ?? true,
+        agency_id: currentAgency?.id,
+      };
+    });
+    return [...platformsWithSettings, ...customPlatforms];
+  }, [defaultPlatformSettings, customPlatforms, currentAgency?.id]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -66,16 +107,37 @@ export function PlatformManager() {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      const { error } = await supabase
-        .from("social_media_platforms")
-        .update({ is_active: isActive })
-        .eq("id", id);
-      
-      if (error) throw error;
+    mutationFn: async ({ id, slug, isActive, isDefault }: { id?: string; slug: string; isActive: boolean; isDefault: boolean }) => {
+      if (id) {
+        // Atualizar configuração existente
+        const { error } = await supabase
+          .from("social_media_platforms")
+          .update({ is_active: isActive })
+          .eq("id", id);
+        
+        if (error) throw error;
+      } else {
+        // Criar nova configuração para plataforma padrão
+        const defaultPlatform = defaultPlatforms.find(p => p.slug === slug);
+        if (!defaultPlatform || !currentAgency?.id) return;
+        
+        const { error } = await supabase
+          .from("social_media_platforms")
+          .insert({
+            agency_id: currentAgency.id,
+            slug: defaultPlatform.slug,
+            name: defaultPlatform.name,
+            icon: defaultPlatform.icon,
+            is_default: true,
+            is_active: isActive,
+          });
+        
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["social-platforms"] });
+      queryClient.invalidateQueries({ queryKey: ["default-platform-settings"] });
     },
   });
 
@@ -119,9 +181,9 @@ export function PlatformManager() {
         </div>
 
         <div className="space-y-2">
-          {platforms.map((platform: any) => (
+          {allPlatforms.map((platform: any) => (
             <div
-              key={platform.id}
+              key={platform.slug}
               className="flex items-center justify-between p-3 border rounded-lg"
             >
               <div className="flex items-center gap-3">
@@ -135,10 +197,15 @@ export function PlatformManager() {
                 <Switch
                   checked={platform.is_active}
                   onCheckedChange={(checked) =>
-                    toggleMutation.mutate({ id: platform.id, isActive: checked })
+                    toggleMutation.mutate({ 
+                      id: platform.id, 
+                      slug: platform.slug,
+                      isActive: checked,
+                      isDefault: platform.is_default 
+                    })
                   }
                 />
-                {!platform.is_default && (
+                {!platform.is_default && platform.id && (
                   <Button
                     variant="ghost"
                     size="sm"

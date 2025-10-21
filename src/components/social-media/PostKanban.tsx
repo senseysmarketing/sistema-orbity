@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent } from "@dnd-kit/core";
 import { useSocialMediaPosts, SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 import { PostKanbanColumn } from "./PostKanbanColumn";
@@ -11,14 +11,7 @@ import { PostDetailsDialog } from "./PostDetailsDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { toast } from "sonner";
-
-const defaultColumns = [
-  { id: "draft", title: "Briefing", color: "bg-gray-500" },
-  { id: "in_creation", title: "Em Criação", color: "bg-blue-500" },
-  { id: "pending_approval", title: "Aguardando Aprovação", color: "bg-yellow-500" },
-  { id: "approved", title: "Aprovado", color: "bg-green-500" },
-  { id: "published", title: "Publicado", color: "bg-purple-500" },
-];
+import { useQuery } from "@tanstack/react-query";
 
 export function PostKanban() {
   const { posts, updatePost, deletePost, fetchPosts } = useSocialMediaPosts();
@@ -31,6 +24,42 @@ export function PostKanban() {
   const [filterClient, setFilterClient] = useState<string>("all");
   const [filterContentType, setFilterContentType] = useState<string>("all");
 
+  // Buscar status customizados
+  const { data: customStatuses = [] } = useQuery({
+    queryKey: ['custom-statuses', currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data, error } = await supabase
+        .from('social_media_custom_statuses')
+        .select('*')
+        .eq('agency_id', currentAgency.id)
+        .eq('is_active', true)
+        .order('order_position', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentAgency?.id,
+  });
+
+  // Combinar colunas padrão com status customizados
+  const allColumns = useMemo(() => {
+    const defaultCols = [
+      { id: "draft", title: "Briefing", color: "bg-gray-500" },
+      { id: "in_creation", title: "Em Criação", color: "bg-blue-500" },
+      { id: "pending_approval", title: "Aguardando Aprovação", color: "bg-yellow-500" },
+      { id: "approved", title: "Aprovado", color: "bg-green-500" },
+      { id: "published", title: "Publicado", color: "bg-purple-500" },
+    ];
+    
+    const customCols = customStatuses.map(status => ({
+      id: status.slug,
+      title: status.name,
+      color: status.color,
+    }));
+    
+    return [...defaultCols, ...customCols];
+  }, [customStatuses]);
+
   // Obter lista de clientes únicos
   const uniqueClients = useMemo(() => {
     const clientsMap = new Map();
@@ -42,13 +71,21 @@ export function PostKanban() {
     return Array.from(clientsMap, ([id, name]) => ({ id, name }));
   }, [posts]);
 
-  // Tipos de conteúdo disponíveis
-  const contentTypes = [
-    { id: "feed", label: "Feed" },
-    { id: "stories", label: "Stories" },
-    { id: "reels", label: "Reels" },
-    { id: "carrossel", label: "Carrossel" },
-  ];
+  // Buscar tipos de conteúdo customizados
+  const { data: contentTypes = [] } = useQuery({
+    queryKey: ['content-types', currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data, error } = await supabase
+        .from('social_media_content_types')
+        .select('*')
+        .eq('agency_id', currentAgency.id)
+        .eq('is_active', true);
+      if (error) throw error;
+      return (data || []).map(ct => ({ id: ct.slug, label: ct.name }));
+    },
+    enabled: !!currentAgency?.id,
+  });
 
   // Filtrar e ordenar posts
   const filteredPosts = useMemo(() => {
@@ -100,7 +137,7 @@ export function PostKanban() {
           timestamp: new Date().toISOString(),
           user_id: userId,
           user_name: profileData?.name || 'Usuário desconhecido',
-          action: `Status alterado para: ${defaultColumns.find(c => c.id === newStatus)?.title || newStatus}`
+          action: `Status alterado para: ${allColumns.find(c => c.id === newStatus)?.title || newStatus}`
         };
         
         await updatePost(postId, { 
@@ -180,7 +217,7 @@ export function PostKanban() {
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="overflow-x-auto h-full pb-4">
             <div className="inline-flex gap-4 h-full">
-              {defaultColumns.map(column => (
+              {allColumns.map(column => (
                 <div key={column.id} className="w-80 flex-shrink-0">
                   <PostKanbanColumn
                     id={column.id}

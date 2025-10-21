@@ -9,6 +9,7 @@ import { useSocialMediaPosts, SocialMediaPost } from "@/hooks/useSocialMediaPost
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
 interface PostFormDialogProps {
   open: boolean;
@@ -72,6 +73,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     }
   }, [editPost, defaultDate, open]);
 
+  // Buscar clientes
   useEffect(() => {
     const fetchClients = async () => {
       if (!currentAgency?.id) return;
@@ -84,6 +86,81 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     };
     fetchClients();
   }, [currentAgency?.id]);
+
+  // Buscar tipos de conteúdo customizados
+  const { data: contentTypes = [] } = useQuery({
+    queryKey: ['content-types', currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data, error } = await supabase
+        .from('social_media_content_types')
+        .select('*')
+        .eq('agency_id', currentAgency.id)
+        .eq('is_active', true);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentAgency?.id,
+  });
+
+  // Buscar plataformas ativas
+  const { data: platforms = [] } = useQuery({
+    queryKey: ['social-platforms', currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data, error } = await supabase
+        .from('social_media_platforms')
+        .select('*')
+        .eq('agency_id', currentAgency.id)
+        .eq('is_active', true);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentAgency?.id,
+  });
+
+  // Buscar status customizados
+  const { data: customStatuses = [] } = useQuery({
+    queryKey: ['custom-statuses', currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data, error } = await supabase
+        .from('social_media_custom_statuses')
+        .select('*')
+        .eq('agency_id', currentAgency.id)
+        .eq('is_active', true)
+        .order('order_position', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentAgency?.id,
+  });
+
+  // Buscar horários padrão quando cliente for selecionado
+  useEffect(() => {
+    const fetchSchedulePreference = async () => {
+      if (!formData.client_id || !currentAgency?.id || editPost) return;
+
+      const { data, error } = await supabase
+        .from('social_media_schedule_preferences')
+        .select('preferred_times')
+        .eq('agency_id', currentAgency.id)
+        .eq('client_id', formData.client_id)
+        .eq('platform', formData.platform)
+        .single();
+
+      if (data && data.preferred_times && Array.isArray(data.preferred_times) && data.preferred_times.length > 0) {
+        // Pegar o primeiro horário preferido
+        const preferredTime = data.preferred_times[0] as string;
+        const currentDate = new Date(formData.scheduled_date);
+        const [hours, minutes] = preferredTime.split(':');
+        currentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        setFormData(prev => ({ ...prev, scheduled_date: currentDate.toISOString() }));
+      }
+    };
+
+    fetchSchedulePreference();
+  }, [formData.client_id, formData.platform, currentAgency?.id, editPost]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,12 +231,11 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="instagram">Instagram</SelectItem>
-                  <SelectItem value="facebook">Facebook</SelectItem>
-                  <SelectItem value="linkedin">LinkedIn</SelectItem>
-                  <SelectItem value="twitter">Twitter</SelectItem>
-                  <SelectItem value="tiktok">TikTok</SelectItem>
-                  <SelectItem value="youtube">YouTube</SelectItem>
+                  {platforms.map(platform => (
+                    <SelectItem key={platform.id} value={platform.slug}>
+                      {platform.icon} {platform.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -171,11 +247,11 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="feed">Feed</SelectItem>
-                  <SelectItem value="stories">Stories</SelectItem>
-                  <SelectItem value="reels">Reels</SelectItem>
-                  <SelectItem value="carrossel">Carrossel</SelectItem>
-                  <SelectItem value="video">Vídeo</SelectItem>
+                  {contentTypes.map(type => (
+                    <SelectItem key={type.id} value={type.slug}>
+                      {type.icon} {type.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -219,10 +295,15 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="draft">Rascunho</SelectItem>
+                  <SelectItem value="in_creation">Em Criação</SelectItem>
                   <SelectItem value="pending_approval">Aguardando Aprovação</SelectItem>
                   <SelectItem value="approved">Aprovado</SelectItem>
                   <SelectItem value="published">Publicado</SelectItem>
-                  <SelectItem value="rejected">Rejeitado</SelectItem>
+                  {customStatuses.map(status => (
+                    <SelectItem key={status.id} value={status.slug}>
+                      {status.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
