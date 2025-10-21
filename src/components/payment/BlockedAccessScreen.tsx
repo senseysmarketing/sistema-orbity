@@ -76,7 +76,7 @@ export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
             <p className="text-red-700">
               {isTrialExpired 
                 ? 'Seu período de trial de 7 dias expirou. Para continuar usando o sistema, você precisa assinar um dos nossos planos.'
-                : (paymentStatus.reason || 'Sua agência foi suspensa devido a problemas de pagamento.')
+                : 'Sua agência foi suspensa devido a problemas de pagamento.'
               }
             </p>
             
