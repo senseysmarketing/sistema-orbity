@@ -1,11 +1,28 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Search, LayoutGrid, TrendingUp, Settings } from "lucide-react";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { KanbanColumn } from "@/components/ui/kanban-column";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,8 +41,8 @@ interface Task {
   id: string;
   title: string;
   description: string;
-  status: 'todo' | 'in_progress' | 'em_revisao' | 'done';
-  priority: 'low' | 'medium' | 'high';
+  status: "todo" | "in_progress" | "em_revisao" | "done";
+  priority: "low" | "medium" | "high";
   assigned_to: string | null;
   client_id: string | null;
   due_date: string | null;
@@ -72,7 +89,7 @@ export default function Tasks() {
     assigned_to: "unassigned",
     assigned_users: [] as string[],
     client_id: "no-client",
-    due_date: ""
+    due_date: "",
   });
 
   const { profile } = useAuth();
@@ -91,9 +108,9 @@ export default function Tasks() {
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 3,
-        tolerance: 5
-      }
-    })
+        tolerance: 5,
+      },
+    }),
   );
 
   useEffect(() => {
@@ -101,7 +118,7 @@ export default function Tasks() {
     fetchProfiles();
     fetchClients();
     fetchAssignments();
-    
+
     // Arquivar tarefas concluídas há mais de 7 dias
     archiveOldCompletedTasks();
   }, []);
@@ -114,68 +131,65 @@ export default function Tasks() {
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
       const { error } = await supabase
-        .from('tasks')
+        .from("tasks")
         .update({ archived: true })
-        .eq('agency_id', currentAgency.id)
-        .eq('status', 'done')
-        .eq('archived', false)
-        .lt('updated_at', sevenDaysAgo.toISOString());
+        .eq("agency_id", currentAgency.id)
+        .eq("status", "done")
+        .eq("archived", false)
+        .lt("updated_at", sevenDaysAgo.toISOString());
 
-      if (error) console.error('Error archiving old tasks:', error);
+      if (error) console.error("Error archiving old tasks:", error);
     } catch (error) {
-      console.error('Error archiving old tasks:', error);
+      console.error("Error archiving old tasks:", error);
     }
   };
 
   const fetchTasks = async () => {
     if (!currentAgency) return;
-    
+
     try {
       const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('agency_id', currentAgency.id)
-        .eq('archived', false)
-        .order('created_at', { ascending: false });
-      
+        .from("tasks")
+        .select("*")
+        .eq("agency_id", currentAgency.id)
+        .eq("archived", false)
+        .order("created_at", { ascending: false });
+
       if (error) throw error;
       setTasks(data || []);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar tarefas",
         description: error.message,
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
   const fetchProfiles = async () => {
     if (!currentAgency) return;
-    
+
     try {
       const { data: agencyUsers, error: agencyUsersError } = await supabase
-        .from('agency_users')
-        .select('user_id')
-        .eq('agency_id', currentAgency.id);
-      
+        .from("agency_users")
+        .select("user_id")
+        .eq("agency_id", currentAgency.id);
+
       if (agencyUsersError) throw agencyUsersError;
-      
-      const userIds = agencyUsers?.map(au => au.user_id) || [];
-      
+
+      const userIds = agencyUsers?.map((au) => au.user_id) || [];
+
       if (userIds.length === 0) {
         setProfiles([]);
         return;
       }
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, user_id, name, role')
-        .in('user_id', userIds);
-      
+
+      const { data, error } = await supabase.from("profiles").select("id, user_id, name, role").in("user_id", userIds);
+
       if (error) throw error;
       setProfiles(data || []);
     } catch (error: any) {
-      console.error('Erro ao carregar perfis:', error);
+      console.error("Erro ao carregar perfis:", error);
     }
   };
 
@@ -184,17 +198,14 @@ export default function Tasks() {
       setLoading(false);
       return;
     }
-    
+
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('id, name')
-        .eq('agency_id', currentAgency.id);
-      
+      const { data, error } = await supabase.from("clients").select("id, name").eq("agency_id", currentAgency.id);
+
       if (error) throw error;
       setClients(data || []);
     } catch (error: any) {
-      console.error('Erro ao carregar clientes:', error);
+      console.error("Erro ao carregar clientes:", error);
     } finally {
       setLoading(false);
     }
@@ -202,28 +213,26 @@ export default function Tasks() {
 
   // Dados filtrados
   const filteredTasks = useMemo(() => {
-    let filtered = tasks.filter(task => {
-      const matchesSearch = 
+    let filtered = tasks.filter((task) => {
+      const matchesSearch =
         task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         task.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-      const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
+      const matchesStatus = statusFilter === "all" || task.status === statusFilter;
+      const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter;
 
       let matchesAssigned = true;
-      if (assignedFilter !== 'all') {
+      if (assignedFilter !== "all") {
         const taskAssignedUsers = getAssignedUsers(task.id);
-        if (assignedFilter === 'unassigned') {
+        if (assignedFilter === "unassigned") {
           matchesAssigned = taskAssignedUsers.length === 0;
         } else {
-          matchesAssigned = taskAssignedUsers.some(u => u.user_id === assignedFilter);
+          matchesAssigned = taskAssignedUsers.some((u) => u.user_id === assignedFilter);
         }
       }
 
-      const matchesClient = 
-        clientFilter === 'all' ||
-        (clientFilter === 'no-client' && !task.client_id) ||
-        task.client_id === clientFilter;
+      const matchesClient =
+        clientFilter === "all" || (clientFilter === "no-client" && !task.client_id) || task.client_id === clientFilter;
 
       return matchesSearch && matchesStatus && matchesPriority && matchesAssigned && matchesClient;
     });
@@ -233,84 +242,84 @@ export default function Tasks() {
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      todo: 'A Fazer',
-      in_progress: 'Em Andamento',
-      em_revisao: 'Em Revisão',
-      done: 'Concluída'
+      todo: "A Fazer",
+      in_progress: "Em Andamento",
+      em_revisao: "Em Revisão",
+      done: "Concluída",
     };
     return labels[status] || status;
   };
 
   const getPriorityLabel = (priority: string) => {
     const labels: Record<string, string> = {
-      low: 'Baixa',
-      medium: 'Média',
-      high: 'Alta'
+      low: "Baixa",
+      medium: "Média",
+      high: "Alta",
     };
     return labels[priority] || priority;
   };
 
   const getPriorityColor = (priority: string) => {
     const colors: Record<string, string> = {
-      low: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
-      medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-      high: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+      low: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
+      medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+      high: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
     };
-    return colors[priority] || 'bg-muted text-muted-foreground';
+    return colors[priority] || "bg-muted text-muted-foreground";
   };
 
   const getClientName = (clientId: string | null) => {
-    if (!clientId) return 'Sem cliente';
-    const client = clients.find(c => c.id === clientId);
-    return client?.name || 'Cliente desconhecido';
+    if (!clientId) return "Sem cliente";
+    const client = clients.find((c) => c.id === clientId);
+    return client?.name || "Cliente desconhecido";
   };
 
   const formatDateBR = (value: string | null) => {
-    if (!value) return '';
+    if (!value) return "";
     const s = String(value);
-    const date = s.includes('T') ? new Date(s) : new Date(`${s}T00:00:00`);
-    if (isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('pt-BR');
+    const date = s.includes("T") ? new Date(s) : new Date(`${s}T00:00:00`);
+    if (isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("pt-BR");
   };
 
   const getUrgencyLevel = (task: Task) => {
-    if (task.status === 'done') {
-      return { level: 'completed', label: 'Concluída', color: 'bg-green-500 text-white' };
+    if (task.status === "done") {
+      return { level: "completed", label: "Concluída", color: "bg-green-500 text-white" };
     }
 
     if (!task.due_date) {
-      return { level: 'normal', label: '', color: '' };
+      return { level: "normal", label: "", color: "" };
     }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const dueDate = new Date(task.due_date);
     dueDate.setHours(0, 0, 0, 0);
 
     // Verifica se está atrasada (passou da data de vencimento)
     if (dueDate < today) {
-      return { level: 'overdue', label: 'Atrasada', color: 'bg-red-500 text-white' };
+      return { level: "overdue", label: "Atrasada", color: "bg-red-500 text-white" };
     }
 
     // Verifica se vence hoje
     if (dueDate.getTime() === today.getTime()) {
-      return { level: 'today', label: 'Hoje', color: 'bg-orange-500 text-white' };
+      return { level: "today", label: "Hoje", color: "bg-orange-500 text-white" };
     }
 
     // Verifica se vence esta semana (próximos 7 dias)
     const nextWeek = new Date(today);
     nextWeek.setDate(today.getDate() + 7);
-    
+
     if (dueDate > today && dueDate <= nextWeek) {
-      return { level: 'this-week', label: 'Esta Semana', color: 'bg-blue-500 text-white' };
+      return { level: "this-week", label: "Esta Semana", color: "bg-blue-500 text-white" };
     }
 
-    return { level: 'normal', label: '', color: '' };
+    return { level: "normal", label: "", color: "" };
   };
 
   const dateOnlyToISO = (dateStr: string) => {
-    const [y, m, d] = dateStr.split('-').map(Number);
+    const [y, m, d] = dateStr.split("-").map(Number);
     const ts = Date.UTC(y, (m || 1) - 1, d || 1, 12, 0, 0);
     return new Date(ts).toISOString();
   };
@@ -325,14 +334,14 @@ export default function Tasks() {
       toast({
         title: "Erro",
         description: "O título da tarefa é obrigatório.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     try {
       const { data: taskData, error } = await supabase
-        .from('tasks')
+        .from("tasks")
         .insert({
           title: newTask.title,
           description: newTask.description,
@@ -342,7 +351,7 @@ export default function Tasks() {
           client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
           due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
           created_by: profile?.user_id,
-          agency_id: currentAgency?.id
+          agency_id: currentAgency?.id,
         })
         .select()
         .single();
@@ -355,7 +364,7 @@ export default function Tasks() {
 
       toast({
         title: "Sucesso",
-        description: "Tarefa criada com sucesso!"
+        description: "Tarefa criada com sucesso!",
       });
 
       setNewTask({
@@ -366,7 +375,7 @@ export default function Tasks() {
         assigned_to: "unassigned",
         assigned_users: [],
         client_id: "no-client",
-        due_date: ""
+        due_date: "",
       });
       setIsDialogOpen(false);
       fetchTasks();
@@ -374,7 +383,7 @@ export default function Tasks() {
       toast({
         title: "Erro ao criar tarefa",
         description: error.message,
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -387,9 +396,9 @@ export default function Tasks() {
       status: task.status as any,
       priority: task.priority as any,
       assigned_to: task.assigned_to || "unassigned",
-      assigned_users: getAssignedUsers(task.id).map(u => u.user_id),
+      assigned_users: getAssignedUsers(task.id).map((u) => u.user_id),
       client_id: task.client_id || "no-client",
-      due_date: task.due_date ? task.due_date.split('T')[0] : ""
+      due_date: task.due_date ? task.due_date.split("T")[0] : "",
     });
     setIsEditDialogOpen(true);
   };
@@ -399,14 +408,14 @@ export default function Tasks() {
       toast({
         title: "Erro",
         description: "O título da tarefa é obrigatório.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
     try {
       const { error } = await supabase
-        .from('tasks')
+        .from("tasks")
         .update({
           title: newTask.title,
           description: newTask.description,
@@ -414,20 +423,20 @@ export default function Tasks() {
           priority: newTask.priority,
           assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
           client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
-          due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null
+          due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
         })
-        .eq('id', selectedTask.id);
+        .eq("id", selectedTask.id);
 
       if (error) throw error;
 
       if (selectedTask) {
         await assignUsersToTask(selectedTask.id, newTask.assigned_users);
-        await addHistoryEntry(selectedTask.id, 'Tarefa atualizada');
+        await addHistoryEntry(selectedTask.id, "Tarefa atualizada");
       }
 
       toast({
         title: "Sucesso",
-        description: "Tarefa atualizada com sucesso!"
+        description: "Tarefa atualizada com sucesso!",
       });
 
       setIsEditDialogOpen(false);
@@ -437,30 +446,27 @@ export default function Tasks() {
       toast({
         title: "Erro ao atualizar tarefa",
         description: error.message,
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
   const handleDeleteTask = async (taskId: string) => {
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .delete()
-        .eq('id', taskId);
+      const { error } = await supabase.from("tasks").delete().eq("id", taskId);
 
       if (error) throw error;
 
       toast({
         title: "Sucesso",
-        description: "Tarefa excluída com sucesso!"
+        description: "Tarefa excluída com sucesso!",
       });
       fetchTasks();
     } catch (error: any) {
       toast({
         title: "Erro ao excluir tarefa",
         description: error.message,
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -483,23 +489,23 @@ export default function Tasks() {
     const taskId = active.id as string;
     const newStatus = over.id as string;
 
-    const validStatuses = ['todo', 'in_progress', 'em_revisao', 'done'];
+    const validStatuses = ["todo", "in_progress", "em_revisao", "done"];
     if (!validStatuses.includes(newStatus)) return;
 
-    const task = tasks.find(t => t.id === taskId);
+    const task = tasks.find((t) => t.id === taskId);
     if (!task || task.status === newStatus) return;
 
-    setTasks(prev => prev.map(t => 
-      t.id === taskId 
-        ? { ...t, status: newStatus as 'todo' | 'in_progress' | 'em_revisao' | 'done' } 
-        : t
-    ));
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, status: newStatus as "todo" | "in_progress" | "em_revisao" | "done" } : t,
+      ),
+    );
 
     try {
       const { error } = await supabase
-        .from('tasks')
-        .update({ status: newStatus as 'todo' | 'in_progress' | 'em_revisao' | 'done' })
-        .eq('id', taskId);
+        .from("tasks")
+        .update({ status: newStatus as "todo" | "in_progress" | "em_revisao" | "done" })
+        .eq("id", taskId);
 
       if (error) throw error;
 
@@ -507,24 +513,24 @@ export default function Tasks() {
 
       toast({
         title: "Sucesso",
-        description: `Tarefa movida para ${getStatusLabel(newStatus)}!`
+        description: `Tarefa movida para ${getStatusLabel(newStatus)}!`,
       });
     } catch (error: any) {
-      setTasks(prev => prev.map(t => 
-        t.id === taskId 
-          ? { ...t, status: task.status as 'todo' | 'in_progress' | 'em_revisao' | 'done' } 
-          : t
-      ));
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId ? { ...t, status: task.status as "todo" | "in_progress" | "em_revisao" | "done" } : t,
+        ),
+      );
       toast({
         title: "Erro ao mover tarefa",
         description: error.message,
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
   const sortedTasksByStatus = (status: string) => {
-    return filteredTasks.filter(task => task.status === status);
+    return filteredTasks.filter((task) => task.status === status);
   };
 
   const clearFilters = () => {
@@ -549,9 +555,7 @@ export default function Tasks() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Gestão de Tarefas</h1>
-          <p className="text-muted-foreground">
-            Painel completo para gerenciamento e acompanhamento de tarefas
-          </p>
+          <p className="text-muted-foreground">Painel completo para gerenciamento e acompanhamento de tarefas</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -563,9 +567,7 @@ export default function Tasks() {
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle>Criar Nova Tarefa</DialogTitle>
-              <DialogDescription>
-                Preencha as informações da nova tarefa.
-              </DialogDescription>
+              <DialogDescription>Preencha as informações da nova tarefa.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
@@ -590,7 +592,10 @@ export default function Tasks() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="status">Status</Label>
-                  <Select value={newTask.status} onValueChange={(value: any) => setNewTask({ ...newTask, status: value })}>
+                  <Select
+                    value={newTask.status}
+                    onValueChange={(value: any) => setNewTask({ ...newTask, status: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -604,7 +609,10 @@ export default function Tasks() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="priority">Prioridade</Label>
-                  <Select value={newTask.priority} onValueChange={(value: any) => setNewTask({ ...newTask, priority: value })}>
+                  <Select
+                    value={newTask.priority}
+                    onValueChange={(value: any) => setNewTask({ ...newTask, priority: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -629,7 +637,10 @@ export default function Tasks() {
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="client_id">Cliente</Label>
-                  <Select value={newTask.client_id} onValueChange={(value) => setNewTask({ ...newTask, client_id: value })}>
+                  <Select
+                    value={newTask.client_id}
+                    onValueChange={(value) => setNewTask({ ...newTask, client_id: value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecionar cliente" />
                     </SelectTrigger>
@@ -658,7 +669,7 @@ export default function Tasks() {
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button onClick={handleCreateTask} style={{ backgroundColor: '#150a26', color: 'white' }}>
+              <Button onClick={handleCreateTask} style={{ backgroundColor: "#150a26", color: "white" }}>
                 Criar Tarefa
               </Button>
             </DialogFooter>
@@ -694,13 +705,13 @@ export default function Tasks() {
                 className="pl-8"
               />
             </div>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">Todos Status</SelectItem>
                 <SelectItem value="todo">A Fazer</SelectItem>
                 <SelectItem value="in_progress">Em Andamento</SelectItem>
                 <SelectItem value="em_revisao">Em Revisão</SelectItem>
@@ -713,7 +724,7 @@ export default function Tasks() {
                 <SelectValue placeholder="Prioridade" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="all">Todas Prioridades</SelectItem>
                 <SelectItem value="high">Alta</SelectItem>
                 <SelectItem value="medium">Média</SelectItem>
                 <SelectItem value="low">Baixa</SelectItem>
@@ -725,7 +736,7 @@ export default function Tasks() {
                 <SelectValue placeholder="Responsável" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">Todos Usuários</SelectItem>
                 <SelectItem value="unassigned">Não atribuído</SelectItem>
                 {profiles.map((profile) => (
                   <SelectItem key={profile.id} value={profile.user_id}>
@@ -735,7 +746,11 @@ export default function Tasks() {
               </SelectContent>
             </Select>
 
-            {(searchTerm || statusFilter !== "all" || priorityFilter !== "all" || assignedFilter !== "all" || clientFilter !== "all") && (
+            {(searchTerm ||
+              statusFilter !== "all" ||
+              priorityFilter !== "all" ||
+              assignedFilter !== "all" ||
+              clientFilter !== "all") && (
               <Button variant="outline" onClick={clearFilters}>
                 Limpar
               </Button>
@@ -753,87 +768,87 @@ export default function Tasks() {
               <KanbanColumn
                 id="todo"
                 title="A Fazer"
-                tasks={sortedTasksByStatus('todo')}
+                tasks={sortedTasksByStatus("todo")}
                 color="bg-gray-500"
-                count={sortedTasksByStatus('todo').length}
+                count={sortedTasksByStatus("todo").length}
                 onViewDetails={handleViewDetails}
                 onEdit={handleEditTask}
                 onDelete={handleDeleteTask}
                 getPriorityColor={getPriorityColor}
                 getPriorityLabel={getPriorityLabel}
                 getUrgencyLevel={getUrgencyLevel}
-                getAssignedUserName={() => ''}
+                getAssignedUserName={() => ""}
                 getClientName={getClientName}
                 formatDateBR={formatDateBR}
                 getAssignedUsers={getAssignedUsers}
               />
-              
+
               <KanbanColumn
                 id="in_progress"
                 title="Em Andamento"
-                tasks={sortedTasksByStatus('in_progress')}
+                tasks={sortedTasksByStatus("in_progress")}
                 color="bg-blue-500"
-                count={sortedTasksByStatus('in_progress').length}
+                count={sortedTasksByStatus("in_progress").length}
                 onViewDetails={handleViewDetails}
                 onEdit={handleEditTask}
                 onDelete={handleDeleteTask}
                 getPriorityColor={getPriorityColor}
                 getPriorityLabel={getPriorityLabel}
                 getUrgencyLevel={getUrgencyLevel}
-                getAssignedUserName={() => ''}
+                getAssignedUserName={() => ""}
                 getClientName={getClientName}
                 formatDateBR={formatDateBR}
                 getAssignedUsers={getAssignedUsers}
               />
-              
+
               <KanbanColumn
                 id="em_revisao"
                 title="Em Revisão"
-                tasks={sortedTasksByStatus('em_revisao')}
+                tasks={sortedTasksByStatus("em_revisao")}
                 color="bg-purple-500"
-                count={sortedTasksByStatus('em_revisao').length}
+                count={sortedTasksByStatus("em_revisao").length}
                 onViewDetails={handleViewDetails}
                 onEdit={handleEditTask}
                 onDelete={handleDeleteTask}
                 getPriorityColor={getPriorityColor}
                 getPriorityLabel={getPriorityLabel}
                 getUrgencyLevel={getUrgencyLevel}
-                getAssignedUserName={() => ''}
+                getAssignedUserName={() => ""}
                 getClientName={getClientName}
                 formatDateBR={formatDateBR}
                 getAssignedUsers={getAssignedUsers}
               />
-              
+
               <KanbanColumn
                 id="done"
                 title="Concluídas"
-                tasks={sortedTasksByStatus('done')}
+                tasks={sortedTasksByStatus("done")}
                 color="bg-green-500"
-                count={sortedTasksByStatus('done').length}
+                count={sortedTasksByStatus("done").length}
                 onViewDetails={handleViewDetails}
                 onEdit={handleEditTask}
                 onDelete={handleDeleteTask}
                 getPriorityColor={getPriorityColor}
                 getPriorityLabel={getPriorityLabel}
                 getUrgencyLevel={getUrgencyLevel}
-                getAssignedUserName={() => ''}
+                getAssignedUserName={() => ""}
                 getClientName={getClientName}
                 formatDateBR={formatDateBR}
                 getAssignedUsers={getAssignedUsers}
               />
             </div>
-            
+
             <DragOverlay>
               {activeId ? (
                 <SortableTaskCard
-                  task={tasks.find(task => task.id === activeId)!}
+                  task={tasks.find((task) => task.id === activeId)!}
                   onViewDetails={() => {}}
                   onEdit={() => {}}
                   onDelete={() => {}}
                   getPriorityColor={getPriorityColor}
                   getPriorityLabel={getPriorityLabel}
                   getUrgencyLevel={getUrgencyLevel}
-                  getAssignedUserName={() => ''}
+                  getAssignedUserName={() => ""}
                   getClientName={getClientName}
                   formatDateBR={formatDateBR}
                   assignedUsers={activeId ? getAssignedUsers(activeId) : []}
@@ -844,10 +859,10 @@ export default function Tasks() {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
-          <TaskAnalytics 
-            tasks={filteredTasks} 
-            profiles={profiles} 
-            clients={clients} 
+          <TaskAnalytics
+            tasks={filteredTasks}
+            profiles={profiles}
+            clients={clients}
             getAssignedUsers={getAssignedUsers}
           />
         </TabsContent>
@@ -862,9 +877,7 @@ export default function Tasks() {
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Editar Tarefa</DialogTitle>
-            <DialogDescription>
-              Atualize as informações da tarefa.
-            </DialogDescription>
+            <DialogDescription>Atualize as informações da tarefa.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -889,7 +902,10 @@ export default function Tasks() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="edit-status">Status</Label>
-                <Select value={newTask.status} onValueChange={(value: any) => setNewTask({ ...newTask, status: value })}>
+                <Select
+                  value={newTask.status}
+                  onValueChange={(value: any) => setNewTask({ ...newTask, status: value })}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -903,7 +919,10 @@ export default function Tasks() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-priority">Prioridade</Label>
-                <Select value={newTask.priority} onValueChange={(value: any) => setNewTask({ ...newTask, priority: value })}>
+                <Select
+                  value={newTask.priority}
+                  onValueChange={(value: any) => setNewTask({ ...newTask, priority: value })}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -928,7 +947,10 @@ export default function Tasks() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-client_id">Cliente</Label>
-                <Select value={newTask.client_id} onValueChange={(value) => setNewTask({ ...newTask, client_id: value })}>
+                <Select
+                  value={newTask.client_id}
+                  onValueChange={(value) => setNewTask({ ...newTask, client_id: value })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecionar cliente" />
                   </SelectTrigger>
@@ -957,9 +979,7 @@ export default function Tasks() {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleUpdateTask}>
-              Atualizar
-            </Button>
+            <Button onClick={handleUpdateTask}>Atualizar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
