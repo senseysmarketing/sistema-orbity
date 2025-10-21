@@ -49,6 +49,7 @@ interface Task {
   created_at: string;
   created_by: string;
   archived?: boolean;
+  history?: any[];
 }
 
 interface Profile {
@@ -156,7 +157,7 @@ export default function Tasks() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setTasks(data || []);
+      setTasks((data as any) || []);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar tarefas",
@@ -325,8 +326,31 @@ export default function Tasks() {
   };
 
   const addHistoryEntry = async (taskId: string, action: string) => {
-    // Histórico será implementado em uma migração futura
-    console.log(`Task ${taskId}: ${action}`);
+    try {
+      // Get current task history
+      const { data: currentTask } = await supabase
+        .from("tasks")
+        .select("history")
+        .eq("id", taskId)
+        .single();
+
+      const currentHistory = Array.isArray(currentTask?.history) ? currentTask.history : [];
+      const newEntry = {
+        action,
+        timestamp: new Date().toISOString(),
+        user_name: profile?.name || "Usuário",
+      };
+
+      // Update task with new history entry
+      await supabase
+        .from("tasks")
+        .update({
+          history: [...currentHistory, newEntry] as any,
+        })
+        .eq("id", taskId);
+    } catch (error) {
+      console.error("Error adding history entry:", error);
+    }
   };
 
   const handleCreateTask = async () => {
