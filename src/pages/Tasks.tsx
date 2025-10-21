@@ -844,7 +844,12 @@ export default function Tasks() {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
-          <TaskAnalytics tasks={filteredTasks} profiles={profiles} clients={clients} />
+          <TaskAnalytics 
+            tasks={filteredTasks} 
+            profiles={profiles} 
+            clients={clients} 
+            getAssignedUsers={getAssignedUsers}
+          />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">

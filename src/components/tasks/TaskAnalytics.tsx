@@ -16,7 +16,6 @@ import {
   AlertTriangle,
   UserCheck
 } from "lucide-react";
-import { useTaskAssignments } from "@/hooks/useTaskAssignments";
 
 interface Task {
   id: string;
@@ -48,10 +47,10 @@ interface TaskAnalyticsProps {
   tasks: Task[];
   profiles: Profile[];
   clients: Client[];
+  getAssignedUsers: (taskId: string) => any[];
 }
 
-export function TaskAnalytics({ tasks, profiles, clients }: TaskAnalyticsProps) {
-  const { getAssignedUsers } = useTaskAssignments();
+export function TaskAnalytics({ tasks, profiles, clients, getAssignedUsers }: TaskAnalyticsProps) {
 
   const analytics = useMemo(() => {
     const today = new Date();
