@@ -133,8 +133,8 @@ export function PostKanban() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-4 h-full flex flex-col">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0">
         <h2 className="text-2xl font-bold">Kanban de Produção</h2>
         
         <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
@@ -176,27 +176,29 @@ export function PostKanban() {
         </div>
       </div>
 
-      <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="overflow-x-auto pb-4">
-          <div className="inline-flex gap-4 min-w-full">
-            {defaultColumns.map(column => (
-              <div key={column.id} className="w-80 flex-shrink-0">
-                <PostKanbanColumn
-                  id={column.id}
-                  title={column.title}
-                  color={column.color}
-                  posts={getPostsByStatus(column.id)}
-                  onPostClick={handlePostClick}
-                />
-              </div>
-            ))}
+      <div className="flex-1 overflow-hidden">
+        <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <div className="overflow-x-auto h-full pb-4">
+            <div className="inline-flex gap-4 h-full">
+              {defaultColumns.map(column => (
+                <div key={column.id} className="w-80 flex-shrink-0">
+                  <PostKanbanColumn
+                    id={column.id}
+                    title={column.title}
+                    color={column.color}
+                    posts={getPostsByStatus(column.id)}
+                    onPostClick={handlePostClick}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <DragOverlay>
-          {activePost ? <PostCard post={activePost} /> : null}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay>
+            {activePost ? <PostCard post={activePost} /> : null}
+          </DragOverlay>
+        </DndContext>
+      </div>
 
       <PostFormDialog 
         open={isCreateDialogOpen}
