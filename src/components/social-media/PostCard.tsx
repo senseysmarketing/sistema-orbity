@@ -91,7 +91,7 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
       <div 
         className="text-xs p-1.5 rounded border cursor-pointer hover:brightness-95 transition-all"
         onClick={onClick}
-        style={{ backgroundColor: `${clientColor}15` }}
+        style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
       >
         <div className="flex items-center gap-1">
           <ContentTypeIcon className="h-3 w-3" />
@@ -108,7 +108,7 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
     <div 
       className="p-4 rounded-lg border cursor-pointer hover:shadow-md hover:brightness-95 transition-all"
       onClick={onClick}
-      style={{ backgroundColor: `${clientColor}15` }}
+      style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
