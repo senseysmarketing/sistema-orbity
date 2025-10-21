@@ -27,14 +27,26 @@ serve(async (req) => {
     logStep("Function started");
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header provided");
+    if (!authHeader) {
+      logStep("No authorization header provided - returning unsubscribed");
+      return new Response(JSON.stringify({
+        subscribed: false,
+        subscription_status: 'none'
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+    }
     
     const token = authHeader.replace("Bearer ", "");
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) throw new Error(`Authentication error: ${userError.message}`);
+    if (userError || !userData?.user?.email) {
+      logStep("Authentication error or missing email - returning unsubscribed", { error: userError?.message });
+      return new Response(JSON.stringify({
+        subscribed: false,
+        subscription_status: 'none'
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+    }
     const user = userData.user;
-    if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
+    
 
     // Get user's agency
     const { data: agencyUser, error: agencyError } = await supabaseClient
@@ -213,9 +225,20 @@ serve(async (req) => {
     });
 
     const priceId = activeSubscription.items.data[0].price.id;
-    const subscriptionEnd = new Date(activeSubscription.current_period_end * 1000).toISOString();
-    const trialEnd = activeSubscription.trial_end ? 
-      new Date(activeSubscription.trial_end * 1000).toISOString() : null;
+
+    const toIsoOrNull = (seconds?: number | null): string | null => {
+      if (typeof seconds !== 'number' || !isFinite(seconds)) return null;
+      const d = new Date(seconds * 1000);
+      try {
+        return d.toISOString();
+      } catch {
+        return null;
+      }
+    };
+
+    const subscriptionEnd = toIsoOrNull(activeSubscription.current_period_end);
+    const trialEnd = toIsoOrNull(activeSubscription.trial_end);
+    const periodStart = toIsoOrNull(activeSubscription.current_period_start);
 
     // Get plan details from database based on price ID
     const { data: plan } = await supabaseClient
@@ -243,7 +266,7 @@ serve(async (req) => {
         stripe_subscription_id: activeSubscription.id,
         stripe_price_id: priceId,
         status: activeSubscription.status === 'trialing' ? 'trial' : 'active',
-        current_period_start: new Date(activeSubscription.current_period_start * 1000).toISOString(),
+        current_period_start: periodStart,
         current_period_end: subscriptionEnd,
         trial_end: trialEnd,
         billing_cycle: 'monthly',
