@@ -120,9 +120,9 @@ export function useTaskAssignments() {
   };
 
   const getAssignedUsers = (taskId: string) => {
-    return assignments
-      .filter(assignment => assignment.task_id === taskId)
-      .map(assignment => assignment.profiles);
+    const taskAssignments = assignments.filter(assignment => assignment.task_id === taskId);
+    // Retorna no formato que os componentes esperam
+    return taskAssignments.map(assignment => assignment);
   };
 
   const getTasksForUser = (userId: string) => {

@@ -119,9 +119,9 @@ export function TaskCard({
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Users className="h-3 w-3" />
           <div className="flex flex-wrap gap-1">
-            {assignedUsers.slice(0, 2).map((user, i) => (
+            {assignedUsers.slice(0, 2).map((assignment, i) => (
               <span key={i} className="font-medium">
-                {user.profiles?.name || 'Usuário'}
+                {assignment.profiles?.name || 'Usuário'}
               </span>
             ))}
             {assignedUsers.length > 2 && (
