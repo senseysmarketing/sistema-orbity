@@ -17,37 +17,36 @@ interface PostDetailsDialogProps {
   onDelete: (postId: string) => void;
 }
 
-const getPlatformIcon = (platform: string) => {
-  const icons: Record<string, string> = {
-    instagram: "📷",
-    facebook: "👤",
-    linkedin: "💼",
-    twitter: "🐦",
-    tiktok: "🎵",
-  };
-  return icons[platform.toLowerCase()] || "📱";
+const platformConfig: Record<string, { label: string; icon: string }> = {
+  instagram: { label: "Instagram", icon: "📷" },
+  facebook: { label: "Facebook", icon: "👤" },
+  linkedin: { label: "LinkedIn", icon: "💼" },
+  twitter: { label: "Twitter", icon: "🐦" },
+  youtube: { label: "YouTube", icon: "📺" },
+  tiktok: { label: "TikTok", icon: "🎵" },
 };
 
-const getStatusColor = (status: string) => {
-  const colors: Record<string, string> = {
-    draft: "bg-gray-500",
-    in_creation: "bg-blue-500",
-    pending_approval: "bg-yellow-500",
-    approved: "bg-green-500",
-    published: "bg-purple-500",
-    rejected: "bg-red-500",
-  };
-  return colors[status] || "bg-gray-500";
+const statusConfig: Record<string, { label: string; color: string }> = {
+  draft: { label: "Briefing", color: "bg-gray-500" },
+  in_creation: { label: "Em Criação", color: "bg-blue-500" },
+  pending_approval: { label: "Aguardando", color: "bg-yellow-500" },
+  approved: { label: "Aprovado", color: "bg-green-500" },
+  published: { label: "Publicado", color: "bg-purple-500" },
+  rejected: { label: "Rejeitado", color: "bg-red-500" },
 };
 
-const getPriorityColor = (priority: string) => {
-  const colors: Record<string, string> = {
-    low: "bg-gray-500",
-    medium: "bg-blue-500",
-    high: "bg-orange-500",
-    urgent: "bg-red-500",
-  };
-  return colors[priority] || "bg-gray-500";
+const priorityConfig: Record<string, { label: string; color: string }> = {
+  low: { label: "Baixa", color: "bg-gray-500" },
+  medium: { label: "Média", color: "bg-blue-500" },
+  high: { label: "Alta", color: "bg-orange-500" },
+  urgent: { label: "Urgente", color: "bg-red-500" },
+};
+
+const postTypeConfig: Record<string, string> = {
+  feed: "Feed",
+  stories: "Stories",
+  reels: "Reels",
+  carrossel: "Carrossel",
 };
 
 export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete }: PostDetailsDialogProps) {
@@ -72,21 +71,25 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete }
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <span className="text-2xl">{getPlatformIcon(post.platform)}</span>
+              <span className="text-2xl">{platformConfig[post.platform.toLowerCase()]?.icon || "📱"}</span>
               {post.title}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
-              <Badge className={getStatusColor(post.status)}>
-                {post.status}
+              <Badge className={statusConfig[post.status]?.color || "bg-gray-500"}>
+                {statusConfig[post.status]?.label || post.status}
               </Badge>
-              <Badge className={getPriorityColor(post.priority)}>
-                {post.priority}
+              <Badge className={priorityConfig[post.priority]?.color || "bg-gray-500"}>
+                {priorityConfig[post.priority]?.label || post.priority}
               </Badge>
               <Badge variant="outline">
-                {post.post_type}
+                {postTypeConfig[post.post_type] || post.post_type}
+              </Badge>
+              <Badge variant="outline" className="flex items-center gap-1">
+                <span>{platformConfig[post.platform.toLowerCase()]?.icon || "📱"}</span>
+                {platformConfig[post.platform.toLowerCase()]?.label || post.platform}
               </Badge>
             </div>
 
