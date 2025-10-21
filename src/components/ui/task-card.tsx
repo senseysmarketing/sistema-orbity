@@ -96,7 +96,7 @@ export function TaskCard({
           <Badge variant="outline" className={`${statusConfig[task.status]?.color || "bg-gray-500"} text-white text-xs`}>
             {statusConfig[task.status]?.label || task.status}
           </Badge>
-          {urgency.level !== 'normal' && (
+          {urgency.level !== 'normal' && task.status !== 'done' && (
             <Badge variant="outline" className={`${urgency.color} text-xs flex items-center gap-1`}>
               <UrgencyIcon className="h-3 w-3" />
               {urgency.label}

@@ -120,7 +120,7 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
           <Badge variant="outline" className={`${statusInfo.color} text-white text-xs`}>
             {statusInfo.label}
           </Badge>
-          {urgencyBadge && UrgencyIcon && (
+          {urgencyBadge && UrgencyIcon && post.status !== 'published' && (
             <Badge variant="outline" className={`${urgencyBadge.color} text-white text-xs flex items-center gap-1`}>
               <UrgencyIcon className="h-3 w-3" />
               {urgencyBadge.label}
