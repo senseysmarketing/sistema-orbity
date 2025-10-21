@@ -150,18 +150,32 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      // Ensure we have a valid access token
+      let { data: sessionData } = await supabase.auth.getSession();
+      let accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        accessToken = refreshData.session?.access_token;
+      }
+      if (!accessToken) {
+        toast.error('Sessão expirada. Entre novamente.');
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { priceId },
         headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
       if (error) throw error;
 
       // Open checkout in new tab
-      if (data.url) {
+      if (data?.url) {
         window.open(data.url, '_blank');
+      } else {
+        toast.error('Não foi possível iniciar o checkout.');
       }
     } catch (error) {
       console.error('Error creating checkout:', error);
@@ -176,15 +190,26 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      // Ensure we have a valid access token
+      let { data: sessionData } = await supabase.auth.getSession();
+      let accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        accessToken = refreshData.session?.access_token;
+      }
+      if (!accessToken) {
+        toast.error('Sessão expirada. Entre novamente.');
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('customer-portal', {
         headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
       if (error) {
-        // If user doesn't have a Stripe customer yet, show helpful message
-        const errorMsg = error.message || '';
+        const errorMsg = (error as any).message || '';
         if (errorMsg.includes('No Stripe customer found')) {
           toast.error('Você ainda não tem uma assinatura. Por favor, escolha um plano primeiro.');
           return;

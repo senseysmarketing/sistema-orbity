@@ -41,7 +41,11 @@ export function PricingCards() {
 
   const handlePlanAction = async (plan: any) => {
     if (isCurrentPlan(plan.name)) {
-      await openCustomerPortal();
+      if (currentSubscription?.subscribed) {
+        await openCustomerPortal();
+      } else if (plan.stripe_price_id_monthly) {
+        await createCheckout(plan.stripe_price_id_monthly);
+      }
     } else if (plan.slug === 'free') {
       // Can't downgrade to free through Stripe - would need special handling
       return;
@@ -52,7 +56,7 @@ export function PricingCards() {
 
   const getButtonText = (plan: any) => {
     if (isCurrentPlan(plan.name)) {
-      return 'Gerenciar Plano';
+      return currentSubscription?.subscribed ? 'Gerenciar Plano' : 'Assinar Plano';
     } else if (plan.slug === 'free') {
       return currentSubscription?.subscribed ? 'Plano Atual' : 'Plano Gratuito';
     } else {
