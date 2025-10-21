@@ -177,17 +177,20 @@ export function PostKanban() {
       </div>
 
       <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {defaultColumns.map(column => (
-            <PostKanbanColumn
-              key={column.id}
-              id={column.id}
-              title={column.title}
-              color={column.color}
-              posts={getPostsByStatus(column.id)}
-              onPostClick={handlePostClick}
-            />
-          ))}
+        <div className="overflow-x-auto pb-4">
+          <div className="inline-flex gap-4 min-w-full">
+            {defaultColumns.map(column => (
+              <div key={column.id} className="w-80 flex-shrink-0">
+                <PostKanbanColumn
+                  id={column.id}
+                  title={column.title}
+                  color={column.color}
+                  posts={getPostsByStatus(column.id)}
+                  onPostClick={handlePostClick}
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
         <DragOverlay>
