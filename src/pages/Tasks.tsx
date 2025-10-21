@@ -274,22 +274,39 @@ export default function Tasks() {
   };
 
   const getUrgencyLevel = (task: Task) => {
-    const today = new Date();
-    const dueDate = task.due_date ? new Date(task.due_date) : null;
-
     if (task.status === 'done') {
       return { level: 'completed', label: 'Concluída', color: 'bg-green-500 text-white' };
     }
-    if (dueDate && dueDate < today) {
+
+    if (!task.due_date) {
+      return { level: 'normal', label: '', color: '' };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const dueDate = new Date(task.due_date);
+    dueDate.setHours(0, 0, 0, 0);
+
+    // Verifica se está atrasada (passou da data de vencimento)
+    if (dueDate < today) {
       return { level: 'overdue', label: 'Atrasada', color: 'bg-red-500 text-white' };
     }
-    if (task.priority === 'high') {
-      return { level: 'urgent', label: 'Urgente', color: 'bg-orange-500 text-white' };
+
+    // Verifica se vence hoje
+    if (dueDate.getTime() === today.getTime()) {
+      return { level: 'today', label: 'Hoje', color: 'bg-orange-500 text-white' };
     }
-    if (dueDate && dueDate.toDateString() === today.toDateString()) {
-      return { level: 'today', label: 'Hoje', color: 'bg-blue-500 text-white' };
+
+    // Verifica se vence esta semana (próximos 7 dias)
+    const nextWeek = new Date(today);
+    nextWeek.setDate(today.getDate() + 7);
+    
+    if (dueDate > today && dueDate <= nextWeek) {
+      return { level: 'this-week', label: 'Esta Semana', color: 'bg-blue-500 text-white' };
     }
-    return { level: 'normal', label: 'Normal', color: 'bg-gray-500 text-white' };
+
+    return { level: 'normal', label: '', color: '' };
   };
 
   const dateOnlyToISO = (dateStr: string) => {
