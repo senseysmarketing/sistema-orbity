@@ -1,65 +1,41 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { 
-  LayoutDashboard, CheckSquare, Users, Calendar, Plus, TrendingUp, AlertCircle, 
-  Target, BarChart3, Activity, Clock, DollarSign, Briefcase, Monitor, 
-  Palette, TrendingDown, Filter, Search, ArrowUpIcon, ArrowDownIcon,
-  Bell, Eye, Building, UserCheck, Timer, Zap, AlertTriangle, Award,
-  FileText, PlayCircle, PauseCircle, CheckCircleIcon, XCircle,
-  MessageSquare, Coffee, Star, Layers, Banknote, Wallet
+  LayoutDashboard, TrendingUp, Users, Calendar, Target,
+  MessageSquare, Monitor, FileText, Briefcase, BarChart3
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAgency } from '@/hooks/useAgency';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useTaskAssignments } from '@/hooks/useTaskAssignments';
-
-interface DashboardData {
-  tasks: any[];
-  personalTasks: any[];
-  clients: any[];
-  profiles: any[];
-  clientPayments: any[];
-  expenses: any[];
-  salaries: any[];
-}
+import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics';
+import { QuickActions } from '@/components/dashboard/QuickActions';
+import { RecentActivity } from '@/components/dashboard/RecentActivity';
+import { UpcomingTasks } from '@/components/dashboard/UpcomingTasks';
+import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
   const { profile } = useAuth();
   const { currentAgency } = useAgency();
   const { toast } = useToast();
-  const { assignments, fetchAssignments, getAssignedUsers } = useTaskAssignments();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [dateFilter, setDateFilter] = useState("week");
-  const [priorityFilter, setPriorityFilter] = useState("all");
-  const [clientFilter, setClientFilter] = useState("all");
-  const [data, setData] = useState<DashboardData>({
-    tasks: [],
-    personalTasks: [],
+  const [data, setData] = useState({
     clients: [],
-    profiles: [],
-    clientPayments: [],
-    expenses: [],
-    salaries: []
+    leads: [],
+    meetings: [],
+    tasks: [],
+    socialPosts: [],
+    contracts: [],
+    payments: [],
+    campaigns: [],
   });
 
   useEffect(() => {
     fetchDashboardData();
   }, [profile, currentAgency?.id]);
-
-  // Métricas calculadas com base nas atribuições
-  const myTasks = useMemo(() => {
-    return data.tasks.filter(task => {
-      const taskAssignments = assignments.filter(a => a.task_id === task.id);
-      return taskAssignments.some(a => a.user_id === profile?.user_id);
-    });
-  }, [data.tasks, assignments, profile?.user_id]);
 
   const fetchDashboardData = async () => {
     if (!profile || !currentAgency) {
@@ -70,77 +46,36 @@ const Index = () => {
     try {
       setLoading(true);
 
-      // Buscar dados comuns - filtrados por agência
-      const tasksPromise = supabase
-        .from('tasks')
-        .select('*')
-        .eq('agency_id', currentAgency.id)
-        .order('created_at', { ascending: false });
-
-      const clientsPromise = supabase
-        .from('clients')
-        .select('*')
-        .eq('agency_id', currentAgency.id);
-
-      const personalTasksPromise = supabase
-        .from('personal_tasks')
-        .select('*')
-        .eq('user_id', profile.user_id);
-
-      // Buscar apenas usuários da agência atual
-      const agencyUsersPromise = supabase
-        .from('agency_users')
-        .select('user_id')
-        .eq('agency_id', currentAgency.id);
-
-      // Aguardar tarefas, clientes, tarefas pessoais e usuários da agência
-      const [tasksResult, clientsResult, personalTasksResult, agencyUsersResult] = await Promise.all([
-        tasksPromise,
-        clientsPromise,
-        personalTasksPromise,
-        agencyUsersPromise
+      const [
+        clientsRes,
+        leadsRes,
+        meetingsRes,
+        tasksRes,
+        socialPostsRes,
+        contractsRes,
+        paymentsRes,
+        campaignsRes,
+      ] = await Promise.all([
+        supabase.from('clients').select('*').eq('agency_id', currentAgency.id),
+        supabase.from('leads').select('*').eq('agency_id', currentAgency.id),
+        supabase.from('meetings').select('*').eq('agency_id', currentAgency.id),
+        supabase.from('tasks').select('*, clients(name)').eq('agency_id', currentAgency.id),
+        supabase.from('social_media_posts').select('*').eq('agency_id', currentAgency.id),
+        supabase.from('contracts').select('*').eq('agency_id', currentAgency.id),
+        supabase.from('client_payments').select('*').eq('agency_id', currentAgency.id),
+        supabase.from('campaigns').select('*').eq('agency_id', currentAgency.id),
       ]);
 
-      // Buscar perfis dos usuários da agência
-      const userIds = agencyUsersResult.data?.map(au => au.user_id) || [];
-      let profilesData = [];
-      if (userIds.length > 0) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('user_id', userIds);
-        profilesData = data || [];
-      }
-
-      // Dados específicos para admin
-      let clientPaymentsData = [];
-      let expensesData = [];
-      let salariesData = [];
-
-      if (profile.role === 'agency_admin') {
-        const [paymentsResult, expensesResult, salariesResult] = await Promise.all([
-          supabase.from('client_payments').select('*').eq('agency_id', currentAgency.id),
-          supabase.from('expenses').select('*').eq('agency_id', currentAgency.id),
-          supabase.from('salaries').select('*').eq('agency_id', currentAgency.id)
-        ]);
-
-        clientPaymentsData = paymentsResult.data || [];
-        expensesData = expensesResult.data || [];
-        salariesData = salariesResult.data || [];
-      }
-
       setData({
-        tasks: tasksResult.data || [],
-        clients: clientsResult.data || [],
-        profiles: profilesData,
-        personalTasks: personalTasksResult.data || [],
-        clientPayments: clientPaymentsData,
-        expenses: expensesData,
-        salaries: salariesData
+        clients: clientsRes.data || [],
+        leads: leadsRes.data || [],
+        meetings: meetingsRes.data || [],
+        tasks: tasksRes.data || [],
+        socialPosts: socialPostsRes.data || [],
+        contracts: contractsRes.data || [],
+        payments: paymentsRes.data || [],
+        campaigns: campaignsRes.data || [],
       });
-
-      // Buscar atribuições de tarefas
-      await fetchAssignments();
 
     } catch (error: any) {
       toast({
@@ -153,963 +88,502 @@ const Index = () => {
     }
   };
 
-  // Métricas calculadas
   const metrics = useMemo(() => {
     const today = new Date();
-    const thisWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const thisMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
-    // Tarefas - usando sistema de múltiplas atribuições
-    const myTasks = data.tasks.filter(t => {
-      const taskAssignments = assignments.filter(a => a.task_id === t.id);
-      return taskAssignments.some(a => a.user_id === profile?.user_id);
-    });
-    const overdueTasks = myTasks.filter(t => {
-      const dueDate = t.due_date ? new Date(t.due_date) : null;
-      return dueDate && dueDate < today && t.status !== 'done';
-    });
-    const todayTasks = myTasks.filter(t => {
-      const dueDate = t.due_date ? new Date(t.due_date) : null;
-      return dueDate && dueDate.toDateString() === today.toDateString();
-    });
-    const weekTasks = myTasks.filter(t => {
-      const dueDate = t.due_date ? new Date(t.due_date) : null;
-      return dueDate && dueDate <= thisWeek && dueDate >= today;
-    });
-
-    // Tarefas pessoais
-    const overduePersonalTasks = data.personalTasks.filter(t => {
-      const dueDate = t.due_date ? new Date(t.due_date) : null;
-      return dueDate && dueDate < today && !t.completed;
-    });
+    const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
 
     // Clientes
-    const activeClients = data.clients.filter(c => c.active);
-    const monthlyRevenue = activeClients.reduce((sum, c) => sum + (c.monthly_value || 0), 0);
+    const activeClients = data.clients.filter((c: any) => c.active).length;
+    const monthlyRevenue = data.clients
+      .filter((c: any) => c.active)
+      .reduce((sum: number, c: any) => sum + (c.monthly_value || 0), 0);
 
-    // Pagamentos (apenas admin)
-    const overduePayments = data.clientPayments.filter(p => {
-      const dueDate = new Date(p.due_date);
-      return dueDate < today && p.status === 'pending';
-    });
-    const thisMonthPayments = data.clientPayments.filter(p => {
-      const dueDate = new Date(p.due_date);
-      return dueDate.getMonth() === today.getMonth() && dueDate.getFullYear() === today.getFullYear();
-    });
-    const paidThisMonth = thisMonthPayments.filter(p => p.status === 'paid');
-    const pendingThisMonth = thisMonthPayments.filter(p => p.status === 'pending');
+    // Leads
+    const totalLeads = data.leads.length;
+    const convertedLeads = data.leads.filter((l: any) => l.status === 'client').length;
 
-    // Gastos (apenas admin)
-    const thisMonthExpenses = data.expenses.filter(e => {
-      const dueDate = new Date(e.due_date);
-      return dueDate.getMonth() === today.getMonth() && dueDate.getFullYear() === today.getFullYear();
-    });
-    const totalExpenses = thisMonthExpenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    // Reuniões
+    const upcomingMeetings = data.meetings.filter((m: any) => {
+      const meetingDate = new Date(m.start_time);
+      return meetingDate >= today && m.status !== 'cancelled';
+    }).length;
+    const thisMonthMeetings = data.meetings.filter((m: any) => {
+      const meetingDate = new Date(m.start_time);
+      return meetingDate >= thisMonth && meetingDate < nextMonth;
+    }).length;
 
-    // Salários (apenas admin)
-    const thisMonthSalaries = data.salaries.filter(s => {
-      const dueDate = new Date(s.due_date);
-      return dueDate.getMonth() === today.getMonth() && dueDate.getFullYear() === today.getFullYear();
-    });
-    const totalSalaries = thisMonthSalaries.reduce((sum, s) => sum + parseFloat(s.amount), 0);
+    // Tarefas
+    const totalTasks = data.tasks.length;
+    const completedTasks = data.tasks.filter((t: any) => t.status === 'done').length;
+    const overdueTasks = data.tasks.filter((t: any) => {
+      const dueDate = t.due_date ? new Date(t.due_date) : null;
+      return dueDate && dueDate < today && t.status !== 'done';
+    }).length;
 
-    // Performance
-    const completedTasks = myTasks.filter(t => t.status === 'done').length;
-    const taskCompletionRate = myTasks.length > 0 ? Math.round((completedTasks / myTasks.length) * 100) : 0;
+    // Social Media
+    const totalSocialPosts = data.socialPosts.length;
+    const publishedPosts = data.socialPosts.filter((p: any) => p.status === 'published').length;
 
-    const completedPersonalTasks = data.personalTasks.filter(t => t.completed).length;
-    const personalTaskCompletionRate = data.personalTasks.length > 0 ? 
-      Math.round((completedPersonalTasks / data.personalTasks.length) * 100) : 0;
+    // Investimento em ads (estimado pelos contratos)
+    const adSpend = data.campaigns
+      .filter((c: any) => c.status === 'active')
+      .reduce((sum: number, c: any) => sum + (c.budget || 0), 0);
 
     return {
-      // Tarefas
-      totalTasks: myTasks.length,
-      overdueTasks: overdueTasks.length,
-      todayTasks: todayTasks.length,
-      weekTasks: weekTasks.length,
-      taskCompletionRate,
-      
-      // Tarefas pessoais
-      totalPersonalTasks: data.personalTasks.length,
-      overduePersonalTasks: overduePersonalTasks.length,
-      personalTaskCompletionRate,
-      
-      // Clientes
       totalClients: data.clients.length,
-      activeClients: activeClients.length,
+      activeClients,
+      totalLeads,
+      convertedLeads,
+      totalMeetings: thisMonthMeetings,
+      upcomingMeetings,
+      totalTasks,
+      completedTasks,
+      overdueTasks,
+      totalSocialPosts,
+      publishedPosts,
       monthlyRevenue,
-      
-      // Financeiro (admin)
-      overduePayments: overduePayments.length,
-      thisMonthPayments: thisMonthPayments.length,
-      paidThisMonth: paidThisMonth.length,
-      pendingThisMonth: pendingThisMonth.length,
-      totalExpenses,
-      totalSalaries,
-      
-      // Alertas
-      totalAlerts: overdueTasks.length + overduePersonalTasks.length + overduePayments.length
+      adSpend,
     };
-  }, [data, profile]);
+  }, [data]);
+
+  // Atividades recentes
+  const recentActivities = useMemo(() => {
+    const activities = [];
+
+    // Tarefas concluídas recentemente
+    const recentCompletedTasks = data.tasks
+      .filter((t: any) => t.status === 'done')
+      .slice(0, 3)
+      .map((t: any) => ({
+        id: `task-${t.id}`,
+        type: 'task' as const,
+        title: t.title,
+        description: `Tarefa concluída${t.clients?.name ? ` - ${t.clients.name}` : ''}`,
+        timestamp: t.updated_at,
+      }));
+
+    // Reuniões recentes
+    const recentMeetings = data.meetings
+      .filter((m: any) => m.status === 'completed')
+      .slice(0, 3)
+      .map((m: any) => ({
+        id: `meeting-${m.id}`,
+        type: 'meeting' as const,
+        title: m.title,
+        description: `Reunião realizada`,
+        timestamp: m.start_time,
+      }));
+
+    // Posts publicados
+    const recentPosts = data.socialPosts
+      .filter((p: any) => p.status === 'published')
+      .slice(0, 2)
+      .map((p: any) => ({
+        id: `post-${p.id}`,
+        type: 'post' as const,
+        title: p.content?.substring(0, 50) || 'Post publicado',
+        description: `Publicado em ${p.platform}`,
+        timestamp: p.published_at || p.created_at,
+      }));
+
+    // Novos leads
+    const recentLeads = data.leads
+      .slice(0, 2)
+      .map((l: any) => ({
+        id: `lead-${l.id}`,
+        type: 'lead' as const,
+        title: l.name,
+        description: `Novo lead - ${l.status}`,
+        timestamp: l.created_at,
+      }));
+
+    // Contratos criados
+    const recentContracts = data.contracts
+      .slice(0, 2)
+      .map((c: any) => ({
+        id: `contract-${c.id}`,
+        type: 'contract' as const,
+        title: c.client_name,
+        description: `Contrato criado`,
+        timestamp: c.created_at,
+      }));
+
+    return [...recentCompletedTasks, ...recentMeetings, ...recentPosts, ...recentLeads, ...recentContracts]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 8);
+  }, [data]);
+
+  // Próximas tarefas
+  const upcomingTasks = useMemo(() => {
+    const today = new Date();
+    return data.tasks
+      .filter((t: any) => {
+        const dueDate = t.due_date ? new Date(t.due_date) : null;
+        return t.status !== 'done' && dueDate;
+      })
+      .sort((a: any, b: any) => {
+        const dateA = new Date(a.due_date);
+        const dateB = new Date(b.due_date);
+        return dateA.getTime() - dateB.getTime();
+      })
+      .map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        due_date: t.due_date,
+        priority: t.priority || 'medium',
+        status: t.status,
+        client_name: t.clients?.name,
+      }));
+  }, [data]);
 
   const getRoleGreeting = () => {
     if (!profile) return "Bem-vindo";
+    const firstName = profile.name.split(' ')[0];
     switch (profile.role) {
       case 'agency_admin':
-        return `Bem-vindo, ${profile.name.split(' ')[0]}! 👑`;
+        return `Olá, ${firstName}! 👋`;
       case 'agency_user':
-        return `Bem-vindo, ${profile.name.split(' ')[0]}! 📊`;
+        return `Olá, ${firstName}! 👋`;
       case 'super_admin':
-        return `Bem-vindo, ${profile.name.split(' ')[0]}! 🚀`;
+        return `Olá, ${firstName}! 🚀`;
       default:
-        return `Bem-vindo, ${profile.name.split(' ')[0]}!`;
+        return `Olá, ${firstName}!`;
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
+  const getRoleSubtitle = () => {
+    if (!profile) return "";
+    switch (profile.role) {
+      case 'agency_admin':
+        return "Visão geral completa da sua agência";
+      case 'agency_user':
+        return "Suas tarefas e atividades do dia";
+      default:
+        return "Dashboard principal";
+    }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center h-[calc(100vh-200px)]">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  // Dashboard do Administrador
-  if (profile?.role === 'agency_admin') {
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {getRoleGreeting()}
-            </h1>
-            <p className="text-muted-foreground">
-              Visão geral completa da agência e métricas administrativas
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="week">Esta semana</SelectItem>
-                <SelectItem value="month">Este mês</SelectItem>
-                <SelectItem value="quarter">Trimestre</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="financial">Financeiro</TabsTrigger>
-            <TabsTrigger value="tasks">Tarefas</TabsTrigger>
-            <TabsTrigger value="clients">Clientes</TabsTrigger>
-            <TabsTrigger value="team">Equipe</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-4">
-            {/* KPIs Principais */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Receita Mensal</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{formatCurrency(metrics.monthlyRevenue)}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {metrics.activeClients} clientes ativos
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pagamentos Pendentes</CardTitle>
-                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">{metrics.pendingThisMonth}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {metrics.overduePayments} em atraso
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Tarefas Críticas</CardTitle>
-                  <AlertCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-orange-600">{metrics.overdueTasks}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {metrics.todayTasks} para hoje
-                  </p>
-                </CardContent>
-              </Card>
-
-            </div>
-
-            {/* Gráficos e Métricas */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    Performance da Equipe
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Taxa de Conclusão - Tarefas</span>
-                      <span>{metrics.taskCompletionRate}%</span>
-                    </div>
-                    <Progress value={metrics.taskCompletionRate} className="h-2" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Pagamentos Recebidos</span>
-                      <span>{metrics.thisMonthPayments > 0 ? Math.round((metrics.paidThisMonth / metrics.thisMonthPayments) * 100) : 0}%</span>
-                    </div>
-                    <Progress value={metrics.thisMonthPayments > 0 ? (metrics.paidThisMonth / metrics.thisMonthPayments) * 100 : 0} className="h-2" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5" />
-                    Resumo Financeiro
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Receita Prevista</span>
-                    <span className="font-medium text-green-600">{formatCurrency(metrics.monthlyRevenue)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Gastos Mensais</span>
-                    <span className="font-medium text-red-600">{formatCurrency(metrics.totalExpenses)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Salários</span>
-                    <span className="font-medium text-blue-600">{formatCurrency(metrics.totalSalaries)}</span>
-                  </div>
-                  <div className="border-t pt-2">
-                    <div className="flex justify-between items-center font-semibold">
-                      <span>Lucro Estimado</span>
-                      <span className={metrics.monthlyRevenue - metrics.totalExpenses - metrics.totalSalaries >= 0 ? 'text-green-600' : 'text-red-600'}>
-                        {formatCurrency(metrics.monthlyRevenue - metrics.totalExpenses - metrics.totalSalaries)}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Alertas e Ações */}
-            {metrics.totalAlerts > 0 && (
-              <Card className="border-red-200 bg-red-50 dark:bg-red-950 dark:border-red-800">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-300">
-                    <Bell className="h-5 w-5" />
-                    Alertas Importantes ({metrics.totalAlerts})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {metrics.overdueTasks > 0 && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <AlertCircle className="h-4 w-4 text-red-500" />
-                      <span>{metrics.overdueTasks} tarefas em atraso</span>
-                    </div>
-                  )}
-                  {metrics.overduePayments > 0 && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <DollarSign className="h-4 w-4 text-red-500" />
-                      <span>{metrics.overduePayments} pagamentos em atraso</span>
-                    </div>
-                  )}
-                  {metrics.overduePersonalTasks > 0 && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <CheckSquare className="h-4 w-4 text-red-500" />
-                      <span>{metrics.overduePersonalTasks} tarefas pessoais atrasadas</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="financial" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Banknote className="h-5 w-5" />
-                    Recebimentos
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{metrics.paidThisMonth}</div>
-                  <p className="text-xs text-muted-foreground">Pagamentos recebidos este mês</p>
-                  <div className="mt-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Pendentes:</span>
-                      <span className="text-orange-600">{metrics.pendingThisMonth}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Em atraso:</span>
-                      <span className="text-red-600">{metrics.overduePayments}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Wallet className="h-5 w-5" />
-                    Gastos
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">{formatCurrency(metrics.totalExpenses)}</div>
-                  <p className="text-xs text-muted-foreground">Despesas deste mês</p>
-                  <div className="mt-4">
-                    <div className="flex justify-between text-sm">
-                      <span>Salários:</span>
-                      <span>{formatCurrency(metrics.totalSalaries)}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5" />
-                    Margem
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className={`text-2xl font-bold ${metrics.monthlyRevenue - metrics.totalExpenses - metrics.totalSalaries >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(metrics.monthlyRevenue - metrics.totalExpenses - metrics.totalSalaries)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Lucro líquido estimado</p>
-                  <div className="mt-4">
-                    <div className="flex justify-between text-sm">
-                      <span>Margem:</span>
-                      <span>{metrics.monthlyRevenue > 0 ? Math.round(((metrics.monthlyRevenue - metrics.totalExpenses - metrics.totalSalaries) / metrics.monthlyRevenue) * 100) : 0}%</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="tasks" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Total</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{metrics.totalTasks}</div>
-                  <p className="text-xs text-muted-foreground">Tarefas atribuídas</p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Para Hoje</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{metrics.todayTasks}</div>
-                  <p className="text-xs text-muted-foreground">Vencimento hoje</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Esta Semana</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-orange-600">{metrics.weekTasks}</div>
-                  <p className="text-xs text-muted-foreground">Próximos 7 dias</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Atrasadas</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-red-600">{metrics.overdueTasks}</div>
-                  <p className="text-xs text-muted-foreground">Precisam atenção</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Performance da Equipe</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {data.profiles.map((member) => {
-                    const memberTasks = data.tasks.filter(task => {
-                      const taskAssignments = assignments.filter(a => a.task_id === task.id);
-                      return taskAssignments.some(a => a.user_id === member.user_id);
-                    });
-                    const completedTasks = memberTasks.filter(t => t.status === 'done').length;
-                    const completionRate = memberTasks.length > 0 ? Math.round((completedTasks / memberTasks.length) * 100) : 0;
-                    
-                    return (
-                      <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                            <span className="text-sm font-semibold">{member.name.charAt(0)}</span>
-                          </div>
-                          <div>
-                            <p className="font-medium">{member.name}</p>
-                            <p className="text-sm text-muted-foreground">{member.role}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold">{completedTasks}/{memberTasks.length}</p>
-                          <p className="text-sm text-muted-foreground">{completionRate}% conclusão</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="clients" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Clientes Ativos
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{metrics.activeClients}</div>
-                  <p className="text-xs text-muted-foreground">De {metrics.totalClients} cadastrados</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5" />
-                    Receita Mensal
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{formatCurrency(metrics.monthlyRevenue)}</div>
-                  <p className="text-xs text-muted-foreground">Valor total contratado</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5" />
-                    Ticket Médio
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{formatCurrency(metrics.activeClients > 0 ? metrics.monthlyRevenue / metrics.activeClients : 0)}</div>
-                  <p className="text-xs text-muted-foreground">Por cliente ativo</p>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="team" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              {data.profiles.map((member) => {
-                const memberTasks = data.tasks.filter(task => {
-                  const taskAssignments = assignments.filter(a => a.task_id === task.id);
-                  return taskAssignments.some(a => a.user_id === member.user_id);
-                });
-                const completedTasks = memberTasks.filter(t => t.status === 'done').length;
-                const overdueTasks = memberTasks.filter(t => {
-                  const dueDate = t.due_date ? new Date(t.due_date) : null;
-                  return dueDate && dueDate < new Date() && t.status !== 'done';
-                }).length;
-
-                return (
-                  <Card key={member.id}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-semibold">{member.name.charAt(0)}</span>
-                        </div>
-                        <div>
-                          <p className="text-base">{member.name}</p>
-                          <p className="text-sm text-muted-foreground">{member.role}</p>
-                        </div>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex justify-between text-sm">
-                        <span>Tarefas Total:</span>
-                        <span className="font-medium">{memberTasks.length}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Concluídas:</span>
-                        <span className="font-medium text-green-600">{completedTasks}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Em Atraso:</span>
-                        <span className="font-medium text-red-600">{overdueTasks}</span>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-sm">
-                          <span>Performance:</span>
-                          <span>{memberTasks.length > 0 ? Math.round((completedTasks / memberTasks.length) * 100) : 0}%</span>
-                        </div>
-                        <Progress value={memberTasks.length > 0 ? (completedTasks / memberTasks.length) * 100 : 0} className="h-2" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    );
-  }
-
-  // Dashboard do Gestor de Tráfego
-  if (profile?.role === 'agency_user') {
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              {getRoleGreeting()}
-            </h1>
-            <p className="text-muted-foreground">
-              Gestão de campanhas, tráfego pago e performance digital
-            </p>
-          </div>
-        </div>
-
-        <Tabs defaultValue="campaigns" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="campaigns">Campanhas</TabsTrigger>
-            <TabsTrigger value="tasks">Minhas Tarefas</TabsTrigger>
-            <TabsTrigger value="personal">Tarefas Pessoais</TabsTrigger>
-            <TabsTrigger value="performance">Performance</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="campaigns" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Clientes Ativos</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{metrics.activeClients}</div>
-                  <p className="text-xs text-muted-foreground">Total de clientes ativos</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Minhas Tarefas</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{metrics.totalTasks}</div>
-                  <p className="text-xs text-muted-foreground">{metrics.overdueTasks} atrasadas</p>
-                </CardContent>
-              </Card>
-            </div>
-
-          </TabsContent>
-
-          <TabsContent value="tasks" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Total</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{metrics.totalTasks}</div>
-                  <p className="text-xs text-muted-foreground">Tarefas atribuídas</p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Para Hoje</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{metrics.todayTasks}</div>
-                  <p className="text-xs text-muted-foreground">Vencimento hoje</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Esta Semana</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-orange-600">{metrics.weekTasks}</div>
-                  <p className="text-xs text-muted-foreground">Próximos 7 dias</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Performance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{metrics.taskCompletionRate}%</div>
-                  <p className="text-xs text-muted-foreground">Taxa de conclusão</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Progresso das Tarefas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Conclusão Geral</span>
-                    <span>{metrics.taskCompletionRate}%</span>
-                  </div>
-                  <Progress value={metrics.taskCompletionRate} className="h-3" />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="personal" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Total</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{metrics.totalPersonalTasks}</div>
-                  <p className="text-xs text-muted-foreground">Tarefas pessoais</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Concluídas</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">{data.personalTasks.filter(t => t.completed).length}</div>
-                  <p className="text-xs text-muted-foreground">Finalizadas</p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Performance</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">{metrics.personalTaskCompletionRate}%</div>
-                  <p className="text-xs text-muted-foreground">Taxa de conclusão</p>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="performance" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Resumo de Performance</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Tarefas Profissionais</span>
-                      <span>{metrics.taskCompletionRate}%</span>
-                    </div>
-                    <Progress value={metrics.taskCompletionRate} className="h-2" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Tarefas Pessoais</span>
-                      <span>{metrics.personalTaskCompletionRate}%</span>
-                    </div>
-                    <Progress value={metrics.personalTaskCompletionRate} className="h-2" />
-                  </div>
-                </CardContent>
-              </Card>
-
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    );
-  }
-
-  // Dashboard do Usuário
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <LayoutDashboard className="h-8 w-8 text-primary" />
             {getRoleGreeting()}
           </h1>
-          <p className="text-muted-foreground">
-            Suas criações, projetos e tarefas de design
+          <p className="text-muted-foreground mt-1">
+            {getRoleSubtitle()}
           </p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm text-muted-foreground">Agência</p>
+          <p className="font-semibold">{currentAgency?.name || 'Carregando...'}</p>
         </div>
       </div>
 
+      {/* Métricas Principais */}
+      <DashboardMetrics metrics={metrics} />
+
+      {/* Conteúdo por Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-          <TabsTrigger value="tasks">Minhas Tarefas</TabsTrigger>
-          <TabsTrigger value="personal">Tarefas Pessoais</TabsTrigger>
+          <TabsTrigger value="tasks">Tarefas</TabsTrigger>
+          <TabsTrigger value="crm">CRM</TabsTrigger>
+          <TabsTrigger value="social">Social</TabsTrigger>
+          <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
 
+        {/* Visão Geral */}
         <TabsContent value="overview" className="space-y-4">
-          {/* Métricas Principais */}
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <QuickActions />
+            <RecentActivity activities={recentActivities} />
+          </div>
+          
+          <UpcomingTasks tasks={upcomingTasks} />
+        </TabsContent>
+
+        {/* Tarefas */}
+        <TabsContent value="tasks" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Projetos Ativos</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total de Tarefas</CardTitle>
+                <Briefcase className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{metrics.totalTasks}</div>
-                <p className="text-xs text-muted-foreground">Tarefas atribuídas</p>
+                <p className="text-xs text-muted-foreground">
+                  {metrics.completedTasks} concluídas
+                </p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Para Hoje</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Tarefas Atrasadas</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{metrics.todayTasks}</div>
-                <p className="text-xs text-muted-foreground">Entregas hoje</p>
+                <div className="text-2xl font-bold text-red-600">{metrics.overdueTasks}</div>
+                <p className="text-xs text-muted-foreground">
+                  Requerem atenção imediata
+                </p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Esta Semana</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Taxa de Conclusão</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{metrics.weekTasks}</div>
-                <p className="text-xs text-muted-foreground">Próximos 7 dias</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Performance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{metrics.taskCompletionRate}%</div>
-                <p className="text-xs text-muted-foreground">Taxa de conclusão</p>
+                <div className="text-2xl font-bold text-green-600">
+                  {metrics.totalTasks > 0 ? Math.round((metrics.completedTasks / metrics.totalTasks) * 100) : 0}%
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Performance da equipe
+                </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Progresso e Produtividade */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Palette className="h-5 w-5" />
-                  Progresso dos Projetos
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Projetos Concluídos</span>
-                    <span>{metrics.taskCompletionRate}%</span>
-                  </div>
-                  <Progress value={metrics.taskCompletionRate} className="h-3" />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Tarefas Pessoais</span>
-                    <span>{metrics.personalTaskCompletionRate}%</span>
-                  </div>
-                  <Progress value={metrics.personalTaskCompletionRate} className="h-3" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Métricas de Produtividade
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Projetos Concluídos</span>
-                  <span className="font-medium text-green-600">{myTasks.filter(t => t.status === 'done').length}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Em Andamento</span>
-                  <span className="font-medium text-blue-600">{myTasks.filter(t => t.status === 'in_progress').length}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Aguardando Revisão</span>
-                  <span className="font-medium text-orange-600">{myTasks.filter(t => t.status === 'em_revisao').length}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Em Atraso</span>
-                  <span className="font-medium text-red-600">{metrics.overdueTasks}</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Alertas específicos do usuário */}
-          {(metrics.overdueTasks > 0 || metrics.todayTasks > 0) && (
-            <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950 dark:border-orange-800">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
-                  <Clock className="h-5 w-5" />
-                  Deadlines Importantes
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {metrics.todayTasks > 0 && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Timer className="h-4 w-4 text-orange-500" />
-                    <span>{metrics.todayTasks} projetos com entrega hoje</span>
-                  </div>
-                )}
-                {metrics.overdueTasks > 0 && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                    <span>{metrics.overdueTasks} projetos em atraso</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="tasks" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">A Fazer</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{myTasks.filter(t => t.status === 'todo').length}</div>
-                <p className="text-xs text-muted-foreground">Projetos novos</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Em Andamento</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{myTasks.filter(t => t.status === 'in_progress').length}</div>
-                <p className="text-xs text-muted-foreground">Em desenvolvimento</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Em Revisão</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{myTasks.filter(t => t.status === 'em_revisao').length}</div>
-                <p className="text-xs text-muted-foreground">Aguardando aprovação</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Concluídas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{myTasks.filter(t => t.status === 'done').length}</div>
-                <p className="text-xs text-muted-foreground">Entregues</p>
-              </CardContent>
-            </Card>
+          <UpcomingTasks tasks={upcomingTasks} />
+          
+          <div className="flex justify-end">
+            <Button onClick={() => navigate('/tasks')}>
+              Ver Todas as Tarefas
+            </Button>
           </div>
         </TabsContent>
 
-        <TabsContent value="personal" className="space-y-4">
+        {/* CRM */}
+        <TabsContent value="crm" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Total</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
+                <Target className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{metrics.totalPersonalTasks}</div>
-                <p className="text-xs text-muted-foreground">Tarefas pessoais</p>
+                <div className="text-2xl font-bold">{metrics.totalLeads}</div>
+                <p className="text-xs text-muted-foreground">
+                  {metrics.convertedLeads} convertidos
+                </p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Concluídas</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Taxa de Conversão</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{data.personalTasks.filter(t => t.completed).length}</div>
-                <p className="text-xs text-muted-foreground">Finalizadas</p>
+                <div className="text-2xl font-bold text-green-600">
+                  {metrics.totalLeads > 0 ? Math.round((metrics.convertedLeads / metrics.totalLeads) * 100) : 0}%
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Lead para cliente
+                </p>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Performance</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Reuniões Agendadas</CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{metrics.personalTaskCompletionRate}%</div>
-                <p className="text-xs text-muted-foreground">Taxa de conclusão</p>
+                <div className="text-2xl font-bold text-blue-600">{metrics.upcomingMeetings}</div>
+                <p className="text-xs text-muted-foreground">
+                  {metrics.totalMeetings} no mês
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => navigate('/crm')}>
+              Acessar CRM
+            </Button>
+            <Button onClick={() => navigate('/agenda')}>
+              Ver Agenda
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* Social Media */}
+        <TabsContent value="social" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Posts Criados</CardTitle>
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{metrics.totalSocialPosts}</div>
+                <p className="text-xs text-muted-foreground">
+                  Total de conteúdos
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Posts Publicados</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{metrics.publishedPosts}</div>
+                <p className="text-xs text-muted-foreground">
+                  {metrics.totalSocialPosts > 0 ? Math.round((metrics.publishedPosts / metrics.totalSocialPosts) * 100) : 0}% do planejado
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Taxa de Publicação</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">
+                  {metrics.totalSocialPosts > 0 ? Math.round((metrics.publishedPosts / metrics.totalSocialPosts) * 100) : 0}%
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Performance de entrega
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="flex justify-end">
+            <Button onClick={() => navigate('/social-media')}>
+              Acessar Social Media
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* Performance */}
+        <TabsContent value="performance" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{metrics.activeClients}</div>
+                <p className="text-xs text-muted-foreground">
+                  De {metrics.totalClients} total
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Contratos Ativos</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{data.contracts.filter((c: any) => c.status === 'active').length}</div>
+                <p className="text-xs text-muted-foreground">
+                  {data.contracts.length} total
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Campanhas Ativas</CardTitle>
+                <Monitor className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{data.campaigns.filter((c: any) => c.status === 'active').length}</div>
+                <p className="text-xs text-muted-foreground">
+                  Tráfego pago rodando
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Receita Mensal</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  {new Intl.NumberFormat('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                    minimumFractionDigits: 0,
+                  }).format(metrics.monthlyRevenue)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Contratos recorrentes
+                </p>
               </CardContent>
             </Card>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Organização Pessoal</CardTitle>
+              <CardTitle>Resumo de Performance</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Progresso Geral</span>
-                  <span>{metrics.personalTaskCompletionRate}%</span>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Produtividade</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span>Tarefas concluídas</span>
+                      <span>{metrics.completedTasks}/{metrics.totalTasks}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Posts publicados</span>
+                      <span>{metrics.publishedPosts}/{metrics.totalSocialPosts}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Leads convertidos</span>
+                      <span>{metrics.convertedLeads}/{metrics.totalLeads}</span>
+                    </div>
+                  </div>
                 </div>
-                <Progress value={metrics.personalTaskCompletionRate} className="h-3" />
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Eficiência</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span>Taxa de conclusão de tarefas</span>
+                      <span className="text-green-600 font-medium">
+                        {metrics.totalTasks > 0 ? Math.round((metrics.completedTasks / metrics.totalTasks) * 100) : 0}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Taxa de conversão CRM</span>
+                      <span className="text-green-600 font-medium">
+                        {metrics.totalLeads > 0 ? Math.round((metrics.convertedLeads / metrics.totalLeads) * 100) : 0}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Taxa de publicação</span>
+                      <span className="text-green-600 font-medium">
+                        {metrics.totalSocialPosts > 0 ? Math.round((metrics.publishedPosts / metrics.totalSocialPosts) * 100) : 0}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
