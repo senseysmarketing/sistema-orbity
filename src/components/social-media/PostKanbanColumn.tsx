@@ -10,9 +10,10 @@ interface PostKanbanColumnProps {
   title: string;
   color: string;
   posts: SocialMediaPost[];
+  onPostClick?: (post: SocialMediaPost) => void;
 }
 
-export function PostKanbanColumn({ id, title, color, posts }: PostKanbanColumnProps) {
+export function PostKanbanColumn({ id, title, color, posts, onPostClick }: PostKanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -34,7 +35,7 @@ export function PostKanbanColumn({ id, title, color, posts }: PostKanbanColumnPr
             />
           ) : (
             posts.map(post => (
-              <SortablePostCard key={post.id} post={post} />
+              <SortablePostCard key={post.id} post={post} onClick={onPostClick} />
             ))
           )}
         </SortableContext>

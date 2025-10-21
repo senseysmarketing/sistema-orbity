@@ -5,9 +5,10 @@ import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 
 interface SortablePostCardProps {
   post: SocialMediaPost;
+  onClick?: (post: SocialMediaPost) => void;
 }
 
-export function SortablePostCard({ post }: SortablePostCardProps) {
+export function SortablePostCard({ post, onClick }: SortablePostCardProps) {
   const {
     attributes,
     listeners,
@@ -25,7 +26,7 @@ export function SortablePostCard({ post }: SortablePostCardProps) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <PostCard post={post} />
+      <PostCard post={post} onClick={() => onClick?.(post)} />
     </div>
   );
 }

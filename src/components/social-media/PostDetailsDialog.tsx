@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, User, Hash, Building2, Target } from "lucide-react";
+import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History } from "lucide-react";
 import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState } from "react";
@@ -173,6 +173,31 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete }
                 </div>
               )}
             </div>
+
+            {/* Histórico de Movimentações */}
+            {post.approval_history && Array.isArray(post.approval_history) && post.approval_history.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <History className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">Histórico de Movimentações</p>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {post.approval_history.map((entry: any, index: number) => (
+                      <div key={index} className="flex items-start gap-2 p-2 rounded-md bg-muted/50">
+                        <div className="flex-1">
+                          <p className="text-sm">{entry.action || `Status: ${entry.status}`}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(entry.timestamp), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <DialogFooter className="gap-2">
