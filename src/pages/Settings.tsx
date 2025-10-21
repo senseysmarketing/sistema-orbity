@@ -15,8 +15,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { PricingCards } from "@/components/subscription/PricingCards";
-import { SubscriptionStatus } from "@/components/subscription/SubscriptionStatus";
-import { PaymentStatusCard } from "@/components/payment/PaymentStatusCard";
+import { SubscriptionDetails } from "@/components/subscription/SubscriptionDetails";
+import { BillingHistory } from "@/components/subscription/BillingHistory";
 import { UsersManagement } from "@/components/admin/UsersManagement";
 
 export default function Settings() {
@@ -219,29 +219,23 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="subscription" className="space-y-4">
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                <CreditCard className="h-6 w-6" />
-                Gerenciar Assinatura
-              </h2>
-              <p className="text-muted-foreground">
-                Visualize e gerencie seu plano de assinatura atual
-              </p>
-            </div>
+        <TabsContent value="subscription" className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+              <CreditCard className="h-6 w-6" />
+              Gerenciar Assinatura
+            </h2>
+            <p className="text-muted-foreground">
+              Visualize e gerencie seu plano de assinatura atual
+            </p>
+          </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <SubscriptionStatus />
-              </div>
-              <div className="space-y-4">
-                <PaymentStatusCard />
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <SubscriptionDetails />
+              <BillingHistory />
             </div>
-
             <div>
-              <h3 className="text-lg font-semibold mb-4">Planos Disponíveis</h3>
               <PricingCards />
             </div>
           </div>
