@@ -1578,6 +1578,60 @@ export type Database = {
           },
         ]
       }
+      social_media_approval_rules: {
+        Row: {
+          agency_id: string
+          approvers: Json | null
+          created_at: string
+          from_status: string
+          id: string
+          is_active: boolean
+          name: string
+          requires_approval: boolean
+          to_status: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          approvers?: Json | null
+          created_at?: string
+          from_status: string
+          id?: string
+          is_active?: boolean
+          name: string
+          requires_approval?: boolean
+          to_status: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          approvers?: Json | null
+          created_at?: string
+          from_status?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          requires_approval?: boolean
+          to_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_approval_rules_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_approval_rules_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       social_media_assignments: {
         Row: {
           assigned_at: string | null
@@ -1616,6 +1670,111 @@ export type Database = {
           },
         ]
       }
+      social_media_content_types: {
+        Row: {
+          agency_id: string
+          created_at: string
+          icon: string | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_content_types_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_content_types_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      social_media_custom_statuses: {
+        Row: {
+          agency_id: string
+          color: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_default: boolean
+          name: string
+          order_position: number
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name: string
+          order_position?: number
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          color?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name?: string
+          order_position?: number
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_custom_statuses_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_custom_statuses_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       social_media_notifications: {
         Row: {
           created_at: string | null
@@ -1651,6 +1810,117 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "social_media_posts"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_media_platforms: {
+        Row: {
+          agency_id: string
+          created_at: string
+          icon: string | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_platforms_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_platforms_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      social_media_post_templates: {
+        Row: {
+          agency_id: string
+          content_template: string | null
+          created_at: string
+          description: string | null
+          hashtags: string[] | null
+          id: string
+          is_active: boolean
+          mentions: string[] | null
+          name: string
+          platform: string
+          post_type: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          content_template?: string | null
+          created_at?: string
+          description?: string | null
+          hashtags?: string[] | null
+          id?: string
+          is_active?: boolean
+          mentions?: string[] | null
+          name: string
+          platform: string
+          post_type: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          content_template?: string | null
+          created_at?: string
+          description?: string | null
+          hashtags?: string[] | null
+          id?: string
+          is_active?: boolean
+          mentions?: string[] | null
+          name?: string
+          platform?: string
+          post_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_post_templates_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_post_templates_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
           },
         ]
       }
@@ -1742,6 +2012,64 @@ export type Database = {
           },
           {
             foreignKeyName: "social_media_posts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_media_schedule_preferences: {
+        Row: {
+          agency_id: string
+          client_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          platform: string
+          preferred_times: Json
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          platform: string
+          preferred_times?: Json
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          platform?: string
+          preferred_times?: Json
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_schedule_preferences_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_schedule_preferences_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "social_media_schedule_preferences_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"

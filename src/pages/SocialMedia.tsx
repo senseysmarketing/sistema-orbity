@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, LayoutGrid, BarChart3, FolderOpen, Target, Settings } from "lucide-react";
+import { Calendar, LayoutGrid, BarChart3, Settings } from "lucide-react";
 import { SocialMediaCalendar } from "@/components/social-media/SocialMediaCalendar";
 import { PostKanban } from "@/components/social-media/PostKanban";
 import { SocialMediaDashboard } from "@/components/social-media/SocialMediaDashboard";
-import { ContentLibrary } from "@/components/social-media/ContentLibrary";
-import { CampaignsManager } from "@/components/social-media/CampaignsManager";
 import { SocialMediaSettings } from "@/components/social-media/SocialMediaSettings";
 
 export default function SocialMedia() {
@@ -21,7 +19,7 @@ export default function SocialMedia() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
           <TabsTrigger value="calendar" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             <span className="hidden sm:inline">Calendário</span>
@@ -34,17 +32,9 @@ export default function SocialMedia() {
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Dashboard</span>
           </TabsTrigger>
-          <TabsTrigger value="library" className="flex items-center gap-2">
-            <FolderOpen className="h-4 w-4" />
-            <span className="hidden sm:inline">Biblioteca</span>
-          </TabsTrigger>
-          <TabsTrigger value="campaigns" className="flex items-center gap-2">
-            <Target className="h-4 w-4" />
-            <span className="hidden sm:inline">Campanhas</span>
-          </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Config</span>
+            <span className="hidden sm:inline">Configurações</span>
           </TabsTrigger>
         </TabsList>
 
@@ -58,14 +48,6 @@ export default function SocialMedia() {
 
         <TabsContent value="dashboard" className="space-y-4">
           <SocialMediaDashboard />
-        </TabsContent>
-
-        <TabsContent value="library" className="space-y-4">
-          <ContentLibrary />
-        </TabsContent>
-
-        <TabsContent value="campaigns" className="space-y-4">
-          <CampaignsManager />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
