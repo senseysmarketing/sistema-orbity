@@ -3,9 +3,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
-import { useSocialMediaPosts } from "@/hooks/useSocialMediaPosts";
+import { useSocialMediaPosts, SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 import { PostFormDialog } from "./PostFormDialog";
 import { PostCard } from "./PostCard";
+import { PostDetailsDialog } from "./PostDetailsDialog";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -13,7 +14,10 @@ export function SocialMediaCalendar() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const { posts, loading } = useSocialMediaPosts();
+  const [selectedPost, setSelectedPost] = useState<SocialMediaPost | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<SocialMediaPost | null>(null);
+  const { posts, loading, deletePost } = useSocialMediaPosts();
 
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
@@ -37,6 +41,25 @@ export function SocialMediaCalendar() {
     const newDate = new Date(selectedDate);
     newDate.setMonth(newDate.getMonth() + 1);
     setSelectedDate(newDate);
+  };
+
+  const handlePostClick = (post: SocialMediaPost) => {
+    setSelectedPost(post);
+    setIsDetailsOpen(true);
+  };
+
+  const handleEdit = (post: SocialMediaPost) => {
+    setEditingPost(post);
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleDelete = async (postId: string) => {
+    await deletePost(postId);
+  };
+
+  const handleDialogClose = () => {
+    setIsCreateDialogOpen(false);
+    setEditingPost(null);
   };
 
   return (
@@ -103,7 +126,12 @@ export function SocialMediaCalendar() {
                 </CardHeader>
                 <CardContent className="p-2 space-y-1">
                   {dayPosts.slice(0, 3).map(post => (
-                    <PostCard key={post.id} post={post} compact />
+                    <PostCard 
+                      key={post.id} 
+                      post={post} 
+                      compact 
+                      onClick={() => handlePostClick(post)}
+                    />
                   ))}
                   {dayPosts.length > 3 && (
                     <p className="text-xs text-muted-foreground">
@@ -119,8 +147,17 @@ export function SocialMediaCalendar() {
 
       <PostFormDialog 
         open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
+        onOpenChange={handleDialogClose}
         defaultDate={selectedDate}
+        editPost={editingPost}
+      />
+
+      <PostDetailsDialog
+        post={selectedPost}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
       />
     </div>
   );

@@ -1,20 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSocialMediaPosts } from "@/hooks/useSocialMediaPosts";
+import { useSocialMediaPosts, SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
-import { useEffect, useState as useClientState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 interface PostFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultDate?: Date;
-  post?: any;
+  editPost?: SocialMediaPost | null;
 }
 
 interface Client {
@@ -22,11 +22,55 @@ interface Client {
   name: string;
 }
 
-export function PostFormDialog({ open, onOpenChange, defaultDate, post }: PostFormDialogProps) {
+export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: PostFormDialogProps) {
   const { createPost, updatePost } = useSocialMediaPosts();
   const { currentAgency } = useAgency();
-  const [clients, setClients] = useClientState<Client[]>([]);
+  const { toast } = useToast();
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    client_id: "",
+    scheduled_date: defaultDate?.toISOString() || new Date().toISOString(),
+    post_type: "feed",
+    platform: "instagram",
+    status: "draft",
+    priority: "medium",
+    hashtags: "",
+    notes: "",
+  });
+
+  useEffect(() => {
+    if (editPost) {
+      setFormData({
+        title: editPost.title,
+        description: editPost.description || "",
+        client_id: editPost.client_id || "",
+        scheduled_date: editPost.scheduled_date,
+        post_type: editPost.post_type,
+        platform: editPost.platform,
+        status: editPost.status,
+        priority: editPost.priority,
+        hashtags: editPost.hashtags?.join(", ") || "",
+        notes: editPost.notes || "",
+      });
+    } else {
+      setFormData({
+        title: "",
+        description: "",
+        client_id: "",
+        scheduled_date: defaultDate?.toISOString() || new Date().toISOString(),
+        post_type: "feed",
+        platform: "instagram",
+        status: "draft",
+        priority: "medium",
+        hashtags: "",
+        notes: "",
+      });
+    }
+  }, [editPost, defaultDate, open]);
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -41,19 +85,6 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, post }: PostFo
     fetchClients();
   }, [currentAgency?.id]);
 
-  const [formData, setFormData] = useState({
-    title: post?.title || "",
-    description: post?.description || "",
-    client_id: post?.client_id || "",
-    scheduled_date: post?.scheduled_date || defaultDate?.toISOString() || new Date().toISOString(),
-    post_type: post?.post_type || "feed",
-    platform: post?.platform || "instagram",
-    status: post?.status || "draft",
-    priority: post?.priority || "medium",
-    hashtags: post?.hashtags?.join(", ") || "",
-    notes: post?.notes || "",
-  });
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -67,15 +98,21 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, post }: PostFo
         approval_history: [],
       };
 
-      if (post?.id) {
-        await updatePost(post.id, data);
+      if (editPost?.id) {
+        await updatePost(editPost.id, data);
+        toast({ title: "Postagem atualizada com sucesso!" });
       } else {
         await createPost(data);
+        toast({ title: "Postagem criada com sucesso!" });
       }
       
       onOpenChange(false);
     } catch (error) {
       console.error(error);
+      toast({ 
+        title: "Erro ao salvar postagem", 
+        variant: "destructive" 
+      });
     } finally {
       setLoading(false);
     }
@@ -85,7 +122,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, post }: PostFo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{post ? "Editar Postagem" : "Nova Postagem"}</DialogTitle>
+          <DialogTitle>{editPost ? "Editar Postagem" : "Nova Postagem"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -230,7 +267,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, post }: PostFo
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Salvando..." : post ? "Atualizar" : "Criar Postagem"}
+              {loading ? "Salvando..." : editPost ? "Atualizar" : "Criar Postagem"}
             </Button>
           </div>
         </form>

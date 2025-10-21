@@ -1,0 +1,212 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Pencil, Trash2, Calendar, User, Hash, Building2, Target } from "lucide-react";
+import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useState } from "react";
+
+interface PostDetailsDialogProps {
+  post: SocialMediaPost | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onEdit: (post: SocialMediaPost) => void;
+  onDelete: (postId: string) => void;
+}
+
+const getPlatformIcon = (platform: string) => {
+  const icons: Record<string, string> = {
+    instagram: "📷",
+    facebook: "👤",
+    linkedin: "💼",
+    twitter: "🐦",
+    tiktok: "🎵",
+  };
+  return icons[platform.toLowerCase()] || "📱";
+};
+
+const getStatusColor = (status: string) => {
+  const colors: Record<string, string> = {
+    draft: "bg-gray-500",
+    in_creation: "bg-blue-500",
+    pending_approval: "bg-yellow-500",
+    approved: "bg-green-500",
+    published: "bg-purple-500",
+    rejected: "bg-red-500",
+  };
+  return colors[status] || "bg-gray-500";
+};
+
+const getPriorityColor = (priority: string) => {
+  const colors: Record<string, string> = {
+    low: "bg-gray-500",
+    medium: "bg-blue-500",
+    high: "bg-orange-500",
+    urgent: "bg-red-500",
+  };
+  return colors[priority] || "bg-gray-500";
+};
+
+export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete }: PostDetailsDialogProps) {
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+
+  if (!post) return null;
+
+  const handleDelete = () => {
+    onDelete(post.id);
+    setShowDeleteAlert(false);
+    onOpenChange(false);
+  };
+
+  const handleEdit = () => {
+    onEdit(post);
+    onOpenChange(false);
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="text-2xl">{getPlatformIcon(post.platform)}</span>
+              {post.title}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge className={getStatusColor(post.status)}>
+                {post.status}
+              </Badge>
+              <Badge className={getPriorityColor(post.priority)}>
+                {post.priority}
+              </Badge>
+              <Badge variant="outline">
+                {post.post_type}
+              </Badge>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <div className="flex items-start gap-2">
+                <Calendar className="h-4 w-4 mt-1 text-muted-foreground" />
+                <div>
+                  <p className="text-sm font-medium">Data de Publicação</p>
+                  <p className="text-sm text-muted-foreground">
+                    {format(new Date(post.scheduled_date), "PPP 'às' HH:mm", { locale: ptBR })}
+                  </p>
+                </div>
+              </div>
+
+              {post.clients && (
+                <div className="flex items-start gap-2">
+                  <Building2 className="h-4 w-4 mt-1 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Cliente</p>
+                    <p className="text-sm text-muted-foreground">{post.clients.name}</p>
+                  </div>
+                </div>
+              )}
+
+              {post.campaigns && (
+                <div className="flex items-start gap-2">
+                  <Target className="h-4 w-4 mt-1 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Campanha</p>
+                    <p className="text-sm text-muted-foreground">{post.campaigns.name}</p>
+                  </div>
+                </div>
+              )}
+
+              {post.description && (
+                <div>
+                  <p className="text-sm font-medium mb-1">Descrição</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {post.description}
+                  </p>
+                </div>
+              )}
+
+              {post.hashtags && post.hashtags.length > 0 && (
+                <div className="flex items-start gap-2">
+                  <Hash className="h-4 w-4 mt-1 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium mb-1">Hashtags</p>
+                    <div className="flex flex-wrap gap-1">
+                      {post.hashtags.map((tag, index) => (
+                        <Badge key={index} variant="secondary" className="text-xs">
+                          #{tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {post.mentions && post.mentions.length > 0 && (
+                <div className="flex items-start gap-2">
+                  <User className="h-4 w-4 mt-1 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium mb-1">Menções</p>
+                    <div className="flex flex-wrap gap-1">
+                      {post.mentions.map((mention, index) => (
+                        <Badge key={index} variant="secondary" className="text-xs">
+                          @{mention}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {post.notes && (
+                <div>
+                  <p className="text-sm font-medium mb-1">Observações</p>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {post.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteAlert(true)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </Button>
+            <Button onClick={handleEdit}>
+              <Pencil className="h-4 w-4 mr-2" />
+              Editar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a postagem "{post.title}"? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
