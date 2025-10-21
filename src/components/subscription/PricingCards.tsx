@@ -42,13 +42,14 @@ export function PricingCards() {
     const isTrialExpired = currentSubscription?.subscription_end && 
       new Date(currentSubscription.subscription_end) <= new Date();
     
-    // Only consider current if subscribed AND (not in trial OR trial not expired)
-    return currentSubscription?.subscribed && !isTrialExpired;
+    // Only consider current if subscription is ACTIVE (not trial/past_due/unpaid)
+    const isActive = currentSubscription?.subscribed && currentSubscription?.subscription_status === 'active';
+    return isActive && !isTrialExpired;
   };
 
   const handlePlanAction = async (plan: any) => {
     if (isCurrentPlan(plan.name)) {
-      if (currentSubscription?.subscribed) {
+      if (currentSubscription?.subscribed && currentSubscription?.subscription_status === 'active') {
         await openCustomerPortal();
       } else if (plan.stripe_price_id_monthly) {
         await createCheckout(plan.stripe_price_id_monthly);
@@ -65,12 +66,13 @@ export function PricingCards() {
     // Check if trial is expired
     const isTrialExpired = currentSubscription?.subscription_end && 
       new Date(currentSubscription.subscription_end) <= new Date();
+    const isActive = currentSubscription?.subscribed && currentSubscription?.subscription_status === 'active';
     
     if (isCurrentPlan(plan.name)) {
       return 'Gerenciar Plano';
     } else if (plan.slug === 'free') {
       return 'Plano Gratuito';
-    } else if (isTrialExpired || !currentSubscription?.subscribed) {
+    } else if (isTrialExpired || !isActive) {
       return 'Assinar Plano';
     } else {
       return 'Fazer Upgrade';
