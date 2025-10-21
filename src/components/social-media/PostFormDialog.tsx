@@ -87,8 +87,27 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     fetchClients();
   }, [currentAgency?.id]);
 
-  // Buscar tipos de conteúdo customizados
-  const { data: contentTypes = [] } = useQuery({
+  // Tipos de conteúdo padrão
+  const defaultContentTypes = [
+    { slug: 'feed', name: 'Feed', icon: '📱' },
+    { slug: 'stories', name: 'Stories', icon: '📖' },
+    { slug: 'reels', name: 'Reels', icon: '🎬' },
+    { slug: 'carrossel', name: 'Carrossel', icon: '🎠' },
+    { slug: 'video', name: 'Vídeo', icon: '🎥' },
+  ];
+
+  // Plataformas padrão
+  const defaultPlatforms = [
+    { slug: 'instagram', name: 'Instagram', icon: '📷' },
+    { slug: 'facebook', name: 'Facebook', icon: '👥' },
+    { slug: 'linkedin', name: 'LinkedIn', icon: '💼' },
+    { slug: 'twitter', name: 'Twitter', icon: '🐦' },
+    { slug: 'tiktok', name: 'TikTok', icon: '🎵' },
+    { slug: 'youtube', name: 'YouTube', icon: '📺' },
+  ];
+
+  // Buscar tipos de conteúdo customizados e combinar com padrões
+  const { data: customContentTypes = [] } = useQuery({
     queryKey: ['content-types', currentAgency?.id],
     queryFn: async () => {
       if (!currentAgency?.id) return [];
@@ -96,28 +115,55 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         .from('social_media_content_types')
         .select('*')
         .eq('agency_id', currentAgency.id)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('is_default', false);
       if (error) throw error;
       return data || [];
     },
     enabled: !!currentAgency?.id,
   });
 
-  // Buscar plataformas ativas
-  const { data: platforms = [] } = useQuery({
-    queryKey: ['social-platforms', currentAgency?.id],
+  const allContentTypes = [...defaultContentTypes, ...customContentTypes];
+
+  // Buscar plataformas ativas customizadas e combinar com padrões
+  const { data: customPlatforms = [] } = useQuery({
+    queryKey: ['custom-platforms', currentAgency?.id],
     queryFn: async () => {
       if (!currentAgency?.id) return [];
       const { data, error } = await supabase
         .from('social_media_platforms')
         .select('*')
         .eq('agency_id', currentAgency.id)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('is_default', false);
       if (error) throw error;
       return data || [];
     },
     enabled: !!currentAgency?.id,
   });
+
+  // Buscar configurações de plataformas padrão desativadas
+  const { data: disabledDefaultPlatforms = [] } = useQuery({
+    queryKey: ['disabled-platforms', currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data, error } = await supabase
+        .from('social_media_platforms')
+        .select('slug')
+        .eq('agency_id', currentAgency.id)
+        .eq('is_active', false)
+        .eq('is_default', true);
+      if (error) throw error;
+      return (data || []).map(p => p.slug);
+    },
+    enabled: !!currentAgency?.id,
+  });
+
+  // Filtrar plataformas padrão ativas e combinar com customizadas
+  const activePlatforms = [
+    ...defaultPlatforms.filter(p => !disabledDefaultPlatforms.includes(p.slug)),
+    ...customPlatforms
+  ];
 
   // Buscar status customizados
   const { data: customStatuses = [] } = useQuery({
@@ -231,8 +277,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {platforms.map(platform => (
-                    <SelectItem key={platform.id} value={platform.slug}>
+                  {activePlatforms.map(platform => (
+                    <SelectItem key={platform.slug} value={platform.slug}>
                       {platform.icon} {platform.name}
                     </SelectItem>
                   ))}
@@ -247,8 +293,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {contentTypes.map(type => (
-                    <SelectItem key={type.id} value={type.slug}>
+                  {allContentTypes.map(type => (
+                    <SelectItem key={type.slug} value={type.slug}>
                       {type.icon} {type.name}
                     </SelectItem>
                   ))}

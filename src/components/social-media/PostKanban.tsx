@@ -71,8 +71,17 @@ export function PostKanban() {
     return Array.from(clientsMap, ([id, name]) => ({ id, name }));
   }, [posts]);
 
-  // Buscar tipos de conteúdo customizados
-  const { data: contentTypes = [] } = useQuery({
+  // Tipos de conteúdo padrão
+  const defaultContentTypes = [
+    { id: 'feed', label: 'Feed' },
+    { id: 'stories', label: 'Stories' },
+    { id: 'reels', label: 'Reels' },
+    { id: 'carrossel', label: 'Carrossel' },
+    { id: 'video', label: 'Vídeo' },
+  ];
+
+  // Buscar tipos de conteúdo customizados e combinar com padrões
+  const { data: customContentTypes = [] } = useQuery({
     queryKey: ['content-types', currentAgency?.id],
     queryFn: async () => {
       if (!currentAgency?.id) return [];
@@ -80,12 +89,15 @@ export function PostKanban() {
         .from('social_media_content_types')
         .select('*')
         .eq('agency_id', currentAgency.id)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('is_default', false);
       if (error) throw error;
       return (data || []).map(ct => ({ id: ct.slug, label: ct.name }));
     },
     enabled: !!currentAgency?.id,
   });
+
+  const allContentTypes = [...defaultContentTypes, ...customContentTypes];
 
   // Filtrar e ordenar posts
   const filteredPosts = useMemo(() => {
@@ -197,7 +209,7 @@ export function PostKanban() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os tipos</SelectItem>
-                {contentTypes.map(type => (
+                {allContentTypes.map(type => (
                   <SelectItem key={type.id} value={type.id}>
                     {type.label}
                   </SelectItem>
