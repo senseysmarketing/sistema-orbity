@@ -36,7 +36,9 @@ export function PricingCards() {
   };
 
   const isCurrentPlan = (planName: string) => {
-    return currentSubscription?.plan_name === planName;
+    // Only consider it current plan if subscribed or customer_id exists (meaning they've paid before)
+    return currentSubscription?.plan_name === planName && 
+           (currentSubscription?.subscribed || currentSubscription?.customer_id);
   };
 
   const handlePlanAction = async (plan: any) => {
