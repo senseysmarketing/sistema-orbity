@@ -1,10 +1,11 @@
 import { usePaymentMiddleware } from '@/hooks/usePaymentMiddleware';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, CreditCard, RefreshCw, Calendar } from 'lucide-react';
+import { AlertTriangle, CreditCard, RefreshCw, Calendar, LogOut } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { PricingCards } from '@/components/subscription/PricingCards';
 import { useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface BlockedAccessScreenProps {
   onRetry?: () => void;
@@ -13,6 +14,7 @@ interface BlockedAccessScreenProps {
 export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
   const { paymentStatus, refreshPaymentStatus } = usePaymentMiddleware();
   const { openCustomerPortal, currentSubscription } = useSubscription();
+  const { signOut } = useAuth();
   const [showPlans, setShowPlans] = useState(false);
 
   const handleRetry = async () => {
@@ -109,6 +111,15 @@ export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
                 >
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Verificar Status
+                </Button>
+
+                <Button 
+                  variant="outline" 
+                  onClick={signOut}
+                  className="w-full border-red-300 text-red-600 hover:bg-red-50"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sair da Conta
                 </Button>
               </div>
             </div>
