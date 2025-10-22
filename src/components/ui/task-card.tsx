@@ -88,11 +88,10 @@ export function TaskCard({
       onClick={(e) => onClick?.(e)}
       style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex flex-col gap-2 flex-1 min-w-0 overflow-hidden">
-          <h3 className="font-semibold line-clamp-2">{task.title}</h3>
-        </div>
-        <div className="flex gap-1 flex-wrap flex-shrink-0 ml-2">
+      {/* Linha 1: Ícone Prioridade + Badges */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <PriorityIcon className="h-5 w-5 flex-shrink-0" style={{ color: getPriorityColor(task.priority) }} />
+        <div className="flex gap-1 flex-wrap">
           <Badge variant="outline" className={`${statusConfig[task.status]?.color || "bg-gray-500"} text-white text-xs`}>
             {statusConfig[task.status]?.label || task.status}
           </Badge>
@@ -104,6 +103,9 @@ export function TaskCard({
           )}
         </div>
       </div>
+
+      {/* Linha 2: Título */}
+      <h3 className="font-semibold line-clamp-2 break-words mb-3">{task.title}</h3>
       
       {task.description && (
         <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
@@ -111,6 +113,7 @@ export function TaskCard({
         </p>
       )}
       
+      {/* Linha 3: Data + Badge Cliente */}
       <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
         {task.due_date && (
           <span>
