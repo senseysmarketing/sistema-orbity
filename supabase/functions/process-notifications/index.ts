@@ -136,16 +136,17 @@ async function processReminders() {
   console.log(`[${new Date().toISOString()}] Processing reminder notifications...`);
   
   const now = new Date();
-  const in1Hour = addHours(now, 1);
+  const in2Hours = addHours(now, 2);
 
+  // Buscar lembretes que devem notificar nas próximas 2 horas
+  // Isso cobre lembretes com até 60 min de antecedência
   const { data: reminders, error } = await supabase
     .from('reminders')
     .select('*')
     .eq('completed', false)
     .eq('notification_enabled', true)
     .not('reminder_time', 'is', null)
-    .lte('reminder_time', in1Hour.toISOString())
-    .gte('reminder_time', now.toISOString());
+    .lte('reminder_time', in2Hours.toISOString());
 
   if (error) {
     console.error('Error fetching reminders:', error);
@@ -161,7 +162,12 @@ async function processReminders() {
     const minutesBefore = reminder.notification_minutes_before || 0;
     const notificationTime = new Date(reminderTime.getTime() - minutesBefore * 60000);
 
-    if (notificationTime <= now && (!reminder.last_notification_sent || new Date(reminder.last_notification_sent) < notificationTime)) {
+    // Verificar se já passou da hora de notificar e se ainda não foi enviada
+    const alreadySent = reminder.last_notification_sent && new Date(reminder.last_notification_sent) >= notificationTime;
+    
+    if (notificationTime <= now && !alreadySent) {
+      console.log(`Processing reminder ${reminder.id} - Notification time: ${notificationTime.toISOString()}, Reminder time: ${reminderTime.toISOString()}`);
+      
       // Check user preferences
       const prefCheck = await checkUserPreferences(reminder.user_id, 'reminders');
       if (!prefCheck.canSend) {
@@ -193,7 +199,11 @@ async function processReminders() {
         .eq('id', reminder.id);
       
       sentCount++;
-      console.log(`Notification sent for reminder ${reminder.id}`);
+      console.log(`✅ Notification sent for reminder ${reminder.id}`);
+    } else if (alreadySent) {
+      console.log(`⏭️ Reminder ${reminder.id} already sent at ${reminder.last_notification_sent}`);
+    } else {
+      console.log(`⏰ Reminder ${reminder.id} not ready yet - will notify at ${notificationTime.toISOString()}`);
     }
   }
 
