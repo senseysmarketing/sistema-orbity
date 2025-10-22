@@ -62,6 +62,7 @@ export function NotificationItem({ notification, onClose }: NotificationItemProp
 
   const handleArchive = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     await archiveNotification(notification.id);
   };
 
@@ -84,10 +85,12 @@ export function NotificationItem({ notification, onClose }: NotificationItemProp
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
               onClick={handleArchive}
+              type="button"
             >
               <X className="h-3 w-3" />
+              <span className="sr-only">Arquivar</span>
             </Button>
           </div>
           
