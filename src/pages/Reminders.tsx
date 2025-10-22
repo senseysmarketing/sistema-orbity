@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Search, Bell, Calendar as CalendarIcon, Flag, CheckCircle2, List as ListIcon } from 'lucide-react';
 import { Reminder, useReminders } from '@/hooks/useReminders';
 import { useReminderLists } from '@/hooks/useReminderLists';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 import { ReminderFormDialog } from '@/components/reminders/ReminderFormDialog';
 import { ReminderCard } from '@/components/reminders/ReminderCard';
 import { ReminderDetailsDialog } from '@/components/reminders/ReminderDetailsDialog';
@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 export default function Reminders() {
   const { reminders, loading, toggleReminder, deleteReminder, createReminder, updateReminder } = useReminders();
   const { lists } = useReminderLists();
-  const { permission, requestPermission, showNotification } = useNotifications();
+  const { permission, requestPermission, showNotification } = useBrowserNotifications();
   const [search, setSearch] = useState('');
   const [selectedList, setSelectedList] = useState<string | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'today' | 'scheduled' | 'flagged' | 'completed'>('all');

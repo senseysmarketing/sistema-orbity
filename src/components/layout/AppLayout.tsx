@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from "@/components/ui/button";
 import { Loader2, Moon, Sun } from 'lucide-react';
 import { useTheme } from "@/components/ui/theme-provider";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 export function AppLayout() {
   const { user, loading } = useAuth();
@@ -36,16 +37,20 @@ export function AppLayout() {
           <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-card/50 backdrop-blur-sm flex-shrink-0 z-40">
             <SidebarTrigger className="h-8 w-8" />
             
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="h-9 w-9"
-            >
-              <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-              <span className="sr-only">Alternar tema</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                className="h-9 w-9"
+              >
+                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                <span className="sr-only">Alternar tema</span>
+              </Button>
+            </div>
           </header>
           
           {/* Main content */}

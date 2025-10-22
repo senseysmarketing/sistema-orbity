@@ -1507,6 +1507,147 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          agency_id: string
+          browser_notifications: boolean
+          created_at: string
+          do_not_disturb_end: string | null
+          do_not_disturb_start: string | null
+          email_digest: boolean
+          id: string
+          leads_enabled: boolean
+          meetings_enabled: boolean
+          payments_enabled: boolean
+          posts_enabled: boolean
+          reminders_enabled: boolean
+          system_enabled: boolean
+          tasks_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agency_id: string
+          browser_notifications?: boolean
+          created_at?: string
+          do_not_disturb_end?: string | null
+          do_not_disturb_start?: string | null
+          email_digest?: boolean
+          id?: string
+          leads_enabled?: boolean
+          meetings_enabled?: boolean
+          payments_enabled?: boolean
+          posts_enabled?: boolean
+          reminders_enabled?: boolean
+          system_enabled?: boolean
+          tasks_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agency_id?: string
+          browser_notifications?: boolean
+          created_at?: string
+          do_not_disturb_end?: string | null
+          do_not_disturb_start?: string | null
+          email_digest?: boolean
+          id?: string
+          leads_enabled?: boolean
+          meetings_enabled?: boolean
+          payments_enabled?: boolean
+          posts_enabled?: boolean
+          reminders_enabled?: boolean
+          system_enabled?: boolean
+          tasks_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_preferences_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          action_label: string | null
+          action_url: string | null
+          agency_id: string
+          created_at: string
+          id: string
+          is_archived: boolean
+          is_read: boolean
+          message: string
+          metadata: Json | null
+          priority: Database["public"]["Enums"]["notification_priority"]
+          read_at: string | null
+          scheduled_for: string | null
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Insert: {
+          action_label?: string | null
+          action_url?: string | null
+          agency_id: string
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          is_read?: boolean
+          message: string
+          metadata?: Json | null
+          priority?: Database["public"]["Enums"]["notification_priority"]
+          read_at?: string | null
+          scheduled_for?: string | null
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Update: {
+          action_label?: string | null
+          action_url?: string | null
+          agency_id?: string
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          is_read?: boolean
+          message?: string
+          metadata?: Json | null
+          priority?: Database["public"]["Enums"]["notification_priority"]
+          read_at?: string | null
+          scheduled_for?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2808,6 +2949,16 @@ export type Database = {
         | "quick_call"
         | "workshop"
         | "results"
+      notification_priority: "low" | "medium" | "high" | "urgent"
+      notification_type:
+        | "reminder"
+        | "task"
+        | "post"
+        | "payment"
+        | "expense"
+        | "lead"
+        | "meeting"
+        | "system"
       payment_status: "pending" | "paid" | "overdue"
       recurrence_type:
         | "none"
@@ -2966,6 +3117,17 @@ export const Constants = {
         "quick_call",
         "workshop",
         "results",
+      ],
+      notification_priority: ["low", "medium", "high", "urgent"],
+      notification_type: [
+        "reminder",
+        "task",
+        "post",
+        "payment",
+        "expense",
+        "lead",
+        "meeting",
+        "system",
       ],
       payment_status: ["pending", "paid", "overdue"],
       recurrence_type: [
