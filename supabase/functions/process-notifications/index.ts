@@ -279,7 +279,10 @@ async function processTasks() {
         message: task.title,
         action_url: '/tasks',
         action_label: 'Ver tarefa',
-        metadata: { task_id: task.id },
+        metadata: { 
+          task_id: task.id,
+          play_sound: true
+        },
       });
 
       await trackNotification('task', task.id, assignment.user_id, task.agency_id);
@@ -352,7 +355,10 @@ async function processPosts() {
         message: post.title || 'Post sem título',
         action_url: '/social-media',
         action_label: 'Ver post',
-        metadata: { post_id: post.id },
+        metadata: { 
+          post_id: post.id,
+          play_sound: true
+        },
       });
 
       await trackNotification('post', post.id, user.user_id, post.agency_id);
@@ -429,7 +435,10 @@ async function processPayments() {
         message: `${payment.clients?.name || 'Cliente'} - R$ ${payment.amount}`,
         action_url: '/admin',
         action_label: 'Ver pagamento',
-        metadata: { payment_id: payment.id },
+        metadata: { 
+          payment_id: payment.id,
+          play_sound: true
+        },
       });
 
       await trackNotification('payment', payment.id, admin.user_id, payment.agency_id);
@@ -462,7 +471,7 @@ async function processLeads() {
   let skippedCount = 0;
 
   for (const lead of leads || []) {
-    if (!lead.assigned_to) continue;
+    if (!lead.assigned_to || !lead.agency_id) continue;
 
     const shouldSend = await shouldSendNotification(
       'lead',
@@ -494,7 +503,10 @@ async function processLeads() {
       message: `${lead.name} - sem contato há 7 dias`,
       action_url: '/crm',
       action_label: 'Ver lead',
-      metadata: { lead_id: lead.id },
+      metadata: { 
+        lead_id: lead.id,
+        play_sound: true
+      },
     });
 
     await trackNotification('lead', lead.id, lead.assigned_to, lead.agency_id);
@@ -528,6 +540,8 @@ async function processMeetings() {
   let skippedCount = 0;
 
   for (const meeting of meetings || []) {
+    if (!meeting.agency_id) continue;
+
     // Notify organizer
     const shouldSendOrganizer = await shouldSendNotification(
       'meeting',
@@ -550,7 +564,10 @@ async function processMeetings() {
           message: meeting.title,
           action_url: '/agenda',
           action_label: 'Ver reunião',
-          metadata: { meeting_id: meeting.id },
+          metadata: { 
+            meeting_id: meeting.id,
+            play_sound: true
+          },
         });
 
         await trackNotification('meeting', meeting.id, meeting.organizer_id, meeting.agency_id);
@@ -597,7 +614,10 @@ async function processMeetings() {
         message: meeting.title,
         action_url: '/agenda',
         action_label: 'Ver reunião',
-        metadata: { meeting_id: meeting.id },
+        metadata: { 
+          meeting_id: meeting.id,
+          play_sound: true
+        },
       });
 
       await trackNotification('meeting', meeting.id, participant.user_id, meeting.agency_id);
