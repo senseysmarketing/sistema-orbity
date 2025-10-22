@@ -230,7 +230,7 @@ async function processTasks() {
   const { data: tasks, error } = await supabase
     .from('tasks')
     .select('*, task_assignments(user_id)')
-    .neq('status', 'completed')
+    .neq('status', 'done')
     .gte('due_date', todayBrasilia.toISOString())
     .lt('due_date', tomorrowBrasilia.toISOString());
 
