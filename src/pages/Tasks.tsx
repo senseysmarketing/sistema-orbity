@@ -797,7 +797,7 @@ export default function Tasks() {
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="flex gap-6 overflow-x-auto pb-4">
               <KanbanColumn
                 id="todo"
                 title="A Fazer"

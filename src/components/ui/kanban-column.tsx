@@ -57,7 +57,7 @@ export function KanbanColumn({
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-[330px] w-[330px] flex-shrink-0">
       <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
         <div className={`w-3 h-3 ${color} rounded-full`}></div>
         <h3 className="font-semibold">{title}</h3>
