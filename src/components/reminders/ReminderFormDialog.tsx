@@ -8,7 +8,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Reminder, RecurrenceType, ReminderPriority, useReminders } from '@/hooks/useReminders';
+import { Reminder, RecurrenceType, ReminderPriority } from '@/hooks/useReminders';
 import { ReminderList, useReminderLists } from '@/hooks/useReminderLists';
 import { CalendarIcon, Bell, Flag, List, Repeat, Plus, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -18,10 +18,11 @@ interface ReminderFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   reminder?: Reminder | null;
+  onCreate: (data: Partial<Reminder>) => Promise<void> | void;
+  onUpdate: (id: string, data: Partial<Reminder>) => Promise<void> | void;
 }
 
-export function ReminderFormDialog({ open, onOpenChange, reminder }: ReminderFormDialogProps) {
-  const { createReminder, updateReminder } = useReminders();
+export function ReminderFormDialog({ open, onOpenChange, reminder, onCreate, onUpdate }: ReminderFormDialogProps) {
   const { lists } = useReminderLists();
   
   const [title, setTitle] = useState('');
@@ -106,9 +107,9 @@ export function ReminderFormDialog({ open, onOpenChange, reminder }: ReminderFor
     };
 
     if (reminder) {
-      await updateReminder(reminder.id, data);
+      await onUpdate(reminder.id, data);
     } else {
-      await createReminder(data);
+      await onCreate(data);
     }
 
     onOpenChange(false);

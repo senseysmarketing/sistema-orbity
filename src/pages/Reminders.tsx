@@ -13,7 +13,7 @@ import { isToday, isTomorrow, isPast, isThisWeek, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 export default function Reminders() {
-  const { reminders, loading, toggleReminder, deleteReminder } = useReminders();
+  const { reminders, loading, toggleReminder, deleteReminder, createReminder, updateReminder } = useReminders();
   const { lists } = useReminderLists();
   const { permission, requestPermission, showNotification } = useNotifications();
   const [search, setSearch] = useState('');
@@ -375,6 +375,8 @@ export default function Reminders() {
         open={formOpen}
         onOpenChange={handleFormClose}
         reminder={editingReminder}
+        onCreate={createReminder}
+        onUpdate={updateReminder}
       />
     </div>
   );
