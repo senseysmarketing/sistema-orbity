@@ -111,12 +111,10 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
       onClick={(e) => onClick?.(e)}
       style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
     >
-      <div className="flex items-start justify-between mb-3 gap-2">
-        <div className="flex flex-col gap-2 flex-1 min-w-0">
-          <ContentTypeIcon className="h-5 w-5 flex-shrink-0" />
-          <h3 className="font-semibold line-clamp-2 break-words">{post.title}</h3>
-        </div>
-        <div className="flex gap-1 flex-wrap flex-shrink-0 ml-2">
+      {/* Linha 1: Ícone + Badges */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <ContentTypeIcon className="h-5 w-5 flex-shrink-0" />
+        <div className="flex gap-1 flex-wrap">
           <Badge variant="outline" className={`${statusInfo.color} text-white text-xs`}>
             {statusInfo.label}
           </Badge>
@@ -128,6 +126,9 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
           )}
         </div>
       </div>
+
+      {/* Linha 2: Título */}
+      <h3 className="font-semibold line-clamp-2 break-words mb-3">{post.title}</h3>
       
       {post.description && (
         <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
@@ -135,6 +136,7 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
         </p>
       )}
       
+      {/* Linha 3: Data + Badge Cliente */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
           {format(new Date(post.scheduled_date), "dd/MM/yyyy", { locale: ptBR })}
