@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAgency } from '@/hooks/useAgency';
+import { useAuth } from '@/hooks/useAuth';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 
 export type NotificationType = 'reminder' | 'task' | 'post' | 'payment' | 'expense' | 'lead' | 'meeting' | 'system';
@@ -31,6 +32,7 @@ export function useNotifications() {
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
   const { currentAgency } = useAgency();
+  const { user } = useAuth();
   const { showNotification } = useBrowserNotifications();
 
   const fetchNotifications = async (filter?: 'all' | 'unread' | 'today') => {
@@ -217,6 +219,37 @@ export function useNotifications() {
     };
   }, [currentAgency?.id]);
 
+  const enableDoNotDisturb = async (hours: number) => {
+    if (!user) return;
+
+    try {
+      const now = new Date();
+      const endTime = new Date(now.getTime() + hours * 60 * 60 * 1000);
+
+      const { error } = await supabase
+        .from('notification_preferences')
+        .upsert({
+          user_id: user.id,
+          agency_id: user.user_metadata?.agency_id,
+          do_not_disturb_until: endTime.toISOString(),
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Não perturbe ativado",
+        description: `Você não receberá notificações pelos próximos ${hours} hora(s).`,
+      });
+    } catch (error) {
+      console.error('Error enabling do not disturb:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível ativar o modo não perturbe.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return {
     notifications,
     loading,
@@ -226,5 +259,6 @@ export function useNotifications() {
     markAllAsRead,
     archiveNotification,
     deleteNotification,
+    enableDoNotDisturb,
   };
 }

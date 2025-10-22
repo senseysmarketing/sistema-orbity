@@ -1,6 +1,12 @@
 import { useState } from "react";
-import { Settings, CheckCheck } from "lucide-react";
+import { Settings, CheckCheck, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -13,9 +19,13 @@ interface NotificationCenterProps {
 }
 
 export function NotificationCenter({ onClose }: NotificationCenterProps) {
-  const { notifications, loading, markAllAsRead } = useNotifications();
+  const { notifications, loading, markAllAsRead, enableDoNotDisturb } = useNotifications();
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread' | 'today'>('all');
+
+  const handleDoNotDisturb = (hours: number) => {
+    enableDoNotDisturb(hours);
+  };
 
   const filteredNotifications = notifications.filter(n => {
     if (filter === 'unread') return !n.is_read;
@@ -39,6 +49,30 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
       <div className="flex items-center justify-between p-4 border-b">
         <h3 className="font-semibold text-lg">Notificações</h3>
         <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Moon className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleDoNotDisturb(1)}>
+                Não perturbe por 1 hora
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDoNotDisturb(2)}>
+                Não perturbe por 2 horas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDoNotDisturb(4)}>
+                Não perturbe por 4 horas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDoNotDisturb(8)}>
+                Não perturbe por 8 horas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDoNotDisturb(24)}>
+                Não perturbe por 24 horas
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="ghost"
             size="icon"
