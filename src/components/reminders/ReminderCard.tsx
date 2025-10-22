@@ -14,9 +14,10 @@ interface ReminderCardProps {
   onToggle: (id: string, completed: boolean) => void;
   onEdit: (reminder: Reminder) => void;
   onDelete: (id: string) => void;
+  onClick: (reminder: Reminder) => void;
 }
 
-export function ReminderCard({ reminder, onToggle, onEdit, onDelete }: ReminderCardProps) {
+export function ReminderCard({ reminder, onToggle, onEdit, onDelete, onClick }: ReminderCardProps) {
   const isOverdue = reminder.reminder_time && isPast(new Date(reminder.reminder_time)) && !reminder.completed;
   const completedSubtasks = reminder.subtasks.filter(st => st.completed).length;
 
@@ -44,7 +45,7 @@ export function ReminderCard({ reminder, onToggle, onEdit, onDelete }: ReminderC
 
   return (
     <Card className={cn(
-      "p-4 transition-all hover:shadow-md",
+      "p-4 transition-all hover:shadow-md cursor-pointer",
       reminder.completed && "opacity-60",
       isOverdue && "border-red-300"
     )}>
@@ -53,9 +54,10 @@ export function ReminderCard({ reminder, onToggle, onEdit, onDelete }: ReminderC
           checked={reminder.completed}
           onCheckedChange={(checked) => onToggle(reminder.id, checked as boolean)}
           className="mt-1"
+          onClick={(e) => e.stopPropagation()}
         />
 
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0" onClick={() => onClick(reminder)}>
           <div className="flex items-center gap-2 mb-1">
             <h3 className={cn(
               "font-medium",
@@ -113,7 +115,7 @@ export function ReminderCard({ reminder, onToggle, onEdit, onDelete }: ReminderC
         </div>
 
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
             <Button variant="ghost" size="icon">
               <MoreVertical className="h-4 w-4" />
             </Button>

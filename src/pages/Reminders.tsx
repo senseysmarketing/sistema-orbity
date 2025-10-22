@@ -9,6 +9,7 @@ import { useReminderLists } from '@/hooks/useReminderLists';
 import { useNotifications } from '@/hooks/useNotifications';
 import { ReminderFormDialog } from '@/components/reminders/ReminderFormDialog';
 import { ReminderCard } from '@/components/reminders/ReminderCard';
+import { ReminderDetailsDialog } from '@/components/reminders/ReminderDetailsDialog';
 import { isToday, isTomorrow, isPast, isThisWeek, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +22,8 @@ export default function Reminders() {
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'today' | 'scheduled' | 'flagged' | 'completed'>('all');
   const [formOpen, setFormOpen] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
+  const [detailsReminder, setDetailsReminder] = useState<Reminder | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -162,6 +165,27 @@ export default function Reminders() {
   const handleFormClose = () => {
     setFormOpen(false);
     setEditingReminder(null);
+  };
+
+  const handleDetailsOpen = (reminder: Reminder) => {
+    setDetailsReminder(reminder);
+    setDetailsOpen(true);
+  };
+
+  const handleToggleSubtask = async (subtaskId: string) => {
+    if (!detailsReminder) return;
+    
+    const updatedSubtasks = detailsReminder.subtasks.map(st =>
+      st.id === subtaskId ? { ...st, completed: !st.completed } : st
+    );
+    
+    await updateReminder(detailsReminder.id, { subtasks: updatedSubtasks });
+    
+    // Atualiza o reminder local para o diálogo
+    setDetailsReminder({
+      ...detailsReminder,
+      subtasks: updatedSubtasks
+    });
   };
 
   if (loading) {
@@ -348,6 +372,7 @@ export default function Reminders() {
                       onToggle={toggleReminder}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
+                      onClick={handleDetailsOpen}
                     />
                   ))}
                 </div>
@@ -377,6 +402,15 @@ export default function Reminders() {
         reminder={editingReminder}
         onCreate={createReminder}
         onUpdate={updateReminder}
+      />
+
+      <ReminderDetailsDialog
+        reminder={detailsReminder}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onToggleSubtask={handleToggleSubtask}
       />
     </div>
   );
