@@ -653,7 +653,7 @@ async function processPayments() {
 }
 
 // ============================================
-// MAINTENANCE FUNCTION
+// MAINTENANCE FUNCTIONS
 // ============================================
 
 async function cleanupOldTracking() {
@@ -670,6 +670,27 @@ async function cleanupOldTracking() {
     console.error('Error cleaning up tracking:', error);
   } else {
     console.log('✅ Old tracking records cleaned up');
+  }
+}
+
+async function archiveReadNotifications() {
+  console.log('📦 Archiving read notifications...');
+  
+  const oneHourAgo = addHours(new Date(), -1);
+  
+  const { data, error } = await supabase
+    .from('notifications')
+    .update({ is_archived: true })
+    .eq('is_read', true)
+    .eq('is_archived', false)
+    .not('read_at', 'is', null)
+    .lt('read_at', oneHourAgo.toISOString())
+    .select('id');
+
+  if (error) {
+    console.error('Error archiving notifications:', error);
+  } else {
+    console.log(`✅ Archived ${data?.length || 0} read notifications`);
   }
 }
 
@@ -695,8 +716,9 @@ Deno.serve(async (req) => {
       processMeetings(),
     ]);
 
-    // Executar limpeza em background (não bloqueia a resposta)
+    // Executar manutenção em background (não bloqueia a resposta)
     cleanupOldTracking().catch(console.error);
+    archiveReadNotifications().catch(console.error);
 
     const duration = Date.now() - startTime;
     console.log(`✅ All notifications processed successfully in ${duration}ms`);
