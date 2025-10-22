@@ -165,12 +165,12 @@ export function ManageSubscriptionDialog({ open, onOpenChange }: ManageSubscript
                       </div>
                     )}
 
-                    {plan.has_advanced_reports && (
-                      <div className="flex items-center gap-2">
-                        <Check className="h-4 w-4 text-green-500" />
-                        <span className="text-sm">Relatórios Avançados</span>
-                      </div>
-                    )}
+
+                    <div className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">Planner Social Media</span>
+                    </div>
+
 
                     <Button
                       className="w-full mt-4"

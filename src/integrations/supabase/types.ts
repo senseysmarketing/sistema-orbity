@@ -2234,6 +2234,7 @@ export type Database = {
           max_campaigns: number | null
           max_clients: number
           max_content_storage_gb: number | null
+          max_contracts: number
           max_facebook_ad_accounts: number
           max_leads: number
           max_social_media_posts: number | null
@@ -2262,6 +2263,7 @@ export type Database = {
           max_campaigns?: number | null
           max_clients?: number
           max_content_storage_gb?: number | null
+          max_contracts?: number
           max_facebook_ad_accounts?: number
           max_leads?: number
           max_social_media_posts?: number | null
@@ -2290,6 +2292,7 @@ export type Database = {
           max_campaigns?: number | null
           max_clients?: number
           max_content_storage_gb?: number | null
+          max_contracts?: number
           max_facebook_ad_accounts?: number
           max_leads?: number
           max_social_media_posts?: number | null
@@ -2636,10 +2639,7 @@ export type Database = {
       }
     }
     Functions: {
-      archive_old_approved_posts: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      archive_old_approved_posts: { Args: never; Returns: number }
       check_agency_limits: {
         Args: {
           agency_uuid: string
@@ -2679,21 +2679,12 @@ export type Database = {
         }[]
       }
       get_current_user_role: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
-      get_user_agency_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_agency_admin: {
-        Args: { agency_uuid?: string }
-        Returns: boolean
-      }
+      get_user_agency_id: { Args: never; Returns: string }
+      is_admin: { Args: never; Returns: boolean }
+      is_agency_admin: { Args: { agency_uuid?: string }; Returns: boolean }
       is_agency_subscription_active: {
         Args: { agency_uuid?: string }
         Returns: boolean
@@ -2702,14 +2693,8 @@ export type Database = {
         Args: { agency_uuid?: string }
         Returns: boolean
       }
-      is_master_user: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_super_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      is_master_user: { Args: never; Returns: boolean }
+      is_super_admin: { Args: never; Returns: boolean }
       start_agency_trial: {
         Args: { p_agency_id: string; p_plan_slug?: string }
         Returns: undefined

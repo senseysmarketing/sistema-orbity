@@ -243,14 +243,6 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     switch (feature) {
       case 'crm':
         return currentPlan.has_crm;
-      case 'advanced_reports':
-        return currentPlan.has_advanced_reports;
-      case 'api_access':
-        return currentPlan.has_api_access;
-      case 'white_label':
-        return currentPlan.has_white_label;
-      case 'priority_support':
-        return currentPlan.has_priority_support;
       default:
         return true;
     }
@@ -270,44 +262,20 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         return currentCount >= currentPlan.max_users;
       case 'clients':
         return currentCount >= currentPlan.max_clients;
+      case 'contracts':
+        return currentCount >= currentPlan.max_contracts;
       case 'leads':
         return currentCount >= currentPlan.max_leads;
       case 'tasks':
         return currentCount >= currentPlan.max_tasks;
-      case 'storage':
-        return currentCount >= currentPlan.max_storage_gb;
-      case 'facebook_ad_accounts':
-        return currentCount >= currentPlan.max_facebook_ad_accounts;
       default:
         return false;
     }
   };
 
   const getMaxFacebookAdAccounts = (): number => {
-    // Try to match plan by name (case-insensitive) first
-    let currentPlan = currentSubscription?.subscribed 
-      ? plans.find(p => p.name.trim().toLowerCase() === (currentSubscription.plan_name || '').trim().toLowerCase())
-      : plans.find(p => p.slug === 'free');
-
-    // Fallbacks if exact match not found
-    if (!currentPlan && currentSubscription?.plan_name) {
-      const planNameLc = currentSubscription.plan_name.trim().toLowerCase();
-      // partial match
-      currentPlan = plans.find(p => p.name.trim().toLowerCase().includes(planNameLc) || planNameLc.includes(p.name.trim().toLowerCase())) || undefined;
-      // explicit Senseys fallback by slug if user plan mentions it
-      if (!currentPlan && planNameLc.includes('senseys')) {
-        currentPlan = plans.find(p => p.slug === 'senseys') || currentPlan;
-      }
-    }
-
-    // If still not found, keep free as the minimal fallback
-    if (!currentPlan) {
-      currentPlan = plans.find(p => p.slug === 'free');
-    }
-
-    const max = currentPlan?.max_facebook_ad_accounts;
-    if (!max || isNaN(max as any)) return 10; // fallback
-    return max >= 999999 ? Number.POSITIVE_INFINITY : max;
+    // All plans have unlimited Facebook Ad Accounts for now
+    return Number.POSITIVE_INFINITY;
   };
 
   // Check if user has been away for too long when page becomes visible
