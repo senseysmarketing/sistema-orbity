@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAgency } from '@/hooks/useAgency';
+import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 
 export type NotificationType = 'reminder' | 'task' | 'post' | 'payment' | 'expense' | 'lead' | 'meeting' | 'system';
 export type NotificationPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -30,6 +31,7 @@ export function useNotifications() {
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
   const { currentAgency } = useAgency();
+  const { showNotification } = useBrowserNotifications();
 
   const fetchNotifications = async (filter?: 'all' | 'unread' | 'today') => {
     if (!currentAgency?.id) return;
@@ -194,6 +196,17 @@ export function useNotifications() {
         },
         (payload) => {
           console.log('Notification change:', payload);
+          
+          // Show browser notification for new notifications
+          if (payload.eventType === 'INSERT') {
+            const newNotification = payload.new as Notification;
+            showNotification(newNotification.title, {
+              body: newNotification.message,
+              tag: newNotification.id,
+              icon: '/favicon.ico',
+            });
+          }
+          
           fetchNotifications();
         }
       )
