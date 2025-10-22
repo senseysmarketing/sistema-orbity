@@ -32,6 +32,8 @@ export function useNotifications() {
   const { currentAgency } = useAgency();
 
   const fetchNotifications = async (filter?: 'all' | 'unread' | 'today') => {
+    if (!currentAgency?.id) return;
+    
     try {
       setLoading(true);
       let query = supabase
@@ -95,6 +97,8 @@ export function useNotifications() {
   };
 
   const markAllAsRead = async () => {
+    if (!currentAgency?.id) return;
+    
     try {
       const { error } = await supabase
         .from('notifications')
@@ -173,7 +177,7 @@ export function useNotifications() {
   };
 
   useEffect(() => {
-    if (!currentAgency.id) return;
+    if (!currentAgency?.id) return;
 
     fetchNotifications();
 
