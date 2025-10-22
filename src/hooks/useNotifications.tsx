@@ -190,7 +190,7 @@ export function useNotifications() {
           event: '*',
           schema: 'public',
           table: 'notifications',
-          filter: `agency_id=eq.${currentAgency.id}`,
+          filter: `agency_id=eq.${currentAgency?.id}`,
         },
         (payload) => {
           console.log('Notification change:', payload);
@@ -202,7 +202,7 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentAgency.id]);
+  }, [currentAgency?.id]);
 
   return {
     notifications,
