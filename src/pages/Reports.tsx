@@ -49,12 +49,12 @@ export default function Reports() {
       
       const [
         { data: tasks },
-        { data: personalTasks },
+        { data: reminders },
         { data: clients },
         { data: payments }
       ] = await Promise.all([
         supabase.from('tasks').select('*').eq('agency_id', currentAgency.id),
-        supabase.from('personal_tasks').select('completed, user_id').eq('user_id', profile?.user_id || ''),
+        supabase.from('reminders').select('completed, user_id').eq('user_id', profile?.user_id || ''),
         supabase.from('clients').select('active, monthly_value').eq('agency_id', currentAgency.id),
         supabase.from('client_payments').select('status, amount').eq('agency_id', currentAgency.id)
       ]);
@@ -72,7 +72,7 @@ export default function Reports() {
       const myTasks = tasks?.filter(t => myTaskIds.includes(t.id)) || [];
       const completedTasks = myTasks.filter(t => t.status === 'done').length;
       
-      const personalTasksCompleted = personalTasks?.filter(t => t.completed).length || 0;
+      const remindersCompleted = reminders?.filter(t => t.completed).length || 0;
       const activeClients = clients?.filter(c => c.active).length || 0;
       const monthlyRevenue = clients?.filter(c => c.active).reduce((sum, c) => sum + (c.monthly_value || 0), 0) || 0;
       const pendingPayments = payments?.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0) || 0;
@@ -80,7 +80,7 @@ export default function Reports() {
       setReportData({
         totalTasks: myTasks.length,
         completedTasks,
-        personalTasksCompleted,
+        personalTasksCompleted: remindersCompleted,
         activeClients,
         monthlyRevenue,
         pendingPayments,

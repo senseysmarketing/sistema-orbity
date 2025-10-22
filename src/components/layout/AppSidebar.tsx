@@ -19,8 +19,8 @@ const menuItems = [{
   icon: CheckSquare,
   roles: ["agency_admin", "agency_user"]
 }, {
-  title: "Tarefas Pessoais",
-  url: "/personal-tasks",
+  title: "Lembretes",
+  url: "/reminders",
   icon: User,
   roles: ["agency_admin", "agency_user"]
 }, {

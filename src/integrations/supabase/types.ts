@@ -1507,80 +1507,6 @@ export type Database = {
         }
         Relationships: []
       }
-      personal_tasks: {
-        Row: {
-          agency_id: string | null
-          category: string | null
-          client_id: string | null
-          completed: boolean
-          created_at: string
-          description: string | null
-          due_date: string | null
-          id: string
-          is_routine: boolean
-          title: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          agency_id?: string | null
-          category?: string | null
-          client_id?: string | null
-          completed?: boolean
-          created_at?: string
-          description?: string | null
-          due_date?: string | null
-          id?: string
-          is_routine?: boolean
-          title: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          agency_id?: string | null
-          category?: string | null
-          client_id?: string | null
-          completed?: boolean
-          created_at?: string
-          description?: string | null
-          due_date?: string | null
-          id?: string
-          is_routine?: boolean
-          title?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "personal_tasks_agency_id_fkey"
-            columns: ["agency_id"]
-            isOneToOne: false
-            referencedRelation: "agencies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "personal_tasks_agency_id_fkey"
-            columns: ["agency_id"]
-            isOneToOne: false
-            referencedRelation: "master_agency_overview"
-            referencedColumns: ["agency_id"]
-          },
-          {
-            foreignKeyName: "personal_tasks_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "personal_tasks_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1613,6 +1539,173 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      reminder_lists: {
+        Row: {
+          agency_id: string | null
+          color: string
+          created_at: string
+          icon: string
+          id: string
+          is_default: boolean
+          name: string
+          order_position: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agency_id?: string | null
+          color?: string
+          created_at?: string
+          icon?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          order_position?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agency_id?: string | null
+          color?: string
+          created_at?: string
+          icon?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          order_position?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_lists_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminder_lists_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      reminders: {
+        Row: {
+          agency_id: string | null
+          completed: boolean
+          completed_at: string | null
+          created_at: string
+          id: string
+          is_flagged: boolean
+          last_notification_sent: string | null
+          list_id: string | null
+          notes: string | null
+          notification_enabled: boolean
+          notification_minutes_before: number | null
+          notification_sound: string | null
+          parent_reminder_id: string | null
+          priority: Database["public"]["Enums"]["reminder_priority"]
+          recurrence_count: number | null
+          recurrence_days_of_week: number[] | null
+          recurrence_end_date: string | null
+          recurrence_interval: number | null
+          recurrence_type: Database["public"]["Enums"]["recurrence_type"]
+          reminder_time: string | null
+          subtasks: Json | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agency_id?: string | null
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_flagged?: boolean
+          last_notification_sent?: string | null
+          list_id?: string | null
+          notes?: string | null
+          notification_enabled?: boolean
+          notification_minutes_before?: number | null
+          notification_sound?: string | null
+          parent_reminder_id?: string | null
+          priority?: Database["public"]["Enums"]["reminder_priority"]
+          recurrence_count?: number | null
+          recurrence_days_of_week?: number[] | null
+          recurrence_end_date?: string | null
+          recurrence_interval?: number | null
+          recurrence_type?: Database["public"]["Enums"]["recurrence_type"]
+          reminder_time?: string | null
+          subtasks?: Json | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agency_id?: string | null
+          completed?: boolean
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_flagged?: boolean
+          last_notification_sent?: string | null
+          list_id?: string | null
+          notes?: string | null
+          notification_enabled?: boolean
+          notification_minutes_before?: number | null
+          notification_sound?: string | null
+          parent_reminder_id?: string | null
+          priority?: Database["public"]["Enums"]["reminder_priority"]
+          recurrence_count?: number | null
+          recurrence_days_of_week?: number[] | null
+          recurrence_end_date?: string | null
+          recurrence_interval?: number | null
+          recurrence_type?: Database["public"]["Enums"]["recurrence_type"]
+          reminder_time?: string | null
+          subtasks?: Json | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminders_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminders_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "reminders_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "reminder_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminders_parent_reminder_id_fkey"
+            columns: ["parent_reminder_id"]
+            isOneToOne: false
+            referencedRelation: "reminders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       salaries: {
         Row: {
@@ -2716,6 +2809,14 @@ export type Database = {
         | "workshop"
         | "results"
       payment_status: "pending" | "paid" | "overdue"
+      recurrence_type:
+        | "none"
+        | "daily"
+        | "weekly"
+        | "monthly"
+        | "yearly"
+        | "custom"
+      reminder_priority: "none" | "low" | "medium" | "high"
       subscription_plan: "free" | "basic" | "pro" | "enterprise"
       task_priority: "low" | "medium" | "high"
       task_status: "todo" | "in_progress" | "done" | "em_revisao"
@@ -2867,6 +2968,15 @@ export const Constants = {
         "results",
       ],
       payment_status: ["pending", "paid", "overdue"],
+      recurrence_type: [
+        "none",
+        "daily",
+        "weekly",
+        "monthly",
+        "yearly",
+        "custom",
+      ],
+      reminder_priority: ["none", "low", "medium", "high"],
       subscription_plan: ["free", "basic", "pro", "enterprise"],
       task_priority: ["low", "medium", "high"],
       task_status: ["todo", "in_progress", "done", "em_revisao"],

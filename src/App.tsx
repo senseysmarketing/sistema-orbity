@@ -15,7 +15,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Tasks from "./pages/Tasks";
-import PersonalTasks from "./pages/PersonalTasks";
+import Reminders from "./pages/Reminders";
 import CRM from "./pages/CRM";
 import Agenda from "./pages/Agenda";
 import Traffic from "./pages/Traffic";
@@ -56,7 +56,7 @@ const App = () => (
                       }>
                         <Route index element={<Index />} />
                         <Route path="tasks" element={<Tasks />} />
-                        <Route path="personal-tasks" element={<PersonalTasks />} />
+                        <Route path="reminders" element={<Reminders />} />
                         <Route path="crm" element={<CRM />} />
                         <Route path="agenda" element={<Agenda />} />
                         <Route path="traffic" element={<Traffic />} />
