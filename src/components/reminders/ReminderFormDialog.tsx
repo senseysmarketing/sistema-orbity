@@ -46,12 +46,11 @@ export function ReminderFormDialog({ open, onOpenChange, reminder, onCreate, onU
       setTitle(reminder.title);
       setNotes(reminder.notes || '');
       if (reminder.reminder_time) {
-        // Convert UTC to local timezone
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        // Convert UTC to Brasília timezone
         const utcDate = new Date(reminder.reminder_time);
-        const localDate = toZonedTime(utcDate, timezone);
-        setReminderDate(localDate);
-        setReminderTime(format(localDate, 'HH:mm'));
+        const brasiliaDate = toZonedTime(utcDate, 'America/Sao_Paulo');
+        setReminderDate(brasiliaDate);
+        setReminderTime(format(brasiliaDate, 'HH:mm'));
       }
       setListId(reminder.list_id || '');
       setPriority(reminder.priority);
@@ -93,9 +92,8 @@ export function ReminderFormDialog({ open, onOpenChange, reminder, onCreate, onU
       const dateTime = new Date(reminderDate);
       dateTime.setHours(parseInt(hours), parseInt(minutes));
       
-      // Convert local timezone to UTC
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const utcDate = fromZonedTime(dateTime, timezone);
+      // Convert Brasília timezone to UTC
+      const utcDate = fromZonedTime(dateTime, 'America/Sao_Paulo');
       reminderTimeISO = utcDate.toISOString();
     }
 

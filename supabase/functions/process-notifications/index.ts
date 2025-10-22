@@ -1,9 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
+import { toZonedTime, fromZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
+import { addDays, addHours } from 'https://esm.sh/date-fns@3.6.0';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
+
+const TIMEZONE = 'America/Sao_Paulo';
 
 interface NotificationData {
   user_id: string;
@@ -17,6 +21,26 @@ interface NotificationData {
   metadata?: any;
 }
 
+// ============= TIMEZONE HELPERS =============
+
+function getTodayInBrasilia(): Date {
+  const nowUtc = new Date();
+  const nowBrasilia = toZonedTime(nowUtc, TIMEZONE);
+  nowBrasilia.setHours(0, 0, 0, 0);
+  return nowBrasilia;
+}
+
+function getTomorrowInBrasilia(): Date {
+  const today = getTodayInBrasilia();
+  return addDays(today, 1);
+}
+
+function convertToBrasiliaTime(utcDate: Date): Date {
+  return toZonedTime(utcDate, TIMEZONE);
+}
+
+// ============= NOTIFICATION HELPERS =============
+
 async function createNotification(data: NotificationData) {
   const { error } = await supabase
     .from('notifications')
@@ -27,13 +51,93 @@ async function createNotification(data: NotificationData) {
   }
 }
 
+async function shouldSendNotification(
+  type: string,
+  entityId: string,
+  userId: string,
+  agencyId: string,
+  minIntervalHours: number = 24
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('notification_tracking')
+    .select('last_sent_at')
+    .eq('notification_type', type)
+    .eq('entity_id', entityId)
+    .eq('user_id', userId)
+    .single();
+
+  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    console.error('Error checking notification tracking:', error);
+    return true; // Send on error to be safe
+  }
+
+  if (!data) return true; // First time sending
+
+  const lastSent = new Date(data.last_sent_at);
+  const now = new Date();
+  const hoursSince = (now.getTime() - lastSent.getTime()) / (1000 * 60 * 60);
+
+  return hoursSince >= minIntervalHours;
+}
+
+async function trackNotification(
+  type: string,
+  entityId: string,
+  userId: string,
+  agencyId: string
+) {
+  const { error } = await supabase
+    .from('notification_tracking')
+    .upsert({
+      notification_type: type,
+      entity_id: entityId,
+      user_id: userId,
+      agency_id: agencyId,
+      last_sent_at: new Date().toISOString()
+    }, {
+      onConflict: 'notification_type,entity_id,user_id'
+    });
+
+  if (error) {
+    console.error('Error tracking notification:', error);
+  }
+}
+
+async function checkUserPreferences(userId: string, preferenceType: string): Promise<{ 
+  canSend: boolean; 
+  reason?: string 
+}> {
+  const { data: prefs } = await supabase
+    .from('notification_preferences')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  // Check do not disturb
+  if (prefs?.do_not_disturb_until) {
+    const dndUntil = new Date(prefs.do_not_disturb_until);
+    if (new Date() < dndUntil) {
+      return { canSend: false, reason: 'do_not_disturb' };
+    }
+  }
+
+  // Check if notification type is enabled
+  const prefKey = `${preferenceType}_enabled`;
+  if (prefs && prefs[prefKey] === false) {
+    return { canSend: false, reason: `${preferenceType}_disabled` };
+  }
+
+  return { canSend: true };
+}
+
+// ============= NOTIFICATION PROCESSORS =============
+
 async function processReminders() {
-  console.log('Processing reminder notifications...');
+  console.log(`[${new Date().toISOString()}] Processing reminder notifications...`);
   
   const now = new Date();
-  const in1Hour = new Date(now.getTime() + 60 * 60000);
+  const in1Hour = addHours(now, 1);
 
-  // Get reminders that need notifications (stored in UTC)
   const { data: reminders, error } = await supabase
     .from('reminders')
     .select('*')
@@ -48,30 +152,21 @@ async function processReminders() {
     return;
   }
 
+  console.log(`Found ${reminders?.length || 0} reminders to process`);
+  let sentCount = 0;
+  let skippedCount = 0;
+
   for (const reminder of reminders || []) {
-    // Check if notification was already sent
     const reminderTime = new Date(reminder.reminder_time);
     const minutesBefore = reminder.notification_minutes_before || 0;
     const notificationTime = new Date(reminderTime.getTime() - minutesBefore * 60000);
 
     if (notificationTime <= now && (!reminder.last_notification_sent || new Date(reminder.last_notification_sent) < notificationTime)) {
       // Check user preferences
-      const { data: prefs } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('user_id', reminder.user_id)
-        .single();
-
-      // Check do not disturb
-      const doNotDisturbUntil = prefs?.do_not_disturb_until ? new Date(prefs.do_not_disturb_until) : null;
-      if (doNotDisturbUntil && now < doNotDisturbUntil) {
-        console.log(`User ${reminder.user_id} is in do not disturb mode, skipping notification`);
-        continue;
-      }
-
-      // Check if reminders are enabled
-      if (prefs && !prefs.reminders_enabled) {
-        console.log(`Reminders disabled for user ${reminder.user_id}, skipping notification`);
+      const prefCheck = await checkUserPreferences(reminder.user_id, 'reminders');
+      if (!prefCheck.canSend) {
+        console.log(`Skipping reminder ${reminder.id}: ${prefCheck.reason}`);
+        skippedCount++;
         continue;
       }
 
@@ -97,36 +192,63 @@ async function processReminders() {
         .update({ last_notification_sent: now.toISOString() })
         .eq('id', reminder.id);
       
+      sentCount++;
       console.log(`Notification sent for reminder ${reminder.id}`);
     }
   }
+
+  console.log(`Reminders: sent ${sentCount}, skipped ${skippedCount}`);
 }
 
 async function processTasks() {
-  console.log('Processing task notifications...');
+  console.log(`[${new Date().toISOString()}] Processing task notifications...`);
   
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const todayBrasilia = getTodayInBrasilia();
+  const tomorrowBrasilia = getTomorrowInBrasilia();
 
-  // Get tasks due today
   const { data: tasks, error } = await supabase
     .from('tasks')
     .select('*, task_assignments(user_id)')
-    .eq('completed', false)
-    .gte('due_date', today.toISOString())
-    .lt('due_date', tomorrow.toISOString());
+    .neq('status', 'completed')
+    .gte('due_date', todayBrasilia.toISOString())
+    .lt('due_date', tomorrowBrasilia.toISOString());
 
   if (error) {
     console.error('Error fetching tasks:', error);
     return;
   }
 
+  console.log(`Found ${tasks?.length || 0} tasks to process`);
+  let sentCount = 0;
+  let skippedCount = 0;
+
   for (const task of tasks || []) {
     const assignments = task.task_assignments || [];
     
     for (const assignment of assignments) {
+      // Check deduplication
+      const shouldSend = await shouldSendNotification(
+        'task',
+        task.id,
+        assignment.user_id,
+        task.agency_id,
+        24 // Don't resend within 24 hours
+      );
+
+      if (!shouldSend) {
+        console.log(`Skipping duplicate task notification ${task.id} for user ${assignment.user_id}`);
+        skippedCount++;
+        continue;
+      }
+
+      // Check user preferences
+      const prefCheck = await checkUserPreferences(assignment.user_id, 'tasks');
+      if (!prefCheck.canSend) {
+        console.log(`Skipping task ${task.id}: ${prefCheck.reason}`);
+        skippedCount++;
+        continue;
+      }
+
       await createNotification({
         user_id: assignment.user_id,
         agency_id: task.agency_id,
@@ -138,32 +260,38 @@ async function processTasks() {
         action_label: 'Ver tarefa',
         metadata: { task_id: task.id },
       });
+
+      await trackNotification('task', task.id, assignment.user_id, task.agency_id);
+      sentCount++;
+      console.log(`Notification sent for task ${task.id} to user ${assignment.user_id}`);
     }
   }
+
+  console.log(`Tasks: sent ${sentCount}, skipped ${skippedCount}`);
 }
 
 async function processPosts() {
-  console.log('Processing post notifications...');
+  console.log(`[${new Date().toISOString()}] Processing post notifications...`);
   
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const todayBrasilia = getTodayInBrasilia();
+  const tomorrowBrasilia = getTomorrowInBrasilia();
 
-  // Get posts scheduled for today
   const { data: posts, error } = await supabase
     .from('social_media_posts')
     .select('*')
     .in('status', ['approved', 'scheduled'])
-    .gte('scheduled_date', today.toISOString())
-    .lt('scheduled_date', tomorrow.toISOString());
+    .gte('scheduled_date', todayBrasilia.toISOString())
+    .lt('scheduled_date', tomorrowBrasilia.toISOString());
 
   if (error) {
     console.error('Error fetching posts:', error);
     return;
   }
 
-  // Get all users in each agency
+  console.log(`Found ${posts?.length || 0} posts to process`);
+  let sentCount = 0;
+  let skippedCount = 0;
+
   for (const post of posts || []) {
     const { data: users } = await supabase
       .from('agency_users')
@@ -171,6 +299,29 @@ async function processPosts() {
       .eq('agency_id', post.agency_id);
 
     for (const user of users || []) {
+      // Check deduplication
+      const shouldSend = await shouldSendNotification(
+        'post',
+        post.id,
+        user.user_id,
+        post.agency_id,
+        24
+      );
+
+      if (!shouldSend) {
+        console.log(`Skipping duplicate post notification ${post.id} for user ${user.user_id}`);
+        skippedCount++;
+        continue;
+      }
+
+      // Check user preferences
+      const prefCheck = await checkUserPreferences(user.user_id, 'posts');
+      if (!prefCheck.canSend) {
+        console.log(`Skipping post ${post.id}: ${prefCheck.reason}`);
+        skippedCount++;
+        continue;
+      }
+
       await createNotification({
         user_id: user.user_id,
         agency_id: post.agency_id,
@@ -182,19 +333,22 @@ async function processPosts() {
         action_label: 'Ver post',
         metadata: { post_id: post.id },
       });
+
+      await trackNotification('post', post.id, user.user_id, post.agency_id);
+      sentCount++;
+      console.log(`Notification sent for post ${post.id} to user ${user.user_id}`);
     }
   }
+
+  console.log(`Posts: sent ${sentCount}, skipped ${skippedCount}`);
 }
 
 async function processPayments() {
-  console.log('Processing payment notifications...');
+  console.log(`[${new Date().toISOString()}] Processing payment notifications...`);
   
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const in3Days = new Date(today);
-  in3Days.setDate(in3Days.getDate() + 3);
+  const todayBrasilia = getTodayInBrasilia();
+  const in3Days = addDays(todayBrasilia, 3);
 
-  // Get payments due in 3 days or overdue
   const { data: payments, error } = await supabase
     .from('client_payments')
     .select('*, clients(name)')
@@ -206,11 +360,14 @@ async function processPayments() {
     return;
   }
 
+  console.log(`Found ${payments?.length || 0} payments to process`);
+  let sentCount = 0;
+  let skippedCount = 0;
+
   for (const payment of payments || []) {
     const dueDate = new Date(payment.due_date);
-    const isOverdue = dueDate < today;
+    const isOverdue = dueDate < todayBrasilia;
     
-    // Get agency admins
     const { data: admins } = await supabase
       .from('agency_users')
       .select('user_id')
@@ -218,6 +375,30 @@ async function processPayments() {
       .in('role', ['owner', 'admin']);
 
     for (const admin of admins || []) {
+      // Different intervals for overdue vs upcoming
+      const minInterval = isOverdue ? 12 : 24;
+      
+      const shouldSend = await shouldSendNotification(
+        'payment',
+        payment.id,
+        admin.user_id,
+        payment.agency_id,
+        minInterval
+      );
+
+      if (!shouldSend) {
+        console.log(`Skipping duplicate payment notification ${payment.id} for user ${admin.user_id}`);
+        skippedCount++;
+        continue;
+      }
+
+      const prefCheck = await checkUserPreferences(admin.user_id, 'payments');
+      if (!prefCheck.canSend) {
+        console.log(`Skipping payment ${payment.id}: ${prefCheck.reason}`);
+        skippedCount++;
+        continue;
+      }
+
       await createNotification({
         user_id: admin.user_id,
         agency_id: payment.agency_id,
@@ -229,17 +410,21 @@ async function processPayments() {
         action_label: 'Ver pagamento',
         metadata: { payment_id: payment.id },
       });
+
+      await trackNotification('payment', payment.id, admin.user_id, payment.agency_id);
+      sentCount++;
+      console.log(`Notification sent for payment ${payment.id} to admin ${admin.user_id}`);
     }
   }
+
+  console.log(`Payments: sent ${sentCount}, skipped ${skippedCount}`);
 }
 
 async function processLeads() {
-  console.log('Processing lead notifications...');
+  console.log(`[${new Date().toISOString()}] Processing lead notifications...`);
   
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const sevenDaysAgo = addDays(new Date(), -7);
 
-  // Get leads without follow-up for 7 days
   const { data: leads, error } = await supabase
     .from('leads')
     .select('*')
@@ -251,30 +436,60 @@ async function processLeads() {
     return;
   }
 
+  console.log(`Found ${leads?.length || 0} leads to process`);
+  let sentCount = 0;
+  let skippedCount = 0;
+
   for (const lead of leads || []) {
-    if (lead.assigned_to) {
-      await createNotification({
-        user_id: lead.assigned_to,
-        agency_id: lead.agency_id,
-        type: 'lead',
-        priority: lead.priority === 'high' ? 'high' : 'medium',
-        title: '🎯 Lead precisa de follow-up',
-        message: `${lead.name} - sem contato há 7 dias`,
-        action_url: '/crm',
-        action_label: 'Ver lead',
-        metadata: { lead_id: lead.id },
-      });
+    if (!lead.assigned_to) continue;
+
+    const shouldSend = await shouldSendNotification(
+      'lead',
+      lead.id,
+      lead.assigned_to,
+      lead.agency_id,
+      24
+    );
+
+    if (!shouldSend) {
+      console.log(`Skipping duplicate lead notification ${lead.id}`);
+      skippedCount++;
+      continue;
     }
+
+    const prefCheck = await checkUserPreferences(lead.assigned_to, 'leads');
+    if (!prefCheck.canSend) {
+      console.log(`Skipping lead ${lead.id}: ${prefCheck.reason}`);
+      skippedCount++;
+      continue;
+    }
+
+    await createNotification({
+      user_id: lead.assigned_to,
+      agency_id: lead.agency_id,
+      type: 'lead',
+      priority: lead.priority === 'high' ? 'high' : 'medium',
+      title: '🎯 Lead precisa de follow-up',
+      message: `${lead.name} - sem contato há 7 dias`,
+      action_url: '/crm',
+      action_label: 'Ver lead',
+      metadata: { lead_id: lead.id },
+    });
+
+    await trackNotification('lead', lead.id, lead.assigned_to, lead.agency_id);
+    sentCount++;
+    console.log(`Notification sent for lead ${lead.id}`);
   }
+
+  console.log(`Leads: sent ${sentCount}, skipped ${skippedCount}`);
 }
 
 async function processMeetings() {
-  console.log('Processing meeting notifications...');
+  console.log(`[${new Date().toISOString()}] Processing meeting notifications...`);
   
   const now = new Date();
-  const in1Hour = new Date(now.getTime() + 60 * 60000);
+  const in1Hour = addHours(now, 1);
 
-  // Get meetings in the next hour
   const { data: meetings, error } = await supabase
     .from('meetings')
     .select('*')
@@ -287,26 +502,26 @@ async function processMeetings() {
     return;
   }
 
+  console.log(`Found ${meetings?.length || 0} meetings to process`);
+  let sentCount = 0;
+  let skippedCount = 0;
+
   for (const meeting of meetings || []) {
     // Notify organizer
-    await createNotification({
-      user_id: meeting.organizer_id,
-      agency_id: meeting.agency_id,
-      type: 'meeting',
-      priority: 'high',
-      title: '📅 Reunião em 1 hora',
-      message: meeting.title,
-      action_url: '/agenda',
-      action_label: 'Ver reunião',
-      metadata: { meeting_id: meeting.id },
-    });
+    const shouldSendOrganizer = await shouldSendNotification(
+      'meeting',
+      meeting.id,
+      meeting.organizer_id,
+      meeting.agency_id,
+      2 // Can notify again 2 hours later if still upcoming
+    );
 
-    // Notify participants
-    const participants = meeting.participants || [];
-    for (const participant of participants) {
-      if (participant.user_id) {
+    if (shouldSendOrganizer) {
+      const prefCheck = await checkUserPreferences(meeting.organizer_id, 'meetings');
+      
+      if (prefCheck.canSend) {
         await createNotification({
-          user_id: participant.user_id,
+          user_id: meeting.organizer_id,
           agency_id: meeting.agency_id,
           type: 'meeting',
           priority: 'high',
@@ -316,14 +531,70 @@ async function processMeetings() {
           action_label: 'Ver reunião',
           metadata: { meeting_id: meeting.id },
         });
+
+        await trackNotification('meeting', meeting.id, meeting.organizer_id, meeting.agency_id);
+        sentCount++;
+        console.log(`Notification sent for meeting ${meeting.id} to organizer`);
+      } else {
+        skippedCount++;
       }
+    } else {
+      skippedCount++;
+    }
+
+    // Notify participants
+    const participants = meeting.participants || [];
+    for (const participant of participants) {
+      if (!participant.user_id) continue;
+
+      const shouldSendParticipant = await shouldSendNotification(
+        'meeting',
+        meeting.id,
+        participant.user_id,
+        meeting.agency_id,
+        2
+      );
+
+      if (!shouldSendParticipant) {
+        skippedCount++;
+        continue;
+      }
+
+      const prefCheck = await checkUserPreferences(participant.user_id, 'meetings');
+      if (!prefCheck.canSend) {
+        console.log(`Skipping meeting ${meeting.id} for participant: ${prefCheck.reason}`);
+        skippedCount++;
+        continue;
+      }
+
+      await createNotification({
+        user_id: participant.user_id,
+        agency_id: meeting.agency_id,
+        type: 'meeting',
+        priority: 'high',
+        title: '📅 Reunião em 1 hora',
+        message: meeting.title,
+        action_url: '/agenda',
+        action_label: 'Ver reunião',
+        metadata: { meeting_id: meeting.id },
+      });
+
+      await trackNotification('meeting', meeting.id, participant.user_id, meeting.agency_id);
+      sentCount++;
+      console.log(`Notification sent for meeting ${meeting.id} to participant ${participant.user_id}`);
     }
   }
+
+  console.log(`Meetings: sent ${sentCount}, skipped ${skippedCount}`);
 }
+
+// ============= MAIN HANDLER =============
 
 Deno.serve(async (req) => {
   try {
-    console.log('Starting notification processing...');
+    console.log(`\n========== NOTIFICATION PROCESSING STARTED: ${new Date().toISOString()} ==========`);
+    console.log(`Timezone: ${TIMEZONE}`);
+    console.log(`Today in Brasilia: ${getTodayInBrasilia().toISOString()}`);
 
     await Promise.all([
       processReminders(),
@@ -334,16 +605,25 @@ Deno.serve(async (req) => {
       processMeetings(),
     ]);
 
-    console.log('Notification processing completed');
+    console.log('========== NOTIFICATION PROCESSING COMPLETED ==========\n');
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Notifications processed' }),
+      JSON.stringify({ 
+        success: true, 
+        message: 'Notifications processed',
+        timestamp: new Date().toISOString(),
+        timezone: TIMEZONE
+      }),
       { headers: { 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error processing notifications:', error);
+    console.error('========== ERROR PROCESSING NOTIFICATIONS ==========');
+    console.error(error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        timestamp: new Date().toISOString()
+      }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }

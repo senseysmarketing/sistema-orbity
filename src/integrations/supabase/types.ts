@@ -1514,6 +1514,7 @@ export type Database = {
           created_at: string
           do_not_disturb_end: string | null
           do_not_disturb_start: string | null
+          do_not_disturb_until: string | null
           email_digest: boolean
           id: string
           leads_enabled: boolean
@@ -1532,6 +1533,7 @@ export type Database = {
           created_at?: string
           do_not_disturb_end?: string | null
           do_not_disturb_start?: string | null
+          do_not_disturb_until?: string | null
           email_digest?: boolean
           id?: string
           leads_enabled?: boolean
@@ -1550,6 +1552,7 @@ export type Database = {
           created_at?: string
           do_not_disturb_end?: string | null
           do_not_disturb_start?: string | null
+          do_not_disturb_until?: string | null
           email_digest?: boolean
           id?: string
           leads_enabled?: boolean
@@ -1578,6 +1581,36 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
         ]
+      }
+      notification_tracking: {
+        Row: {
+          agency_id: string
+          created_at: string
+          entity_id: string
+          id: string
+          last_sent_at: string
+          notification_type: string
+          user_id: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          entity_id: string
+          id?: string
+          last_sent_at?: string
+          notification_type: string
+          user_id: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          entity_id?: string
+          id?: string
+          last_sent_at?: string
+          notification_type?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -2882,6 +2915,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      cleanup_old_notification_tracking: { Args: never; Returns: undefined }
       enforce_plan_limits: {
         Args: {
           agency_uuid: string
