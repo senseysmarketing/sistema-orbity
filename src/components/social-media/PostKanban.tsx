@@ -224,9 +224,9 @@ export function PostKanban() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-hidden">
         <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 pb-4">
+          <div className="flex gap-6 overflow-x-auto pb-4 h-full scroll-smooth scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
             {allColumns.map(column => (
               <PostKanbanColumn
                 key={column.id}
