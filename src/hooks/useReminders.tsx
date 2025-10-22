@@ -112,11 +112,23 @@ export function useReminders() {
         user_id: user.id,
       };
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('reminders')
-        .insert([insertData]);
+        .insert([insertData])
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Atualização otimista do cache local
+      if (data) {
+        const newReminder = {
+          ...data,
+          subtasks: typeof data.subtasks === 'string' ? JSON.parse(data.subtasks) : (data.subtasks || []),
+          tags: data.tags || [],
+        };
+        setReminders(prev => [...prev, newReminder as Reminder]);
+      }
 
       toast({
         title: "Lembrete criado",
@@ -139,12 +151,24 @@ export function useReminders() {
       delete updateData.created_at;
       delete updateData.updated_at;
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('reminders')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Atualização otimista do cache local
+      if (data) {
+        const updatedReminder = {
+          ...data,
+          subtasks: typeof data.subtasks === 'string' ? JSON.parse(data.subtasks) : (data.subtasks || []),
+          tags: data.tags || [],
+        };
+        setReminders(prev => prev.map(r => r.id === id ? updatedReminder as Reminder : r));
+      }
 
       toast({
         title: "Lembrete atualizado",
@@ -161,6 +185,13 @@ export function useReminders() {
 
   const toggleReminder = async (id: string, completed: boolean) => {
     try {
+      // Atualização otimista do cache local
+      setReminders(prev => prev.map(r => 
+        r.id === id 
+          ? { ...r, completed, completed_at: completed ? new Date().toISOString() : null }
+          : r
+      ));
+
       const { error } = await supabase
         .from('reminders')
         .update({
@@ -176,6 +207,12 @@ export function useReminders() {
         audio.play().catch(() => {});
       }
     } catch (error: any) {
+      // Reverter em caso de erro
+      setReminders(prev => prev.map(r => 
+        r.id === id 
+          ? { ...r, completed: !completed, completed_at: !completed ? new Date().toISOString() : null }
+          : r
+      ));
       toast({
         title: "Erro ao atualizar lembrete",
         description: error.message,
@@ -186,12 +223,24 @@ export function useReminders() {
 
   const deleteReminder = async (id: string) => {
     try {
+      // Backup para possível reversão
+      const backup = reminders.find(r => r.id === id);
+      
+      // Atualização otimista do cache local
+      setReminders(prev => prev.filter(r => r.id !== id));
+
       const { error } = await supabase
         .from('reminders')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        // Reverter em caso de erro
+        if (backup) {
+          setReminders(prev => [...prev, backup]);
+        }
+        throw error;
+      }
 
       toast({
         title: "Lembrete removido",
