@@ -12,6 +12,7 @@ import { Reminder, RecurrenceType, ReminderPriority } from '@/hooks/useReminders
 import { ReminderList, useReminderLists } from '@/hooks/useReminderLists';
 import { CalendarIcon, Bell, Flag, List, Repeat, Plus, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { cn } from '@/lib/utils';
 
 interface ReminderFormDialogProps {
@@ -45,9 +46,12 @@ export function ReminderFormDialog({ open, onOpenChange, reminder, onCreate, onU
       setTitle(reminder.title);
       setNotes(reminder.notes || '');
       if (reminder.reminder_time) {
-        const date = new Date(reminder.reminder_time);
-        setReminderDate(date);
-        setReminderTime(format(date, 'HH:mm'));
+        // Convert UTC to local timezone
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const utcDate = new Date(reminder.reminder_time);
+        const localDate = toZonedTime(utcDate, timezone);
+        setReminderDate(localDate);
+        setReminderTime(format(localDate, 'HH:mm'));
       }
       setListId(reminder.list_id || '');
       setPriority(reminder.priority);
@@ -88,7 +92,11 @@ export function ReminderFormDialog({ open, onOpenChange, reminder, onCreate, onU
       const [hours, minutes] = reminderTime ? reminderTime.split(':') : ['00', '00'];
       const dateTime = new Date(reminderDate);
       dateTime.setHours(parseInt(hours), parseInt(minutes));
-      reminderTimeISO = dateTime.toISOString();
+      
+      // Convert local timezone to UTC
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const utcDate = fromZonedTime(dateTime, timezone);
+      reminderTimeISO = utcDate.toISOString();
     }
 
     const data = {

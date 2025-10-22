@@ -31,10 +31,9 @@ async function processReminders() {
   console.log('Processing reminder notifications...');
   
   const now = new Date();
-  const in15Minutes = new Date(now.getTime() + 15 * 60000);
   const in1Hour = new Date(now.getTime() + 60 * 60000);
 
-  // Get reminders that need notifications
+  // Get reminders that need notifications (stored in UTC)
   const { data: reminders, error } = await supabase
     .from('reminders')
     .select('*')
