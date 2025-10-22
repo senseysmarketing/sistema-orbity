@@ -118,9 +118,16 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
 
       if (lead) {
         // Update existing lead
+        const finalUpdates: any = { ...leadData };
+        
+        // Reset follow_up_notification_sent_at if last_contact changed
+        if (leadData.last_contact !== lead.last_contact) {
+          finalUpdates.follow_up_notification_sent_at = null;
+        }
+        
         const { error } = await supabase
           .from('leads')
-          .update(leadData)
+          .update(finalUpdates)
           .eq('id', lead.id);
 
         if (error) throw error;
@@ -132,6 +139,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
           .insert({
             ...leadData,
             created_by: profile.user_id,
+            follow_up_notification_sent_at: null, // Garantir que notificação será enviada
           });
 
         if (error) throw error;

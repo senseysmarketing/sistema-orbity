@@ -438,17 +438,25 @@ export default function Tasks() {
     }
 
     try {
+      const updates: any = {
+        title: newTask.title,
+        description: newTask.description,
+        status: newTask.status,
+        priority: newTask.priority,
+        assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
+        client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
+        due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
+      };
+
+      // Reset notification_sent_at if due_date changed
+      const originalDueDate = selectedTask.due_date ? selectedTask.due_date.split('T')[0] : null;
+      if (newTask.due_date !== originalDueDate) {
+        updates.notification_sent_at = null;
+      }
+
       const { error } = await supabase
         .from("tasks")
-        .update({
-          title: newTask.title,
-          description: newTask.description,
-          status: newTask.status,
-          priority: newTask.priority,
-          assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
-          client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
-          due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
-        })
+        .update(updates)
         .eq("id", selectedTask.id);
 
       if (error) throw error;

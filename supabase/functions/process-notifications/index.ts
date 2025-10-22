@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
-import { toZonedTime, fromZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
+import { toZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
 import { addDays, addHours } from 'https://esm.sh/date-fns@3.6.0';
 
 const supabase = createClient(
@@ -8,6 +8,11 @@ const supabase = createClient(
 );
 
 const TIMEZONE = 'America/Sao_Paulo';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 interface NotificationData {
   user_id: string;
@@ -21,7 +26,90 @@ interface NotificationData {
   metadata?: any;
 }
 
-// ============= TIMEZONE HELPERS =============
+interface BatchTrackingRecord {
+  notification_type: string;
+  entity_id: string;
+  user_id: string;
+  agency_id: string;
+}
+
+// ============================================
+// BATCH PROCESSING HELPERS
+// ============================================
+
+async function batchCheckNotifications(
+  records: BatchTrackingRecord[],
+  minIntervalHours: number = 24
+): Promise<Set<string>> {
+  if (records.length === 0) return new Set();
+
+  const entityIds = [...new Set(records.map(r => r.entity_id))];
+  const userIds = [...new Set(records.map(r => r.user_id))];
+  
+  const { data, error } = await supabase
+    .from('notification_tracking')
+    .select('entity_id, user_id, last_sent_at')
+    .in('entity_id', entityIds)
+    .in('user_id', userIds);
+
+  if (error) {
+    console.error('Error batch checking notifications:', error);
+    return new Set();
+  }
+
+  const recentlySent = new Set<string>();
+  const now = new Date();
+
+  data?.forEach(record => {
+    const lastSent = new Date(record.last_sent_at);
+    const hoursSince = (now.getTime() - lastSent.getTime()) / (1000 * 60 * 60);
+    
+    if (hoursSince < minIntervalHours) {
+      recentlySent.add(`${record.entity_id}_${record.user_id}`);
+    }
+  });
+
+  return recentlySent;
+}
+
+async function batchTrackNotifications(records: BatchTrackingRecord[]) {
+  if (records.length === 0) return;
+
+  const now = new Date().toISOString();
+  const upsertData = records.map(r => ({
+    notification_type: r.notification_type,
+    entity_id: r.entity_id,
+    user_id: r.user_id,
+    agency_id: r.agency_id,
+    last_sent_at: now
+  }));
+
+  const { error } = await supabase
+    .from('notification_tracking')
+    .upsert(upsertData, {
+      onConflict: 'notification_type,entity_id,user_id'
+    });
+
+  if (error) {
+    console.error('Error batch tracking notifications:', error);
+  }
+}
+
+async function batchCreateNotifications(notifications: NotificationData[]) {
+  if (notifications.length === 0) return;
+
+  const { error } = await supabase
+    .from('notifications')
+    .insert(notifications);
+
+  if (error) {
+    console.error('Error batch creating notifications:', error);
+  }
+}
+
+// ============================================
+// USER PREFERENCES & UTILITY FUNCTIONS
+// ============================================
 
 function getTodayInBrasilia(): Date {
   const nowUtc = new Date();
@@ -30,116 +118,49 @@ function getTodayInBrasilia(): Date {
   return nowBrasilia;
 }
 
-function getTomorrowInBrasilia(): Date {
-  const today = getTodayInBrasilia();
-  return addDays(today, 1);
-}
-
-function convertToBrasiliaTime(utcDate: Date): Date {
-  return toZonedTime(utcDate, TIMEZONE);
-}
-
-// ============= NOTIFICATION HELPERS =============
-
-async function createNotification(data: NotificationData) {
-  const { error } = await supabase
-    .from('notifications')
-    .insert(data);
-
-  if (error) {
-    console.error('Error creating notification:', error);
-  }
-}
-
-async function shouldSendNotification(
-  type: string,
-  entityId: string,
+async function checkUserPreferences(
   userId: string,
   agencyId: string,
-  minIntervalHours: number = 24
+  notificationType: string
 ): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('notification_tracking')
-    .select('last_sent_at')
-    .eq('notification_type', type)
-    .eq('entity_id', entityId)
-    .eq('user_id', userId)
-    .single();
-
-  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-    console.error('Error checking notification tracking:', error);
-    return true; // Send on error to be safe
-  }
-
-  if (!data) return true; // First time sending
-
-  const lastSent = new Date(data.last_sent_at);
-  const now = new Date();
-  const hoursSince = (now.getTime() - lastSent.getTime()) / (1000 * 60 * 60);
-
-  return hoursSince >= minIntervalHours;
-}
-
-async function trackNotification(
-  type: string,
-  entityId: string,
-  userId: string,
-  agencyId: string
-) {
-  const { error } = await supabase
-    .from('notification_tracking')
-    .upsert({
-      notification_type: type,
-      entity_id: entityId,
-      user_id: userId,
-      agency_id: agencyId,
-      last_sent_at: new Date().toISOString()
-    }, {
-      onConflict: 'notification_type,entity_id,user_id'
-    });
-
-  if (error) {
-    console.error('Error tracking notification:', error);
-  }
-}
-
-async function checkUserPreferences(userId: string, preferenceType: string): Promise<{ 
-  canSend: boolean; 
-  reason?: string 
-}> {
-  const { data: prefs } = await supabase
+  const { data: preferences } = await supabase
     .from('notification_preferences')
     .select('*')
     .eq('user_id', userId)
-    .single();
+    .eq('agency_id', agencyId)
+    .maybeSingle();
 
-  // Check do not disturb
-  if (prefs?.do_not_disturb_until) {
-    const dndUntil = new Date(prefs.do_not_disturb_until);
-    if (new Date() < dndUntil) {
-      return { canSend: false, reason: 'do_not_disturb' };
-    }
+  if (!preferences) return true;
+
+  const typeEnabled = {
+    'reminders': preferences.reminders_enabled,
+    'tasks': preferences.tasks_enabled,
+    'posts': preferences.posts_enabled,
+    'payments': preferences.payments_enabled,
+    'leads': preferences.leads_enabled,
+    'meetings': preferences.meetings_enabled,
+    'system': preferences.system_enabled,
+  }[notificationType];
+
+  if (typeEnabled === false) return false;
+
+  if (preferences.do_not_disturb_until && new Date(preferences.do_not_disturb_until) > new Date()) {
+    return false;
   }
 
-  // Check if notification type is enabled
-  const prefKey = `${preferenceType}_enabled`;
-  if (prefs && prefs[prefKey] === false) {
-    return { canSend: false, reason: `${preferenceType}_disabled` };
-  }
-
-  return { canSend: true };
+  return true;
 }
 
-// ============= NOTIFICATION PROCESSORS =============
+// ============================================
+// NOTIFICATION PROCESSORS
+// ============================================
 
 async function processReminders() {
-  console.log(`[${new Date().toISOString()}] Processing reminder notifications...`);
+  console.log('⏰ Processing reminder notifications...');
   
   const now = new Date();
   const in2Hours = addHours(now, 2);
 
-  // Buscar lembretes que devem notificar nas próximas 2 horas
-  // Isso cobre lembretes com até 60 min de antecedência
   const { data: reminders, error } = await supabase
     .from('reminders')
     .select('*')
@@ -153,30 +174,20 @@ async function processReminders() {
     return;
   }
 
-  console.log(`Found ${reminders?.length || 0} reminders to process`);
-  let sentCount = 0;
-  let skippedCount = 0;
+  console.log(`📊 Found ${reminders?.length || 0} reminders to process`);
+
+  const notificationsToCreate: NotificationData[] = [];
+  const remindersToUpdate: { id: string; last_notification_sent: string }[] = [];
 
   for (const reminder of reminders || []) {
     const reminderTime = new Date(reminder.reminder_time);
     const minutesBefore = reminder.notification_minutes_before || 0;
     const notificationTime = new Date(reminderTime.getTime() - minutesBefore * 60000);
 
-    // Verificar se já passou da hora de notificar e se ainda não foi enviada
-    const alreadySent = reminder.last_notification_sent && new Date(reminder.last_notification_sent) >= notificationTime;
+    const alreadySent = reminder.last_notification_sent && 
+      new Date(reminder.last_notification_sent) >= notificationTime;
     
     if (notificationTime <= now && !alreadySent) {
-      console.log(`Processing reminder ${reminder.id} - Notification time: ${notificationTime.toISOString()}, Reminder time: ${reminderTime.toISOString()}`);
-      
-      // Check user preferences
-      const prefCheck = await checkUserPreferences(reminder.user_id, 'reminders');
-      if (!prefCheck.canSend) {
-        console.log(`Skipping reminder ${reminder.id}: ${prefCheck.reason}`);
-        skippedCount++;
-        continue;
-      }
-
-      // Get agency_id from reminder or from user's agency
       let agencyId = reminder.agency_id;
       if (!agencyId) {
         const { data: userAgency } = await supabase
@@ -187,7 +198,10 @@ async function processReminders() {
         agencyId = userAgency?.agency_id;
       }
 
-      await createNotification({
+      const canSend = await checkUserPreferences(reminder.user_id, agencyId, 'reminders');
+      if (!canSend) continue;
+
+      notificationsToCreate.push({
         user_id: reminder.user_id,
         agency_id: agencyId,
         type: 'reminder',
@@ -198,84 +212,77 @@ async function processReminders() {
         action_label: 'Ver lembrete',
         metadata: { 
           reminder_id: reminder.id,
-          play_sound: true,
-          notification_sound: reminder.notification_sound || 'default'
+          play_sound: true
         },
       });
 
-      // Update last notification sent
-      await supabase
-        .from('reminders')
-        .update({ last_notification_sent: now.toISOString() })
-        .eq('id', reminder.id);
-      
-      sentCount++;
-      console.log(`✅ Notification sent for reminder ${reminder.id}`);
-    } else if (alreadySent) {
-      console.log(`⏭️ Reminder ${reminder.id} already sent at ${reminder.last_notification_sent}`);
-    } else {
-      console.log(`⏰ Reminder ${reminder.id} not ready yet - will notify at ${notificationTime.toISOString()}`);
+      remindersToUpdate.push({
+        id: reminder.id,
+        last_notification_sent: now.toISOString()
+      });
     }
   }
 
-  console.log(`Reminders: sent ${sentCount}, skipped ${skippedCount}`);
+  await batchCreateNotifications(notificationsToCreate);
+
+  // Update last_notification_sent for reminders
+  for (const update of remindersToUpdate) {
+    await supabase
+      .from('reminders')
+      .update({ last_notification_sent: update.last_notification_sent })
+      .eq('id', update.id);
+  }
+
+  console.log(`✅ Created ${notificationsToCreate.length} reminder notifications`);
 }
 
 async function processTasks() {
-  console.log(`[${new Date().toISOString()}] Processing task notifications...`);
+  console.log('📋 Processing task notifications...');
   
-  const todayBrasilia = getTodayInBrasilia();
-  const tomorrowBrasilia = getTomorrowInBrasilia();
+  const now = new Date();
+  const in24Hours = addHours(now, 24);
+  const oneDayAgo = addHours(now, -24);
 
+  // Query OTIMIZADA: usa o novo campo notification_sent_at
   const { data: tasks, error } = await supabase
     .from('tasks')
-    .select('*, task_assignments(user_id)')
+    .select(`
+      id,
+      title,
+      due_date,
+      agency_id,
+      notification_sent_at,
+      task_assignments(user_id)
+    `)
     .neq('status', 'done')
-    .gte('due_date', todayBrasilia.toISOString())
-    .lt('due_date', tomorrowBrasilia.toISOString());
+    .eq('archived', false)
+    .gte('due_date', now.toISOString())
+    .lte('due_date', in24Hours.toISOString())
+    .or(`notification_sent_at.is.null,notification_sent_at.lt.${oneDayAgo.toISOString()}`);
 
   if (error) {
     console.error('Error fetching tasks:', error);
     return;
   }
 
-  console.log(`Found ${tasks?.length || 0} tasks to process`);
-  let sentCount = 0;
-  let skippedCount = 0;
+  console.log(`📊 Found ${tasks?.length || 0} tasks to notify`);
+
+  const notificationsToCreate: NotificationData[] = [];
+  const tasksToUpdate: string[] = [];
 
   for (const task of tasks || []) {
-    const assignments = task.task_assignments || [];
-    
-    for (const assignment of assignments) {
-      // Check deduplication
-      const shouldSend = await shouldSendNotification(
-        'task',
-        task.id,
-        assignment.user_id,
-        task.agency_id,
-        24 // Don't resend within 24 hours
-      );
+    if (!task.agency_id) continue;
 
-      if (!shouldSend) {
-        console.log(`Skipping duplicate task notification ${task.id} for user ${assignment.user_id}`);
-        skippedCount++;
-        continue;
-      }
+    for (const assignment of task.task_assignments || []) {
+      const canSend = await checkUserPreferences(assignment.user_id, task.agency_id, 'tasks');
+      if (!canSend) continue;
 
-      // Check user preferences
-      const prefCheck = await checkUserPreferences(assignment.user_id, 'tasks');
-      if (!prefCheck.canSend) {
-        console.log(`Skipping task ${task.id}: ${prefCheck.reason}`);
-        skippedCount++;
-        continue;
-      }
-
-      await createNotification({
+      notificationsToCreate.push({
         user_id: assignment.user_id,
         agency_id: task.agency_id,
         type: 'task',
-        priority: 'high',
-        title: '📋 Tarefa para hoje',
+        priority: 'medium',
+        title: '📋 Tarefa próxima do prazo',
         message: task.title,
         action_url: '/tasks',
         action_label: 'Ver tarefa',
@@ -284,74 +291,75 @@ async function processTasks() {
           play_sound: true
         },
       });
+    }
 
-      await trackNotification('task', task.id, assignment.user_id, task.agency_id);
-      sentCount++;
-      console.log(`Notification sent for task ${task.id} to user ${assignment.user_id}`);
+    if (task.task_assignments && task.task_assignments.length > 0) {
+      tasksToUpdate.push(task.id);
     }
   }
 
-  console.log(`Tasks: sent ${sentCount}, skipped ${skippedCount}`);
+  await batchCreateNotifications(notificationsToCreate);
+
+  if (tasksToUpdate.length > 0) {
+    await supabase
+      .from('tasks')
+      .update({ notification_sent_at: new Date().toISOString() })
+      .in('id', tasksToUpdate);
+  }
+
+  console.log(`✅ Created ${notificationsToCreate.length} task notifications`);
 }
 
 async function processPosts() {
-  console.log(`[${new Date().toISOString()}] Processing post notifications...`);
+  console.log('📱 Processing post notifications...');
   
-  const todayBrasilia = getTodayInBrasilia();
-  const tomorrowBrasilia = getTomorrowInBrasilia();
+  const now = new Date();
+  const in3Hours = addHours(now, 3);
+  const oneDayAgo = addHours(now, -24);
 
+  // Query OTIMIZADA
   const { data: posts, error } = await supabase
     .from('social_media_posts')
-    .select('*')
-    .in('status', ['approved', 'scheduled'])
-    .gte('scheduled_date', todayBrasilia.toISOString())
-    .lt('scheduled_date', tomorrowBrasilia.toISOString());
+    .select(`
+      id,
+      title,
+      scheduled_date,
+      agency_id,
+      notification_sent_at,
+      agencies!inner(
+        agency_users(user_id)
+      )
+    `)
+    .eq('archived', false)
+    .gte('scheduled_date', now.toISOString())
+    .lte('scheduled_date', in3Hours.toISOString())
+    .or(`notification_sent_at.is.null,notification_sent_at.lt.${oneDayAgo.toISOString()}`);
 
   if (error) {
     console.error('Error fetching posts:', error);
     return;
   }
 
-  console.log(`Found ${posts?.length || 0} posts to process`);
-  let sentCount = 0;
-  let skippedCount = 0;
+  console.log(`📊 Found ${posts?.length || 0} posts to notify`);
+
+  const notificationsToCreate: NotificationData[] = [];
+  const postsToUpdate: string[] = [];
 
   for (const post of posts || []) {
-    const { data: users } = await supabase
-      .from('agency_users')
-      .select('user_id')
-      .eq('agency_id', post.agency_id);
+    if (!post.agency_id) continue;
 
-    for (const user of users || []) {
-      // Check deduplication
-      const shouldSend = await shouldSendNotification(
-        'post',
-        post.id,
-        user.user_id,
-        post.agency_id,
-        24
-      );
+    const agencyUsers = (post.agencies as any)?.agency_users || [];
+    
+    for (const user of agencyUsers) {
+      const canSend = await checkUserPreferences(user.user_id, post.agency_id, 'posts');
+      if (!canSend) continue;
 
-      if (!shouldSend) {
-        console.log(`Skipping duplicate post notification ${post.id} for user ${user.user_id}`);
-        skippedCount++;
-        continue;
-      }
-
-      // Check user preferences
-      const prefCheck = await checkUserPreferences(user.user_id, 'posts');
-      if (!prefCheck.canSend) {
-        console.log(`Skipping post ${post.id}: ${prefCheck.reason}`);
-        skippedCount++;
-        continue;
-      }
-
-      await createNotification({
+      notificationsToCreate.push({
         user_id: user.user_id,
         agency_id: post.agency_id,
         type: 'post',
         priority: 'medium',
-        title: '📱 Post programado para hoje',
+        title: '📱 Post próximo de publicar',
         message: post.title || 'Post sem título',
         action_url: '/social-media',
         action_label: 'Ver post',
@@ -360,146 +368,61 @@ async function processPosts() {
           play_sound: true
         },
       });
+    }
 
-      await trackNotification('post', post.id, user.user_id, post.agency_id);
-      sentCount++;
-      console.log(`Notification sent for post ${post.id} to user ${user.user_id}`);
+    if (agencyUsers.length > 0) {
+      postsToUpdate.push(post.id);
     }
   }
 
-  console.log(`Posts: sent ${sentCount}, skipped ${skippedCount}`);
-}
+  await batchCreateNotifications(notificationsToCreate);
 
-async function processPayments() {
-  console.log(`[${new Date().toISOString()}] Processing payment notifications...`);
-  
-  const todayBrasilia = getTodayInBrasilia();
-  const in3Days = addDays(todayBrasilia, 3);
-
-  const { data: payments, error } = await supabase
-    .from('client_payments')
-    .select('*, clients(name)')
-    .eq('status', 'pending')
-    .lte('due_date', in3Days.toISOString());
-
-  if (error) {
-    console.error('Error fetching payments:', error);
-    return;
+  if (postsToUpdate.length > 0) {
+    await supabase
+      .from('social_media_posts')
+      .update({ notification_sent_at: new Date().toISOString() })
+      .in('id', postsToUpdate);
   }
 
-  console.log(`Found ${payments?.length || 0} payments to process`);
-  let sentCount = 0;
-  let skippedCount = 0;
-
-  for (const payment of payments || []) {
-    const dueDate = new Date(payment.due_date);
-    const isOverdue = dueDate < todayBrasilia;
-    
-    const { data: admins } = await supabase
-      .from('agency_users')
-      .select('user_id')
-      .eq('agency_id', payment.agency_id)
-      .in('role', ['owner', 'admin']);
-
-    for (const admin of admins || []) {
-      // Different intervals for overdue vs upcoming
-      const minInterval = isOverdue ? 12 : 24;
-      
-      const shouldSend = await shouldSendNotification(
-        'payment',
-        payment.id,
-        admin.user_id,
-        payment.agency_id,
-        minInterval
-      );
-
-      if (!shouldSend) {
-        console.log(`Skipping duplicate payment notification ${payment.id} for user ${admin.user_id}`);
-        skippedCount++;
-        continue;
-      }
-
-      const prefCheck = await checkUserPreferences(admin.user_id, 'payments');
-      if (!prefCheck.canSend) {
-        console.log(`Skipping payment ${payment.id}: ${prefCheck.reason}`);
-        skippedCount++;
-        continue;
-      }
-
-      await createNotification({
-        user_id: admin.user_id,
-        agency_id: payment.agency_id,
-        type: 'payment',
-        priority: isOverdue ? 'urgent' : 'high',
-        title: isOverdue ? '💸 Pagamento em atraso' : '💰 Pagamento próximo',
-        message: `${payment.clients?.name || 'Cliente'} - R$ ${payment.amount}`,
-        action_url: '/admin',
-        action_label: 'Ver pagamento',
-        metadata: { 
-          payment_id: payment.id,
-          play_sound: true
-        },
-      });
-
-      await trackNotification('payment', payment.id, admin.user_id, payment.agency_id);
-      sentCount++;
-      console.log(`Notification sent for payment ${payment.id} to admin ${admin.user_id}`);
-    }
-  }
-
-  console.log(`Payments: sent ${sentCount}, skipped ${skippedCount}`);
+  console.log(`✅ Created ${notificationsToCreate.length} post notifications`);
 }
 
 async function processLeads() {
-  console.log(`[${new Date().toISOString()}] Processing lead notifications...`);
+  console.log('🎯 Processing lead notifications...');
   
-  const sevenDaysAgo = addDays(new Date(), -7);
+  const todayBrasilia = getTodayInBrasilia();
+  const sevenDaysAgo = addDays(todayBrasilia, -7);
+  const oneDayAgo = addDays(todayBrasilia, -1);
 
+  // Query OTIMIZADA
   const { data: leads, error } = await supabase
     .from('leads')
-    .select('*')
-    .not('status', 'in', '("won","lost")')
-    .or(`last_contact.is.null,last_contact.lt.${sevenDaysAgo.toISOString()}`);
+    .select('id, name, assigned_to, agency_id, last_contact, follow_up_notification_sent_at')
+    .not('assigned_to', 'is', null)
+    .not('agency_id', 'is', null)
+    .lte('last_contact', sevenDaysAgo.toISOString())
+    .or(`follow_up_notification_sent_at.is.null,follow_up_notification_sent_at.lt.${oneDayAgo.toISOString()}`);
 
   if (error) {
     console.error('Error fetching leads:', error);
     return;
   }
 
-  console.log(`Found ${leads?.length || 0} leads to process`);
-  let sentCount = 0;
-  let skippedCount = 0;
+  console.log(`📊 Found ${leads?.length || 0} leads to notify`);
+
+  const notificationsToCreate: NotificationData[] = [];
+  const leadsToUpdate: string[] = [];
 
   for (const lead of leads || []) {
-    if (!lead.assigned_to || !lead.agency_id) continue;
+    const canSend = await checkUserPreferences(lead.assigned_to!, lead.agency_id, 'leads');
+    if (!canSend) continue;
 
-    const shouldSend = await shouldSendNotification(
-      'lead',
-      lead.id,
-      lead.assigned_to,
-      lead.agency_id,
-      24
-    );
-
-    if (!shouldSend) {
-      console.log(`Skipping duplicate lead notification ${lead.id}`);
-      skippedCount++;
-      continue;
-    }
-
-    const prefCheck = await checkUserPreferences(lead.assigned_to, 'leads');
-    if (!prefCheck.canSend) {
-      console.log(`Skipping lead ${lead.id}: ${prefCheck.reason}`);
-      skippedCount++;
-      continue;
-    }
-
-    await createNotification({
-      user_id: lead.assigned_to,
+    notificationsToCreate.push({
+      user_id: lead.assigned_to!,
       agency_id: lead.agency_id,
       type: 'lead',
-      priority: lead.priority === 'high' ? 'high' : 'medium',
-      title: '🎯 Lead precisa de follow-up',
+      priority: 'high',
+      title: '🎯 Lead requer follow-up',
       message: `${lead.name} - sem contato há 7 dias`,
       action_url: '/crm',
       action_label: 'Ver lead',
@@ -509,23 +432,31 @@ async function processLeads() {
       },
     });
 
-    await trackNotification('lead', lead.id, lead.assigned_to, lead.agency_id);
-    sentCount++;
-    console.log(`Notification sent for lead ${lead.id}`);
+    leadsToUpdate.push(lead.id);
   }
 
-  console.log(`Leads: sent ${sentCount}, skipped ${skippedCount}`);
+  await batchCreateNotifications(notificationsToCreate);
+
+  if (leadsToUpdate.length > 0) {
+    await supabase
+      .from('leads')
+      .update({ follow_up_notification_sent_at: new Date().toISOString() })
+      .in('id', leadsToUpdate);
+  }
+
+  console.log(`✅ Created ${notificationsToCreate.length} lead notifications`);
 }
 
 async function processMeetings() {
-  console.log(`[${new Date().toISOString()}] Processing meeting notifications...`);
+  console.log('📅 Processing meeting notifications...');
   
   const now = new Date();
   const in1Hour = addHours(now, 1);
 
   const { data: meetings, error } = await supabase
     .from('meetings')
-    .select('*')
+    .select('id, title, start_time, organizer_id, participants, agency_id')
+    .not('agency_id', 'is', null)
     .eq('status', 'scheduled')
     .gte('start_time', now.toISOString())
     .lte('start_time', in1Hour.toISOString());
@@ -535,108 +466,226 @@ async function processMeetings() {
     return;
   }
 
-  console.log(`Found ${meetings?.length || 0} meetings to process`);
-  let sentCount = 0;
-  let skippedCount = 0;
+  console.log(`📊 Found ${meetings?.length || 0} meetings to notify`);
+
+  // Preparar batch check
+  const trackingRecords: BatchTrackingRecord[] = [];
+  meetings?.forEach(meeting => {
+    trackingRecords.push({
+      notification_type: 'meeting',
+      entity_id: meeting.id,
+      user_id: meeting.organizer_id,
+      agency_id: meeting.agency_id
+    });
+
+    (meeting.participants as any[] || []).forEach((p: any) => {
+      trackingRecords.push({
+        notification_type: 'meeting',
+        entity_id: meeting.id,
+        user_id: p.user_id,
+        agency_id: meeting.agency_id
+      });
+    });
+  });
+
+  // Verificar em batch quais já foram enviadas
+  const recentlySent = await batchCheckNotifications(trackingRecords, 1);
+
+  const notificationsToCreate: NotificationData[] = [];
+  const toTrack: BatchTrackingRecord[] = [];
 
   for (const meeting of meetings || []) {
-    if (!meeting.agency_id) continue;
-
-    // Notify organizer
-    const shouldSendOrganizer = await shouldSendNotification(
-      'meeting',
-      meeting.id,
-      meeting.organizer_id,
-      meeting.agency_id,
-      2 // Can notify again 2 hours later if still upcoming
-    );
-
-    if (shouldSendOrganizer) {
-      const prefCheck = await checkUserPreferences(meeting.organizer_id, 'meetings');
-      
-      if (prefCheck.canSend) {
-        await createNotification({
+    // Organizer
+    const orgKey = `${meeting.id}_${meeting.organizer_id}`;
+    if (!recentlySent.has(orgKey)) {
+      const canSend = await checkUserPreferences(meeting.organizer_id, meeting.agency_id, 'meetings');
+      if (canSend) {
+        notificationsToCreate.push({
           user_id: meeting.organizer_id,
           agency_id: meeting.agency_id,
           type: 'meeting',
           priority: 'high',
-          title: '📅 Reunião em 1 hora',
+          title: '📅 Reunião em breve',
           message: meeting.title,
           action_url: '/agenda',
           action_label: 'Ver reunião',
-          metadata: { 
-            meeting_id: meeting.id,
-            play_sound: true
-          },
+          metadata: { meeting_id: meeting.id, play_sound: true },
         });
-
-        await trackNotification('meeting', meeting.id, meeting.organizer_id, meeting.agency_id);
-        sentCount++;
-        console.log(`Notification sent for meeting ${meeting.id} to organizer`);
-      } else {
-        skippedCount++;
+        toTrack.push({
+          notification_type: 'meeting',
+          entity_id: meeting.id,
+          user_id: meeting.organizer_id,
+          agency_id: meeting.agency_id
+        });
       }
-    } else {
-      skippedCount++;
     }
 
-    // Notify participants
-    const participants = meeting.participants || [];
-    for (const participant of participants) {
-      if (!participant.user_id) continue;
-
-      const shouldSendParticipant = await shouldSendNotification(
-        'meeting',
-        meeting.id,
-        participant.user_id,
-        meeting.agency_id,
-        2
-      );
-
-      if (!shouldSendParticipant) {
-        skippedCount++;
-        continue;
+    // Participants
+    for (const participant of (meeting.participants as any[] || [])) {
+      const partKey = `${meeting.id}_${participant.user_id}`;
+      if (!recentlySent.has(partKey)) {
+        const canSend = await checkUserPreferences(participant.user_id, meeting.agency_id, 'meetings');
+        if (canSend) {
+          notificationsToCreate.push({
+            user_id: participant.user_id,
+            agency_id: meeting.agency_id,
+            type: 'meeting',
+            priority: 'high',
+            title: '📅 Reunião em breve',
+            message: meeting.title,
+            action_url: '/agenda',
+            action_label: 'Ver reunião',
+            metadata: { meeting_id: meeting.id, play_sound: true },
+          });
+          toTrack.push({
+            notification_type: 'meeting',
+            entity_id: meeting.id,
+            user_id: participant.user_id,
+            agency_id: meeting.agency_id
+          });
+        }
       }
-
-      const prefCheck = await checkUserPreferences(participant.user_id, 'meetings');
-      if (!prefCheck.canSend) {
-        console.log(`Skipping meeting ${meeting.id} for participant: ${prefCheck.reason}`);
-        skippedCount++;
-        continue;
-      }
-
-      await createNotification({
-        user_id: participant.user_id,
-        agency_id: meeting.agency_id,
-        type: 'meeting',
-        priority: 'high',
-        title: '📅 Reunião em 1 hora',
-        message: meeting.title,
-        action_url: '/agenda',
-        action_label: 'Ver reunião',
-        metadata: { 
-          meeting_id: meeting.id,
-          play_sound: true
-        },
-      });
-
-      await trackNotification('meeting', meeting.id, participant.user_id, meeting.agency_id);
-      sentCount++;
-      console.log(`Notification sent for meeting ${meeting.id} to participant ${participant.user_id}`);
     }
   }
 
-  console.log(`Meetings: sent ${sentCount}, skipped ${skippedCount}`);
+  await batchCreateNotifications(notificationsToCreate);
+  await batchTrackNotifications(toTrack);
+
+  console.log(`✅ Created ${notificationsToCreate.length} meeting notifications`);
 }
 
-// ============= MAIN HANDLER =============
+async function processPayments() {
+  console.log('💰 Processing payment notifications...');
+  
+  const todayBrasilia = getTodayInBrasilia();
+  const in3Days = addDays(todayBrasilia, 3);
+
+  const { data: payments, error } = await supabase
+    .from('client_payments')
+    .select(`
+      id,
+      amount,
+      due_date,
+      agency_id,
+      clients(name)
+    `)
+    .eq('status', 'pending')
+    .lte('due_date', in3Days.toISOString())
+    .not('agency_id', 'is', null);
+
+  if (error) {
+    console.error('Error fetching payments:', error);
+    return;
+  }
+
+  console.log(`📊 Found ${payments?.length || 0} payments to notify`);
+
+  // Get agency admins for each agency
+  const agencyIds = [...new Set(payments?.map(p => p.agency_id) || [])];
+  const adminsByAgency: Record<string, any[]> = {};
+
+  for (const agencyId of agencyIds) {
+    const { data: admins } = await supabase
+      .from('agency_users')
+      .select('user_id')
+      .eq('agency_id', agencyId)
+      .in('role', ['owner', 'admin']);
+    
+    adminsByAgency[agencyId] = admins || [];
+  }
+
+  // Preparar batch check
+  const trackingRecords: BatchTrackingRecord[] = [];
+  payments?.forEach(payment => {
+    const admins = adminsByAgency[payment.agency_id] || [];
+    admins.forEach(admin => {
+      trackingRecords.push({
+        notification_type: 'payment',
+        entity_id: payment.id,
+        user_id: admin.user_id,
+        agency_id: payment.agency_id
+      });
+    });
+  });
+
+  const recentlySent = await batchCheckNotifications(trackingRecords, 24);
+
+  const notificationsToCreate: NotificationData[] = [];
+  const toTrack: BatchTrackingRecord[] = [];
+
+  for (const payment of payments || []) {
+    const admins = adminsByAgency[payment.agency_id] || [];
+    
+    for (const admin of admins) {
+      const key = `${payment.id}_${admin.user_id}`;
+      if (!recentlySent.has(key)) {
+        const canSend = await checkUserPreferences(admin.user_id, payment.agency_id, 'payments');
+        if (canSend) {
+          notificationsToCreate.push({
+            user_id: admin.user_id,
+            agency_id: payment.agency_id,
+            type: 'payment',
+            priority: 'high',
+            title: '💰 Pagamento próximo do vencimento',
+            message: `${(payment.clients as any)?.name || 'Cliente'} - R$ ${payment.amount}`,
+            action_url: '/admin',
+            action_label: 'Ver pagamento',
+            metadata: { 
+              payment_id: payment.id,
+              play_sound: true
+            },
+          });
+          toTrack.push({
+            notification_type: 'payment',
+            entity_id: payment.id,
+            user_id: admin.user_id,
+            agency_id: payment.agency_id
+          });
+        }
+      }
+    }
+  }
+
+  await batchCreateNotifications(notificationsToCreate);
+  await batchTrackNotifications(toTrack);
+
+  console.log(`✅ Created ${notificationsToCreate.length} payment notifications`);
+}
+
+// ============================================
+// MAINTENANCE FUNCTION
+// ============================================
+
+async function cleanupOldTracking() {
+  console.log('🧹 Cleaning up old notification tracking...');
+  
+  const thirtyDaysAgo = addDays(new Date(), -30);
+  
+  const { error } = await supabase
+    .from('notification_tracking')
+    .delete()
+    .lt('last_sent_at', thirtyDaysAgo.toISOString());
+
+  if (error) {
+    console.error('Error cleaning up tracking:', error);
+  } else {
+    console.log('✅ Old tracking records cleaned up');
+  }
+}
+
+// ============================================
+// MAIN HANDLER
+// ============================================
 
 Deno.serve(async (req) => {
-  try {
-    console.log(`\n========== NOTIFICATION PROCESSING STARTED: ${new Date().toISOString()} ==========`);
-    console.log(`Timezone: ${TIMEZONE}`);
-    console.log(`Today in Brasilia: ${getTodayInBrasilia().toISOString()}`);
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
 
+  try {
+    console.log('🚀 Starting notification processing...');
+    const startTime = Date.now();
+    
     await Promise.all([
       processReminders(),
       processTasks(),
@@ -646,26 +695,28 @@ Deno.serve(async (req) => {
       processMeetings(),
     ]);
 
-    console.log('========== NOTIFICATION PROCESSING COMPLETED ==========\n');
+    // Executar limpeza em background (não bloqueia a resposta)
+    cleanupOldTracking().catch(console.error);
 
+    const duration = Date.now() - startTime;
+    console.log(`✅ All notifications processed successfully in ${duration}ms`);
+    
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: 'Notifications processed',
-        timestamp: new Date().toISOString(),
-        timezone: TIMEZONE
+        duration_ms: duration
       }),
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('========== ERROR PROCESSING NOTIFICATIONS ==========');
-    console.error(error);
+    console.error('❌ Error processing notifications:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        timestamp: new Date().toISOString()
-      }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: error.message }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });

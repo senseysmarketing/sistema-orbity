@@ -1227,6 +1227,7 @@ export type Database = {
           created_by: string
           custom_fields: Json | null
           email: string | null
+          follow_up_notification_sent_at: string | null
           id: string
           last_contact: string | null
           name: string
@@ -1249,6 +1250,7 @@ export type Database = {
           created_by: string
           custom_fields?: Json | null
           email?: string | null
+          follow_up_notification_sent_at?: string | null
           id?: string
           last_contact?: string | null
           name: string
@@ -1271,6 +1273,7 @@ export type Database = {
           created_by?: string
           custom_fields?: Json | null
           email?: string | null
+          follow_up_notification_sent_at?: string | null
           id?: string
           last_contact?: string | null
           name?: string
@@ -2344,6 +2347,7 @@ export type Database = {
           id: string
           mentions: string[] | null
           notes: string | null
+          notification_sent_at: string | null
           platform: string
           post_type: string
           priority: string
@@ -2367,6 +2371,7 @@ export type Database = {
           id?: string
           mentions?: string[] | null
           notes?: string | null
+          notification_sent_at?: string | null
           platform: string
           post_type: string
           priority?: string
@@ -2390,6 +2395,7 @@ export type Database = {
           id?: string
           mentions?: string[] | null
           notes?: string | null
+          notification_sent_at?: string | null
           platform?: string
           post_type?: string
           priority?: string
@@ -2666,6 +2672,7 @@ export type Database = {
           due_date: string | null
           history: Json | null
           id: string
+          notification_sent_at: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           status: Database["public"]["Enums"]["task_status"]
           title: string
@@ -2682,6 +2689,7 @@ export type Database = {
           due_date?: string | null
           history?: Json | null
           id?: string
+          notification_sent_at?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           status?: Database["public"]["Enums"]["task_status"]
           title: string
@@ -2698,6 +2706,7 @@ export type Database = {
           due_date?: string | null
           history?: Json | null
           id?: string
+          notification_sent_at?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           status?: Database["public"]["Enums"]["task_status"]
           title?: string
