@@ -3,13 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Search, Bell, Calendar as CalendarIcon, Flag, CheckCircle2, List as ListIcon } from 'lucide-react';
+import { Plus, Search, Bell, Calendar as CalendarIcon, Flag, CheckCircle2, List as ListIcon, FolderPlus } from 'lucide-react';
 import { Reminder, useReminders } from '@/hooks/useReminders';
 import { useReminderLists } from '@/hooks/useReminderLists';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 import { ReminderFormDialog } from '@/components/reminders/ReminderFormDialog';
 import { ReminderCard } from '@/components/reminders/ReminderCard';
 import { ReminderDetailsDialog } from '@/components/reminders/ReminderDetailsDialog';
+import { CreateListDialog } from '@/components/reminders/CreateListDialog';
 import { isToday, isTomorrow, isPast, isThisWeek, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +25,7 @@ export default function Reminders() {
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [detailsReminder, setDetailsReminder] = useState<Reminder | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [createListOpen, setCreateListOpen] = useState(false);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -327,12 +329,24 @@ export default function Reminders() {
               Concluídos
             </Button>
 
-            {lists.length > 0 && (
-              <>
-                <div className="border-t pt-4 mt-4">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">LISTAS</p>
-                </div>
-                {lists.map(list => (
+            <div className="border-t pt-4 mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-muted-foreground">LISTAS</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCreateListOpen(true)}
+                  className="h-6 px-2"
+                >
+                  <FolderPlus className="h-3 w-3" />
+                </Button>
+              </div>
+              {lists.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  Nenhuma lista criada
+                </p>
+              ) : (
+                lists.map(list => (
                   <Button
                     key={list.id}
                     variant={selectedList === list.id ? 'default' : 'ghost'}
@@ -342,9 +356,9 @@ export default function Reminders() {
                     <span className="mr-2">{list.icon}</span>
                     {list.name}
                   </Button>
-                ))}
-              </>
-            )}
+                ))
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -411,6 +425,11 @@ export default function Reminders() {
         onEdit={handleEdit}
         onDelete={handleDelete}
         onToggleSubtask={handleToggleSubtask}
+      />
+
+      <CreateListDialog
+        open={createListOpen}
+        onOpenChange={setCreateListOpen}
       />
     </div>
   );
