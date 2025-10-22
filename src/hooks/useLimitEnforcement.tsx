@@ -5,7 +5,7 @@ export function useLimitEnforcement() {
   const { enforceLimit, checkLimit, getUsagePercentage } = usePaymentMiddleware();
 
   const enforceLimitWithToast = (
-    type: 'users' | 'clients' | 'leads' | 'tasks' | 'storage',
+    type: 'users' | 'clients' | 'contracts' | 'leads' | 'tasks',
     action: string,
     onSuccess?: () => void
   ) => {
@@ -20,7 +20,7 @@ export function useLimitEnforcement() {
   };
 
   const checkLimitWithWarning = (
-    type: 'users' | 'clients' | 'leads' | 'tasks' | 'storage',
+    type: 'users' | 'clients' | 'contracts' | 'leads' | 'tasks',
     newCount?: number
   ): boolean => {
     const canAdd = checkLimit(type, newCount);
@@ -31,9 +31,9 @@ export function useLimitEnforcement() {
       const limitNames = {
         users: 'usuários',
         clients: 'clientes',
+        contracts: 'contratos',
         leads: 'leads',
-        tasks: 'tarefas',
-        storage: 'armazenamento'
+        tasks: 'tarefas'
       };
       
       toast.warning(

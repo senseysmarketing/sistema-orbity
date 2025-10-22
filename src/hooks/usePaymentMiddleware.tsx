@@ -18,17 +18,17 @@ interface PaymentStatus {
 interface PlanLimits {
   users: number;
   clients: number;
+  contracts: number;
   leads: number;
   tasks: number;
-  storage: number;
 }
 
 interface UsageCounts {
   users: number;
   clients: number;
+  contracts: number;
   leads: number;
   tasks: number;
-  storage: number;
 }
 
 interface PaymentMiddlewareContextType {
@@ -60,16 +60,16 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
   const [planLimits, setPlanLimits] = useState<PlanLimits>({
     users: 0,
     clients: 0,
+    contracts: 0,
     leads: 0,
-    tasks: 0,
-    storage: 0
+    tasks: 0
   });
   const [usageCounts, setUsageCounts] = useState<UsageCounts>({
     users: 0,
     clients: 0,
+    contracts: 0,
     leads: 0,
-    tasks: 0,
-    storage: 0
+    tasks: 0
   });
   const [loading, setLoading] = useState(true);
   const [lastCheckTime, setLastCheckTime] = useState(0);
@@ -136,11 +136,11 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
         cache.set(cacheKey, fullStatus);
 
         setPlanLimits({
-          users: sub.max_users,
-          clients: sub.max_clients,
-          leads: sub.max_leads,
-          tasks: sub.max_tasks,
-          storage: sub.max_storage_gb
+          users: sub.max_users || 0,
+          clients: sub.max_clients || 0,
+          contracts: (sub as any).max_contracts || 0,
+          leads: sub.max_leads || 0,
+          tasks: sub.max_tasks || 0
         });
       }
       
@@ -164,18 +164,20 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
 
     try {
       // Get current usage counts
-      const [usersResult, clientsResult, tasksResult] = await Promise.all([
+      const [usersResult, clientsResult, contractsResult, leadsResult, tasksResult] = await Promise.all([
         supabase.from('agency_users').select('*', { count: 'exact', head: true }).eq('agency_id', currentAgency.id),
         supabase.from('clients').select('*', { count: 'exact', head: true }).eq('agency_id', currentAgency.id).eq('active', true),
+        supabase.from('contracts').select('*', { count: 'exact', head: true }).eq('agency_id', currentAgency.id),
+        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('agency_id', currentAgency.id),
         supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('agency_id', currentAgency.id).eq('archived', false)
       ]);
 
       setUsageCounts({
         users: usersResult.count || 0,
         clients: clientsResult.count || 0,
-        leads: 0, // Placeholder - implement when leads feature is added
-        tasks: tasksResult.count || 0,
-        storage: 0 // Placeholder - implement when storage tracking is added
+        contracts: contractsResult.count || 0,
+        leads: leadsResult.count || 0,
+        tasks: tasksResult.count || 0
       });
     } catch (error) {
       console.error('Error fetching usage counts:', error);
@@ -211,9 +213,9 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
       const limitNames = {
         users: 'usuários',
         clients: 'clientes',
+        contracts: 'contratos',
         leads: 'leads',
-        tasks: 'tarefas',
-        storage: 'armazenamento'
+        tasks: 'tarefas'
       };
 
       toast.error(
