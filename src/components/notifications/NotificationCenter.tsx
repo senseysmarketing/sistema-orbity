@@ -21,7 +21,7 @@ interface NotificationCenterProps {
 export function NotificationCenter({ onClose }: NotificationCenterProps) {
   const { notifications, loading, markAllAsRead, enableDoNotDisturb } = useNotifications();
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'today'>('all');
+  const [filter, setFilter] = useState<'all' | 'unread' | 'today'>('unread');
 
   const handleDoNotDisturb = (hours: number) => {
     enableDoNotDisturb(hours);
@@ -91,7 +91,7 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
         </div>
       </div>
 
-      <Tabs defaultValue="all" className="w-full" onValueChange={(v) => setFilter(v as any)}>
+      <Tabs defaultValue="unread" className="w-full" onValueChange={(v) => setFilter(v as any)}>
         <TabsList className="w-full rounded-none border-b">
           <TabsTrigger value="all" className="flex-1">Todas</TabsTrigger>
           <TabsTrigger value="unread" className="flex-1">Não lidas</TabsTrigger>
