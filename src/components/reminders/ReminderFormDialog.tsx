@@ -202,13 +202,12 @@ export function ReminderFormDialog({ open, onOpenChange, reminder }: ReminderFor
           </div>
 
           <div>
-            <Label htmlFor="list">Lista</Label>
-            <Select value={listId} onValueChange={setListId}>
+            <Label htmlFor="list">Lista (Opcional)</Label>
+            <Select value={listId || undefined} onValueChange={(value) => setListId(value || '')}>
               <SelectTrigger id="list">
-                <SelectValue placeholder="Selecionar lista" />
+                <SelectValue placeholder="Sem lista" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Sem lista</SelectItem>
                 {lists.map((list) => (
                   <SelectItem key={list.id} value={list.id}>
                     <span className="flex items-center gap-2">
@@ -226,10 +225,9 @@ export function ReminderFormDialog({ open, onOpenChange, reminder }: ReminderFor
               <Label htmlFor="priority">Prioridade</Label>
               <Select value={priority} onValueChange={(v) => setPriority(v as ReminderPriority)}>
                 <SelectTrigger id="priority">
-                  <SelectValue />
+                  <SelectValue placeholder="Nenhuma" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Nenhuma</SelectItem>
                   <SelectItem value="low">Baixa</SelectItem>
                   <SelectItem value="medium">Média</SelectItem>
                   <SelectItem value="high">Alta</SelectItem>
