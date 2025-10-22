@@ -183,13 +183,13 @@ export function PricingCards() {
               <div className="flex items-start gap-2">
                 <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
                 <span className="text-sm">
-                  {plan.max_leads >= 999999 ? 'Leads ilimitados' : `${plan.max_leads} leads`}
+                  {plan.max_contracts >= 999999 ? 'Contratos ilimitados' : `${plan.max_contracts} contratos`}
                 </span>
               </div>
               <div className="flex items-start gap-2">
                 <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
                 <span className="text-sm">
-                  {plan.max_facebook_ad_accounts >= 999999 ? 'Contas ilimitadas' : `${plan.max_facebook_ad_accounts} contas Meta`}
+                  {plan.max_leads >= 999999 ? 'Leads ilimitados' : `${plan.max_leads} leads`}
                 </span>
               </div>
               <div className="flex items-start gap-2">
@@ -197,10 +197,6 @@ export function PricingCards() {
                 <span className="text-sm">
                   {plan.max_tasks >= 999999 ? 'Tarefas ilimitadas' : `${plan.max_tasks} tarefas`}
                 </span>
-              </div>
-              <div className="flex items-start gap-2">
-                <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                <span className="text-sm">{plan.max_storage_gb}GB armazenamento</span>
               </div>
               
               {plan.has_crm && (
@@ -210,33 +206,10 @@ export function PricingCards() {
                 </div>
               )}
               
-              {plan.has_advanced_reports && (
-                <div className="flex items-start gap-2">
-                  <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">Relatórios Avançados</span>
-                </div>
-              )}
-              
-              {plan.has_api_access && (
-                <div className="flex items-start gap-2">
-                  <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">API Access</span>
-                </div>
-              )}
-              
-              {plan.has_white_label && (
-                <div className="flex items-start gap-2">
-                  <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">White Label</span>
-                </div>
-              )}
-              
-              {plan.has_priority_support && (
-                <div className="flex items-start gap-2">
-                  <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm">Suporte Prioritário</span>
-                </div>
-              )}
+              <div className="flex items-start gap-2">
+                <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                <span className="text-sm">Planner Social Media</span>
+              </div>
             </div>
           </CardContent>
 

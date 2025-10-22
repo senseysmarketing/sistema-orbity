@@ -16,14 +16,10 @@ interface SubscriptionPlan {
   price_yearly?: number;
   max_users: number;
   max_clients: number;
+  max_contracts: number;
   max_leads: number;
   max_tasks: number;
-  max_storage_gb: number;
   has_crm: boolean;
-  has_advanced_reports: boolean;
-  has_api_access: boolean;
-  has_white_label: boolean;
-  has_priority_support: boolean;
 }
 
 export function PlanSelectionStep() {
@@ -87,15 +83,13 @@ export function PlanSelectionStep() {
     const features = [
       plan.max_users >= 999999 ? 'Usuários ilimitados' : `${plan.max_users} usuários`,
       plan.max_clients >= 999999 ? 'Clientes ilimitados' : `${plan.max_clients} clientes`,
+      plan.max_contracts >= 999999 ? 'Contratos ilimitados' : `${plan.max_contracts} contratos`,
+      plan.max_leads >= 999999 ? 'Leads ilimitados' : `${plan.max_leads} leads`,
       plan.max_tasks >= 999999 ? 'Tarefas ilimitadas' : `${plan.max_tasks} tarefas`,
-      `${plan.max_storage_gb}GB de armazenamento`,
     ];
 
-    if (plan.has_crm) features.push('CRM completo');
-    if (plan.has_advanced_reports) features.push('Relatórios avançados');
-    if (plan.has_api_access) features.push('Acesso à API');
-    if (plan.has_white_label) features.push('White label');
-    if (plan.has_priority_support) features.push('Suporte prioritário');
+    if (plan.has_crm) features.push('CRM Completo');
+    features.push('Planner Social Media');
 
     return features;
   };

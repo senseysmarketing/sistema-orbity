@@ -18,15 +18,10 @@ interface SubscriptionPlan {
   stripe_price_id_yearly?: string;
   max_users: number;
   max_clients: number;
+  max_contracts: number;
   max_leads: number;
   max_tasks: number;
-  max_storage_gb: number;
   has_crm: boolean;
-  has_advanced_reports: boolean;
-  has_api_access: boolean;
-  has_white_label: boolean;
-  has_priority_support: boolean;
-  max_facebook_ad_accounts: number;
   sort_order: number;
 }
 
