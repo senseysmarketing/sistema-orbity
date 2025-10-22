@@ -80,9 +80,9 @@ export function SubscriptionDetails() {
   const usageLabels = {
     users: 'Usuários',
     clients: 'Clientes',
+    contracts: 'Contratos',
     leads: 'Leads',
-    tasks: 'Tarefas',
-    storage: 'Armazenamento (GB)'
+    tasks: 'Tarefas'
   };
 
   return (
