@@ -111,10 +111,10 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
       onClick={(e) => onClick?.(e)}
       style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex flex-col gap-2 flex-1 min-w-0 overflow-hidden">
+      <div className="flex items-start justify-between mb-3 gap-2">
+        <div className="flex flex-col gap-2 flex-1 min-w-0">
           <ContentTypeIcon className="h-5 w-5 flex-shrink-0" />
-          <h3 className="font-semibold line-clamp-2">{post.title}</h3>
+          <h3 className="font-semibold line-clamp-2 break-words">{post.title}</h3>
         </div>
         <div className="flex gap-1 flex-wrap flex-shrink-0 ml-2">
           <Badge variant="outline" className={`${statusInfo.color} text-white text-xs`}>
