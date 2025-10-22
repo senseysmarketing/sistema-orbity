@@ -176,9 +176,20 @@ async function processReminders() {
         continue;
       }
 
+      // Get agency_id from reminder or from user's agency
+      let agencyId = reminder.agency_id;
+      if (!agencyId) {
+        const { data: userAgency } = await supabase
+          .from('agency_users')
+          .select('agency_id')
+          .eq('user_id', reminder.user_id)
+          .single();
+        agencyId = userAgency?.agency_id;
+      }
+
       await createNotification({
         user_id: reminder.user_id,
-        agency_id: reminder.agency_id,
+        agency_id: agencyId,
         type: 'reminder',
         priority: reminder.priority === 'high' ? 'high' : 'medium',
         title: '⏰ Lembrete',
