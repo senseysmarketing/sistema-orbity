@@ -1,13 +1,15 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Reminder } from '@/hooks/useReminders';
-import { Calendar, Bell, Repeat, Flag, List, Clock, Edit, Trash2 } from 'lucide-react';
+import { Calendar, Bell, Repeat, Flag, List, Clock, Pencil, Trash2 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useState } from 'react';
 
 interface ReminderDetailsDialogProps {
   reminder: Reminder | null;
@@ -26,9 +28,22 @@ export function ReminderDetailsDialog({
   onDelete,
   onToggleSubtask,
 }: ReminderDetailsDialogProps) {
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  
   if (!reminder) return null;
 
   const isOverdue = reminder.reminder_time && isPast(new Date(reminder.reminder_time)) && !reminder.completed;
+
+  const handleDelete = () => {
+    onDelete(reminder.id);
+    setShowDeleteAlert(false);
+    onOpenChange(false);
+  };
+
+  const handleEdit = () => {
+    onEdit(reminder);
+    onOpenChange(false);
+  };
 
   const getPriorityColor = () => {
     switch (reminder.priority) {
@@ -59,42 +74,15 @@ export function ReminderDetailsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {reminder.title}
               {reminder.is_flagged && <Flag className="h-5 w-5 fill-current text-red-500" />}
             </DialogTitle>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onEdit(reminder);
-                  onOpenChange(false);
-                }}
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Editar
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (confirm('Tem certeza que deseja excluir este lembrete?')) {
-                    onDelete(reminder.id);
-                    onOpenChange(false);
-                  }
-                }}
-              >
-                <Trash2 className="h-4 w-4 mr-2 text-red-600" />
-                Excluir
-              </Button>
-            </div>
-          </div>
-        </DialogHeader>
+          </DialogHeader>
 
         <div className="space-y-6">
           {/* Status */}
@@ -238,7 +226,39 @@ export function ReminderDetailsDialog({
             </span>
           </div>
         </div>
+
+        <DialogFooter className="gap-2">
+          <Button
+            variant="destructive"
+            onClick={() => setShowDeleteAlert(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Excluir
+          </Button>
+          <Button onClick={handleEdit}>
+            <Pencil className="h-4 w-4 mr-2" />
+            Editar
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja excluir o lembrete "{reminder.title}"? Esta ação não pode ser desfeita.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            Excluir
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   );
 }
