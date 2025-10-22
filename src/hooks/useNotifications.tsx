@@ -202,6 +202,16 @@ export function useNotifications() {
           // Show browser notification for new notifications
           if (payload.eventType === 'INSERT') {
             const newNotification = payload.new as Notification;
+            
+            // Play sound if metadata indicates it
+            if (newNotification.metadata?.play_sound) {
+              const audio = new Audio('/notification.mp3');
+              audio.play().catch(() => {
+                console.log('Failed to play notification sound');
+              });
+            }
+            
+            // Show browser notification
             showNotification(newNotification.title, {
               body: newNotification.message,
               tag: newNotification.id,
@@ -230,8 +240,10 @@ export function useNotifications() {
         .from('notification_preferences')
         .upsert({
           user_id: user.id,
-          agency_id: user.user_metadata?.agency_id,
+          agency_id: currentAgency?.id,
           do_not_disturb_until: endTime.toISOString(),
+        }, {
+          onConflict: 'user_id,agency_id'
         });
 
       if (error) throw error;

@@ -55,6 +55,26 @@ async function processReminders() {
     const notificationTime = new Date(reminderTime.getTime() - minutesBefore * 60000);
 
     if (notificationTime <= now && (!reminder.last_notification_sent || new Date(reminder.last_notification_sent) < notificationTime)) {
+      // Check user preferences
+      const { data: prefs } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', reminder.user_id)
+        .single();
+
+      // Check do not disturb
+      const doNotDisturbUntil = prefs?.do_not_disturb_until ? new Date(prefs.do_not_disturb_until) : null;
+      if (doNotDisturbUntil && now < doNotDisturbUntil) {
+        console.log(`User ${reminder.user_id} is in do not disturb mode, skipping notification`);
+        continue;
+      }
+
+      // Check if reminders are enabled
+      if (prefs && !prefs.reminders_enabled) {
+        console.log(`Reminders disabled for user ${reminder.user_id}, skipping notification`);
+        continue;
+      }
+
       await createNotification({
         user_id: reminder.user_id,
         agency_id: reminder.agency_id,
@@ -64,7 +84,11 @@ async function processReminders() {
         message: reminder.title,
         action_url: '/reminders',
         action_label: 'Ver lembrete',
-        metadata: { reminder_id: reminder.id },
+        metadata: { 
+          reminder_id: reminder.id,
+          play_sound: true,
+          notification_sound: reminder.notification_sound || 'default'
+        },
       });
 
       // Update last notification sent
@@ -72,6 +96,8 @@ async function processReminders() {
         .from('reminders')
         .update({ last_notification_sent: now.toISOString() })
         .eq('id', reminder.id);
+      
+      console.log(`Notification sent for reminder ${reminder.id}`);
     }
   }
 }
