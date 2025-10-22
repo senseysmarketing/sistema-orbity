@@ -67,6 +67,10 @@ export function SubscriptionDetails() {
     }
   };
 
+  const formatLimit = (limit: number) => {
+    return limit >= 999999 ? '∞' : limit.toString();
+  };
+
   const isTrialActive = (currentSubscription?.subscription_status === 'trial' || 
     currentSubscription?.subscription_status === 'trialing') && 
     currentSubscription?.trial_end && 
@@ -160,7 +164,7 @@ export function SubscriptionDetails() {
             <h4 className="font-semibold text-sm">Uso do Plano</h4>
             {Object.entries(usageCounts).map(([key, count]) => {
               const limit = planLimits[key as keyof typeof planLimits];
-              const percentage = getUsagePercentage(key as keyof typeof planLimits);
+              const percentage = limit >= 999999 ? 0 : getUsagePercentage(key as keyof typeof planLimits);
               
               if (limit === 0) return null;
 
@@ -171,7 +175,7 @@ export function SubscriptionDetails() {
                       {usageLabels[key as keyof typeof usageLabels]}
                     </span>
                     <span className={percentage >= 90 ? 'text-red-600 font-medium' : 'font-medium'}>
-                      {count}/{limit}
+                      {count}/{formatLimit(limit)}
                     </span>
                   </div>
                   <Progress 
