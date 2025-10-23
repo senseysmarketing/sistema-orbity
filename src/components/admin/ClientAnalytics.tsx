@@ -97,7 +97,7 @@ export function ClientAnalytics({ payments, monthlyValue, startDate }: ClientAna
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold">
-                R$ {averageTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 0 })}
+                R$ {averageTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
@@ -116,7 +116,7 @@ export function ClientAnalytics({ payments, monthlyValue, startDate }: ClientAna
           <CardContent>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold text-purple-600">
-                R$ {ltv.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 0 })}
+                R$ {ltv.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
