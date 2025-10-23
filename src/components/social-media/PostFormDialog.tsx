@@ -243,6 +243,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     try {
       const data = {
         ...formData,
+        client_id: formData.client_id || null,
         hashtags: formData.hashtags.split(",").map(h => h.trim()).filter(Boolean),
         attachments: [],
         mentions: [],
