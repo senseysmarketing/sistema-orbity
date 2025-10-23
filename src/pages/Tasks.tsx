@@ -456,6 +456,38 @@ export default function Tasks() {
     }
 
     try {
+      // Detectar mudanças
+      const changes: string[] = [];
+      
+      if (selectedTask.title !== newTask.title) {
+        changes.push(`Título: "${selectedTask.title}" → "${newTask.title}"`);
+      }
+      
+      if (selectedTask.description !== newTask.description) {
+        changes.push(`Descrição alterada`);
+      }
+      
+      if (selectedTask.status !== newTask.status) {
+        changes.push(`Status: ${getStatusLabel(selectedTask.status)} → ${getStatusLabel(newTask.status)}`);
+      }
+      
+      if (selectedTask.priority !== newTask.priority) {
+        changes.push(`Prioridade: ${getPriorityLabel(selectedTask.priority)} → ${getPriorityLabel(newTask.priority)}`);
+      }
+      
+      const originalDueDate = selectedTask.due_date ? selectedTask.due_date.split('T')[0] : null;
+      if (newTask.due_date !== originalDueDate) {
+        const oldDate = originalDueDate ? formatDateBR(originalDueDate) : "Sem data";
+        const newDate = newTask.due_date ? formatDateBR(newTask.due_date) : "Sem data";
+        changes.push(`Data de vencimento: ${oldDate} → ${newDate}`);
+      }
+      
+      const originalClientId = selectedTask.client_id || "no-client";
+      const newClientId = newTask.client_id;
+      if (originalClientId !== newClientId) {
+        changes.push(`Cliente: ${getClientName(selectedTask.client_id)} → ${getClientName(newTask.client_id === "no-client" ? null : newTask.client_id)}`);
+      }
+
       const updates: any = {
         title: newTask.title,
         description: newTask.description,
@@ -467,7 +499,6 @@ export default function Tasks() {
       };
 
       // Reset notification_sent_at if due_date changed
-      const originalDueDate = selectedTask.due_date ? selectedTask.due_date.split('T')[0] : null;
       if (newTask.due_date !== originalDueDate) {
         updates.notification_sent_at = null;
       }
@@ -481,7 +512,11 @@ export default function Tasks() {
 
       if (selectedTask) {
         await assignUsersToTask(selectedTask.id, newTask.assigned_users);
-        await addHistoryEntry(selectedTask.id, "Tarefa atualizada");
+        
+        // Adicionar histórico com mudanças detalhadas
+        if (changes.length > 0) {
+          await addHistoryEntry(selectedTask.id, `Tarefa editada: ${changes.join("; ")}`);
+        }
       }
 
       toast({

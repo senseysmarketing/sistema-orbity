@@ -302,7 +302,99 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
       };
 
       if (editPost?.id) {
-        await updatePost(editPost.id, data);
+        // Detectar mudanças
+        const changes: string[] = [];
+        
+        if (editPost.title !== formData.title) {
+          changes.push(`Título: "${editPost.title}" → "${formData.title}"`);
+        }
+        
+        if (editPost.description !== formData.description) {
+          changes.push(`Descrição alterada`);
+        }
+        
+        const oldDate = new Date(editPost.scheduled_date).toLocaleString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const newDate = new Date(formData.scheduled_date).toLocaleString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        if (oldDate !== newDate) {
+          changes.push(`Data: ${oldDate} → ${newDate}`);
+        }
+        
+        const statusLabels: Record<string, string> = {
+          draft: "Briefing",
+          in_creation: "Em Criação",
+          pending_approval: "Aguardando",
+          approved: "Aprovado",
+          published: "Publicado",
+          rejected: "Rejeitado",
+        };
+        
+        if (editPost.status !== formData.status) {
+          changes.push(`Status: ${statusLabels[editPost.status] || editPost.status} → ${statusLabels[formData.status] || formData.status}`);
+        }
+        
+        const platformLabels: Record<string, string> = {
+          instagram: "Instagram",
+          facebook: "Facebook",
+          linkedin: "LinkedIn",
+          twitter: "Twitter",
+          youtube: "YouTube",
+          tiktok: "TikTok",
+        };
+        
+        if (editPost.platform !== formData.platform) {
+          changes.push(`Plataforma: ${platformLabels[editPost.platform] || editPost.platform} → ${platformLabels[formData.platform] || formData.platform}`);
+        }
+        
+        const postTypeLabels: Record<string, string> = {
+          feed: "Feed",
+          stories: "Stories",
+          reels: "Reels",
+          carrossel: "Carrossel",
+          video: "Vídeo",
+        };
+        
+        if (editPost.post_type !== formData.post_type) {
+          changes.push(`Tipo: ${postTypeLabels[editPost.post_type] || editPost.post_type} → ${postTypeLabels[formData.post_type] || formData.post_type}`);
+        }
+
+        // Adicionar histórico com as mudanças
+        const currentHistory = Array.isArray(editPost.approval_history) ? editPost.approval_history : [];
+        
+        // Obter nome do usuário atual
+        const { data: { user } } = await supabase.auth.getUser();
+        let userName = "Usuário";
+        if (user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("name")
+            .eq("user_id", user.id)
+            .single();
+          if (profile) userName = profile.name;
+        }
+        
+        const newHistoryEntry = {
+          action: changes.length > 0 ? `Postagem editada: ${changes.join("; ")}` : "Postagem editada",
+          timestamp: new Date().toISOString(),
+          user_name: userName,
+        };
+
+        await updatePost(editPost.id, {
+          ...data,
+          approval_history: [...currentHistory, newHistoryEntry] as any,
+        });
+        
         toast({ title: "Postagem atualizada com sucesso!" });
       } else {
         await createPost(data);
