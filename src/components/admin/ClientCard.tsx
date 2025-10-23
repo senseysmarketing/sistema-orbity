@@ -87,9 +87,10 @@ export function ClientCard({
 
   return (
     <Card 
-      className={`transition-all hover:shadow-lg ${getCardBackground()} ${
+      className={`cursor-pointer transition-all hover:shadow-lg ${getCardBackground()} ${
         loyaltyStatus === 'expiring' ? 'border-orange-400 dark:border-orange-600 border-2' : ''
       }`}
+      onClick={() => onView(client)}
     >
       <CardContent className="p-6">
         <div className="space-y-4">
