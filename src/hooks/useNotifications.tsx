@@ -203,14 +203,6 @@ export function useNotifications() {
           if (payload.eventType === 'INSERT') {
             const newNotification = payload.new as Notification;
             
-            // Play sound if metadata indicates it
-            if (newNotification.metadata?.play_sound) {
-              const audio = new Audio('/notification.mp3');
-              audio.play().catch(() => {
-                console.log('Failed to play notification sound');
-              });
-            }
-            
             // Show browser notification
             showNotification(newNotification.title, {
               body: newNotification.message,
