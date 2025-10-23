@@ -19,6 +19,8 @@ import { ClientForm } from "@/components/admin/ClientForm";
 import { PaymentForm } from "@/components/admin/PaymentForm";
 import { ExpenseForm } from "@/components/admin/ExpenseForm";
 import { SalaryForm } from "@/components/admin/SalaryForm";
+import { ClientCard } from "@/components/admin/ClientCard";
+import { ClientDetailsDialog } from "@/components/admin/ClientDetailsDialog";
 interface Client {
   id: string;
   name: string;
@@ -84,6 +86,12 @@ export default function Admin() {
   const [clientDetailsOpen, setClientDetailsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  
+  // Filtros para a aba de Clientes & Pagamentos
+  const [clientSearchTerm, setClientSearchTerm] = useState("");
+  const [clientStatusFilter, setClientStatusFilter] = useState<string>("all");
+  const [clientLoyaltyFilter, setClientLoyaltyFilter] = useState<string>("all");
+  const [clientPaymentStatusFilter, setClientPaymentStatusFilter] = useState<string>("all");
 
   // Payment states
   const [selectedPayment, setSelectedPayment] = useState<ClientPayment | null>(null);
@@ -787,18 +795,14 @@ export default function Admin() {
 
       {/* Tabs principais */}
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             <span>Dashboard</span>
           </TabsTrigger>
-          <TabsTrigger value="clients" className="flex items-center gap-2">
+          <TabsTrigger value="clients-payments" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            <span>Clientes</span>
-          </TabsTrigger>
-          <TabsTrigger value="payments" className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            <span>Pagamentos</span>
+            <span>Clientes & Pagamentos</span>
           </TabsTrigger>
           <TabsTrigger value="expenses" className="flex items-center gap-2">
             <Receipt className="h-4 w-4" />
@@ -1161,6 +1165,311 @@ export default function Admin() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Nova Aba Unificada: Clientes & Pagamentos */}
+        <TabsContent value="clients-payments" className="space-y-6">
+          {/* Métricas de Clientes */}
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Users className="h-4 w-4 text-blue-600" />
+                  Clientes Ativos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">{analytics.activeClients}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {analytics.inactiveClients} inativos
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  MRR
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-green-600">
+                  R$ {monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 0 })}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Receita Recorrente Mensal
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-purple-600" />
+                  Taxa de Renovação
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">
+                  {analytics.paymentConversionRate.toFixed(0)}%
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {analytics.paymentStats.paid} de {filteredPayments.length} pagamentos
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className={analytics.loyaltyAlerts.ending30Days.length + analytics.loyaltyAlerts.expired.length > 0 ? 'border-orange-400' : ''}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-orange-600" />
+                  Em Risco
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-orange-600">
+                  {analytics.loyaltyAlerts.ending30Days.length + analytics.loyaltyAlerts.expired.length}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Clientes precisam atenção
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Alertas Proativos */}
+          {(analytics.totalOverdue > 0 || analytics.loyaltyAlerts.ending30Days.length > 0) && (
+            <div className="grid gap-4 md:grid-cols-3">
+              {analytics.totalOverdue > 0 && (
+                <Card className="bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-900">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="h-8 w-8 text-red-600" />
+                      <div>
+                        <p className="text-sm font-medium text-red-700 dark:text-red-400">
+                          R$ {analytics.totalOverdue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em pagamentos atrasados
+                        </p>
+                        <p className="text-xs text-red-600 dark:text-red-300">
+                          {analytics.paymentStats.overdue} pagamento(s) precisam de atenção
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {analytics.loyaltyAlerts.ending30Days.length > 0 && (
+                <Card className="bg-orange-50/50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className="h-8 w-8 text-orange-600" />
+                      <div>
+                        <p className="text-sm font-medium text-orange-700 dark:text-orange-400">
+                          {analytics.loyaltyAlerts.ending30Days.length} contrato(s) vencem em 30 dias
+                        </p>
+                        <p className="text-xs text-orange-600 dark:text-orange-300">
+                          Entre em contato para renovar
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {analytics.paymentConversionRate >= 85 && (
+                <Card className="bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Target className="h-8 w-8 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                          Taxa de renovação: {analytics.paymentConversionRate.toFixed(0)}%
+                        </p>
+                        <p className="text-xs text-green-600 dark:text-green-300">
+                          🎯 Acima da média! Parabéns!
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* Filtros */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Filtros de Clientes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-4">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Buscar cliente..." 
+                    value={clientSearchTerm} 
+                    onChange={(e) => setClientSearchTerm(e.target.value)} 
+                    className="pl-8" 
+                  />
+                </div>
+
+                <Select value={clientStatusFilter} onValueChange={setClientStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os Status</SelectItem>
+                    <SelectItem value="active">Ativos</SelectItem>
+                    <SelectItem value="inactive">Inativos</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={clientLoyaltyFilter} onValueChange={setClientLoyaltyFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Fidelidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="with">Com Fidelidade</SelectItem>
+                    <SelectItem value="without">Sem Fidelidade</SelectItem>
+                    <SelectItem value="expiring">Fidelidade Vencendo</SelectItem>
+                    <SelectItem value="expired">Fidelidade Vencida</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={clientPaymentStatusFilter} onValueChange={setClientPaymentStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pagamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="paid">Em Dia</SelectItem>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="overdue">Atrasado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="mt-4 flex justify-between items-center">
+                <p className="text-sm text-muted-foreground">
+                  {clients.filter(client => {
+                    const matchesSearch = client.name.toLowerCase().includes(clientSearchTerm.toLowerCase());
+                    const matchesStatus = clientStatusFilter === 'all' || 
+                      (clientStatusFilter === 'active' && client.active) ||
+                      (clientStatusFilter === 'inactive' && !client.active);
+                    const matchesLoyalty = clientLoyaltyFilter === 'all' ||
+                      (clientLoyaltyFilter === 'with' && client.has_loyalty) ||
+                      (clientLoyaltyFilter === 'without' && !client.has_loyalty);
+                    return matchesSearch && matchesStatus && matchesLoyalty;
+                  }).length} cliente(s) encontrado(s)
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setClientSearchTerm("");
+                    setClientStatusFilter("all");
+                    setClientLoyaltyFilter("all");
+                    setClientPaymentStatusFilter("all");
+                  }}
+                >
+                  Limpar Filtros
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Header com Botão de Novo Cliente */}
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold">
+              Clientes ({clients.length})
+            </h3>
+            <Button
+              onClick={() => {
+                const canAdd = checkLimitWithWarning('clients', clients.length + 1);
+                if (canAdd) {
+                  setSelectedClient(null);
+                  setClientFormOpen(true);
+                }
+              }}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Novo Cliente
+            </Button>
+          </div>
+
+          {/* Grid de Cards de Clientes */}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {clients
+              .filter(client => {
+                const matchesSearch = client.name.toLowerCase().includes(clientSearchTerm.toLowerCase());
+                const matchesStatus = clientStatusFilter === 'all' || 
+                  (clientStatusFilter === 'active' && client.active) ||
+                  (clientStatusFilter === 'inactive' && !client.active);
+                const matchesLoyalty = clientLoyaltyFilter === 'all' ||
+                  (clientLoyaltyFilter === 'with' && client.has_loyalty) ||
+                  (clientLoyaltyFilter === 'without' && !client.has_loyalty) ||
+                  (clientLoyaltyFilter === 'expiring' && client.has_loyalty && client.contract_end_date && 
+                    Math.ceil((new Date(client.contract_end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) <= 30 &&
+                    Math.ceil((new Date(client.contract_end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) >= 0) ||
+                  (clientLoyaltyFilter === 'expired' && client.has_loyalty && client.contract_end_date &&
+                    Math.ceil((new Date(client.contract_end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) < 0);
+                
+                // Filtro de status de pagamento
+                if (clientPaymentStatusFilter !== 'all') {
+                  const clientPayments = payments.filter(p => p.client_id === client.id);
+                  const hasStatus = clientPayments.some(p => p.status === clientPaymentStatusFilter);
+                  if (!hasStatus) return false;
+                }
+                
+                return matchesSearch && matchesStatus && matchesLoyalty;
+              })
+              .map(client => {
+                const clientPayments = payments.filter(p => p.client_id === client.id);
+                const currentYear = new Date().getFullYear();
+                const paymentsThisYear = clientPayments.filter(p => 
+                  p.status === 'paid' && new Date(p.due_date).getFullYear() === currentYear
+                ).length;
+                const totalPaymentsYear = 12;
+                
+                const nextPayment = clientPayments
+                  .filter(p => new Date(p.due_date) >= new Date())
+                  .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0];
+
+                return (
+                  <ClientCard
+                    key={client.id}
+                    client={client}
+                    paymentsThisYear={paymentsThisYear}
+                    totalPaymentsYear={totalPaymentsYear}
+                    nextPaymentDate={nextPayment?.due_date || null}
+                    nextPaymentStatus={nextPayment?.status || null}
+                    onView={handleViewClient}
+                    onEdit={handleEditClient}
+                    onDelete={handleDeleteClient}
+                    onGenerateContract={(client) => navigate('/contracts')}
+                    onCreateReminder={(client) => navigate('/reminders')}
+                  />
+                );
+              })}
+          </div>
+
+          {/* Dialog de Detalhes do Cliente */}
+          <ClientDetailsDialog
+            client={selectedClient}
+            open={clientDetailsOpen}
+            onOpenChange={setClientDetailsOpen}
+            payments={payments}
+            onEdit={handleEditClient}
+            onGenerateContract={(client) => navigate('/contracts')}
+            onDeactivate={handleDeleteClient}
+            onMarkPaymentAsPaid={(paymentId) => handleUpdatePaymentStatus(paymentId, 'paid')}
+          />
         </TabsContent>
 
         <TabsContent value="clients" className="space-y-6">
