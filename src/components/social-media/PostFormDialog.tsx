@@ -210,22 +210,45 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     enabled: !!currentAgency?.id,
   });
 
-  // Buscar horários padrão quando cliente for selecionado
+  // Buscar horários padrão quando plataforma ou cliente mudar
   useEffect(() => {
     const fetchSchedulePreference = async () => {
-      if (!formData.client_id || !currentAgency?.id || editPost) return;
+      if (!currentAgency?.id || editPost) return;
 
-      const { data, error } = await supabase
+      // Buscar preferência específica do cliente primeiro
+      let query = supabase
         .from('social_media_schedule_preferences')
         .select('preferred_times')
         .eq('agency_id', currentAgency.id)
-        .eq('client_id', formData.client_id)
-        .eq('platform', formData.platform)
-        .single();
+        .eq('platform', formData.platform);
 
-      if (data && data.preferred_times && Array.isArray(data.preferred_times) && data.preferred_times.length > 0) {
+      // Se tiver cliente, buscar preferência específica
+      if (formData.client_id) {
+        query = query.eq('client_id', formData.client_id);
+      } else {
+        // Se não tiver cliente, buscar preferência geral (client_id null)
+        query = query.is('client_id', null);
+      }
+
+      const { data, error } = await query.maybeSingle();
+
+      // Se não encontrou preferência específica e tem cliente, buscar preferência geral
+      let preferenceData = data;
+      if (!preferenceData && formData.client_id) {
+        const { data: generalData } = await supabase
+          .from('social_media_schedule_preferences')
+          .select('preferred_times')
+          .eq('agency_id', currentAgency.id)
+          .eq('platform', formData.platform)
+          .is('client_id', null)
+          .maybeSingle();
+        
+        preferenceData = generalData;
+      }
+
+      if (preferenceData && preferenceData.preferred_times && Array.isArray(preferenceData.preferred_times) && preferenceData.preferred_times.length > 0) {
         // Pegar o primeiro horário preferido
-        const preferredTime = data.preferred_times[0] as string;
+        const preferredTime = preferenceData.preferred_times[0] as string;
         const currentDate = new Date(formData.scheduled_date);
         const [hours, minutes] = preferredTime.split(':');
         currentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
@@ -234,7 +257,35 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     };
 
     fetchSchedulePreference();
-  }, [formData.client_id, formData.platform, currentAgency?.id, editPost]);
+  }, [formData.platform, formData.client_id, currentAgency?.id, editPost, open]);
+
+  // Aplicar horário padrão ao abrir o modal
+  useEffect(() => {
+    if (open && !editPost && defaultDate) {
+      const fetchInitialSchedule = async () => {
+        if (!currentAgency?.id) return;
+
+        // Buscar preferência geral para a plataforma padrão (instagram)
+        const { data } = await supabase
+          .from('social_media_schedule_preferences')
+          .select('preferred_times')
+          .eq('agency_id', currentAgency.id)
+          .eq('platform', 'instagram')
+          .is('client_id', null)
+          .maybeSingle();
+
+        if (data && data.preferred_times && Array.isArray(data.preferred_times) && data.preferred_times.length > 0) {
+          const preferredTime = data.preferred_times[0] as string;
+          const currentDate = new Date(defaultDate);
+          const [hours, minutes] = preferredTime.split(':');
+          currentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+          setFormData(prev => ({ ...prev, scheduled_date: currentDate.toISOString() }));
+        }
+      };
+
+      fetchInitialSchedule();
+    }
+  }, [open, editPost, defaultDate, currentAgency?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
