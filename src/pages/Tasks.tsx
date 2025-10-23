@@ -327,14 +327,32 @@ export default function Tasks() {
 
   const addHistoryEntry = async (taskId: string, action: string) => {
     try {
-      // Get current task history
+      // Get current task history and created_by
       const { data: currentTask } = await supabase
         .from("tasks")
-        .select("history")
+        .select("history, created_by")
         .eq("id", taskId)
         .single();
 
       const currentHistory = Array.isArray(currentTask?.history) ? currentTask.history : [];
+      
+      // Se for o primeiro histórico, adicionar informação de criação
+      if (currentHistory.length === 0 && currentTask?.created_by) {
+        const { data: creatorProfile } = await supabase
+          .from("profiles")
+          .select("name")
+          .eq("user_id", currentTask.created_by)
+          .single();
+
+        if (creatorProfile) {
+          currentHistory.push({
+            action: "Tarefa criada",
+            timestamp: new Date().toISOString(),
+            user_name: creatorProfile.name,
+          });
+        }
+      }
+
       const newEntry = {
         action,
         timestamp: new Date().toISOString(),

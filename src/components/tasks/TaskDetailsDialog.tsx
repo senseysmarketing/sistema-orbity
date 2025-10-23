@@ -8,6 +8,7 @@ import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle,
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Task {
   id: string;
@@ -55,14 +56,31 @@ const priorityConfig: Record<string, { label: string; color: string }> = {
 export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, getClientName, getAssignedUsers }: TaskDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
+  const [creatorName, setCreatorName] = useState<string>("");
 
   useEffect(() => {
-    // Histórico virá do campo history da tarefa quando implementado
-    if (task?.history) {
-      setHistory(Array.isArray(task.history) ? task.history : []);
-    } else {
-      setHistory([]);
-    }
+    const loadTaskDetails = async () => {
+      if (task?.history) {
+        setHistory(Array.isArray(task.history) ? task.history : []);
+      } else {
+        setHistory([]);
+      }
+
+      // Buscar nome do criador
+      if (task?.created_by) {
+        const { data: creatorProfile } = await supabase
+          .from("profiles")
+          .select("name")
+          .eq("user_id", task.created_by)
+          .single();
+        
+        if (creatorProfile) {
+          setCreatorName(creatorProfile.name);
+        }
+      }
+    };
+
+    loadTaskDetails();
   }, [task]);
 
   if (!task) return null;
@@ -192,7 +210,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
             </div>
 
             {/* Histórico de Movimentações */}
-            {history && Array.isArray(history) && history.length > 0 && (
+            {(history && history.length > 0) || creatorName ? (
               <>
                 <Separator />
                 <div className="space-y-3">
@@ -201,6 +219,20 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                     <p className="text-sm font-medium">Histórico de Movimentações</p>
                   </div>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {/* Entrada de criação */}
+                    {creatorName && (
+                      <div className="flex items-start gap-2 p-2 rounded-md bg-muted/50">
+                        <div className="flex-1">
+                          <p className="text-sm">Tarefa criada</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{format(new Date(task.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+                            <span>•</span>
+                            <span>por {creatorName}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* Histórico de mudanças */}
                     {history.map((entry: any, index: number) => (
                       <div key={index} className="flex items-start gap-2 p-2 rounded-md bg-muted/50">
                         <div className="flex-1">
@@ -220,7 +252,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                   </div>
                 </div>
               </>
-            )}
+            ) : null}
           </div>
 
           <DialogFooter className="gap-2">

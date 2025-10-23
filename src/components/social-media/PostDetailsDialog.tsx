@@ -7,7 +7,8 @@ import { ptBR } from "date-fns/locale";
 import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History } from "lucide-react";
 import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PostDetailsDialogProps {
   post: SocialMediaPost | null;
@@ -51,6 +52,25 @@ const postTypeConfig: Record<string, string> = {
 
 export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete }: PostDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [creatorName, setCreatorName] = useState<string>("");
+
+  useEffect(() => {
+    const loadCreator = async () => {
+      if (post?.created_by) {
+        const { data: creatorProfile } = await supabase
+          .from("profiles")
+          .select("name")
+          .eq("user_id", post.created_by)
+          .single();
+        
+        if (creatorProfile) {
+          setCreatorName(creatorProfile.name);
+        }
+      }
+    };
+
+    loadCreator();
+  }, [post]);
 
   if (!post) return null;
 
@@ -178,7 +198,7 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete }
             </div>
 
             {/* Histórico de Movimentações */}
-            {post.approval_history && Array.isArray(post.approval_history) && post.approval_history.length > 0 && (
+            {(post.approval_history && Array.isArray(post.approval_history) && post.approval_history.length > 0) || creatorName ? (
               <>
                 <Separator />
                 <div className="space-y-3">
@@ -187,7 +207,21 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete }
                     <p className="text-sm font-medium">Histórico de Movimentações</p>
                   </div>
                   <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {post.approval_history.map((entry: any, index: number) => (
+                    {/* Entrada de criação */}
+                    {creatorName && (
+                      <div className="flex items-start gap-2 p-2 rounded-md bg-muted/50">
+                        <div className="flex-1">
+                          <p className="text-sm">Postagem criada</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{format(new Date(post.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+                            <span>•</span>
+                            <span>por {creatorName}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* Histórico de aprovações/mudanças */}
+                    {post.approval_history && Array.isArray(post.approval_history) && post.approval_history.map((entry: any, index: number) => (
                       <div key={index} className="flex items-start gap-2 p-2 rounded-md bg-muted/50">
                         <div className="flex-1">
                           <p className="text-sm">{entry.action || `Status: ${entry.status}`}</p>
@@ -206,7 +240,7 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete }
                   </div>
                 </div>
               </>
-            )}
+            ) : null}
           </div>
 
           <DialogFooter className="gap-2">
