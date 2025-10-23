@@ -123,7 +123,7 @@ export function ClientDetailsDialog({
             </TabsTrigger>
             <TabsTrigger value="history">
               <History className="h-4 w-4 mr-2" />
-              Histórico
+              Pagamentos
             </TabsTrigger>
             <TabsTrigger value="projection">
               <TrendingUp className="h-4 w-4 mr-2" />

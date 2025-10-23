@@ -46,11 +46,15 @@ export function ClientPaymentHistory({ payments, onMarkAsPaid }: ClientPaymentHi
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "dd/MM/yyyy", { locale: ptBR });
+    // Parse como data UTC e formata apenas a data, ignorando timezone
+    const [year, month, day] = dateString.split('T')[0].split('-');
+    return `${day}/${month}/${year}`;
   };
 
   const formatMonth = (dateString: string) => {
-    return format(new Date(dateString), "MMMM 'de' yyyy", { locale: ptBR });
+    const [year, month] = dateString.split('T')[0].split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    return format(date, "MMMM 'de' yyyy", { locale: ptBR });
   };
 
   const sortedPayments = [...payments].sort((a, b) => 
