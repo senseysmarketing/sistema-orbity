@@ -117,17 +117,10 @@ export function SalaryDetailsDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <DialogTitle className="text-2xl">{salary.employee_name}</DialogTitle>
-                <DialogDescription>
-                  Detalhes completos do salário
-                </DialogDescription>
-              </div>
-              <Badge className={getStatusColor(salary.status)}>
-                {getStatusLabel(salary.status)}
-              </Badge>
-            </div>
+            <DialogTitle className="text-2xl">{salary.employee_name}</DialogTitle>
+            <DialogDescription>
+              Detalhes completos do salário
+            </DialogDescription>
           </DialogHeader>
 
           <Tabs defaultValue="info" className="w-full">
