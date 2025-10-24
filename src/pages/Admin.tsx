@@ -2464,47 +2464,6 @@ export default function Admin() {
         </AlertDialogContent>
         </AlertDialog>
 
-        {/* Dialog de detalhes da despesa */}
-        <AlertDialog open={expenseDetailsOpen} onOpenChange={setExpenseDetailsOpen}>
-          <AlertDialogContent className="max-w-md">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Detalhes da Despesa</AlertDialogTitle>
-            </AlertDialogHeader>
-            <div className="space-y-4">
-              {selectedExpense && <>
-                  <div>
-                    <span className="font-medium">Nome:</span>
-                    <p>{selectedExpense.name}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Valor:</span>
-                    <p>R$ {selectedExpense.amount.toLocaleString('pt-BR', {
-                  minimumFractionDigits: 2
-                })}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Data de Vencimento:</span>
-                    <p>{new Date(selectedExpense.due_date).toLocaleDateString('pt-BR')}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Status:</span>
-                    <p>{getStatusLabel(selectedExpense.status)}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Tipo:</span>
-                    <p>{selectedExpense.is_fixed ? 'Fixa' : 'Variável'}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Data de Pagamento:</span>
-                    <p>{selectedExpense.paid_date ? new Date(selectedExpense.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}</p>
-                  </div>
-                </>}
-            </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Fechar</AlertDialogCancel>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
 
         {/* Dialog de confirmação de exclusão de despesa */}
         <AlertDialog open={expenseDeleteDialogOpen} onOpenChange={setExpenseDeleteDialogOpen}>
