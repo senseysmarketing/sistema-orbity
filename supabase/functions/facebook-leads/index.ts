@@ -85,17 +85,26 @@ async function listPages(supabase: any, userId: string, params: any) {
     throw new Error('No active Facebook connection found');
   }
 
-  // Fetch pages from Facebook Graph API
-  const pagesUrl = `https://graph.facebook.com/v18.0/me/accounts?access_token=${connection.access_token}`;
-  const pagesResponse = await fetch(pagesUrl);
-  const pagesData = await pagesResponse.json();
+  // Fetch all pages with pagination from Facebook Graph API
+  let allPages: any[] = [];
+  let nextUrl = `https://graph.facebook.com/v18.0/me/accounts?access_token=${connection.access_token}&limit=100`;
 
-  if (pagesData.error) {
-    throw new Error(`Facebook API error: ${pagesData.error.message}`);
+  while (nextUrl) {
+    const pagesResponse = await fetch(nextUrl);
+    const pagesData = await pagesResponse.json();
+
+    if (pagesData.error) {
+      throw new Error(`Facebook API error: ${pagesData.error.message}`);
+    }
+
+    allPages = [...allPages, ...(pagesData.data || [])];
+    nextUrl = pagesData.paging?.next || null;
   }
 
+  console.log(`Fetched ${allPages.length} pages for agency ${agencyId}`);
+
   return new Response(
-    JSON.stringify({ pages: pagesData.data || [] }),
+    JSON.stringify({ pages: allPages }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
 }

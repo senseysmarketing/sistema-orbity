@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Facebook, RefreshCw, Trash2, AlertCircle, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,6 +63,8 @@ export function FacebookLeadsIntegration() {
   const [selectedForm, setSelectedForm] = useState<string>("");
   const [defaultStatus, setDefaultStatus] = useState("new");
   const [defaultPriority, setDefaultPriority] = useState("medium");
+  
+  const [pageSearch, setPageSearch] = useState("");
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [integrationToDelete, setIntegrationToDelete] = useState<string | null>(null);
@@ -176,6 +179,10 @@ export function FacebookLeadsIntegration() {
     setForms([]);
     await fetchForms(pageId);
   };
+
+  const filteredPages = pages.filter(page =>
+    page.name.toLowerCase().includes(pageSearch.toLowerCase())
+  );
 
   const handleSaveIntegration = async () => {
     if (!currentAgency || !connectionId || !selectedPage || !selectedForm) {
@@ -336,22 +343,43 @@ export function FacebookLeadsIntegration() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Clique no botão de atualizar <RefreshCw className="h-3 w-3 inline" /> para carregar suas páginas do Facebook
+            </AlertDescription>
+          </Alert>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Página do Facebook</Label>
               <div className="flex gap-2">
-                <Select value={selectedPage} onValueChange={handlePageSelect}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma página" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pages.map((page) => (
-                      <SelectItem key={page.id} value={page.id}>
-                        {page.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex-1 space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Buscar página..."
+                    value={pageSearch}
+                    onChange={(e) => setPageSearch(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border rounded-md"
+                  />
+                  <Select value={selectedPage} onValueChange={handlePageSelect}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma página" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredPages.length === 0 && pages.length > 0 && (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          Nenhuma página encontrada
+                        </div>
+                      )}
+                      {filteredPages.map((page) => (
+                        <SelectItem key={page.id} value={page.id}>
+                          {page.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button
                   variant="outline"
                   size="icon"
