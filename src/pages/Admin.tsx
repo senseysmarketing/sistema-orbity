@@ -1346,59 +1346,63 @@ export default function Admin() {
             </div>
           )}
 
-          {/* Filtros e Botões em linha */}
+          {/* Header com Filtros e Botões */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <h2 className="text-2xl font-bold">
+              Clientes ({showInactiveClients ? clients.filter(c => !c.active).length : clients.filter(c => c.active).length})
+            </h2>
+            
             <div className="flex flex-wrap gap-2 items-center w-full lg:w-auto">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              
-              <div className="relative w-[200px]">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Buscar cliente..." 
-                  value={clientSearchTerm} 
-                  onChange={(e) => setClientSearchTerm(e.target.value)} 
-                  className="pl-8" 
-                />
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                
+                <div className="relative w-[180px]">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Buscar cliente..." 
+                    value={clientSearchTerm} 
+                    onChange={(e) => setClientSearchTerm(e.target.value)} 
+                    className="pl-8" 
+                  />
+                </div>
+
+                <Select value={clientStatusFilter} onValueChange={setClientStatusFilter}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Status</SelectItem>
+                    <SelectItem value="active">Ativos</SelectItem>
+                    <SelectItem value="inactive">Inativos</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={clientLoyaltyFilter} onValueChange={setClientLoyaltyFilter}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="Fidelidade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="with">Com Fidelidade</SelectItem>
+                    <SelectItem value="without">Sem Fidelidade</SelectItem>
+                    <SelectItem value="expiring">Vencendo</SelectItem>
+                    <SelectItem value="expired">Vencida</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={clientPaymentStatusFilter} onValueChange={setClientPaymentStatusFilter}>
+                  <SelectTrigger className="w-[130px]">
+                    <SelectValue placeholder="Pagamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="paid">Em Dia</SelectItem>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="overdue">Atrasado</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <Select value={clientStatusFilter} onValueChange={setClientStatusFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Status</SelectItem>
-                  <SelectItem value="active">Ativos</SelectItem>
-                  <SelectItem value="inactive">Inativos</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={clientLoyaltyFilter} onValueChange={setClientLoyaltyFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Fidelidade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="with">Com Fidelidade</SelectItem>
-                  <SelectItem value="without">Sem Fidelidade</SelectItem>
-                  <SelectItem value="expiring">Vencendo</SelectItem>
-                  <SelectItem value="expired">Vencida</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={clientPaymentStatusFilter} onValueChange={setClientPaymentStatusFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Pagamento" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="paid">Em Dia</SelectItem>
-                  <SelectItem value="pending">Pendente</SelectItem>
-                  <SelectItem value="overdue">Atrasado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2">
               <Button
                 variant={showInactiveClients ? "default" : "outline"}
                 onClick={() => setShowInactiveClients(!showInactiveClients)}
@@ -1407,6 +1411,7 @@ export default function Admin() {
                 <UserX className="h-4 w-4" />
                 {showInactiveClients ? "Ocultar Inativos" : "Ver Inativos"} ({clients.filter(c => !c.active).length})
               </Button>
+              
               <Button
                 onClick={() => {
                   const canAdd = checkLimitWithWarning('clients', clients.length + 1);
