@@ -98,8 +98,8 @@ export function ClientCard({
           {/* Header com ícone, badges e menu */}
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3 flex-1">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Building className="h-5 w-5 text-primary" />
+              <div>
+                <Building className="h-6 w-6 text-primary" />
               </div>
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">

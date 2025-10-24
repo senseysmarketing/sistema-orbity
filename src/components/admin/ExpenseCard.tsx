@@ -156,13 +156,13 @@ export function ExpenseCard({
           {/* Header com ícone da categoria, badges e menu */}
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3 flex-1">
-              <div className="p-2 bg-primary/10 rounded-lg">
+              <div>
                 {item.type === 'salary' ? (
-                  <Wallet className="h-5 w-5 text-primary" />
+                  <Wallet className="h-6 w-6 text-primary" />
                 ) : category ? (
-                  <span className="text-2xl">{category.icon}</span>
+                  <span className="text-3xl">{category.icon}</span>
                 ) : (
-                  <Receipt className="h-5 w-5 text-primary" />
+                  <Receipt className="h-6 w-6 text-primary" />
                 )}
               </div>
               <div className="flex-1 space-y-2">
