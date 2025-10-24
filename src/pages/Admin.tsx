@@ -255,7 +255,7 @@ export default function Admin() {
 
     const { data, error } = await supabase
       .from('expenses')
-      .select('*')
+      .select('*, category')
       .eq('agency_id', currentAgency.id)
       .gte('due_date', startDate)
       .lte('due_date', endDate)
