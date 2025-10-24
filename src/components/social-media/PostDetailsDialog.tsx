@@ -4,11 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History } from "lucide-react";
-import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
+import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History, ListTodo } from "lucide-react";
+import { SocialMediaPost, Subtask } from "@/hooks/useSocialMediaPosts";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface PostDetailsDialogProps {
   post: SocialMediaPost | null;
@@ -16,6 +17,7 @@ interface PostDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   onEdit: (post: SocialMediaPost) => void;
   onDelete: (postId: string) => void;
+  onPostUpdate?: () => void;
 }
 
 const platformConfig: Record<string, { label: string; icon: string }> = {
@@ -50,9 +52,10 @@ const postTypeConfig: Record<string, string> = {
   carrossel: "Carrossel",
 };
 
-export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete }: PostDetailsDialogProps) {
+export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, onPostUpdate }: PostDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [creatorName, setCreatorName] = useState<string>("");
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
 
   useEffect(() => {
     const loadCreator = async () => {
@@ -69,8 +72,38 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete }
       }
     };
 
+    if (post?.subtasks) {
+      setSubtasks(Array.isArray(post.subtasks) ? post.subtasks : []);
+    } else {
+      setSubtasks([]);
+    }
+
     loadCreator();
   }, [post]);
+
+  const handleToggleSubtask = async (subtaskId: string) => {
+    if (!post) return;
+
+    const updatedSubtasks = subtasks.map(st =>
+      st.id === subtaskId ? { ...st, completed: !st.completed } : st
+    );
+
+    setSubtasks(updatedSubtasks);
+
+    try {
+      const { error } = await supabase
+        .from("social_media_posts")
+        .update({ subtasks: updatedSubtasks as any })
+        .eq("id", post.id);
+
+      if (error) throw error;
+      onPostUpdate?.();
+    } catch (error) {
+      console.error("Error updating subtask:", error);
+      // Reverter em caso de erro
+      setSubtasks(subtasks);
+    }
+  };
 
   if (!post) return null;
 
@@ -196,6 +229,34 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete }
                 </div>
               )}
             </div>
+
+            {/* Subtarefas */}
+            {subtasks.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <ListTodo className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">
+                      Subtarefas ({subtasks.filter(st => st.completed).length}/{subtasks.length})
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {subtasks.map((subtask) => (
+                      <div key={subtask.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
+                        <Checkbox
+                          checked={subtask.completed}
+                          onCheckedChange={() => handleToggleSubtask(subtask.id)}
+                        />
+                        <span className={`text-sm ${subtask.completed ? 'line-through text-muted-foreground' : ''}`}>
+                          {subtask.title}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Histórico de Movimentações */}
             {(post.approval_history && Array.isArray(post.approval_history) && post.approval_history.length > 0) || creatorName ? (

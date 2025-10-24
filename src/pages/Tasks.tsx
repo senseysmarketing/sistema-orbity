@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Search, LayoutGrid, TrendingUp, Settings } from "lucide-react";
+import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 import {
   DndContext,
   DragEndEvent,
@@ -50,6 +51,7 @@ interface Task {
   created_by: string;
   archived?: boolean;
   history?: any[];
+  subtasks?: Subtask[];
 }
 
 interface Profile {
@@ -91,6 +93,7 @@ export default function Tasks() {
     assigned_users: [] as string[],
     client_id: "no-client",
     due_date: "",
+    subtasks: [] as Subtask[],
   });
 
   const { profile } = useAuth();
@@ -394,6 +397,7 @@ export default function Tasks() {
           due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
           created_by: profile?.user_id,
           agency_id: currentAgency?.id,
+          subtasks: newTask.subtasks as any,
         })
         .select()
         .single();
@@ -418,6 +422,7 @@ export default function Tasks() {
         assigned_users: [],
         client_id: "no-client",
         due_date: "",
+        subtasks: [],
       });
       setIsDialogOpen(false);
       fetchTasks();
@@ -441,6 +446,7 @@ export default function Tasks() {
       assigned_users: getAssignedUsers(task.id).map((u) => u.user_id),
       client_id: task.client_id || "no-client",
       due_date: task.due_date ? task.due_date.split("T")[0] : "",
+      subtasks: task.subtasks || [],
     });
     setIsEditDialogOpen(true);
   };
@@ -496,6 +502,7 @@ export default function Tasks() {
         assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
         client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
         due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
+        subtasks: newTask.subtasks as any,
       };
 
       // Reset notification_sent_at if due_date changed
@@ -758,6 +765,10 @@ export default function Tasks() {
                   onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
                 />
               </div>
+              <SubtaskManager
+                subtasks={newTask.subtasks}
+                onChange={(subtasks) => setNewTask({ ...newTask, subtasks })}
+              />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -1068,6 +1079,10 @@ export default function Tasks() {
                 onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
               />
             </div>
+            <SubtaskManager
+              subtasks={newTask.subtasks}
+              onChange={(subtasks) => setNewTask({ ...newTask, subtasks })}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
@@ -1086,6 +1101,7 @@ export default function Tasks() {
         onDelete={handleDeleteTask}
         getClientName={getClientName}
         getAssignedUsers={getAssignedUsers}
+        onTaskUpdate={fetchTasks}
       />
     </div>
   );

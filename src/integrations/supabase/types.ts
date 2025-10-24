@@ -2356,6 +2356,7 @@ export type Database = {
           priority: string
           scheduled_date: string
           status: string
+          subtasks: Json | null
           title: string
           updated_at: string | null
         }
@@ -2380,6 +2381,7 @@ export type Database = {
           priority?: string
           scheduled_date: string
           status?: string
+          subtasks?: Json | null
           title: string
           updated_at?: string | null
         }
@@ -2404,6 +2406,7 @@ export type Database = {
           priority?: string
           scheduled_date?: string
           status?: string
+          subtasks?: Json | null
           title?: string
           updated_at?: string | null
         }
@@ -2678,6 +2681,7 @@ export type Database = {
           notification_sent_at: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           status: Database["public"]["Enums"]["task_status"]
+          subtasks: Json | null
           title: string
           updated_at: string
         }
@@ -2695,6 +2699,7 @@ export type Database = {
           notification_sent_at?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           status?: Database["public"]["Enums"]["task_status"]
+          subtasks?: Json | null
           title: string
           updated_at?: string
         }
@@ -2712,6 +2717,7 @@ export type Database = {
           notification_sent_at?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           status?: Database["public"]["Enums"]["task_status"]
+          subtasks?: Json | null
           title?: string
           updated_at?: string
         }

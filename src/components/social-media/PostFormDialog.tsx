@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 
 interface PostFormDialogProps {
   open: boolean;
@@ -48,6 +49,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     priority: "medium",
     hashtags: "",
     notes: "",
+    subtasks: [] as Subtask[],
   });
 
   useEffect(() => {
@@ -63,6 +65,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         priority: editPost.priority,
         hashtags: editPost.hashtags?.join(", ") || "",
         notes: editPost.notes || "",
+        subtasks: editPost.subtasks || [],
       });
     } else {
       setFormData({
@@ -76,6 +79,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         priority: "medium",
         hashtags: "",
         notes: "",
+        subtasks: [],
       });
     }
   }, [editPost, defaultDate, open]);
@@ -299,6 +303,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         attachments: [],
         mentions: [],
         approval_history: [],
+        subtasks: formData.subtasks,
       };
 
       if (editPost?.id) {
@@ -564,6 +569,11 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
               rows={3}
             />
           </div>
+
+          <SubtaskManager
+            subtasks={formData.subtasks}
+            onChange={(subtasks) => setFormData({ ...formData, subtasks })}
+          />
 
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

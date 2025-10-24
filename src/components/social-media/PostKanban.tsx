@@ -260,6 +260,7 @@ export function PostKanban() {
         onOpenChange={setIsDetailsOpen}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onPostUpdate={fetchPosts}
       />
     </div>
   );

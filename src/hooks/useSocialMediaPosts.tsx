@@ -3,6 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAgency } from './useAgency';
 import { toast } from 'sonner';
 
+export interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
 export interface SocialMediaPost {
   id: string;
   title: string;
@@ -23,6 +29,7 @@ export interface SocialMediaPost {
   agency_id: string;
   created_at: string;
   updated_at: string;
+  subtasks?: Subtask[];
   clients?: {
     name: string;
   } | null;
@@ -55,10 +62,15 @@ export function useSocialMediaPosts() {
         .order('scheduled_date', { ascending: true });
 
       if (error) throw error;
-setPosts((data || []) as SocialMediaPost[]);
-if (currentAgency?.id) {
-  postsCache[currentAgency.id] = (data || []) as SocialMediaPost[];
-}
+      const formattedData = (data || []).map(post => ({
+        ...post,
+        subtasks: Array.isArray(post.subtasks) ? post.subtasks as unknown as Subtask[] : []
+      })) as SocialMediaPost[];
+      
+      setPosts(formattedData);
+      if (currentAgency?.id) {
+        postsCache[currentAgency.id] = formattedData;
+      }
     } catch (error: any) {
       toast.error('Erro ao carregar postagens: ' + error.message);
     } finally {
@@ -119,13 +131,18 @@ if (currentAgency?.id) {
 
       if (error) throw error;
       
+      const formattedPost = {
+        ...data,
+        subtasks: Array.isArray(data.subtasks) ? data.subtasks as unknown as Subtask[] : []
+      } as SocialMediaPost;
+      
       // Atualização otimista - adiciona imediatamente ao estado local
-      setPosts(prev => [...prev, data as SocialMediaPost]);
+      setPosts(prev => [...prev, formattedPost]);
 
       // Atualiza cache global e notifica outras instâncias
       const agencyId = currentAgency.id;
       const prevCache = postsCache[agencyId] || [];
-      postsCache[agencyId] = [...prevCache, data as SocialMediaPost];
+      postsCache[agencyId] = [...prevCache, formattedPost];
       window.dispatchEvent(new CustomEvent(POSTS_UPDATED_EVENT, { detail: { agencyId } }));
 
       toast.success('Postagem criada com sucesso');

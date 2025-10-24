@@ -4,11 +4,18 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
 import { supabase } from "@/integrations/supabase/client";
+import { Checkbox } from "@/components/ui/checkbox";
+
+interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
+}
 
 interface Task {
   id: string;
@@ -23,6 +30,7 @@ interface Task {
   created_by: string;
   archived?: boolean;
   history?: any[];
+  subtasks?: Subtask[];
 }
 
 interface Client {
@@ -38,6 +46,7 @@ interface TaskDetailsDialogProps {
   onDelete: (taskId: string) => void;
   getClientName: (clientId: string | null) => string;
   getAssignedUsers: (taskId: string) => any[];
+  onTaskUpdate?: () => void;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -53,10 +62,11 @@ const priorityConfig: Record<string, { label: string; color: string }> = {
   high: { label: "Alta", color: "bg-red-500" },
 };
 
-export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, getClientName, getAssignedUsers }: TaskDetailsDialogProps) {
+export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, getClientName, getAssignedUsers, onTaskUpdate }: TaskDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [creatorName, setCreatorName] = useState<string>("");
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
 
   useEffect(() => {
     const loadTaskDetails = async () => {
@@ -64,6 +74,12 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
         setHistory(Array.isArray(task.history) ? task.history : []);
       } else {
         setHistory([]);
+      }
+
+      if (task?.subtasks) {
+        setSubtasks(Array.isArray(task.subtasks) ? task.subtasks : []);
+      } else {
+        setSubtasks([]);
       }
 
       // Buscar nome do criador
@@ -82,6 +98,30 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
 
     loadTaskDetails();
   }, [task]);
+
+  const handleToggleSubtask = async (subtaskId: string) => {
+    if (!task) return;
+
+    const updatedSubtasks = subtasks.map(st =>
+      st.id === subtaskId ? { ...st, completed: !st.completed } : st
+    );
+
+    setSubtasks(updatedSubtasks);
+
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ subtasks: updatedSubtasks as any })
+        .eq("id", task.id);
+
+      if (error) throw error;
+      onTaskUpdate?.();
+    } catch (error) {
+      console.error("Error updating subtask:", error);
+      // Reverter em caso de erro
+      setSubtasks(subtasks);
+    }
+  };
 
   if (!task) return null;
 
@@ -208,6 +248,34 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                 </div>
               )}
             </div>
+
+            {/* Subtarefas */}
+            {subtasks.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <ListTodo className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">
+                      Subtarefas ({subtasks.filter(st => st.completed).length}/{subtasks.length})
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {subtasks.map((subtask) => (
+                      <div key={subtask.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
+                        <Checkbox
+                          checked={subtask.completed}
+                          onCheckedChange={() => handleToggleSubtask(subtask.id)}
+                        />
+                        <span className={`text-sm ${subtask.completed ? 'line-through text-muted-foreground' : ''}`}>
+                          {subtask.title}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Histórico de Movimentações */}
             {(history && history.length > 0) || creatorName ? (

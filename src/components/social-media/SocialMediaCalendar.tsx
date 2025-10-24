@@ -17,7 +17,7 @@ export function SocialMediaCalendar() {
   const [selectedPost, setSelectedPost] = useState<SocialMediaPost | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<SocialMediaPost | null>(null);
-  const { posts, loading, deletePost } = useSocialMediaPosts();
+  const { posts, loading, deletePost, fetchPosts } = useSocialMediaPosts();
 
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
@@ -242,6 +242,7 @@ export function SocialMediaCalendar() {
         onOpenChange={setIsDetailsOpen}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onPostUpdate={fetchPosts}
       />
     </div>
   );
