@@ -22,6 +22,7 @@ import { SalaryForm } from "@/components/admin/SalaryForm";
 import { ClientCard } from "@/components/admin/ClientCard";
 import { ClientDetailsDialog } from "@/components/admin/ClientDetailsDialog";
 import { ChurnAnalysis } from "@/components/admin/ChurnAnalysis";
+import { ExpenseCard } from "@/components/admin/ExpenseCard";
 interface Client {
   id: string;
   name: string;
@@ -1994,27 +1995,32 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="expenses" className="space-y-6">
-          {/* Filtros para Despesas */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Filtros e Busca - Despesas
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-4">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Buscar despesas..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8" />
-                </div>
+          {/* Header com Filtros e Botões */}
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <h2 className="text-2xl font-bold">
+              Despesas e Salários ({combinedExpensesAndSalaries.length})
+            </h2>
+            
+            <div className="flex flex-wrap gap-2 items-center w-full lg:w-auto">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
                 
+                <div className="relative w-[180px]">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Buscar despesa..." 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
+                    className="pl-8" 
+                  />
+                </div>
+
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-[130px]">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos os Status</SelectItem>
+                    <SelectItem value="all">Todos Status</SelectItem>
                     <SelectItem value="paid">Pagas</SelectItem>
                     <SelectItem value="pending">Pendentes</SelectItem>
                     <SelectItem value="overdue">Atrasadas</SelectItem>
@@ -2022,330 +2028,51 @@ export default function Admin() {
                 </Select>
 
                 <Select value={paymentTypeFilter} onValueChange={setPaymentTypeFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-[130px]">
                     <SelectValue placeholder="Tipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos os Tipos</SelectItem>
+                    <SelectItem value="all">Todos Tipos</SelectItem>
                     <SelectItem value="fixed">Fixas</SelectItem>
                     <SelectItem value="salary">Salários</SelectItem>
                   </SelectContent>
                 </Select>
-
-                <Button variant="outline" onClick={clearFilters}>
-                  Limpar Filtros
-                </Button>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Lista de Despesas */}
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Despesas e Salários ({combinedExpensesAndSalaries.length})</h3>
-            <div className="flex gap-2">
-              <div className="flex gap-1">
-                <Button
-                  variant={expenseViewMode === 'cards' ? 'action' : 'outline'}
-                  size="sm"
-                  onClick={() => setExpenseViewMode('cards')}
-                >
-                  Cards
-                </Button>
-                <Button
-                  variant={expenseViewMode === 'table' ? 'action' : 'outline'}
-                  size="sm"
-                  onClick={() => setExpenseViewMode('table')}
-                >
-                  Tabela
-                </Button>
-              </div>
-              <Button variant="action" onClick={() => setExpenseFormOpen(true)} className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                Nova Despesa
-              </Button>
-              <Button variant="action" onClick={() => setSalaryFormOpen(true)} className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setSalaryFormOpen(true)}
+                className="flex items-center gap-2"
+              >
                 <Users className="h-4 w-4" />
                 Salário
+              </Button>
+              
+              <Button
+                onClick={() => setExpenseFormOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Nova Despesa
               </Button>
             </div>
           </div>
 
-          {/* Visualização Cards vs Tabela */}
-          {expenseViewMode === "cards" ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {combinedExpensesAndSalaries.map(item => (
-                <Card key={`${item.type}-${item.id}`} className={`hover:shadow-lg transition-all duration-200 ${getExpenseCardBackgroundColor(item.status)}`}>
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-2 flex-1">
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg leading-none">
-                            {item.type === 'salary' ? `Salário - ${item.employee_name}` : item.name}
-                          </CardTitle>
-                          <Badge className={getStatusColor(item.status)}>
-                            {getStatusLabel(item.status)}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <DollarSign className="h-3 w-3" />
-                            <span className="font-medium">
-                              R$ {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                          {item.type === 'salary' ? (
-                            <Badge variant="default" className="text-xs">Salário</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-xs">
-                              {item.expense_type === 'avulsa' ? 'Avulsa' : 
-                               item.expense_type === 'recorrente' ? 'Recorrente' : 
-                               item.expense_type === 'parcelada' ? 'Parcelada' : 'Despesa'}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {item.type === 'expense' ? (
-                            <>
-                              <DropdownMenuItem onClick={() => handleViewExpense(item as Expense)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                Ver Detalhes
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleEditExpense(item as Expense)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(item.id, 'paid')}>
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                Marcar como Pago
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(item.id, 'pending')}>
-                                <Timer className="mr-2 h-4 w-4" />
-                                Marcar como Pendente
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(item.id, 'overdue')}>
-                                <AlertTriangle className="mr-2 h-4 w-4" />
-                                Marcar como Atrasado
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDeleteExpense(item as Expense)} className="text-red-600">
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Excluir
-                              </DropdownMenuItem>
-                            </>
-                          ) : (
-                            <>
-                              <DropdownMenuItem onClick={() => handleViewSalary(item as Salary)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                Ver Detalhes
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleEditSalary(item as Salary)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleUpdateSalaryStatus(item.id, 'paid')}>
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                Marcar como Pago
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleUpdateSalaryStatus(item.id, 'pending')}>
-                                <Timer className="mr-2 h-4 w-4" />
-                                Marcar como Pendente
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleUpdateSalaryStatus(item.id, 'overdue')}>
-                                <AlertTriangle className="mr-2 h-4 w-4" />
-                                Marcar como Atrasado
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDeleteSalary(item as Salary)} className="text-red-600">
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Excluir
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">Vencimento</span>
-                        </div>
-                        <p className="text-sm font-medium">{new Date(item.due_date).toLocaleDateString('pt-BR')}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1">
-                          <Receipt className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">Pagamento</span>
-                        </div>
-                        <p className="text-sm font-medium">
-                          {item.paid_date ? new Date(item.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Informações adicionais das despesas */}
-                    {item.type === 'expense' && (
-                      <div className="pt-2 border-t space-y-2">
-                        {item.category && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <Building className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-muted-foreground">Categoria:</span>
-                            <span className="font-medium">{item.category}</span>
-                          </div>
-                        )}
-                        {item.expense_type === 'parcelada' && item.installment_total && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <CreditCard className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-muted-foreground">Parcela:</span>
-                            <span className="font-medium">{item.installment_current}/{item.installment_total}</span>
-                          </div>
-                        )}
-                        {item.expense_type === 'recorrente' && item.recurrence_day && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <Timer className="h-3 w-3 text-muted-foreground" />
-                            <span className="text-muted-foreground">Recorrência:</span>
-                            <span className="font-medium">Todo dia {item.recurrence_day}</span>
-                          </div>
-                        )}
-                        {item.description && (
-                          <div className="space-y-1">
-                            <span className="text-xs text-muted-foreground">Descrição:</span>
-                            <p className="text-xs bg-muted/30 rounded p-2">{item.description}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            /* Visualização em Tabela */
-            <Card>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="border-b bg-muted/50">
-                      <tr>
-                        <th className="p-4 text-left font-medium">Nome</th>
-                        <th className="p-4 text-left font-medium">Tipo</th>
-                        <th className="p-4 text-left font-medium">Status</th>
-                        <th className="p-4 text-left font-medium">Valor</th>
-                        <th className="p-4 text-left font-medium">Vencimento</th>
-                        <th className="p-4 text-left font-medium">Data Pagamento</th>
-                        <th className="p-4 text-center font-medium">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {combinedExpensesAndSalaries.map((item, index) => (
-                        <tr key={`${item.type}-${item.id}`} className={index % 2 === 0 ? "bg-muted/20" : ""}>
-                          <td className="p-4 font-medium">
-                            {item.type === 'salary' ? `Salário - ${item.employee_name}` : item.name}
-                          </td>
-                          <td className="p-4">
-                            {item.type === 'salary' ? (
-                              <Badge variant="default">Salário</Badge>
-                            ) : (
-                              <Badge variant="outline">
-                                {item.expense_type === 'avulsa' ? 'Avulsa' : 
-                                 item.expense_type === 'recorrente' ? 'Recorrente' : 
-                                 item.expense_type === 'parcelada' ? 'Parcelada' : 'Despesa'}
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="p-4">
-                            <Badge className={getStatusColor(item.status)}>
-                              {getStatusLabel(item.status)}
-                            </Badge>
-                          </td>
-                          <td className="p-4">
-                            R$ {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="p-4">{new Date(item.due_date).toLocaleDateString('pt-BR')}</td>
-                          <td className="p-4 text-muted-foreground">
-                            {item.paid_date ? new Date(item.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}
-                          </td>
-                          <td className="p-4">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {item.type === 'expense' ? (
-                                  <>
-                                    <DropdownMenuItem onClick={() => handleViewExpense(item as Expense)}>
-                                      <Eye className="mr-2 h-4 w-4" />
-                                      Ver Detalhes
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleEditExpense(item as Expense)}>
-                                      <Edit className="mr-2 h-4 w-4" />
-                                      Editar
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(item.id, 'paid')}>
-                                      <CheckCircle className="mr-2 h-4 w-4" />
-                                      Marcar como Pago
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(item.id, 'pending')}>
-                                      <Timer className="mr-2 h-4 w-4" />
-                                      Marcar como Pendente
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(item.id, 'overdue')}>
-                                      <AlertTriangle className="mr-2 h-4 w-4" />
-                                      Marcar como Atrasado
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleDeleteExpense(item as Expense)} className="text-red-600">
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Excluir
-                                    </DropdownMenuItem>
-                                  </>
-                                ) : (
-                                  <>
-                                    <DropdownMenuItem onClick={() => handleViewSalary(item as Salary)}>
-                                      <Eye className="mr-2 h-4 w-4" />
-                                      Ver Detalhes
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleEditSalary(item as Salary)}>
-                                      <Edit className="mr-2 h-4 w-4" />
-                                      Editar
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleUpdateSalaryStatus(item.id, 'paid')}>
-                                      <CheckCircle className="mr-2 h-4 w-4" />
-                                      Marcar como Pago
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleUpdateSalaryStatus(item.id, 'pending')}>
-                                      <Timer className="mr-2 h-4 w-4" />
-                                      Marcar como Pendente
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleUpdateSalaryStatus(item.id, 'overdue')}>
-                                      <AlertTriangle className="mr-2 h-4 w-4" />
-                                      Marcar como Atrasado
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleDeleteSalary(item as Salary)} className="text-red-600">
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Excluir
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Grid de Cards de Despesas */}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {combinedExpensesAndSalaries.map(item => (
+              <ExpenseCard
+                key={`${item.type}-${item.id}`}
+                item={item}
+                onView={item.type === 'expense' ? handleViewExpense : handleViewSalary}
+                onEdit={item.type === 'expense' ? handleEditExpense : handleEditSalary}
+                onDelete={item.type === 'expense' ? handleDeleteExpense : handleDeleteSalary}
+                onUpdateStatus={item.type === 'expense' ? handleUpdateExpenseStatus : handleUpdateSalaryStatus}
+              />
+            ))}
+          </div>
+          
+          {/* Visualização em Tabela - Removida por enquanto, focando em cards */}
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6 bg-[7dafd8] bg-white">
