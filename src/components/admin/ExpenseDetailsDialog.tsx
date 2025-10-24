@@ -2,10 +2,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Info, History, TrendingUp, BarChart3, Calendar, DollarSign, Building } from "lucide-react";
+import { Edit, Trash2, Info, History, TrendingUp, BarChart3, Calendar, DollarSign, Repeat } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { ExpenseHealthIndicator } from "./ExpenseHealthIndicator";
+import { ExpensePaymentHistory } from "./ExpensePaymentHistory";
+import { ExpenseProjection } from "./ExpenseProjection";
+import { ExpenseAnalytics } from "./ExpenseAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 import { useAgency } from "@/hooks/useAgency";
@@ -294,111 +297,25 @@ export function ExpenseDetailsDialog({
             </TabsContent>
 
             <TabsContent value="history" className="mt-4">
-              <div className="space-y-4">
-                <h3 className="font-semibold">Histórico de Pagamentos</h3>
-                {relatedExpenses.length > 0 ? (
-                  <div className="space-y-2">
-                    {relatedExpenses.map((exp) => (
-                      <div 
-                        key={exp.id}
-                        className="flex items-center justify-between p-3 rounded-lg border bg-card"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm font-medium">{formatDate(exp.due_date)}</p>
-                            {exp.paid_date && (
-                              <p className="text-xs text-muted-foreground">
-                                Pago em: {formatDate(exp.paid_date)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <p className="text-sm font-semibold">
-                            R$ {exp.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </p>
-                          <Badge className={getStatusColor(exp.status)}>
-                            {getStatusLabel(exp.status)}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    Nenhum histórico disponível
-                  </p>
-                )}
-              </div>
+              <ExpensePaymentHistory payments={relatedExpenses} />
             </TabsContent>
 
             <TabsContent value="projection" className="mt-4">
-              <div className="space-y-4">
-                <h3 className="font-semibold">Projeção Financeira</h3>
-                {expense.expense_type === 'recorrente' && (
-                  <div className="p-4 bg-muted/50 rounded-lg space-y-3">
-                    <h4 className="font-medium">Projeção para os Próximos 12 Meses</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Total Projetado</p>
-                        <p className="text-2xl font-bold text-primary">
-                          R$ {(expense.amount * 12).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Média Mensal</p>
-                        <p className="text-2xl font-bold">
-                          R$ {expense.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {expense.expense_type === 'parcelada' && expense.installment_total && expense.installment_current && (
-                  <div className="p-4 bg-muted/50 rounded-lg space-y-3">
-                    <h4 className="font-medium">Projeção de Quitação</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Parcelas Restantes</p>
-                        <p className="text-2xl font-bold text-primary">
-                          {expense.installment_total - expense.installment_current}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Valor Restante</p>
-                        <p className="text-2xl font-bold">
-                          R$ {(expense.amount * (expense.installment_total - expense.installment_current)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <ExpenseProjection
+                expenseType={expense.expense_type}
+                amount={expense.amount}
+                recurrenceDay={expense.recurrence_day}
+                installmentTotal={expense.installment_total}
+                installmentCurrent={expense.installment_current}
+                dueDate={expense.due_date}
+              />
             </TabsContent>
 
             <TabsContent value="analytics" className="mt-4">
-              <div className="space-y-4">
-                <h3 className="font-semibold">Análise de Desempenho</h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <p className="text-sm text-muted-foreground mb-1">Total de Pagamentos</p>
-                    <p className="text-2xl font-bold">{relatedExpenses.length}</p>
-                  </div>
-                  <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-                    <p className="text-sm text-muted-foreground mb-1">Pagos em Dia</p>
-                    <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {recentExpenses.filter(e => e.status === 'paid' && e.paid_date && new Date(e.paid_date) <= new Date(e.due_date)).length}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900">
-                    <p className="text-sm text-muted-foreground mb-1">Pagos com Atraso</p>
-                    <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                      {latePaymentsLast6Months}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <ExpenseAnalytics
+                payments={relatedExpenses}
+                expenseType={expense.expense_type}
+              />
             </TabsContent>
           </Tabs>
 
