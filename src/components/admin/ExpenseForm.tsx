@@ -364,19 +364,21 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense }: ExpenseF
               </div>
             )}
 
-            {/* Data de Vencimento */}
-            <div className="grid gap-2">
-              <Label htmlFor="due_date">
-                {formData.expense_type === 'parcelada' ? 'Vencimento da 1ª Parcela *' : 'Data de Vencimento *'}
-              </Label>
-              <Input
-                id="due_date"
-                type="date"
-                value={formData.due_date}
-                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                required
-              />
-            </div>
+            {/* Data de Vencimento - Apenas para avulsa e parcelada */}
+            {formData.expense_type !== 'recorrente' && (
+              <div className="grid gap-2">
+                <Label htmlFor="due_date">
+                  {formData.expense_type === 'parcelada' ? 'Vencimento da 1ª Parcela *' : 'Data de Vencimento *'}
+                </Label>
+                <Input
+                  id="due_date"
+                  type="date"
+                  value={formData.due_date}
+                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                  required
+                />
+              </div>
+            )}
 
             {/* Dia de Vencimento para Recorrentes */}
             {formData.expense_type === 'recorrente' && (
@@ -387,10 +389,14 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense }: ExpenseF
                   type="number"
                   min="1"
                   max="31"
+                  placeholder="Ex: 5 (todo dia 5 do mês)"
                   value={formData.recurrence_day}
                   onChange={(e) => setFormData({ ...formData, recurrence_day: e.target.value })}
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  A despesa vencerá todo dia {formData.recurrence_day || '__'} de cada mês
+                </p>
               </div>
             )}
 
