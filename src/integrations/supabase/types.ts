@@ -1149,6 +1149,122 @@ export type Database = {
         }
         Relationships: []
       }
+      facebook_lead_integrations: {
+        Row: {
+          agency_id: string
+          connection_id: string
+          created_at: string
+          created_by: string
+          default_priority: string
+          default_source: string
+          default_status: string
+          field_mapping: Json | null
+          form_id: string
+          form_name: string
+          id: string
+          is_active: boolean
+          last_sync_at: string | null
+          page_id: string
+          page_name: string
+          sync_method: string
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          agency_id: string
+          connection_id: string
+          created_at?: string
+          created_by: string
+          default_priority?: string
+          default_source?: string
+          default_status?: string
+          field_mapping?: Json | null
+          form_id: string
+          form_name: string
+          id?: string
+          is_active?: boolean
+          last_sync_at?: string | null
+          page_id: string
+          page_name: string
+          sync_method?: string
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          agency_id?: string
+          connection_id?: string
+          created_at?: string
+          created_by?: string
+          default_priority?: string
+          default_source?: string
+          default_status?: string
+          field_mapping?: Json | null
+          form_id?: string
+          form_name?: string
+          id?: string
+          is_active?: boolean
+          last_sync_at?: string | null
+          page_id?: string
+          page_name?: string
+          sync_method?: string
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facebook_lead_integrations_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "facebook_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      facebook_lead_sync_log: {
+        Row: {
+          agency_id: string
+          facebook_lead_id: string
+          id: string
+          integration_id: string
+          lead_data: Json | null
+          lead_id: string | null
+          synced_at: string
+        }
+        Insert: {
+          agency_id: string
+          facebook_lead_id: string
+          id?: string
+          integration_id: string
+          lead_data?: Json | null
+          lead_id?: string | null
+          synced_at?: string
+        }
+        Update: {
+          agency_id?: string
+          facebook_lead_id?: string
+          id?: string
+          integration_id?: string
+          lead_data?: Json | null
+          lead_id?: string | null
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facebook_lead_sync_log_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "facebook_lead_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facebook_lead_sync_log_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_activities: {
         Row: {
           agency_id: string

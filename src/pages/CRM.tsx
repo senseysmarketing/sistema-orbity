@@ -16,6 +16,7 @@ import { CRMAlerts } from "@/components/crm/CRMAlerts";
 import { CustomStatusManager } from "@/components/crm/CustomStatusManager";
 import { CRMAdvancedFilters } from "@/components/crm/CRMAdvancedFilters";
 import { CRMAnalytics } from "@/components/crm/CRMAnalytics";
+import { FacebookLeadsIntegration } from "@/components/crm/FacebookLeadsIntegration";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
@@ -601,7 +602,21 @@ export default function CRM() {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
-          <CustomStatusManager onStatusUpdate={() => { fetchLeads(); refreshStatuses(); }} />
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Integração Facebook Lead Ads</CardTitle>
+                <CardDescription>
+                  Configure a captura automática de leads do Facebook
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FacebookLeadsIntegration />
+              </CardContent>
+            </Card>
+            
+            <CustomStatusManager onStatusUpdate={() => { fetchLeads(); refreshStatuses(); }} />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
