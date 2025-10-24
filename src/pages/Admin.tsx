@@ -25,6 +25,7 @@ import { ChurnAnalysis } from "@/components/admin/ChurnAnalysis";
 import { ExpenseCard } from "@/components/admin/ExpenseCard";
 import { ExpenseMetricsCards } from "@/components/admin/ExpenseMetricsCards";
 import { ExpenseDetailsDialog } from "@/components/admin/ExpenseDetailsDialog";
+import { SalaryDetailsDialog } from "@/components/admin/SalaryDetailsDialog";
 interface Client {
   id: string;
   name: string;
@@ -2483,43 +2484,20 @@ export default function Admin() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Dialog de detalhes do salário */}
-        <AlertDialog open={salaryDetailsOpen} onOpenChange={setSalaryDetailsOpen}>
-          <AlertDialogContent className="max-w-md">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Detalhes do Salário</AlertDialogTitle>
-            </AlertDialogHeader>
-            <div className="space-y-4">
-              {selectedSalary && (
-                <>
-                  <div>
-                    <span className="font-medium">Funcionário:</span>
-                    <p>{selectedSalary.employee_name}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Valor:</span>
-                    <p>R$ {selectedSalary.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Data de Vencimento:</span>
-                    <p>{new Date(selectedSalary.due_date).toLocaleDateString('pt-BR')}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Status:</span>
-                    <p>{getStatusLabel(selectedSalary.status)}</p>
-                  </div>
-                  <div>
-                    <span className="font-medium">Data de Pagamento:</span>
-                    <p>{selectedSalary.paid_date ? new Date(selectedSalary.paid_date).toLocaleDateString('pt-BR') : 'Não pago'}</p>
-                  </div>
-                </>
-              )}
-            </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Fechar</AlertDialogCancel>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {/* Modal de Detalhes do Salário */}
+        <SalaryDetailsDialog
+          salary={selectedSalary}
+          open={salaryDetailsOpen}
+          onOpenChange={setSalaryDetailsOpen}
+          onEdit={() => {
+            setSalaryDetailsOpen(false);
+            handleEditSalary(selectedSalary!);
+          }}
+          onDelete={() => {
+            setSalaryDetailsOpen(false);
+            handleDeleteSalary(selectedSalary!);
+          }}
+        />
 
         {/* Dialog de confirmação de exclusão de salário */}
         <AlertDialog open={salaryDeleteDialogOpen} onOpenChange={setSalaryDeleteDialogOpen}>
