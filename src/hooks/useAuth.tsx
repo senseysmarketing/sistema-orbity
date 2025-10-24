@@ -127,11 +127,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             if (profileData) {
               setProfile(profileData as Profile);
-              
-              // Redirect to welcome page if first time login
-              if (!profileData.welcome_seen && window.location.pathname !== '/welcome' && window.location.pathname !== '/onboarding') {
-                window.location.href = '/welcome';
-              }
             }
           }, 0);
         } else {
@@ -156,11 +151,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .then(({ data: profileData }) => {
             if (profileData) {
               setProfile(profileData as Profile);
-              
-              // Redirect to welcome page if first time login
-              if (!profileData.welcome_seen && window.location.pathname !== '/welcome' && window.location.pathname !== '/onboarding') {
-                window.location.href = '/welcome';
-              }
             }
             setLoading(false);
           });

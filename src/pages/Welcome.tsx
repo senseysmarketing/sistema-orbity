@@ -60,14 +60,15 @@ export default function Welcome() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (!user || !profile) {
-      navigate('/auth');
+    // If no user, redirect to auth
+    if (!user) {
+      navigate('/auth', { replace: true });
       return;
     }
 
     // If user already saw welcome, redirect to dashboard
-    if (profile.welcome_seen) {
-      navigate('/');
+    if (profile?.welcome_seen) {
+      navigate('/', { replace: true });
     }
   }, [user, profile, navigate]);
 
@@ -89,7 +90,7 @@ export default function Welcome() {
           .eq('user_id', user.id);
       }
       
-      navigate('/');
+      navigate('/', { replace: true });
       setTimeout(() => startTour(), 500);
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -109,7 +110,7 @@ export default function Welcome() {
           .eq('user_id', user.id);
       }
       
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (error) {
       console.error('Error updating profile:', error);
       toast.error('Erro ao pular tour');
@@ -117,6 +118,11 @@ export default function Welcome() {
       setIsLoading(false);
     }
   };
+
+  // Don't render if no profile or already seen welcome
+  if (!profile || profile.welcome_seen) {
+    return null;
+  }
 
   const progress = (completedItems.length / checklist.length) * 100;
 
