@@ -25,7 +25,7 @@ import { useNavigate } from "react-router-dom";
 interface FacebookPage {
   id: string;
   name: string;
-  access_token?: string;
+  access_token: string;
 }
 
 interface LeadForm {
@@ -60,6 +60,7 @@ export function FacebookLeadsIntegration() {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
 
   const [selectedPage, setSelectedPage] = useState<string>("");
+  const [selectedPageToken, setSelectedPageToken] = useState<string>("");
   const [selectedForm, setSelectedForm] = useState<string>("");
   const [defaultStatus, setDefaultStatus] = useState("new");
   const [defaultPriority, setDefaultPriority] = useState("medium");
@@ -127,7 +128,7 @@ export function FacebookLeadsIntegration() {
     }
   };
 
-  const fetchForms = async (pageId: string) => {
+  const fetchForms = async (pageId: string, pageToken: string) => {
     if (!currentAgency) return;
 
     setLoading(true);
@@ -136,7 +137,8 @@ export function FacebookLeadsIntegration() {
         body: {
           action: 'list_forms',
           agencyId: currentAgency.id,
-          pageId
+          pageId,
+          pageAccessToken: pageToken
         }
       });
 
@@ -174,10 +176,14 @@ export function FacebookLeadsIntegration() {
   };
 
   const handlePageSelect = async (pageId: string) => {
+    const page = pages.find(p => p.id === pageId);
+    if (!page) return;
+
     setSelectedPage(pageId);
+    setSelectedPageToken(page.access_token);
     setSelectedForm("");
     setForms([]);
-    await fetchForms(pageId);
+    await fetchForms(pageId, page.access_token);
   };
 
   const filteredPages = pages.filter(page =>
