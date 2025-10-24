@@ -6,7 +6,7 @@ export function CTASection() {
   const navigate = useNavigate();
 
   return (
-    <section className="py-20 bg-gradient-to-br from-primary via-primary/90 to-secondary">
+    <section className="py-20 bg-gradient-to-br from-[#1c102f] via-primary to-secondary">
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto text-center space-y-8">
           <h2 className="text-3xl md:text-5xl font-bold text-primary-foreground">
@@ -24,7 +24,7 @@ export function CTASection() {
               className="text-lg px-8 py-6 h-auto"
               onClick={() => navigate("/auth?signup=true")}
             >
-              Começar Teste Grátis de 14 Dias
+              Começar Teste Grátis de 7 Dias
               <ArrowRight className="ml-2" />
             </Button>
           </div>
@@ -38,7 +38,7 @@ export function CTASection() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12 max-w-3xl mx-auto">
             <div className="text-primary-foreground/90">
-              <div className="text-3xl font-bold mb-2">14 dias</div>
+              <div className="text-3xl font-bold mb-2">7 dias</div>
               <div className="text-sm">Teste grátis</div>
             </div>
             <div className="text-primary-foreground/90">

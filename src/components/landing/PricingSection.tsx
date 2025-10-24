@@ -17,7 +17,7 @@ export function PricingSection() {
 
         <div className="text-center mt-12 space-y-4">
           <p className="text-sm text-muted-foreground">
-            ✓ 14 dias de teste grátis • ✓ Sem cartão de crédito • ✓ Cancele quando quiser
+            ✓ 7 dias de teste grátis • ✓ Sem cartão de crédito • ✓ Cancele quando quiser
           </p>
           <p className="text-sm text-muted-foreground">
             🔒 Pagamento seguro com criptografia SSL

@@ -6,7 +6,7 @@ export function HeroSection() {
   const navigate = useNavigate();
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-secondary/5 py-20 md:py-32">
+    <section className="relative overflow-hidden bg-gradient-to-br from-[#1c102f]/10 via-background to-primary/5 py-20 md:py-32">
       <div className="container mx-auto px-4">
         <div className="grid gap-12 lg:grid-cols-2 items-center">
           <div className="space-y-8 animate-fade-in">
