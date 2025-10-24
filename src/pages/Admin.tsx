@@ -1346,97 +1346,58 @@ export default function Admin() {
             </div>
           )}
 
-          {/* Filtros */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Filtros de Clientes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-4">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    placeholder="Buscar cliente..." 
-                    value={clientSearchTerm} 
-                    onChange={(e) => setClientSearchTerm(e.target.value)} 
-                    className="pl-8" 
-                  />
-                </div>
-
-                <Select value={clientStatusFilter} onValueChange={setClientStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os Status</SelectItem>
-                    <SelectItem value="active">Ativos</SelectItem>
-                    <SelectItem value="inactive">Inativos</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={clientLoyaltyFilter} onValueChange={setClientLoyaltyFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Fidelidade" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="with">Com Fidelidade</SelectItem>
-                    <SelectItem value="without">Sem Fidelidade</SelectItem>
-                    <SelectItem value="expiring">Fidelidade Vencendo</SelectItem>
-                    <SelectItem value="expired">Fidelidade Vencida</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={clientPaymentStatusFilter} onValueChange={setClientPaymentStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pagamento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="paid">Em Dia</SelectItem>
-                    <SelectItem value="pending">Pendente</SelectItem>
-                    <SelectItem value="overdue">Atrasado</SelectItem>
-                  </SelectContent>
-                </Select>
+          {/* Filtros e Botões em linha */}
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div className="flex flex-wrap gap-2 items-center w-full lg:w-auto">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              
+              <div className="relative w-[200px]">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Buscar cliente..." 
+                  value={clientSearchTerm} 
+                  onChange={(e) => setClientSearchTerm(e.target.value)} 
+                  className="pl-8" 
+                />
               </div>
 
-              <div className="mt-4 flex justify-between items-center">
-                <p className="text-sm text-muted-foreground">
-                  {clients.filter(client => {
-                    const matchesSearch = client.name.toLowerCase().includes(clientSearchTerm.toLowerCase());
-                    const matchesStatus = clientStatusFilter === 'all' || 
-                      (clientStatusFilter === 'active' && client.active) ||
-                      (clientStatusFilter === 'inactive' && !client.active);
-                    const matchesLoyalty = clientLoyaltyFilter === 'all' ||
-                      (clientLoyaltyFilter === 'with' && client.has_loyalty) ||
-                      (clientLoyaltyFilter === 'without' && !client.has_loyalty);
-                    return matchesSearch && matchesStatus && matchesLoyalty;
-                  }).length} cliente(s) encontrado(s)
-                </p>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    setClientSearchTerm("");
-                    setClientStatusFilter("all");
-                    setClientLoyaltyFilter("all");
-                    setClientPaymentStatusFilter("all");
-                  }}
-                >
-                  Limpar Filtros
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+              <Select value={clientStatusFilter} onValueChange={setClientStatusFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Status</SelectItem>
+                  <SelectItem value="active">Ativos</SelectItem>
+                  <SelectItem value="inactive">Inativos</SelectItem>
+                </SelectContent>
+              </Select>
 
-          {/* Header com Botão de Novo Cliente */}
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">
-              Clientes ({clients.filter(c => c.active).length})
-            </h3>
+              <Select value={clientLoyaltyFilter} onValueChange={setClientLoyaltyFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Fidelidade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="with">Com Fidelidade</SelectItem>
+                  <SelectItem value="without">Sem Fidelidade</SelectItem>
+                  <SelectItem value="expiring">Vencendo</SelectItem>
+                  <SelectItem value="expired">Vencida</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={clientPaymentStatusFilter} onValueChange={setClientPaymentStatusFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Pagamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="paid">Em Dia</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="overdue">Atrasado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="flex items-center gap-2">
               <Button
                 variant={showInactiveClients ? "default" : "outline"}
