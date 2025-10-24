@@ -60,7 +60,6 @@ export default function CRM() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [showLeadForm, setShowLeadForm] = useState(false);
-  const [showWebhooks, setShowWebhooks] = useState(false);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [advancedFilters, setAdvancedFilters] = useState({
@@ -258,26 +257,6 @@ export default function CRM() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Dialog open={showWebhooks} onOpenChange={setShowWebhooks}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Webhook className="mr-2 h-4 w-4" />
-                Webhooks
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
-              <DialogHeader>
-                <DialogTitle>Gerenciar Webhooks</DialogTitle>
-                <DialogDescription>
-                  Configure webhooks personalizados para integrar com outras ferramentas
-                </DialogDescription>
-              </DialogHeader>
-              <div className="overflow-y-auto overflow-x-auto max-h-[calc(90vh-120px)] pr-2">
-                <WebhooksManager />
-              </div>
-            </DialogContent>
-          </Dialog>
-          
           <Dialog open={showLeadForm} onOpenChange={setShowLeadForm}>
             <DialogTrigger asChild>
               <Button variant="action">
