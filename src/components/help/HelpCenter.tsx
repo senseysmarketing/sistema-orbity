@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProductTour } from '@/hooks/useProductTour';
+import { useNavigate } from 'react-router-dom';
 import { 
   BookOpen, 
   Video, 
@@ -27,43 +28,50 @@ const quickGuides = [
     icon: LayoutDashboard,
     title: 'Dashboard',
     description: 'Visão geral de métricas e atividades',
-    color: 'text-blue-500'
+    color: 'text-blue-500',
+    route: '/'
   },
   {
     icon: Users,
     title: 'CRM - Leads',
     description: 'Gestão completa do funil de vendas',
-    color: 'text-green-500'
+    color: 'text-green-500',
+    route: '/crm'
   },
   {
     icon: CheckSquare,
     title: 'Tarefas',
     description: 'Organize e acompanhe o trabalho da equipe',
-    color: 'text-orange-500'
+    color: 'text-orange-500',
+    route: '/tasks'
   },
   {
     icon: Calendar,
     title: 'Agenda',
     description: 'Agende reuniões e eventos',
-    color: 'text-purple-500'
+    color: 'text-purple-500',
+    route: '/agenda'
   },
   {
     icon: MessageSquare,
     title: 'Social Media',
     description: 'Planejamento de conteúdo',
-    color: 'text-pink-500'
+    color: 'text-pink-500',
+    route: '/social-media'
   },
   {
     icon: TrendingUp,
     title: 'Tráfego Pago',
     description: 'Monitore campanhas do Facebook Ads',
-    color: 'text-red-500'
+    color: 'text-red-500',
+    route: '/traffic'
   },
   {
     icon: DollarSign,
     title: 'Financeiro',
     description: 'Controle de receitas e despesas',
-    color: 'text-emerald-500'
+    color: 'text-emerald-500',
+    route: '/admin'
   }
 ];
 
@@ -79,11 +87,17 @@ const tips = [
 
 export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
   const { startTour } = useProductTour();
+  const navigate = useNavigate();
   const randomTip = tips[Math.floor(Math.random() * tips.length)];
 
   const handleStartTour = () => {
     onClose();
     setTimeout(() => startTour(), 300);
+  };
+
+  const handleNavigateToGuide = (route: string) => {
+    onClose();
+    navigate(route);
   };
 
   return (
@@ -132,7 +146,11 @@ export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
 
             <div className="grid gap-3">
               {quickGuides.map((guide) => (
-                <Card key={guide.title} className="hover:bg-muted/50 transition-colors cursor-pointer">
+                <Card 
+                  key={guide.title} 
+                  className="hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => handleNavigateToGuide(guide.route)}
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-start gap-3">
                       <guide.icon className={`h-5 w-5 ${guide.color} mt-0.5`} />
