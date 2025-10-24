@@ -89,27 +89,19 @@ export function ExpenseCard({
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'paid':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+        return <Badge className="bg-green-600 text-white hover:bg-green-700">💰 Pago</Badge>;
       case 'pending':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+        return <Badge className="bg-yellow-600 text-white hover:bg-yellow-700">⏰ Pagamento Pendente</Badge>;
       case 'overdue':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+        return <Badge className="bg-red-600 text-white hover:bg-red-700">🚨 Atrasado</Badge>;
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+        return <Badge>{status}</Badge>;
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'paid': return 'Pago';
-      case 'pending': return 'Pagamento Pendente';
-      case 'overdue': return 'Atrasado';
-      default: return status;
-    }
-  };
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
@@ -167,10 +159,7 @@ export function ExpenseCard({
               </div>
               <div className="flex-1 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge className={`gap-1 ${getStatusColor(item.status)}`}>
-                    {item.status === 'pending' && <Clock className="h-3 w-3" />}
-                    {getStatusLabel(item.status)}
-                  </Badge>
+                  {getStatusBadge(item.status)}
                   <Badge variant="outline">
                     {item.type === 'salary' ? 'Salário' : 'Despesa'}
                   </Badge>
