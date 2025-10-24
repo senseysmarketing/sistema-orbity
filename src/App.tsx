@@ -2,9 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, createBrowserRouter, RouterProvider } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { AuthProvider } from "@/hooks/useAuth";
+import { ProductTourProvider } from "@/hooks/useProductTour";
 import { AgencyProvider } from "@/hooks/useAgency";
 import { SubscriptionProvider } from "@/hooks/useSubscription";
 import { MasterProvider } from "@/hooks/useMaster";
@@ -36,17 +37,18 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="light" storageKey="senseys-ui-theme">
       <AuthProvider>
-        <AgencyProvider>
-          <SubscriptionProvider>
-            <MasterProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter future={{ 
-                  v7_startTransition: true,
-                  v7_relativeSplatPath: true 
-                }}>
-                  <PaymentMiddlewareProvider>
+        <ProductTourProvider>
+          <AgencyProvider>
+            <SubscriptionProvider>
+              <MasterProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter future={{ 
+                    v7_startTransition: true,
+                    v7_relativeSplatPath: true 
+                  }}>
+                    <PaymentMiddlewareProvider>
                     <Routes>
                       <Route path="/auth" element={<Auth />} />
                       <Route path="/onboarding" element={<Onboarding />} />
@@ -73,12 +75,13 @@ const App = () => (
                       <Route path="/subscription-canceled" element={<SubscriptionCanceled />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
-                  </PaymentMiddlewareProvider>
-                </BrowserRouter>
-              </TooltipProvider>
-            </MasterProvider>
-          </SubscriptionProvider>
-        </AgencyProvider>
+                    </PaymentMiddlewareProvider>
+                  </BrowserRouter>
+                </TooltipProvider>
+              </MasterProvider>
+            </SubscriptionProvider>
+          </AgencyProvider>
+        </ProductTourProvider>
       </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>

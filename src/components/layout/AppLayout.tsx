@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Moon, Sun } from 'lucide-react';
 import { useTheme } from "@/components/ui/theme-provider";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { HelpButton } from "@/components/help/HelpButton";
+import { TourTooltip } from "@/components/tour/TourTooltip";
 
 export function AppLayout() {
   const { user, loading } = useAuth();
@@ -59,6 +61,10 @@ export function AppLayout() {
           </main>
         </div>
       </div>
+      
+      {/* Global components */}
+      <HelpButton />
+      <TourTooltip />
     </SidebarProvider>
   );
 }
