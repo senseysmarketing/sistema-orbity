@@ -30,6 +30,7 @@ import SubscriptionSuccess from "./pages/SubscriptionSuccess";
 import SubscriptionCanceled from "./pages/SubscriptionCanceled";
 import Contracts from "./pages/Contracts";
 import SocialMedia from "./pages/SocialMedia";
+import LandingPage from "./pages/LandingPage";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ const App = () => (
                   }}>
                     <PaymentMiddlewareProvider>
                     <Routes>
+                      <Route path="/lp" element={<LandingPage />} />
                       <Route path="/auth" element={<Auth />} />
                       <Route path="/onboarding" element={<Onboarding />} />
                       <Route path="/welcome" element={<Welcome />} />
