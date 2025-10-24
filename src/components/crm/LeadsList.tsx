@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, DollarSign, ExternalLink } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, Eye, Building, Mail, Phone, Calendar, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface Lead {
@@ -33,9 +33,10 @@ interface LeadsListProps {
   onEdit: (lead: Lead) => void;
   onDelete: (leadId: string) => void;
   onUpdate: () => void;
+  onView?: (lead: Lead) => void;
 }
 
-export function LeadsList({ leads, onEdit, onDelete }: LeadsListProps) {
+export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'new': return 'bg-blue-100 text-blue-800';
@@ -207,6 +208,12 @@ export function LeadsList({ leads, onEdit, onDelete }: LeadsListProps) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        {onView && (
+                          <DropdownMenuItem onClick={() => onView(lead)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Visualizar
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => onEdit(lead)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Editar

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, Filter, Users, ContactRound, Building, Phone, Mail, DollarSign, Target, TrendingUp, Calendar, Activity, Webhook, Grid, List } from "lucide-react";
+import { Plus, Search, Users, DollarSign, Target, Calendar, Webhook, Grid, List, AlertTriangle, TrendingUp, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,11 +11,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { LeadsKanban } from "@/components/crm/LeadsKanban";
 import { LeadsList } from "@/components/crm/LeadsList";
 import { LeadForm } from "@/components/crm/LeadForm";
+import { LeadDetailsDialog } from "@/components/crm/LeadDetailsDialog";
 import { WebhooksManager } from "@/components/crm/WebhooksManager";
 import { CRMAlerts } from "@/components/crm/CRMAlerts";
 import { CustomStatusManager } from "@/components/crm/CustomStatusManager";
 import { CRMAdvancedFilters } from "@/components/crm/CRMAdvancedFilters";
 import { CRMAnalytics } from "@/components/crm/CRMAnalytics";
+import { CRMMetrics } from "@/components/crm/CRMMetrics";
 import { FacebookLeadsIntegration } from "@/components/crm/FacebookLeadsIntegration";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -58,6 +60,7 @@ export default function CRM() {
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showWebhooks, setShowWebhooks] = useState(false);
+  const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [advancedFilters, setAdvancedFilters] = useState({
     status: [] as string[],
@@ -205,6 +208,12 @@ export default function CRM() {
   const handleLeadEdit = (lead: Lead) => {
     setSelectedLead(lead);
     setShowLeadForm(true);
+    setShowLeadDetails(false);
+  };
+
+  const handleLeadView = (lead: Lead) => {
+    setSelectedLead(lead);
+    setShowLeadDetails(true);
   };
 
   const handleLeadDelete = async (leadId: string) => {
@@ -297,124 +306,121 @@ export default function CRM() {
         </div>
       </div>
 
-      {/* Métricas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.total}</div>
-            <p className="text-xs text-muted-foreground">
-              +{analytics.newLeads} novos este período
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Taxa de Conversão</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.conversionRate}%</div>
-            <Progress value={analytics.conversionRate} className="mt-2" />
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {new Intl.NumberFormat('pt-BR', {
-                style: 'currency',
-                currency: 'BRL'
-              }).format(analytics.totalValue)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Pipeline total
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Follow-up Necessário</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{analytics.followUpNeeded}</div>
-            <p className="text-xs text-muted-foreground">
-              Requer atenção imediata
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Métricas Principais */}
+      <CRMMetrics leads={filteredLeads} />
 
-      {/* Status Overview */}
+      {/* Intelligent Alerts */}
+      {analytics.followUpNeeded > 0 && (
+        <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-400">
+              <AlertTriangle className="h-5 w-5" />
+              Atenção Necessária
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="p-3 bg-white dark:bg-background rounded-lg border border-orange-200 dark:border-orange-900">
+                <div className="text-sm text-muted-foreground mb-1">Follow-ups Atrasados</div>
+                <div className="text-2xl font-bold text-orange-600">{analytics.followUpNeeded}</div>
+                <p className="text-xs text-muted-foreground mt-1">Requerem ação imediata</p>
+              </div>
+              
+              <div className="p-3 bg-white dark:bg-background rounded-lg border border-orange-200 dark:border-orange-900">
+                <div className="text-sm text-muted-foreground mb-1">Alta Prioridade</div>
+                <div className="text-2xl font-bold text-red-600">{analytics.priorityStats.high}</div>
+                <p className="text-xs text-muted-foreground mt-1">Leads urgentes</p>
+              </div>
+
+              <div className="p-3 bg-white dark:bg-background rounded-lg border border-orange-200 dark:border-orange-900">
+                <div className="text-sm text-muted-foreground mb-1">Novos Leads</div>
+                <div className="text-2xl font-bold text-blue-600">{analytics.newLeads}</div>
+                <p className="text-xs text-muted-foreground mt-1">Aguardando contato</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Distribution Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Distribuição por Status</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Activity className="h-5 w-5" />
+              Distribuição por Status
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Novos</span>
-              <Badge variant="secondary">{analytics.statusStats.new}</Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Qualificados</span>
-              <Badge variant="secondary">{analytics.statusStats.qualified}</Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Ganhos</span>
-              <Badge className="bg-green-100 text-green-800">{analytics.statusStats.won}</Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Perdidos</span>
-              <Badge className="bg-red-100 text-red-800">{analytics.statusStats.lost}</Badge>
-            </div>
+          <CardContent className="space-y-3">
+            {Object.entries(analytics.statusStats).map(([status, count]) => {
+              const total = analytics.total || 1;
+              const percentage = (count / total) * 100;
+              return (
+                <div key={status}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm capitalize">{status === 'new' ? 'Novo' : status === 'contacted' ? 'Contatado' : status === 'qualified' ? 'Qualificado' : status === 'proposal' ? 'Proposta' : status === 'negotiation' ? 'Negociação' : status === 'won' ? 'Ganho' : 'Perdido'}</span>
+                    <Badge variant="secondary">{count}</Badge>
+                  </div>
+                  <Progress value={percentage} className="h-2" />
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Por Prioridade</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Target className="h-5 w-5" />
+              Distribuição por Prioridade
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Alta</span>
-              <Badge className="bg-red-100 text-red-800">{analytics.priorityStats.high}</Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Média</span>
-              <Badge className="bg-yellow-100 text-yellow-800">{analytics.priorityStats.medium}</Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Baixa</span>
-              <Badge className="bg-green-100 text-green-800">{analytics.priorityStats.low}</Badge>
-            </div>
+          <CardContent className="space-y-3">
+            {Object.entries(analytics.priorityStats).map(([priority, count]) => {
+              const total = analytics.total || 1;
+              const percentage = (count / total) * 100;
+              return (
+                <div key={priority}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm capitalize">{priority === 'high' ? 'Alta' : priority === 'medium' ? 'Média' : 'Baixa'}</span>
+                    <Badge variant="secondary">{count}</Badge>
+                  </div>
+                  <Progress value={percentage} className="h-2" />
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Principais Origens</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TrendingUp className="h-5 w-5" />
+              Principais Origens
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             {Object.entries(analytics.sourceStats)
               .sort(([,a], [,b]) => b - a)
-              .slice(0, 4)
-              .map(([source, count]) => (
-                <div key={source} className="flex justify-between items-center">
-                  <span className="text-sm capitalize">{source}</span>
-                  <Badge variant="secondary">{count}</Badge>
-                </div>
-              ))}
+              .slice(0, 5)
+              .map(([source, count]) => {
+                const total = analytics.total || 1;
+                const percentage = (count / total) * 100;
+                const isMetaAds = source === 'facebook_leads';
+                return (
+                  <div key={source}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm capitalize flex items-center gap-1">
+                        {isMetaAds && '📱'} {source}
+                      </span>
+                      <Badge variant={isMetaAds ? "default" : "secondary"} className={isMetaAds ? 'bg-blue-600' : ''}>
+                        {count}
+                      </Badge>
+                    </div>
+                    <Progress value={percentage} className="h-2" />
+                  </div>
+                );
+              })}
           </CardContent>
         </Card>
       </div>
@@ -583,6 +589,7 @@ export default function CRM() {
                     onEdit={handleLeadEdit}
                     onDelete={handleLeadDelete}
                     onUpdate={fetchLeads}
+                    onView={handleLeadView}
                   />
                 ) : (
                   <LeadsList 
@@ -590,6 +597,7 @@ export default function CRM() {
                     onEdit={handleLeadEdit}
                     onDelete={handleLeadDelete}
                     onUpdate={fetchLeads}
+                    onView={handleLeadView}
                   />
                 )}
               </div>
@@ -619,6 +627,14 @@ export default function CRM() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Lead Details Dialog */}
+      <LeadDetailsDialog
+        lead={selectedLead}
+        open={showLeadDetails}
+        onOpenChange={setShowLeadDetails}
+        onEdit={handleLeadEdit}
+      />
     </div>
   );
 }

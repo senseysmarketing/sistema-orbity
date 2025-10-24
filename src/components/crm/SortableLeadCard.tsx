@@ -1,12 +1,14 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, DollarSign, Clock } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, DollarSign, Clock, Target, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { LeadScoring } from "./LeadScoring";
 
 interface Lead {
   id: string;
@@ -71,11 +73,32 @@ export function SortableLeadCard({
 
   const urgency = getUrgencyLevel(lead);
 
+  // Get card background based on urgency/status
+  const getCardBackground = () => {
+    if (urgency.level === 'urgent') {
+      return 'bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-900';
+    }
+    if (urgency.level === 'today') {
+      return 'bg-orange-50/50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900';
+    }
+    if (lead.status === 'won') {
+      return 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900';
+    }
+    if (lead.status === 'lost') {
+      return 'bg-gray-50/50 dark:bg-gray-950/20 border-gray-200 dark:border-gray-900';
+    }
+    return 'bg-card';
+  };
+
+  const isMetaAdsLead = lead.source === 'facebook_leads';
+
   return (
     <Card
       ref={setNodeRef}
       style={style}
       className={`transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${
+        getCardBackground()
+      } ${
         isDragging 
           ? 'shadow-2xl border-primary/50 bg-background/95 rotate-3' 
           : 'hover:shadow-lg hover:scale-[1.02] hover:border-border/50'
@@ -84,12 +107,18 @@ export function SortableLeadCard({
       {...listeners}
     >
       <CardContent className="p-3">
-        <div className="space-y-2">
-          <div className="flex items-start justify-between">
-            <h4 className="font-medium text-sm leading-tight">{lead.name}</h4>
+        <div className="space-y-2.5">
+          {/* Header with Name and Actions */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <h4 className="font-medium text-sm leading-tight truncate">{lead.name}</h4>
+              {lead.position && (
+                <p className="text-xs text-muted-foreground truncate">{lead.position}</p>
+              )}
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6">
+                <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0">
                   <MoreHorizontal className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
@@ -109,51 +138,75 @@ export function SortableLeadCard({
             </DropdownMenu>
           </div>
           
+          {/* Badges */}
           <div className="flex gap-1 flex-wrap">
             <Badge className={getPriorityColor(lead.priority)} variant="secondary">
-              {getPriorityLabel(lead.priority)}
+              {lead.priority === 'high' && '🔴'}
+              {lead.priority === 'medium' && '🟡'}
+              {lead.priority === 'low' && '🟢'} {getPriorityLabel(lead.priority)}
             </Badge>
-            <Badge className={urgency.color} variant="secondary">
-              {urgency.label}
-            </Badge>
+            {urgency.level !== 'normal' && (
+              <Badge className={urgency.color} variant="secondary">
+                {urgency.level === 'urgent' && '⚠️'} {urgency.label}
+              </Badge>
+            )}
+            {isMetaAdsLead && (
+              <Badge className="bg-blue-600 text-white text-xs">
+                📱 Meta Ads
+              </Badge>
+            )}
           </div>
           
-          <div className="text-xs text-muted-foreground space-y-1">
+          {/* Lead Information */}
+          <div className="text-xs space-y-1.5">
             {lead.company && (
-              <div className="flex items-center gap-1">
-                <Building className="h-3 w-3 flex-shrink-0" />
+              <div className="flex items-center gap-1.5">
+                <Building className="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
                 <span className="truncate">{lead.company}</span>
               </div>
             )}
             {lead.email && (
-              <div className="flex items-center gap-1">
-                <Mail className="h-3 w-3 flex-shrink-0" />
+              <div className="flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5 flex-shrink-0 text-purple-500" />
                 <span className="truncate">{lead.email}</span>
               </div>
             )}
             {lead.phone && (
-              <div className="flex items-center gap-1">
-                <Phone className="h-3 w-3 flex-shrink-0" />
+              <div className="flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 flex-shrink-0 text-green-500" />
                 <span className="truncate">{lead.phone}</span>
               </div>
             )}
-            {lead.value > 0 && (
-              <div className="flex items-center gap-1 text-green-600 font-medium">
-                <DollarSign className="h-3 w-3 flex-shrink-0" />
-                <span>{formatCurrency(lead.value)}</span>
-              </div>
-            )}
             {lead.next_contact && (
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3 flex-shrink-0" />
-                <span>📅 {formatDate(lead.next_contact)}</span>
+              <div className="flex items-center gap-1.5">
+                <Calendar className={`h-3.5 w-3.5 flex-shrink-0 ${
+                  urgency.level === 'urgent' ? 'text-red-500' : 
+                  urgency.level === 'today' ? 'text-orange-500' : 'text-muted-foreground'
+                }`} />
+                <span className={urgency.level !== 'normal' ? 'font-medium' : ''}>
+                  {formatDate(lead.next_contact)}
+                </span>
               </div>
             )}
-            <div className="flex items-center gap-1 text-muted-foreground/70">
-              <Clock className="h-3 w-3 flex-shrink-0" />
-              <span>{format(new Date(lead.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+            <div className="flex items-center gap-1.5 text-muted-foreground/70">
+              <Target className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="capitalize">{lead.source}</span>
             </div>
-            <div>🎯 {lead.source}</div>
+          </div>
+
+          {/* Value & Score */}
+          {lead.value > 0 && (
+            <div className="space-y-1 p-2 bg-muted/30 rounded-lg">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Valor Estimado</span>
+                <span className="font-semibold text-green-600">{formatCurrency(lead.value)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Lead Score */}
+          <div className="pt-1">
+            <LeadScoring lead={lead} showLabel={false} />
           </div>
         </div>
       </CardContent>

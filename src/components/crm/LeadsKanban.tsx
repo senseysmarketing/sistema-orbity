@@ -35,9 +35,10 @@ interface LeadsKanbanProps {
   onEdit: (lead: Lead) => void;
   onDelete: (leadId: string) => void;
   onUpdate: () => void;
+  onView?: (lead: Lead) => void;
 }
 
-export function LeadsKanban({ leads, onEdit, onDelete, onUpdate }: LeadsKanbanProps) {
+export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView }: LeadsKanbanProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
   const { getStatusConfig, getStatusKey, mapDatabaseStatusToDisplay, mapDisplayStatusToDatabase } = useLeadStatuses();

@@ -1,11 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Users, DollarSign, Target, Clock } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Users, Target, DollarSign, Calendar, TrendingUp, TrendingDown } from "lucide-react";
 
 interface Lead {
   id: string;
-  status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  priority: 'low' | 'medium' | 'high';
+  status: string;
+  priority: string;
   value: number;
   created_at: string;
   next_contact: string | null;
@@ -28,7 +29,6 @@ export function CRMMetrics({ leads }: CRMMetricsProps) {
     .reduce((sum, lead) => sum + (lead.value || 0), 0);
   
   const conversionRate = totalLeads > 0 ? (wonLeads / totalLeads) * 100 : 0;
-  const averageValue = totalLeads > 0 ? totalValue / totalLeads : 0;
   
   // Leads with follow-up needed (next_contact is today or past)
   const today = new Date().toISOString().split('T')[0];
@@ -37,59 +37,67 @@ export function CRMMetrics({ leads }: CRMMetricsProps) {
     !['won', 'lost'].includes(lead.status)
   ).length;
 
+  // Calculate this month vs last month
+  const now = new Date();
+  const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  
+  const leadsThisMonth = leads.filter(l => new Date(l.created_at) >= thisMonth).length;
+  const leadsLastMonth = leads.filter(l => {
+    const createdAt = new Date(l.created_at);
+    return createdAt >= lastMonth && createdAt < thisMonth;
+  }).length;
+
+  const monthlyGrowth = leadsLastMonth > 0 ? ((leadsThisMonth - leadsLastMonth) / leadsLastMonth) * 100 : 0;
+
   const metrics = [
     {
       title: "Total de Leads",
       value: totalLeads,
       icon: Users,
       color: "text-blue-600",
-      bgColor: "bg-blue-50",
-    },
-    {
-      title: "Novos Leads",
-      value: newLeads,
-      icon: TrendingUp,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
+      bgColor: "bg-blue-50 dark:bg-blue-950/30",
+      trend: monthlyGrowth,
+      trendLabel: `${monthlyGrowth >= 0 ? '+' : ''}${monthlyGrowth.toFixed(0)}% este mês`,
     },
     {
       title: "Taxa de Conversão",
       value: `${conversionRate.toFixed(1)}%`,
       icon: Target,
       color: "text-purple-600",
-      bgColor: "bg-purple-50",
+      bgColor: "bg-purple-50 dark:bg-purple-950/30",
+      progress: conversionRate,
+      subtitle: `${wonLeads} de ${totalLeads} convertidos`,
     },
     {
-      title: "Valor Total",
+      title: "Valor Total Pipeline",
       value: new Intl.NumberFormat('pt-BR', {
         style: 'currency',
-        currency: 'BRL'
+        currency: 'BRL',
+        minimumFractionDigits: 0,
       }).format(totalValue),
       icon: DollarSign,
       color: "text-emerald-600",
-      bgColor: "bg-emerald-50",
-    },
-    {
-      title: "Valor Médio",
-      value: new Intl.NumberFormat('pt-BR', {
+      bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
+      subtitle: `${new Intl.NumberFormat('pt-BR', {
         style: 'currency',
-        currency: 'BRL'
-      }).format(averageValue),
-      icon: TrendingUp,
-      color: "text-orange-600",
-      bgColor: "bg-orange-50",
+        currency: 'BRL',
+        minimumFractionDigits: 0,
+      }).format(wonValue)} confirmado`,
     },
     {
-      title: "Follow-up Necessário",
+      title: "Follow-ups Pendentes",
       value: followUpNeeded,
-      icon: Clock,
-      color: "text-red-600",
-      bgColor: "bg-red-50",
+      icon: Calendar,
+      color: followUpNeeded > 0 ? "text-orange-600" : "text-green-600",
+      bgColor: followUpNeeded > 0 ? "bg-orange-50 dark:bg-orange-950/30" : "bg-green-50 dark:bg-green-950/30",
+      subtitle: followUpNeeded > 0 ? "Requer atenção imediata" : "Tudo em dia",
+      badge: followUpNeeded > 0 ? "Urgente" : null,
     },
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {metrics.map((metric, index) => (
         <Card key={index}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -102,41 +110,38 @@ export function CRMMetrics({ leads }: CRMMetricsProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metric.value}</div>
-            {metric.title === "Follow-up Necessário" && followUpNeeded > 0 && (
+            
+            {metric.progress !== undefined && (
+              <Progress value={metric.progress} className="mt-2" />
+            )}
+            
+            {metric.trend !== undefined && (
+              <div className="flex items-center gap-1 mt-1">
+                {metric.trend >= 0 ? (
+                  <TrendingUp className="h-3 w-3 text-green-600" />
+                ) : (
+                  <TrendingDown className="h-3 w-3 text-red-600" />
+                )}
+                <p className={`text-xs ${metric.trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {metric.trendLabel}
+                </p>
+              </div>
+            )}
+            
+            {metric.subtitle && !metric.trend && (
               <p className="text-xs text-muted-foreground mt-1">
-                Requer atenção imediata
+                {metric.subtitle}
               </p>
+            )}
+            
+            {metric.badge && (
+              <Badge variant="destructive" className="mt-2 text-xs">
+                {metric.badge}
+              </Badge>
             )}
           </CardContent>
         </Card>
       ))}
-      
-      {/* Status Distribution */}
-      <Card className="md:col-span-2 lg:col-span-3 xl:col-span-6">
-        <CardHeader>
-          <CardTitle className="text-lg">Distribuição por Status</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-              Novos: {newLeads}
-            </Badge>
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-              Qualificados: {qualifiedLeads}
-            </Badge>
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              Ganhos: {wonLeads}
-            </Badge>
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-red-500"></div>
-              Perdidos: {lostLeads}
-            </Badge>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
