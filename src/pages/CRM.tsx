@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, Users, DollarSign, Target, Calendar, Webhook, Grid, List, AlertTriangle, TrendingUp, Activity } from "lucide-react";
+import { Plus, Search, Users, DollarSign, Target, Calendar, Webhook, Grid, List, AlertTriangle, TrendingUp, Activity, Eye, Settings, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,7 @@ import { CRMAdvancedFilters } from "@/components/crm/CRMAdvancedFilters";
 import { CRMAnalytics } from "@/components/crm/CRMAnalytics";
 import { CRMMetrics } from "@/components/crm/CRMMetrics";
 import { FacebookLeadsIntegration } from "@/components/crm/FacebookLeadsIntegration";
+import { CRMSettings } from "@/components/crm/CRMSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
@@ -447,14 +448,24 @@ export default function CRM() {
 
       {/* Filtros e Leads */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="leads">Leads</TabsTrigger>
-            <TabsTrigger value="analytics">Análises</TabsTrigger>
-            <TabsTrigger value="settings">Configurações</TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <Eye className="h-4 w-4" />
+            <span className="hidden sm:inline">Visão Geral</span>
+          </TabsTrigger>
+          <TabsTrigger value="leads" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Leads</span>
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Análises</span>
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            <span className="hidden sm:inline">Configurações</span>
+          </TabsTrigger>
+        </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
           <Card>
@@ -610,21 +621,7 @@ export default function CRM() {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Integração Facebook Lead Ads</CardTitle>
-                <CardDescription>
-                  Configure a captura automática de leads do Facebook
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FacebookLeadsIntegration />
-              </CardContent>
-            </Card>
-            
-            <CustomStatusManager onStatusUpdate={() => { fetchLeads(); refreshStatuses(); }} />
-          </div>
+          <CRMSettings />
         </TabsContent>
       </Tabs>
 
