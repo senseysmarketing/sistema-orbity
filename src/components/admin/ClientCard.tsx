@@ -20,6 +20,7 @@ interface Client {
   contract_start_date: string | null;
   contract_end_date: string | null;
   has_loyalty: boolean;
+  cancelled_at: string | null;
 }
 
 interface ClientCardProps {
@@ -199,11 +200,19 @@ export function ClientCard({
             </div>
           </div>
 
-          {/* Cliente desde */}
-          {client.start_date && (
+          {/* Cliente desde / Data de inativação */}
+          {client.start_date && client.active && (
             <p className="text-xs text-muted-foreground">
               Cliente desde: {formatDate(client.start_date)}
             </p>
+          )}
+          {!client.active && client.cancelled_at && (
+            <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-950/30 rounded-md border border-red-200 dark:border-red-900">
+              <UserX className="h-4 w-4 text-red-600" />
+              <p className="text-xs text-red-700 dark:text-red-400 font-medium">
+                Inativado em: {formatDate(client.cancelled_at)}
+              </p>
+            </div>
           )}
 
           {/* Progress Bar de Pagamentos */}

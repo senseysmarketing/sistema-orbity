@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal, Calendar, ArrowUpDown, Search, BarChart3, Target, Activity, Timer, Users, CreditCard, Receipt, Wallet, PieChart, FileText, AlertTriangle, CheckCircle, TrendingUp as TrendingUpIcon, Settings, Calculator } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal, Calendar, ArrowUpDown, Search, BarChart3, Target, Activity, Timer, Users, CreditCard, Receipt, Wallet, PieChart, FileText, AlertTriangle, CheckCircle, TrendingUp as TrendingUpIcon, Settings, Calculator, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -94,6 +94,7 @@ export default function Admin() {
   const [clientStatusFilter, setClientStatusFilter] = useState<string>("all");
   const [clientLoyaltyFilter, setClientLoyaltyFilter] = useState<string>("all");
   const [clientPaymentStatusFilter, setClientPaymentStatusFilter] = useState<string>("all");
+  const [showInactiveClients, setShowInactiveClients] = useState(false);
 
   // Payment states
   const [selectedPayment, setSelectedPayment] = useState<ClientPayment | null>(null);
@@ -1434,27 +1435,41 @@ export default function Admin() {
           {/* Header com Botão de Novo Cliente */}
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">
-              Clientes ({clients.length})
+              Clientes ({clients.filter(c => c.active).length})
             </h3>
-            <Button
-              onClick={() => {
-                const canAdd = checkLimitWithWarning('clients', clients.length + 1);
-                if (canAdd) {
-                  setSelectedClient(null);
-                  setClientFormOpen(true);
-                }
-              }}
-              className="flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Novo Cliente
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={showInactiveClients ? "default" : "outline"}
+                onClick={() => setShowInactiveClients(!showInactiveClients)}
+                className="flex items-center gap-2"
+              >
+                <UserX className="h-4 w-4" />
+                {showInactiveClients ? "Ocultar Inativos" : "Ver Inativos"} ({clients.filter(c => !c.active).length})
+              </Button>
+              <Button
+                onClick={() => {
+                  const canAdd = checkLimitWithWarning('clients', clients.length + 1);
+                  if (canAdd) {
+                    setSelectedClient(null);
+                    setClientFormOpen(true);
+                  }
+                }}
+                className="flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Novo Cliente
+              </Button>
+            </div>
           </div>
 
           {/* Grid de Cards de Clientes */}
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {clients
               .filter(client => {
+                // Filtro de clientes ativos/inativos
+                if (!showInactiveClients && !client.active) return false;
+                if (showInactiveClients && client.active) return false;
+
                 const matchesSearch = client.name.toLowerCase().includes(clientSearchTerm.toLowerCase());
                 const matchesStatus = clientStatusFilter === 'all' || 
                   (clientStatusFilter === 'active' && client.active) ||
