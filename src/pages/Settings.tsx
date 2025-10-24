@@ -18,6 +18,7 @@ import { PricingCards } from "@/components/subscription/PricingCards";
 import { SubscriptionDetails } from "@/components/subscription/SubscriptionDetails";
 import { BillingHistory } from "@/components/subscription/BillingHistory";
 import { UsersManagement } from "@/components/admin/UsersManagement";
+import { NotificationPreferences } from "@/components/notifications/NotificationPreferences";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -25,13 +26,8 @@ export default function Settings() {
     email: '',
     avatar_url: '',
   });
-  const [notifications, setNotifications] = useState({
-    emailNotifications: true,
-    taskReminders: true,
-    paymentAlerts: true,
-    weeklyReports: false,
-  });
   const [loading, setLoading] = useState(false);
+  const [notificationPrefsOpen, setNotificationPrefsOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const { profile: userProfile, signOut } = useAuth();
   const { isAgencyAdmin } = useAgency();
@@ -314,90 +310,61 @@ export default function Settings() {
             <CardHeader>
               <CardTitle>Preferências de Notificação</CardTitle>
               <CardDescription>
-                Configure como você quer receber notificações
+                Configure os tipos de notificações, períodos de antecedência e horários de silêncio
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      <span className="font-medium">Notificações por Email</span>
-                    </div>
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-start gap-3">
+                  <Bell className="h-5 w-5 text-primary mt-0.5" />
+                  <div className="flex-1 space-y-2">
+                    <h4 className="font-medium">Personalize Suas Notificações</h4>
                     <p className="text-sm text-muted-foreground">
-                      Receba notificações importantes por email
+                      Configure quando e como você deseja ser notificado sobre lembretes, tarefas, 
+                      pagamentos, leads, reuniões e muito mais. Defina períodos de antecedência 
+                      personalizados e horários de "não perturbe" para cada tipo de notificação.
                     </p>
                   </div>
-                  <Switch
-                    checked={notifications.emailNotifications}
-                    onCheckedChange={(checked) => 
-                      setNotifications(prev => ({ ...prev, emailNotifications: checked }))
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Bell className="h-4 w-4" />
-                      <span className="font-medium">Lembretes de Tarefas</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Receba lembretes sobre prazos de tarefas
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.taskReminders}
-                    onCheckedChange={(checked) => 
-                      setNotifications(prev => ({ ...prev, taskReminders: checked }))
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      <span className="font-medium">Alertas de Pagamento</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Notificações sobre pagamentos pendentes e recebidos
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.paymentAlerts}
-                    onCheckedChange={(checked) => 
-                      setNotifications(prev => ({ ...prev, paymentAlerts: checked }))
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <BarChart3 className="h-4 w-4" />
-                      <span className="font-medium">Relatórios Semanais</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Receba um resumo semanal das atividades
-                    </p>
-                  </div>
-                  <Switch
-                    checked={notifications.weeklyReports}
-                    onCheckedChange={(checked) => 
-                      setNotifications(prev => ({ ...prev, weeklyReports: checked }))
-                    }
-                  />
                 </div>
               </div>
 
-              <Button className="w-full sm:w-auto">
-                <Save className="mr-2 h-4 w-4" />
-                Salvar Preferências
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 p-4 border rounded-lg">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <Bell className="h-4 w-4" />
+                    Tipos de Notificação
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    Lembretes, Tarefas, Posts, Pagamentos, Despesas, Leads, Reuniões e Sistema
+                  </p>
+                </div>
+
+                <div className="space-y-2 p-4 border rounded-lg">
+                  <h4 className="font-medium text-sm flex items-center gap-2">
+                    <Save className="h-4 w-4" />
+                    Períodos Personalizados
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    Defina com quantas horas/dias de antecedência ser notificado
+                  </p>
+                </div>
+              </div>
+
+              <Button 
+                onClick={() => setNotificationPrefsOpen(true)} 
+                className="w-full"
+                size="lg"
+              >
+                <Bell className="mr-2 h-4 w-4" />
+                Configurar Notificações Avançadas
               </Button>
             </CardContent>
           </Card>
+
+          <NotificationPreferences 
+            open={notificationPrefsOpen} 
+            onOpenChange={setNotificationPrefsOpen} 
+          />
         </TabsContent>
 
         <TabsContent value="appearance" className="space-y-4">

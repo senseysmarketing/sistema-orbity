@@ -139,16 +139,46 @@ async function checkUserPreferences(
     'payments': preferences.payments_enabled,
     'leads': preferences.leads_enabled,
     'meetings': preferences.meetings_enabled,
+    'expenses': preferences.expenses_enabled,
     'system': preferences.system_enabled,
   }[notificationType];
 
   if (typeEnabled === false) return false;
 
+  // Check do not disturb until timestamp
   if (preferences.do_not_disturb_until && new Date(preferences.do_not_disturb_until) > new Date()) {
     return false;
   }
 
+  // Check do not disturb time range
+  if (preferences.dnd_start_time && preferences.dnd_end_time) {
+    const now = new Date();
+    const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
+    
+    if (currentTime >= preferences.dnd_start_time && currentTime <= preferences.dnd_end_time) {
+      return false;
+    }
+  }
+
+  // Check weekends
+  if (preferences.dnd_weekends) {
+    const now = new Date();
+    const day = now.getDay();
+    if (day === 0 || day === 6) return false;
+  }
+
   return true;
+}
+
+async function getUserPreferences(userId: string, agencyId: string) {
+  const { data } = await supabase
+    .from('notification_preferences')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('agency_id', agencyId)
+    .maybeSingle();
+  
+  return data;
 }
 
 // ============================================
@@ -159,15 +189,13 @@ async function processReminders() {
   console.log('⏰ Processing reminder notifications...');
   
   const now = new Date();
-  const in2Hours = addHours(now, 2);
 
   const { data: reminders, error } = await supabase
     .from('reminders')
     .select('*')
     .eq('completed', false)
     .eq('notification_enabled', true)
-    .not('reminder_time', 'is', null)
-    .lte('reminder_time', in2Hours.toISOString());
+    .not('reminder_time', 'is', null);
 
   if (error) {
     console.error('Error fetching reminders:', error);
@@ -180,24 +208,28 @@ async function processReminders() {
   const remindersToUpdate: { id: string; last_notification_sent: string }[] = [];
 
   for (const reminder of reminders || []) {
+    let agencyId = reminder.agency_id;
+    if (!agencyId) {
+      const { data: userAgency } = await supabase
+        .from('agency_users')
+        .select('agency_id')
+        .eq('user_id', reminder.user_id)
+        .single();
+      agencyId = userAgency?.agency_id;
+    }
+
+    // Get user preferences for advance time
+    const prefs = await getUserPreferences(reminder.user_id, agencyId);
+    const advanceMinutes = prefs?.reminder_advance_minutes ?? 120;
+    
     const reminderTime = new Date(reminder.reminder_time);
-    const minutesBefore = reminder.notification_minutes_before || 0;
-    const notificationTime = new Date(reminderTime.getTime() - minutesBefore * 60000);
+    const customMinutesBefore = reminder.notification_minutes_before ?? advanceMinutes;
+    const notificationTime = new Date(reminderTime.getTime() - customMinutesBefore * 60000);
 
     const alreadySent = reminder.last_notification_sent && 
       new Date(reminder.last_notification_sent) >= notificationTime;
     
     if (notificationTime <= now && !alreadySent) {
-      let agencyId = reminder.agency_id;
-      if (!agencyId) {
-        const { data: userAgency } = await supabase
-          .from('agency_users')
-          .select('agency_id')
-          .eq('user_id', reminder.user_id)
-          .single();
-        agencyId = userAgency?.agency_id;
-      }
-
       const canSend = await checkUserPreferences(reminder.user_id, agencyId, 'reminders');
       if (!canSend) continue;
 
@@ -240,10 +272,9 @@ async function processTasks() {
   console.log('📋 Processing task notifications...');
   
   const now = new Date();
-  const in24Hours = addHours(now, 24);
   const oneDayAgo = addHours(now, -24);
 
-  // Query OTIMIZADA: usa o novo campo notification_sent_at
+  // Get all incomplete tasks
   const { data: tasks, error } = await supabase
     .from('tasks')
     .select(`
@@ -257,7 +288,6 @@ async function processTasks() {
     .neq('status', 'done')
     .eq('archived', false)
     .gte('due_date', now.toISOString())
-    .lte('due_date', in24Hours.toISOString())
     .or(`notification_sent_at.is.null,notification_sent_at.lt.${oneDayAgo.toISOString()}`);
 
   if (error) {
@@ -274,23 +304,33 @@ async function processTasks() {
     if (!task.agency_id) continue;
 
     for (const assignment of task.task_assignments || []) {
-      const canSend = await checkUserPreferences(assignment.user_id, task.agency_id, 'tasks');
-      if (!canSend) continue;
+      // Get user preferences for advance time
+      const prefs = await getUserPreferences(assignment.user_id, task.agency_id);
+      const advanceHours = prefs?.task_advance_hours ?? 24;
+      
+      const dueDate = new Date(task.due_date);
+      const notificationTime = addHours(now, advanceHours);
+      
+      // Only notify if within the advance window
+      if (dueDate <= notificationTime) {
+        const canSend = await checkUserPreferences(assignment.user_id, task.agency_id, 'tasks');
+        if (!canSend) continue;
 
-      notificationsToCreate.push({
-        user_id: assignment.user_id,
-        agency_id: task.agency_id,
-        type: 'task',
-        priority: 'medium',
-        title: '📋 Tarefa próxima do prazo',
-        message: task.title,
-        action_url: '/tasks',
-        action_label: 'Ver tarefa',
-        metadata: { 
-          task_id: task.id,
-          play_sound: true
-        },
-      });
+        notificationsToCreate.push({
+          user_id: assignment.user_id,
+          agency_id: task.agency_id,
+          type: 'task',
+          priority: 'medium',
+          title: '📋 Tarefa próxima do prazo',
+          message: task.title,
+          action_url: '/tasks',
+          action_label: 'Ver tarefa',
+          metadata: { 
+            task_id: task.id,
+            play_sound: true
+          },
+        });
+      }
     }
 
     if (task.task_assignments && task.task_assignments.length > 0) {
@@ -314,10 +354,9 @@ async function processPosts() {
   console.log('📱 Processing post notifications...');
   
   const now = new Date();
-  const in3Hours = addHours(now, 3);
   const oneDayAgo = addHours(now, -24);
 
-  // Query OTIMIZADA
+  // Get all upcoming posts
   const { data: posts, error } = await supabase
     .from('social_media_posts')
     .select(`
@@ -332,7 +371,6 @@ async function processPosts() {
     `)
     .eq('archived', false)
     .gte('scheduled_date', now.toISOString())
-    .lte('scheduled_date', in3Hours.toISOString())
     .or(`notification_sent_at.is.null,notification_sent_at.lt.${oneDayAgo.toISOString()}`);
 
   if (error) {
@@ -351,23 +389,33 @@ async function processPosts() {
     const agencyUsers = (post.agencies as any)?.agency_users || [];
     
     for (const user of agencyUsers) {
-      const canSend = await checkUserPreferences(user.user_id, post.agency_id, 'posts');
-      if (!canSend) continue;
+      // Get user preferences for advance time
+      const prefs = await getUserPreferences(user.user_id, post.agency_id);
+      const advanceHours = prefs?.post_advance_hours ?? 3;
+      
+      const scheduledDate = new Date(post.scheduled_date);
+      const notificationTime = addHours(now, advanceHours);
+      
+      // Only notify if within the advance window
+      if (scheduledDate <= notificationTime) {
+        const canSend = await checkUserPreferences(user.user_id, post.agency_id, 'posts');
+        if (!canSend) continue;
 
-      notificationsToCreate.push({
-        user_id: user.user_id,
-        agency_id: post.agency_id,
-        type: 'post',
-        priority: 'medium',
-        title: '📱 Post próximo de publicar',
-        message: post.title || 'Post sem título',
-        action_url: '/social-media',
-        action_label: 'Ver post',
-        metadata: { 
-          post_id: post.id,
-          play_sound: true
-        },
-      });
+        notificationsToCreate.push({
+          user_id: user.user_id,
+          agency_id: post.agency_id,
+          type: 'post',
+          priority: 'medium',
+          title: '📱 Post próximo de publicar',
+          message: post.title || 'Post sem título',
+          action_url: '/social-media',
+          action_label: 'Ver post',
+          metadata: { 
+            post_id: post.id,
+            play_sound: true
+          },
+        });
+      }
     }
 
     if (agencyUsers.length > 0) {
@@ -391,16 +439,14 @@ async function processLeads() {
   console.log('🎯 Processing lead notifications...');
   
   const todayBrasilia = getTodayInBrasilia();
-  const sevenDaysAgo = addDays(todayBrasilia, -7);
   const oneDayAgo = addDays(todayBrasilia, -1);
 
-  // Query OTIMIZADA
+  // Get all leads with contacts
   const { data: leads, error } = await supabase
     .from('leads')
     .select('id, name, assigned_to, agency_id, last_contact, follow_up_notification_sent_at')
     .not('assigned_to', 'is', null)
     .not('agency_id', 'is', null)
-    .lte('last_contact', sevenDaysAgo.toISOString())
     .or(`follow_up_notification_sent_at.is.null,follow_up_notification_sent_at.lt.${oneDayAgo.toISOString()}`);
 
   if (error) {
@@ -414,25 +460,35 @@ async function processLeads() {
   const leadsToUpdate: string[] = [];
 
   for (const lead of leads || []) {
-    const canSend = await checkUserPreferences(lead.assigned_to!, lead.agency_id, 'leads');
-    if (!canSend) continue;
+    // Get user preferences for inactive days
+    const prefs = await getUserPreferences(lead.assigned_to!, lead.agency_id);
+    const inactiveDays = prefs?.lead_inactive_days ?? 7;
+    
+    const inactiveThreshold = addDays(todayBrasilia, -inactiveDays);
+    const lastContact = new Date(lead.last_contact);
+    
+    // Only notify if past the inactive threshold
+    if (lastContact <= inactiveThreshold) {
+      const canSend = await checkUserPreferences(lead.assigned_to!, lead.agency_id, 'leads');
+      if (!canSend) continue;
 
-    notificationsToCreate.push({
-      user_id: lead.assigned_to!,
-      agency_id: lead.agency_id,
-      type: 'lead',
-      priority: 'high',
-      title: '🎯 Lead requer follow-up',
-      message: `${lead.name} - sem contato há 7 dias`,
-      action_url: '/crm',
-      action_label: 'Ver lead',
-      metadata: { 
-        lead_id: lead.id,
-        play_sound: true
-      },
-    });
+      notificationsToCreate.push({
+        user_id: lead.assigned_to!,
+        agency_id: lead.agency_id,
+        type: 'lead',
+        priority: 'high',
+        title: '🎯 Lead requer follow-up',
+        message: `${lead.name} - sem contato há ${inactiveDays} dias`,
+        action_url: '/crm',
+        action_label: 'Ver lead',
+        metadata: { 
+          lead_id: lead.id,
+          play_sound: true
+        },
+      });
 
-    leadsToUpdate.push(lead.id);
+      leadsToUpdate.push(lead.id);
+    }
   }
 
   await batchCreateNotifications(notificationsToCreate);
@@ -451,15 +507,13 @@ async function processMeetings() {
   console.log('📅 Processing meeting notifications...');
   
   const now = new Date();
-  const in1Hour = addHours(now, 1);
 
   const { data: meetings, error } = await supabase
     .from('meetings')
     .select('id, title, start_time, organizer_id, participants, agency_id')
     .not('agency_id', 'is', null)
     .eq('status', 'scheduled')
-    .gte('start_time', now.toISOString())
-    .lte('start_time', in1Hour.toISOString());
+    .gte('start_time', now.toISOString());
 
   if (error) {
     console.error('Error fetching meetings:', error);
@@ -495,39 +549,22 @@ async function processMeetings() {
   const toTrack: BatchTrackingRecord[] = [];
 
   for (const meeting of meetings || []) {
-    // Organizer
-    const orgKey = `${meeting.id}_${meeting.organizer_id}`;
-    if (!recentlySent.has(orgKey)) {
-      const canSend = await checkUserPreferences(meeting.organizer_id, meeting.agency_id, 'meetings');
-      if (canSend) {
-        notificationsToCreate.push({
-          user_id: meeting.organizer_id,
-          agency_id: meeting.agency_id,
-          type: 'meeting',
-          priority: 'high',
-          title: '📅 Reunião em breve',
-          message: meeting.title,
-          action_url: '/agenda',
-          action_label: 'Ver reunião',
-          metadata: { meeting_id: meeting.id, play_sound: true },
-        });
-        toTrack.push({
-          notification_type: 'meeting',
-          entity_id: meeting.id,
-          user_id: meeting.organizer_id,
-          agency_id: meeting.agency_id
-        });
-      }
-    }
-
-    // Participants
-    for (const participant of (meeting.participants as any[] || [])) {
-      const partKey = `${meeting.id}_${participant.user_id}`;
-      if (!recentlySent.has(partKey)) {
-        const canSend = await checkUserPreferences(participant.user_id, meeting.agency_id, 'meetings');
+    // Get organizer preferences for advance time
+    const orgPrefs = await getUserPreferences(meeting.organizer_id, meeting.agency_id);
+    const advanceMinutes = orgPrefs?.meeting_advance_minutes ?? 60;
+    
+    const startTime = new Date(meeting.start_time);
+    const notificationTime = new Date(startTime.getTime() - advanceMinutes * 60000);
+    
+    // Only notify if within the advance window
+    if (now >= notificationTime) {
+      // Organizer
+      const orgKey = `${meeting.id}_${meeting.organizer_id}`;
+      if (!recentlySent.has(orgKey)) {
+        const canSend = await checkUserPreferences(meeting.organizer_id, meeting.agency_id, 'meetings');
         if (canSend) {
           notificationsToCreate.push({
-            user_id: participant.user_id,
+            user_id: meeting.organizer_id,
             agency_id: meeting.agency_id,
             type: 'meeting',
             priority: 'high',
@@ -540,9 +577,36 @@ async function processMeetings() {
           toTrack.push({
             notification_type: 'meeting',
             entity_id: meeting.id,
-            user_id: participant.user_id,
+            user_id: meeting.organizer_id,
             agency_id: meeting.agency_id
           });
+        }
+      }
+
+      // Participants
+      for (const participant of (meeting.participants as any[] || [])) {
+        const partKey = `${meeting.id}_${participant.user_id}`;
+        if (!recentlySent.has(partKey)) {
+          const canSend = await checkUserPreferences(participant.user_id, meeting.agency_id, 'meetings');
+          if (canSend) {
+            notificationsToCreate.push({
+              user_id: participant.user_id,
+              agency_id: meeting.agency_id,
+              type: 'meeting',
+              priority: 'high',
+              title: '📅 Reunião em breve',
+              message: meeting.title,
+              action_url: '/agenda',
+              action_label: 'Ver reunião',
+              metadata: { meeting_id: meeting.id, play_sound: true },
+            });
+            toTrack.push({
+              notification_type: 'meeting',
+              entity_id: meeting.id,
+              user_id: participant.user_id,
+              agency_id: meeting.agency_id
+            });
+          }
         }
       }
     }
@@ -554,12 +618,102 @@ async function processMeetings() {
   console.log(`✅ Created ${notificationsToCreate.length} meeting notifications`);
 }
 
+async function processExpenses() {
+  console.log('💸 Processing expense notifications...');
+  
+  const now = new Date();
+  const oneDayAgo = addHours(now, -24);
+
+  // Get all pending expenses
+  const { data: expenses, error } = await supabase
+    .from('expenses')
+    .select('id, name, amount, due_date, agency_id, notification_sent_at')
+    .eq('status', 'pending')
+    .not('agency_id', 'is', null)
+    .gte('due_date', now.toISOString())
+    .or(`notification_sent_at.is.null,notification_sent_at.lt.${oneDayAgo.toISOString()}`);
+
+  if (error) {
+    console.error('Error fetching expenses:', error);
+    return;
+  }
+
+  console.log(`📊 Found ${expenses?.length || 0} expenses to notify`);
+
+  // Get agency admins for each agency
+  const agencyIds = [...new Set(expenses?.map(e => e.agency_id) || [])];
+  const adminsByAgency: Record<string, any[]> = {};
+
+  for (const agencyId of agencyIds) {
+    const { data: admins } = await supabase
+      .from('agency_users')
+      .select('user_id')
+      .eq('agency_id', agencyId)
+      .in('role', ['owner', 'admin']);
+    
+    adminsByAgency[agencyId] = admins || [];
+  }
+
+  const notificationsToCreate: NotificationData[] = [];
+  const expensesToUpdate: string[] = [];
+
+  for (const expense of expenses || []) {
+    const admins = adminsByAgency[expense.agency_id] || [];
+    
+    for (const admin of admins) {
+      // Get user preferences for advance time
+      const prefs = await getUserPreferences(admin.user_id, expense.agency_id);
+      const advanceDays = prefs?.expense_advance_days ?? 3;
+      
+      const dueDate = new Date(expense.due_date);
+      const notificationTime = addDays(now, advanceDays);
+      
+      // Only notify if within the advance window
+      if (dueDate <= notificationTime) {
+        const canSend = await checkUserPreferences(admin.user_id, expense.agency_id, 'expenses');
+        if (!canSend) continue;
+
+        notificationsToCreate.push({
+          user_id: admin.user_id,
+          agency_id: expense.agency_id,
+          type: 'expense',
+          priority: 'high',
+          title: '💸 Despesa próxima do vencimento',
+          message: `${expense.name} - R$ ${expense.amount}`,
+          action_url: '/admin',
+          action_label: 'Ver despesa',
+          metadata: { 
+            expense_id: expense.id,
+            play_sound: true
+          },
+        });
+      }
+    }
+
+    if (admins.length > 0) {
+      expensesToUpdate.push(expense.id);
+    }
+  }
+
+  await batchCreateNotifications(notificationsToCreate);
+
+  if (expensesToUpdate.length > 0) {
+    await supabase
+      .from('expenses')
+      .update({ notification_sent_at: new Date().toISOString() })
+      .in('id', expensesToUpdate);
+  }
+
+  console.log(`✅ Created ${notificationsToCreate.length} expense notifications`);
+}
+
 async function processPayments() {
   console.log('💰 Processing payment notifications...');
   
-  const todayBrasilia = getTodayInBrasilia();
-  const in3Days = addDays(todayBrasilia, 3);
+  const now = new Date();
+  const oneDayAgo = addHours(now, -24);
 
+  // Get all pending payments
   const { data: payments, error } = await supabase
     .from('client_payments')
     .select(`
@@ -570,8 +724,8 @@ async function processPayments() {
       clients(name)
     `)
     .eq('status', 'pending')
-    .lte('due_date', in3Days.toISOString())
-    .not('agency_id', 'is', null);
+    .not('agency_id', 'is', null)
+    .gte('due_date', now.toISOString());
 
   if (error) {
     console.error('Error fetching payments:', error);
@@ -594,60 +748,48 @@ async function processPayments() {
     adminsByAgency[agencyId] = admins || [];
   }
 
-  // Preparar batch check
-  const trackingRecords: BatchTrackingRecord[] = [];
-  payments?.forEach(payment => {
-    const admins = adminsByAgency[payment.agency_id] || [];
-    admins.forEach(admin => {
-      trackingRecords.push({
-        notification_type: 'payment',
-        entity_id: payment.id,
-        user_id: admin.user_id,
-        agency_id: payment.agency_id
-      });
-    });
-  });
-
-  const recentlySent = await batchCheckNotifications(trackingRecords, 24);
-
   const notificationsToCreate: NotificationData[] = [];
-  const toTrack: BatchTrackingRecord[] = [];
+  const paymentsToUpdate: string[] = [];
 
   for (const payment of payments || []) {
     const admins = adminsByAgency[payment.agency_id] || [];
     
     for (const admin of admins) {
-      const key = `${payment.id}_${admin.user_id}`;
-      if (!recentlySent.has(key)) {
+      // Get user preferences for advance time
+      const prefs = await getUserPreferences(admin.user_id, payment.agency_id);
+      const advanceDays = prefs?.payment_advance_days ?? 3;
+      
+      const dueDate = new Date(payment.due_date);
+      const notificationTime = addDays(now, advanceDays);
+      
+      // Only notify if within the advance window
+      if (dueDate <= notificationTime) {
         const canSend = await checkUserPreferences(admin.user_id, payment.agency_id, 'payments');
-        if (canSend) {
-          notificationsToCreate.push({
-            user_id: admin.user_id,
-            agency_id: payment.agency_id,
-            type: 'payment',
-            priority: 'high',
-            title: '💰 Pagamento próximo do vencimento',
-            message: `${(payment.clients as any)?.name || 'Cliente'} - R$ ${payment.amount}`,
-            action_url: '/admin',
-            action_label: 'Ver pagamento',
-            metadata: { 
-              payment_id: payment.id,
-              play_sound: true
-            },
-          });
-          toTrack.push({
-            notification_type: 'payment',
-            entity_id: payment.id,
-            user_id: admin.user_id,
-            agency_id: payment.agency_id
-          });
-        }
+        if (!canSend) continue;
+
+        notificationsToCreate.push({
+          user_id: admin.user_id,
+          agency_id: payment.agency_id,
+          type: 'payment',
+          priority: 'high',
+          title: '💰 Pagamento próximo do vencimento',
+          message: `${(payment.clients as any)?.name || 'Cliente'} - R$ ${payment.amount}`,
+          action_url: '/admin',
+          action_label: 'Ver pagamento',
+          metadata: { 
+            payment_id: payment.id,
+            play_sound: true
+          },
+        });
       }
+    }
+
+    if (admins.length > 0) {
+      paymentsToUpdate.push(payment.id);
     }
   }
 
   await batchCreateNotifications(notificationsToCreate);
-  await batchTrackNotifications(toTrack);
 
   console.log(`✅ Created ${notificationsToCreate.length} payment notifications`);
 }
@@ -712,6 +854,7 @@ Deno.serve(async (req) => {
       processTasks(),
       processPosts(),
       processPayments(),
+      processExpenses(),
       processLeads(),
       processMeetings(),
     ]);

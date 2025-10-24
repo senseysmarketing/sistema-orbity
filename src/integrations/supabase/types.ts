@@ -1036,6 +1036,7 @@ export type Database = {
           installment_total: number | null
           is_fixed: boolean
           name: string
+          notification_sent_at: string | null
           paid_date: string | null
           parent_expense_id: string | null
           recurrence_day: number | null
@@ -1055,6 +1056,7 @@ export type Database = {
           installment_total?: number | null
           is_fixed?: boolean
           name: string
+          notification_sent_at?: string | null
           paid_date?: string | null
           parent_expense_id?: string | null
           recurrence_day?: number | null
@@ -1074,6 +1076,7 @@ export type Database = {
           installment_total?: number | null
           is_fixed?: boolean
           name?: string
+          notification_sent_at?: string | null
           paid_date?: string | null
           parent_expense_id?: string | null
           recurrence_day?: number | null
@@ -1518,17 +1521,32 @@ export type Database = {
           agency_id: string
           browser_notifications: boolean
           created_at: string
+          dnd_end_time: string | null
+          dnd_holidays: boolean | null
+          dnd_start_time: string | null
+          dnd_weekends: boolean | null
           do_not_disturb_end: string | null
           do_not_disturb_start: string | null
           do_not_disturb_until: string | null
           email_digest: boolean
+          expense_advance_days: number | null
+          expenses_enabled: boolean | null
           id: string
+          lead_inactive_days: number | null
           leads_enabled: boolean
+          meeting_advance_minutes: number | null
           meetings_enabled: boolean
+          payment_advance_days: number | null
+          payment_repeat_days: number | null
+          payment_repeat_enabled: boolean | null
           payments_enabled: boolean
+          post_advance_hours: number | null
           posts_enabled: boolean
+          reminder_advance_minutes: number | null
           reminders_enabled: boolean
+          sound_enabled: boolean | null
           system_enabled: boolean
+          task_advance_hours: number | null
           tasks_enabled: boolean
           updated_at: string
           user_id: string
@@ -1537,17 +1555,32 @@ export type Database = {
           agency_id: string
           browser_notifications?: boolean
           created_at?: string
+          dnd_end_time?: string | null
+          dnd_holidays?: boolean | null
+          dnd_start_time?: string | null
+          dnd_weekends?: boolean | null
           do_not_disturb_end?: string | null
           do_not_disturb_start?: string | null
           do_not_disturb_until?: string | null
           email_digest?: boolean
+          expense_advance_days?: number | null
+          expenses_enabled?: boolean | null
           id?: string
+          lead_inactive_days?: number | null
           leads_enabled?: boolean
+          meeting_advance_minutes?: number | null
           meetings_enabled?: boolean
+          payment_advance_days?: number | null
+          payment_repeat_days?: number | null
+          payment_repeat_enabled?: boolean | null
           payments_enabled?: boolean
+          post_advance_hours?: number | null
           posts_enabled?: boolean
+          reminder_advance_minutes?: number | null
           reminders_enabled?: boolean
+          sound_enabled?: boolean | null
           system_enabled?: boolean
+          task_advance_hours?: number | null
           tasks_enabled?: boolean
           updated_at?: string
           user_id: string
@@ -1556,17 +1589,32 @@ export type Database = {
           agency_id?: string
           browser_notifications?: boolean
           created_at?: string
+          dnd_end_time?: string | null
+          dnd_holidays?: boolean | null
+          dnd_start_time?: string | null
+          dnd_weekends?: boolean | null
           do_not_disturb_end?: string | null
           do_not_disturb_start?: string | null
           do_not_disturb_until?: string | null
           email_digest?: boolean
+          expense_advance_days?: number | null
+          expenses_enabled?: boolean | null
           id?: string
+          lead_inactive_days?: number | null
           leads_enabled?: boolean
+          meeting_advance_minutes?: number | null
           meetings_enabled?: boolean
+          payment_advance_days?: number | null
+          payment_repeat_days?: number | null
+          payment_repeat_enabled?: boolean | null
           payments_enabled?: boolean
+          post_advance_hours?: number | null
           posts_enabled?: boolean
+          reminder_advance_minutes?: number | null
           reminders_enabled?: boolean
+          sound_enabled?: boolean | null
           system_enabled?: boolean
+          task_advance_hours?: number | null
           tasks_enabled?: boolean
           updated_at?: string
           user_id?: string
