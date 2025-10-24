@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Play } from "lucide-react";
+import { ArrowRight, LayoutDashboard } from "lucide-react";
 
 export function HeroSection() {
   const navigate = useNavigate();
@@ -39,9 +39,9 @@ export function HeroSection() {
                 size="lg" 
                 variant="outline" 
                 className="text-lg"
+                onClick={() => navigate("/auth")}
               >
-                <Play className="mr-2" />
-                Ver Demo
+                Já tenho conta
               </Button>
             </div>
 
@@ -65,7 +65,7 @@ export function HeroSection() {
               <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
                 <div className="text-center space-y-4">
                   <div className="w-20 h-20 mx-auto rounded-full bg-primary/20 flex items-center justify-center">
-                    <Play className="w-10 h-10 text-primary" />
+                    <LayoutDashboard className="w-10 h-10 text-primary" />
                   </div>
                   <p className="text-muted-foreground">Dashboard Preview</p>
                 </div>
