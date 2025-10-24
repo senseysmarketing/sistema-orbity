@@ -2,7 +2,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Calendar, DollarSign, MoreHorizontal, Edit, Eye, Trash2, CheckCircle, Timer, AlertTriangle, Receipt, Building, CreditCard, Wallet } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Calendar, DollarSign, MoreHorizontal, Edit, Eye, Trash2, CheckCircle, Clock, AlertTriangle, Repeat, Wallet, Receipt } from "lucide-react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAgency } from "@/hooks/useAgency";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -35,7 +39,6 @@ type ExpenseOrSalary = (Expense & { type: 'expense' }) | (Salary & { type: 'sala
 
 interface ExpenseCardProps {
   item: ExpenseOrSalary;
-  categoryIcon?: string;
   onView: (item: any) => void;
   onEdit: (item: any) => void;
   onDelete: (item: any) => void;
@@ -44,12 +47,35 @@ interface ExpenseCardProps {
 
 export function ExpenseCard({
   item,
-  categoryIcon,
   onView,
   onEdit,
   onDelete,
   onUpdateStatus,
 }: ExpenseCardProps) {
+  const [category, setCategory] = useState<any>(null);
+  const { currentAgency } = useAgency();
+
+  useEffect(() => {
+    if (item.type === 'expense' && 'category' in item && item.category && currentAgency) {
+      fetchCategory();
+    }
+  }, [item, currentAgency]);
+
+  const fetchCategory = async () => {
+    if (item.type !== 'expense' || !('category' in item) || !item.category || !currentAgency) return;
+
+    const { data } = await supabase
+      .from('expense_categories')
+      .select('*')
+      .eq('id', item.category)
+      .eq('agency_id', currentAgency.id)
+      .single();
+
+    if (data) {
+      setCategory(data);
+    }
+  };
+
   const getCardBackground = () => {
     switch (item.status) {
       case 'overdue':
@@ -78,14 +104,10 @@ export function ExpenseCard({
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'paid':
-        return 'Pago';
-      case 'pending':
-        return 'Pendente';
-      case 'overdue':
-        return 'Atrasado';
-      default:
-        return status;
+      case 'paid': return 'Pago';
+      case 'pending': return 'Pendente';
+      case 'overdue': return 'Atrasado';
+      default: return status;
     }
   };
 
@@ -107,59 +129,83 @@ export function ExpenseCard({
     return 'Despesa';
   };
 
+  // Calcular urgência
+  const getUrgencyLevel = () => {
+    if (item.status === 'paid') return null;
+    const today = new Date();
+    const due = new Date(item.due_date);
+    const daysUntilDue = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (item.status === 'overdue') return 'overdue';
+    if (daysUntilDue <= 3) return 'urgent';
+    if (daysUntilDue <= 7) return 'soon';
+    return null;
+  };
+
+  const urgencyLevel = getUrgencyLevel();
+
   return (
     <Card 
-      className={`cursor-pointer transition-all hover:shadow-lg border-l-4 ${getCardBackground()}`}
+      className={`cursor-pointer transition-all hover:shadow-lg border ${getCardBackground()} ${
+        urgencyLevel === 'urgent' || urgencyLevel === 'overdue' ? 'ring-2 ring-red-400 dark:ring-red-600' : ''
+      }`}
       onClick={() => onView(item)}
     >
       <CardContent className="p-6">
         <div className="space-y-4">
-          {/* Header com ícone, título e menu */}
-          <div className="flex items-start justify-between gap-3">
+          {/* Header com ícone da categoria, badges e menu */}
+          <div className="flex items-start justify-between">
             <div className="flex items-start gap-3 flex-1">
-              {/* Ícone Principal */}
-              <div className="p-3 bg-primary/10 rounded-xl">
+              <div className="p-2 bg-primary/10 rounded-lg">
                 {item.type === 'salary' ? (
-                  <Wallet className="h-6 w-6 text-primary" />
-                ) : categoryIcon ? (
-                  <span className="text-2xl">{categoryIcon}</span>
+                  <Wallet className="h-5 w-5 text-primary" />
+                ) : category ? (
+                  <span className="text-2xl">{category.icon}</span>
                 ) : (
-                  <Receipt className="h-6 w-6 text-primary" />
+                  <Receipt className="h-5 w-5 text-primary" />
                 )}
               </div>
-              
-              {/* Título e Badges */}
               <div className="flex-1 space-y-2">
-                <h3 className="font-semibold text-lg leading-tight">
-                  {item.type === 'salary' ? `Salário - ${item.employee_name}` : item.name}
-                </h3>
-                
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Badge de Status */}
                   <Badge className={getStatusColor(item.status)}>
-                    {item.status === 'paid' && <CheckCircle className="h-3 w-3 mr-1" />}
-                    {item.status === 'pending' && <Timer className="h-3 w-3 mr-1" />}
-                    {item.status === 'overdue' && <AlertTriangle className="h-3 w-3 mr-1" />}
                     {getStatusLabel(item.status)}
                   </Badge>
-                  
-                  {/* Badge de Tipo */}
-                  <Badge variant={item.type === 'salary' ? 'default' : 'outline'}>
-                    {getTypeLabel()}
+                  <Badge variant="outline">
+                    {item.type === 'salary' ? 'Salário' : 'Despesa'}
                   </Badge>
-
-                  {/* Badge de Categoria */}
-                  {item.type === 'expense' && 'category' in item && item.category && (
-                    <Badge variant="secondary" className="text-xs">
-                      <Building className="h-3 w-3 mr-1" />
-                      {item.category}
+                  {item.type === 'expense' && 'expense_type' in item && item.expense_type && (
+                    <Badge variant="secondary" className="gap-1">
+                      {item.expense_type === 'recorrente' && <Repeat className="h-3 w-3" />}
+                      {item.expense_type === 'parcelada' && <Calendar className="h-3 w-3" />}
+                      {getTypeLabel()}
+                    </Badge>
+                  )}
+                  {category && (
+                    <Badge 
+                      variant="outline"
+                      className="gap-1"
+                      style={{ 
+                        borderColor: category.color,
+                        color: category.color 
+                      }}
+                    >
+                      {category.name}
+                    </Badge>
+                  )}
+                  {urgencyLevel === 'urgent' && (
+                    <Badge className="bg-orange-500 text-white hover:bg-orange-600 animate-pulse">
+                      ⚠️ Vence em breve
+                    </Badge>
+                  )}
+                  {urgencyLevel === 'overdue' && (
+                    <Badge className="bg-red-600 text-white hover:bg-red-700 animate-pulse">
+                      🚨 Atrasado
                     </Badge>
                   )}
                 </div>
               </div>
             </div>
             
-            {/* Menu de Ações */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -180,7 +226,7 @@ export function ExpenseCard({
                   Marcar como Pago
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdateStatus(item.id, 'pending'); }}>
-                  <Timer className="mr-2 h-4 w-4" />
+                  <Clock className="mr-2 h-4 w-4" />
                   Marcar como Pendente
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onUpdateStatus(item.id, 'overdue'); }}>
@@ -198,66 +244,70 @@ export function ExpenseCard({
             </DropdownMenu>
           </div>
 
-          {/* Informações Principais */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Valor */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <DollarSign className="h-3.5 w-3.5" />
-                <span>Valor</span>
-              </div>
-              <p className="text-lg font-bold text-primary">
-                R$ {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
+          {/* Nome da despesa/salário */}
+          <div>
+            <h3 className="font-semibold text-lg">
+              {item.type === 'salary' ? item.employee_name : item.name}
+            </h3>
+            {item.type === 'expense' && 'description' in item && item.description && (
+              <p className="text-sm text-muted-foreground line-clamp-1">{item.description}</p>
+            )}
+          </div>
 
-            {/* Vencimento */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Calendar className="h-3.5 w-3.5" />
-                <span>Vencimento</span>
-              </div>
-              <p className="text-sm font-semibold">
-                {item.type === 'expense' && 'expense_type' in item && item.expense_type === 'recorrente' ? (
-                  <span>Todo dia {item.recurrence_day}</span>
-                ) : (
-                  <span>{new Date(item.due_date).toLocaleDateString('pt-BR')}</span>
-                )}
-              </p>
+          {/* Valor e data de vencimento */}
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Calendar className="h-4 w-4" />
+              <span>
+                {item.type === 'expense' && 'expense_type' in item && item.expense_type === 'recorrente' && 'recurrence_day' in item && item.recurrence_day
+                  ? `Dia ${item.recurrence_day} de cada mês`
+                  : `Venc: ${new Date(item.due_date).toLocaleDateString('pt-BR')}`
+                }
+              </span>
+            </div>
+            <div className="flex items-center gap-2 font-semibold text-primary">
+              <DollarSign className="h-4 w-4" />
+              <span>R$ {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
             </div>
           </div>
 
-          {/* Data de Pagamento */}
+          {/* Data de pagamento se pago */}
           {item.paid_date && (
-            <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-950/20 rounded-lg">
-              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-              <span className="text-sm text-green-700 dark:text-green-300">
+            <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-950/30 rounded-md border border-green-200 dark:border-green-900">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <p className="text-xs text-green-700 dark:text-green-400 font-medium">
                 Pago em: {formatDate(item.paid_date)}
-              </span>
+              </p>
             </div>
           )}
 
-          {/* Informações Adicionais - Despesas */}
-          {item.type === 'expense' && (
-            <div className="pt-3 border-t space-y-2">
-              {/* Parcelas */}
-              {'expense_type' in item && item.expense_type === 'parcelada' && item.installment_total && (
-                <div className="flex items-center justify-between p-2 bg-muted/30 rounded-lg">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <CreditCard className="h-3.5 w-3.5" />
-                    <span>Parcela</span>
-                  </div>
-                  <span className="text-sm font-semibold">{item.installment_current}/{item.installment_total}</span>
-                </div>
-              )}
+          {/* Informações específicas de despesas parceladas */}
+          {item.type === 'expense' && 'expense_type' in item && item.expense_type === 'parcelada' && 'installment_total' in item && item.installment_total && 'installment_current' in item && item.installment_current && (
+            <div className="p-3 bg-muted/50 rounded-lg space-y-2 border">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Progresso</span>
+                <span className="font-medium">
+                  {item.installment_current}/{item.installment_total} parcelas pagas
+                </span>
+              </div>
+              <Progress 
+                value={(item.installment_current / item.installment_total) * 100} 
+                className="h-2"
+              />
+              <div className="flex items-center justify-between text-xs pt-1">
+                <span className="text-muted-foreground">Restante</span>
+                <span className="font-medium text-primary">
+                  R$ {(item.amount * (item.installment_total - item.installment_current)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+          )}
 
-              {/* Descrição */}
-              {'description' in item && item.description && (
-                <div className="space-y-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">Descrição:</span>
-                  <p className="text-xs bg-muted/40 rounded-lg p-2.5 leading-relaxed">{item.description}</p>
-                </div>
-              )}
+          {/* Informação de despesa recorrente */}
+          {item.type === 'expense' && 'expense_type' in item && item.expense_type === 'recorrente' && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Repeat className="h-3 w-3" />
+              <span>Despesa recorrente mensal</span>
             </div>
           )}
         </div>

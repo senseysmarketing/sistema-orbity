@@ -23,6 +23,8 @@ import { ClientCard } from "@/components/admin/ClientCard";
 import { ClientDetailsDialog } from "@/components/admin/ClientDetailsDialog";
 import { ChurnAnalysis } from "@/components/admin/ChurnAnalysis";
 import { ExpenseCard } from "@/components/admin/ExpenseCard";
+import { ExpenseMetricsCards } from "@/components/admin/ExpenseMetricsCards";
+import { ExpenseDetailsDialog } from "@/components/admin/ExpenseDetailsDialog";
 interface Client {
   id: string;
   name: string;
@@ -82,6 +84,7 @@ export default function Admin() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [salaries, setSalaries] = useState<Salary[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [previousMonthExpenses, setPreviousMonthExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
@@ -160,7 +163,14 @@ export default function Admin() {
   }, [hasAccess, currentAgency?.id, selectedMonth, clientSort, paymentSort, expenseSort]);
   const fetchData = async () => {
     try {
-      await Promise.all([fetchClients(), fetchPayments(), fetchExpenses(), fetchSalaries(), fetchExpenseCategories()]);
+      await Promise.all([
+        fetchClients(), 
+        fetchPayments(), 
+        fetchExpenses(), 
+        fetchSalaries(), 
+        fetchExpenseCategories(),
+        fetchPreviousMonthExpenses()
+      ]);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar dados",
@@ -271,6 +281,31 @@ export default function Admin() {
     
     if (error) throw error;
     setSalaries(data || []);
+  };
+
+  const fetchPreviousMonthExpenses = async () => {
+    if (!currentAgency) return;
+    
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    
+    const startDate = `${prevMonthStr}-01`;
+    const endDate = new Date(prevYear, prevMonth, 0).toISOString().split('T')[0];
+
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('agency_id', currentAgency.id)
+      .gte('due_date', startDate)
+      .lte('due_date', endDate);
+    
+    if (error) {
+      console.error('Error fetching previous month expenses:', error);
+      return;
+    }
+    setPreviousMonthExpenses(data || []);
   };
   const getClientName = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
@@ -2123,8 +2158,6 @@ export default function Admin() {
               <ExpenseCard
                 key={`${item.type}-${item.id}`}
                 item={item}
-                categoryIcon={item.type === 'expense' && item.category ? 
-                  expenseCategories.find(c => c.name === item.category)?.icon : undefined}
                 onView={item.type === 'expense' ? handleViewExpense : handleViewSalary}
                 onEdit={item.type === 'expense' ? handleEditExpense : handleEditSalary}
                 onDelete={item.type === 'expense' ? handleDeleteExpense : handleDeleteSalary}
@@ -2133,7 +2166,14 @@ export default function Admin() {
             ))}
           </div>
           
-          {/* Visualização em Tabela - Removida por enquanto, focando em cards */}
+          {/* Modal de Detalhes da Despesa */}
+          <ExpenseDetailsDialog
+            expense={selectedExpense}
+            open={expenseDetailsOpen}
+            onOpenChange={setExpenseDetailsOpen}
+            onEdit={handleEditExpense}
+            onDelete={handleDeleteExpense}
+          />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6 bg-[7dafd8] bg-white">
