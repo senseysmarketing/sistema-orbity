@@ -21,6 +21,7 @@ import { ExpenseForm } from "@/components/admin/ExpenseForm";
 import { SalaryForm } from "@/components/admin/SalaryForm";
 import { ClientCard } from "@/components/admin/ClientCard";
 import { ClientDetailsDialog } from "@/components/admin/ClientDetailsDialog";
+import { ChurnAnalysis } from "@/components/admin/ChurnAnalysis";
 interface Client {
   id: string;
   name: string;
@@ -34,6 +35,7 @@ interface Client {
   contract_start_date: string | null;
   contract_end_date: string | null;
   has_loyalty: boolean;
+  cancelled_at: string | null;
 }
 interface ClientPayment {
   id: string;
@@ -160,7 +162,7 @@ export default function Admin() {
     
     const { data, error } = await supabase
       .from('clients')
-      .select('id, name, monthly_value, active, start_date, contact, service, due_date, observations, contract_start_date, contract_end_date, has_loyalty')
+      .select('id, name, monthly_value, active, start_date, contact, service, due_date, observations, contract_start_date, contract_end_date, has_loyalty, cancelled_at')
       .eq('agency_id', currentAgency.id)
       .order(clientSort);
     
@@ -304,6 +306,52 @@ export default function Admin() {
     setSelectedClient(client);
     setClientDetailsOpen(true);
   };
+  const handleDeactivateClient = async (client: Client) => {
+    try {
+      const {
+        error
+      } = await supabase.from('clients').update({ 
+        active: false, 
+        cancelled_at: new Date().toISOString() 
+      }).eq('id', client.id);
+      if (error) throw error;
+      toast({
+        title: "Cliente desativado",
+        description: `Cliente ${client.name} foi desativado com sucesso!`
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleReactivateClient = async (client: Client) => {
+    try {
+      const {
+        error
+      } = await supabase.from('clients').update({ 
+        active: true, 
+        cancelled_at: null 
+      }).eq('id', client.id);
+      if (error) throw error;
+      toast({
+        title: "Cliente reativado",
+        description: `Cliente ${client.name} foi reativado com sucesso!`
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleDeleteClient = (client: Client) => {
     setClientToDelete(client);
     setDeleteDialogOpen(true);
@@ -1467,7 +1515,9 @@ export default function Admin() {
             payments={payments}
             onEdit={handleEditClient}
             onGenerateContract={(client) => navigate('/contracts')}
-            onDeactivate={handleDeleteClient}
+            onDeactivate={handleDeactivateClient}
+            onReactivate={handleReactivateClient}
+            onDelete={handleDeleteClient}
             onMarkPaymentAsPaid={(paymentId) => handleUpdatePaymentStatus(paymentId, 'paid')}
           />
         </TabsContent>
@@ -2318,6 +2368,9 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6 bg-[7dafd8] bg-white">
+          {/* Análise de Churn */}
+          <ChurnAnalysis clients={clients} selectedMonth={selectedMonth} />
+          
           {/* Métricas Detalhadas */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card>

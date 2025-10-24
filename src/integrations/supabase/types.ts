@@ -674,6 +674,7 @@ export type Database = {
         Row: {
           active: boolean
           agency_id: string | null
+          cancelled_at: string | null
           contact: string | null
           contract_end_date: string | null
           contract_start_date: string | null
@@ -691,6 +692,7 @@ export type Database = {
         Insert: {
           active?: boolean
           agency_id?: string | null
+          cancelled_at?: string | null
           contact?: string | null
           contract_end_date?: string | null
           contract_start_date?: string | null
@@ -708,6 +710,7 @@ export type Database = {
         Update: {
           active?: boolean
           agency_id?: string | null
+          cancelled_at?: string | null
           contact?: string | null
           contract_end_date?: string | null
           contract_start_date?: string | null

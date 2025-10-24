@@ -42,6 +42,7 @@ interface ClientDetailsDialogProps {
   onEdit: (client: Client) => void;
   onGenerateContract: (client: Client) => void;
   onDeactivate: (client: Client) => void;
+  onReactivate: (client: Client) => void;
   onDelete?: (client: Client) => void;
   onMarkPaymentAsPaid: (paymentId: string) => void;
 }
@@ -54,10 +55,12 @@ export function ClientDetailsDialog({
   onEdit,
   onGenerateContract,
   onDeactivate,
+  onReactivate,
   onDelete,
   onMarkPaymentAsPaid,
 }: ClientDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [showDeactivateAlert, setShowDeactivateAlert] = useState(false);
   
   if (!client) return null;
 
@@ -250,22 +253,67 @@ export function ClientDetailsDialog({
               <FileText className="h-4 w-4 mr-2" />
               Gerar Contrato
             </Button>
-            <Button 
-              variant="destructive" 
-              size="sm" 
-              onClick={() => {
-                onDeactivate(client);
-                onOpenChange(false);
-              }}
-            >
-              <UserX className="h-4 w-4 mr-2" />
-              Desativar
-            </Button>
+            {client.active ? (
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                onClick={() => setShowDeactivateAlert(true)}
+              >
+                <UserX className="h-4 w-4 mr-2" />
+                Desativar
+              </Button>
+            ) : (
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={() => {
+                  onReactivate(client);
+                  onOpenChange(false);
+                }}
+              >
+                <UserX className="h-4 w-4 mr-2" />
+                Reativar
+              </Button>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
 
+    {/* Alert Dialog para Desativação */}
+    <AlertDialog open={showDeactivateAlert} onOpenChange={setShowDeactivateAlert}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Desativar Cliente</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja desativar o cliente <strong>{client.name}</strong>? 
+            <br /><br />
+            O cliente será marcado como inativo e:
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>Não aparecerá mais nas seleções de cliente</li>
+              <li>Será contabilizado como cancelamento (churn)</li>
+              <li>A data de cancelamento será registrada</li>
+              <li>Você poderá reativá-lo posteriormente se necessário</li>
+            </ul>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              onDeactivate(client);
+              onOpenChange(false);
+              setShowDeactivateAlert(false);
+            }}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            Desativar Cliente
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    {/* Alert Dialog para Exclusão */}
     <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
       <AlertDialogContent>
         <AlertDialogHeader>
