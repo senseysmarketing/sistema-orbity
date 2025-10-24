@@ -69,11 +69,19 @@ interface Salary {
   paid_date: string | null;
   status: 'pending' | 'paid' | 'overdue';
 }
+
+interface ExpenseCategory {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
 export default function Admin() {
   const [clients, setClients] = useState<Client[]>([]);
   const [payments, setPayments] = useState<ClientPayment[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [salaries, setSalaries] = useState<Salary[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
@@ -115,7 +123,11 @@ export default function Admin() {
   const [salaryDeleteDialogOpen, setSalaryDeleteDialogOpen] = useState(false);
   const [salaryToDelete, setSalaryToDelete] = useState<Salary | null>(null);
 
-  // Filtros e busca
+  // Filtros e busca - Despesas
+  const [expenseSearchTerm, setExpenseSearchTerm] = useState("");
+  const [expenseStatusFilter, setExpenseStatusFilter] = useState<string>("all");
+  const [expenseTypeFilter, setExpenseTypeFilter] = useState<string>("all");
+  const [expenseCategoryFilter, setExpenseCategoryFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
@@ -148,7 +160,7 @@ export default function Admin() {
   }, [hasAccess, currentAgency?.id, selectedMonth, clientSort, paymentSort, expenseSort]);
   const fetchData = async () => {
     try {
-      await Promise.all([fetchClients(), fetchPayments(), fetchExpenses(), fetchSalaries()]);
+      await Promise.all([fetchClients(), fetchPayments(), fetchExpenses(), fetchSalaries(), fetchExpenseCategories()]);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar dados",
@@ -158,6 +170,22 @@ export default function Admin() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchExpenseCategories = async () => {
+    if (!currentAgency) return;
+    
+    const { data, error } = await supabase
+      .from('expense_categories')
+      .select('*')
+      .eq('agency_id', currentAgency.id)
+      .order('name');
+    
+    if (error) {
+      console.error('Erro ao buscar categorias:', error);
+      return;
+    }
+    setExpenseCategories(data || []);
   };
   const fetchClients = async () => {
     if (!currentAgency) return;
@@ -646,15 +674,28 @@ export default function Admin() {
     
     return combined.filter(item => {
       const itemName = item.type === 'salary' ? item.employee_name || '' : item.name;
-      const matchesSearch = itemName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
-      const matchesType = paymentTypeFilter === 'all' || 
-        (paymentTypeFilter === 'fixed' && item.is_fixed) || 
-        (paymentTypeFilter === 'variable' && !item.is_fixed) ||
-        (paymentTypeFilter === 'salary' && item.type === 'salary');
-      return matchesSearch && matchesStatus && matchesType;
+      const matchesSearch = itemName.toLowerCase().includes(expenseSearchTerm.toLowerCase());
+      const matchesStatus = expenseStatusFilter === 'all' || item.status === expenseStatusFilter;
+      
+      // Filtro de tipo de despesa
+      let matchesType = true;
+      if (expenseTypeFilter !== 'all') {
+        if (expenseTypeFilter === 'salary') {
+          matchesType = item.type === 'salary';
+        } else if (item.type === 'expense' && 'expense_type' in item) {
+          matchesType = item.expense_type === expenseTypeFilter;
+        } else {
+          matchesType = false;
+        }
+      }
+      
+      // Filtro de categoria
+      const matchesCategory = expenseCategoryFilter === 'all' || 
+        (item.type === 'expense' && 'category' in item && item.category === expenseCategoryFilter);
+      
+      return matchesSearch && matchesStatus && matchesType && matchesCategory;
     }).sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime());
-  }, [expenses, salaries, searchTerm, statusFilter, paymentTypeFilter]);
+  }, [expenses, salaries, expenseSearchTerm, expenseStatusFilter, expenseTypeFilter, expenseCategoryFilter]);
 
   // Análises e métricas avançadas
   const analytics = useMemo(() => {
@@ -1995,27 +2036,28 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="expenses" className="space-y-6">
-          {/* Header com Filtros e Botões */}
+          {/* Header com Título, Filtros e Botões */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <h2 className="text-2xl font-bold">
               Despesas e Salários ({combinedExpensesAndSalaries.length})
             </h2>
             
             <div className="flex flex-wrap gap-2 items-center w-full lg:w-auto">
+              {/* Filtros */}
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 
                 <div className="relative w-[180px]">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input 
-                    placeholder="Buscar despesa..." 
-                    value={searchTerm} 
-                    onChange={(e) => setSearchTerm(e.target.value)} 
+                    placeholder="Buscar..." 
+                    value={expenseSearchTerm} 
+                    onChange={(e) => setExpenseSearchTerm(e.target.value)} 
                     className="pl-8" 
                   />
                 </div>
 
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select value={expenseStatusFilter} onValueChange={setExpenseStatusFilter}>
                   <SelectTrigger className="w-[130px]">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -2027,18 +2069,35 @@ export default function Admin() {
                   </SelectContent>
                 </Select>
 
-                <Select value={paymentTypeFilter} onValueChange={setPaymentTypeFilter}>
-                  <SelectTrigger className="w-[130px]">
+                <Select value={expenseTypeFilter} onValueChange={setExpenseTypeFilter}>
+                  <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="Tipo" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos Tipos</SelectItem>
-                    <SelectItem value="fixed">Fixas</SelectItem>
                     <SelectItem value="salary">Salários</SelectItem>
+                    <SelectItem value="avulsa">Avulsas</SelectItem>
+                    <SelectItem value="recorrente">Recorrentes</SelectItem>
+                    <SelectItem value="parcelada">Parceladas</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={expenseCategoryFilter} onValueChange={setExpenseCategoryFilter}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas Categorias</SelectItem>
+                    {expenseCategories.map((category) => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.icon} {category.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
+              {/* Botões de Ação */}
               <Button
                 variant="outline"
                 onClick={() => setSalaryFormOpen(true)}
@@ -2064,6 +2123,8 @@ export default function Admin() {
               <ExpenseCard
                 key={`${item.type}-${item.id}`}
                 item={item}
+                categoryIcon={item.type === 'expense' && item.category ? 
+                  expenseCategories.find(c => c.name === item.category)?.icon : undefined}
                 onView={item.type === 'expense' ? handleViewExpense : handleViewSalary}
                 onEdit={item.type === 'expense' ? handleEditExpense : handleEditSalary}
                 onDelete={item.type === 'expense' ? handleDeleteExpense : handleDeleteSalary}
