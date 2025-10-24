@@ -1,4 +1,5 @@
 import { DollarSign, Calendar, TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from "recharts";
 import { format, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -40,35 +41,47 @@ export function ExpenseProjection({
       <div className="space-y-6">
         {/* Cards de Resumo */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="h-4 w-4 text-blue-600" />
-              <span className="text-sm text-muted-foreground">Total Projetado (12 meses)</span>
-            </div>
-            <p className="text-2xl font-bold text-blue-600">
-              R$ {totalProjected.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-          </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-blue-600" />
+                Total Projetado (12 meses)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-blue-600">
+                R$ {totalProjected.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </CardContent>
+          </Card>
           
-          <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-            <div className="flex items-center gap-2 mb-2">
-              <Calendar className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-muted-foreground">Média Mensal</span>
-            </div>
-            <p className="text-2xl font-bold text-green-600">
-              R$ {amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-          </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-green-600" />
+                Média Mensal
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-green-600">
+                R$ {amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </CardContent>
+          </Card>
 
-          <div className="p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-4 w-4 text-purple-600" />
-              <span className="text-sm text-muted-foreground">Restante (ano)</span>
-            </div>
-            <p className="text-2xl font-bold text-purple-600">
-              R$ {(amount * monthsRemaining).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-          </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-purple-600" />
+                Restante (ano)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-purple-600">
+                R$ {(amount * monthsRemaining).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Gráfico de Projeção */}
@@ -149,44 +162,56 @@ export function ExpenseProjection({
       <div className="space-y-6">
         {/* Cards de Resumo */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-muted-foreground">Já Pago</span>
-            </div>
-            <p className="text-2xl font-bold text-green-600">
-              R$ {totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {installmentCurrent}/{installmentTotal} parcelas
-            </p>
-          </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                Já Pago
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-green-600">
+                R$ {totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {installmentCurrent}/{installmentTotal} parcelas
+              </p>
+            </CardContent>
+          </Card>
           
-          <div className="p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="h-4 w-4 text-orange-600" />
-              <span className="text-sm text-muted-foreground">Ainda a Pagar</span>
-            </div>
-            <p className="text-2xl font-bold text-orange-600">
-              R$ {totalRemaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {remainingInstallments} parcelas restantes
-            </p>
-          </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-orange-600" />
+                Ainda a Pagar
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-orange-600">
+                R$ {totalRemaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {remainingInstallments} parcelas restantes
+              </p>
+            </CardContent>
+          </Card>
 
-          <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="h-4 w-4 text-blue-600" />
-              <span className="text-sm text-muted-foreground">Valor Total</span>
-            </div>
-            <p className="text-2xl font-bold text-blue-600">
-              R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {installmentTotal}x de R$ {amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-          </div>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-blue-600" />
+                Valor Total
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-blue-600">
+                R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {installmentTotal}x de R$ {amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Gráficos */}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, CheckCircle, Clock, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
 import { format } from "date-fns";
@@ -105,34 +106,53 @@ export function ExpensePaymentHistory({ payments }: ExpensePaymentHistoryProps) 
     <div className="space-y-6">
       {/* Estatísticas Rápidas */}
       <div className="grid grid-cols-4 gap-4">
-        <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-          <div className="flex items-center gap-2 mb-1">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <span className="text-sm text-muted-foreground">Pagos</span>
-          </div>
-          <p className="text-2xl font-bold text-green-600">{totalPaid}</p>
-        </div>
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-900">
-          <div className="flex items-center gap-2 mb-1">
-            <Clock className="h-4 w-4 text-yellow-600" />
-            <span className="text-sm text-muted-foreground">Pendentes</span>
-          </div>
-          <p className="text-2xl font-bold text-yellow-600">{totalPending}</p>
-        </div>
-        <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900">
-          <div className="flex items-center gap-2 mb-1">
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-            <span className="text-sm text-muted-foreground">Atrasados</span>
-          </div>
-          <p className="text-2xl font-bold text-red-600">{totalOverdue}</p>
-        </div>
-        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-          <div className="flex items-center gap-2 mb-1">
-            <Calendar className="h-4 w-4 text-blue-600" />
-            <span className="text-sm text-muted-foreground">Pontualidade</span>
-          </div>
-          <p className="text-2xl font-bold text-blue-600">{onTimeRate.toFixed(0)}%</p>
-        </div>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              Pagos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-green-600">{totalPaid}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Clock className="h-4 w-4 text-yellow-600" />
+              Pendentes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-yellow-600">{totalPending}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              Atrasados
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-red-600">{totalOverdue}</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-blue-600" />
+              Pontualidade
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-blue-600">{onTimeRate.toFixed(0)}%</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filtros */}

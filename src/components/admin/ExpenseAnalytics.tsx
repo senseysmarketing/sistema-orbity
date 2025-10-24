@@ -1,4 +1,6 @@
-import { CheckCircle, AlertTriangle, TrendingUp, Calendar, DollarSign, Clock } from "lucide-react";
+import { CheckCircle, AlertTriangle, TrendingUp, Calendar, DollarSign, Clock, Target } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LineChart, Line } from "recharts";
 import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -83,46 +85,88 @@ export function ExpenseAnalytics({ payments, expenseType }: ExpenseAnalyticsProp
   return (
     <div className="space-y-6">
       {/* Cards de Estatísticas */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar className="h-4 w-4 text-blue-600" />
-            <span className="text-sm text-muted-foreground">Total de Pagamentos</span>
-          </div>
-          <p className="text-3xl font-bold text-blue-600">{totalPayments}</p>
-        </div>
+      <div className="grid grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-blue-600" />
+              Total de Pagamentos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-blue-600">
+              R$ {payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {totalPayments} pagamentos registrados
+            </p>
+          </CardContent>
+        </Card>
 
-        <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <span className="text-sm text-muted-foreground">Pagos em Dia</span>
-          </div>
-          <p className="text-3xl font-bold text-green-600">{paidOnTime.length}</p>
-          <p className="text-xs text-muted-foreground mt-1">{onTimeRate.toFixed(1)}% do total</p>
-        </div>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Target className="h-4 w-4 text-green-600" />
+              Taxa de Pontualidade
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-2">
+              <p className="text-2xl font-bold text-green-600">
+                {onTimeRate.toFixed(0)}%
+              </p>
+              <Badge 
+                variant="outline"
+                className={
+                  onTimeRate >= 90
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                    : onTimeRate >= 70
+                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                }
+              >
+                {onTimeRate >= 90 ? 'Excelente' : onTimeRate >= 70 ? 'Bom' : 'Atenção'}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {paidOnTime.length} de {paidPayments.length} pagamentos em dia
+            </p>
+          </CardContent>
+        </Card>
 
-        <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-            <span className="text-sm text-muted-foreground">Pagos com Atraso</span>
-          </div>
-          <p className="text-3xl font-bold text-red-600">
-            {paidPayments.length - paidOnTime.length}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Média: {avgDaysLate.toFixed(0)} dias de atraso
-          </p>
-        </div>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+              Atrasos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-red-600">
+              {paidPayments.length - paidOnTime.length}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {avgDaysLate > 0 ? `Média de ${avgDaysLate.toFixed(0)} dias de atraso` : 'Nenhum atraso'}
+            </p>
+          </CardContent>
+        </Card>
 
-        <div className="p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="h-4 w-4 text-purple-600" />
-            <span className="text-sm text-muted-foreground">Valor Médio</span>
-          </div>
-          <p className="text-2xl font-bold text-purple-600">
-            R$ {avgAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </p>
-        </div>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-purple-600" />
+              Valor Médio
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-purple-600">
+              R$ {avgAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Por pagamento
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Gráfico de Evolução Mensal */}
