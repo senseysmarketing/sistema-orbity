@@ -119,18 +119,32 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-sidebar-foreground/70">Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {filteredMenuItems.map(item => <SidebarMenuItem key={item.title}>
+              {filteredMenuItems.map(item => {
+                const getTourAttr = (url: string) => {
+                  if (url === '/') return 'dashboard';
+                  if (url === '/crm') return 'crm';
+                  if (url === '/tasks') return 'tasks';
+                  if (url === '/agenda') return 'agenda';
+                  if (url === '/social-media') return 'social-media';
+                  if (url === '/traffic') return 'traffic';
+                  if (url === '/admin') return 'admin';
+                  return undefined;
+                };
+                
+                return <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end={item.url === "/"} className={({
-                  isActive
-                }) => getNavCls({
-                  isActive
-                })}>
+                    <NavLink 
+                      to={item.url} 
+                      end={item.url === "/"} 
+                      className={({isActive}) => getNavCls({isActive})}
+                      data-tour={getTourAttr(item.url)}
+                    >
                       <item.icon className="h-4 w-4" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
-                </SidebarMenuItem>)}
+                </SidebarMenuItem>
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

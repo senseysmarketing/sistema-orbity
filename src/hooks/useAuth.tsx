@@ -11,6 +11,9 @@ interface Profile {
   email: string;
   role: 'super_admin' | 'agency_admin' | 'agency_user';
   avatar_url?: string;
+  onboarding_completed?: boolean;
+  tour_completed?: boolean;
+  welcome_seen?: boolean;
 }
 
 interface AuthContextType {
@@ -124,6 +127,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             if (profileData) {
               setProfile(profileData as Profile);
+              
+              // Redirect to welcome page if first time login
+              if (!profileData.welcome_seen && window.location.pathname !== '/welcome' && window.location.pathname !== '/onboarding') {
+                window.location.href = '/welcome';
+              }
             }
           }, 0);
         } else {
@@ -148,6 +156,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .then(({ data: profileData }) => {
             if (profileData) {
               setProfile(profileData as Profile);
+              
+              // Redirect to welcome page if first time login
+              if (!profileData.welcome_seen && window.location.pathname !== '/welcome' && window.location.pathname !== '/onboarding') {
+                window.location.href = '/welcome';
+              }
             }
             setLoading(false);
           });

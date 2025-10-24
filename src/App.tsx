@@ -14,6 +14,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Welcome from "./pages/Welcome";
 import Tasks from "./pages/Tasks";
 import Reminders from "./pages/Reminders";
 import CRM from "./pages/CRM";
@@ -49,6 +50,7 @@ const App = () => (
                     <Routes>
                       <Route path="/auth" element={<Auth />} />
                       <Route path="/onboarding" element={<Onboarding />} />
+                      <Route path="/welcome" element={<Welcome />} />
                       <Route path="/" element={
                         <PaymentMiddlewareWrapper>
                           <AppLayout />

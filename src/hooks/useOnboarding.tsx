@@ -106,6 +106,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
+      // User will be redirected to /welcome via useAuth effect
       return true;
     } catch (error: any) {
       console.error('Onboarding error:', error);

@@ -1694,9 +1694,12 @@ export type Database = {
           email: string
           id: string
           name: string
+          onboarding_completed: boolean | null
           role: Database["public"]["Enums"]["user_role"]
+          tour_completed: boolean | null
           updated_at: string
           user_id: string
+          welcome_seen: boolean | null
         }
         Insert: {
           avatar_url?: string | null
@@ -1704,9 +1707,12 @@ export type Database = {
           email: string
           id?: string
           name: string
+          onboarding_completed?: boolean | null
           role: Database["public"]["Enums"]["user_role"]
+          tour_completed?: boolean | null
           updated_at?: string
           user_id: string
+          welcome_seen?: boolean | null
         }
         Update: {
           avatar_url?: string | null
@@ -1714,9 +1720,12 @@ export type Database = {
           email?: string
           id?: string
           name?: string
+          onboarding_completed?: boolean | null
           role?: Database["public"]["Enums"]["user_role"]
+          tour_completed?: boolean | null
           updated_at?: string
           user_id?: string
+          welcome_seen?: boolean | null
         }
         Relationships: []
       }
@@ -2869,6 +2878,51 @@ export type Database = {
           },
           {
             foreignKeyName: "usage_metrics_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      user_achievements: {
+        Row: {
+          achievement_type: string
+          agency_id: string
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          achievement_type: string
+          agency_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          achievement_type?: string
+          agency_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_achievements_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
