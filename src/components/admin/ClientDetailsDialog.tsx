@@ -1,8 +1,10 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, FileText, UserX, Info, History, TrendingUp, BarChart3 } from "lucide-react";
+import { Edit, FileText, UserX, Info, History, TrendingUp, BarChart3, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useState } from "react";
 import { ClientHealthIndicator } from "./ClientHealthIndicator";
 import { ClientPaymentHistory } from "./ClientPaymentHistory";
 import { ClientRevenueProjection } from "./ClientRevenueProjection";
@@ -40,6 +42,7 @@ interface ClientDetailsDialogProps {
   onEdit: (client: Client) => void;
   onGenerateContract: (client: Client) => void;
   onDeactivate: (client: Client) => void;
+  onDelete?: (client: Client) => void;
   onMarkPaymentAsPaid: (paymentId: string) => void;
 }
 
@@ -51,8 +54,11 @@ export function ClientDetailsDialog({
   onEdit,
   onGenerateContract,
   onDeactivate,
+  onDelete,
   onMarkPaymentAsPaid,
 }: ClientDetailsDialogProps) {
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  
   if (!client) return null;
 
   const clientPayments = payments.filter(p => p.client_id === client.id);
@@ -81,39 +87,17 @@ export function ClientDetailsDialog({
     : 1;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
               <span>{client.name}</span>
               <Badge variant={client.active ? "default" : "destructive"}>
                 {client.active ? "Ativo" : "Inativo"}
               </Badge>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => onEdit(client)}>
-                <Edit className="h-4 w-4 mr-2" />
-                Editar
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => onGenerateContract(client)}>
-                <FileText className="h-4 w-4 mr-2" />
-                Gerar Contrato
-              </Button>
-              <Button 
-                variant="destructive" 
-                size="sm" 
-                onClick={() => {
-                  onDeactivate(client);
-                  onOpenChange(false);
-                }}
-              >
-                <UserX className="h-4 w-4 mr-2" />
-                Desativar
-              </Button>
-            </div>
-          </DialogTitle>
-        </DialogHeader>
+            </DialogTitle>
+          </DialogHeader>
 
         <Tabs defaultValue="info" className="mt-4">
           <TabsList className="grid w-full grid-cols-4">
@@ -243,7 +227,71 @@ export function ClientDetailsDialog({
             />
           </TabsContent>
         </Tabs>
+
+        <DialogFooter className="flex items-center justify-between gap-2">
+          <div>
+            {onDelete && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowDeleteAlert(true)}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => onEdit(client)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Editar
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onGenerateContract(client)}>
+              <FileText className="h-4 w-4 mr-2" />
+              Gerar Contrato
+            </Button>
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={() => {
+                onDeactivate(client);
+                onOpenChange(false);
+              }}
+            >
+              <UserX className="h-4 w-4 mr-2" />
+              Desativar
+            </Button>
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Excluir Cliente</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja excluir o cliente <strong>{client.name}</strong>? 
+            Esta ação não pode ser desfeita e todos os dados relacionados ao cliente serão removidos permanentemente.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              if (onDelete) {
+                onDelete(client);
+                onOpenChange(false);
+              }
+              setShowDeleteAlert(false);
+            }}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            Excluir
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
