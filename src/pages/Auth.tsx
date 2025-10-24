@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Building2, Sparkles } from "lucide-react";
 import orbityLogo from "@/assets/orbity-logo.png";
-import orbityWallpaper from "@/assets/orbity-wallpaper.png";
+import authBackground from "@/assets/auth-background-new.png";
 export default function Auth() {
   const { user, loading, signIn } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +35,7 @@ export default function Auth() {
     <div
       className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center bg-no-repeat relative"
       style={{
-        backgroundImage: `url(${orbityWallpaper})`,
+        backgroundImage: `url(${authBackground})`,
       }}
     >
       {/* Overlay para melhor legibilidade */}
