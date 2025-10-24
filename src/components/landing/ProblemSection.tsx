@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Flame, BarChart3, Clock, DollarSign, Users2 } from "lucide-react";
+import { Flame, BarChart3, Clock, DollarSign, Users2, AlertCircle } from "lucide-react";
 
 const problems = [
   {
@@ -26,6 +26,11 @@ const problems = [
     icon: Users2,
     title: "Equipe desorganizada e improdutiva",
     description: "Colaboração ineficiente reduz a produtividade do time"
+  },
+  {
+    icon: AlertCircle,
+    title: "Falta de visibilidade em tempo real",
+    description: "Sem dashboards centralizados é impossível tomar decisões rápidas"
   }
 ];
 
