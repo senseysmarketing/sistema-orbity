@@ -193,7 +193,7 @@ export function ExpenseCard({
                     </Badge>
                   )}
                   {urgencyLevel === 'urgent' && (
-                    <Badge className="bg-orange-500 text-white hover:bg-orange-600 animate-pulse">
+                    <Badge className="bg-orange-500 text-white hover:bg-orange-600">
                       ⚠️ Vence em breve
                     </Badge>
                   )}
