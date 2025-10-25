@@ -131,12 +131,20 @@ export default function CRM() {
     const conversionRate = total > 0 ? Math.round((wonLeads / total) * 100) : 0;
     const averageValue = total > 0 ? totalValue / total : 0;
     
-    // Leads with follow-up needed (next_contact is today or past)
-    const today = new Date().toISOString().split('T')[0];
-    const followUpNeeded = filteredLeads.filter(lead => 
-      lead.next_contact && lead.next_contact <= today && 
-      !['won', 'lost'].includes(lead.status)
-    ).length;
+    // Leads with follow-up needed (next_contact is today or past) - usando todos os leads, não filtrados
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Zera as horas para comparação apenas de data
+    
+    const followUpNeeded = leads.filter(lead => {
+      if (!lead.next_contact || ['won', 'lost'].includes(lead.status)) {
+        return false;
+      }
+      
+      const nextContactDate = new Date(lead.next_contact);
+      nextContactDate.setHours(0, 0, 0, 0);
+      
+      return nextContactDate <= today;
+    }).length;
 
     // Build status stats from actual statuses in use
     const statusStats: { [key: string]: number } = {};
@@ -171,7 +179,7 @@ export default function CRM() {
       priorityStats,
       sourceStats
     };
-  }, [filteredLeads, mapDatabaseStatusToDisplay]);
+  }, [filteredLeads, leads, mapDatabaseStatusToDisplay]);
 
   const handleLeadSave = async (savedLead: Lead) => {
     // Update local cache optimistically
