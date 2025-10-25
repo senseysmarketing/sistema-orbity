@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { 
   Mail, Phone, Building, Calendar, DollarSign, Target, Clock, 
-  Edit, Tag, User, Globe, MessageSquare, TrendingUp
+  Edit, Tag, User, Globe, MessageSquare, TrendingUp, History
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Lead {
   id: string;
@@ -32,6 +34,16 @@ interface Lead {
   updated_at: string;
 }
 
+interface LeadHistoryItem {
+  id: string;
+  action_type: string;
+  description: string;
+  created_at: string;
+  profiles: {
+    name: string;
+  } | null;
+}
+
 interface LeadDetailsDialogProps {
   lead: Lead | null;
   open: boolean;
@@ -40,6 +52,51 @@ interface LeadDetailsDialogProps {
 }
 
 export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDetailsDialogProps) {
+  const [history, setHistory] = useState<LeadHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    if (lead && open) {
+      fetchHistory();
+    }
+  }, [lead, open]);
+
+  const fetchHistory = async () => {
+    if (!lead) return;
+    
+    setLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from('lead_history')
+        .select('*')
+        .eq('lead_id', lead.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      // Fetch user names separately
+      const historyWithUsers = await Promise.all(
+        (data || []).map(async (item) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('user_id', item.user_id)
+            .single();
+          
+          return {
+            ...item,
+            profiles: profile
+          };
+        })
+      );
+      
+      setHistory(historyWithUsers as LeadHistoryItem[]);
+    } catch (error) {
+      console.error('Error fetching lead history:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
   if (!lead) return null;
 
   const formatCurrency = (value: number) => {
@@ -129,10 +186,11 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
         </DialogHeader>
 
         <Tabs defaultValue="overview" className="mt-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Visão Geral</TabsTrigger>
             <TabsTrigger value="details">Detalhes</TabsTrigger>
             <TabsTrigger value="notes">Notas</TabsTrigger>
+            <TabsTrigger value="history">Histórico</TabsTrigger>
           </TabsList>
 
           <div className="mt-4 overflow-y-auto max-h-[calc(90vh-280px)]">
@@ -341,6 +399,38 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{lead.notes}</p>
                   ) : (
                     <p className="text-sm text-muted-foreground italic">Nenhuma nota adicionada</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="history" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <History className="h-4 w-4" />
+                    Histórico de Movimentações
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingHistory ? (
+                    <p className="text-sm text-muted-foreground">Carregando histórico...</p>
+                  ) : history.length === 0 ? (
+                    <p className="text-sm text-muted-foreground italic">Nenhuma movimentação registrada</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {history.map((item) => (
+                        <div key={item.id} className="flex gap-3 pb-4 border-b last:border-0 last:pb-0">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{item.description}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {format(new Date(item.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })} 
+                              {item.profiles && ` • por ${item.profiles.name}`}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </CardContent>
               </Card>

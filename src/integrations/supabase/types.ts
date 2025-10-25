@@ -1307,6 +1307,53 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_history: {
+        Row: {
+          action_type: string
+          agency_id: string
+          created_at: string
+          description: string | null
+          field_name: string | null
+          id: string
+          lead_id: string
+          new_value: string | null
+          old_value: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          agency_id: string
+          created_at?: string
+          description?: string | null
+          field_name?: string | null
+          id?: string
+          lead_id: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          agency_id?: string
+          created_at?: string
+          description?: string | null
+          field_name?: string | null
+          id?: string
+          lead_id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_statuses: {
         Row: {
           agency_id: string
