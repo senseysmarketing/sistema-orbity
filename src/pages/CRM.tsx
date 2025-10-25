@@ -199,8 +199,19 @@ export default function CRM() {
     };
   }, [filteredLeads]);
 
-  const handleLeadSave = async () => {
-    await fetchLeads();
+  const handleLeadSave = async (savedLead: Lead) => {
+    // Update local cache optimistically
+    setLeads(prev => {
+      const exists = prev.find(l => l.id === savedLead.id);
+      if (exists) {
+        // Update existing lead
+        return prev.map(l => l.id === savedLead.id ? savedLead : l);
+      } else {
+        // Add new lead
+        return [savedLead, ...prev];
+      }
+    });
+    
     setShowLeadForm(false);
     setSelectedLead(null);
   };

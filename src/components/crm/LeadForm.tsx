@@ -34,7 +34,7 @@ interface Lead {
 
 interface LeadFormProps {
   lead?: Lead | null;
-  onSave: () => void;
+  onSave: (savedLead: Lead) => void;
   onCancel: () => void;
 }
 
@@ -131,22 +131,34 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
           .eq('id', lead.id);
 
         if (error) throw error;
+        
         toast.success('Lead atualizado com sucesso');
+        
+        // Return updated lead data
+        onSave({
+          ...lead,
+          ...leadData,
+          id: lead.id,
+        } as Lead);
       } else {
         // Create new lead
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('leads')
           .insert({
             ...leadData,
             created_by: profile.user_id,
-            follow_up_notification_sent_at: null, // Garantir que notificação será enviada
-          });
+            follow_up_notification_sent_at: null,
+          })
+          .select()
+          .single();
 
         if (error) throw error;
+        
         toast.success('Lead criado com sucesso');
+        
+        // Return newly created lead
+        onSave(data as Lead);
       }
-
-      onSave();
     } catch (error) {
       console.error('Error saving lead:', error);
       toast.error('Erro ao salvar lead');
