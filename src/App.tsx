@@ -50,33 +50,33 @@ const App = () => (
                     v7_relativeSplatPath: true 
                   }}>
                     <PaymentMiddlewareProvider>
-                    <Routes>
-                      <Route path="/lp" element={<LandingPage />} />
-                      <Route path="/auth" element={<Auth />} />
-                      <Route path="/onboarding" element={<Onboarding />} />
-                      <Route path="/welcome" element={<Welcome />} />
-                      <Route path="/" element={
-                        <PaymentMiddlewareWrapper>
-                          <AppLayout />
-                        </PaymentMiddlewareWrapper>
-                      }>
-                        <Route index element={<Index />} />
-                        <Route path="tasks" element={<Tasks />} />
-                        <Route path="reminders" element={<Reminders />} />
-                        <Route path="crm" element={<CRM />} />
-                        <Route path="agenda" element={<Agenda />} />
-                        <Route path="traffic" element={<Traffic />} />
-                        <Route path="admin" element={<Admin />} />
-                        <Route path="contracts" element={<Contracts />} />
-                        <Route path="social-media" element={<SocialMedia />} />
-                        <Route path="reports" element={<Reports />} />
-                        <Route path="settings" element={<Settings />} />
-                        <Route path="master" element={<Master />} />
-                      </Route>
-                      <Route path="/subscription-success" element={<SubscriptionSuccess />} />
-                      <Route path="/subscription-canceled" element={<SubscriptionCanceled />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
+                      <Routes>
+                        <Route path="/lp" element={<LandingPage />} />
+                        <Route path="/auth" element={<Auth />} />
+                        <Route path="/onboarding" element={<Onboarding />} />
+                        <Route path="/welcome" element={<Welcome />} />
+                        <Route path="/subscription-success" element={<SubscriptionSuccess />} />
+                        <Route path="/subscription-canceled" element={<SubscriptionCanceled />} />
+                        <Route path="/" element={
+                          <PaymentMiddlewareWrapper>
+                            <AppLayout />
+                          </PaymentMiddlewareWrapper>
+                        }>
+                          <Route index element={<Index />} />
+                          <Route path="tasks" element={<Tasks />} />
+                          <Route path="reminders" element={<Reminders />} />
+                          <Route path="crm" element={<CRM />} />
+                          <Route path="agenda" element={<Agenda />} />
+                          <Route path="traffic" element={<Traffic />} />
+                          <Route path="admin" element={<Admin />} />
+                          <Route path="contracts" element={<Contracts />} />
+                          <Route path="social-media" element={<SocialMedia />} />
+                          <Route path="reports" element={<Reports />} />
+                          <Route path="settings" element={<Settings />} />
+                          <Route path="master" element={<Master />} />
+                        </Route>
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
                     </PaymentMiddlewareProvider>
                   </BrowserRouter>
                 </TooltipProvider>
