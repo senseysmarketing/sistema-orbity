@@ -140,6 +140,9 @@ export default function CRM() {
 
   // Análises e métricas
   const analytics = useMemo(() => {
+    const { mapDatabaseStatusToDisplay, getStatusConfig } = useLeadStatuses();
+    const statusConfig = getStatusConfig();
+    
     const total = filteredLeads.length;
     const newLeads = filteredLeads.filter(lead => lead.status === 'new').length;
     const qualifiedLeads = filteredLeads.filter(lead => lead.status === 'qualified').length;
@@ -161,15 +164,12 @@ export default function CRM() {
       !['won', 'lost'].includes(lead.status)
     ).length;
 
-    const statusStats = {
-      new: newLeads,
-      contacted: filteredLeads.filter(l => l.status === 'contacted').length,
-      qualified: qualifiedLeads,
-      proposal: filteredLeads.filter(l => l.status === 'proposal').length,
-      negotiation: filteredLeads.filter(l => l.status === 'negotiation').length,
-      won: wonLeads,
-      lost: lostLeads,
-    };
+    // Build status stats from actual statuses in use
+    const statusStats: { [key: string]: number } = {};
+    filteredLeads.forEach(lead => {
+      const displayStatus = mapDatabaseStatusToDisplay(lead.status);
+      statusStats[displayStatus] = (statusStats[displayStatus] || 0) + 1;
+    });
 
     const priorityStats = {
       high: filteredLeads.filter(l => l.priority === 'high').length,
@@ -355,19 +355,21 @@ export default function CRM() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {Object.entries(analytics.statusStats).map(([status, count]) => {
-              const total = analytics.total || 1;
-              const percentage = (count / total) * 100;
-              return (
-                <div key={status}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm capitalize">{status === 'new' ? 'Novo' : status === 'contacted' ? 'Contatado' : status === 'qualified' ? 'Qualificado' : status === 'proposal' ? 'Proposta' : status === 'negotiation' ? 'Negociação' : status === 'won' ? 'Ganho' : 'Perdido'}</span>
-                    <Badge variant="secondary">{count}</Badge>
+            {Object.entries(analytics.statusStats)
+              .filter(([_, count]) => count > 0) // Only show statuses with leads
+              .map(([status, count]) => {
+                const total = analytics.total || 1;
+                const percentage = (count / total) * 100;
+                return (
+                  <div key={status}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm">{status}</span>
+                      <Badge variant="secondary">{count}</Badge>
+                    </div>
+                    <Progress value={percentage} className="h-2" />
                   </div>
-                  <Progress value={percentage} className="h-2" />
-                </div>
-              );
-            })}
+                );
+              })}
           </CardContent>
         </Card>
 
