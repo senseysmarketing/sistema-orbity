@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Copy, CheckCircle, Sparkles, TrendingUp, Calendar, RefreshCw, Edit3 } from "lucide-react";
+import { Copy, CheckCircle, Sparkles, TrendingUp, Calendar, RefreshCw, Edit3, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { DateRange } from "react-day-picker";
@@ -31,6 +32,7 @@ export function ReportsTab({ selectedAdAccounts }: ReportsTabProps) {
   });
   const [copiedTemplate, setCopiedTemplate] = useState<number | null>(null);
   const [customMessage, setCustomMessage] = useState("");
+  const [showMetricsDialog, setShowMetricsDialog] = useState(false);
   
   const { toast } = useToast();
 
@@ -392,13 +394,7 @@ Estratégia + Otimização = RESULTADOS! ✨
               <Textarea
                 placeholder="Digite sua mensagem personalizada aqui... 
 
-💡 Dica: Use os dados das métricas:
-• Investimento: {formatCurrency(totalSpend)}
-• Impressões: {formatNumber(totalImpressions)}
-• Cliques: {formatNumber(totalClicks)}
-• Conversões: {totalConversions}
-• CTR: {avgCTR?.toFixed(2)}%
-• CPC: {formatCurrency(avgCPC)}"
+💡 Dica: Clique no botão 'Ver Variáveis' para ver todas as nomenclaturas disponíveis!"
                 value={customMessage}
                 onChange={(e) => setCustomMessage(e.target.value)}
                 className="min-h-[150px] font-mono"
@@ -419,6 +415,131 @@ Estratégia + Otimização = RESULTADOS! ✨
                 >
                   Limpar
                 </Button>
+                <Dialog open={showMetricsDialog} onOpenChange={setShowMetricsDialog}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <Info className="h-4 w-4 mr-2" />
+                      Ver Variáveis
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>📊 Variáveis Disponíveis para Mensagem Personalizada</DialogTitle>
+                      <DialogDescription>
+                        Copie e cole estas variáveis na sua mensagem personalizada. Elas serão substituídas pelos valores reais.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-6 mt-4">
+                      {/* Variáveis Principais */}
+                      <div>
+                        <h4 className="font-semibold mb-3 text-sm">💰 Métricas Financeiras</h4>
+                        <div className="space-y-2">
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${formatCurrency(totalSpend)}'}</code>
+                            <p className="text-xs text-muted-foreground">Investimento total no período</p>
+                          </div>
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${formatCurrency(avgCPC)}'}</code>
+                            <p className="text-xs text-muted-foreground">Custo por clique médio</p>
+                          </div>
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${formatCurrency(avgCPM)}'}</code>
+                            <p className="text-xs text-muted-foreground">Custo por mil impressões</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Métricas de Performance */}
+                      <div>
+                        <h4 className="font-semibold mb-3 text-sm">📈 Métricas de Performance</h4>
+                        <div className="space-y-2">
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${formatNumber(totalImpressions)}'}</code>
+                            <p className="text-xs text-muted-foreground">Total de impressões</p>
+                          </div>
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${formatNumber(totalClicks)}'}</code>
+                            <p className="text-xs text-muted-foreground">Total de cliques</p>
+                          </div>
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${totalConversions}'}</code>
+                            <p className="text-xs text-muted-foreground">Total de conversões</p>
+                          </div>
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${avgCTR?.toFixed(2)}%'}</code>
+                            <p className="text-xs text-muted-foreground">Taxa de cliques (CTR)</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Informações da Campanha */}
+                      <div>
+                        <h4 className="font-semibold mb-3 text-sm">🎯 Informações da Campanha</h4>
+                        <div className="space-y-2">
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${period}'}</code>
+                            <p className="text-xs text-muted-foreground">Período do relatório</p>
+                          </div>
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${accountName}'}</code>
+                            <p className="text-xs text-muted-foreground">Nome da conta de anúncios</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Métricas Adicionais */}
+                      <div>
+                        <h4 className="font-semibold mb-3 text-sm">📊 Outras Métricas</h4>
+                        <div className="space-y-2">
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${formatNumber(totalReach)}'}</code>
+                            <p className="text-xs text-muted-foreground">Alcance total (pessoas únicas alcançadas)</p>
+                          </div>
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${totalLeads}'}</code>
+                            <p className="text-xs text-muted-foreground">Total de leads gerados</p>
+                          </div>
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${formatCurrency(costPerLead)}'}</code>
+                            <p className="text-xs text-muted-foreground">Custo por lead</p>
+                          </div>
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${totalMessages}'}</code>
+                            <p className="text-xs text-muted-foreground">Total de mensagens iniciadas</p>
+                          </div>
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${formatCurrency(costPerMessage)}'}</code>
+                            <p className="text-xs text-muted-foreground">Custo por mensagem iniciada</p>
+                          </div>
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${engagementRate?.toFixed(2)}%'}</code>
+                            <p className="text-xs text-muted-foreground">Taxa de engajamento</p>
+                          </div>
+                          <div className="bg-muted p-3 rounded-lg">
+                            <code className="text-sm font-mono block mb-1">{'${formatNumber(totalEngagements)}'}</code>
+                            <p className="text-xs text-muted-foreground">Total de engajamentos (curtidas, comentários, compartilhamentos)</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Exemplo de Uso */}
+                      <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <h4 className="font-semibold mb-2 text-sm text-blue-900 dark:text-blue-100">💡 Exemplo de Uso</h4>
+                        <pre className="text-xs font-mono whitespace-pre-wrap text-blue-800 dark:text-blue-200">
+{`🚀 Resultados do período ${'{period}'}:
+
+💰 Investimento: ${'{formatCurrency(totalSpend)'}
+👥 Alcance: ${'{formatNumber(totalReach)'} pessoas
+📨 Mensagens: ${'{totalMessages}'}
+🎯 Leads: ${'{totalLeads}'}
+📊 CTR: ${'{avgCTR?.toFixed(2)}'}%
+
+✨ Resultados otimizados diariamente!`}
+                        </pre>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardContent>
           </Card>
