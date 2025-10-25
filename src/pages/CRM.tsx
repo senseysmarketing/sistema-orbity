@@ -225,12 +225,24 @@ export default function CRM() {
 
       if (error) throw error;
       
-      setLeads(leads.filter(lead => lead.id !== leadId));
+      // Update local state optimistically
+      setLeads(prev => prev.filter(l => l.id !== leadId));
       toast.success('Lead excluído com sucesso');
     } catch (error) {
       console.error('Error deleting lead:', error);
       toast.error('Erro ao excluir lead');
+      // Refresh on error
+      fetchLeads();
     }
+  };
+
+  const handleLeadMove = (leadId: string, newStatus: string) => {
+    // Optimistic update - update local state immediately
+    setLeads(prev => prev.map(lead => 
+      lead.id === leadId 
+        ? { ...lead, status: newStatus as Lead['status'], updated_at: new Date().toISOString() }
+        : lead
+    ));
   };
 
   if (loading) {
@@ -580,6 +592,7 @@ export default function CRM() {
                     onDelete={handleLeadDelete}
                     onUpdate={fetchLeads}
                     onView={handleLeadView}
+                    onLeadMove={handleLeadMove}
                   />
                 ) : (
                   <LeadsList 

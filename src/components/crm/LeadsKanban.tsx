@@ -36,9 +36,10 @@ interface LeadsKanbanProps {
   onDelete: (leadId: string) => void;
   onUpdate: () => void;
   onView?: (lead: Lead) => void;
+  onLeadMove?: (leadId: string, newStatus: string) => void;
 }
 
-export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView }: LeadsKanbanProps) {
+export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadMove }: LeadsKanbanProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
   const { getStatusConfig, getStatusKey, mapDatabaseStatusToDisplay, mapDisplayStatusToDatabase } = useLeadStatuses();
@@ -137,6 +138,12 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView }: Leads
       const displayStatus = statusConfig[newStatus].title;
       const dbStatus = mapDisplayStatusToDatabase(displayStatus);
       
+      // Update local cache immediately (optimistic update)
+      if (onLeadMove) {
+        onLeadMove(leadId, dbStatus);
+      }
+      
+      // Update in background without blocking UI
       const { error } = await supabase
         .from('leads')
         .update({ 
@@ -148,9 +155,6 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView }: Leads
       if (error) throw error;
       
       toast.success('Status do lead atualizado com sucesso');
-      
-      // Refresh data to update UI
-      onUpdate();
     } catch (error) {
       console.error('Error updating lead status:', error);
       toast.error('Erro ao atualizar status do lead');
