@@ -137,11 +137,6 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView }: Leads
       const displayStatus = statusConfig[newStatus].title;
       const dbStatus = mapDisplayStatusToDatabase(displayStatus);
       
-      // Update local state immediately for better UX
-      const updatedLeads = leads.map(l => 
-        l.id === leadId ? { ...l, status: dbStatus } : l
-      );
-      
       const { error } = await supabase
         .from('leads')
         .update({ 
@@ -153,8 +148,9 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView }: Leads
       if (error) throw error;
       
       toast.success('Status do lead atualizado com sucesso');
-      // Only call onUpdate if it's defined and we need a full refresh
-      // This prevents unnecessary full page refreshes
+      
+      // Refresh data to update UI
+      onUpdate();
     } catch (error) {
       console.error('Error updating lead status:', error);
       toast.error('Erro ao atualizar status do lead');
