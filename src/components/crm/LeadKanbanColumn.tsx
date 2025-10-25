@@ -80,20 +80,22 @@ export function LeadKanbanColumn({
           {leads.length === 0 ? (
             <DropZoneIndicator isActive={isOver} isEmpty={true} title={title} />
           ) : (
-            leads.map((lead) => (
-              <SortableLeadCard
-                key={lead.id}
-                lead={lead}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onView={onView}
-                getPriorityColor={getPriorityColor}
-                getPriorityLabel={getPriorityLabel}
-                getUrgencyLevel={getUrgencyLevel}
-                formatCurrency={formatCurrency}
-                formatDate={formatDate}
-              />
-            ))
+            [...leads]
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+              .map((lead) => (
+                <SortableLeadCard
+                  key={lead.id}
+                  lead={lead}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onView={onView}
+                  getPriorityColor={getPriorityColor}
+                  getPriorityLabel={getPriorityLabel}
+                  getUrgencyLevel={getUrgencyLevel}
+                  formatCurrency={formatCurrency}
+                  formatDate={formatDate}
+                />
+              ))
           )}
         </SortableContext>
       </div>

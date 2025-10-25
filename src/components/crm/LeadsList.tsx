@@ -127,7 +127,9 @@ export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {leads.map((lead) => (
+              {[...leads]
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                .map((lead) => (
                 <TableRow key={lead.id}>
                   <TableCell>
                     <div className="space-y-1">

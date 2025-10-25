@@ -9,6 +9,7 @@ import {
   DollarSign, Clock, Target, AlertTriangle, GripVertical, 
   Circle, Star, ArrowUp, ArrowRight, ArrowDown, MessageCircle
 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LeadScoring } from "./LeadScoring";
@@ -220,19 +221,19 @@ export function SortableLeadCard({
           <div className="text-xs space-y-1.5">
             {lead.company && (
               <div className="flex items-center gap-1.5">
-                <Building className="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
+                <Building className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                 <span className="truncate">{lead.company}</span>
               </div>
             )}
             {lead.email && (
               <div className="flex items-center gap-1.5">
-                <Mail className="h-3.5 w-3.5 flex-shrink-0 text-purple-500" />
+                <Mail className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                 <span className="truncate">{lead.email}</span>
               </div>
             )}
             {lead.phone && (
               <div className="flex items-center gap-1.5">
-                <Phone className="h-3.5 w-3.5 flex-shrink-0 text-green-500" />
+                <Phone className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                 <span className="truncate">{lead.phone}</span>
               </div>
             )}
@@ -250,6 +251,15 @@ export function SortableLeadCard({
             <div className="flex items-center gap-1.5 text-muted-foreground/70">
               <Target className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="capitalize">{lead.source}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-muted-foreground/70">
+              <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+              <span>
+                {formatDistanceToNow(new Date(lead.created_at), { 
+                  addSuffix: true, 
+                  locale: ptBR 
+                })}
+              </span>
             </div>
           </div>
 
