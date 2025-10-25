@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
-import { MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, DollarSign, Clock, Target, AlertTriangle } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, DollarSign, Clock, Target, AlertTriangle, GripVertical } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LeadScoring } from "./LeadScoring";
@@ -36,6 +36,7 @@ interface SortableLeadCardProps {
   lead: Lead;
   onEdit: (lead: Lead) => void;
   onDelete: (leadId: string) => void;
+  onView?: (lead: Lead) => void;
   getPriorityColor: (priority: string) => string;
   getPriorityLabel: (priority: string) => string;
   getUrgencyLevel: (lead: Lead) => { level: string; label: string; color: string };
@@ -48,6 +49,7 @@ export function SortableLeadCard({
   lead,
   onEdit,
   onDelete,
+  onView,
   getPriorityColor,
   getPriorityLabel,
   getUrgencyLevel,
@@ -92,20 +94,38 @@ export function SortableLeadCard({
 
   const isMetaAdsLead = lead.source === 'facebook_leads';
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (!isDragging) {
+      onView?.(lead);
+    }
+  };
+
   return (
-    <Card
+    <div
       ref={setNodeRef}
       style={style}
-      className={`transition-all duration-200 cursor-grab active:cursor-grabbing select-none ${
-        getCardBackground()
-      } ${
-        isDragging 
-          ? 'shadow-2xl border-primary/50 bg-background/95 rotate-3' 
-          : 'hover:shadow-lg hover:scale-[1.02] hover:border-border/50'
-      }`}
-      {...attributes}
-      {...listeners}
+      className="relative"
     >
+      <button
+        type="button"
+        aria-label="Arrastar"
+        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <Card
+        className={`transition-all duration-200 cursor-pointer select-none ${
+          getCardBackground()
+        } ${
+          isDragging 
+            ? 'shadow-2xl border-primary/50 bg-background/95' 
+            : 'hover:shadow-lg hover:scale-[1.02] hover:border-border/50'
+        }`}
+        onClick={handleClick}
+      >
       <CardContent className="p-3">
         <div className="space-y-2.5">
           {/* Header with Name and Actions */}
@@ -206,10 +226,11 @@ export function SortableLeadCard({
 
           {/* Lead Score */}
           <div className="pt-1">
-            <LeadScoring lead={lead} showLabel={false} />
+          <LeadScoring lead={lead} showLabel={false} />
           </div>
         </div>
       </CardContent>
     </Card>
+    </div>
   );
 }

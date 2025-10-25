@@ -180,7 +180,7 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView }: Leads
       onDragEnd={handleDragEnd}
       collisionDetection={closestCenter}
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 min-h-[600px]">
+      <div className="flex gap-4 overflow-x-auto pb-4">
         {Object.entries(statusConfig).map(([statusKey, config]) => (
           <LeadKanbanColumn
             key={statusKey}
@@ -191,6 +191,7 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView }: Leads
             count={groupedLeads[statusKey]?.length || 0}
             onEdit={onEdit}
             onDelete={onDelete}
+            onView={onView}
             getPriorityColor={getPriorityColor}
             getPriorityLabel={getPriorityLabel}
             getUrgencyLevel={getUrgencyLevel}
