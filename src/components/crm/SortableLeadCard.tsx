@@ -9,6 +9,7 @@ import { MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, DollarSi
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LeadScoring } from "./LeadScoring";
+import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 
 interface Lead {
   id: string;
@@ -64,6 +65,16 @@ export function SortableLeadCard({
     transform,
     transition,
   } = useSortable({ id: lead.id });
+
+  const { mapDatabaseStatusToDisplay, getStatusConfig } = useLeadStatuses();
+  const statusConfig = getStatusConfig();
+  const displayStatus = mapDatabaseStatusToDisplay(lead.status);
+  
+  // Find status configuration
+  const statusKey = Object.keys(statusConfig).find(
+    key => statusConfig[key].title === displayStatus
+  );
+  const currentStatusConfig = statusKey ? statusConfig[statusKey] : null;
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -160,6 +171,12 @@ export function SortableLeadCard({
           
           {/* Badges */}
           <div className="flex gap-1 flex-wrap">
+            {currentStatusConfig && (
+              <Badge variant="outline" className="text-xs">
+                <div className={`w-2 h-2 rounded-full ${currentStatusConfig.color} mr-1.5`}></div>
+                {displayStatus}
+              </Badge>
+            )}
             <Badge className={getPriorityColor(lead.priority)} variant="secondary">
               {lead.priority === 'high' && '🔴'}
               {lead.priority === 'medium' && '🟡'}
