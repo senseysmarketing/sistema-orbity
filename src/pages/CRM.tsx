@@ -353,20 +353,36 @@ export default function CRM() {
           </CardHeader>
           <CardContent className="space-y-3">
             {Object.entries(analytics.statusStats)
-              .filter(([_, count]) => count > 0) // Only show statuses with leads
+              .filter(([_, count]) => count > 0)
+              .sort(([, a], [, b]) => b - a) // Sort by count descending
               .map(([status, count]) => {
                 const total = analytics.total || 1;
                 const percentage = (count / total) * 100;
+                
+                // Get status color from config
+                const statusInfo = Object.values(getStatusConfig()).find(
+                  config => config.title === status
+                );
+                const statusColor = statusInfo?.color || 'bg-gray-500';
+                
                 return (
                   <div key={status}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm">{status}</span>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${statusColor}`} />
+                        <span className="text-sm font-medium">{status}</span>
+                      </div>
                       <Badge variant="secondary">{count}</Badge>
                     </div>
                     <Progress value={percentage} className="h-2" />
                   </div>
                 );
               })}
+            {Object.keys(analytics.statusStats).length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhum lead cadastrado
+              </p>
+            )}
           </CardContent>
         </Card>
 

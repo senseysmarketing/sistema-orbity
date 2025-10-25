@@ -4,11 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Progress } from "@/components/ui/progress";
 import { 
   MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, 
   DollarSign, Clock, Target, AlertTriangle, GripVertical, 
-  Circle, Star, ArrowUp, ArrowRight, ArrowDown 
+  Circle, Star, ArrowUp, ArrowRight, ArrowDown, MessageCircle
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -112,6 +111,16 @@ export function SortableLeadCard({
   const handleClick = (e: React.MouseEvent) => {
     if (!isDragging) {
       onView?.(lead);
+    }
+  };
+
+  const handleWhatsAppClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (lead.phone) {
+      // Remove caracteres não numéricos
+      const phoneNumber = lead.phone.replace(/\D/g, '');
+      // Abre WhatsApp em nova aba
+      window.open(`https://wa.me/55${phoneNumber}`, '_blank');
     }
   };
 
@@ -222,9 +231,20 @@ export function SortableLeadCard({
               </div>
             )}
             {lead.phone && (
-              <div className="flex items-center gap-1.5">
-                <Phone className="h-3.5 w-3.5 flex-shrink-0 text-green-500" />
-                <span className="truncate">{lead.phone}</span>
+              <div className="flex items-center gap-1.5 justify-between">
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <Phone className="h-3.5 w-3.5 flex-shrink-0 text-green-500" />
+                  <span className="truncate">{lead.phone}</span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-900/20"
+                  onClick={handleWhatsAppClick}
+                  title="Abrir no WhatsApp"
+                >
+                  <MessageCircle className="h-4 w-4 text-green-600" />
+                </Button>
               </div>
             )}
             {lead.next_contact && (
@@ -244,19 +264,20 @@ export function SortableLeadCard({
             </div>
           </div>
 
-          {/* Value & Score */}
+          {/* Value */}
           {lead.value > 0 && (
-            <div className="space-y-1 p-2 bg-muted/30 rounded-lg">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Valor Estimado</span>
-                <span className="font-semibold text-green-600">{formatCurrency(lead.value)}</span>
+            <div className="flex items-center justify-between p-2 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
+              <div className="flex items-center gap-1.5">
+                <DollarSign className="h-3.5 w-3.5 text-green-600" />
+                <span className="text-xs text-muted-foreground">Valor</span>
               </div>
+              <span className="text-sm font-semibold text-green-600">{formatCurrency(lead.value)}</span>
             </div>
           )}
 
           {/* Lead Score */}
           <div className="pt-1">
-          <LeadScoring lead={lead} showLabel={false} />
+            <LeadScoring lead={lead} showLabel={false} />
           </div>
         </div>
       </CardContent>
