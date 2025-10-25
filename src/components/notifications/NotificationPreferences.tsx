@@ -147,7 +147,7 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
           agency_id: currentAgency.id,
           ...preferences,
         }, {
-          onConflict: 'user_id,agency_id'
+          onConflict: 'user_id'
         });
 
       if (error) throw error;

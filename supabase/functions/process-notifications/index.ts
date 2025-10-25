@@ -123,12 +123,22 @@ async function checkUserPreferences(
   agencyId: string,
   notificationType: string
 ): Promise<boolean> {
-  const { data: preferences } = await supabase
+  let { data: preferences } = await supabase
     .from('notification_preferences')
     .select('*')
     .eq('user_id', userId)
     .eq('agency_id', agencyId)
     .maybeSingle();
+
+  // Fallback: usa preferências por usuário (sem agência) se não houver registro por agência
+  if (!preferences) {
+    const { data: userOnlyPrefs } = await supabase
+      .from('notification_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    preferences = userOnlyPrefs as any;
+  }
 
   if (!preferences) return true;
 
@@ -171,12 +181,21 @@ async function checkUserPreferences(
 }
 
 async function getUserPreferences(userId: string, agencyId: string) {
-  const { data } = await supabase
+  let { data } = await supabase
     .from('notification_preferences')
     .select('*')
     .eq('user_id', userId)
     .eq('agency_id', agencyId)
     .maybeSingle();
+
+  if (!data) {
+    const { data: userOnly } = await supabase
+      .from('notification_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    data = userOnly as any;
+  }
   
   return data;
 }

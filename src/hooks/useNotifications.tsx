@@ -235,7 +235,7 @@ export function useNotifications() {
           agency_id: currentAgency?.id,
           do_not_disturb_until: endTime.toISOString(),
         }, {
-          onConflict: 'user_id,agency_id'
+          onConflict: 'user_id'
         });
 
       if (error) throw error;
