@@ -51,7 +51,7 @@ interface Lead {
 export default function CRM() {
   const { profile } = useAuth();
   const { currentAgency } = useAgency();
-  const { refresh: refreshStatuses } = useLeadStatuses();
+  const { refresh: refreshStatuses, mapDatabaseStatusToDisplay, getStatusConfig } = useLeadStatuses();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
@@ -140,9 +140,6 @@ export default function CRM() {
 
   // Análises e métricas
   const analytics = useMemo(() => {
-    const { mapDatabaseStatusToDisplay, getStatusConfig } = useLeadStatuses();
-    const statusConfig = getStatusConfig();
-    
     const total = filteredLeads.length;
     const newLeads = filteredLeads.filter(lead => lead.status === 'new').length;
     const qualifiedLeads = filteredLeads.filter(lead => lead.status === 'qualified').length;
@@ -197,7 +194,7 @@ export default function CRM() {
       priorityStats,
       sourceStats
     };
-  }, [filteredLeads]);
+  }, [filteredLeads, mapDatabaseStatusToDisplay]);
 
   const handleLeadSave = async (savedLead: Lead) => {
     // Update local cache optimistically
