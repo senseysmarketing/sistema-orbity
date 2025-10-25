@@ -15,7 +15,7 @@ import { LeadDetailsDialog } from "@/components/crm/LeadDetailsDialog";
 import { WebhooksManager } from "@/components/crm/WebhooksManager";
 import { CRMAlerts } from "@/components/crm/CRMAlerts";
 import { CustomStatusManager } from "@/components/crm/CustomStatusManager";
-import { CRMAdvancedFilters } from "@/components/crm/CRMAdvancedFilters";
+
 import { CRMAnalytics } from "@/components/crm/CRMAnalytics";
 import { CRMMetrics } from "@/components/crm/CRMMetrics";
 import { FacebookLeadsIntegration } from "@/components/crm/FacebookLeadsIntegration";
@@ -63,17 +63,6 @@ export default function CRM() {
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [advancedFilters, setAdvancedFilters] = useState({
-    status: [] as string[],
-    priority: [] as string[],
-    source: [] as string[],
-    assignedTo: [] as string[],
-    valueRange: { min: null as number | null, max: null as number | null },
-    dateRange: { from: null as Date | null, to: null as Date | null },
-    tags: [] as string[],
-    hasNextContact: null as boolean | null,
-    followUpOverdue: null as boolean | null,
-  });
 
   // Get unique sources from existing leads
   const uniqueSources = useMemo(() => {
@@ -121,34 +110,10 @@ export default function CRM() {
       const matchesDateRange = 
         (!dateFilter.from || new Date(lead.created_at) >= dateFilter.from) &&
         (!dateFilter.to || new Date(lead.created_at) <= dateFilter.to);
-
-      // Advanced filters
-      const matchesAdvancedStatus = advancedFilters.status.length === 0 || advancedFilters.status.includes(lead.status);
-      const matchesAdvancedPriority = advancedFilters.priority.length === 0 || advancedFilters.priority.includes(lead.priority);
-      const matchesAdvancedSource = advancedFilters.source.length === 0 || advancedFilters.source.includes(lead.source);
       
-      const matchesValueRange = 
-        (advancedFilters.valueRange.min === null || lead.value >= advancedFilters.valueRange.min) &&
-        (advancedFilters.valueRange.max === null || lead.value <= advancedFilters.valueRange.max);
-
-      const matchesAdvancedDateRange = 
-        (!advancedFilters.dateRange.from || new Date(lead.created_at) >= advancedFilters.dateRange.from) &&
-        (!advancedFilters.dateRange.to || new Date(lead.created_at) <= advancedFilters.dateRange.to);
-
-      const matchesFollowUp = 
-        advancedFilters.hasNextContact === null ||
-        (advancedFilters.hasNextContact === true && lead.next_contact !== null) ||
-        (advancedFilters.hasNextContact === false && lead.next_contact === null);
-
-      const matchesOverdue = 
-        advancedFilters.followUpOverdue === null ||
-        (advancedFilters.followUpOverdue === true && lead.next_contact && new Date(lead.next_contact) < new Date());
-      
-      return matchesSearch && matchesStatus && matchesPriority && matchesSource && matchesDateRange &&
-             matchesAdvancedStatus && matchesAdvancedPriority && matchesAdvancedSource &&
-             matchesValueRange && matchesAdvancedDateRange && matchesFollowUp && matchesOverdue;
+      return matchesSearch && matchesStatus && matchesPriority && matchesSource && matchesDateRange;
     });
-  }, [leads, searchQuery, statusFilter, priorityFilter, sourceFilter, dateFilter, advancedFilters]);
+  }, [leads, searchQuery, statusFilter, priorityFilter, sourceFilter, dateFilter]);
 
   // Análises e métricas
   const analytics = useMemo(() => {
@@ -498,22 +463,6 @@ export default function CRM() {
         }}
       />
 
-      {/* Filtros Avançados */}
-      <CRMAdvancedFilters 
-        filters={advancedFilters}
-        onFiltersChange={setAdvancedFilters}
-        onClearFilters={() => setAdvancedFilters({
-          status: [],
-          priority: [],
-          source: [],
-          assignedTo: [],
-          valueRange: { min: null, max: null },
-          dateRange: { from: null, to: null },
-          tags: [],
-          hasNextContact: null,
-          followUpOverdue: null,
-        })}
-      />
 
       {/* Filtros e Leads */}
       <Tabs defaultValue="overview" className="space-y-4">
@@ -666,7 +615,7 @@ export default function CRM() {
                 </div>
 
                 {/* Date Filter and Export */}
-                <div className="flex flex-col md:flex-row gap-4 items-end">
+                <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium mb-2 block">Data inicial</label>
@@ -692,11 +641,10 @@ export default function CRM() {
                     </div>
                   </div>
                   
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-end md:pb-0 pb-0">
                     {(dateFilter.from || dateFilter.to || statusFilter !== 'all' || priorityFilter !== 'all' || sourceFilter !== 'all') && (
                       <Button
                         variant="outline"
-                        size="sm"
                         onClick={() => {
                           setDateFilter({ from: null, to: null });
                           setStatusFilter('all');
@@ -710,7 +658,6 @@ export default function CRM() {
                     )}
                     <Button
                       variant="outline"
-                      size="sm"
                       onClick={exportToCSV}
                       disabled={filteredLeads.length === 0}
                     >
