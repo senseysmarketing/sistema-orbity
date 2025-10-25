@@ -668,7 +668,7 @@ export default function CRM() {
                 </div>
               </div>
 
-              <div>
+              <div className="mt-6">
                 {view === 'kanban' ? (
                   <LeadsKanban 
                     leads={filteredLeads} 
