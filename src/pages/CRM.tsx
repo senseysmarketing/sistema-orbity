@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, Users, DollarSign, Target, Calendar, Webhook, Grid, List, AlertTriangle, TrendingUp, Activity, Eye, Settings, LayoutGrid } from "lucide-react";
+import { Plus, Search, Users, DollarSign, Target, Calendar, Webhook, Grid, List, AlertTriangle, TrendingUp, Activity, Eye, Settings, LayoutGrid, Download, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,6 +59,7 @@ export default function CRM() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -73,6 +74,12 @@ export default function CRM() {
     hasNextContact: null as boolean | null,
     followUpOverdue: null as boolean | null,
   });
+
+  // Get unique sources from existing leads
+  const uniqueSources = useMemo(() => {
+    const sources = new Set(leads.map(lead => lead.source).filter(Boolean));
+    return Array.from(sources);
+  }, [leads]);
 
   const fetchLeads = async () => {
     if (!currentAgency?.id) return;
@@ -110,6 +117,11 @@ export default function CRM() {
       const matchesPriority = priorityFilter === 'all' || lead.priority === priorityFilter;
       const matchesSource = sourceFilter === 'all' || lead.source === sourceFilter;
 
+      // Date filter
+      const matchesDateRange = 
+        (!dateFilter.from || new Date(lead.created_at) >= dateFilter.from) &&
+        (!dateFilter.to || new Date(lead.created_at) <= dateFilter.to);
+
       // Advanced filters
       const matchesAdvancedStatus = advancedFilters.status.length === 0 || advancedFilters.status.includes(lead.status);
       const matchesAdvancedPriority = advancedFilters.priority.length === 0 || advancedFilters.priority.includes(lead.priority);
@@ -119,7 +131,7 @@ export default function CRM() {
         (advancedFilters.valueRange.min === null || lead.value >= advancedFilters.valueRange.min) &&
         (advancedFilters.valueRange.max === null || lead.value <= advancedFilters.valueRange.max);
 
-      const matchesDateRange = 
+      const matchesAdvancedDateRange = 
         (!advancedFilters.dateRange.from || new Date(lead.created_at) >= advancedFilters.dateRange.from) &&
         (!advancedFilters.dateRange.to || new Date(lead.created_at) <= advancedFilters.dateRange.to);
 
@@ -132,11 +144,11 @@ export default function CRM() {
         advancedFilters.followUpOverdue === null ||
         (advancedFilters.followUpOverdue === true && lead.next_contact && new Date(lead.next_contact) < new Date());
       
-      return matchesSearch && matchesStatus && matchesPriority && matchesSource &&
+      return matchesSearch && matchesStatus && matchesPriority && matchesSource && matchesDateRange &&
              matchesAdvancedStatus && matchesAdvancedPriority && matchesAdvancedSource &&
-             matchesValueRange && matchesDateRange && matchesFollowUp && matchesOverdue;
+             matchesValueRange && matchesAdvancedDateRange && matchesFollowUp && matchesOverdue;
     });
-  }, [leads, searchQuery, statusFilter, priorityFilter, sourceFilter, advancedFilters]);
+  }, [leads, searchQuery, statusFilter, priorityFilter, sourceFilter, dateFilter, advancedFilters]);
 
   // Análises e métricas
   const analytics = useMemo(() => {
@@ -252,6 +264,39 @@ export default function CRM() {
         : lead
     ));
   };
+
+  const exportToCSV = () => {
+    const headers = ['Nome', 'Email', 'Telefone', 'Empresa', 'Status', 'Prioridade', 'Origem', 'Valor', 'Criado em'];
+    const csvData = filteredLeads.map(lead => [
+      lead.name,
+      lead.email || '',
+      lead.phone || '',
+      lead.company || '',
+      mapDatabaseStatusToDisplay(lead.status),
+      lead.priority === 'high' ? 'Alta' : lead.priority === 'medium' ? 'Média' : 'Baixa',
+      lead.source,
+      lead.value.toString(),
+      new Date(lead.created_at).toLocaleDateString('pt-BR')
+    ]);
+
+    const csv = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `leads_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`${filteredLeads.length} leads exportados com sucesso`);
+  };
+
 
   if (loading) {
     return (
@@ -565,58 +610,115 @@ export default function CRM() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col md:flex-row gap-4 mb-6">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                  <Input
-                    placeholder="Buscar leads..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
+              <div className="space-y-4">
+                {/* Search and Main Filters */}
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Input
+                      placeholder="Buscar leads..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full md:w-[180px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os Status</SelectItem>
+                      {Object.entries(getStatusConfig()).map(([key, config]) => (
+                        <SelectItem key={key} value={key}>
+                          {config.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                    <SelectTrigger className="w-full md:w-[180px]">
+                      <SelectValue placeholder="Prioridade" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as Prioridades</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="medium">Média</SelectItem>
+                      <SelectItem value="low">Baixa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                    <SelectTrigger className="w-full md:w-[180px]">
+                      <SelectValue placeholder="Origem" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as Origens</SelectItem>
+                      {uniqueSources.map(source => (
+                        <SelectItem key={source} value={source}>
+                          {source === 'facebook_leads' ? 'Meta Ads' : 
+                           source.charAt(0).toUpperCase() + source.slice(1).replace('_', ' ')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full md:w-[180px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os Status</SelectItem>
-                    <SelectItem value="new">Novo</SelectItem>
-                    <SelectItem value="contacted">Contatado</SelectItem>
-                    <SelectItem value="qualified">Qualificado</SelectItem>
-                    <SelectItem value="proposal">Proposta</SelectItem>
-                    <SelectItem value="negotiation">Negociação</SelectItem>
-                    <SelectItem value="won">Ganho</SelectItem>
-                    <SelectItem value="lost">Perdido</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger className="w-full md:w-[180px]">
-                    <SelectValue placeholder="Prioridade" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as Prioridades</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                    <SelectItem value="medium">Média</SelectItem>
-                    <SelectItem value="low">Baixa</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                  <SelectTrigger className="w-full md:w-[180px]">
-                    <SelectValue placeholder="Origem" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as Origens</SelectItem>
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="website">Website</SelectItem>
-                    <SelectItem value="social_media">Redes Sociais</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="phone">Telefone</SelectItem>
-                    <SelectItem value="referral">Indicação</SelectItem>
-                    <SelectItem value="event">Evento</SelectItem>
-                    <SelectItem value="advertisement">Anúncio</SelectItem>
-                  </SelectContent>
-                </Select>
+
+                {/* Date Filter and Export */}
+                <div className="flex flex-col md:flex-row gap-4 items-end">
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Data inicial</label>
+                      <Input
+                        type="date"
+                        value={dateFilter.from ? dateFilter.from.toISOString().split('T')[0] : ''}
+                        onChange={(e) => setDateFilter(prev => ({ 
+                          ...prev, 
+                          from: e.target.value ? new Date(e.target.value) : null 
+                        }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium mb-2 block">Data final</label>
+                      <Input
+                        type="date"
+                        value={dateFilter.to ? dateFilter.to.toISOString().split('T')[0] : ''}
+                        onChange={(e) => setDateFilter(prev => ({ 
+                          ...prev, 
+                          to: e.target.value ? new Date(e.target.value) : null 
+                        }))}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    {(dateFilter.from || dateFilter.to || statusFilter !== 'all' || priorityFilter !== 'all' || sourceFilter !== 'all') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setDateFilter({ from: null, to: null });
+                          setStatusFilter('all');
+                          setPriorityFilter('all');
+                          setSourceFilter('all');
+                          setSearchQuery('');
+                        }}
+                      >
+                        Limpar Filtros
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportToCSV}
+                      disabled={filteredLeads.length === 0}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar ({filteredLeads.length})
+                    </Button>
+                  </div>
+                </div>
               </div>
 
               <div>
