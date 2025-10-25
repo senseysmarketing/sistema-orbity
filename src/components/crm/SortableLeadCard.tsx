@@ -128,12 +128,12 @@ export function SortableLeadCard({
     <div
       ref={setNodeRef}
       style={style}
-      className="relative"
+      className="relative pr-8"
     >
       <button
         type="button"
         aria-label="Arrastar"
-        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+        className="absolute right-2 top-2 z-10 rounded p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
         {...attributes}
         {...listeners}
         onClick={(e) => e.stopPropagation()}
@@ -231,20 +231,9 @@ export function SortableLeadCard({
               </div>
             )}
             {lead.phone && (
-              <div className="flex items-center gap-1.5 justify-between">
-                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                  <Phone className="h-3.5 w-3.5 flex-shrink-0 text-green-500" />
-                  <span className="truncate">{lead.phone}</span>
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-900/20"
-                  onClick={handleWhatsAppClick}
-                  title="Abrir no WhatsApp"
-                >
-                  <MessageCircle className="h-4 w-4 text-green-600" />
-                </Button>
+              <div className="flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 flex-shrink-0 text-green-500" />
+                <span className="truncate">{lead.phone}</span>
               </div>
             )}
             {lead.next_contact && (
@@ -275,10 +264,21 @@ export function SortableLeadCard({
             </div>
           )}
 
-          {/* Lead Score */}
-          <div className="pt-1">
-            <LeadScoring lead={lead} showLabel={false} />
-          </div>
+          {/* WhatsApp Badge - substitui a barra de score */}
+          {lead.phone ? (
+            <Badge 
+              variant="outline" 
+              className="w-full justify-center gap-1.5 py-1.5 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 cursor-pointer"
+              onClick={handleWhatsAppClick}
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              WhatsApp
+            </Badge>
+          ) : (
+            <div className="pt-1">
+              <LeadScoring lead={lead} showLabel={false} />
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

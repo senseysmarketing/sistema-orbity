@@ -502,26 +502,28 @@ export default function CRM() {
             <CardContent>
               <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <div className="text-center p-4 border rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">{analytics.statusStats.new}</div>
+                  <div className="text-center p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                    <div className="text-2xl font-bold text-blue-600">{analytics.newLeads}</div>
                     <div className="text-sm text-muted-foreground">Novos Leads</div>
                   </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <div className="text-2xl font-bold text-orange-600">{analytics.statusStats.qualified}</div>
+                  <div className="text-center p-4 border rounded-lg bg-orange-50 dark:bg-orange-950/20">
+                    <div className="text-2xl font-bold text-orange-600">{analytics.qualifiedLeads}</div>
                     <div className="text-sm text-muted-foreground">Qualificados</div>
                   </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">{analytics.statusStats.proposal}</div>
-                    <div className="text-sm text-muted-foreground">Em Proposta</div>
+                  <div className="text-center p-4 border rounded-lg bg-purple-50 dark:bg-purple-950/20">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {filteredLeads.filter(l => !['new', 'qualified', 'won', 'lost'].includes(l.status)).length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Em Negociação</div>
                   </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">{analytics.statusStats.won}</div>
+                  <div className="text-center p-4 border rounded-lg bg-green-50 dark:bg-green-950/20">
+                    <div className="text-2xl font-bold text-green-600">{analytics.wonLeads}</div>
                     <div className="text-sm text-muted-foreground">Fechados</div>
                   </div>
                 </div>
                 
-                <div className="text-center">
-                  <div className="text-3xl font-bold">
+                <div className="text-center p-4 border rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
+                  <div className="text-3xl font-bold text-green-600">
                     {new Intl.NumberFormat('pt-BR', {
                       style: 'currency',
                       currency: 'BRL'
