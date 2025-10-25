@@ -5,7 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
-import { MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, DollarSign, Clock, Target, AlertTriangle, GripVertical } from "lucide-react";
+import { 
+  MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, 
+  DollarSign, Clock, Target, AlertTriangle, GripVertical, 
+  Circle, Star, ArrowUp, ArrowRight, ArrowDown 
+} from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LeadScoring } from "./LeadScoring";
@@ -172,23 +176,32 @@ export function SortableLeadCard({
           {/* Badges */}
           <div className="flex gap-1 flex-wrap">
             {currentStatusConfig && (
-              <Badge variant="outline" className="text-xs">
-                <div className={`w-2 h-2 rounded-full ${currentStatusConfig.color} mr-1.5`}></div>
+              <Badge variant="outline" className={`${currentStatusConfig.color.replace('bg-', 'bg-')} text-white text-xs border-0`}>
                 {displayStatus}
               </Badge>
             )}
-            <Badge className={getPriorityColor(lead.priority)} variant="secondary">
-              {lead.priority === 'high' && '🔴'}
-              {lead.priority === 'medium' && '🟡'}
-              {lead.priority === 'low' && '🟢'} {getPriorityLabel(lead.priority)}
+            <Badge variant="outline" className={`${
+              lead.priority === 'high' ? 'bg-red-500' : 
+              lead.priority === 'medium' ? 'bg-yellow-500' : 
+              'bg-green-500'
+            } text-white text-xs border-0 flex items-center gap-1`}>
+              {lead.priority === 'high' && <ArrowUp className="h-3 w-3" />}
+              {lead.priority === 'medium' && <ArrowRight className="h-3 w-3" />}
+              {lead.priority === 'low' && <ArrowDown className="h-3 w-3" />}
+              {getPriorityLabel(lead.priority)}
             </Badge>
             {urgency.level !== 'normal' && (
-              <Badge className={urgency.color} variant="secondary">
-                {urgency.level === 'urgent' && '⚠️'} {urgency.label}
+              <Badge variant="outline" className={`${
+                urgency.level === 'urgent' ? 'bg-red-500' : 
+                urgency.level === 'today' ? 'bg-orange-500' : 
+                'bg-orange-500'
+              } text-white text-xs border-0 flex items-center gap-1`}>
+                <AlertTriangle className="h-3 w-3" />
+                {urgency.label}
               </Badge>
             )}
             {isMetaAdsLead && (
-              <Badge className="bg-blue-600 text-white text-xs">
+              <Badge variant="outline" className="bg-blue-600 text-white text-xs border-0">
                 📱 Meta Ads
               </Badge>
             )}
