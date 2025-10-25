@@ -428,7 +428,14 @@ export default function CRM() {
       </div>
 
       {/* Alertas do CRM */}
-      <CRMAlerts leads={filteredLeads} onEdit={handleLeadEdit} />
+      <CRMAlerts 
+        leads={filteredLeads} 
+        onEdit={handleLeadEdit}
+        onViewDetails={(lead) => {
+          setSelectedLead(lead as Lead);
+          setShowLeadDetails(true);
+        }}
+      />
 
       {/* Filtros Avançados */}
       <CRMAdvancedFilters 
