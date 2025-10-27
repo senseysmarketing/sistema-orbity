@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Trash2, Plus, Settings, Edit } from "lucide-react";
 import { useAgency } from "@/hooks/useAgency";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CustomStatus {
   id: string;
@@ -62,16 +63,17 @@ export function CustomStatusManager({ onStatusUpdate }: CustomStatusManagerProps
     if (!currentAgency?.id) return;
 
     try {
-      // For now, use mock data since the table is just created and types aren't updated yet
-      const mockStatuses: CustomStatus[] = defaultStatuses.map((status, index) => ({
-        id: `status-${index}`,
-        agency_id: currentAgency.id,
-        ...status,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }));
-      
-      setStatuses(mockStatuses);
+      const { data: customStatuses, error } = await supabase
+        .from('lead_statuses')
+        .select('*')
+        .eq('agency_id', currentAgency.id)
+        .order('order_position', { ascending: true });
+
+      if (error) throw error;
+
+      if (customStatuses) {
+        setStatuses(customStatuses as CustomStatus[]);
+      }
     } catch (error) {
       console.error('Error fetching statuses:', error);
       toast.error('Erro ao carregar status');
@@ -90,29 +92,34 @@ export function CustomStatusManager({ onStatusUpdate }: CustomStatusManagerProps
 
     try {
       if (editingStatus) {
-        // For now, just update local state
-        setStatuses(prev => prev.map(s => 
-          s.id === editingStatus.id 
-            ? { ...s, name: formData.name, color: formData.color }
-            : s
-        ));
+        const { error } = await supabase
+          .from('lead_statuses')
+          .update({ 
+            name: formData.name, 
+            color: formData.color,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingStatus.id);
+
+        if (error) throw error;
         toast.success('Status atualizado com sucesso');
       } else {
-        // For now, just add to local state
-        const newStatus: CustomStatus = {
-          id: `status-${Date.now()}`,
-          agency_id: currentAgency.id,
-          name: formData.name,
-          color: formData.color,
-          order_position: statuses.length + 1,
-          is_default: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        setStatuses(prev => [...prev, newStatus]);
+        const { error } = await supabase
+          .from('lead_statuses')
+          .insert({
+            agency_id: currentAgency.id,
+            name: formData.name,
+            color: formData.color,
+            order_position: statuses.length + 1,
+            is_default: false,
+            is_system: false,
+          });
+
+        if (error) throw error;
         toast.success('Status criado com sucesso');
       }
 
+      await fetchStatuses();
       setFormData({ name: '', color: 'bg-blue-500' });
       setEditingStatus(null);
       setShowForm(false);
@@ -127,7 +134,14 @@ export function CustomStatusManager({ onStatusUpdate }: CustomStatusManagerProps
 
   const handleDelete = async (statusId: string) => {
     try {
-      setStatuses(prev => prev.filter(s => s.id !== statusId));
+      const { error } = await supabase
+        .from('lead_statuses')
+        .delete()
+        .eq('id', statusId);
+
+      if (error) throw error;
+
+      await fetchStatuses();
       toast.success('Status excluído com sucesso');
       onStatusUpdate?.();
     } catch (error) {

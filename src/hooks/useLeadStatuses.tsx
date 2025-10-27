@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAgency } from "@/hooks/useAgency";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LeadStatus {
   id: string;
@@ -31,7 +32,34 @@ export function useLeadStatuses() {
 
     setLoading(true);
     try {
-      // For now, use mock data since the table is just created and types aren't updated yet
+      const { data: customStatuses, error } = await supabase
+        .from('lead_statuses')
+        .select('*')
+        .eq('agency_id', currentAgency.id)
+        .order('order_position', { ascending: true });
+
+      if (error) throw error;
+
+      // Se não há status customizados, criar os padrões
+      if (!customStatuses || customStatuses.length === 0) {
+        const defaultStatusesData = defaultStatuses.map((status, index) => ({
+          agency_id: currentAgency.id,
+          ...status,
+        }));
+
+        const { data: createdStatuses, error: createError } = await supabase
+          .from('lead_statuses')
+          .insert(defaultStatusesData)
+          .select();
+
+        if (createError) throw createError;
+        setStatuses(createdStatuses as LeadStatus[]);
+      } else {
+        setStatuses(customStatuses as LeadStatus[]);
+      }
+    } catch (error) {
+      console.error('Error fetching lead statuses:', error);
+      // Fallback para status mockados em caso de erro
       const mockStatuses: LeadStatus[] = defaultStatuses.map((status, index) => ({
         id: `status-${index}`,
         agency_id: currentAgency.id,
@@ -39,10 +67,7 @@ export function useLeadStatuses() {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }));
-      
       setStatuses(mockStatuses);
-    } catch (error) {
-      console.error('Error fetching lead statuses:', error);
     } finally {
       setLoading(false);
     }
