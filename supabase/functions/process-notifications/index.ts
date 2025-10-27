@@ -647,7 +647,7 @@ async function processExpenses() {
     .from('expenses')
     .select('*')
     .eq('status', 'pending')
-    .not('agency_id', 'is', null');
+    .not('agency_id', 'is', null);
 
   if (error) {
     console.error('Error fetching expenses:', error);
