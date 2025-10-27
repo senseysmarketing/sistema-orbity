@@ -210,11 +210,6 @@ export function SortableLeadCard({
                 {urgency.label}
               </Badge>
             )}
-            {isMetaAdsLead && (
-              <Badge variant="outline" className="bg-blue-600 text-white text-xs border-0">
-                📱 Meta Ads
-              </Badge>
-            )}
           </div>
           
           {/* Lead Information */}
