@@ -641,16 +641,13 @@ async function processExpenses() {
   console.log('💸 Processing expense notifications...');
   
   const now = new Date();
-  const oneDayAgo = addHours(now, -24);
-
-  // Get all pending expenses
+  
+  // Get all expenses from database
   const { data: expenses, error } = await supabase
     .from('expenses')
-    .select('id, name, amount, due_date, agency_id, notification_sent_at')
+    .select('*')
     .eq('status', 'pending')
-    .not('agency_id', 'is', null)
-    .gte('due_date', now.toISOString())
-    .or(`notification_sent_at.is.null,notification_sent_at.lt.${oneDayAgo.toISOString()}`);
+    .not('agency_id', 'is', null');
 
   if (error) {
     console.error('Error fetching expenses:', error);
@@ -659,7 +656,7 @@ async function processExpenses() {
 
   console.log(`📊 Found ${expenses?.length || 0} expenses to notify`);
 
-  // Get agency admins for each agency
+  // Get agency admins for all agencies with expenses
   const agencyIds = [...new Set(expenses?.map(e => e.agency_id) || [])];
   const adminsByAgency: Record<string, any[]> = {};
 
@@ -673,55 +670,88 @@ async function processExpenses() {
     adminsByAgency[agencyId] = admins || [];
   }
 
+  // Prepare batch tracking check
+  const trackingRecords: BatchTrackingRecord[] = [];
+  expenses?.forEach(expense => {
+    const admins = adminsByAgency[expense.agency_id] || [];
+    admins.forEach(admin => {
+      trackingRecords.push({
+        notification_type: 'expense',
+        entity_id: expense.id,
+        user_id: admin.user_id,
+        agency_id: expense.agency_id
+      });
+    });
+  });
+
+  // Check which notifications were recently sent
+  const recentlySent = await batchCheckNotifications(trackingRecords, 24);
+
   const notificationsToCreate: NotificationData[] = [];
-  const expensesToUpdate: string[] = [];
+  const toTrack: BatchTrackingRecord[] = [];
 
   for (const expense of expenses || []) {
     const admins = adminsByAgency[expense.agency_id] || [];
     
     for (const admin of admins) {
-      // Get user preferences for advance time
+      // Check if already sent recently
+      const key = `${expense.id}_${admin.user_id}`;
+      if (recentlySent.has(key)) {
+        console.log(`⏭️ Skipping expense ${expense.id} for user ${admin.user_id} - already notified`);
+        continue;
+      }
+
+      // Check user preferences
+      const canSend = await checkUserPreferences(admin.user_id, expense.agency_id, 'expenses');
+      if (!canSend) continue;
+
       const prefs = await getUserPreferences(admin.user_id, expense.agency_id);
       const advanceDays = prefs?.expense_advance_days ?? 3;
       
       const dueDate = new Date(expense.due_date);
-      const notificationTime = addDays(now, advanceDays);
+      const notificationTime = addDays(dueDate, -advanceDays);
       
-      // Only notify if within the advance window
-      if (dueDate <= notificationTime) {
-        const canSend = await checkUserPreferences(admin.user_id, expense.agency_id, 'expenses');
-        if (!canSend) continue;
+      // Check if in notification window
+      const isInAdvanceWindow = now >= notificationTime && now < dueDate;
+      const isPastDue = now >= dueDate;
+      
+      console.log(`🔍 Expense ${expense.id}: due=${dueDate.toISOString()}, notifyAt=${notificationTime.toISOString()}, now=${now.toISOString()}`);
+      console.log(`📊 In window: ${isInAdvanceWindow}, Past due: ${isPastDue}`);
+      
+      if (!isInAdvanceWindow && !isPastDue) continue;
 
-        notificationsToCreate.push({
-          user_id: admin.user_id,
-          agency_id: expense.agency_id,
-          type: 'expense',
-          priority: 'high',
-          title: '💸 Despesa próxima do vencimento',
-          message: `${expense.name} - R$ ${expense.amount}`,
-          action_url: '/admin',
-          action_label: 'Ver despesa',
-          metadata: { 
-            expense_id: expense.id,
-            play_sound: true
-          },
-        });
-      }
-    }
+      const priority = isPastDue ? 'urgent' : 'medium';
+      const title = isPastDue 
+        ? '🚨 Despesa ATRASADA' 
+        : '💸 Despesa próxima do vencimento';
 
-    if (admins.length > 0) {
-      expensesToUpdate.push(expense.id);
+      notificationsToCreate.push({
+        user_id: admin.user_id,
+        agency_id: expense.agency_id,
+        type: 'expense',
+        priority: priority,
+        title: title,
+        message: `${expense.name} - R$ ${expense.amount}`,
+        action_url: '/admin',
+        action_label: 'Ver despesa',
+        metadata: { 
+          expense_id: expense.id,
+          play_sound: true,
+          is_overdue: isPastDue
+        },
+      });
+
+      toTrack.push({
+        notification_type: 'expense',
+        entity_id: expense.id,
+        user_id: admin.user_id,
+        agency_id: expense.agency_id
+      });
     }
   }
 
   await batchCreateNotifications(notificationsToCreate);
-
-  if (expensesToUpdate.length > 0) {
-    await supabase
-      .from('expenses')
-      .update({ notification_sent_at: new Date().toISOString() })
-      .in('id', expensesToUpdate);
-  }
+  await batchTrackNotifications(toTrack);
 
   console.log(`✅ Created ${notificationsToCreate.length} expense notifications`);
 }
@@ -730,9 +760,8 @@ async function processPayments() {
   console.log('💰 Processing payment notifications...');
   
   const now = new Date();
-  const oneDayAgo = addHours(now, -24);
-
-  // Get all pending payments
+  
+  // Get all payments from database
   const { data: payments, error } = await supabase
     .from('client_payments')
     .select(`
@@ -743,8 +772,7 @@ async function processPayments() {
       clients(name)
     `)
     .eq('status', 'pending')
-    .not('agency_id', 'is', null)
-    .gte('due_date', now.toISOString());
+    .not('agency_id', 'is', null);
 
   if (error) {
     console.error('Error fetching payments:', error);
@@ -753,7 +781,7 @@ async function processPayments() {
 
   console.log(`📊 Found ${payments?.length || 0} payments to notify`);
 
-  // Get agency admins for each agency
+  // Get agency admins for all agencies with payments
   const agencyIds = [...new Set(payments?.map(p => p.agency_id) || [])];
   const adminsByAgency: Record<string, any[]> = {};
 
@@ -767,48 +795,96 @@ async function processPayments() {
     adminsByAgency[agencyId] = admins || [];
   }
 
+  // Prepare batch tracking check
+  const trackingRecords: BatchTrackingRecord[] = [];
+  payments?.forEach(payment => {
+    const admins = adminsByAgency[payment.agency_id] || [];
+    admins.forEach(admin => {
+      trackingRecords.push({
+        notification_type: 'payment',
+        entity_id: payment.id,
+        user_id: admin.user_id,
+        agency_id: payment.agency_id
+      });
+    });
+  });
+
+  // Check which notifications were recently sent
+  const recentlySent = await batchCheckNotifications(trackingRecords, 24);
+
   const notificationsToCreate: NotificationData[] = [];
-  const paymentsToUpdate: string[] = [];
+  const toTrack: BatchTrackingRecord[] = [];
 
   for (const payment of payments || []) {
     const admins = adminsByAgency[payment.agency_id] || [];
     
     for (const admin of admins) {
-      // Get user preferences for advance time
+      // Check if already sent recently
+      const key = `${payment.id}_${admin.user_id}`;
+      if (recentlySent.has(key)) {
+        console.log(`⏭️ Skipping payment ${payment.id} for user ${admin.user_id} - already notified`);
+        continue;
+      }
+
+      // Check user preferences
+      const canSend = await checkUserPreferences(admin.user_id, payment.agency_id, 'payments');
+      if (!canSend) continue;
+
       const prefs = await getUserPreferences(admin.user_id, payment.agency_id);
       const advanceDays = prefs?.payment_advance_days ?? 3;
+      const repeatEnabled = prefs?.payment_repeat_enabled ?? false;
+      const repeatDays = prefs?.payment_repeat_days ?? 1;
       
       const dueDate = new Date(payment.due_date);
-      const notificationTime = addDays(now, advanceDays);
+      const notificationTime = addDays(dueDate, -advanceDays);
       
-      // Only notify if within the advance window
-      if (dueDate <= notificationTime) {
-        const canSend = await checkUserPreferences(admin.user_id, payment.agency_id, 'payments');
-        if (!canSend) continue;
+      // Check if in notification window
+      const isInAdvanceWindow = now >= notificationTime && now < dueDate;
+      const isPastDue = now >= dueDate;
+      
+      console.log(`🔍 Payment ${payment.id}: due=${dueDate.toISOString()}, notifyAt=${notificationTime.toISOString()}, now=${now.toISOString()}`);
+      console.log(`📊 In window: ${isInAdvanceWindow}, Past due: ${isPastDue}`);
+      
+      if (!isInAdvanceWindow && !isPastDue) continue;
 
-        notificationsToCreate.push({
-          user_id: admin.user_id,
-          agency_id: payment.agency_id,
-          type: 'payment',
-          priority: 'high',
-          title: '💰 Pagamento próximo do vencimento',
-          message: `${(payment.clients as any)?.name || 'Cliente'} - R$ ${payment.amount}`,
-          action_url: '/admin',
-          action_label: 'Ver pagamento',
-          metadata: { 
-            payment_id: payment.id,
-            play_sound: true
-          },
-        });
+      // For overdue payments, check repeat settings
+      if (isPastDue && !repeatEnabled) {
+        console.log(`⏭️ Skipping overdue payment ${payment.id} - repeat not enabled`);
+        continue;
       }
-    }
 
-    if (admins.length > 0) {
-      paymentsToUpdate.push(payment.id);
+      const priority = isPastDue ? 'urgent' : 'high';
+      const title = isPastDue 
+        ? '🚨 Pagamento ATRASADO' 
+        : '💰 Pagamento próximo do vencimento';
+
+      notificationsToCreate.push({
+        user_id: admin.user_id,
+        agency_id: payment.agency_id,
+        type: 'payment',
+        priority: priority,
+        title: title,
+        message: `${(payment.clients as any)?.name || 'Cliente'} - R$ ${payment.amount}`,
+        action_url: '/admin',
+        action_label: 'Ver pagamento',
+        metadata: { 
+          payment_id: payment.id,
+          play_sound: true,
+          is_overdue: isPastDue
+        },
+      });
+
+      toTrack.push({
+        notification_type: 'payment',
+        entity_id: payment.id,
+        user_id: admin.user_id,
+        agency_id: payment.agency_id
+      });
     }
   }
 
   await batchCreateNotifications(notificationsToCreate);
+  await batchTrackNotifications(toTrack);
 
   console.log(`✅ Created ${notificationsToCreate.length} payment notifications`);
 }

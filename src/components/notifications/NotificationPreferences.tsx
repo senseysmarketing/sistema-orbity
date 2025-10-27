@@ -342,22 +342,30 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
                         />
                       </div>
                       {preferences.payment_repeat_enabled && (
-                        <div className="space-y-2">
-                          <Label className="text-xs text-muted-foreground">Repetir a cada</Label>
-                          <Select
-                            value={preferences.payment_repeat_days.toString()}
-                            onValueChange={(value) => setPreferences(p => ({ ...p, payment_repeat_days: parseInt(value) }))}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="1">Diariamente</SelectItem>
-                              <SelectItem value="2">A cada 2 dias</SelectItem>
-                              <SelectItem value="7">Semanalmente</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <>
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Repetir a cada</Label>
+                            <Select
+                              value={preferences.payment_repeat_days.toString()}
+                              onValueChange={(value) => setPreferences(p => ({ ...p, payment_repeat_days: parseInt(value) }))}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">Diariamente</SelectItem>
+                                <SelectItem value="2">A cada 2 dias</SelectItem>
+                                <SelectItem value="7">Semanalmente</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
+                            <p className="text-xs text-blue-700 dark:text-blue-300">
+                              ⚡ Repetição ativa: você receberá notificações a cada {preferences.payment_repeat_days} dia(s) 
+                              para pagamentos não realizados após o vencimento
+                            </p>
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -581,6 +589,38 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+
+          <div className="mt-6 p-4 border rounded-lg bg-muted/50">
+            <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+              <span>💡</span>
+              Status do Sistema de Notificações
+            </h4>
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-green-600 dark:text-green-400">✅</span>
+                <span>CRON Job: Ativo (executa a cada 30 minutos)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-green-600 dark:text-green-400">✅</span>
+                <span>Sistema de Tracking: Habilitado (evita notificações duplicadas)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={preferences.browser_notifications ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400"}>
+                  {preferences.browser_notifications ? "✅" : "⚠️"}
+                </span>
+                <span>Notificações do Navegador: {preferences.browser_notifications ? 'Ativas' : 'Desativadas'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={preferences.sound_enabled ? "text-green-600 dark:text-green-400" : "text-gray-400"}>
+                  {preferences.sound_enabled ? "🔔" : "🔕"}
+                </span>
+                <span>Som de Notificações: {preferences.sound_enabled ? 'Ativo' : 'Desativado'}</span>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
+              <p>💡 Dica: As notificações são verificadas automaticamente e respeitam todas as suas preferências configuradas acima.</p>
+            </div>
+          </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
