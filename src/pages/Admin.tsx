@@ -1548,6 +1548,15 @@ export default function Admin() {
                   .filter(p => new Date(p.due_date) >= new Date())
                   .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0];
 
+                // Verifica o pagamento do mês atual
+                const currentDate = new Date();
+                const currentMonth = currentDate.getMonth() + 1;
+                const currentYear2 = currentDate.getFullYear();
+                const currentMonthPayment = clientPayments.find(p => {
+                  const paymentDate = new Date(p.due_date);
+                  return paymentDate.getMonth() + 1 === currentMonth && paymentDate.getFullYear() === currentYear2;
+                });
+
                 return (
                   <ClientCard
                     key={client.id}
@@ -1556,6 +1565,7 @@ export default function Admin() {
                     totalPaymentsYear={totalPaymentsYear}
                     nextPaymentDate={nextPayment?.due_date || null}
                     nextPaymentStatus={nextPayment?.status || null}
+                    currentMonthPaymentStatus={currentMonthPayment?.status || null}
                     onView={handleViewClient}
                     onEdit={handleEditClient}
                     onDelete={handleDeleteClient}

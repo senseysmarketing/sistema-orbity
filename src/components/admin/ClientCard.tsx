@@ -29,6 +29,7 @@ interface ClientCardProps {
   totalPaymentsYear: number;
   nextPaymentDate: string | null;
   nextPaymentStatus: 'paid' | 'pending' | 'overdue' | null;
+  currentMonthPaymentStatus: 'paid' | 'pending' | 'overdue' | null;
   onView: (client: Client) => void;
   onEdit: (client: Client) => void;
   onDelete: (client: Client) => void;
@@ -42,6 +43,7 @@ export function ClientCard({
   totalPaymentsYear,
   nextPaymentDate,
   nextPaymentStatus,
+  currentMonthPaymentStatus,
   onView,
   onEdit,
   onDelete,
@@ -127,19 +129,19 @@ export function ClientCard({
                     </>
                   )}
                   
-                  {nextPaymentStatus === 'paid' && (
+                  {currentMonthPaymentStatus === 'paid' && (
                     <Badge className="bg-green-600 text-white hover:bg-green-700">
-                      💰 Pagamento em Dia
+                      💰 Pago este Mês
                     </Badge>
                   )}
-                  {nextPaymentStatus === 'pending' && (
+                  {currentMonthPaymentStatus === 'pending' && (
                     <Badge className="bg-yellow-600 text-white hover:bg-yellow-700">
-                      ⏰ Pagamento Pendente
+                      ⏰ Pendente este Mês
                     </Badge>
                   )}
-                  {nextPaymentStatus === 'overdue' && (
+                  {currentMonthPaymentStatus === 'overdue' && (
                     <Badge className="bg-red-600 text-white hover:bg-red-700">
-                      🚨 Pagamento Atrasado
+                      🚨 Atrasado este Mês
                     </Badge>
                   )}
                 </div>
