@@ -40,6 +40,7 @@ interface Integration {
   default_status: string;
   default_priority: string;
   is_active: boolean;
+  webhook_active: boolean;
   last_sync_at: string | null;
   created_at: string;
 }
@@ -214,6 +215,7 @@ export function FacebookLeadsIntegration() {
           connectionId,
           pageId: selectedPage,
           pageName: page.name,
+          pageAccessToken: selectedPageToken,
           formId: selectedForm,
           formName: form.name,
           defaultStatus,
@@ -224,8 +226,8 @@ export function FacebookLeadsIntegration() {
       if (error) throw error;
 
       toast({
-        title: "Integração salva!",
-        description: "A integração com Facebook Leads foi configurada com sucesso"
+        title: "✅ Integração salva!",
+        description: "Webhook configurado! Os leads serão capturados automaticamente."
       });
 
       // Reset form
@@ -352,7 +354,10 @@ export function FacebookLeadsIntegration() {
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              Clique no botão de atualizar <RefreshCw className="h-3 w-3 inline" /> para carregar suas páginas do Facebook
+              <div className="space-y-1">
+                <p>Os leads serão capturados <strong>automaticamente e instantaneamente</strong> quando preencherem o formulário!</p>
+                <p className="text-xs">Clique em <RefreshCw className="h-3 w-3 inline" /> para carregar suas páginas</p>
+              </div>
             </AlertDescription>
           </Alert>
           
@@ -474,15 +479,26 @@ export function FacebookLeadsIntegration() {
                   className="flex items-center justify-between p-4 border rounded-lg"
                 >
                   <div className="flex-1">
-                    <div className="font-medium">{integration.form_name}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-medium">{integration.form_name}</div>
+                      {integration.webhook_active && (
+                        <Badge variant="default" className="bg-green-600">
+                          🔄 Automático
+                        </Badge>
+                      )}
+                    </div>
                     <div className="text-sm text-muted-foreground">
                       {integration.page_name}
                     </div>
-                    {integration.last_sync_at && (
+                    {integration.webhook_active ? (
+                      <div className="text-xs text-green-600 mt-1 font-medium">
+                        ✅ Captura automática ativa - leads chegam instantaneamente
+                      </div>
+                    ) : integration.last_sync_at ? (
                       <div className="text-xs text-muted-foreground mt-1">
                         Última sincronização: {new Date(integration.last_sync_at).toLocaleString('pt-BR')}
                       </div>
-                    )}
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={integration.is_active ? "default" : "secondary"}>
@@ -493,6 +509,7 @@ export function FacebookLeadsIntegration() {
                       size="sm"
                       onClick={() => handleSyncLeads(integration.id)}
                       disabled={syncing}
+                      title="Sincronização manual (backup)"
                     >
                       {syncing ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

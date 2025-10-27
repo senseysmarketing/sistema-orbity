@@ -12,12 +12,38 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get authenticated user
+  try {
+    const url = new URL(req.url);
+    
+    // Facebook webhook verification (GET request)
+    if (req.method === 'GET') {
+      const mode = url.searchParams.get('hub.mode');
+      const token = url.searchParams.get('hub.verify_token');
+      const challenge = url.searchParams.get('hub.challenge');
+      
+      const verifyToken = Deno.env.get('FACEBOOK_VERIFY_TOKEN') || 'senseys_webhook_2025';
+      
+      if (mode === 'subscribe' && token === verifyToken) {
+        console.log('Webhook verified successfully');
+        return new Response(challenge, { status: 200 });
+      } else {
+        console.error('Webhook verification failed');
+        return new Response('Forbidden', { status: 403 });
+      }
+    }
+    
+    // Facebook webhook notification (POST request)
+    if (req.method === 'POST' && url.pathname.includes('webhook')) {
+      const body = await req.json();
+      console.log('Webhook received:', JSON.stringify(body));
+      return await handleWebhook(supabase, body);
+    }
+
+    // Regular API calls require authentication
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
       throw new Error('No authorization header');
@@ -53,8 +79,8 @@ serve(async (req) => {
       case 'sync_leads':
         return await syncLeads(supabase, user.id, params);
       
-      case 'webhook_receiver':
-        return await handleWebhook(supabase, params);
+      case 'subscribe_webhook':
+        return await subscribeWebhook(supabase, user.id, params);
       
       default:
         throw new Error('Invalid action');
@@ -155,6 +181,7 @@ async function saveIntegration(supabase: any, userId: string, params: any) {
     connectionId,
     pageId,
     pageName,
+    pageAccessToken,
     formId,
     formName,
     syncMethod,
@@ -176,6 +203,7 @@ async function saveIntegration(supabase: any, userId: string, params: any) {
       default_status: defaultStatus || 'new',
       default_priority: defaultPriority || 'medium',
       field_mapping: fieldMapping || {},
+      webhook_active: false,
       created_by: userId
     })
     .select()
@@ -185,13 +213,84 @@ async function saveIntegration(supabase: any, userId: string, params: any) {
     throw new Error(`Failed to save integration: ${error.message}`);
   }
 
-  // If webhook method, we could setup Facebook webhook here
-  // For now, return success
+  // Auto-subscribe webhook after saving integration
+  try {
+    await setupWebhookSubscription(pageId, pageAccessToken, data.id);
+    
+    // Update webhook status
+    await supabase
+      .from('facebook_lead_integrations')
+      .update({ webhook_active: true })
+      .eq('id', data.id);
+      
+    console.log(`Webhook configured successfully for integration ${data.id}`);
+  } catch (webhookError) {
+    console.error('Failed to setup webhook:', webhookError);
+    // Don't fail the entire operation, just log the error
+  }
   
   return new Response(
     JSON.stringify({ success: true, integration: data }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
+}
+
+// Setup webhook subscription on Facebook page
+async function setupWebhookSubscription(pageId: string, pageAccessToken: string, integrationId: string) {
+  const webhookUrl = `https://ovookkywclrqfmtumelw.supabase.co/functions/v1/facebook-leads`;
+  const verifyToken = Deno.env.get('FACEBOOK_VERIFY_TOKEN') || 'senseys_webhook_2025';
+
+  const subscribeUrl = `https://graph.facebook.com/v18.0/${pageId}/subscribed_apps`;
+  const response = await fetch(subscribeUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      subscribed_fields: ['leadgen'],
+      access_token: pageAccessToken
+    })
+  });
+
+  const data = await response.json();
+  
+  if (data.error) {
+    throw new Error(`Facebook webhook subscription failed: ${data.error.message}`);
+  }
+
+  console.log(`Webhook subscribed for page ${pageId}, integration ${integrationId}`);
+  return data;
+}
+
+// Subscribe webhook manually
+async function subscribeWebhook(supabase: any, userId: string, params: any) {
+  const { integrationId, pageAccessToken } = params;
+
+  const { data: integration, error: intError } = await supabase
+    .from('facebook_lead_integrations')
+    .select('*')
+    .eq('id', integrationId)
+    .single();
+
+  if (intError || !integration) {
+    throw new Error('Integration not found');
+  }
+
+  try {
+    await setupWebhookSubscription(integration.page_id, pageAccessToken, integrationId);
+    
+    await supabase
+      .from('facebook_lead_integrations')
+      .update({ webhook_active: true })
+      .eq('id', integrationId);
+
+    return new Response(
+      JSON.stringify({ success: true, message: 'Webhook ativado com sucesso' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error: any) {
+    throw new Error(`Failed to subscribe webhook: ${error.message}`);
+  }
 }
 
 // Get Integrations
@@ -348,12 +447,121 @@ async function syncLeads(supabase: any, userId: string, params: any) {
   );
 }
 
-// Handle Webhook from Facebook (future implementation)
-async function handleWebhook(supabase: any, params: any) {
-  // This would handle real-time webhook notifications from Facebook
-  // For now, return not implemented
-  return new Response(
-    JSON.stringify({ message: 'Webhook handler not yet implemented' }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
+// Handle Webhook from Facebook
+async function handleWebhook(supabase: any, body: any) {
+  console.log('Processing webhook:', JSON.stringify(body, null, 2));
+
+  if (body.object !== 'page') {
+    return new Response(JSON.stringify({ message: 'Not a page event' }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  // Process each entry in the webhook
+  for (const entry of body.entry || []) {
+    const pageId = entry.id;
+    
+    for (const change of entry.changes || []) {
+      if (change.field !== 'leadgen') continue;
+
+      const leadgenId = change.value?.leadgen_id;
+      const formId = change.value?.form_id;
+
+      if (!leadgenId || !formId) continue;
+
+      console.log(`New lead received - Page: ${pageId}, Form: ${formId}, Lead: ${leadgenId}`);
+
+      // Find matching integration
+      const { data: integration, error: intError } = await supabase
+        .from('facebook_lead_integrations')
+        .select('*, facebook_connections(*)')
+        .eq('page_id', pageId)
+        .eq('form_id', formId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (intError || !integration) {
+        console.error('No active integration found for this form');
+        continue;
+      }
+
+      // Check if lead already processed
+      const { data: existing } = await supabase
+        .from('facebook_lead_sync_log')
+        .select('id')
+        .eq('facebook_lead_id', leadgenId)
+        .maybeSingle();
+
+      if (existing) {
+        console.log(`Lead ${leadgenId} already processed, skipping`);
+        continue;
+      }
+
+      // Fetch full lead data from Facebook
+      const accessToken = integration.facebook_connections.access_token;
+      const leadUrl = `https://graph.facebook.com/v18.0/${leadgenId}?access_token=${accessToken}`;
+      
+      const leadResponse = await fetch(leadUrl);
+      const leadData = await leadResponse.json();
+
+      if (leadData.error) {
+        console.error('Error fetching lead data:', leadData.error);
+        continue;
+      }
+
+      // Parse field data
+      const fieldData: any = {};
+      if (leadData.field_data) {
+        leadData.field_data.forEach((field: any) => {
+          fieldData[field.name] = field.values ? field.values[0] : '';
+        });
+      }
+
+      // Create lead in CRM
+      const crmLeadData = {
+        agency_id: integration.agency_id,
+        name: fieldData.full_name || fieldData.first_name || 'Lead do Facebook',
+        email: fieldData.email || null,
+        phone: fieldData.phone_number || null,
+        company: fieldData.company_name || null,
+        status: integration.default_status,
+        priority: integration.default_priority,
+        source: 'facebook_leads',
+        notes: `🚀 Lead capturado automaticamente via webhook\nFormulário: ${integration.form_name}\nPágina: ${integration.page_name}\nData: ${new Date(leadData.created_time).toLocaleString('pt-BR')}`,
+        custom_fields: fieldData,
+        created_by: integration.created_by
+      };
+
+      const { data: newLead, error: leadError } = await supabase
+        .from('leads')
+        .insert(crmLeadData)
+        .select()
+        .single();
+
+      if (leadError) {
+        console.error('Failed to create lead:', leadError);
+        continue;
+      }
+
+      // Log successful sync
+      await supabase
+        .from('facebook_lead_sync_log')
+        .insert({
+          integration_id: integration.id,
+          agency_id: integration.agency_id,
+          facebook_lead_id: leadgenId,
+          lead_id: newLead.id,
+          lead_data: leadData,
+          sync_method: 'webhook'
+        });
+
+      console.log(`✅ Lead ${leadgenId} successfully created in CRM as ${newLead.id}`);
+    }
+  }
+
+  return new Response(JSON.stringify({ success: true }), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
 }
