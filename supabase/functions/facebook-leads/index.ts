@@ -233,7 +233,7 @@ async function saveIntegration(supabase: any, userId: string, params: any) {
 
 // Setup webhook subscription on Facebook page
 async function setupWebhookSubscription(pageId: string, pageAccessToken: string, integrationId: string) {
-  const webhookUrl = `https://ovookkywclrqfmtumelw.supabase.co/functions/v1/facebook-leads`;
+  const webhookUrl = `https://ovookkywclrqfmtumelw.functions.supabase.co/facebook-leads`;
   const verifyToken = Deno.env.get('FACEBOOK_VERIFY_TOKEN');
 
   const subscribeUrl = `https://graph.facebook.com/v18.0/${pageId}/subscribed_apps`;
