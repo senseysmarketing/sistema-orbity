@@ -931,6 +931,110 @@ async function archiveReadNotifications() {
   }
 }
 
+async function processDailySummary() {
+  console.log('📊 Processing daily summary notifications...');
+  
+  const todayBrasilia = getTodayInBrasilia();
+  const endOfDayBrasilia = new Date(todayBrasilia);
+  endOfDayBrasilia.setHours(23, 59, 59, 999);
+
+  // Get all agencies
+  const { data: agencies, error: agenciesError } = await supabase
+    .from('agencies')
+    .select('id, name')
+    .eq('is_active', true);
+
+  if (agenciesError) {
+    console.error('Error fetching agencies:', agenciesError);
+    return;
+  }
+
+  console.log(`📊 Processing daily summary for ${agencies?.length || 0} agencies`);
+
+  const notificationsToCreate: NotificationData[] = [];
+  const trackingToCreate: BatchTrackingRecord[] = [];
+
+  for (const agency of agencies || []) {
+    // Count tasks due today
+    const { count: tasksCount } = await supabase
+      .from('tasks')
+      .select('*', { count: 'exact', head: true })
+      .eq('agency_id', agency.id)
+      .neq('status', 'done')
+      .eq('archived', false)
+      .gte('due_date', todayBrasilia.toISOString())
+      .lte('due_date', endOfDayBrasilia.toISOString());
+
+    // Count posts scheduled for today
+    const { count: postsCount } = await supabase
+      .from('social_media_posts')
+      .select('*', { count: 'exact', head: true })
+      .eq('agency_id', agency.id)
+      .eq('archived', false)
+      .gte('scheduled_date', todayBrasilia.toISOString())
+      .lte('scheduled_date', endOfDayBrasilia.toISOString());
+
+    const totalItems = (tasksCount || 0) + (postsCount || 0);
+
+    // Only send notification if there are items to do today
+    if (totalItems > 0) {
+      // Get all agency users
+      const { data: agencyUsers } = await supabase
+        .from('agency_users')
+        .select('user_id')
+        .eq('agency_id', agency.id);
+
+      for (const user of agencyUsers || []) {
+        const canSend = await checkUserPreferences(user.user_id, agency.id, 'system');
+        if (!canSend) continue;
+
+        // Build message
+        let message = '📋 Resumo do dia: ';
+        const parts = [];
+        
+        if (tasksCount && tasksCount > 0) {
+          parts.push(`${tasksCount} tarefa${tasksCount > 1 ? 's' : ''}`);
+        }
+        
+        if (postsCount && postsCount > 0) {
+          parts.push(`${postsCount} post${postsCount > 1 ? 's' : ''}`);
+        }
+        
+        message += parts.join(' e ') + ' para hoje';
+
+        notificationsToCreate.push({
+          user_id: user.user_id,
+          agency_id: agency.id,
+          type: 'system',
+          priority: 'medium',
+          title: '🌅 Bom dia! Seu resumo diário',
+          message,
+          action_url: tasksCount && tasksCount > 0 ? '/tasks' : '/social-media',
+          action_label: 'Ver detalhes',
+          metadata: { 
+            tasks_count: tasksCount || 0,
+            posts_count: postsCount || 0,
+            date: todayBrasilia.toISOString(),
+            play_sound: false
+          },
+        });
+
+        trackingToCreate.push({
+          notification_type: 'daily_summary',
+          entity_id: agency.id,
+          user_id: user.user_id,
+          agency_id: agency.id
+        });
+      }
+    }
+  }
+
+  await batchCreateNotifications(notificationsToCreate);
+  await batchTrackNotifications(trackingToCreate);
+
+  console.log(`✅ Created ${notificationsToCreate.length} daily summary notifications`);
+}
+
 // ============================================
 // MAIN HANDLER
 // ============================================
@@ -941,18 +1045,26 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const { action } = await req.json().catch(() => ({}));
+    
     console.log('🚀 Starting notification processing...');
     const startTime = Date.now();
     
-    await Promise.all([
-      processReminders(),
-      processTasks(),
-      processPosts(),
-      processPayments(),
-      processExpenses(),
-      processLeads(),
-      processMeetings(),
-    ]);
+    // If action is 'daily_summary', only run that
+    if (action === 'daily_summary') {
+      await processDailySummary();
+    } else {
+      // Run all regular notification processors
+      await Promise.all([
+        processReminders(),
+        processTasks(),
+        processPosts(),
+        processPayments(),
+        processExpenses(),
+        processLeads(),
+        processMeetings(),
+      ]);
+    }
 
     // Executar manutenção em background (não bloqueia a resposta)
     cleanupOldTracking().catch(console.error);
@@ -964,7 +1076,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Notifications processed',
+        message: action === 'daily_summary' ? 'Daily summary processed' : 'Notifications processed',
         duration_ms: duration
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
