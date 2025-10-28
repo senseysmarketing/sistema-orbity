@@ -161,18 +161,35 @@ export function FacebookLeadsIntegration() {
     if (!currentAgency) return;
 
     try {
-      const { data, error } = await supabase.functions.invoke('facebook-leads', {
-        body: {
-          action: 'get_integrations',
-          agencyId: currentAgency.id
-        }
-      });
+      const { data, error } = await supabase
+        .from('facebook_lead_integrations')
+        .select('*')
+        .eq('agency_id', currentAgency.id)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      setIntegrations(data.integrations || []);
+      // Map database fields to component format
+      const mappedIntegrations = (data || []).map(integration => ({
+        id: integration.id,
+        page_name: integration.page_name,
+        form_name: integration.form_name,
+        default_status: integration.default_status,
+        default_priority: integration.default_priority,
+        is_active: integration.is_active,
+        webhook_active: integration.sync_method === 'webhook',
+        last_sync_at: integration.last_sync_at,
+        created_at: integration.created_at
+      }));
+
+      setIntegrations(mappedIntegrations);
     } catch (error: any) {
       console.error('Error fetching integrations:', error);
+      toast({
+        title: "Erro ao buscar integrações",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   };
 
@@ -281,12 +298,10 @@ export function FacebookLeadsIntegration() {
     if (!integrationToDelete) return;
 
     try {
-      const { error } = await supabase.functions.invoke('facebook-leads', {
-        body: {
-          action: 'delete_integration',
-          integrationId: integrationToDelete
-        }
-      });
+      const { error } = await supabase
+        .from('facebook_lead_integrations')
+        .delete()
+        .eq('id', integrationToDelete);
 
       if (error) throw error;
 
