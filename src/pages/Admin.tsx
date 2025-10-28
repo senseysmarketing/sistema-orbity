@@ -1554,7 +1554,23 @@ export default function Admin() {
                 const currentYear2 = currentDate.getFullYear();
                 const currentMonthPayment = clientPayments.find(p => {
                   const paymentDate = new Date(p.due_date);
-                  return paymentDate.getMonth() + 1 === currentMonth && paymentDate.getFullYear() === currentYear2;
+                  const paymentMonth = paymentDate.getMonth() + 1;
+                  const paymentYear = paymentDate.getFullYear();
+                  
+                  // Verifica se o pagamento é do mês atual
+                  if (paymentMonth === currentMonth && paymentYear === currentYear2) {
+                    return true;
+                  }
+                  
+                  // Se o pagamento foi pago, verifica também pela data de pagamento
+                  if (p.paid_date) {
+                    const paidDate = new Date(p.paid_date);
+                    const paidMonth = paidDate.getMonth() + 1;
+                    const paidYear = paidDate.getFullYear();
+                    return paidMonth === currentMonth && paidYear === currentYear2;
+                  }
+                  
+                  return false;
                 });
 
                 return (
