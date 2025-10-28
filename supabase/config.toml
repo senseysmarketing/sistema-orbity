@@ -58,3 +58,6 @@ verify_jwt = false
 
 [functions.monthly-closure]
 verify_jwt = false
+
+[functions.facebook-leads]
+verify_jwt = false

@@ -26,7 +26,7 @@ serve(async (req) => {
       const token = url.searchParams.get('hub.verify_token');
       const challenge = url.searchParams.get('hub.challenge');
       
-      const verifyToken = Deno.env.get('FACEBOOK_VERIFY_TOKEN') || 'senseys_webhook_2025';
+      const verifyToken = Deno.env.get('FACEBOOK_VERIFY_TOKEN');
       
       console.log(`[WEBHOOK] Verification attempt - Mode: ${mode}, Token match: ${token === verifyToken}`);
       
@@ -234,7 +234,7 @@ async function saveIntegration(supabase: any, userId: string, params: any) {
 // Setup webhook subscription on Facebook page
 async function setupWebhookSubscription(pageId: string, pageAccessToken: string, integrationId: string) {
   const webhookUrl = `https://ovookkywclrqfmtumelw.supabase.co/functions/v1/facebook-leads`;
-  const verifyToken = Deno.env.get('FACEBOOK_VERIFY_TOKEN') || 'senseys_webhook_2025';
+  const verifyToken = Deno.env.get('FACEBOOK_VERIFY_TOKEN');
 
   const subscribeUrl = `https://graph.facebook.com/v18.0/${pageId}/subscribed_apps`;
   const response = await fetch(subscribeUrl, {
