@@ -18,6 +18,7 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
+    console.log(`[WEBHOOK] Request received - Method: ${req.method}, Path: ${url.pathname}`);
     
     // Facebook webhook verification (GET request)
     if (req.method === 'GET') {
@@ -27,19 +28,21 @@ serve(async (req) => {
       
       const verifyToken = Deno.env.get('FACEBOOK_VERIFY_TOKEN') || 'senseys_webhook_2025';
       
+      console.log(`[WEBHOOK] Verification attempt - Mode: ${mode}, Token match: ${token === verifyToken}`);
+      
       if (mode === 'subscribe' && token === verifyToken) {
-        console.log('Webhook verified successfully');
+        console.log('[WEBHOOK] ✅ Verification successful');
         return new Response(challenge, { status: 200 });
       } else {
-        console.error('Webhook verification failed');
+        console.error('[WEBHOOK] ❌ Verification failed');
         return new Response('Forbidden', { status: 403 });
       }
     }
     
-    // Facebook webhook notification (POST request)
-    if (req.method === 'POST' && url.pathname.includes('webhook')) {
+    // Facebook webhook notification (POST request) - accept all POST requests
+    if (req.method === 'POST') {
       const body = await req.json();
-      console.log('Webhook received:', JSON.stringify(body));
+      console.log('[WEBHOOK] 📥 POST received:', JSON.stringify(body, null, 2));
       return await handleWebhook(supabase, body);
     }
 
@@ -216,16 +219,9 @@ async function saveIntegration(supabase: any, userId: string, params: any) {
   // Auto-subscribe webhook after saving integration
   try {
     await setupWebhookSubscription(pageId, pageAccessToken, data.id);
-    
-    // Update webhook status
-    await supabase
-      .from('facebook_lead_integrations')
-      .update({ webhook_active: true })
-      .eq('id', data.id);
-      
-    console.log(`Webhook configured successfully for integration ${data.id}`);
+    console.log(`✅ Webhook configured successfully for integration ${data.id}`);
   } catch (webhookError) {
-    console.error('Failed to setup webhook:', webhookError);
+    console.error('❌ Failed to setup webhook:', webhookError);
     // Don't fail the entire operation, just log the error
   }
   
@@ -278,11 +274,6 @@ async function subscribeWebhook(supabase: any, userId: string, params: any) {
 
   try {
     await setupWebhookSubscription(integration.page_id, pageAccessToken, integrationId);
-    
-    await supabase
-      .from('facebook_lead_integrations')
-      .update({ webhook_active: true })
-      .eq('id', integrationId);
 
     return new Response(
       JSON.stringify({ success: true, message: 'Webhook ativado com sucesso' }),
@@ -449,9 +440,10 @@ async function syncLeads(supabase: any, userId: string, params: any) {
 
 // Handle Webhook from Facebook
 async function handleWebhook(supabase: any, body: any) {
-  console.log('Processing webhook:', JSON.stringify(body, null, 2));
+  console.log('[WEBHOOK] 🔄 Processing webhook:', JSON.stringify(body, null, 2));
 
   if (body.object !== 'page') {
+    console.log('[WEBHOOK] ⚠️ Not a page event, ignoring');
     return new Response(JSON.stringify({ message: 'Not a page event' }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -461,18 +453,29 @@ async function handleWebhook(supabase: any, body: any) {
   // Process each entry in the webhook
   for (const entry of body.entry || []) {
     const pageId = entry.id;
+    console.log(`[WEBHOOK] 📄 Processing entry for page: ${pageId}`);
     
     for (const change of entry.changes || []) {
-      if (change.field !== 'leadgen') continue;
+      console.log(`[WEBHOOK] 🔍 Change detected - Field: ${change.field}`);
+      
+      if (change.field !== 'leadgen') {
+        console.log('[WEBHOOK] ⏭️ Skipping non-leadgen event');
+        continue;
+      }
 
       const leadgenId = change.value?.leadgen_id;
       const formId = change.value?.form_id;
 
-      if (!leadgenId || !formId) continue;
+      if (!leadgenId || !formId) {
+        console.log('[WEBHOOK] ⚠️ Missing leadgen_id or form_id');
+        continue;
+      }
 
-      console.log(`New lead received - Page: ${pageId}, Form: ${formId}, Lead: ${leadgenId}`);
+      console.log(`[WEBHOOK] 🎯 New lead detected - Page: ${pageId}, Form: ${formId}, Lead: ${leadgenId}`);
 
       // Find matching integration
+      console.log(`[WEBHOOK] 🔎 Looking for integration - Page: ${pageId}, Form: ${formId}`);
+      
       const { data: integration, error: intError } = await supabase
         .from('facebook_lead_integrations')
         .select('*, facebook_connections(*)')
@@ -481,10 +484,17 @@ async function handleWebhook(supabase: any, body: any) {
         .eq('is_active', true)
         .maybeSingle();
 
-      if (intError || !integration) {
-        console.error('No active integration found for this form');
+      if (intError) {
+        console.error('[WEBHOOK] ❌ Error fetching integration:', intError);
         continue;
       }
+
+      if (!integration) {
+        console.error('[WEBHOOK] ❌ No active integration found for this form');
+        continue;
+      }
+
+      console.log(`[WEBHOOK] ✅ Integration found: ${integration.id}`);
 
       // Check if lead already processed
       const { data: existing } = await supabase
@@ -494,7 +504,7 @@ async function handleWebhook(supabase: any, body: any) {
         .maybeSingle();
 
       if (existing) {
-        console.log(`Lead ${leadgenId} already processed, skipping`);
+        console.log(`[WEBHOOK] ⚠️ Lead ${leadgenId} already processed, skipping`);
         continue;
       }
 
