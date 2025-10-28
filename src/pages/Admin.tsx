@@ -240,8 +240,7 @@ export default function Admin() {
       .from('client_payments')
       .select('*')
       .eq('agency_id', currentAgency.id)
-      .gte('due_date', startDate)
-      .lte('due_date', endDate)
+      .or(`and(due_date.gte.${startDate},due_date.lte.${endDate}),and(paid_date.gte.${startDate},paid_date.lte.${endDate})`)
       .order(paymentSort, { ascending: paymentSort === 'status' ? true : false });
     
     if (error) throw error;
@@ -1548,30 +1547,20 @@ export default function Admin() {
                   .filter(p => new Date(p.due_date) >= new Date())
                   .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0];
 
-                // Verifica o pagamento do mês atual
+                // Verifica o status de pagamento do mês atual
                 const currentDate = new Date();
                 const currentMonth = currentDate.getMonth() + 1;
                 const currentYear2 = currentDate.getFullYear();
-                const currentMonthPayment = clientPayments.find(p => {
-                  const paymentDate = new Date(p.due_date);
-                  const paymentMonth = paymentDate.getMonth() + 1;
-                  const paymentYear = paymentDate.getFullYear();
-                  
-                  // Verifica se o pagamento é do mês atual
-                  if (paymentMonth === currentMonth && paymentYear === currentYear2) {
-                    return true;
-                  }
-                  
-                  // Se o pagamento foi pago, verifica também pela data de pagamento
-                  if (p.paid_date) {
-                    const paidDate = new Date(p.paid_date);
-                    const paidMonth = paidDate.getMonth() + 1;
-                    const paidYear = paidDate.getFullYear();
-                    return paidMonth === currentMonth && paidYear === currentYear2;
-                  }
-                  
-                  return false;
-                });
+                const isSameMonthYear = (dateStr: string) => {
+                  const d = new Date(dateStr);
+                  return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear2;
+                };
+                
+                const hasPaidThisMonth = clientPayments.some(p => p.paid_date && isSameMonthYear(p.paid_date));
+                const dueThisMonth = clientPayments.find(p => isSameMonthYear(p.due_date));
+                const computedCurrentMonthStatus: 'paid' | 'pending' | 'overdue' | null = hasPaidThisMonth
+                  ? 'paid'
+                  : (dueThisMonth?.status ?? null);
 
                 return (
                   <ClientCard
@@ -1581,7 +1570,7 @@ export default function Admin() {
                     totalPaymentsYear={totalPaymentsYear}
                     nextPaymentDate={nextPayment?.due_date || null}
                     nextPaymentStatus={nextPayment?.status || null}
-                    currentMonthPaymentStatus={currentMonthPayment?.status || null}
+                    currentMonthPaymentStatus={computedCurrentMonthStatus}
                     onView={handleViewClient}
                     onEdit={handleEditClient}
                     onDelete={handleDeleteClient}
