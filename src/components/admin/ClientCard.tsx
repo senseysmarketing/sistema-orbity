@@ -65,19 +65,28 @@ export function ClientCard({
 
   const loyaltyStatus = getLoyaltyStatus();
 
-  // Define cor de fundo baseado no status do próximo pagamento
-  const getCardBackground = () => {
-    if (!nextPaymentStatus) return 'bg-card';
+  // Define borda colorida baseado no status
+  const getCardBorder = () => {
+    // Prioriza fidelidade vencendo
+    if (loyaltyStatus === 'expiring') {
+      return 'border-orange-400 dark:border-orange-600 border-2';
+    }
+    if (loyaltyStatus === 'expired') {
+      return 'border-red-400 dark:border-red-600 border-2';
+    }
+    
+    // Se não tem status de fidelidade especial, usa status de pagamento
+    if (!nextPaymentStatus) return '';
     
     switch (nextPaymentStatus) {
       case 'overdue':
-        return 'bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-900';
+        return 'border-red-400 dark:border-red-600 border-2';
       case 'pending':
-        return 'bg-yellow-50/50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900';
+        return 'border-yellow-400 dark:border-yellow-600 border-2';
       case 'paid':
-        return 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900';
+        return 'border-green-400 dark:border-green-600 border-2';
       default:
-        return 'bg-card';
+        return '';
     }
   };
 
@@ -90,9 +99,7 @@ export function ClientCard({
 
   return (
     <Card 
-      className={`cursor-pointer transition-all hover:shadow-lg ${getCardBackground()} ${
-        loyaltyStatus === 'expiring' ? 'border-orange-400 dark:border-orange-600 border-2' : ''
-      }`}
+      className={`cursor-pointer transition-all hover:shadow-lg ${getCardBorder()}`}
       onClick={() => onView(client)}
     >
       <CardContent className="p-6">
