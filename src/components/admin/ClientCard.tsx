@@ -65,20 +65,11 @@ export function ClientCard({
 
   const loyaltyStatus = getLoyaltyStatus();
 
-  // Define borda colorida baseado no status
+  // Define borda colorida baseado no status do pagamento do mês atual
   const getCardBorder = () => {
-    // Prioriza fidelidade vencendo
-    if (loyaltyStatus === 'expiring') {
-      return 'border-orange-400 dark:border-orange-600 border-2';
-    }
-    if (loyaltyStatus === 'expired') {
-      return 'border-red-400 dark:border-red-600 border-2';
-    }
+    if (!currentMonthPaymentStatus) return '';
     
-    // Se não tem status de fidelidade especial, usa status de pagamento
-    if (!nextPaymentStatus) return '';
-    
-    switch (nextPaymentStatus) {
+    switch (currentMonthPaymentStatus) {
       case 'overdue':
         return 'border-red-400 dark:border-red-600 border-2';
       case 'pending':
