@@ -92,8 +92,8 @@ export function TaskCard({
       <div className="flex items-center justify-between gap-2 mb-2">
         <PriorityIcon className="h-5 w-5 flex-shrink-0" style={{ color: getPriorityColor(task.priority) }} />
         <div className="flex gap-1 flex-wrap">
-          <Badge variant="outline" className={`${statusConfig[task.status]?.color || "bg-gray-500"} text-white text-xs`}>
-            {statusConfig[task.status]?.label || task.status}
+          <Badge variant="outline" style={{ backgroundColor: getPriorityColor(task.priority) }} className="text-white text-xs">
+            {getPriorityLabel(task.priority)}
           </Badge>
           {urgency.level !== 'normal' && task.status !== 'done' && (
             <Badge variant="outline" className={`${urgency.color} text-xs flex items-center gap-1`}>

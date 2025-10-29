@@ -60,6 +60,20 @@ const getClientColor = (clientId?: string | null): string => {
   return colors[Math.abs(hash) % colors.length];
 };
 
+const priorityConfig = {
+  low: { label: "Baixa", color: "bg-blue-500" },
+  medium: { label: "Média", color: "bg-yellow-500" },
+  high: { label: "Alta", color: "bg-red-500" },
+};
+
+const getPriorityColor = (priority: string) => {
+  return priorityConfig[priority as keyof typeof priorityConfig]?.color || "bg-gray-500";
+};
+
+const getPriorityLabel = (priority: string) => {
+  return priorityConfig[priority as keyof typeof priorityConfig]?.label || priority;
+};
+
 const getUrgencyBadge = (scheduledDate: string) => {
   const now = startOfDay(new Date());
   const postDate = startOfDay(new Date(scheduledDate));
@@ -115,8 +129,8 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
       <div className="flex items-center justify-between gap-2 mb-2">
         <ContentTypeIcon className="h-5 w-5 flex-shrink-0" />
         <div className="flex gap-1 flex-wrap">
-          <Badge variant="outline" className={`${statusInfo.color} text-white text-xs`}>
-            {statusInfo.label}
+          <Badge variant="outline" className={`${getPriorityColor(post.priority)} text-white text-xs`}>
+            {getPriorityLabel(post.priority)}
           </Badge>
           {urgencyBadge && UrgencyIcon && post.status !== 'published' && (
             <Badge variant="outline" className={`${urgencyBadge.color} text-white text-xs flex items-center gap-1`}>
