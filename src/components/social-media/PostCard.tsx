@@ -1,9 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
-import { Instagram, Facebook, Linkedin, Twitter, Youtube, Image, Film, LayoutGrid, Zap, Clock, AlertCircle } from "lucide-react";
+import { Instagram, Facebook, Linkedin, Twitter, Youtube, Image, Film, LayoutGrid, Zap, Clock, AlertCircle, Users } from "lucide-react";
 import { format, isToday, isBefore, startOfDay, addDays, isBefore as isBeforeDate } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { PostAssignedUsers } from "./PostAssignedUsers";
 
 interface PostCardProps {
   post: SocialMediaPost;
@@ -152,7 +151,7 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
       )}
       
       {/* Linha 3: Data + Badge Cliente */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
         <span>
           {format(new Date(post.scheduled_date), "dd/MM/yyyy", { locale: ptBR })}
         </span>
@@ -168,8 +167,18 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
 
       {/* Linha 4: Usuários Atribuídos */}
       {post.assigned_users && post.assigned_users.length > 0 && (
-        <div className="mt-2">
-          <PostAssignedUsers users={post.assigned_users} maxDisplay={3} size="sm" />
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Users className="h-3 w-3" />
+          <div className="flex flex-wrap gap-1">
+            {post.assigned_users.slice(0, 2).map((user, i) => (
+              <span key={i} className="font-medium">
+                {user.name}
+              </span>
+            ))}
+            {post.assigned_users.length > 2 && (
+              <span>+{post.assigned_users.length - 2}</span>
+            )}
+          </div>
         </div>
       )}
 
