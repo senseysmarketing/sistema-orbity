@@ -31,32 +31,32 @@ export function TourTooltip() {
         case 'top':
           top = targetRect.top - tooltipRect.height - 24;
           left = targetRect.left + (targetRect.width - tooltipRect.width) / 2;
-          // Seta apontando para baixo
+          // Seta apontando para baixo, mais à direita do elemento
           arrowTop = targetRect.top - 20;
-          arrowLeft = targetRect.left + targetRect.width / 2;
+          arrowLeft = targetRect.right - 40;
           arrowRotation = 180;
           break;
         case 'bottom':
           top = targetRect.bottom + 24;
           left = targetRect.left + (targetRect.width - tooltipRect.width) / 2;
-          // Seta apontando para cima
+          // Seta apontando para cima, mais à direita do elemento
           arrowTop = targetRect.bottom + 8;
-          arrowLeft = targetRect.left + targetRect.width / 2;
+          arrowLeft = targetRect.right - 40;
           arrowRotation = 0;
           break;
         case 'left':
           top = targetRect.top + (targetRect.height - tooltipRect.height) / 2;
           left = targetRect.left - tooltipRect.width - 24;
-          // Seta apontando para direita
-          arrowTop = targetRect.top + targetRect.height / 2;
+          // Seta apontando para direita, mais acima
+          arrowTop = targetRect.top + 40;
           arrowLeft = targetRect.left - 20;
           arrowRotation = 90;
           break;
         case 'right':
           top = targetRect.top + (targetRect.height - tooltipRect.height) / 2;
           left = targetRect.right + 24;
-          // Seta apontando para esquerda
-          arrowTop = targetRect.top + targetRect.height / 2;
+          // Seta apontando para esquerda, mais acima
+          arrowTop = targetRect.top + 40;
           arrowLeft = targetRect.right + 8;
           arrowRotation = -90;
           break;
