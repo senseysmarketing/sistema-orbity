@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Clock, AlertCircle, Target, Users } from "lucide-react";
+import { CheckCircle, Clock, AlertCircle, Target, Users, Circle, Loader, Eye, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -59,11 +59,11 @@ const priorityIcons = {
   high: AlertCircle,
 };
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  todo: { label: "A Fazer", color: "bg-gray-500" },
-  in_progress: { label: "Em Andamento", color: "bg-blue-500" },
-  em_revisao: { label: "Em Revisão", color: "bg-purple-500" },
-  done: { label: "Concluída", color: "bg-green-500" },
+const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
+  todo: { label: "A Fazer", color: "bg-gray-500", icon: Circle },
+  in_progress: { label: "Em Andamento", color: "bg-blue-500", icon: Loader },
+  em_revisao: { label: "Em Revisão", color: "bg-purple-500", icon: Eye },
+  done: { label: "Concluída", color: "bg-green-500", icon: CheckCircle2 },
 };
 
 export function TaskCard({
@@ -79,6 +79,7 @@ export function TaskCard({
   const clientColor = getClientColor(task.client_id);
   const urgency = getUrgencyLevel(task);
   const PriorityIcon = priorityIcons[task.priority as keyof typeof priorityIcons] || Target;
+  const StatusIcon = statusConfig[task.status]?.icon || Circle;
   const UrgencyIcon = urgency.level === 'completed' ? CheckCircle : 
                       urgency.level === 'overdue' ? AlertCircle : Clock;
 
@@ -88,9 +89,9 @@ export function TaskCard({
       onClick={(e) => onClick?.(e)}
       style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
     >
-      {/* Linha 1: Ícone Prioridade + Badges */}
+      {/* Linha 1: Ícone Status + Badges */}
       <div className="flex items-center justify-between gap-2 mb-2">
-        <PriorityIcon className={`h-5 w-5 flex-shrink-0 ${getPriorityColor(task.priority).replace('bg-','text-')}`} />
+        <StatusIcon className="h-5 w-5 flex-shrink-0" />
         <div className="flex gap-1 flex-wrap">
           <Badge variant="outline" className={`${getPriorityColor(task.priority)} text-white text-xs`}>
             {getPriorityLabel(task.priority)}
