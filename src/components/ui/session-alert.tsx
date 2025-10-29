@@ -39,7 +39,7 @@ export function SessionAlert({
 
   return (
     <div className="fixed top-4 right-4 z-50 w-96 animate-in slide-in-from-top-2">
-      <Alert className="bg-warning/10 border-warning text-warning-foreground">
+      <Alert className="bg-background border-warning shadow-lg">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <h4 className="font-semibold mb-1">{title}</h4>
@@ -50,7 +50,7 @@ export function SessionAlert({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-warning-foreground/70 hover:text-warning-foreground"
+            className="h-6 w-6"
             onClick={() => {
               setIsVisible(false);
               onDismiss();
