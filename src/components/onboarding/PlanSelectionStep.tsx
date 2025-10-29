@@ -23,7 +23,7 @@ interface SubscriptionPlan {
 }
 
 export function PlanSelectionStep() {
-  const { onboardingData, updatePlanSelection, nextStep, prevStep } = useOnboarding();
+  const { onboardingData, updatePlanSelection, initiateCheckout, nextStep, prevStep } = useOnboarding();
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState(onboardingData.planSlug || '');
   const [loading, setLoading] = useState(true);
@@ -50,11 +50,38 @@ export function PlanSelectionStep() {
     }
   };
 
+  const handlePlanAction = async (plan: SubscriptionPlan) => {
+    if (plan.slug === 'basic') {
+      // Plano básico - trial gratuito, apenas seleciona
+      setSelectedPlan(plan.slug);
+      toast.success('Plano Básico selecionado! Continue para finalizar.');
+    } else {
+      // Profissional/Enterprise - requer pagamento imediato
+      if (!onboardingData.companyData || !onboardingData.adminUser) {
+        toast.error('Complete os dados da empresa e do administrador primeiro');
+        return;
+      }
+      
+      setSelectedPlan(plan.slug);
+      updatePlanSelection(plan.slug);
+      
+      // Inicia checkout imediatamente
+      await initiateCheckout(plan.slug);
+    }
+  };
+
   const handleContinue = () => {
     if (!selectedPlan) {
       toast.error('Selecione um plano para continuar');
       return;
     }
+    
+    // Se não for básico, não deve chegar aqui pois já foi para checkout
+    if (selectedPlan !== 'basic') {
+      toast.error('Para planos Profissional e Enterprise, use o botão "Contratar Agora"');
+      return;
+    }
+    
     updatePlanSelection(selectedPlan);
     nextStep();
   };
@@ -113,11 +140,8 @@ export function PlanSelectionStep() {
       <CardHeader className="text-center space-y-4">
         <CardTitle className="text-2xl">Escolha Seu Plano</CardTitle>
         <p className="text-muted-foreground">
-          Comece com 7 dias grátis! Você poderá alterar seu plano a qualquer momento.
+          Plano Básico com 7 dias grátis. Planos superiores requerem pagamento imediato.
         </p>
-        <Badge variant="secondary" className="mx-auto">
-          🎉 Trial gratuito de 7 dias em todos os planos
-        </Badge>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -129,18 +153,29 @@ export function PlanSelectionStep() {
             return (
               <Card 
                 key={plan.id}
-                className={`cursor-pointer transition-all duration-200 ${
+                className={`transition-all duration-200 ${
                   isSelected 
                     ? 'ring-2 ring-primary shadow-lg scale-105' 
                     : 'hover:shadow-md hover:scale-102'
                 }`}
-                onClick={() => setSelectedPlan(plan.slug)}
               >
                 <CardHeader className="text-center">
                   <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
                     <Icon className="h-6 w-6 text-primary" />
                   </div>
                   <CardTitle className="text-xl">{plan.name}</CardTitle>
+                  
+                  {/* Badge diferenciada por tipo de plano */}
+                  {plan.slug === 'basic' ? (
+                    <Badge variant="default" className="mx-auto bg-green-500 hover:bg-green-600">
+                      🎉 7 dias grátis
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="mx-auto">
+                      💳 Pagamento imediato
+                    </Badge>
+                  )}
+                  
                   <div className="text-3xl font-bold text-primary">
                     {formatCurrency(plan.price_monthly)}
                     <span className="text-sm font-normal text-muted-foreground">/mês</span>
@@ -158,11 +193,32 @@ export function PlanSelectionStep() {
                       </li>
                     ))}
                   </ul>
-                  {isSelected && (
-                    <Badge className="w-full justify-center">
-                      Plano Selecionado
-                    </Badge>
+                  
+                  {/* Botão específico por tipo de plano */}
+                  {plan.slug === 'basic' ? (
+                    <Button 
+                      onClick={() => setSelectedPlan(plan.slug)}
+                      variant={isSelected ? "default" : "outline"}
+                      className="w-full"
+                    >
+                      {isSelected ? 'Plano Selecionado' : 'Selecionar Trial Grátis'}
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={() => handlePlanAction(plan)}
+                      variant="default"
+                      className="w-full"
+                    >
+                      Contratar Agora
+                    </Button>
                   )}
+                  
+                  <p className="text-xs text-center text-muted-foreground">
+                    {plan.slug === 'basic' 
+                      ? 'Comece agora sem cartão de crédito'
+                      : 'Checkout seguro via Stripe'
+                    }
+                  </p>
                 </CardContent>
               </Card>
             );

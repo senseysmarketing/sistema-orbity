@@ -10,16 +10,43 @@ export default function SubscriptionSuccess() {
   const [searchParams] = useSearchParams();
   const { checkSubscription } = useSubscription();
   const sessionId = searchParams.get('session_id');
+  const isFromOnboarding = searchParams.get('onboarding') === 'true';
 
   useEffect(() => {
-    // Check subscription status after successful payment
-    if (sessionId) {
-      // Wait a moment for Stripe to process, then check
-      setTimeout(() => {
-        checkSubscription();
-      }, 2000);
-    }
-  }, [sessionId, checkSubscription]);
+    const handleOnboardingSuccess = async () => {
+      // Check if coming from onboarding checkout
+      const onboardingData = sessionStorage.getItem('onboarding_checkout');
+      
+      if (isFromOnboarding && onboardingData) {
+        const { email, password } = JSON.parse(onboardingData);
+        
+        // Auto-login the user
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        if (!error) {
+          // Clear onboarding data
+          sessionStorage.removeItem('onboarding_checkout');
+          
+          // Check subscription and redirect to welcome
+          setTimeout(() => {
+            checkSubscription();
+            navigate('/welcome');
+          }, 2000);
+        }
+      } else if (sessionId) {
+        // Regular subscription flow
+        setTimeout(() => {
+          checkSubscription();
+        }, 2000);
+      }
+    };
+    
+    handleOnboardingSuccess();
+  }, [sessionId, isFromOnboarding, checkSubscription, navigate]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">

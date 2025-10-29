@@ -281,29 +281,64 @@ serve(async (req) => {
       trialEnd 
     });
 
-    // Sync to local database (upsert)
-    const { error: syncError } = await supabaseClient
+    // Check if local subscription exists in pending_payment status (from onboarding)
+    const { data: existingSubscription } = await supabaseClient
       .from('agency_subscriptions')
-      .upsert({
-        agency_id: agencyId,
-        plan_id: plan?.id,
-        stripe_customer_id: customerId,
-        stripe_subscription_id: activeSubscription.id,
-        stripe_price_id: priceId,
-        status: activeSubscription.status === 'trialing' ? 'trial' : 'active',
-        current_period_start: periodStart,
-        current_period_end: subscriptionEnd,
-        trial_end: trialEnd,
-        billing_cycle: 'monthly',
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'agency_id'
-      });
+      .select('id, status')
+      .eq('agency_id', agencyId)
+      .maybeSingle();
 
-    if (syncError) {
-      logStep("Warning: Could not sync subscription to local database", { error: syncError.message });
+    if (existingSubscription?.status === 'pending_payment') {
+      logStep("Found pending_payment subscription, updating to active");
+      
+      // Update existing subscription from pending_payment to active
+      const { error: updateError } = await supabaseClient
+        .from('agency_subscriptions')
+        .update({
+          plan_id: plan?.id,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: activeSubscription.id,
+          stripe_price_id: priceId,
+          status: activeSubscription.status === 'trialing' ? 'trial' : 'active',
+          current_period_start: periodStart,
+          current_period_end: subscriptionEnd,
+          trial_start: null,
+          trial_end: trialEnd,
+          billing_cycle: 'monthly',
+          updated_at: new Date().toISOString()
+        })
+        .eq('agency_id', agencyId);
+
+      if (updateError) {
+        logStep("Warning: Could not update subscription from pending_payment", { error: updateError.message });
+      } else {
+        logStep("Successfully updated subscription from pending_payment to active");
+      }
     } else {
-      logStep("Successfully synced Stripe subscription to local database");
+      // Sync to local database (upsert)
+      const { error: syncError } = await supabaseClient
+        .from('agency_subscriptions')
+        .upsert({
+          agency_id: agencyId,
+          plan_id: plan?.id,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: activeSubscription.id,
+          stripe_price_id: priceId,
+          status: activeSubscription.status === 'trialing' ? 'trial' : 'active',
+          current_period_start: periodStart,
+          current_period_end: subscriptionEnd,
+          trial_end: trialEnd,
+          billing_cycle: 'monthly',
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'agency_id'
+        });
+
+      if (syncError) {
+        logStep("Warning: Could not sync subscription to local database", { error: syncError.message });
+      } else {
+        logStep("Successfully synced Stripe subscription to local database");
+      }
     }
 
     return new Response(JSON.stringify({
