@@ -68,9 +68,47 @@ export function useSocialMediaPosts() {
         .order('scheduled_date', { ascending: true });
 
       if (error) throw error;
+
+      // Buscar atribuições para todos os posts
+      const postIds = (data || []).map(post => post.id);
+      let assignmentsMap: Record<string, any[]> = {};
+
+      if (postIds.length > 0) {
+        const { data: assignments } = await supabase
+          .from('post_assignments')
+          .select('post_id, user_id')
+          .in('post_id', postIds);
+
+        if (assignments && assignments.length > 0) {
+          const userIds = [...new Set(assignments.map(a => a.user_id))];
+          
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, user_id, name, role')
+            .in('user_id', userIds);
+
+          // Criar mapa de atribuições
+          assignments.forEach(assignment => {
+            if (!assignmentsMap[assignment.post_id]) {
+              assignmentsMap[assignment.post_id] = [];
+            }
+            const profile = profiles?.find(p => p.user_id === assignment.user_id);
+            if (profile) {
+              assignmentsMap[assignment.post_id].push({
+                id: profile.id,
+                user_id: profile.user_id,
+                name: profile.name,
+                role: profile.role
+              });
+            }
+          });
+        }
+      }
+
       const formattedData = (data || []).map(post => ({
         ...post,
-        subtasks: Array.isArray(post.subtasks) ? post.subtasks as unknown as Subtask[] : []
+        subtasks: Array.isArray(post.subtasks) ? post.subtasks as unknown as Subtask[] : [],
+        assigned_users: assignmentsMap[post.id] || []
       })) as SocialMediaPost[];
       
       setPosts(formattedData);

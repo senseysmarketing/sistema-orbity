@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Users } from "lucide-react";
 
 interface User {
   id: string;
@@ -15,81 +16,81 @@ interface PostAssignedUsersProps {
 }
 
 export function PostAssignedUsers({ 
-  users, 
+  users = [], 
   maxDisplay = 3, 
   size = 'sm',
   showNames = false 
 }: PostAssignedUsersProps) {
-  if (!users || users.length === 0) {
-    return null;
-  }
-
   const getUserInitials = (name: string) => {
+    if (!name || typeof name !== 'string') return '??';
     return name
       .split(' ')
-      .map(n => n[0])
+      .map(word => word.charAt(0))
       .join('')
-      .substring(0, 2)
-      .toUpperCase();
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   const getSizeClasses = () => {
     switch (size) {
       case 'sm':
         return 'h-6 w-6 text-xs';
-      case 'md':
-        return 'h-8 w-8 text-sm';
       case 'lg':
-        return 'h-10 w-10 text-base';
+        return 'h-10 w-10 text-sm';
       default:
-        return 'h-6 w-6 text-xs';
+        return 'h-8 w-8 text-xs';
     }
   };
 
-  const displayUsers = users.slice(0, maxDisplay);
+  if (!users || users.length === 0) {
+    return null;
+  }
+
+  const visibleUsers = users.slice(0, maxDisplay);
   const remainingCount = users.length - maxDisplay;
 
-  // Se houver apenas um usuário e showNames for true
-  if (users.length === 1 && showNames) {
+  if (showNames && users.length === 1) {
     return (
       <div className="flex items-center gap-2">
         <Avatar className={getSizeClasses()}>
-          <AvatarFallback className="bg-primary text-primary-foreground">
-            {getUserInitials(users[0].name)}
-          </AvatarFallback>
+          <AvatarFallback>{getUserInitials(users[0].name)}</AvatarFallback>
         </Avatar>
-        <span className="text-sm text-muted-foreground">{users[0].name}</span>
+        <span className="text-sm font-medium">{users[0].name}</span>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center -space-x-2">
-        {displayUsers.map((user) => (
+    <div className="flex items-center gap-1">
+      <div className="flex -space-x-1">
+        {visibleUsers.map((user) => (
           <Avatar 
-            key={user.id} 
+            key={user.user_id} 
             className={`${getSizeClasses()} border-2 border-background`}
             title={user.name}
           >
-            <AvatarFallback className="bg-primary text-primary-foreground">
-              {getUserInitials(user.name)}
-            </AvatarFallback>
+            <AvatarFallback>{getUserInitials(user.name)}</AvatarFallback>
           </Avatar>
         ))}
+        
         {remainingCount > 0 && (
           <div 
             className={`${getSizeClasses()} rounded-full bg-muted border-2 border-background flex items-center justify-center`}
-            title={`+${remainingCount} usuário${remainingCount > 1 ? 's' : ''}`}
+            title={`+${remainingCount} usuários`}
           >
-            <span className="text-xs text-muted-foreground">+{remainingCount}</span>
+            <span className="text-xs font-medium">+{remainingCount}</span>
           </div>
         )}
       </div>
+
       {showNames && users.length > 1 && (
-        <span className="text-xs text-muted-foreground">
-          {users.map(u => u.name.split(' ')[0]).join(', ')}
-        </span>
+        <div className="flex flex-col">
+          <span className="text-sm font-medium">{users.length} usuários</span>
+          <span className="text-xs text-muted-foreground">
+            {users.slice(0, 2).map(u => u.name.split(' ')[0]).join(', ')}
+            {users.length > 2 && ` e mais ${users.length - 2}`}
+          </span>
+        </div>
       )}
     </div>
   );
