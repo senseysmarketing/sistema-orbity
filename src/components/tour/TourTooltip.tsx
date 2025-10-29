@@ -6,156 +6,132 @@ import { useProductTour } from '@/hooks/useProductTour';
 
 export function TourTooltip() {
   const { isActive, currentStep, totalSteps, currentStepData, nextStep, prevStep, skipTour } = useProductTour();
-  const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [arrowPosition, setArrowPosition] = useState({ top: 0, left: 0, rotation: 0 });
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isActive || !currentStepData) return;
 
-    const updatePosition = () => {
+    const updateTargetPosition = () => {
       const targetElement = document.querySelector(currentStepData.target);
-      if (!targetElement || !tooltipRef.current) return;
+      if (!targetElement) return;
 
-      const targetRect = targetElement.getBoundingClientRect();
-      const tooltipRect = tooltipRef.current.getBoundingClientRect();
-      const placement = currentStepData.placement || 'bottom';
-      
-      let top = 0;
-      let left = 0;
-      let arrowTop = 0;
-      let arrowLeft = 0;
-      let arrowRotation = 0;
+      const rect = targetElement.getBoundingClientRect();
+      setTargetRect(rect);
 
-      switch (placement) {
-        case 'top':
-          top = targetRect.top - tooltipRect.height - 24;
-          left = targetRect.left + (targetRect.width - tooltipRect.width) / 2;
-          // Seta apontando para baixo, mais à direita do elemento
-          arrowTop = targetRect.top - 20;
-          arrowLeft = targetRect.right - 40;
-          arrowRotation = 180;
-          break;
-        case 'bottom':
-          top = targetRect.bottom + 24;
-          left = targetRect.left + (targetRect.width - tooltipRect.width) / 2;
-          // Seta apontando para cima, mais à direita do elemento
-          arrowTop = targetRect.bottom + 8;
-          arrowLeft = targetRect.right - 40;
-          arrowRotation = 0;
-          break;
-        case 'left':
-          top = targetRect.top + (targetRect.height - tooltipRect.height) / 2;
-          left = targetRect.left - tooltipRect.width - 24;
-          // Seta apontando para direita, mais acima
-          arrowTop = targetRect.top + 40;
-          arrowLeft = targetRect.left - 20;
-          arrowRotation = 90;
-          break;
-        case 'right':
-          top = targetRect.top + (targetRect.height - tooltipRect.height) / 2;
-          left = targetRect.right + 24;
-          // Seta apontando para esquerda, mais acima
-          arrowTop = targetRect.top + 40;
-          arrowLeft = targetRect.right + 8;
-          arrowRotation = -90;
-          break;
-      }
-
-      // Keep tooltip in viewport
-      const padding = 16;
-      top = Math.max(padding, Math.min(top, window.innerHeight - tooltipRect.height - padding));
-      left = Math.max(padding, Math.min(left, window.innerWidth - tooltipRect.width - padding));
-
-      setPosition({ top, left });
-      setArrowPosition({ top: arrowTop, left: arrowLeft, rotation: arrowRotation });
-
-      // Scroll target into view
+      // Scroll target into view smoothly
       targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
 
-    updatePosition();
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition);
+    updateTargetPosition();
+    window.addEventListener('resize', updateTargetPosition);
+    window.addEventListener('scroll', updateTargetPosition, true);
 
     return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition);
+      window.removeEventListener('resize', updateTargetPosition);
+      window.removeEventListener('scroll', updateTargetPosition, true);
     };
   }, [isActive, currentStepData]);
 
-  if (!isActive || !currentStepData) return null;
+  if (!isActive || !currentStepData || !targetRect) return null;
+
+  // Calculate arrow path from modal to target
+  const modalPosition = { bottom: 24, right: 24 }; // Fixed bottom-right position
+  const modalCenter = {
+    x: window.innerWidth - modalPosition.right - 192, // 192 = half of w-96 (384px)
+    y: window.innerHeight - modalPosition.bottom - 120 // Approximate modal height
+  };
+  
+  const targetCenter = {
+    x: targetRect.left + targetRect.width / 2,
+    y: targetRect.top + targetRect.height / 2
+  };
 
   return (
     <>
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[9998] animate-fade-in" onClick={skipTour} />
+      {/* Overlay com efeito de spotlight */}
+      <div className="fixed inset-0 z-[9998] animate-fade-in" onClick={skipTour}>
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      </div>
       
-      {/* Spotlight effect on target */}
+      {/* Spotlight effect - destaque no elemento alvo */}
+      <div
+        className="fixed z-[9999] pointer-events-none rounded-lg"
+        style={{
+          top: targetRect.top - 8,
+          left: targetRect.left - 8,
+          width: targetRect.width + 16,
+          height: targetRect.height + 16,
+          boxShadow: '0 0 0 4px hsl(var(--primary)), 0 0 60px 20px hsl(var(--primary) / 0.4), 0 0 0 9999px rgba(0, 0, 0, 0.3)',
+          animation: 'pulse-glow 2s ease-in-out infinite',
+        }}
+      />
+
       <style>{`
         ${currentStepData.target} {
           position: relative;
-          z-index: 9999 !important;
-          box-shadow: 0 0 0 4px hsl(var(--primary)), 0 0 40px 8px hsl(var(--primary) / 0.3) !important;
-          border-radius: 8px;
-          animation: pulse-glow 2s ease-in-out infinite;
+          z-index: 10000 !important;
         }
         
         @keyframes pulse-glow {
           0%, 100% {
-            box-shadow: 0 0 0 4px hsl(var(--primary)), 0 0 40px 8px hsl(var(--primary) / 0.3);
+            box-shadow: 0 0 0 4px hsl(var(--primary)), 0 0 60px 20px hsl(var(--primary) / 0.4), 0 0 0 9999px rgba(0, 0, 0, 0.3);
           }
           50% {
-            box-shadow: 0 0 0 4px hsl(var(--primary)), 0 0 60px 12px hsl(var(--primary) / 0.5);
+            box-shadow: 0 0 0 6px hsl(var(--primary)), 0 0 80px 30px hsl(var(--primary) / 0.6), 0 0 0 9999px rgba(0, 0, 0, 0.3);
           }
         }
         
-        @keyframes bounce-arrow {
-          0%, 100% {
-            transform: translateY(0) rotate(var(--arrow-rotation));
+        @keyframes draw-line {
+          0% {
+            stroke-dashoffset: 1000;
           }
-          50% {
-            transform: translateY(-8px) rotate(var(--arrow-rotation));
+          100% {
+            stroke-dashoffset: 0;
           }
         }
       `}</style>
 
-      {/* Seta animada apontando para o elemento */}
-      <div 
-        className="fixed z-[9999] pointer-events-none"
-        style={{ 
-          top: `${arrowPosition.top}px`, 
-          left: `${arrowPosition.left}px`,
-          '--arrow-rotation': `${arrowPosition.rotation}deg`
-        } as React.CSSProperties}
+      {/* Linha conectando modal ao elemento alvo */}
+      <svg
+        className="fixed inset-0 z-[9999] pointer-events-none"
+        style={{ width: '100%', height: '100%' }}
       >
-        <svg
-          width="32"
-          height="32"
-          viewBox="0 0 24 24"
+        <defs>
+          <marker
+            id="arrowhead"
+            markerWidth="10"
+            markerHeight="10"
+            refX="9"
+            refY="3"
+            orient="auto"
+          >
+            <polygon
+              points="0 0, 10 3, 0 6"
+              fill="hsl(var(--primary))"
+            />
+          </marker>
+        </defs>
+        <path
+          d={`M ${modalCenter.x} ${modalCenter.y} Q ${(modalCenter.x + targetCenter.x) / 2} ${(modalCenter.y + targetCenter.y) / 2 - 50}, ${targetCenter.x} ${targetCenter.y}`}
+          stroke="hsl(var(--primary))"
+          strokeWidth="3"
           fill="none"
-          className="text-primary drop-shadow-lg"
+          strokeDasharray="10,5"
+          markerEnd="url(#arrowhead)"
           style={{
-            animation: 'bounce-arrow 1.5s ease-in-out infinite',
-            transformOrigin: 'center',
-            transform: `translateX(-50%) translateY(-50%) rotate(${arrowPosition.rotation}deg)`
+            filter: 'drop-shadow(0 0 8px hsl(var(--primary) / 0.6))',
+            animation: 'draw-line 1s ease-out forwards',
+            strokeDasharray: '1000',
+            strokeDashoffset: '1000'
           }}
-        >
-          <path
-            d="M12 5L12 19M12 19L5 12M12 19L19 12"
-            stroke="currentColor"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
+        />
+      </svg>
 
-      {/* Tooltip */}
+      {/* Modal fixo no canto inferior direito */}
       <Card 
         ref={tooltipRef}
-        className="fixed z-[10000] w-96 shadow-2xl border-2 border-primary/20 animate-scale-in"
-        style={{ top: `${position.top}px`, left: `${position.left}px` }}
+        className="fixed bottom-6 right-6 z-[10000] w-96 shadow-2xl border-2 border-primary/30 animate-scale-in"
       >
         <CardHeader className="pb-3 bg-gradient-to-r from-primary/5 to-transparent">
           <div className="flex items-start justify-between gap-2">
