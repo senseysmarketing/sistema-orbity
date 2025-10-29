@@ -265,11 +265,11 @@ export default function Tasks() {
 
   const getPriorityColor = (priority: string) => {
     const colors: Record<string, string> = {
-      low: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
-      medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-      high: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+      low: "bg-blue-500",
+      medium: "bg-yellow-500",
+      high: "bg-red-500",
     };
-    return colors[priority] || "bg-muted text-muted-foreground";
+    return colors[priority] || "bg-gray-500";
   };
 
   const getClientName = (clientId: string | null) => {
