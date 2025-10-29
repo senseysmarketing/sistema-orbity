@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAgency } from './useAgency';
 import { toast } from 'sonner';
+import { useCache } from './useCache';
 
 export interface Subtask {
   id: string;
@@ -50,11 +51,35 @@ export function useSocialMediaPosts() {
   const { currentAgency } = useAgency();
   const [posts, setPosts] = useState<SocialMediaPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [minLoadTime, setMinLoadTime] = useState(true);
+  const cache = useCache<SocialMediaPost[]>(5 * 60 * 1000); // 5 minutos
 
   const fetchPosts = async () => {
-    if (!currentAgency?.id) return;
+    if (!currentAgency?.id) {
+      setLoading(false);
+      setMinLoadTime(false);
+      return;
+    }
+
+    // Timer para garantir mínimo de 500ms de skeleton
+    const minLoadTimer = setTimeout(() => setMinLoadTime(false), 500);
 
     try {
+      // Verificar cache primeiro
+      const cacheKey = `posts-${currentAgency.id}`;
+      const cached = cache.get(cacheKey);
+      
+      if (cached.exists && cached.data) {
+        setPosts(cached.data);
+        // Se dados estão em cache e não estão obsoletos, mostrar imediatamente
+        if (!cached.isStale) {
+          setLoading(false);
+          clearTimeout(minLoadTimer);
+          setMinLoadTime(false);
+          return;
+        }
+      }
+
       setLoading(true);
       const { data, error } = await supabase
         .from('social_media_posts')
@@ -112,13 +137,19 @@ export function useSocialMediaPosts() {
       })) as SocialMediaPost[];
       
       setPosts(formattedData);
+      
+      // Atualizar cache
       if (currentAgency?.id) {
+        const cacheKey = `posts-${currentAgency.id}`;
+        cache.set(cacheKey, formattedData);
         postsCache[currentAgency.id] = formattedData;
       }
     } catch (error: any) {
       toast.error('Erro ao carregar postagens: ' + error.message);
     } finally {
+      clearTimeout(minLoadTimer);
       setLoading(false);
+      setMinLoadTime(false);
     }
   };
 
@@ -275,7 +306,7 @@ export function useSocialMediaPosts() {
 
   return {
     posts,
-    loading,
+    loading: loading || minLoadTime,
     fetchPosts,
     createPost,
     updatePost,

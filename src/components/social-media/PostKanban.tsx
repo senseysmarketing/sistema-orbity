@@ -12,9 +12,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import { PostCardSkeleton } from "@/components/ui/post-card-skeleton";
 
 export function PostKanban() {
-  const { posts, updatePost, deletePost, fetchPosts } = useSocialMediaPosts();
+  const { posts, loading, updatePost, deletePost, fetchPosts } = useSocialMediaPosts();
   const { currentAgency } = useAgency();
   const [activePost, setActivePost] = useState<SocialMediaPost | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -225,24 +226,41 @@ export function PostKanban() {
       </div>
 
       <div className="flex-1 overflow-hidden">
-        <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <div className="flex gap-6 overflow-x-auto pb-4 h-full scroll-smooth scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+        {loading ? (
+          <div className="flex gap-6 overflow-x-auto pb-4 h-full">
             {allColumns.map(column => (
-              <PostKanbanColumn
-                key={column.id}
-                id={column.id}
-                title={column.title}
-                color={column.color}
-                posts={getPostsByStatus(column.id)}
-                onPostClick={handlePostClick}
-              />
+              <div key={column.id} className="flex-shrink-0 w-[350px] space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className={`w-3 h-3 rounded-full ${column.color}`} />
+                  <h3 className="font-semibold">{column.title}</h3>
+                </div>
+                <div className="space-y-3">
+                  <PostCardSkeleton />
+                  <PostCardSkeleton />
+                </div>
+              </div>
             ))}
           </div>
+        ) : (
+          <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+            <div className="flex gap-6 overflow-x-auto pb-4 h-full scroll-smooth scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+              {allColumns.map(column => (
+                <PostKanbanColumn
+                  key={column.id}
+                  id={column.id}
+                  title={column.title}
+                  color={column.color}
+                  posts={getPostsByStatus(column.id)}
+                  onPostClick={handlePostClick}
+                />
+              ))}
+            </div>
 
-          <DragOverlay>
-            {activePost ? <PostCard post={activePost} /> : null}
-          </DragOverlay>
-        </DndContext>
+            <DragOverlay>
+              {activePost ? <PostCard post={activePost} /> : null}
+            </DragOverlay>
+          </DndContext>
+        )}
       </div>
 
       <PostFormDialog 
