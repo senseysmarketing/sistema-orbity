@@ -36,6 +36,12 @@ export interface SocialMediaPost {
   campaigns?: {
     name: string;
   } | null;
+  assigned_users?: {
+    id: string;
+    user_id: string;
+    name: string;
+    role: string;
+  }[];
 }
 const POSTS_UPDATED_EVENT = 'social-media-posts-updated';
 const postsCache: Record<string, SocialMediaPost[]> = {};

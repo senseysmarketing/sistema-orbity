@@ -11,6 +11,7 @@ import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
+import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
 
 interface PostFormDialogProps {
   open: boolean;
@@ -29,6 +30,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
   const { currentAgency } = useAgency();
   const { toast } = useToast();
   const [clients, setClients] = useState<Client[]>([]);
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Helper para converter Date para formato datetime-local mantendo fuso horário local
@@ -84,19 +87,56 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     }
   }, [editPost, defaultDate, open]);
 
-  // Buscar clientes
+  // Buscar clientes e perfis
   useEffect(() => {
-    const fetchClients = async () => {
+    const fetchData = async () => {
       if (!currentAgency?.id) return;
-      const { data } = await supabase
+      
+      // Buscar clientes
+      const { data: clientsData } = await supabase
         .from('clients')
         .select('id, name')
         .eq('agency_id', currentAgency.id)
         .eq('active', true);
-      if (data) setClients(data);
+      if (clientsData) setClients(clientsData);
+
+      // Buscar perfis de usuários da agência
+      const { data: agencyUsers } = await supabase
+        .from('agency_users')
+        .select('user_id')
+        .eq('agency_id', currentAgency.id);
+      
+      if (agencyUsers) {
+        const userIds = agencyUsers.map(u => u.user_id);
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, user_id, name, role')
+          .in('user_id', userIds);
+        if (profilesData) setProfiles(profilesData);
+      }
     };
-    fetchClients();
+    fetchData();
   }, [currentAgency?.id]);
+
+  // Carregar atribuições do post sendo editado
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      if (!editPost?.id) {
+        setSelectedUserIds([]);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('post_assignments')
+        .select('user_id')
+        .eq('post_id', editPost.id);
+      
+      if (data) {
+        setSelectedUserIds(data.map(a => a.user_id));
+      }
+    };
+    fetchAssignments();
+  }, [editPost?.id]);
 
   // Tipos de conteúdo padrão
   const defaultContentTypes = [
@@ -399,10 +439,34 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
           ...data,
           approval_history: [...currentHistory, newHistoryEntry] as any,
         });
+
+        // Atualizar atribuições
+        await supabase
+          .from('post_assignments')
+          .delete()
+          .eq('post_id', editPost.id);
+
+        if (selectedUserIds.length > 0) {
+          const assignments = selectedUserIds.map(userId => ({
+            post_id: editPost.id,
+            user_id: userId
+          }));
+          await supabase.from('post_assignments').insert(assignments);
+        }
         
         toast({ title: "Postagem atualizada com sucesso!" });
       } else {
-        await createPost(data);
+        const createdPost = await createPost(data);
+        
+        // Criar atribuições para o novo post
+        if (createdPost && selectedUserIds.length > 0) {
+          const assignments = selectedUserIds.map(userId => ({
+            post_id: createdPost.id,
+            user_id: userId
+          }));
+          await supabase.from('post_assignments').insert(assignments);
+        }
+        
         toast({ title: "Postagem criada com sucesso!" });
       }
       
@@ -548,6 +612,15 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div>
+            <Label>Atribuir a Usuários</Label>
+            <MultiUserSelector
+              users={profiles}
+              selectedUserIds={selectedUserIds}
+              onSelectionChange={setSelectedUserIds}
+            />
           </div>
 
           <div>

@@ -3,17 +3,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 // Evento customizado para sincronização entre componentes
-const ASSIGNMENTS_UPDATED_EVENT = 'task-assignments-updated';
+const POST_ASSIGNMENTS_UPDATED_EVENT = 'post-assignments-updated';
 
-interface TaskAssignment {
+interface PostAssignment {
   id: string;
-  task_id: string;
+  post_id: string;
   user_id: string;
   assigned_at: string;
   assigned_by: string | null;
 }
 
-interface TaskAssignmentWithProfile extends TaskAssignment {
+interface PostAssignmentWithProfile extends PostAssignment {
   profiles: {
     id: string;
     user_id: string;
@@ -22,26 +22,26 @@ interface TaskAssignmentWithProfile extends TaskAssignment {
   };
 }
 
-export function useTaskAssignments() {
-  const [assignments, setAssignments] = useState<TaskAssignmentWithProfile[]>([]);
+export function usePostAssignments() {
+  const [assignments, setAssignments] = useState<PostAssignmentWithProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const fetchAssignments = useCallback(async (taskId?: string) => {
+  const fetchAssignments = useCallback(async (postId?: string) => {
     setLoading(true);
     try {
       let query = supabase
-        .from('task_assignments')
+        .from('post_assignments')
         .select('*');
 
-      if (taskId) {
-        query = query.eq('task_id', taskId);
+      if (postId) {
+        query = query.eq('post_id', postId);
       }
 
       const { data: assignmentData, error: assignmentError } = await query;
 
       if (assignmentError) {
-        console.error('Error fetching assignments:', assignmentError);
+        console.error('Error fetching post assignments:', assignmentError);
         throw assignmentError;
       }
 
@@ -85,7 +85,7 @@ export function useTaskAssignments() {
     }
   }, [toast]);
 
-  const assignUsersToTask = async (taskId: string, userIds: string[]) => {
+  const assignUsersToPost = async (postId: string, userIds: string[]) => {
     // Salvar estado anterior para rollback
     const previousAssignments = [...assignments];
     
@@ -93,7 +93,7 @@ export function useTaskAssignments() {
       // Atualização otimista: atualizar UI imediatamente
       const newAssignments = userIds.map(userId => ({
         id: `temp-${userId}`,
-        task_id: taskId,
+        post_id: postId,
         user_id: userId,
         assigned_at: new Date().toISOString(),
         assigned_by: null,
@@ -108,35 +108,35 @@ export function useTaskAssignments() {
 
       // Remover atribuições existentes
       await supabase
-        .from('task_assignments')
+        .from('post_assignments')
         .delete()
-        .eq('task_id', taskId);
+        .eq('post_id', postId);
 
       // Adicionar novas atribuições
       if (userIds.length > 0) {
         const assignmentsToInsert = userIds.map(userId => ({
-          task_id: taskId,
+          post_id: postId,
           user_id: userId
         }));
 
         const { error } = await supabase
-          .from('task_assignments')
+          .from('post_assignments')
           .insert(assignmentsToInsert);
 
         if (error) throw error;
       }
 
       // Buscar dados completos
-      await fetchAssignments(taskId);
+      await fetchAssignments(postId);
       
       // Emitir evento para outros componentes
-      window.dispatchEvent(new CustomEvent(ASSIGNMENTS_UPDATED_EVENT, { 
-        detail: { taskId, userIds } 
+      window.dispatchEvent(new CustomEvent(POST_ASSIGNMENTS_UPDATED_EVENT, { 
+        detail: { postId, userIds } 
       }));
       
       toast({
         title: "Sucesso",
-        description: "Usuários atribuídos à tarefa com sucesso!",
+        description: "Usuários atribuídos ao post com sucesso!",
       });
     } catch (error: any) {
       // Rollback em caso de erro
@@ -150,33 +150,32 @@ export function useTaskAssignments() {
     }
   };
 
-  const getAssignedUsers = (taskId: string) => {
-    const taskAssignments = assignments.filter(assignment => assignment.task_id === taskId);
-    // Retorna no formato que os componentes esperam
-    return taskAssignments.map(assignment => assignment);
+  const getAssignedUsers = (postId: string) => {
+    const postAssignments = assignments.filter(assignment => assignment.post_id === postId);
+    return postAssignments.map(assignment => assignment);
   };
 
-  const getTasksForUser = (userId: string) => {
+  const getPostsForUser = (userId: string) => {
     return assignments
       .filter(assignment => assignment.user_id === userId)
-      .map(assignment => assignment.task_id);
+      .map(assignment => assignment.post_id);
   };
 
-  const removeUserFromTask = async (taskId: string, userId: string) => {
+  const removeUserFromPost = async (postId: string, userId: string) => {
     try {
       const { error } = await supabase
-        .from('task_assignments')
+        .from('post_assignments')
         .delete()
-        .eq('task_id', taskId)
+        .eq('post_id', postId)
         .eq('user_id', userId);
 
       if (error) throw error;
 
-      await fetchAssignments(taskId);
+      await fetchAssignments(postId);
       
       toast({
         title: "Sucesso",
-        description: "Usuário removido da tarefa com sucesso!",
+        description: "Usuário removido do post com sucesso!",
       });
     } catch (error: any) {
       toast({
@@ -190,16 +189,16 @@ export function useTaskAssignments() {
   // Listener para sincronização em tempo real
   useEffect(() => {
     const channel = supabase
-      .channel('task-assignments-changes')
+      .channel('post-assignments-changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'task_assignments'
+          table: 'post_assignments'
         },
         (payload) => {
-          console.log('Task assignment change detected:', payload);
+          console.log('Post assignment change detected:', payload);
           // Recarregar atribuições quando houver mudanças
           fetchAssignments();
         }
@@ -208,14 +207,14 @@ export function useTaskAssignments() {
 
     // Listener para eventos customizados
     const handleAssignmentUpdate = (event: any) => {
-      fetchAssignments(event.detail?.taskId);
+      fetchAssignments(event.detail?.postId);
     };
     
-    window.addEventListener(ASSIGNMENTS_UPDATED_EVENT, handleAssignmentUpdate);
+    window.addEventListener(POST_ASSIGNMENTS_UPDATED_EVENT, handleAssignmentUpdate);
 
     return () => {
       supabase.removeChannel(channel);
-      window.removeEventListener(ASSIGNMENTS_UPDATED_EVENT, handleAssignmentUpdate);
+      window.removeEventListener(POST_ASSIGNMENTS_UPDATED_EVENT, handleAssignmentUpdate);
     };
   }, [fetchAssignments]);
 
@@ -223,9 +222,9 @@ export function useTaskAssignments() {
     assignments,
     loading,
     fetchAssignments,
-    assignUsersToTask,
+    assignUsersToPost,
     getAssignedUsers,
-    getTasksForUser,
-    removeUserFromTask
+    getPostsForUser,
+    removeUserFromPost
   };
 }

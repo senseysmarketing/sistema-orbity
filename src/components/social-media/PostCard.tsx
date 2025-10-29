@@ -3,6 +3,7 @@ import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 import { Instagram, Facebook, Linkedin, Twitter, Youtube, Image, Film, LayoutGrid, Zap, Clock, AlertCircle } from "lucide-react";
 import { format, isToday, isBefore, startOfDay, addDays, isBefore as isBeforeDate } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { PostAssignedUsers } from "./PostAssignedUsers";
 
 interface PostCardProps {
   post: SocialMediaPost;
@@ -164,6 +165,13 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
           </span>
         )}
       </div>
+
+      {/* Linha 4: Usuários Atribuídos */}
+      {post.assigned_users && post.assigned_users.length > 0 && (
+        <div className="mt-2">
+          <PostAssignedUsers users={post.assigned_users} maxDisplay={3} size="sm" />
+        </div>
+      )}
 
       {post.hashtags && post.hashtags.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">

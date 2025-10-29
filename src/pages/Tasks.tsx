@@ -125,6 +125,17 @@ export default function Tasks() {
 
     // Arquivar tarefas concluídas há mais de 7 dias
     archiveOldCompletedTasks();
+
+    // Listener para mudanças nas atribuições
+    const handleAssignmentsUpdate = () => {
+      fetchTasks();
+      fetchAssignments();
+    };
+
+    window.addEventListener('task-assignments-updated', handleAssignmentsUpdate);
+    return () => {
+      window.removeEventListener('task-assignments-updated', handleAssignmentsUpdate);
+    };
   }, []);
 
   const archiveOldCompletedTasks = async () => {

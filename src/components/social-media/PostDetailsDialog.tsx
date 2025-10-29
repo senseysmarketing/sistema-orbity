@@ -4,12 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History, ListTodo } from "lucide-react";
+import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History, ListTodo, Users } from "lucide-react";
 import { SocialMediaPost, Subtask } from "@/hooks/useSocialMediaPosts";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PostAssignedUsers } from "./PostAssignedUsers";
 
 interface PostDetailsDialogProps {
   post: SocialMediaPost | null;
@@ -56,9 +57,13 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [creatorName, setCreatorName] = useState<string>("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [assignedUsers, setAssignedUsers] = useState<any[]>([]);
 
   useEffect(() => {
-    const loadCreator = async () => {
+    const loadData = async () => {
+      if (!post?.id) return;
+
+      // Buscar criador
       if (post?.created_by) {
         const { data: creatorProfile } = await supabase
           .from("profiles")
@@ -70,6 +75,26 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
           setCreatorName(creatorProfile.name);
         }
       }
+
+      // Buscar usuários atribuídos
+      const { data: assignments } = await supabase
+        .from('post_assignments')
+        .select('user_id')
+        .eq('post_id', post.id);
+
+      if (assignments && assignments.length > 0) {
+        const userIds = assignments.map(a => a.user_id);
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, user_id, name, role')
+          .in('user_id', userIds);
+        
+        if (profiles) {
+          setAssignedUsers(profiles);
+        }
+      } else {
+        setAssignedUsers([]);
+      }
     };
 
     if (post?.subtasks) {
@@ -78,7 +103,7 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
       setSubtasks([]);
     }
 
-    loadCreator();
+    loadData();
   }, [post]);
 
   const handleToggleSubtask = async (subtaskId: string) => {
@@ -175,6 +200,16 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
                   <div>
                     <p className="text-sm font-medium">Campanha</p>
                     <p className="text-sm text-muted-foreground">{post.campaigns.name}</p>
+                  </div>
+                </div>
+              )}
+
+              {assignedUsers.length > 0 && (
+                <div className="flex items-start gap-2">
+                  <Users className="h-4 w-4 mt-1 text-muted-foreground" />
+                  <div className="w-full">
+                    <p className="text-sm font-medium mb-2">Atribuído a</p>
+                    <PostAssignedUsers users={assignedUsers} showNames={true} size="md" />
                   </div>
                 </div>
               )}
