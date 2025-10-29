@@ -35,26 +35,12 @@ export function TourTooltip() {
 
   if (!isActive || !currentStepData || !targetRect) return null;
 
-  // Calculate arrow path from modal to target
-  const modalPosition = { bottom: 24, right: 24 }; // Fixed bottom-right position
-  const modalCenter = {
-    x: window.innerWidth - modalPosition.right - 192, // 192 = half of w-96 (384px)
-    y: window.innerHeight - modalPosition.bottom - 120 // Approximate modal height
-  };
-  
-  const targetCenter = {
-    x: targetRect.left + targetRect.width / 2,
-    y: targetRect.top + targetRect.height / 2
-  };
-
   return (
     <>
-      {/* Overlay com efeito de spotlight */}
-      <div className="fixed inset-0 z-[9998] animate-fade-in" onClick={skipTour}>
-        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-      </div>
+      {/* Overlay escuro sem blur */}
+      <div className="fixed inset-0 bg-black/75 z-[9998] animate-fade-in" onClick={skipTour} />
       
-      {/* Spotlight effect - destaque no elemento alvo */}
+      {/* Spotlight com cor de alto contraste */}
       <div
         className="fixed z-[9999] pointer-events-none rounded-lg"
         style={{
@@ -62,8 +48,8 @@ export function TourTooltip() {
           left: targetRect.left - 8,
           width: targetRect.width + 16,
           height: targetRect.height + 16,
-          boxShadow: '0 0 0 4px hsl(var(--primary)), 0 0 60px 20px hsl(var(--primary) / 0.4), 0 0 0 9999px rgba(0, 0, 0, 0.3)',
-          animation: 'pulse-glow 2s ease-in-out infinite',
+          boxShadow: '0 0 0 3px hsl(var(--primary)), 0 0 0 6px hsl(var(--background)), 0 0 40px 15px hsl(var(--primary) / 0.8), 0 0 0 9999px rgba(0, 0, 0, 0.75)',
+          animation: 'pulse-spotlight 2s ease-in-out infinite',
         }}
       />
 
@@ -73,60 +59,15 @@ export function TourTooltip() {
           z-index: 10000 !important;
         }
         
-        @keyframes pulse-glow {
+        @keyframes pulse-spotlight {
           0%, 100% {
-            box-shadow: 0 0 0 4px hsl(var(--primary)), 0 0 60px 20px hsl(var(--primary) / 0.4), 0 0 0 9999px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 0 0 3px hsl(var(--primary)), 0 0 0 6px hsl(var(--background)), 0 0 40px 15px hsl(var(--primary) / 0.8), 0 0 0 9999px rgba(0, 0, 0, 0.75);
           }
           50% {
-            box-shadow: 0 0 0 6px hsl(var(--primary)), 0 0 80px 30px hsl(var(--primary) / 0.6), 0 0 0 9999px rgba(0, 0, 0, 0.3);
-          }
-        }
-        
-        @keyframes draw-line {
-          0% {
-            stroke-dashoffset: 1000;
-          }
-          100% {
-            stroke-dashoffset: 0;
+            box-shadow: 0 0 0 4px hsl(var(--primary)), 0 0 0 8px hsl(var(--background)), 0 0 60px 25px hsl(var(--primary) / 0.9), 0 0 0 9999px rgba(0, 0, 0, 0.75);
           }
         }
       `}</style>
-
-      {/* Linha conectando modal ao elemento alvo */}
-      <svg
-        className="fixed inset-0 z-[9999] pointer-events-none"
-        style={{ width: '100%', height: '100%' }}
-      >
-        <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="10"
-            markerHeight="10"
-            refX="9"
-            refY="3"
-            orient="auto"
-          >
-            <polygon
-              points="0 0, 10 3, 0 6"
-              fill="hsl(var(--primary))"
-            />
-          </marker>
-        </defs>
-        <path
-          d={`M ${modalCenter.x} ${modalCenter.y} Q ${(modalCenter.x + targetCenter.x) / 2} ${(modalCenter.y + targetCenter.y) / 2 - 50}, ${targetCenter.x} ${targetCenter.y}`}
-          stroke="hsl(var(--primary))"
-          strokeWidth="3"
-          fill="none"
-          strokeDasharray="10,5"
-          markerEnd="url(#arrowhead)"
-          style={{
-            filter: 'drop-shadow(0 0 8px hsl(var(--primary) / 0.6))',
-            animation: 'draw-line 1s ease-out forwards',
-            strokeDasharray: '1000',
-            strokeDashoffset: '1000'
-          }}
-        />
-      </svg>
 
       {/* Modal fixo no canto inferior direito */}
       <Card 
