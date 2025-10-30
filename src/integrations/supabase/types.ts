@@ -1739,6 +1739,163 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_delivery_logs: {
+        Row: {
+          agency_id: string
+          channel: string
+          created_at: string | null
+          error_message: string | null
+          id: string
+          notification_id: string | null
+          sent_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          agency_id: string
+          channel: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          notification_id?: string | null
+          sent_at?: string | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          agency_id?: string
+          channel?: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          notification_id?: string | null
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_delivery_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_delivery_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "notification_delivery_logs_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_integrations: {
+        Row: {
+          agency_id: string
+          created_at: string | null
+          custom_webhook_auth_type: string | null
+          custom_webhook_auth_value: string | null
+          custom_webhook_enabled: boolean | null
+          custom_webhook_headers: Json | null
+          custom_webhook_method: string | null
+          custom_webhook_template: Json | null
+          custom_webhook_url: string | null
+          discord_enabled: boolean | null
+          discord_webhook_url: string | null
+          email_enabled: boolean | null
+          email_from_address: string | null
+          email_from_name: string | null
+          email_provider: string | null
+          evolution_api_key: string | null
+          evolution_api_url: string | null
+          evolution_instance_name: string | null
+          id: string
+          slack_channel: string | null
+          slack_enabled: boolean | null
+          slack_webhook_url: string | null
+          updated_at: string | null
+          whatsapp_enabled: boolean | null
+          whatsapp_provider: string | null
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string | null
+          custom_webhook_auth_type?: string | null
+          custom_webhook_auth_value?: string | null
+          custom_webhook_enabled?: boolean | null
+          custom_webhook_headers?: Json | null
+          custom_webhook_method?: string | null
+          custom_webhook_template?: Json | null
+          custom_webhook_url?: string | null
+          discord_enabled?: boolean | null
+          discord_webhook_url?: string | null
+          email_enabled?: boolean | null
+          email_from_address?: string | null
+          email_from_name?: string | null
+          email_provider?: string | null
+          evolution_api_key?: string | null
+          evolution_api_url?: string | null
+          evolution_instance_name?: string | null
+          id?: string
+          slack_channel?: string | null
+          slack_enabled?: boolean | null
+          slack_webhook_url?: string | null
+          updated_at?: string | null
+          whatsapp_enabled?: boolean | null
+          whatsapp_provider?: string | null
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string | null
+          custom_webhook_auth_type?: string | null
+          custom_webhook_auth_value?: string | null
+          custom_webhook_enabled?: boolean | null
+          custom_webhook_headers?: Json | null
+          custom_webhook_method?: string | null
+          custom_webhook_template?: Json | null
+          custom_webhook_url?: string | null
+          discord_enabled?: boolean | null
+          discord_webhook_url?: string | null
+          email_enabled?: boolean | null
+          email_from_address?: string | null
+          email_from_name?: string | null
+          email_provider?: string | null
+          evolution_api_key?: string | null
+          evolution_api_url?: string | null
+          evolution_instance_name?: string | null
+          id?: string
+          slack_channel?: string | null
+          slack_enabled?: boolean | null
+          slack_webhook_url?: string | null
+          updated_at?: string | null
+          whatsapp_enabled?: boolean | null
+          whatsapp_provider?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_integrations_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_integrations_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           agency_id: string
@@ -3232,6 +3389,75 @@ export type Database = {
           },
           {
             foreignKeyName: "user_achievements_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      user_notification_channels: {
+        Row: {
+          agency_id: string
+          browser_enabled: boolean | null
+          created_at: string | null
+          custom_webhook_enabled: boolean | null
+          discord_enabled: boolean | null
+          discord_user_id: string | null
+          email_enabled: boolean | null
+          id: string
+          in_app_enabled: boolean | null
+          slack_enabled: boolean | null
+          slack_user_id: string | null
+          updated_at: string | null
+          user_id: string
+          whatsapp_enabled: boolean | null
+          whatsapp_phone: string | null
+        }
+        Insert: {
+          agency_id: string
+          browser_enabled?: boolean | null
+          created_at?: string | null
+          custom_webhook_enabled?: boolean | null
+          discord_enabled?: boolean | null
+          discord_user_id?: string | null
+          email_enabled?: boolean | null
+          id?: string
+          in_app_enabled?: boolean | null
+          slack_enabled?: boolean | null
+          slack_user_id?: string | null
+          updated_at?: string | null
+          user_id: string
+          whatsapp_enabled?: boolean | null
+          whatsapp_phone?: string | null
+        }
+        Update: {
+          agency_id?: string
+          browser_enabled?: boolean | null
+          created_at?: string | null
+          custom_webhook_enabled?: boolean | null
+          discord_enabled?: boolean | null
+          discord_user_id?: string | null
+          email_enabled?: boolean | null
+          id?: string
+          in_app_enabled?: boolean | null
+          slack_enabled?: boolean | null
+          slack_user_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+          whatsapp_enabled?: boolean | null
+          whatsapp_phone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_notification_channels_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_notification_channels_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
