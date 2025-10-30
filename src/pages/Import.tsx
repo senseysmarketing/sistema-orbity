@@ -1,0 +1,379 @@
+import { useState } from "react";
+import { Users, DollarSign, Briefcase, Target, Download } from "lucide-react";
+import { ImportCard } from "@/components/import/ImportCard";
+import { ImportUploader } from "@/components/import/ImportUploader";
+import { ImportPreview } from "@/components/import/ImportPreview";
+import { ImportResults } from "@/components/import/ImportResults";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { generateTemplate, ImportType } from "@/lib/import/templateGenerator";
+import { parseImportFile, ParsedData } from "@/lib/import/excelParser";
+import { 
+  validateClients, 
+  validatePayments, 
+  validateExpenses, 
+  validateSalaries, 
+  validateLeads,
+  ValidationError 
+} from "@/lib/import/validators";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAgency } from "@/hooks/useAgency";
+
+type Step = 'select' | 'download' | 'upload' | 'preview' | 'results';
+
+export default function Import() {
+  const [step, setStep] = useState<Step>('select');
+  const [selectedType, setSelectedType] = useState<ImportType | null>(null);
+  const [parsedData, setParsedData] = useState<ParsedData>({});
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [importResults, setImportResults] = useState({ success: 0, errors: 0 });
+  const { toast } = useToast();
+  const { currentAgency } = useAgency();
+
+  const handleTypeSelect = (type: ImportType) => {
+    setSelectedType(type);
+    setStep('download');
+  };
+
+  const handleDownloadTemplate = () => {
+    if (selectedType) {
+      generateTemplate(selectedType);
+      toast({
+        title: "Template baixado!",
+        description: "Preencha o template e faça o upload quando estiver pronto.",
+      });
+      setStep('upload');
+    }
+  };
+
+  const handleFileSelect = async (file: File) => {
+    if (!selectedType) return;
+    
+    setIsProcessing(true);
+    try {
+      // Parse file
+      const data = await parseImportFile(file, selectedType);
+      setParsedData(data);
+
+      // Validate data
+      const errors: ValidationError[] = [];
+      
+      if (selectedType === 'clients_and_payments') {
+        if (data.clients) {
+          const clientValidation = validateClients(data.clients);
+          errors.push(...clientValidation.errors);
+        }
+        if (data.payments && data.clients) {
+          const paymentValidation = validatePayments(data.payments, data.clients);
+          errors.push(...paymentValidation.errors);
+        }
+      } else if (selectedType === 'expenses' && data.expenses) {
+        const expenseValidation = validateExpenses(data.expenses);
+        errors.push(...expenseValidation.errors);
+      } else if (selectedType === 'salaries' && data.salaries) {
+        const salaryValidation = validateSalaries(data.salaries);
+        errors.push(...salaryValidation.errors);
+      } else if (selectedType === 'leads' && data.leads) {
+        const leadValidation = validateLeads(data.leads);
+        errors.push(...leadValidation.errors);
+      }
+
+      setValidationErrors(errors);
+      setStep('preview');
+    } catch (error) {
+      console.error('Error parsing file:', error);
+      toast({
+        title: "Erro ao processar arquivo",
+        description: "Verifique se o arquivo está no formato correto.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!currentAgency || validationErrors.length > 0) return;
+
+    setIsProcessing(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Import clients and payments
+      if (selectedType === 'clients_and_payments') {
+        if (parsedData.clients) {
+          const clientsToInsert = parsedData.clients.map(c => ({
+            agency_id: currentAgency.id,
+            name: c.nome,
+            monthly_value: c.valorMensal,
+            due_date: c.diaVencimento,
+            start_date: c.dataInicio || null,
+            contact: c.contato || null,
+            service: c.servico || null,
+            active: c.ativo === 'SIM',
+            has_loyalty: c.temFidelidade === 'SIM',
+            observations: c.observacoes || null
+          }));
+
+          const { data: insertedClients, error: clientError } = await supabase
+            .from('clients')
+            .insert(clientsToInsert)
+            .select();
+
+          if (clientError) throw clientError;
+          successCount += insertedClients.length;
+
+          // Create client map
+          const clientMap = new Map(
+            insertedClients.map(c => [c.name.toLowerCase().trim(), c.id])
+          );
+
+          // Import payments
+          if (parsedData.payments) {
+            const paymentsToInsert = parsedData.payments.map(p => ({
+              agency_id: currentAgency.id,
+              client_id: clientMap.get(p.cliente.toLowerCase().trim()),
+              amount: p.valor,
+              due_date: p.vencimento,
+              paid_date: p.dataPagamento || null,
+              status: p.status.toLowerCase()
+            })).filter(p => p.client_id); // Only insert payments with valid clients
+
+            const { data: insertedPayments, error: paymentError } = await supabase
+              .from('client_payments')
+              .insert(paymentsToInsert);
+
+            if (paymentError) throw paymentError;
+            successCount += paymentsToInsert.length;
+          }
+        }
+      }
+
+      // Import expenses
+      if (selectedType === 'expenses' && parsedData.expenses) {
+        const expensesToInsert = parsedData.expenses.map(e => ({
+          agency_id: currentAgency.id,
+          name: e.nome,
+          amount: e.valor,
+          due_date: e.vencimento,
+          category: e.categoria || null,
+          expense_type: e.tipo.toLowerCase(),
+          status: e.status.toLowerCase(),
+          description: e.descricao || null,
+          installment_total: e.parcelas || null,
+          recurrence_day: e.diaRecorrencia || null,
+          is_fixed: e.tipo === 'FIXA'
+        }));
+
+        const { error } = await supabase.from('expenses').insert(expensesToInsert);
+        if (error) throw error;
+        successCount += expensesToInsert.length;
+      }
+
+      // Import salaries
+      if (selectedType === 'salaries' && parsedData.salaries) {
+        const salariesToInsert = parsedData.salaries.map(s => ({
+          agency_id: currentAgency.id,
+          employee_name: s.funcionario,
+          amount: s.valor,
+          due_date: s.vencimento,
+          paid_date: s.dataPagamento || null,
+          status: s.status.toLowerCase()
+        }));
+
+        const { error } = await supabase.from('salaries').insert(salariesToInsert);
+        if (error) throw error;
+        successCount += salariesToInsert.length;
+      }
+
+      // Import leads
+      if (selectedType === 'leads' && parsedData.leads) {
+        const leadsToInsert = parsedData.leads.map(l => ({
+          agency_id: currentAgency.id,
+          created_by: user.id,
+          name: l.nome,
+          email: l.email || null,
+          phone: l.telefone || null,
+          company: l.empresa || null,
+          position: l.cargo || null,
+          source: l.origem.toLowerCase(),
+          status: l.status.toLowerCase(),
+          priority: l.prioridade.toLowerCase(),
+          value: l.valorEstimado || 0,
+          notes: l.notas || null
+        }));
+
+        const { error } = await supabase.from('leads').insert(leadsToInsert);
+        if (error) throw error;
+        successCount += leadsToInsert.length;
+      }
+
+      // Log import
+      await supabase.from('import_logs').insert([{
+        agency_id: currentAgency.id,
+        user_id: user.id,
+        import_type: selectedType || 'unknown',
+        total_rows: successCount + errorCount,
+        success_count: successCount,
+        error_count: errorCount,
+        errors: validationErrors as any
+      }]);
+
+      setImportResults({ success: successCount, errors: errorCount });
+      setStep('results');
+
+      toast({
+        title: "Importação concluída!",
+        description: `${successCount} registros importados com sucesso.`,
+      });
+    } catch (error) {
+      console.error('Import error:', error);
+      toast({
+        title: "Erro na importação",
+        description: "Ocorreu um erro ao importar os dados. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReset = () => {
+    setStep('select');
+    setSelectedType(null);
+    setParsedData({});
+    setValidationErrors([]);
+    setImportResults({ success: 0, errors: 0 });
+  };
+
+  return (
+    <div className="container mx-auto p-6 max-w-7xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Importação de Dados</h1>
+        <p className="text-muted-foreground">
+          Importe seus dados existentes através de planilhas Excel
+        </p>
+      </div>
+
+      {/* Step Indicator */}
+      <div className="mb-8">
+        <div className="flex items-center justify-center gap-2">
+          {['select', 'download', 'upload', 'preview', 'results'].map((s, index) => (
+            <div key={s} className="flex items-center">
+              <div className={`
+                h-10 w-10 rounded-full flex items-center justify-center font-semibold
+                ${step === s ? 'bg-primary text-primary-foreground' : 
+                  ['select', 'download', 'upload', 'preview', 'results'].indexOf(step) > index ? 
+                  'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}
+              `}>
+                {index + 1}
+              </div>
+              {index < 4 && (
+                <div className={`h-0.5 w-12 ${
+                  ['select', 'download', 'upload', 'preview', 'results'].indexOf(step) > index ? 
+                  'bg-primary' : 'bg-muted'
+                }`} />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      {step === 'select' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <ImportCard
+            icon={Users}
+            title="Clientes & Pagamentos"
+            description="Importe clientes e seus históricos de pagamentos"
+            onClick={() => handleTypeSelect('clients_and_payments')}
+          />
+          <ImportCard
+            icon={DollarSign}
+            title="Despesas"
+            description="Importe despesas fixas, avulsas e parceladas"
+            onClick={() => handleTypeSelect('expenses')}
+          />
+          <ImportCard
+            icon={Briefcase}
+            title="Salários"
+            description="Importe folha de pagamento e salários"
+            onClick={() => handleTypeSelect('salaries')}
+          />
+          <ImportCard
+            icon={Target}
+            title="Leads"
+            description="Importe seus leads e prospects do CRM"
+            onClick={() => handleTypeSelect('leads')}
+          />
+        </div>
+      )}
+
+      {step === 'download' && (
+        <Card className="max-w-2xl mx-auto">
+          <CardHeader>
+            <CardTitle>Baixar Template</CardTitle>
+            <CardDescription>
+              Baixe o template Excel e preencha com seus dados
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="p-6 bg-muted rounded-lg space-y-4">
+              <h3 className="font-semibold">Instruções:</h3>
+              <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+                <li>Baixe o template clicando no botão abaixo</li>
+                <li>Preencha todas as colunas obrigatórias (marcadas com *)</li>
+                <li>Siga os formatos indicados nas instruções do template</li>
+                <li>Salve o arquivo como .xlsx</li>
+                <li>Faça o upload do arquivo preenchido</li>
+              </ol>
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={handleDownloadTemplate} className="flex-1">
+                <Download className="h-4 w-4 mr-2" />
+                Baixar Template
+              </Button>
+              <Button variant="outline" onClick={handleReset}>
+                Voltar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 'upload' && (
+        <div className="max-w-2xl mx-auto">
+          <ImportUploader
+            onFileSelect={handleFileSelect}
+            onCancel={handleReset}
+            isProcessing={isProcessing}
+          />
+        </div>
+      )}
+
+      {step === 'preview' && (
+        <ImportPreview
+          data={parsedData}
+          errors={validationErrors}
+          onConfirm={handleConfirmImport}
+          onCancel={handleReset}
+        />
+      )}
+
+      {step === 'results' && (
+        <ImportResults
+          successCount={importResults.success}
+          errorCount={importResults.errors}
+          importType={selectedType || ''}
+          onNewImport={handleReset}
+        />
+      )}
+    </div>
+  );
+}

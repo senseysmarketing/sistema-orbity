@@ -4,7 +4,7 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGrou
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Shield, ContactRound, FileText, Instagram, Calendar } from "lucide-react";
+import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Shield, ContactRound, FileText, Instagram, Calendar, Upload } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import logoNew from "@/assets/logo-new.png";
 
@@ -53,6 +53,11 @@ const menuItems = [{
   url: "/social-media",
   icon: Instagram,
   roles: ["agency_admin", "agency_user"]
+}, {
+  title: "Importação",
+  url: "/import",
+  icon: Upload,
+  roles: ["agency_admin"]
 }, {
   title: "Relatórios",
   url: "/reports",

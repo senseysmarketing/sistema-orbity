@@ -31,6 +31,7 @@ import SubscriptionCanceled from "./pages/SubscriptionCanceled";
 import Contracts from "./pages/Contracts";
 import SocialMedia from "./pages/SocialMedia";
 import LandingPage from "./pages/LandingPage";
+import Import from "./pages/Import";
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,7 @@ const App = () => (
                           <Route path="admin" element={<Admin />} />
                           <Route path="contracts" element={<Contracts />} />
                           <Route path="social-media" element={<SocialMedia />} />
+                          <Route path="import" element={<Import />} />
                           <Route path="reports" element={<Reports />} />
                           <Route path="settings" element={<Settings />} />
                           <Route path="master" element={<Master />} />
