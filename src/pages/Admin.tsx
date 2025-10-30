@@ -694,8 +694,20 @@ export default function Admin() {
   };
 
   // Dados filtrados
-  const filteredPayments = useMemo(() => {
+  // Pagamentos do mês selecionado (apenas com vencimento no mês)
+  const paymentsInSelectedMonth = useMemo(() => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+    
     return payments.filter(payment => {
+      const dueDate = new Date(payment.due_date);
+      return dueDate >= startDate && dueDate <= endDate;
+    });
+  }, [payments, selectedMonth]);
+
+  const filteredPayments = useMemo(() => {
+    return paymentsInSelectedMonth.filter(payment => {
       const clientName = getClientName(payment.client_id).toLowerCase();
       const matchesSearch = clientName.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || payment.status === statusFilter;
@@ -716,7 +728,7 @@ export default function Admin() {
       }
       return matchesSearch && matchesStatus && matchesClient && matchesValueRange;
     });
-  }, [payments, searchTerm, statusFilter, clientFilter, valueRangeFilter]);
+  }, [paymentsInSelectedMonth, searchTerm, statusFilter, clientFilter, valueRangeFilter]);
   const filteredExpenses = useMemo(() => {
     return expenses.filter(expense => {
       const matchesSearch = expense.name.toLowerCase().includes(searchTerm.toLowerCase());
