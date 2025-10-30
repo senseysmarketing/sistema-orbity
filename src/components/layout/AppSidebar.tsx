@@ -7,6 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Shield, ContactRound, FileText, Instagram, Calendar, Upload } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import logoNew from "@/assets/logo-new.png";
+import faviconLogo from "@/assets/favicon-logo.png";
 
 // Categorias de menu organizadas tematicamente
 const menuCategories = [
@@ -150,7 +151,7 @@ export function AppSidebar() {
             <img src={logoNew} alt="Logo" className="w-[122px] h-[32px] object-contain" />
           </div>}
         {collapsed && <div className="flex justify-center">
-            <img src={logoNew} alt="Logo" className="h-6 w-6" />
+            <img src={faviconLogo} alt="Logo" className="h-8 w-8 object-contain" />
           </div>}
       </SidebarHeader>
 
