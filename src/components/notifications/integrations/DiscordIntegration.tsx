@@ -75,7 +75,8 @@ export function DiscordIntegration() {
       const { error } = await supabase.functions.invoke('send-discord', {
         body: { 
           test: true,
-          message: "🎉 Teste de integração Discord bem-sucedido!"
+          message: "🎉 Teste de integração Discord bem-sucedido!",
+          agencyId: currentAgency!.id
         }
       });
 
