@@ -20,7 +20,7 @@ serve(async (req) => {
     const { test, email, notification, userId, agencyId } = await req.json();
 
     // Fixed sender information
-    const FROM_EMAIL = "contato@orbityapp.com.br";
+    const FROM_EMAIL = "contato@notificacoes.orbityapp.com.br";
     const FROM_NAME = "Orbity";
 
     // Get user's email configuration
