@@ -18,7 +18,7 @@ import { PricingCards } from "@/components/subscription/PricingCards";
 import { SubscriptionDetails } from "@/components/subscription/SubscriptionDetails";
 import { BillingHistory } from "@/components/subscription/BillingHistory";
 import { UsersManagement } from "@/components/admin/UsersManagement";
-import { NotificationPreferences } from "@/components/notifications/NotificationPreferences";
+import { NotificationSummaryCard } from "@/components/notifications/NotificationSummaryCard";
 import { NotificationChannelsConfig } from "@/components/notifications/NotificationChannelsConfig";
 
 export default function Settings() {
@@ -28,7 +28,7 @@ export default function Settings() {
     avatar_url: '',
   });
   const [loading, setLoading] = useState(false);
-  const [notificationPrefsOpen, setNotificationPrefsOpen] = useState(false);
+  
   const { theme, setTheme } = useTheme();
   const { profile: userProfile, signOut } = useAuth();
   const { isAgencyAdmin } = useAgency();
@@ -307,45 +307,15 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Minhas Preferências de Notificação</CardTitle>
-              <CardDescription>
-                Configure quando e como você deseja ser notificado
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                <div className="flex items-start gap-3">
-                  <Bell className="h-5 w-5 text-primary mt-0.5" />
-                  <div className="flex-1 space-y-2">
-                    <h4 className="font-medium">Personalize Suas Notificações</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Configure tipos de notificações, períodos de antecedência, 
-                      horários de "não perturbe" e canais de recebimento (email, Discord, Slack).
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <Button 
-                onClick={() => setNotificationPrefsOpen(true)} 
-                className="w-full"
-                size="lg"
-              >
-                <Bell className="mr-2 h-4 w-4" />
-                Configurar Preferências
-              </Button>
-            </CardContent>
-          </Card>
+        <TabsContent value="notifications" className="space-y-6">
+          <NotificationSummaryCard />
 
           {isAgencyAdmin && (
             <Card>
               <CardHeader>
-                <CardTitle>Canais de Entrega (Admin)</CardTitle>
+                <CardTitle>Configurações da Agência (Admin)</CardTitle>
                 <CardDescription>
-                  Configure os canais de notificação disponíveis para a agência
+                  Configure as integrações de notificação para toda a agência
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -353,11 +323,6 @@ export default function Settings() {
               </CardContent>
             </Card>
           )}
-
-          <NotificationPreferences 
-            open={notificationPrefsOpen} 
-            onOpenChange={setNotificationPrefsOpen} 
-          />
         </TabsContent>
 
         <TabsContent value="appearance" className="space-y-4">
