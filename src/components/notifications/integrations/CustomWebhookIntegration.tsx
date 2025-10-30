@@ -116,7 +116,8 @@ export function CustomWebhookIntegration() {
       const { error } = await supabase.functions.invoke('send-custom-webhook', {
         body: { 
           test: true,
-          message: "🎉 Teste de webhook personalizado!"
+          message: "🎉 Teste de webhook personalizado!",
+          agencyId: currentAgency!.id
         }
       });
 

@@ -76,7 +76,8 @@ export function SlackIntegration() {
       const { error } = await supabase.functions.invoke('send-slack', {
         body: { 
           test: true,
-          message: "🎉 Teste de integração Slack bem-sucedido!"
+          message: "🎉 Teste de integração Slack bem-sucedido!",
+          agencyId: currentAgency!.id
         }
       });
 
