@@ -19,6 +19,7 @@ import { SubscriptionDetails } from "@/components/subscription/SubscriptionDetai
 import { BillingHistory } from "@/components/subscription/BillingHistory";
 import { UsersManagement } from "@/components/admin/UsersManagement";
 import { NotificationPreferences } from "@/components/notifications/NotificationPreferences";
+import { NotificationIntegrations } from "@/components/notifications/NotificationIntegrations";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -137,6 +138,7 @@ export default function Settings() {
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="subscription">Assinatura</TabsTrigger>
           {isAgencyAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
+          {isAgencyAdmin && <TabsTrigger value="integrations">Integrações</TabsTrigger>}
           <TabsTrigger value="account">Conta</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="appearance">Aparência</TabsTrigger>
@@ -252,6 +254,12 @@ export default function Settings() {
               </div>
               <UsersManagement />
             </div>
+          </TabsContent>
+        )}
+
+        {isAgencyAdmin && (
+          <TabsContent value="integrations" className="space-y-4">
+            <NotificationIntegrations />
           </TabsContent>
         )}
 
