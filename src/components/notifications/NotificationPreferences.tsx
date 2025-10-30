@@ -7,13 +7,14 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useAuth } from "@/hooks/useAuth";
 import { 
   Bell, Clock, Calendar, DollarSign, Users, 
-  MessageSquare, AlertTriangle, Volume2, Moon 
+  MessageSquare, AlertTriangle, Volume2, Moon, Mail 
 } from "lucide-react";
 
 interface NotificationPreferencesProps {
@@ -55,6 +56,12 @@ interface Preferences {
   sound_enabled: boolean;
 }
 
+interface EmailConfig {
+  email_enabled: boolean;
+  email_address: string;
+  email_notification_types: string[];
+}
+
 export function NotificationPreferences({ open, onOpenChange }: NotificationPreferencesProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
@@ -87,11 +94,18 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
     sound_enabled: true,
   });
 
+  const [emailConfig, setEmailConfig] = useState<EmailConfig>({
+    email_enabled: false,
+    email_address: '',
+    email_notification_types: [],
+  });
+
   useEffect(() => {
-    if (open && user) {
+    if (open && user && currentAgency) {
       fetchPreferences();
+      fetchEmailConfig();
     }
-  }, [open, user]);
+  }, [open, user, currentAgency]);
 
   const fetchPreferences = async () => {
     try {
@@ -136,21 +150,60 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
     }
   };
 
+  const fetchEmailConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_notification_channels')
+        .select('email_enabled, email_address, email_notification_types')
+        .eq('user_id', user!.id)
+        .eq('agency_id', currentAgency!.id)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      if (data) {
+        setEmailConfig({
+          email_enabled: data.email_enabled ?? false,
+          email_address: data.email_address ?? '',
+          email_notification_types: data.email_notification_types ?? [],
+        });
+      }
+    } catch (error: any) {
+      console.error('Error fetching email config:', error);
+    }
+  };
+
   const handleSave = async () => {
     try {
       setLoading(true);
 
-      const { error } = await supabase
+      // Salvar preferências
+      const { error: preferencesError } = await supabase
         .from('notification_preferences')
         .upsert({
           user_id: user!.id,
-          agency_id: currentAgency.id,
+          agency_id: currentAgency!.id,
           ...preferences,
         }, {
           onConflict: 'user_id'
         });
 
-      if (error) throw error;
+      if (preferencesError) throw preferencesError;
+
+      // Salvar configuração de email
+      const { error: emailError } = await supabase
+        .from('user_notification_channels')
+        .upsert({
+          user_id: user!.id,
+          agency_id: currentAgency!.id,
+          email_enabled: emailConfig.email_enabled,
+          email_address: emailConfig.email_address,
+          email_notification_types: emailConfig.email_notification_types,
+        }, {
+          onConflict: 'user_id,agency_id'
+        });
+
+      if (emailError) throw emailError;
 
       toast({
         title: "Preferências salvas",
@@ -560,16 +613,91 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex-1">
-                    <Label htmlFor="email" className="font-normal">Resumo Diário por E-mail</Label>
-                    <p className="text-xs text-muted-foreground">Receba um resumo diário das suas notificações</p>
+                <div className="space-y-4 p-4 border rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <Label htmlFor="email" className="font-normal flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        Notificações por E-mail
+                      </Label>
+                      <p className="text-xs text-muted-foreground">Configure seu email para receber notificações</p>
+                    </div>
+                    <Switch
+                      id="email"
+                      checked={emailConfig.email_enabled}
+                      onCheckedChange={(checked) => setEmailConfig(prev => ({ ...prev, email_enabled: checked }))}
+                    />
                   </div>
-                  <Switch
-                    id="email"
-                    checked={preferences.email_digest}
-                    onCheckedChange={(checked) => updatePreference('email_digest', checked)}
-                  />
+
+                  {emailConfig.email_enabled && (
+                    <div className="ml-6 space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email_address" className="text-xs text-muted-foreground">
+                          Endereço de E-mail
+                        </Label>
+                        <Input
+                          id="email_address"
+                          type="email"
+                          placeholder="seu@email.com"
+                          value={emailConfig.email_address}
+                          onChange={(e) => setEmailConfig(prev => ({ ...prev, email_address: e.target.value }))}
+                        />
+                      </div>
+
+                      <div className="space-y-3">
+                        <Label className="text-xs text-muted-foreground">
+                          Selecione os tipos de notificação que deseja receber por email:
+                        </Label>
+                        
+                        <div className="space-y-2">
+                          {[
+                            { value: 'reminder', label: 'Lembretes', enabled: preferences.reminders_enabled },
+                            { value: 'task', label: 'Tarefas', enabled: preferences.tasks_enabled },
+                            { value: 'post', label: 'Posts Social Media', enabled: preferences.posts_enabled },
+                            { value: 'payment', label: 'Pagamentos', enabled: preferences.payments_enabled },
+                            { value: 'expense', label: 'Despesas', enabled: preferences.expenses_enabled },
+                            { value: 'lead', label: 'Leads (CRM)', enabled: preferences.leads_enabled },
+                            { value: 'meeting', label: 'Reuniões', enabled: preferences.meetings_enabled },
+                            { value: 'system', label: 'Sistema', enabled: preferences.system_enabled },
+                          ].map(({ value, label, enabled }) => (
+                            <div key={value} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`email_${value}`}
+                                checked={emailConfig.email_notification_types.includes(value)}
+                                disabled={!enabled}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setEmailConfig(prev => ({
+                                      ...prev,
+                                      email_notification_types: [...prev.email_notification_types, value]
+                                    }));
+                                  } else {
+                                    setEmailConfig(prev => ({
+                                      ...prev,
+                                      email_notification_types: prev.email_notification_types.filter(t => t !== value)
+                                    }));
+                                  }
+                                }}
+                              />
+                              <Label 
+                                htmlFor={`email_${value}`} 
+                                className={`text-sm font-normal cursor-pointer ${!enabled ? 'text-muted-foreground' : ''}`}
+                              >
+                                {label}
+                                {!enabled && <span className="ml-1 text-xs">(desabilitado)</span>}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
+                          <p className="text-xs text-blue-700 dark:text-blue-300">
+                            💡 Os emails serão enviados respeitando os períodos de antecedência e o modo "Não Perturbe" configurados acima.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between p-3 border rounded-lg">
