@@ -697,12 +697,12 @@ export default function Admin() {
   // Pagamentos do mês selecionado (apenas com vencimento no mês)
   const paymentsInSelectedMonth = useMemo(() => {
     const [year, month] = selectedMonth.split('-').map(Number);
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
+    const startStr = `${selectedMonth}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endStr = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
     
     return payments.filter(payment => {
-      const dueDate = new Date(payment.due_date);
-      return dueDate >= startDate && dueDate <= endDate;
+      return payment.due_date >= startStr && payment.due_date <= endStr;
     });
   }, [payments, selectedMonth]);
 
