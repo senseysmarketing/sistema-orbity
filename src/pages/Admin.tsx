@@ -910,7 +910,7 @@ export default function Admin() {
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
   const totalSalaries = salaries.reduce((sum, s) => sum + s.amount, 0);
   const totalCosts = totalExpenses + totalSalaries;
-  const monthlyRevenue = clients.filter(c => c.active).reduce((sum, c) => sum + (c.monthly_value || 0), 0);
+  const monthlyRevenue = paymentsInSelectedMonth.reduce((sum, p) => sum + p.amount, 0);
   const netProfit = monthlyRevenue - totalCosts;
   const clearFilters = () => {
     setSearchTerm("");
