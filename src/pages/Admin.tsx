@@ -229,20 +229,16 @@ export default function Admin() {
   };
   const fetchPayments = async () => {
     if (!currentAgency) return;
-    
-    const [year, month] = selectedMonth.split('-').map(Number);
-    const startDate = `${selectedMonth}-01`;
-    const endDate = new Date(year, month, 0).toISOString().split('T')[0];
 
     await updatePaymentStatuses();
     
-    // Busca pagamentos do mês selecionado E pagamentos futuros pendentes
+    // Busca TODOS os pagamentos da agência (sem filtro de data)
+    // O filtro de data será aplicado apenas na visualização da aba de pagamentos
     const { data, error } = await supabase
       .from('client_payments')
       .select('*')
       .eq('agency_id', currentAgency.id)
-      .or(`and(due_date.gte.${startDate},due_date.lte.${endDate}),and(paid_date.gte.${startDate},paid_date.lte.${endDate}),and(due_date.gt.${endDate},status.neq.paid)`)
-      .order(paymentSort, { ascending: paymentSort === 'status' ? true : false });
+      .order('due_date', { ascending: false });
     
     if (error) throw error;
     setPayments(data || []);
