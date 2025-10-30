@@ -215,7 +215,11 @@ export default function Tasks() {
     }
 
     try {
-      const { data, error } = await supabase.from("clients").select("id, name").eq("agency_id", currentAgency.id);
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name")
+        .eq("agency_id", currentAgency.id)
+        .order("name", { ascending: true });
 
       if (error) throw error;
       setClients(data || []);

@@ -97,7 +97,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         .from('clients')
         .select('id, name')
         .eq('agency_id', currentAgency.id)
-        .eq('active', true);
+        .eq('active', true)
+        .order('name', { ascending: true });
       if (clientsData) setClients(clientsData);
 
       // Buscar perfis de usuários da agência
