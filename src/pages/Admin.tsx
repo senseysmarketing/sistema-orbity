@@ -236,11 +236,12 @@ export default function Admin() {
 
     await updatePaymentStatuses();
     
+    // Busca pagamentos do mês selecionado E pagamentos futuros pendentes
     const { data, error } = await supabase
       .from('client_payments')
       .select('*')
       .eq('agency_id', currentAgency.id)
-      .or(`and(due_date.gte.${startDate},due_date.lte.${endDate}),and(paid_date.gte.${startDate},paid_date.lte.${endDate})`)
+      .or(`and(due_date.gte.${startDate},due_date.lte.${endDate}),and(paid_date.gte.${startDate},paid_date.lte.${endDate}),and(due_date.gt.${endDate},status.neq.paid)`)
       .order(paymentSort, { ascending: paymentSort === 'status' ? true : false });
     
     if (error) throw error;
