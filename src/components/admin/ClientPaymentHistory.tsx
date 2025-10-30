@@ -107,112 +107,114 @@ export function ClientPaymentHistory({ payments, onMarkAsPaid, onDeletePayment, 
 
   return (
     <>
-      <div className="space-y-4">
-        <div className="relative">
-          {/* Timeline vertical */}
-          <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border" />
-          
-          {sortedPayments.map((payment, index) => (
-            <Card 
-              key={payment.id} 
-              className={`relative ml-14 mb-4 ${
-                payment.status === 'paid' 
-                  ? 'bg-green-50/50 dark:bg-green-950/20' 
-                  : payment.status === 'overdue'
-                  ? 'bg-red-50/50 dark:bg-red-950/20'
-                  : 'bg-yellow-50/50 dark:bg-yellow-950/20'
-              }`}
-            >
-              {/* Ponto na timeline */}
-              <div className="absolute -left-14 top-6 z-10">
-                {getStatusIcon(payment.status)}
-              </div>
-              
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold capitalize">
-                        {formatMonth(payment.due_date)}
-                      </h4>
-                      {getStatusBadge(payment.status)}
-                    </div>
-                    
-                    <p className="text-2xl font-bold text-primary">
-                      R$ {payment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                    
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      {editingPaymentId === payment.id ? (
-                        <div className="flex items-center gap-2">
-                          <span>Vencimento:</span>
-                          <Input
-                            type="date"
-                            value={newDueDate}
-                            onChange={(e) => setNewDueDate(e.target.value)}
-                            className="w-40 h-8"
-                          />
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleSaveEdit(payment.id)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={handleCancelEdit}
-                            className="h-8 w-8 p-0"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <p>Vencimento: {formatDate(payment.due_date)}</p>
-                      )}
-                      {payment.paid_date && (
-                        <p className="text-green-600 dark:text-green-400">
-                          Pago em: {formatDate(payment.paid_date)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    {payment.status !== 'paid' && (
-                      <>
-                        <Button
-                          size="sm"
-                          onClick={() => onMarkAsPaid(payment.id)}
-                        >
-                          Marcar como Pago
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleStartEdit(payment.id, payment.due_date)}
-                        >
-                          <Calendar className="h-4 w-4 mr-2" />
-                          Alterar Data
-                        </Button>
-                      </>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setPaymentToDelete(payment.id)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Excluir
-                    </Button>
-                  </div>
+      <div className="max-h-[500px] overflow-y-auto pr-2">
+        <div className="space-y-4">
+          <div className="relative">
+            {/* Timeline vertical */}
+            <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border" />
+            
+            {sortedPayments.map((payment, index) => (
+              <Card 
+                key={payment.id} 
+                className={`relative ml-14 mb-4 ${
+                  payment.status === 'paid' 
+                    ? 'bg-green-50/50 dark:bg-green-950/20' 
+                    : payment.status === 'overdue'
+                    ? 'bg-red-50/50 dark:bg-red-950/20'
+                    : 'bg-yellow-50/50 dark:bg-yellow-950/20'
+                }`}
+              >
+                {/* Ponto na timeline */}
+                <div className="absolute -left-14 top-6 z-10">
+                  {getStatusIcon(payment.status)}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+                
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold capitalize">
+                          {formatMonth(payment.due_date)}
+                        </h4>
+                        {getStatusBadge(payment.status)}
+                      </div>
+                      
+                      <p className="text-2xl font-bold text-primary">
+                        R$ {payment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                      
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        {editingPaymentId === payment.id ? (
+                          <div className="flex items-center gap-2">
+                            <span>Vencimento:</span>
+                            <Input
+                              type="date"
+                              value={newDueDate}
+                              onChange={(e) => setNewDueDate(e.target.value)}
+                              className="w-40 h-8"
+                            />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleSaveEdit(payment.id)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={handleCancelEdit}
+                              className="h-8 w-8 p-0"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <p>Vencimento: {formatDate(payment.due_date)}</p>
+                        )}
+                        {payment.paid_date && (
+                          <p className="text-green-600 dark:text-green-400">
+                            Pago em: {formatDate(payment.paid_date)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2">
+                      {payment.status !== 'paid' && (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => onMarkAsPaid(payment.id)}
+                          >
+                            Marcar como Pago
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStartEdit(payment.id, payment.due_date)}
+                          >
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Alterar Data
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setPaymentToDelete(payment.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Excluir
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
 
