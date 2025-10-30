@@ -96,9 +96,20 @@ const Index = () => {
 
     // Clientes
     const activeClients = data.clients.filter((c: any) => c.active).length;
-    const monthlyRevenue = data.clients
-      .filter((c: any) => c.active)
-      .reduce((sum: number, c: any) => sum + (c.monthly_value || 0), 0);
+    
+    // Receita Mensal - baseada em pagamentos do mês atual
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1;
+    const selectedMonth = `${year}-${String(month).padStart(2, '0')}`;
+    const startStr = `${selectedMonth}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const endStr = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
+    
+    const paymentsThisMonth = data.payments.filter((payment: any) => {
+      return payment.due_date >= startStr && payment.due_date <= endStr;
+    });
+    
+    const monthlyRevenue = paymentsThisMonth.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
     // Leads
     const totalLeads = data.leads.length;
