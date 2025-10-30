@@ -177,24 +177,29 @@ export default function Import() {
             observations: c.observacoes || null
           }));
 
-          // Get existing clients to check for duplicates
+          // Get existing clients to check for duplicates and update
           const { data: existingClients } = await supabase
             .from('clients')
             .select('id, name')
             .eq('agency_id', currentAgency.id);
 
-          const existingClientNames = new Set(
-            (existingClients || []).map(c => c.name.toLowerCase().trim())
+          const existingClientMap = new Map(
+            (existingClients || []).map(c => [c.name.toLowerCase().trim(), c.id])
           );
 
-          // Separate clients into new and duplicates
+          // Separate clients into new and existing
           const newClients = clientsToInsert.filter(
-            c => !existingClientNames.has(c.name.toLowerCase().trim())
+            c => !existingClientMap.has(c.name.toLowerCase().trim())
+          );
+
+          const existingClientsToUpdate = clientsToInsert.filter(
+            c => existingClientMap.has(c.name.toLowerCase().trim())
           );
 
           let insertedClients: any[] = [];
+          let updatedCount = 0;
           
-          // Insert only new clients
+          // Insert new clients
           if (newClients.length > 0) {
             const { data, error: clientError } = await supabase
               .from('clients')
@@ -206,13 +211,46 @@ export default function Import() {
             successCount += insertedClients.length;
           }
 
-          // Report duplicates as skipped
-          const skippedCount = clientsToInsert.length - newClients.length;
-          if (skippedCount > 0) {
-            errorCount += skippedCount;
+          // Update existing clients
+          if (existingClientsToUpdate.length > 0) {
+            for (const client of existingClientsToUpdate) {
+              const clientId = existingClientMap.get(client.name.toLowerCase().trim());
+              if (!clientId) continue;
+
+              // Only update fields that have values
+              const updateData: any = {};
+              if (client.monthly_value !== null && client.monthly_value !== undefined) {
+                updateData.monthly_value = client.monthly_value;
+              }
+              if (client.due_date !== null && client.due_date !== undefined) {
+                updateData.due_date = client.due_date;
+              }
+              if (client.contact) updateData.contact = client.contact;
+              if (client.service) updateData.service = client.service;
+              if (client.observations) updateData.observations = client.observations;
+              updateData.has_loyalty = client.has_loyalty;
+              updateData.active = client.active;
+              updateData.updated_at = new Date().toISOString();
+
+              const { error: updateError } = await supabase
+                .from('clients')
+                .update(updateData)
+                .eq('id', clientId);
+
+              if (updateError) {
+                console.error('Error updating client:', updateError);
+                errorCount++;
+              } else {
+                updatedCount++;
+              }
+            }
+          }
+
+          // Report results
+          if (updatedCount > 0) {
             toast({
-              title: "Atenção",
-              description: `${skippedCount} cliente(s) já existem e foram ignorados.`,
+              title: "Clientes atualizados",
+              description: `${updatedCount} cliente(s) existente(s) foram atualizados com os novos dados.`,
               variant: "default"
             });
           }
