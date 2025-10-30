@@ -246,7 +246,11 @@ export function generateTemplate(type: ImportType): void {
 
   // Add data sheets
   config.sheets.forEach(sheet => {
-    const data = [sheet.headers, ...sheet.example];
+    // Convert example objects to arrays of values matching the headers
+    const exampleRows = sheet.example.map(row => 
+      sheet.headers.map(header => row[header] ?? '')
+    );
+    const data = [sheet.headers, ...exampleRows];
     const ws = XLSX.utils.aoa_to_sheet(data);
 
     // Set column widths
