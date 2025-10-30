@@ -1265,6 +1265,60 @@ export type Database = {
           },
         ]
       }
+      import_logs: {
+        Row: {
+          agency_id: string
+          created_at: string
+          error_count: number | null
+          errors: Json | null
+          file_name: string | null
+          id: string
+          import_type: string
+          success_count: number | null
+          total_rows: number | null
+          user_id: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          error_count?: number | null
+          errors?: Json | null
+          file_name?: string | null
+          id?: string
+          import_type: string
+          success_count?: number | null
+          total_rows?: number | null
+          user_id: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          error_count?: number | null
+          errors?: Json | null
+          file_name?: string | null
+          id?: string
+          import_type?: string
+          success_count?: number | null
+          total_rows?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       lead_activities: {
         Row: {
           agency_id: string
