@@ -488,6 +488,48 @@ export default function Admin() {
     setPaymentDeleteDialogOpen(true);
   };
   
+  const handleDeletePaymentById = async (paymentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('client_payments')
+        .delete()
+        .eq('id', paymentId);
+      if (error) throw error;
+      toast({
+        title: "Pagamento excluído",
+        description: "Pagamento excluído com sucesso!"
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao excluir pagamento",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleUpdatePaymentDueDate = async (paymentId: string, newDueDate: string) => {
+    try {
+      const { error } = await supabase
+        .from('client_payments')
+        .update({ due_date: newDueDate })
+        .eq('id', paymentId);
+      if (error) throw error;
+      toast({
+        title: "Data atualizada",
+        description: "Data de vencimento atualizada com sucesso!"
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar data",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
   const confirmDeletePayment = async () => {
     if (!paymentToDelete) return;
     try {
@@ -1593,6 +1635,8 @@ export default function Admin() {
             onReactivate={handleReactivateClient}
             onDelete={handleDeleteClient}
             onMarkPaymentAsPaid={(paymentId) => handleUpdatePaymentStatus(paymentId, 'paid')}
+            onDeletePayment={handleDeletePaymentById}
+            onUpdatePaymentDueDate={handleUpdatePaymentDueDate}
           />
         </TabsContent>
 

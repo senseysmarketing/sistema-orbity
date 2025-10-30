@@ -45,6 +45,8 @@ interface ClientDetailsDialogProps {
   onReactivate: (client: Client) => void;
   onDelete?: (client: Client) => void;
   onMarkPaymentAsPaid: (paymentId: string) => void;
+  onDeletePayment: (paymentId: string) => void;
+  onUpdatePaymentDueDate: (paymentId: string, newDueDate: string) => void;
 }
 
 export function ClientDetailsDialog({
@@ -58,6 +60,8 @@ export function ClientDetailsDialog({
   onReactivate,
   onDelete,
   onMarkPaymentAsPaid,
+  onDeletePayment,
+  onUpdatePaymentDueDate,
 }: ClientDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showDeactivateAlert, setShowDeactivateAlert] = useState(false);
@@ -209,6 +213,8 @@ export function ClientDetailsDialog({
             <ClientPaymentHistory 
               payments={clientPayments}
               onMarkAsPaid={onMarkPaymentAsPaid}
+              onDeletePayment={onDeletePayment}
+              onUpdateDueDate={onUpdatePaymentDueDate}
             />
           </TabsContent>
 
