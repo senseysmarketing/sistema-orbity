@@ -19,26 +19,56 @@ serve(async (req) => {
 
     const { test, email, notification, userId, agencyId } = await req.json();
 
-    // Get agency configuration
-    const { data: config } = await supabase
-      .from('notification_integrations')
-      .select('email_from_name, email_from_address')
+    // Fixed sender information
+    const FROM_EMAIL = "contato@orbityapp.com.br";
+    const FROM_NAME = "Orbity";
+
+    // Get user's email configuration
+    const { data: channelData } = await supabase
+      .from('user_notification_channels')
+      .select('email_address, email_enabled, email_notification_types')
+      .eq('user_id', userId)
       .eq('agency_id', agencyId)
-      .single();
+      .maybeSingle();
 
-    const fromName = config?.email_from_name || 'Orbity Notificações';
-    const fromAddress = config?.email_from_address || 'notificacoes@orbity.com.br';
+    // For test mode, use profile email if no channel config
+    let targetEmail = '';
+    
+    if (test) {
+      if (channelData?.email_address) {
+        targetEmail = channelData.email_address;
+      } else {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('user_id', userId)
+          .single();
 
-    // Get user email
-    let targetEmail = email;
-    if (userId && !test) {
-      const { data: userData } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('user_id', userId)
-        .single();
+        targetEmail = profileData?.email || '';
+      }
+    } else {
+      // For real notifications, check if user wants to receive emails
+      if (!channelData?.email_enabled || !channelData?.email_address) {
+        console.log('Email notifications not enabled for user or email not configured');
+        return new Response(
+          JSON.stringify({ success: false, reason: 'Email not enabled or not configured' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-      targetEmail = userData?.email;
+      // Check if notification type is allowed
+      if (notification && channelData.email_notification_types) {
+        const notificationType = notification.type;
+        if (!channelData.email_notification_types.includes(notificationType)) {
+          console.log(`Notification type ${notificationType} not allowed for user`);
+          return new Response(
+            JSON.stringify({ success: false, reason: 'Notification type not allowed' }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+      
+      targetEmail = channelData.email_address;
     }
 
     if (!targetEmail) {
@@ -95,7 +125,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `${fromName} <${fromAddress}>`,
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
         to: [targetEmail],
         subject: test ? '🎉 Teste de Integração - Email' : notification?.title || 'Notificação',
         html: htmlContent,

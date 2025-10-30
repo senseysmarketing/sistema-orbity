@@ -19,7 +19,7 @@ import { SubscriptionDetails } from "@/components/subscription/SubscriptionDetai
 import { BillingHistory } from "@/components/subscription/BillingHistory";
 import { UsersManagement } from "@/components/admin/UsersManagement";
 import { NotificationPreferences } from "@/components/notifications/NotificationPreferences";
-import { NotificationIntegrations } from "@/components/notifications/NotificationIntegrations";
+import { NotificationChannelsConfig } from "@/components/notifications/NotificationChannelsConfig";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -138,7 +138,6 @@ export default function Settings() {
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="subscription">Assinatura</TabsTrigger>
           {isAgencyAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
-          {isAgencyAdmin && <TabsTrigger value="integrations">Integrações</TabsTrigger>}
           <TabsTrigger value="account">Conta</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="appearance">Aparência</TabsTrigger>
@@ -257,11 +256,6 @@ export default function Settings() {
           </TabsContent>
         )}
 
-        {isAgencyAdmin && (
-          <TabsContent value="integrations" className="space-y-4">
-            <NotificationIntegrations />
-          </TabsContent>
-        )}
 
         <TabsContent value="account" className="space-y-4">
           <Card>
@@ -316,9 +310,9 @@ export default function Settings() {
         <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Preferências de Notificação</CardTitle>
+              <CardTitle>Minhas Preferências de Notificação</CardTitle>
               <CardDescription>
-                Configure os tipos de notificações, períodos de antecedência e horários de silêncio
+                Configure quando e como você deseja ser notificado
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -328,33 +322,10 @@ export default function Settings() {
                   <div className="flex-1 space-y-2">
                     <h4 className="font-medium">Personalize Suas Notificações</h4>
                     <p className="text-sm text-muted-foreground">
-                      Configure quando e como você deseja ser notificado sobre lembretes, tarefas, 
-                      pagamentos, leads, reuniões e muito mais. Defina períodos de antecedência 
-                      personalizados e horários de "não perturbe" para cada tipo de notificação.
+                      Configure tipos de notificações, períodos de antecedência, 
+                      horários de "não perturbe" e canais de recebimento (email, Discord, Slack).
                     </p>
                   </div>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2 p-4 border rounded-lg">
-                  <h4 className="font-medium text-sm flex items-center gap-2">
-                    <Bell className="h-4 w-4" />
-                    Tipos de Notificação
-                  </h4>
-                  <p className="text-xs text-muted-foreground">
-                    Lembretes, Tarefas, Posts, Pagamentos, Despesas, Leads, Reuniões e Sistema
-                  </p>
-                </div>
-
-                <div className="space-y-2 p-4 border rounded-lg">
-                  <h4 className="font-medium text-sm flex items-center gap-2">
-                    <Save className="h-4 w-4" />
-                    Períodos Personalizados
-                  </h4>
-                  <p className="text-xs text-muted-foreground">
-                    Defina com quantas horas/dias de antecedência ser notificado
-                  </p>
                 </div>
               </div>
 
@@ -364,10 +335,24 @@ export default function Settings() {
                 size="lg"
               >
                 <Bell className="mr-2 h-4 w-4" />
-                Configurar Notificações Avançadas
+                Configurar Preferências
               </Button>
             </CardContent>
           </Card>
+
+          {isAgencyAdmin && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Canais de Entrega (Admin)</CardTitle>
+                <CardDescription>
+                  Configure os canais de notificação disponíveis para a agência
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <NotificationChannelsConfig />
+              </CardContent>
+            </Card>
+          )}
 
           <NotificationPreferences 
             open={notificationPrefsOpen} 
