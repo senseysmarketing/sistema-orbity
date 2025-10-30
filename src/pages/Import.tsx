@@ -94,6 +94,62 @@ export default function Import() {
     }
   };
 
+  // Map Portuguese status to database enum values
+  const mapStatus = (status: string): 'paid' | 'pending' | 'overdue' => {
+    const statusMap: Record<string, 'paid' | 'pending' | 'overdue'> = {
+      'PAGO': 'paid',
+      'PENDENTE': 'pending',
+      'ATRASADO': 'overdue'
+    };
+    return statusMap[status.toUpperCase()] || 'pending';
+  };
+
+  // Map Portuguese expense type to database enum values
+  const mapExpenseType = (tipo: string): 'avulsa' | 'parcelada' | 'recorrente' => {
+    const tipoMap: Record<string, 'avulsa' | 'parcelada' | 'recorrente'> = {
+      'FIXA': 'recorrente',
+      'AVULSA': 'avulsa',
+      'PARCELADA': 'parcelada'
+    };
+    return tipoMap[tipo.toUpperCase()] || 'avulsa';
+  };
+
+  // Map Portuguese source to database values
+  const mapSource = (origem: string): string => {
+    const origemMap: Record<string, string> = {
+      'MANUAL': 'manual',
+      'SITE': 'site',
+      'INDICACAO': 'indicacao',
+      'REDES_SOCIAIS': 'redes_sociais',
+      'FACEBOOK_LEADS': 'facebook_leads'
+    };
+    return origemMap[origem.toUpperCase()] || 'manual';
+  };
+
+  // Map Portuguese priority to database values
+  const mapPriority = (prioridade: string): 'low' | 'medium' | 'high' => {
+    const prioridadeMap: Record<string, 'low' | 'medium' | 'high'> = {
+      'BAIXA': 'low',
+      'MEDIA': 'medium',
+      'ALTA': 'high'
+    };
+    return prioridadeMap[prioridade.toUpperCase()] || 'medium';
+  };
+
+  // Map Portuguese lead status to database values
+  const mapLeadStatus = (status: string): string => {
+    const statusMap: Record<string, string> = {
+      'NOVO': 'new',
+      'CONTATO': 'contato',
+      'QUALIFICADO': 'qualificado',
+      'PROPOSTA': 'proposta',
+      'NEGOCIACAO': 'negociacao',
+      'GANHO': 'ganho',
+      'PERDIDO': 'perdido'
+    };
+    return statusMap[status.toUpperCase()] || 'new';
+  };
+
   const handleConfirmImport = async () => {
     if (!currentAgency || validationErrors.length > 0) return;
 
@@ -142,7 +198,7 @@ export default function Import() {
               amount: p.valor,
               due_date: p.vencimento,
               paid_date: p.dataPagamento || null,
-              status: p.status.toLowerCase()
+              status: mapStatus(p.status)
             })).filter(p => p.client_id); // Only insert payments with valid clients
 
             const { data: insertedPayments, error: paymentError } = await supabase
@@ -163,8 +219,8 @@ export default function Import() {
           amount: e.valor,
           due_date: e.vencimento,
           category: e.categoria || null,
-          expense_type: e.tipo.toLowerCase(),
-          status: e.status.toLowerCase(),
+          expense_type: mapExpenseType(e.tipo),
+          status: mapStatus(e.status),
           description: e.descricao || null,
           installment_total: e.parcelas || null,
           recurrence_day: e.diaRecorrencia || null,
@@ -184,7 +240,7 @@ export default function Import() {
           amount: s.valor,
           due_date: s.vencimento,
           paid_date: s.dataPagamento || null,
-          status: s.status.toLowerCase()
+          status: mapStatus(s.status)
         }));
 
         const { error } = await supabase.from('salaries').insert(salariesToInsert);
@@ -202,9 +258,9 @@ export default function Import() {
           phone: l.telefone || null,
           company: l.empresa || null,
           position: l.cargo || null,
-          source: l.origem.toLowerCase(),
-          status: l.status.toLowerCase(),
-          priority: l.prioridade.toLowerCase(),
+          source: mapSource(l.origem),
+          status: mapLeadStatus(l.status),
+          priority: mapPriority(l.prioridade),
           value: l.valorEstimado || 0,
           notes: l.notas || null
         }));
