@@ -1814,15 +1814,11 @@ export type Database = {
           email_from_address: string | null
           email_from_name: string | null
           email_provider: string | null
-          evolution_api_key: string | null
-          evolution_api_url: string | null
-          evolution_instance_name: string | null
           id: string
           slack_channel: string | null
           slack_enabled: boolean | null
           slack_webhook_url: string | null
           updated_at: string | null
-          whatsapp_enabled: boolean | null
           whatsapp_provider: string | null
         }
         Insert: {
@@ -1841,15 +1837,11 @@ export type Database = {
           email_from_address?: string | null
           email_from_name?: string | null
           email_provider?: string | null
-          evolution_api_key?: string | null
-          evolution_api_url?: string | null
-          evolution_instance_name?: string | null
           id?: string
           slack_channel?: string | null
           slack_enabled?: boolean | null
           slack_webhook_url?: string | null
           updated_at?: string | null
-          whatsapp_enabled?: boolean | null
           whatsapp_provider?: string | null
         }
         Update: {
@@ -1868,15 +1860,11 @@ export type Database = {
           email_from_address?: string | null
           email_from_name?: string | null
           email_provider?: string | null
-          evolution_api_key?: string | null
-          evolution_api_url?: string | null
-          evolution_instance_name?: string | null
           id?: string
           slack_channel?: string | null
           slack_enabled?: boolean | null
           slack_webhook_url?: string | null
           updated_at?: string | null
-          whatsapp_enabled?: boolean | null
           whatsapp_provider?: string | null
         }
         Relationships: [
@@ -3404,15 +3392,15 @@ export type Database = {
           custom_webhook_enabled: boolean | null
           discord_enabled: boolean | null
           discord_user_id: string | null
+          email_address: string | null
           email_enabled: boolean | null
+          email_notification_types: string[] | null
           id: string
           in_app_enabled: boolean | null
           slack_enabled: boolean | null
           slack_user_id: string | null
           updated_at: string | null
           user_id: string
-          whatsapp_enabled: boolean | null
-          whatsapp_phone: string | null
         }
         Insert: {
           agency_id: string
@@ -3421,15 +3409,15 @@ export type Database = {
           custom_webhook_enabled?: boolean | null
           discord_enabled?: boolean | null
           discord_user_id?: string | null
+          email_address?: string | null
           email_enabled?: boolean | null
+          email_notification_types?: string[] | null
           id?: string
           in_app_enabled?: boolean | null
           slack_enabled?: boolean | null
           slack_user_id?: string | null
           updated_at?: string | null
           user_id: string
-          whatsapp_enabled?: boolean | null
-          whatsapp_phone?: string | null
         }
         Update: {
           agency_id?: string
@@ -3438,15 +3426,15 @@ export type Database = {
           custom_webhook_enabled?: boolean | null
           discord_enabled?: boolean | null
           discord_user_id?: string | null
+          email_address?: string | null
           email_enabled?: boolean | null
+          email_notification_types?: string[] | null
           id?: string
           in_app_enabled?: boolean | null
           slack_enabled?: boolean | null
           slack_user_id?: string | null
           updated_at?: string | null
           user_id?: string
-          whatsapp_enabled?: boolean | null
-          whatsapp_phone?: string | null
         }
         Relationships: [
           {
