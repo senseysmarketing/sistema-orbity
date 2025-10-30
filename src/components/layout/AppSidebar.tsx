@@ -8,67 +8,92 @@ import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarC
 import { useAuth } from "@/hooks/useAuth";
 import logoNew from "@/assets/logo-new.png";
 
-const menuItems = [{
-  title: "Dashboard",
-  url: "/",
-  icon: LayoutDashboard,
-  roles: ["agency_admin", "agency_user"]
-}, {
-  title: "Tarefas Gerais",
-  url: "/tasks",
-  icon: CheckSquare,
-  roles: ["agency_admin", "agency_user"]
-}, {
-  title: "Lembretes",
-  url: "/reminders",
-  icon: User,
-  roles: ["agency_admin", "agency_user"]
-}, {
-  title: "CRM & Leads",
-  url: "/crm",
-  icon: ContactRound,
-  roles: ["agency_admin", "agency_user"]
-}, {
-  title: "Agenda",
-  url: "/agenda",
-  icon: Calendar,
-  roles: ["agency_admin", "agency_user"]
-}, {
-  title: "Controle de Tráfego",
-  url: "/traffic",
-  icon: TrendingUp,
-  roles: ["agency_admin", "agency_user"]
-}, {
-  title: "Administrativo",
-  url: "/admin",
-  icon: DollarSign,
-  roles: ["agency_admin"]
-}, {
-  title: "Contratos",
-  url: "/contracts",
-  icon: FileText,
-  roles: ["agency_admin", "agency_user"]
-}, {
-  title: "Social Media",
-  url: "/social-media",
-  icon: Instagram,
-  roles: ["agency_admin", "agency_user"]
-}, {
-  title: "Importação",
-  url: "/import",
-  icon: Upload,
-  roles: ["agency_admin"]
-}, {
-  title: "Relatórios",
-  url: "/reports",
-  icon: BarChart3,
-  roles: ["agency_admin", "agency_user"]
-}, {
-  title: "Configurações",
-  url: "/settings",
-  icon: Settings,
-  roles: ["agency_admin"]
-}];
+// Categorias de menu organizadas tematicamente
+const menuCategories = [
+  {
+    label: "Gestão & Visão Geral",
+    items: [
+      {
+        title: "Dashboard",
+        url: "/",
+        icon: LayoutDashboard,
+      },
+      {
+        title: "Relatórios",
+        url: "/reports",
+        icon: BarChart3,
+      }
+    ]
+  },
+  {
+    label: "Operacional",
+    items: [
+      {
+        title: "Tarefas Gerais",
+        url: "/tasks",
+        icon: CheckSquare,
+      },
+      {
+        title: "Lembretes",
+        url: "/reminders",
+        icon: User,
+      },
+      {
+        title: "Agenda",
+        url: "/agenda",
+        icon: Calendar,
+      },
+      {
+        title: "CRM & Leads",
+        url: "/crm",
+        icon: ContactRound,
+      }
+    ]
+  },
+  {
+    label: "Marketing & Vendas",
+    items: [
+      {
+        title: "Social Media",
+        url: "/social-media",
+        icon: Instagram,
+      },
+      {
+        title: "Controle de Tráfego",
+        url: "/traffic",
+        icon: TrendingUp,
+      },
+      {
+        title: "Contratos",
+        url: "/contracts",
+        icon: FileText,
+      }
+    ]
+  },
+  {
+    label: "Administração",
+    items: [
+      {
+        title: "Administrativo",
+        url: "/admin",
+        icon: DollarSign,
+        requiresAdmin: true
+      },
+      {
+        title: "Importação",
+        url: "/import",
+        icon: Upload,
+        requiresAdmin: true
+      },
+      {
+        title: "Configurações",
+        url: "/settings",
+        icon: Settings,
+        requiresAdmin: true
+      }
+    ]
+  }
+];
 
 export function AppSidebar() {
   const {
@@ -107,7 +132,17 @@ export function AppSidebar() {
   const getInitials = (name: string) => {
     return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
   };
-  const filteredMenuItems = menuItems.filter(item => !profile?.role || item.roles.includes(profile.role));
+  const getTourAttr = (url: string) => {
+    if (url === '/') return 'dashboard';
+    if (url === '/crm') return 'crm';
+    if (url === '/tasks') return 'tasks';
+    if (url === '/agenda') return 'agenda';
+    if (url === '/social-media') return 'social-media';
+    if (url === '/traffic') return 'traffic';
+    if (url === '/admin') return 'admin';
+    return undefined;
+  };
+
   return <Sidebar className={`${collapsed ? "w-14" : "w-64"} bg-sidebar border-r-0`} collapsible="icon">
       {/* Header */}
       <SidebarHeader className="border-b border-sidebar-border p-4 bg-sidebar">
@@ -120,39 +155,32 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="bg-sidebar">
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/70">Menu Principal</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {filteredMenuItems.map(item => {
-                const getTourAttr = (url: string) => {
-                  if (url === '/') return 'dashboard';
-                  if (url === '/crm') return 'crm';
-                  if (url === '/tasks') return 'tasks';
-                  if (url === '/agenda') return 'agenda';
-                  if (url === '/social-media') return 'social-media';
-                  if (url === '/traffic') return 'traffic';
-                  if (url === '/admin') return 'admin';
-                  return undefined;
-                };
-                
-                return <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url} 
-                      end={item.url === "/"} 
-                      className={({isActive}) => getNavCls({isActive})}
-                      data-tour={getTourAttr(item.url)}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {menuCategories.map((category) => (
+          <SidebarGroup key={category.label}>
+            <SidebarGroupLabel className="text-sidebar-foreground/70">
+              {category.label}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {category.items.map(item => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink 
+                        to={item.url} 
+                        end={item.url === "/"} 
+                        className={({isActive}) => getNavCls({isActive})}
+                        data-tour={getTourAttr(item.url)}
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
 
         {/* Master Section - Only for super admin */}
         {profile?.role === 'super_admin' && (

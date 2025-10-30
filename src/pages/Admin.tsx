@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal, Calendar, ArrowUpDown, Search, BarChart3, Target, Activity, Timer, Users, CreditCard, Receipt, Wallet, PieChart, FileText, AlertTriangle, CheckCircle, TrendingUp as TrendingUpIcon, Settings, Calculator, UserX } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal, Calendar, ArrowUpDown, Search, BarChart3, Target, Activity, Timer, Users, CreditCard, Receipt, Wallet, PieChart, FileText, AlertTriangle, CheckCircle, TrendingUp as TrendingUpIcon, Settings, Calculator, UserX, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
@@ -80,6 +81,46 @@ interface ExpenseCategory {
   color: string;
 }
 export default function Admin() {
+  const { profile } = useAuth();
+  const { currentAgency } = useAgency();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  // Verificação de permissão de admin
+  if (profile?.role !== 'agency_admin' && profile?.role !== 'super_admin') {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)] p-6">
+        <Card className="max-w-2xl w-full">
+          <CardHeader className="text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="h-24 w-24 rounded-full bg-destructive/10 flex items-center justify-center">
+                <ShieldAlert className="h-12 w-12 text-destructive" />
+              </div>
+            </div>
+            <CardTitle className="text-3xl">Acesso Restrito</CardTitle>
+            <CardDescription className="text-lg">
+              Você não tem permissão para acessar esta área
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert variant="destructive">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertTitle className="text-lg font-semibold">Permissão Necessária</AlertTitle>
+              <AlertDescription className="text-base mt-2">
+                Esta tela é exclusiva para administradores da agência. Somente usuários com permissão de administrador podem acessar o painel administrativo, incluindo gestão de clientes, pagamentos, despesas e relatórios financeiros.
+              </AlertDescription>
+            </Alert>
+            <div className="flex justify-center pt-4">
+              <Button onClick={() => navigate('/')} variant="default">
+                Voltar ao Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const [clients, setClients] = useState<Client[]>([]);
   const [payments, setPayments] = useState<ClientPayment[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -147,21 +188,15 @@ export default function Admin() {
   const [clientViewMode, setClientViewMode] = useState<"cards" | "table">("cards");
   const [paymentViewMode, setPaymentViewMode] = useState<"cards" | "table">("cards");
   const [expenseViewMode, setExpenseViewMode] = useState<"cards" | "table">("cards");
-  const { profile } = useAuth();
-  const { currentAgency } = useAgency();
-  const { toast } = useToast();
   const { checkLimitWithWarning } = useLimitEnforcement();
-  const navigate = useNavigate();
 
-  // Verifica se o usuário tem permissão para acessar a página
-  const hasAccess = profile?.role === 'agency_admin';
   useEffect(() => {
-    if (hasAccess && currentAgency) {
+    if (currentAgency) {
       fetchData();
     } else {
       setLoading(false);
     }
-  }, [hasAccess, currentAgency?.id, selectedMonth, clientSort, paymentSort, expenseSort]);
+  }, [currentAgency?.id, selectedMonth, clientSort, paymentSort, expenseSort]);
   const fetchData = async () => {
     try {
       await Promise.all([
@@ -915,19 +950,7 @@ export default function Admin() {
     setPaymentTypeFilter("all");
     setValueRangeFilter("all");
   };
-  if (!hasAccess) {
-    return <div className="flex items-center justify-center h-64">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Acesso Restrito</h3>
-            <p className="text-muted-foreground text-center">
-              Esta página é restrita apenas para administradores.
-            </p>
-          </CardContent>
-        </Card>
-      </div>;
-  }
+
   if (loading) {
     return <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
