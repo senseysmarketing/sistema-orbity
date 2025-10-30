@@ -177,17 +177,50 @@ export default function Import() {
             observations: c.observacoes || null
           }));
 
-          const { data: insertedClients, error: clientError } = await supabase
+          // Get existing clients to check for duplicates
+          const { data: existingClients } = await supabase
             .from('clients')
-            .insert(clientsToInsert)
-            .select();
+            .select('id, name')
+            .eq('agency_id', currentAgency.id);
 
-          if (clientError) throw clientError;
-          successCount += insertedClients.length;
+          const existingClientNames = new Set(
+            (existingClients || []).map(c => c.name.toLowerCase().trim())
+          );
 
-          // Create client map
+          // Separate clients into new and duplicates
+          const newClients = clientsToInsert.filter(
+            c => !existingClientNames.has(c.name.toLowerCase().trim())
+          );
+
+          let insertedClients: any[] = [];
+          
+          // Insert only new clients
+          if (newClients.length > 0) {
+            const { data, error: clientError } = await supabase
+              .from('clients')
+              .insert(newClients)
+              .select();
+
+            if (clientError) throw clientError;
+            insertedClients = data || [];
+            successCount += insertedClients.length;
+          }
+
+          // Report duplicates as skipped
+          const skippedCount = clientsToInsert.length - newClients.length;
+          if (skippedCount > 0) {
+            errorCount += skippedCount;
+            toast({
+              title: "Atenção",
+              description: `${skippedCount} cliente(s) já existem e foram ignorados.`,
+              variant: "default"
+            });
+          }
+
+          // Create client map with all clients (existing + new)
+          const allClients = [...(existingClients || []), ...insertedClients];
           const clientMap = new Map(
-            insertedClients.map(c => [c.name.toLowerCase().trim(), c.id])
+            allClients.map(c => [c.name.toLowerCase().trim(), c.id])
           );
 
           // Import payments
@@ -201,12 +234,14 @@ export default function Import() {
               status: mapStatus(p.status)
             })).filter(p => p.client_id); // Only insert payments with valid clients
 
-            const { data: insertedPayments, error: paymentError } = await supabase
-              .from('client_payments')
-              .insert(paymentsToInsert);
+            if (paymentsToInsert.length > 0) {
+              const { error: paymentError } = await supabase
+                .from('client_payments')
+                .insert(paymentsToInsert);
 
-            if (paymentError) throw paymentError;
-            successCount += paymentsToInsert.length;
+              if (paymentError) throw paymentError;
+              successCount += paymentsToInsert.length;
+            }
           }
         }
       }
