@@ -6,7 +6,17 @@ export const ClientImportSchema = z.object({
   valorMensal: z.number().positive("Valor mensal deve ser positivo"),
   diaVencimento: z.number().int().min(1, "Dia mínimo é 1").max(31, "Dia máximo é 31"),
   dataInicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato de data inválido (use YYYY-MM-DD)").optional().nullable(),
-  contato: z.string().optional().nullable(),
+  contato: z.union([z.string(), z.number()]).transform(val => {
+    if (val === null || val === undefined) return null;
+    const phoneStr = String(val).replace(/\D/g, '');
+    if (!phoneStr) return null;
+    if (phoneStr.length === 11) {
+      return `+55 (${phoneStr.slice(0, 2)}) ${phoneStr.slice(2, 7)}-${phoneStr.slice(7)}`;
+    } else if (phoneStr.length === 10) {
+      return `+55 (${phoneStr.slice(0, 2)}) ${phoneStr.slice(2, 6)}-${phoneStr.slice(6)}`;
+    }
+    return phoneStr;
+  }).optional().nullable(),
   servico: z.string().optional().nullable(),
   ativo: z.enum(['SIM', 'NAO'], { errorMap: () => ({ message: "Ativo deve ser SIM ou NAO" }) }),
   temFidelidade: z.enum(['SIM', 'NAO'], { errorMap: () => ({ message: "Tem Fidelidade deve ser SIM ou NAO" }) }).optional().nullable(),
@@ -48,7 +58,23 @@ export const SalaryImportSchema = z.object({
 export const LeadImportSchema = z.object({
   nome: z.string().min(1, "Nome é obrigatório"),
   email: z.string().email("Email inválido").optional().nullable(),
-  telefone: z.string().optional().nullable(),
+  telefone: z.union([z.string(), z.number()]).transform(val => {
+    if (val === null || val === undefined) return null;
+    // Convert to string if it's a number
+    const phoneStr = String(val).replace(/\D/g, '');
+    if (!phoneStr) return null;
+    
+    // Format Brazilian phone: +55 (DDD) 91234-5678 or +55 (DDD) 1234-5678
+    if (phoneStr.length === 11) {
+      // With 9 in front: +55 (XX) 9XXXX-XXXX
+      return `+55 (${phoneStr.slice(0, 2)}) ${phoneStr.slice(2, 7)}-${phoneStr.slice(7)}`;
+    } else if (phoneStr.length === 10) {
+      // Without 9: +55 (XX) XXXX-XXXX
+      return `+55 (${phoneStr.slice(0, 2)}) ${phoneStr.slice(2, 6)}-${phoneStr.slice(6)}`;
+    }
+    // Return as is if format doesn't match
+    return phoneStr;
+  }).optional().nullable(),
   empresa: z.string().optional().nullable(),
   cargo: z.string().optional().nullable(),
   origem: z.enum(['MANUAL', 'SITE', 'INDICACAO', 'REDES_SOCIAIS', 'FACEBOOK_LEADS'], { 
