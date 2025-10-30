@@ -391,9 +391,12 @@ export default function Import() {
               </ol>
             </div>
             <div className="flex gap-3">
-              <Button onClick={handleDownloadTemplate} className="flex-1">
+              <Button onClick={handleDownloadTemplate} variant="outline" className="flex-1">
                 <Download className="h-4 w-4 mr-2" />
                 Baixar Template
+              </Button>
+              <Button onClick={() => setStep('upload')} className="flex-1">
+                Continuar
               </Button>
               <Button variant="outline" onClick={handleReset}>
                 Voltar
