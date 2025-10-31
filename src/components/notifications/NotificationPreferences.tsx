@@ -181,7 +181,7 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
 
       const { error: prefsError } = await supabase
         .from("notification_preferences")
-        .upsert(prefsToSave);
+        .upsert(prefsToSave, { onConflict: 'user_id,agency_id' });
 
       if (prefsError) throw prefsError;
 
@@ -195,7 +195,7 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
 
       const { error: emailError } = await supabase
         .from("user_notification_channels")
-        .upsert(emailConfigToSave);
+        .upsert(emailConfigToSave, { onConflict: 'user_id,agency_id' });
 
       if (emailError) throw emailError;
 
