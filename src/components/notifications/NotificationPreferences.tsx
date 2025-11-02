@@ -125,7 +125,7 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
       // Fetch email channel config  
       const { data: emailData } = await supabase
         .from("user_notification_channels")
-        .select("email_enabled, email_address")
+        .select("email_enabled, email_address, email_digest")
         .eq("user_id", user.id)
         .eq("agency_id", currentAgency.id)
         .maybeSingle();
@@ -135,6 +135,7 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
           ...prev,
           email_enabled: emailData.email_enabled ?? false,
           email_address: emailData.email_address || user.email || "",
+          email_digest: emailData.email_digest ?? false,
         }));
       } else {
         setChannels(prev => ({
@@ -191,6 +192,7 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
         agency_id: currentAgency.id,
         email_enabled: channels.email_enabled,
         email_address: channels.email_address,
+        email_digest: channels.email_digest,
       };
 
       const { error: emailError } = await supabase

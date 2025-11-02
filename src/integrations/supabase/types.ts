@@ -3393,6 +3393,7 @@ export type Database = {
           discord_enabled: boolean | null
           discord_user_id: string | null
           email_address: string | null
+          email_digest: boolean | null
           email_enabled: boolean | null
           email_notification_types: string[] | null
           id: string
@@ -3410,6 +3411,7 @@ export type Database = {
           discord_enabled?: boolean | null
           discord_user_id?: string | null
           email_address?: string | null
+          email_digest?: boolean | null
           email_enabled?: boolean | null
           email_notification_types?: string[] | null
           id?: string
@@ -3427,6 +3429,7 @@ export type Database = {
           discord_enabled?: boolean | null
           discord_user_id?: string | null
           email_address?: string | null
+          email_digest?: boolean | null
           email_enabled?: boolean | null
           email_notification_types?: string[] | null
           id?: string
