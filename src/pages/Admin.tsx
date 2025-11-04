@@ -23,6 +23,7 @@ import { SalaryForm } from "@/components/admin/SalaryForm";
 import { ClientCard } from "@/components/admin/ClientCard";
 import { ClientDetailsDialog } from "@/components/admin/ClientDetailsDialog";
 import { ChurnAnalysis } from "@/components/admin/ChurnAnalysis";
+import { FinancialMetricsHelp } from "@/components/admin/FinancialMetricsHelp";
 import { ExpenseCard } from "@/components/admin/ExpenseCard";
 import { ExpenseMetricsCards } from "@/components/admin/ExpenseMetricsCards";
 import { ExpenseDetailsDialog } from "@/components/admin/ExpenseDetailsDialog";
@@ -935,14 +936,45 @@ export default function Admin() {
     };
   }, [filteredPayments, filteredExpenses, clients, expenses]);
 
-  // Cálculos financeiros
-  const totalReceivable = payments.filter(p => p.status !== 'paid').reduce((sum, p) => sum + p.amount, 0);
+  // ============ REGIME DE CAIXA (REAL) ============
+  // Pagamentos efetivamente recebidos no mês
+  const paidPaymentsThisMonth = paymentsInSelectedMonth.filter(p => p.status === 'paid');
+  const monthlyRevenueReal = paidPaymentsThisMonth.reduce((sum, p) => sum + p.amount, 0);
+
+  // Despesas efetivamente pagas no mês
+  const paidExpensesThisMonth = expenses.filter(e => e.status === 'paid');
+  const totalExpensesPaidReal = paidExpensesThisMonth.reduce((sum, e) => sum + e.amount, 0);
+
+  // Salários efetivamente pagos no mês
+  const paidSalariesThisMonth = salaries.filter(s => s.status === 'paid');
+  const totalSalariesPaidReal = paidSalariesThisMonth.reduce((sum, s) => sum + s.amount, 0);
+
+  // Lucro Líquido Real (Caixa)
+  const totalCostsReal = totalExpensesPaidReal + totalSalariesPaidReal;
+  const netProfitReal = monthlyRevenueReal - totalCostsReal;
+
+  // ============ REGIME DE COMPETÊNCIA (PREVISTO) ============
+  // Receita prevista (todos os pagamentos com vencimento no mês)
+  const monthlyRevenueExpected = paymentsInSelectedMonth.reduce((sum, p) => sum + p.amount, 0);
+
+  // Despesas previstas (todas as despesas e salários do mês)
+  const totalExpensesExpected = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalSalariesExpected = salaries.reduce((sum, s) => sum + s.amount, 0);
+  const totalCostsExpected = totalExpensesExpected + totalSalariesExpected;
+
+  // Resultado previsto
+  const netProfitExpected = monthlyRevenueExpected - totalCostsExpected;
+
+  // ============ VALORES GLOBAIS (TODOS OS MESES) ============
   const totalReceived = payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalSalaries = salaries.reduce((sum, s) => sum + s.amount, 0);
-  const totalCosts = totalExpenses + totalSalaries;
-  const monthlyRevenue = paymentsInSelectedMonth.reduce((sum, p) => sum + p.amount, 0);
-  const netProfit = monthlyRevenue - totalCosts;
+  const totalReceivable = payments.filter(p => p.status !== 'paid').reduce((sum, p) => sum + p.amount, 0);
+  
+  // Manter variáveis legadas para compatibilidade
+  const totalExpenses = totalExpensesExpected;
+  const totalSalaries = totalSalariesExpected;
+  const totalCosts = totalCostsExpected;
+  const monthlyRevenue = monthlyRevenueExpected;
+  const netProfit = netProfitExpected;
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
@@ -959,7 +991,7 @@ export default function Admin() {
   return <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <div>
+        <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Painel Administrativo</h1>
           <p className="text-muted-foreground">
             Dashboard completo para gestão financeira e administrativa
@@ -1015,26 +1047,56 @@ export default function Admin() {
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6">
+          {/* Indicador de Regime de Caixa */}
+          <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <div className="text-sm flex-1">
+              <span className="font-medium text-blue-900 dark:text-blue-100">Regime de Caixa:</span>
+              <span className="text-blue-700 dark:text-blue-300 ml-1">
+                Os valores exibidos consideram apenas pagamentos e despesas efetivamente realizados.
+              </span>
+            </div>
+            <FinancialMetricsHelp />
+          </div>
+
+          {/* Alerta de Pagamentos em Atraso */}
+          {analytics.totalOverdue > 0 && (
+            <Alert variant="destructive" className="border-red-200 bg-red-50 dark:bg-red-950/20">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Atenção: Pagamentos em Atraso</AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p>
+                  Você tem <strong>R$ {analytics.totalOverdue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong> em
+                  pagamentos atrasados ({analytics.paymentStats.overdue} pagamentos).
+                </p>
+                <p className="text-sm">
+                  Esses valores <strong>não estão incluídos</strong> no lucro líquido real,
+                  pois ainda não foram recebidos. O lucro previsto considera esses valores.
+                </p>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Estatísticas Principais */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Receita Mensal</CardTitle>
+                <CardTitle className="text-sm font-medium">Receita Mensal Real</CardTitle>
                 <TrendingUpIcon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  R$ {monthlyRevenue.toLocaleString('pt-BR', {
+                  R$ {monthlyRevenueReal.toLocaleString('pt-BR', {
                   minimumFractionDigits: 2
                 })}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {analytics.activeClients} contratos ativos
+                  Valores efetivamente recebidos
                 </p>
-                <div className="mt-2">
-                  <div className="text-xs text-muted-foreground">Ticket médio</div>
+                <div className="mt-2 space-y-1">
+                  <div className="text-xs text-muted-foreground">Previsto total</div>
                   <div className="text-sm font-medium">
-                    R$ {analytics.avgClientValue.toLocaleString('pt-BR', {
+                    R$ {monthlyRevenueExpected.toLocaleString('pt-BR', {
                     minimumFractionDigits: 2
                   })}
                   </div>
@@ -1092,22 +1154,22 @@ export default function Admin() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Lucro Líquido</CardTitle>
+                <CardTitle className="text-sm font-medium">Lucro Líquido Real</CardTitle>
                 <Calculator className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  R$ {netProfit.toLocaleString('pt-BR', {
+                <div className={`text-2xl font-bold ${netProfitReal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  R$ {netProfitReal.toLocaleString('pt-BR', {
                   minimumFractionDigits: 2
                 })}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  receita - custos
+                  Valores recebidos vs pagos
                 </p>
-                <div className="mt-2">
-                  <div className="text-xs text-muted-foreground">Margem</div>
+                <div className="mt-2 space-y-1">
+                  <div className="text-xs text-muted-foreground">Margem Real</div>
                   <div className="text-sm font-medium">
-                    {monthlyRevenue > 0 ? (netProfit / monthlyRevenue * 100).toFixed(1) : 0}%
+                    {monthlyRevenueReal > 0 ? (netProfitReal / monthlyRevenueReal * 100).toFixed(1) : 0}%
                   </div>
                 </div>
               </CardContent>
@@ -1115,35 +1177,27 @@ export default function Admin() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Fidelidade</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">Resultado Previsto</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
-                  {analytics.loyaltyClients}
+                <div className={`text-2xl font-bold ${netProfitExpected >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                  R$ {netProfitExpected.toLocaleString('pt-BR', {
+                  minimumFractionDigits: 2
+                })}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  clientes com fidelidade
+                  Considerando pendentes
                 </p>
-                <div className="mt-2 space-y-1">
-                  {analytics.loyaltyAlerts.ending7Days.length > 0 && (
-                    <div className="text-xs text-red-600">
-                      {analytics.loyaltyAlerts.ending7Days.length} vencendo em 7 dias
-                    </div>
-                  )}
-                  {analytics.loyaltyAlerts.ending30Days.length > 0 && (
-                    <div className="text-xs text-orange-600">
-                      {analytics.loyaltyAlerts.ending30Days.length} vencendo em 30 dias
-                    </div>
-                  )}
-                  {analytics.loyaltyAlerts.expired.length > 0 && (
-                    <div className="text-xs text-red-700 font-medium">
-                      {analytics.loyaltyAlerts.expired.length} vencido(s)
-                    </div>
-                  )}
+                <div className="mt-2">
+                  <div className="text-xs text-muted-foreground">Diferença</div>
+                  <div className={`text-sm font-medium ${(netProfitExpected - netProfitReal) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                    R$ {Math.abs(netProfitExpected - netProfitReal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </div>
                 </div>
               </CardContent>
             </Card>
+
           </div>
 
           {/* Gráficos de Performance */}
@@ -2390,29 +2444,38 @@ export default function Admin() {
             <CardContent>
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="space-y-4">
-                  <h4 className="font-semibold text-green-600">Receitas</h4>
+                  <h4 className="font-semibold text-green-600 flex items-center gap-2">
+                    Receitas
+                    <Badge variant="outline" className="text-xs">Regime de Caixa</Badge>
+                  </h4>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span>Pagamentos Recebidos</span>
-                      <span>R$ {analytics.totalReceived.toLocaleString('pt-BR', {
+                      <span className="font-medium">💰 Pagamentos Recebidos</span>
+                      <span className="font-semibold text-green-600">R$ {analytics.totalReceived.toLocaleString('pt-BR', {
                         minimumFractionDigits: 2
                       })}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Pagamentos Pendentes</span>
-                      <span>R$ {analytics.totalPending.toLocaleString('pt-BR', {
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">⏳ Pagamentos Pendentes</span>
+                      <span className="text-blue-600">R$ {analytics.totalPending.toLocaleString('pt-BR', {
                         minimumFractionDigits: 2
                       })}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Pagamentos Atrasados</span>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">⚠️ Pagamentos Atrasados</span>
                       <span className="text-red-600">R$ {analytics.totalOverdue.toLocaleString('pt-BR', {
                         minimumFractionDigits: 2
                       })}</span>
                     </div>
                     <hr />
-                    <div className="flex justify-between font-semibold">
-                      <span>Total Esperado</span>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Total Realizado</span>
+                      <span className="font-semibold">R$ {analytics.totalReceived.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2
+                      })}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total Previsto</span>
                       <span>R$ {(analytics.totalReceived + analytics.totalPending + analytics.totalOverdue).toLocaleString('pt-BR', {
                         minimumFractionDigits: 2
                       })}</span>
@@ -2421,30 +2484,45 @@ export default function Admin() {
                 </div>
 
                 <div className="space-y-4">
-                  <h4 className="font-semibold text-red-600">Despesas</h4>
+                  <h4 className="font-semibold text-red-600 flex items-center gap-2">
+                    Despesas
+                    <Badge variant="outline" className="text-xs">Regime de Caixa</Badge>
+                  </h4>
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span>Despesas Pagas</span>
-                      <span>R$ {analytics.totalExpensesPaid.toLocaleString('pt-BR', {
+                      <span className="font-medium">💸 Despesas Pagas</span>
+                      <span className="font-semibold text-red-600">R$ {totalExpensesPaidReal.toLocaleString('pt-BR', {
                         minimumFractionDigits: 2
                       })}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Despesas Pendentes</span>
-                      <span>R$ {analytics.totalExpensesPending.toLocaleString('pt-BR', {
+                      <span className="font-medium">👥 Salários Pagos</span>
+                      <span className="font-semibold text-red-600">R$ {totalSalariesPaidReal.toLocaleString('pt-BR', {
                         minimumFractionDigits: 2
                       })}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Salários</span>
-                      <span>R$ {totalSalaries.toLocaleString('pt-BR', {
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">⏳ Despesas Pendentes</span>
+                      <span className="text-orange-600">R$ {analytics.totalExpensesPending.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2
+                      })}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">⏳ Salários Pendentes</span>
+                      <span className="text-orange-600">R$ {(totalSalariesExpected - totalSalariesPaidReal).toLocaleString('pt-BR', {
                         minimumFractionDigits: 2
                       })}</span>
                     </div>
                     <hr />
-                    <div className="flex justify-between font-semibold">
-                      <span>Total Custos</span>
-                      <span>R$ {(analytics.totalExpensesPaid + analytics.totalExpensesPending + totalSalaries).toLocaleString('pt-BR', {
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Total Custos Reais</span>
+                      <span className="font-semibold">R$ {totalCostsReal.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2
+                      })}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total Custos Previstos</span>
+                      <span>R$ {totalCostsExpected.toLocaleString('pt-BR', {
                         minimumFractionDigits: 2
                       })}</span>
                     </div>
@@ -2452,15 +2530,49 @@ export default function Admin() {
                 </div>
               </div>
 
-              <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-semibold">Resultado Líquido</span>
-                  <span className={`text-2xl font-bold ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    R$ {netProfit.toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2
-                  })}
-                  </span>
+              <div className="mt-6 space-y-3">
+                {/* Resultado Real (Caixa) */}
+                <div className="p-4 bg-green-50/50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">💰 Resultado Real (Caixa)</span>
+                      <p className="text-xs text-muted-foreground">Apenas valores recebidos vs pagos</p>
+                    </div>
+                    <span className={`text-2xl font-bold ${netProfitReal >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      R$ {netProfitReal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
+
+                {/* Resultado Previsto (Competência) */}
+                <div className="p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">📊 Resultado Previsto (Competência)</span>
+                      <p className="text-xs text-muted-foreground">Considerando pendentes e atrasados</p>
+                    </div>
+                    <span className={`text-2xl font-bold ${netProfitExpected >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                      R$ {netProfitExpected.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Alerta de Diferença */}
+                {Math.abs(netProfitExpected - netProfitReal) > 0 && (
+                  <div className="p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                      <div className="text-sm">
+                        <span className="font-medium">Diferença de R$ {Math.abs(netProfitExpected - netProfitReal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        <span className="text-muted-foreground ml-1">
+                          {netProfitExpected > netProfitReal 
+                            ? '(valores a receber/pagar ainda não efetivados)' 
+                            : '(pagamentos atrasados impactando o resultado)'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
