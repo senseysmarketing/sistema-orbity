@@ -1621,7 +1621,7 @@ export default function Admin() {
                   .filter(p => new Date(p.due_date) >= new Date())
                   .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())[0];
 
-                // Verifica o status de pagamento do mês atual
+                // Verifica o status de pagamento - prioriza pagamentos em atraso
                 const currentDate = new Date();
                 const currentMonth = currentDate.getMonth() + 1;
                 const currentYear2 = currentDate.getFullYear();
@@ -1630,11 +1630,18 @@ export default function Admin() {
                   return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear2;
                 };
                 
+                // Primeiro, verifica se há pagamentos em atraso (de qualquer mês)
+                const hasOverduePayments = clientPayments.some(p => p.status === 'overdue');
+                
+                // Se não houver atrasos, verifica o status do mês atual
                 const hasPaidThisMonth = clientPayments.some(p => p.paid_date && isSameMonthYear(p.paid_date));
                 const dueThisMonth = clientPayments.find(p => isSameMonthYear(p.due_date));
-                const computedCurrentMonthStatus: 'paid' | 'pending' | 'overdue' | null = hasPaidThisMonth
-                  ? 'paid'
-                  : (dueThisMonth?.status ?? null);
+                
+                const computedCurrentMonthStatus: 'paid' | 'pending' | 'overdue' | null = hasOverduePayments
+                  ? 'overdue'
+                  : (hasPaidThisMonth
+                    ? 'paid'
+                    : (dueThisMonth?.status ?? null));
 
                 return (
                   <ClientCard
