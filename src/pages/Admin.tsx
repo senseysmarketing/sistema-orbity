@@ -1687,15 +1687,14 @@ export default function Admin() {
                 // Primeiro, verifica se há pagamentos em atraso (de qualquer mês)
                 const hasOverduePayments = clientPayments.some(p => p.status === 'overdue');
                 
-                // Se não houver atrasos, verifica o status do mês atual
-                const hasPaidThisMonth = clientPayments.some(p => p.paid_date && isSameMonthYear(p.paid_date));
+                // Busca o pagamento que vence no mês atual
                 const dueThisMonth = clientPayments.find(p => isSameMonthYear(p.due_date));
                 
+                // Se há pagamentos em atraso, prioriza mostrar 'overdue'
+                // Caso contrário, mostra o status do pagamento que vence no mês atual
                 const computedCurrentMonthStatus: 'paid' | 'pending' | 'overdue' | null = hasOverduePayments
                   ? 'overdue'
-                  : (hasPaidThisMonth
-                    ? 'paid'
-                    : (dueThisMonth?.status ?? null));
+                  : (dueThisMonth?.status ?? null);
 
                 return (
                   <ClientCard
