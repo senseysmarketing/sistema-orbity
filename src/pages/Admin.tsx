@@ -86,6 +86,7 @@ export default function Admin() {
   const { currentAgency } = useAgency();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [isRunningClosure, setIsRunningClosure] = useState(false);
 
   // Verificação de permissão de admin
   if (profile?.role !== 'agency_admin' && profile?.role !== 'super_admin') {
@@ -477,6 +478,32 @@ export default function Admin() {
       setClientToDelete(null);
     }
   };
+
+  const handleRunMonthlyClosure = async () => {
+    setIsRunningClosure(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('monthly-closure');
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Fechamento mensal executado",
+        description: `Pagamentos, despesas e salários recorrentes foram gerados com sucesso!`,
+      });
+      
+      // Recarregar dados
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao executar fechamento",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsRunningClosure(false);
+    }
+  };
+
   const handleUpdatePaymentStatus = async (paymentId: string, newStatus: 'pending' | 'paid' | 'overdue') => {
     try {
       const updateData: any = {
@@ -1047,16 +1074,27 @@ export default function Admin() {
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6">
-          {/* Indicador de Regime de Caixa */}
-          <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <div className="text-sm flex-1">
-              <span className="font-medium text-blue-900 dark:text-blue-100">Regime de Caixa:</span>
-              <span className="text-blue-700 dark:text-blue-300 ml-1">
-                Os valores exibidos consideram apenas pagamentos e despesas efetivamente realizados.
-              </span>
+          {/* Indicador de Regime de Caixa + Botão de Fechamento */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800 flex-1">
+              <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <div className="text-sm flex-1">
+                <span className="font-medium text-blue-900 dark:text-blue-100">Regime de Caixa:</span>
+                <span className="text-blue-700 dark:text-blue-300 ml-1">
+                  Os valores exibidos consideram apenas pagamentos e despesas efetivamente realizados.
+                </span>
+              </div>
+              <FinancialMetricsHelp />
             </div>
-            <FinancialMetricsHelp />
+            <Button 
+              onClick={handleRunMonthlyClosure}
+              disabled={isRunningClosure}
+              variant="outline"
+              className="shrink-0"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              {isRunningClosure ? "Executando..." : "Executar Fechamento Mensal"}
+            </Button>
           </div>
 
           {/* Alerta de Pagamentos em Atraso */}
