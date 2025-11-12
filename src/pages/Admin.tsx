@@ -134,6 +134,9 @@ export default function Admin() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
+  // Controla execução única do gerador automático de pagamentos do mês atual
+  const [hasEnsuredCurrentMonthPayments, setHasEnsuredCurrentMonthPayments] = useState(false);
+
   // Form states
   const [clientFormOpen, setClientFormOpen] = useState(false);
   const [paymentFormOpen, setPaymentFormOpen] = useState(false);
@@ -340,6 +343,49 @@ export default function Admin() {
     }
     setPreviousMonthExpenses(data || []);
   };
+
+  // Garante que cada cliente ativo tenha o pagamento do mês ATUAL criado automaticamente
+  useEffect(() => {
+    if (!currentAgency?.id) return;
+    if (hasEnsuredCurrentMonthPayments) return;
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1; // 1-12
+    const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
+
+    // Clientes que devem ter cobrança mensal
+    const missingClients = clients
+      .filter((c) => c.active && !!c.monthly_value && !!c.due_date)
+      .filter((c) => !payments.some((p) => p.client_id === c.id && p.due_date.startsWith(monthPrefix)));
+
+    if (missingClients.length === 0) {
+      setHasEnsuredCurrentMonthPayments(true);
+      return;
+    }
+
+    const rows = missingClients.map((c) => ({
+      client_id: c.id,
+      agency_id: currentAgency.id,
+      amount: Number(c.monthly_value),
+      // Usa o dia configurado do cliente; limita a 28 para evitar meses curtos inválidos
+      due_date: `${year}-${String(month).padStart(2, '0')}-${String(Math.min(c.due_date, 28)).padStart(2, '0')}`,
+      status: 'pending' as const,
+    }));
+
+    const insertMissing = async () => {
+      const { error } = await supabase.from('client_payments').insert(rows);
+      if (error) {
+        console.error('Erro ao gerar pagamentos do mês atual:', error);
+      }
+      setHasEnsuredCurrentMonthPayments(true);
+      // Recarrega lista para refletir imediatamente no modal
+      fetchPayments();
+    };
+
+    insertMissing();
+  }, [clients, payments, currentAgency?.id, hasEnsuredCurrentMonthPayments]);
+
   const getClientName = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
     return client?.name || 'Cliente desconhecido';
