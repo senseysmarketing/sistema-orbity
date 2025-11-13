@@ -347,20 +347,18 @@ export default function Admin() {
   // Garante que cada cliente ativo tenha o pagamento do mês ATUAL criado automaticamente
   useEffect(() => {
     if (!currentAgency?.id) return;
-    if (hasEnsuredCurrentMonthPayments) return;
 
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1; // 1-12
     const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
 
-    // Clientes que devem ter cobrança mensal
+    // Clientes que devem ter cobrança mensal (apenas ativos)
     const missingClients = clients
       .filter((c) => c.active && !!c.monthly_value && !!c.due_date)
       .filter((c) => !payments.some((p) => p.client_id === c.id && p.due_date.startsWith(monthPrefix)));
 
     if (missingClients.length === 0) {
-      setHasEnsuredCurrentMonthPayments(true);
       return;
     }
 
@@ -378,13 +376,12 @@ export default function Admin() {
       if (error) {
         console.error('Erro ao gerar pagamentos do mês atual:', error);
       }
-      setHasEnsuredCurrentMonthPayments(true);
       // Recarrega lista para refletir imediatamente no modal
       fetchPayments();
     };
 
     insertMissing();
-  }, [clients, payments, currentAgency?.id, hasEnsuredCurrentMonthPayments]);
+  }, [clients, payments, currentAgency?.id]);
 
   const getClientName = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
