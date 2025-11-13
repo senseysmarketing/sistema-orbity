@@ -344,9 +344,48 @@ export default function Admin() {
     setPreviousMonthExpenses(data || []);
   };
 
-  // Garante que cada cliente ativo tenha o pagamento do mês ATUAL criado automaticamente
+  // Limpa pagamentos duplicados de novembro 2025 (uma única vez)
   useEffect(() => {
     if (!currentAgency?.id) return;
+    
+    const cleanDuplicates = async () => {
+      const { data: duplicates } = await supabase
+        .from('client_payments')
+        .select('id, client_id, created_at')
+        .gte('due_date', '2025-11-01')
+        .lt('due_date', '2025-12-01')
+        .eq('agency_id', currentAgency.id)
+        .order('client_id')
+        .order('created_at');
+
+      if (!duplicates || duplicates.length === 0) return;
+
+      // Agrupar por client_id e manter apenas o mais antigo
+      const toDelete: string[] = [];
+      const seen = new Set<string>();
+
+      duplicates.forEach(payment => {
+        if (seen.has(payment.client_id)) {
+          toDelete.push(payment.id);
+        } else {
+          seen.add(payment.client_id);
+        }
+      });
+
+      if (toDelete.length > 0) {
+        await supabase.from('client_payments').delete().in('id', toDelete);
+        console.log(`Deletados ${toDelete.length} pagamentos duplicados de novembro`);
+        fetchPayments();
+      }
+    };
+
+    cleanDuplicates();
+  }, [currentAgency?.id]);
+
+  // Garante que cada cliente ativo tenha o pagamento do mês ATUAL criado automaticamente
+  useEffect(() => {
+    if (!currentAgency?.id || clients.length === 0) return;
+    if (hasEnsuredCurrentMonthPayments) return;
 
     const now = new Date();
     const year = now.getFullYear();
@@ -359,6 +398,7 @@ export default function Admin() {
       .filter((c) => !payments.some((p) => p.client_id === c.id && p.due_date.startsWith(monthPrefix)));
 
     if (missingClients.length === 0) {
+      setHasEnsuredCurrentMonthPayments(true);
       return;
     }
 
@@ -376,12 +416,13 @@ export default function Admin() {
       if (error) {
         console.error('Erro ao gerar pagamentos do mês atual:', error);
       }
+      setHasEnsuredCurrentMonthPayments(true);
       // Recarrega lista para refletir imediatamente no modal
       fetchPayments();
     };
 
     insertMissing();
-  }, [clients, payments, currentAgency?.id]);
+  }, [clients, payments, currentAgency?.id, hasEnsuredCurrentMonthPayments]);
 
   const getClientName = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
