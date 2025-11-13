@@ -872,10 +872,19 @@ export default function Admin() {
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
 
-    // Análise de pagamentos
-    const paidPayments = filteredPayments.filter(p => p.status === 'paid');
-    const pendingPayments = filteredPayments.filter(p => p.status === 'pending');
-    const overduePayments = filteredPayments.filter(p => p.status === 'overdue');
+    // Análise de pagamentos (apenas clientes ativos)
+    const paidPayments = filteredPayments.filter(p => {
+      const client = clients.find(c => c.id === p.client_id);
+      return p.status === 'paid' && client?.active;
+    });
+    const pendingPayments = filteredPayments.filter(p => {
+      const client = clients.find(c => c.id === p.client_id);
+      return p.status === 'pending' && client?.active;
+    });
+    const overduePayments = filteredPayments.filter(p => {
+      const client = clients.find(c => c.id === p.client_id);
+      return p.status === 'overdue' && client?.active;
+    });
     const totalReceived = paidPayments.reduce((sum, p) => sum + p.amount, 0);
     const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
     const totalOverdue = overduePayments.reduce((sum, p) => sum + p.amount, 0);
@@ -984,8 +993,12 @@ export default function Admin() {
   }, [filteredPayments, filteredExpenses, clients, expenses]);
 
   // ============ REGIME DE CAIXA (REAL) ============
-  // Pagamentos efetivamente recebidos no mês
-  const paidPaymentsThisMonth = paymentsInSelectedMonth.filter(p => p.status === 'paid');
+  // Pagamentos efetivamente recebidos no mês (apenas clientes ativos)
+  const paidPaymentsThisMonth = paymentsInSelectedMonth
+    .filter(p => {
+      const client = clients.find(c => c.id === p.client_id);
+      return p.status === 'paid' && client?.active;
+    });
   const monthlyRevenueReal = paidPaymentsThisMonth.reduce((sum, p) => sum + p.amount, 0);
 
   // Despesas efetivamente pagas no mês
@@ -1001,8 +1014,13 @@ export default function Admin() {
   const netProfitReal = monthlyRevenueReal - totalCostsReal;
 
   // ============ REGIME DE COMPETÊNCIA (PREVISTO) ============
-  // Receita prevista (todos os pagamentos com vencimento no mês)
-  const monthlyRevenueExpected = paymentsInSelectedMonth.reduce((sum, p) => sum + p.amount, 0);
+  // Receita prevista (apenas pagamentos de clientes ativos com vencimento no mês)
+  const monthlyRevenueExpected = paymentsInSelectedMonth
+    .filter(p => {
+      const client = clients.find(c => c.id === p.client_id);
+      return client?.active;
+    })
+    .reduce((sum, p) => sum + p.amount, 0);
 
   // Despesas previstas (todas as despesas e salários do mês)
   const totalExpensesExpected = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -1013,8 +1031,19 @@ export default function Admin() {
   const netProfitExpected = monthlyRevenueExpected - totalCostsExpected;
 
   // ============ VALORES GLOBAIS (TODOS OS MESES) ============
-  const totalReceived = payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
-  const totalReceivable = payments.filter(p => p.status !== 'paid').reduce((sum, p) => sum + p.amount, 0);
+  // Apenas pagamentos de clientes ativos
+  const totalReceived = payments
+    .filter(p => {
+      const client = clients.find(c => c.id === p.client_id);
+      return p.status === 'paid' && client?.active;
+    })
+    .reduce((sum, p) => sum + p.amount, 0);
+  const totalReceivable = payments
+    .filter(p => {
+      const client = clients.find(c => c.id === p.client_id);
+      return p.status !== 'paid' && client?.active;
+    })
+    .reduce((sum, p) => sum + p.amount, 0);
   
   // Manter variáveis legadas para compatibilidade
   const totalExpenses = totalExpensesExpected;
