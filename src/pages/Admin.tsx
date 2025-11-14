@@ -119,40 +119,8 @@ export default function Admin() {
   const [clientPaymentStatusFilter, setClientPaymentStatusFilter] = useState<string>("all");
   const [showInactiveClients, setShowInactiveClients] = useState(false);
 
-  // Verificação de permissão de admin (APÓS todos os hooks)
-  if (profile?.role !== 'agency_admin' && profile?.role !== 'super_admin') {
-    return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-200px)] p-6">
-        <Card className="max-w-2xl w-full">
-          <CardHeader className="text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="h-24 w-24 rounded-full bg-destructive/10 flex items-center justify-center">
-                <ShieldAlert className="h-12 w-12 text-destructive" />
-              </div>
-            </div>
-            <CardTitle className="text-3xl">Acesso Restrito</CardTitle>
-            <CardDescription className="text-lg">
-              Você não tem permissão para acessar esta área
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert variant="destructive">
-              <ShieldAlert className="h-4 w-4" />
-              <AlertTitle className="text-lg font-semibold">Permissão Necessária</AlertTitle>
-              <AlertDescription className="text-base mt-2">
-                Esta tela é exclusiva para administradores da agência. Somente usuários com permissão de administrador podem acessar o painel administrativo, incluindo gestão de clientes, pagamentos, despesas e relatórios financeiros.
-              </AlertDescription>
-            </Alert>
-            <div className="flex justify-center pt-4">
-              <Button onClick={() => navigate('/')} variant="default">
-                Voltar ao Dashboard
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Verificação de permissão (sem retorno antecipado)
+  const hasAccess = profile?.role === 'agency_admin' || profile?.role === 'super_admin';
 
   // Payment states
   const [selectedPayment, setSelectedPayment] = useState<ClientPayment | null>(null);
@@ -1121,6 +1089,41 @@ export default function Admin() {
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>;
   }
+
+  if (!hasAccess) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)] p-6">
+        <Card className="max-w-2xl w-full">
+          <CardHeader className="text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="h-24 w-24 rounded-full bg-destructive/10 flex items-center justify-center">
+                <ShieldAlert className="h-12 w-12 text-destructive" />
+              </div>
+            </div>
+            <CardTitle className="text-3xl">Acesso Restrito</CardTitle>
+            <CardDescription className="text-lg">
+              Você não tem permissão para acessar esta área
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert variant="destructive">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertTitle className="text-lg font-semibold">Permissão Necessária</AlertTitle>
+              <AlertDescription className="text-base mt-2">
+                Esta tela é exclusiva para administradores da agência. Somente usuários com permissão de administrador podem acessar o painel administrativo, incluindo gestão de clientes, pagamentos, despesas e relatórios financeiros.
+              </AlertDescription>
+            </Alert>
+            <div className="flex justify-center pt-4">
+              <Button onClick={() => navigate('/')} variant="default">
+                Voltar ao Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
