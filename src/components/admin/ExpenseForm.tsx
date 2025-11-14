@@ -103,14 +103,35 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense }: ExpenseF
 
     try {
       // Validações específicas por tipo
-      if (formData.expense_type === 'recorrente' && !formData.recurrence_day) {
-        toast({
-          title: "Erro",
-          description: "Despesas recorrentes precisam de um dia de vencimento.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
+      if (formData.expense_type === 'recorrente') {
+        if (!formData.recurrence_day) {
+          toast({
+            title: "Erro",
+            description: "Despesas recorrentes precisam de um dia de vencimento.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+        // Para recorrentes, usar o dia informado no mês atual se due_date estiver vazio
+        if (!formData.due_date) {
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = now.getMonth() + 1;
+          const day = Math.min(parseInt(formData.recurrence_day), 28); // Limitar a 28 para evitar meses inválidos
+          formData.due_date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+      } else {
+        // Para avulsa e parcelada, due_date é obrigatório
+        if (!formData.due_date) {
+          toast({
+            title: "Erro",
+            description: "A data de vencimento é obrigatória.",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
       }
 
       if (formData.expense_type === 'parcelada' && (!formData.installment_total || Number(formData.installment_total) < 2)) {
