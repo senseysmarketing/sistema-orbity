@@ -87,7 +87,39 @@ export default function Admin() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Verificação de permissão de admin
+  const [clients, setClients] = useState<Client[]>([]);
+  const [payments, setPayments] = useState<ClientPayment[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [salaries, setSalaries] = useState<Salary[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [previousMonthExpenses, setPreviousMonthExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  // Controla execução única do gerador automático de pagamentos do mês atual
+  const [hasEnsuredCurrentMonthPayments, setHasEnsuredCurrentMonthPayments] = useState(false);
+
+  // Form states
+  const [clientFormOpen, setClientFormOpen] = useState(false);
+  const [paymentFormOpen, setPaymentFormOpen] = useState(false);
+  const [expenseFormOpen, setExpenseFormOpen] = useState(false);
+  const [salaryFormOpen, setSalaryFormOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [clientDetailsOpen, setClientDetailsOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  
+  // Filtros para a aba de Clientes & Pagamentos
+  const [clientSearchTerm, setClientSearchTerm] = useState("");
+  const [clientStatusFilter, setClientStatusFilter] = useState<string>("all");
+  const [clientLoyaltyFilter, setClientLoyaltyFilter] = useState<string>("all");
+  const [clientPaymentStatusFilter, setClientPaymentStatusFilter] = useState<string>("all");
+  const [showInactiveClients, setShowInactiveClients] = useState(false);
+
+  // Verificação de permissão de admin (APÓS todos os hooks)
   if (profile?.role !== 'agency_admin' && profile?.role !== 'super_admin') {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)] p-6">
@@ -121,38 +153,6 @@ export default function Admin() {
       </div>
     );
   }
-
-  const [clients, setClients] = useState<Client[]>([]);
-  const [payments, setPayments] = useState<ClientPayment[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [salaries, setSalaries] = useState<Salary[]>([]);
-  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
-  const [previousMonthExpenses, setPreviousMonthExpenses] = useState<Expense[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
-
-  // Controla execução única do gerador automático de pagamentos do mês atual
-  const [hasEnsuredCurrentMonthPayments, setHasEnsuredCurrentMonthPayments] = useState(false);
-
-  // Form states
-  const [clientFormOpen, setClientFormOpen] = useState(false);
-  const [paymentFormOpen, setPaymentFormOpen] = useState(false);
-  const [expenseFormOpen, setExpenseFormOpen] = useState(false);
-  const [salaryFormOpen, setSalaryFormOpen] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [clientDetailsOpen, setClientDetailsOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
-  
-  // Filtros para a aba de Clientes & Pagamentos
-  const [clientSearchTerm, setClientSearchTerm] = useState("");
-  const [clientStatusFilter, setClientStatusFilter] = useState<string>("all");
-  const [clientLoyaltyFilter, setClientLoyaltyFilter] = useState<string>("all");
-  const [clientPaymentStatusFilter, setClientPaymentStatusFilter] = useState<string>("all");
-  const [showInactiveClients, setShowInactiveClients] = useState(false);
 
   // Payment states
   const [selectedPayment, setSelectedPayment] = useState<ClientPayment | null>(null);
