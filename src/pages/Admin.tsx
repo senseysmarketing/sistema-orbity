@@ -344,37 +344,56 @@ export default function Admin() {
     setPreviousMonthExpenses(data || []);
   };
 
-  // Limpa pagamentos duplicados de novembro 2025 (uma única vez)
+  // Limpa pagamentos duplicados do MÊS ATUAL (mantém o 'paid' se existir)
   useEffect(() => {
     if (!currentAgency?.id) return;
     
     const cleanDuplicates = async () => {
-      const { data: duplicates } = await supabase
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1; // 1-12
+      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+
+      const { data: paymentsMonth, error } = await supabase
         .from('client_payments')
-        .select('id, client_id, created_at')
-        .gte('due_date', '2025-11-01')
-        .lt('due_date', '2025-12-01')
+        .select('id, client_id, status, paid_date, created_at, amount')
         .eq('agency_id', currentAgency.id)
+        .gte('due_date', startDate)
+        .lte('due_date', endDate)
         .order('client_id')
         .order('created_at');
 
-      if (!duplicates || duplicates.length === 0) return;
+      if (error || !paymentsMonth) return;
 
-      // Agrupar por client_id e manter apenas o mais antigo
+      // Agrupar por client_id e decidir qual manter
+      const groups = new Map<string, any[]>();
+      paymentsMonth.forEach((p: any) => {
+        const arr = groups.get(p.client_id) || [];
+        arr.push(p);
+        groups.set(p.client_id, arr);
+      });
+
       const toDelete: string[] = [];
-      const seen = new Set<string>();
+      groups.forEach((list) => {
+        if (list.length <= 1) return;
 
-      duplicates.forEach(payment => {
-        if (seen.has(payment.client_id)) {
-          toDelete.push(payment.id);
-        } else {
-          seen.add(payment.client_id);
+        // Preferir manter um pagamento 'paid' se existir, senão o mais antigo
+        let keep = list.find((p) => p.status === 'paid');
+        if (!keep) {
+          keep = list.reduce((prev, curr) => (
+            new Date(prev.created_at) <= new Date(curr.created_at) ? prev : curr
+          ));
         }
+
+        list.forEach((p) => {
+          if (p.id !== keep.id) toDelete.push(p.id);
+        });
       });
 
       if (toDelete.length > 0) {
         await supabase.from('client_payments').delete().in('id', toDelete);
-        console.log(`Deletados ${toDelete.length} pagamentos duplicados de novembro`);
+        console.log(`Deletados ${toDelete.length} pagamentos duplicados do mês atual`);
         fetchPayments();
       }
     };
