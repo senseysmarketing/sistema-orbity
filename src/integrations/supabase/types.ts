@@ -3522,6 +3522,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      extract_month_immutable: { Args: { d: string }; Returns: string }
       get_agency_subscription: {
         Args: { agency_uuid?: string }
         Returns: {

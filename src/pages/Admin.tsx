@@ -312,66 +312,12 @@ export default function Admin() {
     setPreviousMonthExpenses(data || []);
   };
 
-  // Limpa pagamentos duplicados do MÊS ATUAL (mantém o 'paid' se existir)
-  useEffect(() => {
-    if (!currentAgency?.id) return;
-    
-    const cleanDuplicates = async () => {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth() + 1; // 1-12
-      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-      const endDate = new Date(year, month, 0).toISOString().split('T')[0];
-
-      const { data: paymentsMonth, error } = await supabase
-        .from('client_payments')
-        .select('id, client_id, status, paid_date, created_at, amount')
-        .eq('agency_id', currentAgency.id)
-        .gte('due_date', startDate)
-        .lte('due_date', endDate)
-        .order('client_id')
-        .order('created_at');
-
-      if (error || !paymentsMonth) return;
-
-      // Agrupar por client_id e decidir qual manter
-      const groups = new Map<string, any[]>();
-      paymentsMonth.forEach((p: any) => {
-        const arr = groups.get(p.client_id) || [];
-        arr.push(p);
-        groups.set(p.client_id, arr);
-      });
-
-      const toDelete: string[] = [];
-      groups.forEach((list) => {
-        if (list.length <= 1) return;
-
-        // Preferir manter um pagamento 'paid' se existir, senão o mais antigo
-        let keep = list.find((p) => p.status === 'paid');
-        if (!keep) {
-          keep = list.reduce((prev, curr) => (
-            new Date(prev.created_at) <= new Date(curr.created_at) ? prev : curr
-          ));
-        }
-
-        list.forEach((p) => {
-          if (p.id !== keep.id) toDelete.push(p.id);
-        });
-      });
-
-      if (toDelete.length > 0) {
-        await supabase.from('client_payments').delete().in('id', toDelete);
-        console.log(`Deletados ${toDelete.length} pagamentos duplicados do mês atual`);
-        fetchPayments();
-      }
-    };
-
-    cleanDuplicates();
-  }, [currentAgency?.id]);
+  // Removido: limpeza de duplicatas agora é feita por UNIQUE INDEX no banco
 
   // Garante que cada cliente ativo tenha o pagamento do mês ATUAL criado automaticamente
+  // usando upsert para evitar duplicatas
   useEffect(() => {
-    if (!currentAgency?.id || clients.length === 0) return;
+    if (!currentAgency?.id || clients.length === 0 || payments.length === 0) return;
     if (hasEnsuredCurrentMonthPayments) return;
 
     const now = new Date();
@@ -380,9 +326,14 @@ export default function Admin() {
     const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
 
     // Clientes que devem ter cobrança mensal (apenas ativos)
-    const missingClients = clients
-      .filter((c) => c.active && !!c.monthly_value && !!c.due_date)
-      .filter((c) => !payments.some((p) => p.client_id === c.id && p.due_date.startsWith(monthPrefix)));
+    const activeClients = clients.filter(
+      (c) => c.active && !!c.monthly_value && !!c.due_date
+    );
+
+    // Identificar clientes sem pagamento neste mês
+    const missingClients = activeClients.filter(
+      (c) => !payments.some((p) => p.client_id === c.id && p.due_date.startsWith(monthPrefix))
+    );
 
     if (missingClients.length === 0) {
       setHasEnsuredCurrentMonthPayments(true);
@@ -393,22 +344,24 @@ export default function Admin() {
       client_id: c.id,
       agency_id: currentAgency.id,
       amount: Number(c.monthly_value),
-      // Usa o dia configurado do cliente; limita a 28 para evitar meses curtos inválidos
       due_date: `${year}-${String(month).padStart(2, '0')}-${String(Math.min(c.due_date, 28)).padStart(2, '0')}`,
       status: 'pending' as const,
     }));
 
-    const insertMissing = async () => {
-      const { error } = await supabase.from('client_payments').insert(rows);
+    const upsertMissing = async () => {
+      // Upsert: insert ignora conflito se já existir pagamento neste mês
+      const { error } = await supabase
+        .from('client_payments')
+        .upsert(rows, { onConflict: 'agency_id,client_id,extract_month_immutable(due_date)', ignoreDuplicates: true });
+
       if (error) {
         console.error('Erro ao gerar pagamentos do mês atual:', error);
       }
       setHasEnsuredCurrentMonthPayments(true);
-      // Recarrega lista para refletir imediatamente no modal
       fetchPayments();
     };
 
-    insertMissing();
+    upsertMissing();
   }, [clients, payments, currentAgency?.id, hasEnsuredCurrentMonthPayments]);
 
   const getClientName = (clientId: string) => {
