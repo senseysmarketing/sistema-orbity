@@ -128,24 +128,25 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         if (clientError) throw clientError;
         savedClientId = newClientData?.id;
 
-        // Criar pagamento automático para o cliente
+        // Criar pagamento automático para o cliente usando upsert
         if (newClientData && formData.monthly_value) {
           const currentDate = new Date();
           const currentYear = currentDate.getFullYear();
           const currentMonth = currentDate.getMonth();
           
           // Calcular a data de vencimento para o mês atual
-          const dueDate = new Date(currentYear, currentMonth, parseInt(formData.due_date));
+          const dueDay = Math.min(parseInt(formData.due_date), 28);
+          const dueDate = new Date(currentYear, currentMonth, dueDay);
           
           const { error: paymentError } = await supabase
             .from('client_payments')
-            .insert([{
+            .upsert([{
               client_id: newClientData.id,
               amount: parseFloat(formData.monthly_value),
               due_date: dueDate.toISOString().split('T')[0],
               status: 'pending',
               agency_id: currentAgency?.id
-            }]);
+            }], { onConflict: 'agency_id,client_id,extract_month_immutable(due_date)', ignoreDuplicates: true });
           
           if (paymentError) {
             console.error('Erro ao criar pagamento automático:', paymentError);

@@ -254,7 +254,7 @@ export default function ContractPreview({ data, onComplete }: ContractPreviewPro
         if (updateError) throw updateError;
       }
 
-      // Gerar pagamentos mensais recorrentes
+      // Gerar pagamentos mensais recorrentes usando upsert
       const payments = [];
       const startDate = new Date(data.start_date);
       const endDate = data.end_date ? new Date(data.end_date) : null;
@@ -262,7 +262,7 @@ export default function ContractPreview({ data, onComplete }: ContractPreviewPro
 
       while (!endDate || currentDate <= endDate) {
         const dueDate = new Date(currentDate);
-        dueDate.setDate(5); // Vencimento sempre dia 5
+        dueDate.setDate(Math.min(5, 28)); // Vencimento dia 5 (limitado a 28)
 
         payments.push({
           agency_id: currentAgency.id,
@@ -281,7 +281,7 @@ export default function ContractPreview({ data, onComplete }: ContractPreviewPro
       if (payments.length > 0) {
         const { error: paymentsError } = await supabase
           .from("client_payments")
-          .insert(payments);
+          .upsert(payments, { onConflict: 'agency_id,client_id,extract_month_immutable(due_date)', ignoreDuplicates: true });
 
         if (paymentsError) throw paymentsError;
       }
