@@ -105,8 +105,12 @@ const Index = () => {
     const lastDay = new Date(year, month, 0).getDate();
     const endStr = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
     
+    // Filtrar pagamentos do mês apenas de clientes ativos
+    const activeClientIds = data.clients.filter((c: any) => c.active).map((c: any) => c.id);
     const paymentsThisMonth = data.payments.filter((payment: any) => {
-      return payment.due_date >= startStr && payment.due_date <= endStr;
+      return payment.due_date >= startStr && 
+             payment.due_date <= endStr &&
+             activeClientIds.includes(payment.client_id);
     });
     
     const monthlyRevenue = paymentsThisMonth.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
