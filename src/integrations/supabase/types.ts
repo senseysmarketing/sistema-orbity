@@ -1107,6 +1107,45 @@ export type Database = {
           },
         ]
       }
+      facebook_api_audit: {
+        Row: {
+          ad_account_id: string
+          agency_id: string
+          created_at: string | null
+          endpoint: string
+          error_message: string | null
+          id: string
+          method: string | null
+          response_data: Json | null
+          response_time_ms: number | null
+          status: string
+        }
+        Insert: {
+          ad_account_id: string
+          agency_id: string
+          created_at?: string | null
+          endpoint: string
+          error_message?: string | null
+          id?: string
+          method?: string | null
+          response_data?: Json | null
+          response_time_ms?: number | null
+          status: string
+        }
+        Update: {
+          ad_account_id?: string
+          agency_id?: string
+          created_at?: string | null
+          endpoint?: string
+          error_message?: string | null
+          id?: string
+          method?: string | null
+          response_data?: Json | null
+          response_time_ms?: number | null
+          status?: string
+        }
+        Relationships: []
+      }
       facebook_connections: {
         Row: {
           access_token: string
