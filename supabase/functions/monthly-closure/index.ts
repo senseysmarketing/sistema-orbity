@@ -98,7 +98,7 @@ async function processAgencyClosure(supabase: any, agencyId: string): Promise<Mo
     if (!client.monthly_value || client.monthly_value <= 0) continue;
 
     const dueDay = client.due_date || 10;
-    const dueDate = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), dueDay);
+    const dueDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), dueDay);
 
     // Verificar se já existe pagamento para este mês
     const { data: existingPayment } = await supabase
@@ -106,8 +106,8 @@ async function processAgencyClosure(supabase: any, agencyId: string): Promise<Mo
       .select('id')
       .eq('client_id', client.id)
       .eq('agency_id', agencyId)
-      .gte('due_date', nextMonth.toISOString().split('T')[0])
-      .lt('due_date', new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 1).toISOString().split('T')[0])
+      .gte('due_date', currentMonth.toISOString().split('T')[0])
+      .lt('due_date', new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1).toISOString().split('T')[0])
       .single();
 
     if (!existingPayment) {
@@ -132,7 +132,7 @@ async function processAgencyClosure(supabase: any, agencyId: string): Promise<Mo
 
   for (const expense of recurringExpenses || []) {
     const dueDay = expense.recurrence_day || new Date(expense.due_date).getDate();
-    const dueDate = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), dueDay);
+    const dueDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), dueDay);
 
     // Verificar se já existe despesa recorrente para este mês
     const { data: existingExpense } = await supabase
@@ -141,8 +141,8 @@ async function processAgencyClosure(supabase: any, agencyId: string): Promise<Mo
       .eq('name', expense.name)
       .eq('agency_id', agencyId)
       .eq('expense_type', 'recorrente')
-      .gte('due_date', nextMonth.toISOString().split('T')[0])
-      .lt('due_date', new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 1).toISOString().split('T')[0])
+      .gte('due_date', currentMonth.toISOString().split('T')[0])
+      .lt('due_date', new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1).toISOString().split('T')[0])
       .single();
 
     if (!existingExpense) {
@@ -207,16 +207,17 @@ async function processAgencyClosure(supabase: any, agencyId: string): Promise<Mo
     }
   }
 
-  // 4. GERAR SALÁRIOS (se houver algum no mês anterior, replica para o próximo mês)
+  // 4. GERAR SALÁRIOS (baseado nos salários do mês anterior)
+  const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const { data: lastMonthSalaries } = await supabase
     .from('salaries')
     .select('employee_name, amount')
     .eq('agency_id', agencyId)
-    .gte('due_date', currentMonth.toISOString().split('T')[0])
-    .lt('due_date', nextMonth.toISOString().split('T')[0]);
+    .gte('due_date', previousMonth.toISOString().split('T')[0])
+    .lt('due_date', currentMonth.toISOString().split('T')[0]);
 
   for (const salary of lastMonthSalaries || []) {
-    const dueDate = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 5); // Dia 5 do mês
+    const dueDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 5); // Dia 5 do mês
 
     // Verificar se já existe salário para este funcionário neste mês
     const { data: existingSalary } = await supabase
@@ -224,8 +225,8 @@ async function processAgencyClosure(supabase: any, agencyId: string): Promise<Mo
       .select('id')
       .eq('employee_name', salary.employee_name)
       .eq('agency_id', agencyId)
-      .gte('due_date', nextMonth.toISOString().split('T')[0])
-      .lt('due_date', new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 1).toISOString().split('T')[0])
+      .gte('due_date', currentMonth.toISOString().split('T')[0])
+      .lt('due_date', new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1).toISOString().split('T')[0])
       .single();
 
     if (!existingSalary) {
