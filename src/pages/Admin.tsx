@@ -81,6 +81,25 @@ interface ExpenseCategory {
   icon: string;
   color: string;
 }
+// Helper function para verificar se cliente estava ativo em determinado mês
+const wasClientActiveInMonth = (client: Client, monthStr: string): boolean => {
+  // Se cliente está ativo agora, estava ativo naquele mês
+  if (client.active) return true;
+  
+  // Se foi cancelado, verificar se foi DEPOIS do mês analisado
+  if (client.cancelled_at) {
+    const [year, month] = monthStr.split('-').map(Number);
+    const monthEnd = new Date(year, month, 0, 23, 59, 59); // Último dia do mês às 23:59:59
+    const cancelledDate = new Date(client.cancelled_at);
+    
+    // Cliente estava ativo no mês se foi cancelado DEPOIS do final do mês
+    return cancelledDate > monthEnd;
+  }
+  
+  // Se não está ativo e não tem cancelled_at, consideramos inativo
+  return false;
+};
+
 export default function Admin() {
   const { profile } = useAuth();
   const { currentAgency } = useAgency();
@@ -367,6 +386,27 @@ export default function Admin() {
   const getClientName = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
     return client?.name || 'Cliente desconhecido';
+  };
+
+  // Verifica se cliente foi desativado DEPOIS do mês sendo visualizado
+  const getClientDeactivationInfo = (clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client || client.active || !client.cancelled_at) return null;
+    
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const monthEnd = new Date(year, month, 0, 23, 59, 59);
+    const cancelledDate = new Date(client.cancelled_at);
+    
+    // Retorna info se foi desativado DEPOIS do mês atual
+    if (cancelledDate > monthEnd) {
+      return {
+        wasActiveInMonth: true,
+        cancelledAt: client.cancelled_at,
+        cancelledDate: cancelledDate.toLocaleDateString('pt-BR')
+      };
+    }
+    
+    return null;
   };
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -850,18 +890,18 @@ export default function Admin() {
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
 
-    // Análise de pagamentos (apenas clientes ativos)
+    // Análise de pagamentos (clientes que estavam ativos no mês selecionado)
     const paidPayments = filteredPayments.filter(p => {
       const client = clients.find(c => c.id === p.client_id);
-      return p.status === 'paid' && client?.active;
+      return p.status === 'paid' && client && wasClientActiveInMonth(client, selectedMonth);
     });
     const pendingPayments = filteredPayments.filter(p => {
       const client = clients.find(c => c.id === p.client_id);
-      return p.status === 'pending' && client?.active;
+      return p.status === 'pending' && client && wasClientActiveInMonth(client, selectedMonth);
     });
     const overduePayments = filteredPayments.filter(p => {
       const client = clients.find(c => c.id === p.client_id);
-      return p.status === 'overdue' && client?.active;
+      return p.status === 'overdue' && client && wasClientActiveInMonth(client, selectedMonth);
     });
     const totalReceived = paidPayments.reduce((sum, p) => sum + p.amount, 0);
     const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
@@ -971,11 +1011,11 @@ export default function Admin() {
   }, [filteredPayments, filteredExpenses, clients, expenses]);
 
   // ============ REGIME DE CAIXA (REAL) ============
-  // Pagamentos efetivamente recebidos no mês (apenas clientes ativos)
+  // Pagamentos efetivamente recebidos no mês (clientes que estavam ativos no mês)
   const paidPaymentsThisMonth = paymentsInSelectedMonth
     .filter(p => {
       const client = clients.find(c => c.id === p.client_id);
-      return p.status === 'paid' && client?.active;
+      return p.status === 'paid' && client && wasClientActiveInMonth(client, selectedMonth);
     });
   const monthlyRevenueReal = paidPaymentsThisMonth.reduce((sum, p) => sum + p.amount, 0);
 
@@ -992,11 +1032,11 @@ export default function Admin() {
   const netProfitReal = monthlyRevenueReal - totalCostsReal;
 
   // ============ REGIME DE COMPETÊNCIA (PREVISTO) ============
-  // Receita prevista (apenas pagamentos de clientes ativos com vencimento no mês)
+  // Receita prevista (pagamentos de clientes que estavam ativos no mês)
   const monthlyRevenueExpected = paymentsInSelectedMonth
     .filter(p => {
       const client = clients.find(c => c.id === p.client_id);
-      return client?.active;
+      return client && wasClientActiveInMonth(client, selectedMonth);
     })
     .reduce((sum, p) => sum + p.amount, 0);
 
@@ -1009,16 +1049,14 @@ export default function Admin() {
   const netProfitExpected = monthlyRevenueExpected - totalCostsExpected;
 
   // ============ VALORES GLOBAIS (TODOS OS MESES) ============
-  // Apenas pagamentos de clientes ativos
+  // Pagamentos de todos os clientes (histórico completo - inclui clientes desativados)
   const totalReceived = payments
-    .filter(p => {
-      const client = clients.find(c => c.id === p.client_id);
-      return p.status === 'paid' && client?.active;
-    })
+    .filter(p => p.status === 'paid')
     .reduce((sum, p) => sum + p.amount, 0);
   const totalReceivable = payments
     .filter(p => {
       const client = clients.find(c => c.id === p.client_id);
+      // Para valores a receber, considerar apenas clientes ativos atualmente
       return p.status !== 'paid' && client?.active;
     })
     .reduce((sum, p) => sum + p.amount, 0);
@@ -2156,16 +2194,24 @@ export default function Admin() {
           {/* Visualização Cards vs Tabela */}
           {paymentViewMode === "cards" ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {filteredPayments.map(payment => (
+              {filteredPayments.map(payment => {
+                const deactivationInfo = getClientDeactivationInfo(payment.client_id);
+                return (
                 <Card key={payment.id} className={`hover:shadow-lg transition-all duration-200 ${getPaymentCardBackgroundColor(payment.status)}`}>
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
                       <div className="space-y-2 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <CardTitle className="text-lg leading-none">{getClientName(payment.client_id)}</CardTitle>
                           <Badge className={getStatusColor(payment.status)}>
                             {getStatusLabel(payment.status)}
                           </Badge>
+                          {deactivationInfo && (
+                            <Badge variant="outline" className="text-orange-600 border-orange-400 bg-orange-50 dark:bg-orange-950/30">
+                              <UserX className="h-3 w-3 mr-1" />
+                              Inativado em {deactivationInfo.cancelledDate}
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
@@ -2232,7 +2278,7 @@ export default function Admin() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              )})}
             </div>
           ) : (
             /* Visualização em Tabela */
@@ -2251,9 +2297,21 @@ export default function Admin() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredPayments.map((payment, index) => (
+                      {filteredPayments.map((payment, index) => {
+                        const deactivationInfo = getClientDeactivationInfo(payment.client_id);
+                        return (
                         <tr key={payment.id} className={index % 2 === 0 ? "bg-muted/20" : ""}>
-                          <td className="p-4 font-medium">{getClientName(payment.client_id)}</td>
+                          <td className="p-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="font-medium">{getClientName(payment.client_id)}</span>
+                              {deactivationInfo && (
+                                <Badge variant="outline" className="text-orange-600 border-orange-400 bg-orange-50 dark:bg-orange-950/30 text-xs w-fit">
+                                  <UserX className="h-3 w-3 mr-1" />
+                                  Inativado em {deactivationInfo.cancelledDate}
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
                           <td className="p-4">
                             <Badge className={getStatusColor(payment.status)}>
                               {getStatusLabel(payment.status)}
@@ -2302,7 +2360,7 @@ export default function Admin() {
                             </DropdownMenu>
                           </td>
                         </tr>
-                      ))}
+                      )})}
                     </tbody>
                   </table>
                 </div>
