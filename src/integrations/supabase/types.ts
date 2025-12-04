@@ -618,6 +618,7 @@ export type Database = {
           amount: number
           client_id: string
           created_at: string
+          description: string | null
           due_date: string
           id: string
           paid_date: string | null
@@ -629,6 +630,7 @@ export type Database = {
           amount: number
           client_id: string
           created_at?: string
+          description?: string | null
           due_date: string
           id?: string
           paid_date?: string | null
@@ -640,6 +642,7 @@ export type Database = {
           amount?: number
           client_id?: string
           created_at?: string
+          description?: string | null
           due_date?: string
           id?: string
           paid_date?: string | null

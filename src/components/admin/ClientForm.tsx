@@ -128,7 +128,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         if (clientError) throw clientError;
         savedClientId = newClientData?.id;
 
-        // Criar pagamento automático para o cliente usando upsert
+        // Criar pagamento automático para o cliente
         if (newClientData && formData.monthly_value) {
           const currentDate = new Date();
           const currentYear = currentDate.getFullYear();
@@ -140,16 +140,48 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
           
           const { error: paymentError } = await supabase
             .from('client_payments')
-            .upsert([{
+            .insert([{
               client_id: newClientData.id,
               amount: parseFloat(formData.monthly_value),
               due_date: dueDate.toISOString().split('T')[0],
               status: 'pending',
-              agency_id: currentAgency?.id
-            }], { onConflict: 'agency_id,client_id,extract_month_immutable(due_date)', ignoreDuplicates: true });
+              agency_id: currentAgency?.id,
+              description: 'Mensalidade'
+            }]);
           
           if (paymentError) {
             console.error('Erro ao criar pagamento automático:', paymentError);
+            toast({
+              title: "Cliente criado, mas pagamento não gerado",
+              description: "Use o botão 'Gerar Pagamento' no card do cliente ou adicione manualmente.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Cliente criado com sucesso",
+              description: "Pagamento do mês atual gerado automaticamente!",
+            });
+            onSuccess();
+            onOpenChange(false);
+            
+            if (generateContract && savedClientId) {
+              navigate(`/contracts?clientId=${savedClientId}`);
+            }
+            
+            setFormData({
+              name: '',
+              contact: '',
+              service: '',
+              monthly_value: '',
+              active: true,
+              start_date: '',
+              due_date: '1',
+              observations: '',
+              contract_start_date: null,
+              contract_end_date: null,
+              has_loyalty: true,
+            });
+            return;
           }
         }
       }
