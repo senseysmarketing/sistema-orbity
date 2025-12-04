@@ -35,6 +35,7 @@ interface ClientCardProps {
   onDelete: (client: Client) => void;
   onGenerateContract: (client: Client) => void;
   onCreateReminder: (client: Client) => void;
+  onGeneratePayment?: (client: Client) => void;
 }
 
 export function ClientCard({
@@ -49,6 +50,7 @@ export function ClientCard({
   onDelete,
   onGenerateContract,
   onCreateReminder,
+  onGeneratePayment,
 }: ClientCardProps) {
   // Calcula status de fidelidade
   const getLoyaltyStatus = () => {
@@ -165,6 +167,12 @@ export function ClientCard({
                   <FileText className="mr-2 h-4 w-4" />
                   Gerar Contrato
                 </DropdownMenuItem>
+                {onGeneratePayment && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onGeneratePayment(client); }}>
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    Gerar Pagamento
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateReminder(client); }}>
                   <Bell className="mr-2 h-4 w-4" />
                   Criar Lembrete

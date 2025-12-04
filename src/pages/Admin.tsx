@@ -130,6 +130,7 @@ export default function Admin() {
   const [clientDetailsOpen, setClientDetailsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [preselectedClientForPayment, setPreselectedClientForPayment] = useState<{ id: string; name: string; monthly_value?: number | null } | null>(null);
   
   // Filtros para a aba de Clientes & Pagamentos
   const [clientSearchTerm, setClientSearchTerm] = useState("");
@@ -1837,6 +1838,10 @@ export default function Admin() {
                     onDelete={handleDeleteClient}
                     onGenerateContract={(client) => navigate('/contracts')}
                     onCreateReminder={(client) => navigate('/reminders')}
+                    onGeneratePayment={(client) => {
+                      setPreselectedClientForPayment({ id: client.id, name: client.name, monthly_value: client.monthly_value });
+                      setPaymentFormOpen(true);
+                    }}
                   />
                 );
               })}
@@ -2789,10 +2794,19 @@ export default function Admin() {
           </AlertDialogContent>
         </AlertDialog>
 
-      <PaymentForm open={paymentFormOpen} onOpenChange={open => {
-        setPaymentFormOpen(open);
-        if (!open) setSelectedPayment(null);
-      }} payment={selectedPayment} onSuccess={fetchData} />
+      <PaymentForm 
+        open={paymentFormOpen} 
+        onOpenChange={open => {
+          setPaymentFormOpen(open);
+          if (!open) {
+            setSelectedPayment(null);
+            setPreselectedClientForPayment(null);
+          }
+        }} 
+        payment={selectedPayment} 
+        preselectedClient={preselectedClientForPayment || undefined}
+        onSuccess={fetchData} 
+      />
 
       <ExpenseForm open={expenseFormOpen} onOpenChange={open => {
       setExpenseFormOpen(open);
