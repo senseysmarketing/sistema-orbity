@@ -9,7 +9,7 @@ import { CalendarFilters, MeetingTypeFilter, MeetingStatusFilter } from "@/compo
 import { WeekView } from "@/components/agenda/WeekView";
 import { DayView } from "@/components/agenda/DayView";
 import { MonthView } from "@/components/agenda/MonthView";
-import { format } from "date-fns";
+import { Loader2 } from "lucide-react";
 
 type ViewMode = "month" | "week" | "day";
 
@@ -23,6 +23,7 @@ export default function Agenda() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
+  const [duplicatingMeeting, setDuplicatingMeeting] = useState<Meeting | null>(null);
   const [prefilledDateTime, setPrefilledDateTime] = useState<{ date: Date; hour: number } | null>(null);
   
   // Filters
@@ -48,14 +49,17 @@ export default function Agenda() {
     setDetailsDialogOpen(true);
   };
 
-  const handleDetailsClose = () => {
-    setDetailsDialogOpen(false);
-    setSelectedMeeting(null);
+  const handleDetailsClose = (open: boolean) => {
+    setDetailsDialogOpen(open);
+    if (!open) {
+      setSelectedMeeting(null);
+    }
   };
 
   const handleSlotClick = (date: Date, hour: number) => {
     setPrefilledDateTime({ date, hour });
     setEditingMeeting(null);
+    setDuplicatingMeeting(null);
     setFormDialogOpen(true);
   };
 
@@ -67,17 +71,28 @@ export default function Agenda() {
   const handleNewMeeting = () => {
     setPrefilledDateTime(null);
     setEditingMeeting(null);
+    setDuplicatingMeeting(null);
     setFormDialogOpen(true);
   };
 
-  const handleFormClose = () => {
-    setFormDialogOpen(false);
-    setPrefilledDateTime(null);
-    setEditingMeeting(null);
+  const handleFormClose = (open: boolean) => {
+    setFormDialogOpen(open);
+    if (!open) {
+      setPrefilledDateTime(null);
+      setEditingMeeting(null);
+      setDuplicatingMeeting(null);
+    }
   };
 
   const handleMiniCalendarSelect = (date: Date) => {
     setCurrentDate(date);
+  };
+
+  const handleDuplicate = (meeting: Meeting) => {
+    setDuplicatingMeeting(meeting);
+    setEditingMeeting(null);
+    setPrefilledDateTime(null);
+    setFormDialogOpen(true);
   };
 
   return (
@@ -98,8 +113,8 @@ export default function Agenda() {
       />
 
       {isLoading ? (
-        <div className="text-center py-12 text-muted-foreground">
-          Carregando reuniões...
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : (
         <div className="grid lg:grid-cols-[280px_1fr] gap-6">
@@ -157,12 +172,14 @@ export default function Agenda() {
         onOpenChange={handleFormClose}
         meeting={editingMeeting}
         prefilledDateTime={prefilledDateTime}
+        duplicateFrom={duplicatingMeeting}
       />
 
       <MeetingDetailsDialog
         meeting={selectedMeeting}
         open={detailsDialogOpen}
         onOpenChange={handleDetailsClose}
+        onDuplicate={handleDuplicate}
       />
     </div>
   );
