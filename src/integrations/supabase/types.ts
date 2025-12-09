@@ -3181,6 +3181,7 @@ export type Database = {
           default_client_id: string | null
           default_description: string | null
           default_priority: string | null
+          default_status: string | null
           default_title: string | null
           description: string | null
           due_date_offset_days: number | null
@@ -3202,6 +3203,7 @@ export type Database = {
           default_client_id?: string | null
           default_description?: string | null
           default_priority?: string | null
+          default_status?: string | null
           default_title?: string | null
           description?: string | null
           due_date_offset_days?: number | null
@@ -3223,6 +3225,7 @@ export type Database = {
           default_client_id?: string | null
           default_description?: string | null
           default_priority?: string | null
+          default_status?: string | null
           default_title?: string | null
           description?: string | null
           due_date_offset_days?: number | null

@@ -478,10 +478,15 @@ export default function Tasks() {
       userName: profile?.name,
     };
 
+    // Validate status - fallback to "todo" if template status is invalid/deleted
+    const validStatuses: ("todo" | "in_progress" | "em_revisao" | "done")[] = ["todo", "in_progress", "em_revisao", "done"];
+    const templateStatus = template.default_status as typeof validStatuses[number];
+    const status = validStatuses.includes(templateStatus) ? templateStatus : "todo";
+
     setNewTask({
       title: replaceTemplateVariables(template.default_title, context),
       description: replaceTemplateVariables(template.default_description, context),
-      status: "todo",
+      status,
       priority: template.default_priority as "low" | "medium" | "high",
       assigned_to: "unassigned",
       assigned_users: template.auto_assign_creator && profile?.user_id 
