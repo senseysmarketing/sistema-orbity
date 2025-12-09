@@ -20,6 +20,22 @@ serve(async (req) => {
       throw new Error("No authorization header");
     }
 
+    // Get origin URL from request body or referer
+    let originUrl = "https://5e673624-82f5-40bc-b4a6-0e7016e553ab.lovableproject.com";
+    try {
+      const body = await req.json();
+      if (body.origin_url) {
+        originUrl = body.origin_url;
+      }
+    } catch {
+      // No body, use referer or default
+      const referer = req.headers.get("Referer");
+      if (referer) {
+        const refererUrl = new URL(referer);
+        originUrl = refererUrl.origin;
+      }
+    }
+
     const supabase = createClient(
       SUPABASE_URL,
       Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -42,10 +58,11 @@ serve(async (req) => {
       throw new Error("User not associated with an agency");
     }
 
-    // Generate state with user info for callback
+    // Generate state with user info and origin URL for callback
     const state = btoa(JSON.stringify({
       user_id: user.id,
       agency_id: agencyUser.agency_id,
+      origin_url: originUrl,
       timestamp: Date.now(),
     }));
 

@@ -6,6 +6,9 @@ const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Default fallback URL
+const DEFAULT_APP_URL = "https://5e673624-82f5-40bc-b4a6-0e7016e553ab.lovableproject.com";
+
 serve(async (req) => {
   try {
     const url = new URL(req.url);
@@ -13,8 +16,21 @@ serve(async (req) => {
     const state = url.searchParams.get("state");
     const error = url.searchParams.get("error");
 
-    // Determine the redirect base URL from the request origin or use default
-    const appUrl = "https://lovable.dev/projects/6e4fc7f3-4c8f-4ad6-b5bb-ed3b5b78df97";
+    // Default app URL - will be overridden by state if available
+    let appUrl = DEFAULT_APP_URL;
+
+    // Try to parse state early to get origin_url
+    let stateData: { user_id?: string; agency_id?: string; origin_url?: string } = {};
+    if (state) {
+      try {
+        stateData = JSON.parse(atob(state));
+        if (stateData.origin_url) {
+          appUrl = stateData.origin_url;
+        }
+      } catch (e) {
+        console.error("Error parsing state for origin_url:", e);
+      }
+    }
 
     if (error) {
       console.error("OAuth error:", error);
@@ -24,15 +40,6 @@ serve(async (req) => {
     if (!code || !state) {
       console.error("Missing code or state");
       return Response.redirect(`${appUrl}/settings?google_calendar=error&message=missing_params`);
-    }
-
-    // Decode state
-    let stateData;
-    try {
-      stateData = JSON.parse(atob(state));
-    } catch (e) {
-      console.error("Invalid state:", e);
-      return Response.redirect(`${appUrl}/settings?google_calendar=error&message=invalid_state`);
     }
 
     const { user_id, agency_id } = stateData;
@@ -103,7 +110,6 @@ serve(async (req) => {
     return Response.redirect(`${appUrl}/settings?google_calendar=success`);
   } catch (error) {
     console.error("Callback error:", error);
-    const appUrl = "https://lovable.dev/projects/6e4fc7f3-4c8f-4ad6-b5bb-ed3b5b78df97";
-    return Response.redirect(`${appUrl}/settings?google_calendar=error&message=server_error`);
+    return Response.redirect(`${DEFAULT_APP_URL}/settings?google_calendar=error&message=server_error`);
   }
 });

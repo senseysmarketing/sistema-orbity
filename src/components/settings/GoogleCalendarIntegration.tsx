@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Check, ExternalLink, Loader2, Unlink } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar, Check, Download, ExternalLink, Loader2, Unlink } from "lucide-react";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -12,6 +13,7 @@ import { ptBR } from "date-fns/locale";
 
 export const GoogleCalendarIntegration = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [importDays, setImportDays] = useState<string>("30");
   const {
     connection,
     isLoading,
@@ -20,6 +22,7 @@ export const GoogleCalendarIntegration = () => {
     connectGoogleCalendar,
     disconnectGoogleCalendar,
     toggleSync,
+    importEvents,
   } = useGoogleCalendar();
 
   // Handle OAuth callback result
@@ -98,6 +101,41 @@ export const GoogleCalendarIntegration = () => {
                 onCheckedChange={(checked) => toggleSync.mutate(checked)}
                 disabled={toggleSync.isPending}
               />
+            </div>
+
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Importar eventos do Google</p>
+                <p className="text-sm text-muted-foreground">
+                  Importe eventos existentes do Google Calendar para o Orbity
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={importDays} onValueChange={setImportDays}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">Próximos 7 dias</SelectItem>
+                    <SelectItem value="14">Próximos 14 dias</SelectItem>
+                    <SelectItem value="30">Próximos 30 dias</SelectItem>
+                    <SelectItem value="60">Próximos 60 dias</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => importEvents.mutate(parseInt(importDays))}
+                  disabled={importEvents.isPending}
+                >
+                  {importEvents.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 h-4 w-4" />
+                  )}
+                  Importar
+                </Button>
+              </div>
             </div>
 
             <div className="flex gap-2">
