@@ -32,12 +32,16 @@ import { TaskAnalytics } from "@/components/tasks/TaskAnalytics";
 import { TaskDetailsDialog } from "@/components/tasks/TaskDetailsDialog";
 import { TaskStatusManager } from "@/components/tasks/TaskStatusManager";
 import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
+import { TemplateSelector } from "@/components/templates/TemplateSelector";
+import { QuickTemplates } from "@/components/templates/QuickTemplates";
 import { SortableTaskCard } from "@/components/ui/sortable-task-card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useTaskAssignments } from "@/hooks/useTaskAssignments";
+import { useTaskTemplates, TaskTemplate } from "@/hooks/useTaskTemplates";
+import { replaceTemplateVariables, calculateDueDate } from "@/lib/templateVariables";
 
 interface Task {
   id: string;
@@ -76,6 +80,7 @@ export default function Tasks() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
 
   // Filtros e busca
   const [searchTerm, setSearchTerm] = useState("");
@@ -85,16 +90,26 @@ export default function Tasks() {
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  const [newTask, setNewTask] = useState({
+  const [newTask, setNewTask] = useState<{
+    title: string;
+    description: string;
+    status: "todo" | "in_progress" | "em_revisao" | "done";
+    priority: "low" | "medium" | "high";
+    assigned_to: string;
+    assigned_users: string[];
+    client_id: string;
+    due_date: string;
+    subtasks: Subtask[];
+  }>({
     title: "",
     description: "",
-    status: "todo" as const,
-    priority: "medium" as const,
+    status: "todo",
+    priority: "medium",
     assigned_to: "unassigned",
-    assigned_users: [] as string[],
+    assigned_users: [],
     client_id: "no-client",
     due_date: "",
-    subtasks: [] as Subtask[],
+    subtasks: [],
   });
 
   const { profile } = useAuth();
@@ -108,6 +123,8 @@ export default function Tasks() {
     assignUsersToTask,
     getAssignedUsers,
   } = useTaskAssignments();
+
+  const { templates, incrementUsageCount } = useTaskTemplates();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -451,6 +468,44 @@ export default function Tasks() {
     }
   };
 
+  const applyTemplate = (template: TaskTemplate) => {
+    const clientName = template.default_client_id 
+      ? clients.find((c) => c.id === template.default_client_id)?.name 
+      : undefined;
+
+    const context = {
+      clientName,
+      userName: profile?.name,
+    };
+
+    setNewTask({
+      title: replaceTemplateVariables(template.default_title, context),
+      description: replaceTemplateVariables(template.default_description, context),
+      status: "todo",
+      priority: template.default_priority as "low" | "medium" | "high",
+      assigned_to: "unassigned",
+      assigned_users: template.auto_assign_creator && profile?.user_id 
+        ? [profile.user_id] 
+        : [],
+      client_id: template.default_client_id || "no-client",
+      due_date: calculateDueDate(template.due_date_offset_days),
+      subtasks: template.subtasks.map((st) => ({
+        ...st,
+        id: crypto.randomUUID(),
+        completed: false,
+      })),
+    });
+
+    incrementUsageCount(template.id);
+    setIsTemplateSelectorOpen(false);
+    setIsDialogOpen(true);
+
+    toast({
+      title: "Template aplicado",
+      description: `Template "${template.name}" aplicado com sucesso!`,
+    });
+  };
+
   const handleEditTask = (task: Task) => {
     setSelectedTask(task);
     setNewTask({
@@ -684,9 +739,21 @@ export default function Tasks() {
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle>Criar Nova Tarefa</DialogTitle>
-              <DialogDescription>Preencha as informações da nova tarefa.</DialogDescription>
+              <DialogDescription>Preencha as informações ou use um template.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+              {/* Botão de Template */}
+              {templates.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsTemplateSelectorOpen(true)}
+                  className="flex items-center gap-2 justify-center border-dashed"
+                >
+                  <FileText className="h-4 w-4" />
+                  Usar Template
+                </Button>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="title">Título *</Label>
                 <Input
@@ -815,6 +882,15 @@ export default function Tasks() {
         </TabsList>
 
         <TabsContent value="tasks" className="space-y-6">
+          {/* Quick Templates */}
+          {templates.length > 0 && (
+            <QuickTemplates
+              templates={templates}
+              onSelectTemplate={applyTemplate}
+              maxVisible={4}
+            />
+          )}
+
           {/* Filtros simplificados */}
           <div className="flex flex-wrap gap-4">
             <div className="relative flex-1 min-w-[200px]">
@@ -1135,6 +1211,14 @@ export default function Tasks() {
         getClientName={getClientName}
         getAssignedUsers={getAssignedUsers}
         onTaskUpdate={fetchTasks}
+      />
+
+      {/* Template Selector Dialog */}
+      <TemplateSelector
+        open={isTemplateSelectorOpen}
+        onOpenChange={setIsTemplateSelectorOpen}
+        templates={templates}
+        onSelectTemplate={applyTemplate}
       />
     </div>
   );
