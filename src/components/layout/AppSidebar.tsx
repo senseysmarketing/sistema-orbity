@@ -30,6 +30,11 @@ const menuCategories = [
     label: "Operacional",
     items: [
       {
+        title: "Clientes",
+        url: "/clients",
+        icon: Users,
+      },
+      {
         title: "Tarefas Gerais",
         url: "/tasks",
         icon: CheckSquare,
