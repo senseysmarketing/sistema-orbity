@@ -3283,7 +3283,7 @@ export type Database = {
           id: string
           notification_sent_at: string | null
           priority: Database["public"]["Enums"]["task_priority"]
-          status: Database["public"]["Enums"]["task_status"]
+          status: string
           subtasks: Json | null
           title: string
           updated_at: string
@@ -3301,7 +3301,7 @@ export type Database = {
           id?: string
           notification_sent_at?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
-          status?: Database["public"]["Enums"]["task_status"]
+          status?: string
           subtasks?: Json | null
           title: string
           updated_at?: string
@@ -3319,7 +3319,7 @@ export type Database = {
           id?: string
           notification_sent_at?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
-          status?: Database["public"]["Enums"]["task_status"]
+          status?: string
           subtasks?: Json | null
           title?: string
           updated_at?: string
