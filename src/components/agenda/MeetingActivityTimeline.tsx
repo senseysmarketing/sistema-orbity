@@ -1,7 +1,8 @@
 import { Meeting } from "@/hooks/useMeetings";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Clock, Plus, Edit, CheckCircle, XCircle, FileText } from "lucide-react";
+import { History } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 interface MeetingActivityTimelineProps {
   meeting: Meeting;
@@ -9,10 +10,9 @@ interface MeetingActivityTimelineProps {
 
 interface Activity {
   id: string;
-  icon: React.ReactNode;
-  text: string;
+  title: string;
   date: string;
-  color: string;
+  userName?: string;
 }
 
 export const MeetingActivityTimeline = ({ meeting }: MeetingActivityTimelineProps) => {
@@ -21,10 +21,9 @@ export const MeetingActivityTimeline = ({ meeting }: MeetingActivityTimelineProp
   // Created
   activities.push({
     id: "created",
-    icon: <Plus className="h-3 w-3" />,
-    text: `Reunião criada${meeting.organizer?.name ? ` por ${meeting.organizer.name}` : ""}`,
+    title: "Reunião criada",
     date: meeting.created_at,
-    color: "bg-blue-500",
+    userName: meeting.organizer?.name,
   });
 
   // Updated (if different from created)
@@ -34,10 +33,8 @@ export const MeetingActivityTimeline = ({ meeting }: MeetingActivityTimelineProp
     if (updatedDate.getTime() - createdDate.getTime() > 60000) {
       activities.push({
         id: "updated",
-        icon: <Edit className="h-3 w-3" />,
-        text: "Reunião atualizada",
+        title: "Reunião atualizada",
         date: meeting.updated_at,
-        color: "bg-gray-500",
       });
     }
   }
@@ -46,30 +43,26 @@ export const MeetingActivityTimeline = ({ meeting }: MeetingActivityTimelineProp
   if (meeting.status === "completed") {
     activities.push({
       id: "completed",
-      icon: <CheckCircle className="h-3 w-3" />,
-      text: "Reunião concluída",
+      title: "Reunião concluída",
       date: meeting.updated_at,
-      color: "bg-green-500",
     });
   }
 
   if (meeting.status === "cancelled") {
     activities.push({
       id: "cancelled",
-      icon: <XCircle className="h-3 w-3" />,
-      text: `Reunião cancelada${meeting.cancelled_reason ? `: ${meeting.cancelled_reason}` : ""}`,
+      title: meeting.cancelled_reason 
+        ? `Reunião cancelada: ${meeting.cancelled_reason}` 
+        : "Reunião cancelada",
       date: meeting.updated_at,
-      color: "bg-red-500",
     });
   }
 
   if (meeting.status === "no_show") {
     activities.push({
       id: "no_show",
-      icon: <XCircle className="h-3 w-3" />,
-      text: "Participante não compareceu",
+      title: "Participante não compareceu",
       date: meeting.updated_at,
-      color: "bg-orange-500",
     });
   }
 
@@ -77,41 +70,29 @@ export const MeetingActivityTimeline = ({ meeting }: MeetingActivityTimelineProp
   if (meeting.meeting_notes) {
     activities.push({
       id: "notes",
-      icon: <FileText className="h-3 w-3" />,
-      text: "Ata da reunião adicionada",
+      title: "Ata da reunião adicionada",
       date: meeting.updated_at,
-      color: "bg-purple-500",
     });
   }
 
-  // Sort by date
-  activities.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // Sort by date descending (most recent first)
+  activities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-        <Clock className="h-4 w-4" />
+        <History className="h-4 w-4" />
         <span>Histórico de Atividades</span>
       </div>
-      <div className="space-y-2 pl-2">
-        {activities.map((activity, index) => (
-          <div key={activity.id} className="flex items-start gap-3">
-            <div className="relative">
-              <div
-                className={`flex items-center justify-center h-6 w-6 rounded-full text-white ${activity.color}`}
-              >
-                {activity.icon}
-              </div>
-              {index < activities.length - 1 && (
-                <div className="absolute left-1/2 top-6 h-full w-px -translate-x-1/2 bg-border" />
-              )}
-            </div>
-            <div className="flex-1 pb-4">
-              <p className="text-sm">{activity.text}</p>
-              <p className="text-xs text-muted-foreground">
-                {format(new Date(activity.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-              </p>
-            </div>
+      <Separator />
+      <div className="space-y-4">
+        {activities.map((activity) => (
+          <div key={activity.id} className="space-y-0.5">
+            <p className="text-sm font-medium">{activity.title}</p>
+            <p className="text-xs text-muted-foreground">
+              {format(new Date(activity.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+              {activity.userName && ` · por ${activity.userName}`}
+            </p>
           </div>
         ))}
       </div>
