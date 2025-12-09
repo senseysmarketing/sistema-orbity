@@ -33,7 +33,7 @@ import { TaskDetailsDialog } from "@/components/tasks/TaskDetailsDialog";
 import { TaskStatusManager } from "@/components/tasks/TaskStatusManager";
 import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
 import { TemplateSelector } from "@/components/templates/TemplateSelector";
-import { QuickTemplates } from "@/components/templates/QuickTemplates";
+import { QuickTemplatesDropdown } from "@/components/templates/QuickTemplatesDropdown";
 import { SortableTaskCard } from "@/components/ui/sortable-task-card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -729,13 +729,24 @@ export default function Tasks() {
           <h1 className="text-3xl font-bold tracking-tight">Gestão de Tarefas</h1>
           <p className="text-muted-foreground">Painel completo para gerenciamento e acompanhamento de tarefas</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Nova Tarefa
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          {templates.length > 0 && (
+            <QuickTemplatesDropdown
+              templates={templates}
+              onSelectTemplate={(template) => {
+                applyTemplate(template);
+                setIsDialogOpen(true);
+              }}
+              onOpenFullSelector={() => setIsTemplateSelectorOpen(true)}
+            />
+          )}
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Nova Tarefa
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle>Criar Nova Tarefa</DialogTitle>
@@ -863,6 +874,7 @@ export default function Tasks() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Tabs defaultValue="tasks" className="space-y-6">
@@ -882,15 +894,6 @@ export default function Tasks() {
         </TabsList>
 
         <TabsContent value="tasks" className="space-y-6">
-          {/* Quick Templates */}
-          {templates.length > 0 && (
-            <QuickTemplates
-              templates={templates}
-              onSelectTemplate={applyTemplate}
-              maxVisible={4}
-            />
-          )}
-
           {/* Filtros simplificados */}
           <div className="flex flex-wrap gap-4">
             <div className="relative flex-1 min-w-[200px]">
