@@ -21,7 +21,7 @@ interface Task {
   id: string;
   title: string;
   description: string;
-  status: 'todo' | 'in_progress' | 'em_revisao' | 'done';
+  status: string;
   priority: 'low' | 'medium' | 'high';
   assigned_to: string | null;
   client_id: string | null;
