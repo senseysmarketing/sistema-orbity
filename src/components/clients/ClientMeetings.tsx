@@ -1,12 +1,15 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Plus, Calendar, Clock, Video, MapPin, CheckCircle, XCircle } from "lucide-react";
+import { Users, Plus, Calendar, Clock, Video, MapPin, CheckCircle, XCircle, Eye } from "lucide-react";
 import { format, isPast, isFuture } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
+import { MeetingDetailsDialog } from "@/components/agenda/MeetingDetailsDialog";
+import { Meeting } from "@/hooks/useMeetings";
 
 interface ClientMeetingsProps {
   clientId: string;
@@ -30,6 +33,8 @@ const OUTCOME_CONFIG: Record<string, { icon: any; color: string; label: string }
 
 export function ClientMeetings({ clientId, clientName }: ClientMeetingsProps) {
   const navigate = useNavigate();
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const { data: meetings, isLoading } = useQuery({
     queryKey: ["client-meetings", clientId],
@@ -190,18 +195,33 @@ export function ClientMeetings({ clientId, clientName }: ClientMeetingsProps) {
                       </span>
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium">{meeting.title}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="secondary" className="text-xs">
-                          <div className={`h-1.5 w-1.5 rounded-full mr-1 ${statusConfig.color}`} />
-                          {statusConfig.label}
-                        </Badge>
-                        {outcomeConfig && OutcomeIcon && (
-                          <span className={`flex items-center gap-1 text-xs ${outcomeConfig.color}`}>
-                            <OutcomeIcon className="h-3 w-3" />
-                            {outcomeConfig.label}
-                          </span>
-                        )}
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-medium">{meeting.title}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="secondary" className="text-xs">
+                              <div className={`h-1.5 w-1.5 rounded-full mr-1 ${statusConfig.color}`} />
+                              {statusConfig.label}
+                            </Badge>
+                            {outcomeConfig && OutcomeIcon && (
+                              <span className={`flex items-center gap-1 text-xs ${outcomeConfig.color}`}>
+                                <OutcomeIcon className="h-3 w-3" />
+                                {outcomeConfig.label}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedMeeting(meeting as unknown as Meeting);
+                            setDetailsOpen(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Ver Detalhes
+                        </Button>
                       </div>
                       {meeting.meeting_notes && (
                         <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
@@ -216,6 +236,13 @@ export function ClientMeetings({ clientId, clientName }: ClientMeetingsProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Meeting Details Dialog */}
+      <MeetingDetailsDialog
+        meeting={selectedMeeting}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+      />
     </div>
   );
 }
