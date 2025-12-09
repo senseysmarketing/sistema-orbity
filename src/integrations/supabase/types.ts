@@ -612,6 +612,54 @@ export type Database = {
           },
         ]
       }
+      client_credential_history: {
+        Row: {
+          action: string
+          agency_id: string
+          changed_by: string
+          changed_fields: Json | null
+          client_id: string
+          created_at: string
+          credential_id: string
+          id: string
+        }
+        Insert: {
+          action: string
+          agency_id: string
+          changed_by: string
+          changed_fields?: Json | null
+          client_id: string
+          created_at?: string
+          credential_id: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          agency_id?: string
+          changed_by?: string
+          changed_fields?: Json | null
+          client_id?: string
+          created_at?: string
+          credential_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_credential_history_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_credential_history_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "client_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_credentials: {
         Row: {
           agency_id: string

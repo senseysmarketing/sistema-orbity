@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,9 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { Plus, Key, Eye, EyeOff, Copy, ExternalLink, Pencil, Trash2, Globe, Instagram, Facebook, Mail, Server, MoreHorizontal } from "lucide-react";
+import { Plus, Key, Eye, EyeOff, Copy, ExternalLink, Pencil, Trash2, Globe, Instagram, Facebook, Mail, Server, MoreHorizontal, History, Clock } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface ClientCredentialsProps {
   clientId: string;
@@ -28,11 +31,21 @@ const CATEGORIES = [
   { value: "other", label: "Outros", icon: Key },
 ];
 
+const ACTION_LABELS: Record<string, { label: string; color: string }> = {
+  created: { label: "Criado", color: "bg-green-500" },
+  updated: { label: "Atualizado", color: "bg-blue-500" },
+  password_viewed: { label: "Senha visualizada", color: "bg-yellow-500" },
+  password_copied: { label: "Senha copiada", color: "bg-orange-500" },
+  username_copied: { label: "Usuário copiado", color: "bg-purple-500" },
+};
+
 export function ClientCredentials({ clientId }: ClientCredentialsProps) {
   const queryClient = useQueryClient();
   const { currentAgency } = useAgency();
   const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [selectedCredentialId, setSelectedCredentialId] = useState<string | null>(null);
   const [editingCredential, setEditingCredential] = useState<any>(null);
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState({
@@ -57,17 +70,52 @@ export function ClientCredentials({ clientId }: ClientCredentialsProps) {
     },
   });
 
+  const { data: credentialHistory } = useQuery({
+    queryKey: ["credential-history", selectedCredentialId],
+    queryFn: async () => {
+      if (!selectedCredentialId) return [];
+      const { data, error } = await supabase
+        .from("client_credential_history")
+        .select("*, profiles:changed_by(name)")
+        .eq("credential_id", selectedCredentialId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedCredentialId,
+  });
+
+  const logHistoryMutation = useMutation({
+    mutationFn: async ({ credentialId, action, changedFields }: { credentialId: string; action: string; changedFields?: Record<string, any> }) => {
+      const { error } = await supabase.from("client_credential_history").insert({
+        credential_id: credentialId,
+        client_id: clientId,
+        agency_id: currentAgency?.id,
+        action,
+        changed_fields: changedFields || {},
+        changed_by: user?.id,
+      });
+      if (error) throw error;
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from("client_credentials").insert({
+      const { data: newCredential, error } = await supabase.from("client_credentials").insert({
         client_id: clientId,
         agency_id: currentAgency?.id,
         created_by: user?.id,
         ...data,
-      });
+      }).select().single();
       if (error) throw error;
+      return newCredential;
     },
-    onSuccess: () => {
+    onSuccess: (newCredential) => {
+      logHistoryMutation.mutate({ 
+        credentialId: newCredential.id, 
+        action: "created",
+        changedFields: { platform: newCredential.platform }
+      });
       queryClient.invalidateQueries({ queryKey: ["client-credentials", clientId] });
       queryClient.invalidateQueries({ queryKey: ["client-stats", clientId] });
       toast.success("Acesso cadastrado com sucesso!");
@@ -77,14 +125,27 @@ export function ClientCredentials({ clientId }: ClientCredentialsProps) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
+    mutationFn: async ({ id, data, oldData }: { id: string; data: typeof formData; oldData: any }) => {
       const { error } = await supabase
         .from("client_credentials")
         .update(data)
         .eq("id", id);
       if (error) throw error;
+      return { id, data, oldData };
     },
-    onSuccess: () => {
+    onSuccess: ({ id, data, oldData }) => {
+      const changedFields: Record<string, { old: any; new: any }> = {};
+      Object.keys(data).forEach((key) => {
+        if (data[key as keyof typeof data] !== oldData[key]) {
+          changedFields[key] = {
+            old: key === "password" ? "***" : oldData[key],
+            new: key === "password" ? "***" : data[key as keyof typeof data],
+          };
+        }
+      });
+      if (Object.keys(changedFields).length > 0) {
+        logHistoryMutation.mutate({ credentialId: id, action: "updated", changedFields });
+      }
       queryClient.invalidateQueries({ queryKey: ["client-credentials", clientId] });
       toast.success("Acesso atualizado!");
       resetForm();
@@ -127,15 +188,34 @@ export function ClientCredentials({ clientId }: ClientCredentialsProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingCredential) {
-      updateMutation.mutate({ id: editingCredential.id, data: formData });
+      updateMutation.mutate({ id: editingCredential.id, data: formData, oldData: editingCredential });
     } else {
       createMutation.mutate(formData);
     }
   };
 
-  const copyToClipboard = (text: string, label: string) => {
+  const handleViewHistory = (credentialId: string) => {
+    setSelectedCredentialId(credentialId);
+    setHistoryDialogOpen(true);
+  };
+
+  const togglePasswordVisibility = (credentialId: string, credential: any) => {
+    const newState = !showPasswords[credentialId];
+    setShowPasswords((p) => ({ ...p, [credentialId]: newState }));
+    if (newState) {
+      logHistoryMutation.mutate({ credentialId, action: "password_viewed" });
+    }
+  };
+
+  const copyToClipboard = (text: string, label: string, credentialId?: string, type?: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copiado!`);
+    if (credentialId && type) {
+      logHistoryMutation.mutate({ 
+        credentialId, 
+        action: type === "password" ? "password_copied" : "username_copied" 
+      });
+    }
   };
 
   const getCategoryIcon = (category: string) => {
@@ -244,6 +324,59 @@ export function ClientCredentials({ clientId }: ClientCredentialsProps) {
         </Dialog>
       </div>
 
+      {/* History Dialog */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Histórico de Ações
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[400px]">
+            {credentialHistory && credentialHistory.length > 0 ? (
+              <div className="space-y-3">
+                {credentialHistory.map((entry: any) => (
+                  <div key={entry.id} className="flex gap-3 p-3 rounded-lg bg-muted/50">
+                    <div className={`h-2 w-2 rounded-full mt-2 ${ACTION_LABELS[entry.action]?.color || "bg-gray-500"}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-sm">
+                          {ACTION_LABELS[entry.action]?.label || entry.action}
+                        </span>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {format(new Date(entry.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        por {entry.profiles?.name || "Usuário"}
+                      </p>
+                      {entry.changed_fields && Object.keys(entry.changed_fields).length > 0 && entry.action === "updated" && (
+                        <div className="mt-2 text-xs space-y-1">
+                          {Object.entries(entry.changed_fields).map(([field, values]: [string, any]) => (
+                            <div key={field} className="text-muted-foreground">
+                              <span className="font-medium">{field}:</span>{" "}
+                              <span className="line-through">{values.old || "(vazio)"}</span>{" → "}
+                              <span className="text-foreground">{values.new || "(vazio)"}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>Nenhum histórico registrado</p>
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2">
           {[...Array(4)].map((_, i) => (
@@ -285,26 +418,41 @@ export function ClientCredentials({ clientId }: ClientCredentialsProps) {
                             </div>
                             <span className="font-medium">{credential.platform}</span>
                           </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEdit(credential)}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => deleteMutation.mutate(credential.id)}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Remover
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                              onClick={() => handleViewHistory(credential.id)}
+                              title="Ver histórico"
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEdit(credential)}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleViewHistory(credential.id)}>
+                                  <History className="h-4 w-4 mr-2" />
+                                  Histórico
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => deleteMutation.mutate(credential.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Remover
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
 
                         <div className="space-y-2 text-sm">
@@ -317,7 +465,7 @@ export function ClientCredentials({ clientId }: ClientCredentialsProps) {
                                   variant="ghost"
                                   size="icon"
                                   className="h-6 w-6"
-                                  onClick={() => copyToClipboard(credential.username, "Usuário")}
+                                  onClick={() => copyToClipboard(credential.username, "Usuário", credential.id, "username")}
                                 >
                                   <Copy className="h-3 w-3" />
                                 </Button>
@@ -335,9 +483,7 @@ export function ClientCredentials({ clientId }: ClientCredentialsProps) {
                                   variant="ghost"
                                   size="icon"
                                   className="h-6 w-6"
-                                  onClick={() =>
-                                    setShowPasswords((p) => ({ ...p, [credential.id]: !p[credential.id] }))
-                                  }
+                                  onClick={() => togglePasswordVisibility(credential.id, credential)}
                                 >
                                   {showPasswords[credential.id] ? (
                                     <EyeOff className="h-3 w-3" />
@@ -349,7 +495,7 @@ export function ClientCredentials({ clientId }: ClientCredentialsProps) {
                                   variant="ghost"
                                   size="icon"
                                   className="h-6 w-6"
-                                  onClick={() => copyToClipboard(credential.password, "Senha")}
+                                  onClick={() => copyToClipboard(credential.password, "Senha", credential.id, "password")}
                                 >
                                   <Copy className="h-3 w-3" />
                                 </Button>
