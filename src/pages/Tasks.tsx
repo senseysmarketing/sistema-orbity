@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, LayoutGrid, TrendingUp, Settings } from "lucide-react";
+import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText } from "lucide-react";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 import {
   DndContext,
@@ -31,6 +31,7 @@ import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
 import { TaskAnalytics } from "@/components/tasks/TaskAnalytics";
 import { TaskDetailsDialog } from "@/components/tasks/TaskDetailsDialog";
 import { TaskStatusManager } from "@/components/tasks/TaskStatusManager";
+import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
 import { SortableTaskCard } from "@/components/ui/sortable-task-card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -987,8 +988,25 @@ export default function Tasks() {
           />
         </TabsContent>
 
-        <TabsContent value="settings" className="space-y-4">
-          <TaskStatusManager />
+        <TabsContent value="settings" className="space-y-6">
+          <Tabs defaultValue="templates" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="templates" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Templates
+              </TabsTrigger>
+              <TabsTrigger value="statuses" className="flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Status
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="templates">
+              <TaskTemplateManager />
+            </TabsContent>
+            <TabsContent value="statuses">
+              <TaskStatusManager />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
 

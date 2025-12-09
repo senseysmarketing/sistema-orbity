@@ -3171,6 +3171,101 @@ export type Database = {
         }
         Relationships: []
       }
+      task_templates: {
+        Row: {
+          agency_id: string
+          auto_assign_creator: boolean | null
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          default_client_id: string | null
+          default_description: string | null
+          default_priority: string | null
+          default_title: string | null
+          description: string | null
+          due_date_offset_days: number | null
+          estimated_duration_hours: number | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          subtasks: Json | null
+          updated_at: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          agency_id: string
+          auto_assign_creator?: boolean | null
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          default_client_id?: string | null
+          default_description?: string | null
+          default_priority?: string | null
+          default_title?: string | null
+          description?: string | null
+          due_date_offset_days?: number | null
+          estimated_duration_hours?: number | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          subtasks?: Json | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          agency_id?: string
+          auto_assign_creator?: boolean | null
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          default_client_id?: string | null
+          default_description?: string | null
+          default_priority?: string | null
+          default_title?: string | null
+          description?: string | null
+          due_date_offset_days?: number | null
+          estimated_duration_hours?: number | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          subtasks?: Json | null
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_templates_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "task_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "task_templates_default_client_id_fkey"
+            columns: ["default_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           agency_id: string | null
