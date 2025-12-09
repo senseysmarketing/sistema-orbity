@@ -481,9 +481,7 @@ export default function Tasks() {
     };
 
     // Validate status - fallback to "todo" if template status is invalid/deleted
-    const validStatuses: ("todo" | "in_progress" | "em_revisao" | "done")[] = ["todo", "in_progress", "em_revisao", "done"];
-    const templateStatus = template.default_status as typeof validStatuses[number];
-    const status = validStatuses.includes(templateStatus) ? templateStatus : "todo";
+    const status = isValidStatus(template.default_status) ? template.default_status : "todo";
 
     setNewTask({
       title: replaceTemplateVariables(template.default_title, context),
