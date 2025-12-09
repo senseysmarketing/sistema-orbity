@@ -36,7 +36,9 @@ export const useGoogleCalendar = () => {
 
   const connectGoogleCalendar = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("google-calendar-auth");
+      const { data, error } = await supabase.functions.invoke("google-calendar-auth", {
+        body: { origin_url: window.location.origin },
+      });
       
       if (error) throw error;
       if (data.error) throw new Error(data.error);
@@ -50,6 +52,32 @@ export const useGoogleCalendar = () => {
     onError: (error: any) => {
       console.error("Error connecting to Google Calendar:", error);
       toast.error("Erro ao conectar com Google Calendar");
+    },
+  });
+
+  const importEvents = useMutation({
+    mutationFn: async (days: number = 30) => {
+      const { data, error } = await supabase.functions.invoke("google-calendar-import", {
+        body: { days },
+      });
+      
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      
+      return data as { imported: number; total_found: number; already_exists: number; skipped: number; errors?: string[] };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["google-calendar-connection"] });
+      queryClient.invalidateQueries({ queryKey: ["meetings"] });
+      if (data.imported > 0) {
+        toast.success(`${data.imported} evento(s) importado(s) do Google Calendar`);
+      } else {
+        toast.info("Nenhum evento novo encontrado para importar");
+      }
+    },
+    onError: (error: any) => {
+      console.error("Error importing events:", error);
+      toast.error("Erro ao importar eventos do Google Calendar");
     },
   });
 
@@ -122,5 +150,6 @@ export const useGoogleCalendar = () => {
     disconnectGoogleCalendar,
     toggleSync,
     syncMeeting,
+    importEvents,
   };
 };
