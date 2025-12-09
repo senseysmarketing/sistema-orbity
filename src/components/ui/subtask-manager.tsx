@@ -148,7 +148,7 @@ export function SubtaskManager({ subtasks, onChange }: SubtaskManagerProps) {
             items={subtasks.map((st) => st.id)}
             strategy={verticalListSortingStrategy}
           >
-            <div className="mt-2 space-y-1">
+            <div className="mt-2 space-y-1 max-h-80 overflow-y-auto pr-1">
               {subtasks.map((subtask) => (
                 <SortableSubtaskItem
                   key={subtask.id}
@@ -157,6 +157,9 @@ export function SubtaskManager({ subtasks, onChange }: SubtaskManagerProps) {
                 />
               ))}
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {subtasks.length} subtarefa{subtasks.length !== 1 ? 's' : ''}
+            </p>
           </SortableContext>
         </DndContext>
       )}
