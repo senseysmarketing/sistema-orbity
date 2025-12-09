@@ -12,6 +12,10 @@ import { useAgency } from "@/hooks/useAgency";
 import { Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
+
+const TIMEZONE = "America/Sao_Paulo";
 
 interface MeetingFormDialogProps {
   open: boolean;
@@ -100,12 +104,16 @@ export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDi
 
   useEffect(() => {
     if (meeting) {
+      // Convert UTC times to local datetime-local format for the inputs
+      const startZoned = toZonedTime(new Date(meeting.start_time), TIMEZONE);
+      const endZoned = toZonedTime(new Date(meeting.end_time), TIMEZONE);
+      
       setFormData({
         title: meeting.title,
         description: meeting.description || "",
         meeting_type: meeting.meeting_type,
-        start_time: meeting.start_time,
-        end_time: meeting.end_time,
+        start_time: format(startZoned, "yyyy-MM-dd'T'HH:mm"),
+        end_time: format(endZoned, "yyyy-MM-dd'T'HH:mm"),
         location: meeting.location || "",
         google_meet_link: meeting.google_meet_link || "",
         client_id: meeting.client_id || "",
@@ -136,8 +144,15 @@ export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDi
       }
     }
 
+    // Convert local datetime to ISO string with timezone info
+    // The datetime-local input gives us local time, we need to send it as proper ISO
+    const startDate = new Date(formData.start_time);
+    const endDate = new Date(formData.end_time);
+
     const meetingData = {
       ...formData,
+      start_time: startDate.toISOString(),
+      end_time: endDate.toISOString(),
       external_participants: externalParticipants.filter(p => p.name && p.email),
       client_id: formData.client_id || null,
       lead_id: formData.lead_id || null,

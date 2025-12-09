@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { ptBR } from "date-fns/locale";
 import {
   Calendar,
@@ -127,7 +128,7 @@ export const MeetingDetailsDialog = ({
                     <div>
                       <p className="text-xs text-muted-foreground">Data</p>
                       <p className="text-sm font-medium">
-                        {format(new Date(meeting.start_time), "dd/MM/yyyy", { locale: ptBR })}
+                        {format(toZonedTime(new Date(meeting.start_time), "America/Sao_Paulo"), "dd/MM/yyyy", { locale: ptBR })}
                       </p>
                     </div>
                   </div>
@@ -137,8 +138,8 @@ export const MeetingDetailsDialog = ({
                     <div>
                       <p className="text-xs text-muted-foreground">Horário</p>
                       <p className="text-sm font-medium">
-                        {format(new Date(meeting.start_time), "HH:mm", { locale: ptBR })} -{" "}
-                        {format(new Date(meeting.end_time), "HH:mm", { locale: ptBR })}
+                        {format(toZonedTime(new Date(meeting.start_time), "America/Sao_Paulo"), "HH:mm", { locale: ptBR })} -{" "}
+                        {format(toZonedTime(new Date(meeting.end_time), "America/Sao_Paulo"), "HH:mm", { locale: ptBR })}
                       </p>
                     </div>
                   </div>

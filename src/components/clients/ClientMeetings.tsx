@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Users, Plus, Calendar, Clock, Video, MapPin, CheckCircle, XCircle, Eye } from "lucide-react";
 import { format, isPast, isFuture } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { MeetingDetailsDialog } from "@/components/agenda/MeetingDetailsDialog";
@@ -100,10 +101,10 @@ export function ClientMeetings({ clientId, clientName }: ClientMeetingsProps) {
                   >
                     <div className="h-12 w-12 rounded-lg bg-blue-500/10 flex flex-col items-center justify-center">
                       <span className="text-lg font-bold text-blue-600">
-                        {format(new Date(meeting.start_time), "dd")}
+                        {format(toZonedTime(new Date(meeting.start_time), "America/Sao_Paulo"), "dd")}
                       </span>
                       <span className="text-xs text-blue-600">
-                        {format(new Date(meeting.start_time), "MMM", { locale: ptBR })}
+                        {format(toZonedTime(new Date(meeting.start_time), "America/Sao_Paulo"), "MMM", { locale: ptBR })}
                       </span>
                     </div>
                     <div className="flex-1">
@@ -113,7 +114,7 @@ export function ClientMeetings({ clientId, clientName }: ClientMeetingsProps) {
                           <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Clock className="h-3.5 w-3.5" />
-                              {format(new Date(meeting.start_time), "HH:mm")} - {format(new Date(meeting.end_time), "HH:mm")}
+                              {format(toZonedTime(new Date(meeting.start_time), "America/Sao_Paulo"), "HH:mm")} - {format(toZonedTime(new Date(meeting.end_time), "America/Sao_Paulo"), "HH:mm")}
                             </span>
                             {meeting.location && (
                               <span className="flex items-center gap-1">
@@ -188,10 +189,10 @@ export function ClientMeetings({ clientId, clientName }: ClientMeetingsProps) {
                   >
                     <div className="h-10 w-10 rounded-lg bg-muted flex flex-col items-center justify-center">
                       <span className="text-sm font-bold">
-                        {format(new Date(meeting.start_time), "dd")}
+                        {format(toZonedTime(new Date(meeting.start_time), "America/Sao_Paulo"), "dd")}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {format(new Date(meeting.start_time), "MMM", { locale: ptBR })}
+                        {format(toZonedTime(new Date(meeting.start_time), "America/Sao_Paulo"), "MMM", { locale: ptBR })}
                       </span>
                     </div>
                     <div className="flex-1">
