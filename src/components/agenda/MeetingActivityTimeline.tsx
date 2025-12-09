@@ -80,19 +80,23 @@ export const MeetingActivityTimeline = ({ meeting }: MeetingActivityTimelineProp
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-        <History className="h-4 w-4" />
-        <span>Histórico de Atividades</span>
+      <div className="flex items-center gap-2">
+        <History className="h-4 w-4 text-muted-foreground" />
+        <p className="text-sm font-medium">Histórico de Atividades</p>
       </div>
-      <Separator />
-      <div className="space-y-4">
+      <div className="space-y-2 max-h-60 overflow-y-auto">
         {activities.map((activity) => (
-          <div key={activity.id} className="space-y-0.5">
-            <p className="text-sm font-medium">{activity.title}</p>
-            <p className="text-xs text-muted-foreground">
-              {format(new Date(activity.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-              {activity.userName && ` · por ${activity.userName}`}
-            </p>
+          <div key={activity.id} className="p-2 rounded-md bg-muted/50">
+            <p className="text-sm">{activity.title}</p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{format(new Date(activity.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+              {activity.userName && (
+                <>
+                  <span>•</span>
+                  <span>por {activity.userName}</span>
+                </>
+              )}
+            </div>
           </div>
         ))}
       </div>
