@@ -56,7 +56,8 @@ const DEFAULT_STATUSES: TaskStatus[] = [
 export function useTaskStatuses() {
   const { currentAgency } = useAgency();
 
-  const { data: customStatuses = [], isLoading } = useQuery({
+  // Buscar todos os status do banco (incluindo padrão)
+  const { data: dbStatuses = [], isLoading } = useQuery({
     queryKey: ["task-statuses", currentAgency?.id],
     queryFn: async () => {
       if (!currentAgency?.id) return [];
@@ -83,16 +84,18 @@ export function useTaskStatuses() {
     enabled: !!currentAgency?.id,
   });
 
-  // Combinar status padrão com customizados, ordenados por position
+  // Se não há status no banco, usar os padrão
   const allStatuses = useMemo(() => {
-    const combined = [...DEFAULT_STATUSES, ...customStatuses];
-    return combined.sort((a, b) => a.order_position - b.order_position);
-  }, [customStatuses]);
+    if (dbStatuses.length === 0) {
+      return DEFAULT_STATUSES;
+    }
+    return [...dbStatuses].sort((a, b) => a.order_position - b.order_position);
+  }, [dbStatuses]);
 
   // Apenas os status personalizados (não padrão)
   const customOnlyStatuses = useMemo(() => {
-    return customStatuses.filter((s) => !s.is_default);
-  }, [customStatuses]);
+    return dbStatuses.filter((s) => !s.is_default);
+  }, [dbStatuses]);
 
   // Função para obter o nome de um status pelo slug
   const getStatusName = (slug: string): string => {
