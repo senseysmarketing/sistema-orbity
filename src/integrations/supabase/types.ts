@@ -1565,6 +1565,51 @@ export type Database = {
           },
         ]
       }
+      google_calendar_connections: {
+        Row: {
+          access_token: string
+          agency_id: string
+          calendar_id: string | null
+          connected_email: string | null
+          created_at: string | null
+          id: string
+          last_sync_at: string | null
+          refresh_token: string
+          sync_enabled: boolean | null
+          token_expiry: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          agency_id: string
+          calendar_id?: string | null
+          connected_email?: string | null
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          refresh_token: string
+          sync_enabled?: boolean | null
+          token_expiry: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          agency_id?: string
+          calendar_id?: string | null
+          connected_email?: string | null
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          refresh_token?: string
+          sync_enabled?: boolean | null
+          token_expiry?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       import_logs: {
         Row: {
           agency_id: string
@@ -1844,6 +1889,7 @@ export type Database = {
           participants: Json | null
           start_time: string
           status: Database["public"]["Enums"]["meeting_status"]
+          sync_to_google_calendar: boolean | null
           title: string
           updated_at: string
         }
@@ -1871,6 +1917,7 @@ export type Database = {
           participants?: Json | null
           start_time: string
           status?: Database["public"]["Enums"]["meeting_status"]
+          sync_to_google_calendar?: boolean | null
           title: string
           updated_at?: string
         }
@@ -1898,6 +1945,7 @@ export type Database = {
           participants?: Json | null
           start_time?: string
           status?: Database["public"]["Enums"]["meeting_status"]
+          sync_to_google_calendar?: boolean | null
           title?: string
           updated_at?: string
         }
