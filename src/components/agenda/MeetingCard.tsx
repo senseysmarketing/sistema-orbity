@@ -2,6 +2,7 @@ import { Meeting } from "@/hooks/useMeetings";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { ptBR } from "date-fns/locale";
 import { 
   Briefcase, 
@@ -54,7 +55,7 @@ export const MeetingCard = ({ meeting, onClick }: MeetingCardProps) => {
             <div className="min-w-0 flex-1">
               <h4 className="font-semibold text-sm truncate">{meeting.title}</h4>
               <p className="text-xs text-muted-foreground">
-                {format(new Date(meeting.start_time), "HH:mm", { locale: ptBR })}
+                {format(toZonedTime(new Date(meeting.start_time), "America/Sao_Paulo"), "HH:mm", { locale: ptBR })}
               </p>
             </div>
           </div>

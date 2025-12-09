@@ -32,7 +32,7 @@ export const MeetingNotesTab = ({ meeting }: MeetingNotesTabProps) => {
     await updateMeeting.mutateAsync({
       id: meeting.id,
       meeting_notes: notes,
-      outcome: outcome as Meeting["outcome"],
+      outcome: outcome && outcome !== "" ? (outcome as Meeting["outcome"]) : null,
       next_steps: nextSteps,
       follow_up_date: followUpDate || null,
       action_items: actionItems,

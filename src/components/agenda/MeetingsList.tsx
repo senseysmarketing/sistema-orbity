@@ -1,12 +1,15 @@
 import { Meeting } from "@/hooks/useMeetings";
 import { MeetingCard } from "./MeetingCard";
 import { format, isToday, isTomorrow, isThisWeek, isThisMonth } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { ptBR } from "date-fns/locale";
 
 interface MeetingsListProps {
   meetings: Meeting[];
   onMeetingClick: (meeting: Meeting) => void;
 }
+
+const TIMEZONE = "America/Sao_Paulo";
 
 export const MeetingsList = ({ meetings, onMeetingClick }: MeetingsListProps) => {
   const groupMeetings = () => {
@@ -17,7 +20,7 @@ export const MeetingsList = ({ meetings, onMeetingClick }: MeetingsListProps) =>
     const later: Meeting[] = [];
 
     meetings.forEach((meeting) => {
-      const meetingDate = new Date(meeting.start_time);
+      const meetingDate = toZonedTime(new Date(meeting.start_time), TIMEZONE);
       
       if (isToday(meetingDate)) {
         today.push(meeting);

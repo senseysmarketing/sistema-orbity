@@ -3,6 +3,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { useState } from "react";
 import { MeetingCard } from "./MeetingCard";
 import { isSameDay, startOfMonth, endOfMonth } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { ptBR } from "date-fns/locale";
 
 interface AgendaCalendarProps {
@@ -10,14 +11,16 @@ interface AgendaCalendarProps {
   onMeetingClick: (meeting: Meeting) => void;
 }
 
+const TIMEZONE = "America/Sao_Paulo";
+
 export const AgendaCalendar = ({ meetings, onMeetingClick }: AgendaCalendarProps) => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   const meetingsOnSelectedDate = meetings.filter((meeting) =>
-    isSameDay(new Date(meeting.start_time), selectedDate)
+    isSameDay(toZonedTime(new Date(meeting.start_time), TIMEZONE), selectedDate)
   );
 
-  const daysWithMeetings = meetings.map((meeting) => new Date(meeting.start_time));
+  const daysWithMeetings = meetings.map((meeting) => toZonedTime(new Date(meeting.start_time), TIMEZONE));
 
   return (
     <div className="grid md:grid-cols-[350px_1fr] gap-6">
