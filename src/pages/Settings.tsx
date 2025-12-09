@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, Lock, Bell, Palette, Save, Shield, Mail, Phone, BarChart3, CreditCard, Users } from "lucide-react";
+import { User, Lock, Bell, Palette, Save, Shield, Mail, Phone, BarChart3, CreditCard, Users, Puzzle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { BillingHistory } from "@/components/subscription/BillingHistory";
 import { UsersManagement } from "@/components/admin/UsersManagement";
 import { NotificationSummaryCard } from "@/components/notifications/NotificationSummaryCard";
 import { NotificationChannelsConfig } from "@/components/notifications/NotificationChannelsConfig";
+import { GoogleCalendarIntegration } from "@/components/settings/GoogleCalendarIntegration";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -134,10 +135,11 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="subscription">Assinatura</TabsTrigger>
           {isAgencyAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
+          <TabsTrigger value="integrations">Integrações</TabsTrigger>
           <TabsTrigger value="account">Conta</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>
           <TabsTrigger value="appearance">Aparência</TabsTrigger>
@@ -256,6 +258,21 @@ export default function Settings() {
           </TabsContent>
         )}
 
+        <TabsContent value="integrations" className="space-y-6">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+              <Puzzle className="h-6 w-6" />
+              Integrações
+            </h2>
+            <p className="text-muted-foreground">
+              Conecte serviços externos para expandir as funcionalidades
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <GoogleCalendarIntegration />
+          </div>
+        </TabsContent>
 
         <TabsContent value="account" className="space-y-4">
           <Card>

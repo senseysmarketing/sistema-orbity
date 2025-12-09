@@ -30,6 +30,7 @@ export interface Meeting {
   created_at: string;
   updated_at: string;
   cancelled_reason?: string;
+  sync_to_google_calendar?: boolean;
   organizer?: { name: string; email: string };
   client?: { name: string };
   lead?: { name: string };
@@ -57,7 +58,14 @@ export const useMeetings = () => {
         .order("start_time", { ascending: true });
 
       if (error) throw error;
-      return data as Meeting[];
+      
+      // Cast the data properly, handling JSONB types
+      return (data || []).map(m => ({
+        ...m,
+        external_participants: m.external_participants as Meeting['external_participants'],
+        action_items: m.action_items as Meeting['action_items'],
+        participants: m.participants as string[],
+      })) as Meeting[];
     },
     enabled: !!currentAgency?.id,
   });
