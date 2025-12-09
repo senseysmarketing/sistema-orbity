@@ -132,37 +132,37 @@ export function ClientPosts({ clientId, clientName }: ClientPostsProps) {
               {posts.slice(0, 10).map((post) => (
                 <div
                   key={post.id}
-                  className="flex items-start gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
                 >
-                  <div className="h-16 w-16 rounded-lg bg-muted flex items-center justify-center">
-                    <Image className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium line-clamp-2">{post.title || "Sem título"}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge
-                        variant="secondary"
-                        className="text-xs"
-                        style={{ backgroundColor: `${STATUS_COLORS[post.status]}20` }}
-                      >
-                        <div className={`h-1.5 w-1.5 rounded-full mr-1 ${STATUS_COLORS[post.status]}`} />
-                        {STATUS_LABELS[post.status] || post.status}
-                      </Badge>
-                      {post.platform && (
-                        <span className="text-muted-foreground">
-                          {getPlatformIcon(post.platform)}
-                        </span>
-                      )}
+                  <div className="flex items-center gap-3">
+                    <div className={`h-2 w-2 rounded-full ${STATUS_COLORS[post.status] || "bg-gray-400"}`} />
+                    <div>
+                      <p className="font-medium line-clamp-1">{post.title || "Sem título"}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="secondary" className="text-xs">
+                          {STATUS_LABELS[post.status] || post.status}
+                        </Badge>
+                        {post.platform && (
+                          <span className="flex items-center gap-1">
+                            {getPlatformIcon(post.platform)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {post.scheduled_date && (
-                    <div className="text-right text-xs text-muted-foreground">
-                      <p>{format(new Date(post.scheduled_date), "dd/MM", { locale: ptBR })}</p>
-                      <p>{format(new Date(post.scheduled_date), "HH:mm")}</p>
-                    </div>
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {format(new Date(post.scheduled_date), "dd/MM", { locale: ptBR })}
+                    </span>
                   )}
                 </div>
               ))}
+              {posts.length > 10 && (
+                <p className="text-center text-sm text-muted-foreground">
+                  + {posts.length - 10} posts
+                </p>
+              )}
             </div>
           )}
         </CardContent>
