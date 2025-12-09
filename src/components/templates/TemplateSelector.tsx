@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Search, FileText, Clock, Star } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, FileText, Star } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -52,6 +52,9 @@ export function TemplateSelector({
             <FileText className="h-5 w-5" />
             Selecionar Template
           </DialogTitle>
+          <DialogDescription>
+            Escolha um template para preencher automaticamente os dados da tarefa.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="relative">
@@ -100,12 +103,6 @@ export function TemplateSelector({
                   )}
 
                   <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-                    {template.estimated_duration_hours && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {template.estimated_duration_hours}h
-                      </span>
-                    )}
                     {template.subtasks.length > 0 && (
                       <span>{template.subtasks.length} subtarefas</span>
                     )}
