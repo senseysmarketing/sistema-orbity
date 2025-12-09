@@ -612,6 +612,142 @@ export type Database = {
           },
         ]
       }
+      client_credentials: {
+        Row: {
+          agency_id: string
+          category: string | null
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          password: string | null
+          platform: string
+          updated_at: string
+          url: string | null
+          username: string | null
+        }
+        Insert: {
+          agency_id: string
+          category?: string | null
+          client_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          notes?: string | null
+          password?: string | null
+          platform: string
+          updated_at?: string
+          url?: string | null
+          username?: string | null
+        }
+        Update: {
+          agency_id?: string
+          category?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          password?: string | null
+          platform?: string
+          updated_at?: string
+          url?: string | null
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_credentials_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_credentials_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "client_credentials_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_credentials_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      client_notes: {
+        Row: {
+          agency_id: string
+          client_id: string
+          content: string
+          created_at: string
+          created_by: string
+          id: string
+          note_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          client_id: string
+          content: string
+          created_at?: string
+          created_by: string
+          id?: string
+          note_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          client_id?: string
+          content?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          note_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_notes_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_notes_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "client_notes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_notes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       client_payments: {
         Row: {
           agency_id: string | null

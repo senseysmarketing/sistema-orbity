@@ -32,6 +32,8 @@ import Contracts from "./pages/Contracts";
 import SocialMedia from "./pages/SocialMedia";
 import LandingPage from "./pages/LandingPage";
 import Import from "./pages/Import";
+import Clients from "./pages/Clients";
+import ClientDetail from "./pages/ClientDetail";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +66,8 @@ const App = () => (
                           </PaymentMiddlewareWrapper>
                         }>
                           <Route index element={<Index />} />
+                          <Route path="clients" element={<Clients />} />
+                          <Route path="clients/:id" element={<ClientDetail />} />
                           <Route path="tasks" element={<Tasks />} />
                           <Route path="reminders" element={<Reminders />} />
                           <Route path="crm" element={<CRM />} />
