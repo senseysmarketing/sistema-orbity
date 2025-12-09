@@ -41,13 +41,14 @@ import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useTaskAssignments } from "@/hooks/useTaskAssignments";
 import { useTaskTemplates, TaskTemplate } from "@/hooks/useTaskTemplates";
+import { useTaskStatuses } from "@/hooks/useTaskStatuses";
 import { replaceTemplateVariables, calculateDueDate } from "@/lib/templateVariables";
 
 interface Task {
   id: string;
   title: string;
   description: string;
-  status: "todo" | "in_progress" | "em_revisao" | "done";
+  status: string;
   priority: "low" | "medium" | "high";
   assigned_to: string | null;
   client_id: string | null;
@@ -93,7 +94,7 @@ export default function Tasks() {
   const [newTask, setNewTask] = useState<{
     title: string;
     description: string;
-    status: "todo" | "in_progress" | "em_revisao" | "done";
+    status: string;
     priority: "low" | "medium" | "high";
     assigned_to: string;
     assigned_users: string[];
@@ -125,6 +126,7 @@ export default function Tasks() {
   } = useTaskAssignments();
 
   const { templates, incrementUsageCount } = useTaskTemplates();
+  const { statuses, getStatusName, getStatusColor, isValidStatus } = useTaskStatuses();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -420,10 +422,10 @@ export default function Tasks() {
     try {
       const { data: taskData, error } = await supabase
         .from("tasks")
-        .insert({
+        .insert([{
           title: newTask.title,
           description: newTask.description,
-          status: newTask.status,
+          status: newTask.status as any,
           priority: newTask.priority,
           assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
           client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
@@ -431,7 +433,7 @@ export default function Tasks() {
           created_by: profile?.user_id,
           agency_id: currentAgency?.id,
           subtasks: newTask.subtasks as any,
-        })
+        }])
         .select()
         .single();
 
@@ -657,36 +659,36 @@ export default function Tasks() {
     const taskId = active.id as string;
     const newStatus = over.id as string;
 
-    const validStatuses = ["todo", "in_progress", "em_revisao", "done"];
-    if (!validStatuses.includes(newStatus)) return;
+    // Validate against dynamic statuses
+    if (!isValidStatus(newStatus)) return;
 
     const task = tasks.find((t) => t.id === taskId);
     if (!task || task.status === newStatus) return;
 
     setTasks((prev) =>
       prev.map((t) =>
-        t.id === taskId ? { ...t, status: newStatus as "todo" | "in_progress" | "em_revisao" | "done" } : t,
+        t.id === taskId ? { ...t, status: newStatus } : t,
       ),
     );
 
     try {
       const { error } = await supabase
         .from("tasks")
-        .update({ status: newStatus as "todo" | "in_progress" | "em_revisao" | "done" })
+        .update({ status: newStatus as any })
         .eq("id", taskId);
 
       if (error) throw error;
 
-      await addHistoryEntry(taskId, `Status alterado para ${getStatusLabel(newStatus)}`);
+      await addHistoryEntry(taskId, `Status alterado para ${getStatusName(newStatus)}`);
 
       toast({
         title: "Sucesso",
-        description: `Tarefa movida para ${getStatusLabel(newStatus)}!`,
+        description: `Tarefa movida para ${getStatusName(newStatus)}!`,
       });
     } catch (error: any) {
       setTasks((prev) =>
         prev.map((t) =>
-          t.id === taskId ? { ...t, status: task.status as "todo" | "in_progress" | "em_revisao" | "done" } : t,
+          t.id === taskId ? { ...t, status: task.status } : t,
         ),
       );
       toast({
@@ -800,10 +802,11 @@ export default function Tasks() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="todo">A Fazer</SelectItem>
-                      <SelectItem value="in_progress">Em Andamento</SelectItem>
-                      <SelectItem value="em_revisao">Em Revisão</SelectItem>
-                      <SelectItem value="done">Concluída</SelectItem>
+                      {statuses.map((status) => (
+                        <SelectItem key={status.slug} value={status.slug}>
+                          {status.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -917,10 +920,11 @@ export default function Tasks() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos Status</SelectItem>
-                <SelectItem value="todo">A Fazer</SelectItem>
-                <SelectItem value="in_progress">Em Andamento</SelectItem>
-                <SelectItem value="em_revisao">Em Revisão</SelectItem>
-                <SelectItem value="done">Concluída</SelectItem>
+                {statuses.map((status) => (
+                  <SelectItem key={status.slug} value={status.slug}>
+                    {status.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -970,77 +974,26 @@ export default function Tasks() {
             onDragEnd={handleDragEnd}
           >
             <div className="flex gap-6 overflow-x-auto pb-4">
-              <KanbanColumn
-                id="todo"
-                title="A Fazer"
-                tasks={sortedTasksByStatus("todo")}
-                color="bg-gray-500"
-                count={sortedTasksByStatus("todo").length}
-                onViewDetails={handleViewDetails}
-                onEdit={handleEditTask}
-                onDelete={handleDeleteTask}
-                getPriorityColor={getPriorityColor}
-                getPriorityLabel={getPriorityLabel}
-                getUrgencyLevel={getUrgencyLevel}
-                getAssignedUserName={() => ""}
-                getClientName={getClientName}
-                formatDateBR={formatDateBR}
-                getAssignedUsers={getAssignedUsers}
-              />
-
-              <KanbanColumn
-                id="in_progress"
-                title="Em Andamento"
-                tasks={sortedTasksByStatus("in_progress")}
-                color="bg-blue-500"
-                count={sortedTasksByStatus("in_progress").length}
-                onViewDetails={handleViewDetails}
-                onEdit={handleEditTask}
-                onDelete={handleDeleteTask}
-                getPriorityColor={getPriorityColor}
-                getPriorityLabel={getPriorityLabel}
-                getUrgencyLevel={getUrgencyLevel}
-                getAssignedUserName={() => ""}
-                getClientName={getClientName}
-                formatDateBR={formatDateBR}
-                getAssignedUsers={getAssignedUsers}
-              />
-
-              <KanbanColumn
-                id="em_revisao"
-                title="Em Revisão"
-                tasks={sortedTasksByStatus("em_revisao")}
-                color="bg-purple-500"
-                count={sortedTasksByStatus("em_revisao").length}
-                onViewDetails={handleViewDetails}
-                onEdit={handleEditTask}
-                onDelete={handleDeleteTask}
-                getPriorityColor={getPriorityColor}
-                getPriorityLabel={getPriorityLabel}
-                getUrgencyLevel={getUrgencyLevel}
-                getAssignedUserName={() => ""}
-                getClientName={getClientName}
-                formatDateBR={formatDateBR}
-                getAssignedUsers={getAssignedUsers}
-              />
-
-              <KanbanColumn
-                id="done"
-                title="Concluídas"
-                tasks={sortedTasksByStatus("done")}
-                color="bg-green-500"
-                count={sortedTasksByStatus("done").length}
-                onViewDetails={handleViewDetails}
-                onEdit={handleEditTask}
-                onDelete={handleDeleteTask}
-                getPriorityColor={getPriorityColor}
-                getPriorityLabel={getPriorityLabel}
-                getUrgencyLevel={getUrgencyLevel}
-                getAssignedUserName={() => ""}
-                getClientName={getClientName}
-                formatDateBR={formatDateBR}
-                getAssignedUsers={getAssignedUsers}
-              />
+              {statuses.map((status) => (
+                <KanbanColumn
+                  key={status.slug}
+                  id={status.slug}
+                  title={status.name}
+                  tasks={sortedTasksByStatus(status.slug)}
+                  color={status.color}
+                  count={sortedTasksByStatus(status.slug).length}
+                  onViewDetails={handleViewDetails}
+                  onEdit={handleEditTask}
+                  onDelete={handleDeleteTask}
+                  getPriorityColor={getPriorityColor}
+                  getPriorityLabel={getPriorityLabel}
+                  getUrgencyLevel={getUrgencyLevel}
+                  getAssignedUserName={() => ""}
+                  getClientName={getClientName}
+                  formatDateBR={formatDateBR}
+                  getAssignedUsers={getAssignedUsers}
+                />
+              ))}
             </div>
 
             <DragOverlay>
@@ -1132,10 +1085,11 @@ export default function Tasks() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todo">A Fazer</SelectItem>
-                    <SelectItem value="in_progress">Em Andamento</SelectItem>
-                    <SelectItem value="em_revisao">Em Revisão</SelectItem>
-                    <SelectItem value="done">Concluída</SelectItem>
+                    {statuses.map((status) => (
+                      <SelectItem key={status.slug} value={status.slug}>
+                        {status.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
