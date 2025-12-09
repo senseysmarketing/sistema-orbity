@@ -20,6 +20,7 @@ export interface TaskTemplate {
   default_title: string | null;
   default_description: string | null;
   default_priority: string;
+  default_status: string;
   estimated_duration_hours: number | null;
   subtasks: TaskTemplateSubtask[];
   auto_assign_creator: boolean;
@@ -40,6 +41,7 @@ export interface TaskTemplateFormData {
   default_title: string;
   default_description: string;
   default_priority: string;
+  default_status: string;
   estimated_duration_hours: number | null;
   subtasks: TaskTemplateSubtask[];
   auto_assign_creator: boolean;
@@ -102,6 +104,7 @@ export function useTaskTemplates() {
           default_title: formData.default_title || null,
           default_description: formData.default_description || null,
           default_priority: formData.default_priority,
+          default_status: formData.default_status || "todo",
           estimated_duration_hours: formData.estimated_duration_hours,
           subtasks: JSON.parse(JSON.stringify(formData.subtasks)),
           auto_assign_creator: formData.auto_assign_creator,
@@ -135,6 +138,7 @@ export function useTaskTemplates() {
           default_title: formData.default_title || null,
           default_description: formData.default_description || null,
           default_priority: formData.default_priority,
+          default_status: formData.default_status || "todo",
           estimated_duration_hours: formData.estimated_duration_hours,
           subtasks: JSON.parse(JSON.stringify(formData.subtasks)),
           auto_assign_creator: formData.auto_assign_creator,

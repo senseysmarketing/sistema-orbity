@@ -47,6 +47,7 @@ export function TaskTemplateForm({ template, onSubmit, onCancel }: TaskTemplateF
     default_title: "",
     default_description: "",
     default_priority: "medium",
+    default_status: "todo",
     estimated_duration_hours: null,
     subtasks: [],
     auto_assign_creator: false,
@@ -64,6 +65,7 @@ export function TaskTemplateForm({ template, onSubmit, onCancel }: TaskTemplateF
         default_title: template.default_title || "",
         default_description: template.default_description || "",
         default_priority: template.default_priority || "medium",
+        default_status: template.default_status || "todo",
         estimated_duration_hours: template.estimated_duration_hours,
         subtasks: template.subtasks || [],
         auto_assign_creator: template.auto_assign_creator || false,
@@ -191,7 +193,25 @@ export function TaskTemplateForm({ template, onSubmit, onCancel }: TaskTemplateF
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="default_status">Status</Label>
+            <Select
+              value={formData.default_status}
+              onValueChange={(value) => setFormData((prev) => ({ ...prev, default_status: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todo">A Fazer</SelectItem>
+                <SelectItem value="in_progress">Em Andamento</SelectItem>
+                <SelectItem value="em_revisao">Em Revisão</SelectItem>
+                <SelectItem value="done">Concluída</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="default_priority">Prioridade</Label>
             <Select
