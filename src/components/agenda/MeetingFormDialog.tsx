@@ -20,7 +20,8 @@ const TIMEZONE = "America/Sao_Paulo";
 interface MeetingFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  meeting?: Meeting;
+  meeting?: Meeting | null;
+  prefilledDateTime?: { date: Date; hour: number } | null;
 }
 
 // Validation schemas
@@ -57,7 +58,7 @@ const meetingSchema = z.object({
   path: ["end_time"],
 });
 
-export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDialogProps) => {
+export const MeetingFormDialog = ({ open, onOpenChange, meeting, prefilledDateTime }: MeetingFormDialogProps) => {
   const { createMeeting, updateMeeting } = useMeetings();
   const { currentAgency } = useAgency();
   
@@ -120,8 +121,22 @@ export const MeetingFormDialog = ({ open, onOpenChange, meeting }: MeetingFormDi
         lead_id: meeting.lead_id || "",
       });
       setExternalParticipants(meeting.external_participants || []);
+    } else if (prefilledDateTime) {
+      // Prefill from calendar slot click
+      const startDate = new Date(prefilledDateTime.date);
+      startDate.setHours(prefilledDateTime.hour, 0, 0, 0);
+      const endDate = new Date(startDate);
+      endDate.setHours(prefilledDateTime.hour + 1, 0, 0, 0);
+      
+      setFormData(prev => ({
+        ...prev,
+        start_time: format(startDate, "yyyy-MM-dd'T'HH:mm"),
+        end_time: format(endDate, "yyyy-MM-dd'T'HH:mm"),
+      }));
+    } else if (!open) {
+      resetForm();
     }
-  }, [meeting]);
+  }, [meeting, prefilledDateTime, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
