@@ -74,13 +74,26 @@ export function ClientCredentials({ clientId }: ClientCredentialsProps) {
     queryKey: ["credential-history", selectedCredentialId],
     queryFn: async () => {
       if (!selectedCredentialId) return [];
-      const { data, error } = await supabase
+      const { data: historyData, error } = await supabase
         .from("client_credential_history")
-        .select("*, profiles:changed_by(name)")
+        .select("*")
         .eq("credential_id", selectedCredentialId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data;
+      
+      // Fetch profile names for each history entry
+      const userIds = [...new Set(historyData?.map(h => h.changed_by) || [])];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, name")
+        .in("user_id", userIds);
+      
+      const profileMap = new Map(profiles?.map(p => [p.user_id, p.name]) || []);
+      
+      return historyData?.map(h => ({
+        ...h,
+        user_name: profileMap.get(h.changed_by) || "Usuário"
+      })) || [];
     },
     enabled: !!selectedCredentialId,
   });
@@ -350,7 +363,7 @@ export function ClientCredentials({ clientId }: ClientCredentialsProps) {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        por {entry.profiles?.name || "Usuário"}
+                        por {entry.user_name || "Usuário"}
                       </p>
                       {entry.changed_fields && Object.keys(entry.changed_fields).length > 0 && entry.action === "updated" && (
                         <div className="mt-2 text-xs space-y-1">
