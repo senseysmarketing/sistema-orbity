@@ -1,4 +1,4 @@
-import { Clock, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TaskTemplate } from "@/hooks/useTaskTemplates";
@@ -57,17 +57,11 @@ export function QuickTemplates({
               </div>
             </div>
             
-            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-              {template.estimated_duration_hours && (
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {template.estimated_duration_hours}h
-                </span>
-              )}
-              {template.subtasks.length > 0 && (
-                <span>{template.subtasks.length} sub</span>
-              )}
-            </div>
+            {template.subtasks.length > 0 && (
+              <div className="mt-2 text-xs text-muted-foreground">
+                {template.subtasks.length} subtarefas
+              </div>
+            )}
           </Card>
         ))}
       </div>

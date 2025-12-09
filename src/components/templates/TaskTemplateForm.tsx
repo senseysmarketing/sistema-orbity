@@ -57,6 +57,14 @@ export function TaskTemplateForm({ template, onSubmit, onCancel }: TaskTemplateF
     due_date_offset_days: null,
   });
 
+  // Sync default status when statuses load
+  useEffect(() => {
+    if (!template && statuses.length > 0 && formData.default_status === "todo") {
+      const defaultStatus = statuses.find(s => s.is_default)?.slug || statuses[0]?.slug || "todo";
+      setFormData(prev => ({ ...prev, default_status: defaultStatus }));
+    }
+  }, [statuses, template]);
+
   useEffect(() => {
     if (template) {
       setFormData({
@@ -195,7 +203,7 @@ export function TaskTemplateForm({ template, onSubmit, onCancel }: TaskTemplateF
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="default_status">Status</Label>
             <Select
@@ -233,36 +241,6 @@ export function TaskTemplateForm({ template, onSubmit, onCancel }: TaskTemplateF
                 <SelectItem value="high">Alta</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="estimated_duration_hours">Duração Estimada (horas)</Label>
-            <Input
-              id="estimated_duration_hours"
-              type="number"
-              min="0"
-              value={formData.estimated_duration_hours || ""}
-              onChange={(e) => setFormData((prev) => ({ 
-                ...prev, 
-                estimated_duration_hours: e.target.value ? parseInt(e.target.value) : null 
-              }))}
-              placeholder="Ex: 2"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="due_date_offset_days">Prazo (dias após criação)</Label>
-            <Input
-              id="due_date_offset_days"
-              type="number"
-              min="0"
-              value={formData.due_date_offset_days || ""}
-              onChange={(e) => setFormData((prev) => ({ 
-                ...prev, 
-                due_date_offset_days: e.target.value ? parseInt(e.target.value) : null 
-              }))}
-              placeholder="Ex: 7"
-            />
           </div>
         </div>
       </div>

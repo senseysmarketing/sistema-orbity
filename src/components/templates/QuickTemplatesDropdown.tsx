@@ -1,4 +1,4 @@
-import { ChevronDown, Clock, FileText, Star } from "lucide-react";
+import { ChevronDown, FileText, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -72,12 +72,6 @@ export function QuickTemplatesDropdown({
                 <div className="flex items-center gap-3 text-xs text-muted-foreground ml-7">
                   {template.category && (
                     <span>{template.category}</span>
-                  )}
-                  {template.estimated_duration_hours && (
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {template.estimated_duration_hours}h
-                    </span>
                   )}
                   {template.subtasks.length > 0 && (
                     <span>{template.subtasks.length} subtarefas</span>

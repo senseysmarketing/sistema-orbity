@@ -27,7 +27,6 @@ import {
   Pencil, 
   Trash2, 
   FileText, 
-  Clock,
   CheckSquare,
   BarChart3
 } from "lucide-react";
@@ -181,13 +180,6 @@ export function TaskTemplateManager() {
 
                 <div className="flex flex-wrap gap-2">
                   {getPriorityBadge(template.default_priority)}
-                  
-                  {template.estimated_duration_hours && (
-                    <Badge variant="outline" className="gap-1">
-                      <Clock className="h-3 w-3" />
-                      {template.estimated_duration_hours}h
-                    </Badge>
-                  )}
 
                   {template.subtasks && template.subtasks.length > 0 && (
                     <Badge variant="outline" className="gap-1">
