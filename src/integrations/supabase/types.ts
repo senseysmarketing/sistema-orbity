@@ -734,6 +734,80 @@ export type Database = {
           },
         ]
       }
+      client_files: {
+        Row: {
+          agency_id: string
+          category: string | null
+          client_id: string
+          created_at: string | null
+          description: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string
+          file_url: string
+          id: string
+          updated_at: string | null
+          uploaded_by: string
+        }
+        Insert: {
+          agency_id: string
+          category?: string | null
+          client_id: string
+          created_at?: string | null
+          description?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type: string
+          file_url: string
+          id?: string
+          updated_at?: string | null
+          uploaded_by: string
+        }
+        Update: {
+          agency_id?: string
+          category?: string | null
+          client_id?: string
+          created_at?: string | null
+          description?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string
+          file_url?: string
+          id?: string
+          updated_at?: string | null
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_files_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_files_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "client_files_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       client_notes: {
         Row: {
           agency_id: string
