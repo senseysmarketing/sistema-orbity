@@ -13,6 +13,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 import { TaskTemplate, TaskTemplateFormData } from "@/hooks/useTaskTemplates";
+import { useTaskStatuses } from "@/hooks/useTaskStatuses";
 import { Save, X } from "lucide-react";
 
 const TEMPLATE_ICONS = [
@@ -39,6 +40,7 @@ interface TaskTemplateFormProps {
 
 export function TaskTemplateForm({ template, onSubmit, onCancel }: TaskTemplateFormProps) {
   const [loading, setLoading] = useState(false);
+  const { statuses } = useTaskStatuses();
   const [formData, setFormData] = useState<TaskTemplateFormData>({
     name: "",
     description: "",
@@ -204,10 +206,14 @@ export function TaskTemplateForm({ template, onSubmit, onCancel }: TaskTemplateF
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="todo">A Fazer</SelectItem>
-                <SelectItem value="in_progress">Em Andamento</SelectItem>
-                <SelectItem value="em_revisao">Em Revisão</SelectItem>
-                <SelectItem value="done">Concluída</SelectItem>
+                {statuses.map((status) => (
+                  <SelectItem key={status.slug} value={status.slug}>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${status.color}`} />
+                      {status.name}
+                    </div>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

@@ -59,10 +59,12 @@ export function useTaskStatuses() {
   const { data: customStatuses = [], isLoading } = useQuery({
     queryKey: ["task-statuses", currentAgency?.id],
     queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      
       const { data, error } = await supabase
         .from("task_statuses")
         .select("*")
-        .eq("agency_id", currentAgency?.id)
+        .eq("agency_id", currentAgency.id)
         .eq("is_active", true)
         .order("order_position");
 
