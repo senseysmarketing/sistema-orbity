@@ -71,7 +71,8 @@ async function getValidAccessToken(connection: any, supabase: any): Promise<stri
 
 async function createGoogleCalendarEvent(
   accessToken: string,
-  meeting: MeetingData
+  meeting: MeetingData,
+  calendarId: string = "primary"
 ): Promise<{ eventId: string; meetLink: string }> {
   const event = {
     summary: meeting.title,
@@ -97,8 +98,9 @@ async function createGoogleCalendarEvent(
     },
   };
 
+  const encodedCalendarId = encodeURIComponent(calendarId);
   const response = await fetch(
-    "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1",
+    `https://www.googleapis.com/calendar/v3/calendars/${encodedCalendarId}/events?conferenceDataVersion=1`,
     {
       method: "POST",
       headers: {
@@ -125,7 +127,8 @@ async function createGoogleCalendarEvent(
 async function updateGoogleCalendarEvent(
   accessToken: string,
   eventId: string,
-  meeting: MeetingData
+  meeting: MeetingData,
+  calendarId: string = "primary"
 ): Promise<void> {
   const event = {
     summary: meeting.title,
@@ -145,8 +148,9 @@ async function updateGoogleCalendarEvent(
     })) || [],
   };
 
+  const encodedCalendarId = encodeURIComponent(calendarId);
   const response = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+    `https://www.googleapis.com/calendar/v3/calendars/${encodedCalendarId}/events/${eventId}`,
     {
       method: "PATCH",
       headers: {
@@ -167,10 +171,12 @@ async function updateGoogleCalendarEvent(
 
 async function deleteGoogleCalendarEvent(
   accessToken: string,
-  eventId: string
+  eventId: string,
+  calendarId: string = "primary"
 ): Promise<void> {
+  const encodedCalendarId = encodeURIComponent(calendarId);
   const response = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+    `https://www.googleapis.com/calendar/v3/calendars/${encodedCalendarId}/events/${eventId}`,
     {
       method: "DELETE",
       headers: {
@@ -234,11 +240,14 @@ serve(async (req) => {
 
     const accessToken = await getValidAccessToken(connection, supabase);
 
+    const calendarId = connection.calendar_id || "primary";
+    console.log("Using calendar:", calendarId);
+
     let result: any = { synced: true };
 
     switch (action) {
       case "create": {
-        const { eventId, meetLink } = await createGoogleCalendarEvent(accessToken, meeting);
+        const { eventId, meetLink } = await createGoogleCalendarEvent(accessToken, meeting, calendarId);
         result = { synced: true, eventId, meetLink };
         
         // Update meeting with Google Calendar event ID
@@ -255,14 +264,14 @@ serve(async (req) => {
       }
       case "update": {
         if (meeting.google_calendar_event_id) {
-          await updateGoogleCalendarEvent(accessToken, meeting.google_calendar_event_id, meeting);
+          await updateGoogleCalendarEvent(accessToken, meeting.google_calendar_event_id, meeting, calendarId);
           console.log("Updated Google Calendar event:", meeting.google_calendar_event_id);
         }
         break;
       }
       case "delete": {
         if (meeting.google_calendar_event_id) {
-          await deleteGoogleCalendarEvent(accessToken, meeting.google_calendar_event_id);
+          await deleteGoogleCalendarEvent(accessToken, meeting.google_calendar_event_id, calendarId);
           console.log("Deleted Google Calendar event:", meeting.google_calendar_event_id);
         }
         break;
