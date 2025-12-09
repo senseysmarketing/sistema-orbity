@@ -88,11 +88,8 @@ export const MeetingDetailsDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
-          {/* Colored Header */}
-          <div className={cn("h-2 rounded-t-lg", meetingTypeColors[meeting.meeting_type])} />
-          
-          <div className="p-6">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <div>
             <DialogHeader className="pb-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 space-y-2">
