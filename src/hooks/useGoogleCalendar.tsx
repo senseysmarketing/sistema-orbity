@@ -11,6 +11,16 @@ export interface GoogleCalendarConnection {
   sync_enabled: boolean;
   last_sync_at: string | null;
   created_at: string;
+  calendar_id: string | null;
+}
+
+export interface GoogleCalendar {
+  id: string;
+  summary: string;
+  primary?: boolean;
+  backgroundColor?: string;
+  accessRole: string;
+  description?: string;
 }
 
 export const useGoogleCalendar = () => {
@@ -24,7 +34,7 @@ export const useGoogleCalendar = () => {
 
       const { data, error } = await supabase
         .from("google_calendar_connections")
-        .select("id, user_id, agency_id, connected_email, sync_enabled, last_sync_at, created_at")
+        .select("id, user_id, agency_id, connected_email, sync_enabled, last_sync_at, created_at, calendar_id")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -32,6 +42,19 @@ export const useGoogleCalendar = () => {
       return data as GoogleCalendarConnection | null;
     },
     enabled: !!user?.id,
+  });
+
+  const { data: calendarsData, isLoading: isLoadingCalendars, refetch: refetchCalendars } = useQuery({
+    queryKey: ["google-calendars", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("google-calendar-list");
+      
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      
+      return data as { calendars: GoogleCalendar[]; selected_calendar_id: string };
+    },
+    enabled: !!connection,
   });
 
   const connectGoogleCalendar = useMutation({
@@ -46,7 +69,6 @@ export const useGoogleCalendar = () => {
       return data.url as string;
     },
     onSuccess: (url) => {
-      // Redirect to Google OAuth
       window.location.href = url;
     },
     onError: (error: any) => {
@@ -81,6 +103,28 @@ export const useGoogleCalendar = () => {
     },
   });
 
+  const selectCalendar = useMutation({
+    mutationFn: async (calendarId: string) => {
+      if (!user?.id) throw new Error("User not authenticated");
+
+      const { error } = await supabase
+        .from("google_calendar_connections")
+        .update({ calendar_id: calendarId })
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["google-calendar-connection"] });
+      queryClient.invalidateQueries({ queryKey: ["google-calendars"] });
+      toast.success("Calendário selecionado com sucesso");
+    },
+    onError: (error: any) => {
+      console.error("Error selecting calendar:", error);
+      toast.error("Erro ao selecionar calendário");
+    },
+  });
+
   const disconnectGoogleCalendar = useMutation({
     mutationFn: async () => {
       if (!user?.id) throw new Error("User not authenticated");
@@ -94,6 +138,7 @@ export const useGoogleCalendar = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["google-calendar-connection"] });
+      queryClient.invalidateQueries({ queryKey: ["google-calendars"] });
       toast.success("Google Calendar desconectado");
     },
     onError: (error: any) => {
@@ -146,10 +191,15 @@ export const useGoogleCalendar = () => {
     isLoading,
     isConnected: !!connection,
     isSyncEnabled: connection?.sync_enabled ?? false,
+    calendars: calendarsData?.calendars || [],
+    selectedCalendarId: connection?.calendar_id || calendarsData?.selected_calendar_id || "primary",
+    isLoadingCalendars,
     connectGoogleCalendar,
     disconnectGoogleCalendar,
     toggleSync,
     syncMeeting,
     importEvents,
+    selectCalendar,
+    refetchCalendars,
   };
 };

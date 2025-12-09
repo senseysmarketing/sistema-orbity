@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Check, Download, ExternalLink, Loader2, Unlink } from "lucide-react";
+import { Calendar, Check, Download, ExternalLink, Loader2, RefreshCw, Unlink } from "lucide-react";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -19,10 +19,15 @@ export const GoogleCalendarIntegration = () => {
     isLoading,
     isConnected,
     isSyncEnabled,
+    calendars,
+    selectedCalendarId,
+    isLoadingCalendars,
     connectGoogleCalendar,
     disconnectGoogleCalendar,
     toggleSync,
     importEvents,
+    selectCalendar,
+    refetchCalendars,
   } = useGoogleCalendar();
 
   // Handle OAuth callback result
@@ -31,7 +36,6 @@ export const GoogleCalendarIntegration = () => {
     
     if (googleCalendarStatus === "success") {
       toast.success("Google Calendar conectado com sucesso!");
-      // Clean up URL params
       searchParams.delete("google_calendar");
       setSearchParams(searchParams);
     } else if (googleCalendarStatus === "error") {
@@ -42,6 +46,14 @@ export const GoogleCalendarIntegration = () => {
       setSearchParams(searchParams);
     }
   }, [searchParams, setSearchParams]);
+
+  const getCalendarDisplayName = (calendarId: string) => {
+    const calendar = calendars.find(c => c.id === calendarId);
+    if (calendar) {
+      return calendar.summary;
+    }
+    return calendarId === "primary" ? "Calendário Principal" : calendarId;
+  };
 
   if (isLoading) {
     return (
@@ -89,6 +101,64 @@ export const GoogleCalendarIntegration = () => {
               </div>
             </div>
 
+            {/* Calendar Selector */}
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="space-y-1 flex-1 mr-4">
+                <p className="text-sm font-medium">Calendário para sincronização</p>
+                <p className="text-sm text-muted-foreground">
+                  Selecione qual calendário será usado para criar e importar eventos
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={selectedCalendarId}
+                  onValueChange={(value) => selectCalendar.mutate(value)}
+                  disabled={selectCalendar.isPending || isLoadingCalendars}
+                >
+                  <SelectTrigger className="w-[220px]">
+                    {isLoadingCalendars ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Carregando...</span>
+                      </div>
+                    ) : (
+                      <SelectValue placeholder="Selecione um calendário">
+                        {getCalendarDisplayName(selectedCalendarId)}
+                      </SelectValue>
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {calendars.map((calendar) => (
+                      <SelectItem key={calendar.id} value={calendar.id}>
+                        <div className="flex items-center gap-2">
+                          {calendar.backgroundColor && (
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: calendar.backgroundColor }}
+                            />
+                          )}
+                          <span>{calendar.summary}</span>
+                          {calendar.primary && (
+                            <Badge variant="secondary" className="text-xs ml-1">
+                              Principal
+                            </Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => refetchCalendars()}
+                  disabled={isLoadingCalendars}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoadingCalendars ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="space-y-1">
                 <p className="text-sm font-medium">Sincronização automática</p>
@@ -107,7 +177,7 @@ export const GoogleCalendarIntegration = () => {
               <div className="space-y-1">
                 <p className="text-sm font-medium">Importar eventos do Google</p>
                 <p className="text-sm text-muted-foreground">
-                  Importe eventos existentes do Google Calendar para o Orbity
+                  Importe eventos existentes do calendário selecionado para o Orbity
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -167,6 +237,7 @@ export const GoogleCalendarIntegration = () => {
                 <li>• Geração de links do Google Meet</li>
                 <li>• Convites automáticos para participantes</li>
                 <li>• Atualização bidirecional de eventos</li>
+                <li>• Seleção de calendário específico</li>
               </ul>
             </div>
             
