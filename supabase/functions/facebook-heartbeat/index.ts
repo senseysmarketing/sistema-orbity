@@ -32,7 +32,7 @@ async function makeApiCall(
   agencyId: string,
   adAccountId: string,
   supabase: any
-): Promise<void> {
+): Promise<boolean> {
   const startTime = Date.now();
   
   try {
@@ -57,7 +57,7 @@ async function makeApiCall(
         response_time_ms: responseTime,
       });
       console.error(`API call failed for ${endpoint}:`, errorData);
-      return;
+      return false;
     }
 
     const data = await response.json();
@@ -73,6 +73,7 @@ async function makeApiCall(
     });
     
     console.log(`✅ Successful call to ${endpoint} (${responseTime}ms)`);
+    return true;
   } catch (error) {
     const responseTime = Date.now() - startTime;
     await logApiCall(supabase, {
@@ -85,11 +86,11 @@ async function makeApiCall(
       response_time_ms: responseTime,
     });
     console.error(`Exception calling ${endpoint}:`, error);
+    return false;
   }
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -164,16 +165,33 @@ Deno.serve(async (req) => {
         const adAccountId = account.ad_account_id;
         console.log(`\n  [AD ACCOUNT] ${account.name} (${adAccountId})`);
 
-        // Endpoints a serem chamados
+        // Endpoints expandidos para cobrir mais áreas da API (Facebook requer uso real diversificado)
         const endpoints = [
-          `/${adAccountId}?fields=id,name,account_status,currency,balance,amount_spent,business`,
-          `/${adAccountId}/campaigns?fields=id,name,status,objective&limit=5`,
-          `/${adAccountId}/insights?fields=impressions,clicks,spend,cpc,cpm,ctr&date_preset=last_7d`,
+          // Account Info - informações básicas da conta
+          `/${adAccountId}?fields=id,name,account_status,currency,balance,amount_spent,business,funding_source_details`,
+          
+          // Campaigns - campanhas (limitado para evitar rate limit)
+          `/${adAccountId}/campaigns?fields=id,name,status,objective,daily_budget,lifetime_budget,created_time&limit=10`,
+          
+          // Ad Sets - conjuntos de anúncios
+          `/${adAccountId}/adsets?fields=id,name,status,daily_budget,lifetime_budget,targeting,optimization_goal&limit=10`,
+          
+          // Ads - anúncios individuais
+          `/${adAccountId}/ads?fields=id,name,status,creative,created_time&limit=10`,
+          
+          // Insights últimos 7 dias
+          `/${adAccountId}/insights?fields=impressions,clicks,spend,cpc,cpm,ctr,reach,frequency&date_preset=last_7d`,
+          
+          // Insights últimos 30 dias (período maior para demonstrar uso real)
+          `/${adAccountId}/insights?fields=impressions,clicks,spend,cpc,cpm,ctr,reach,frequency,actions,conversions&date_preset=last_30d`,
+          
+          // Custom Audiences - públicos personalizados
+          `/${adAccountId}/customaudiences?fields=id,name,subtype,approximate_count&limit=10`,
         ];
 
         for (const endpoint of endpoints) {
           totalCalls++;
-          await makeApiCall(
+          const success = await makeApiCall(
             endpoint,
             connection.access_token,
             connection.agency_id,
@@ -181,22 +199,19 @@ Deno.serve(async (req) => {
             supabase
           );
           
-          // Pequeno delay entre chamadas para respeitar rate limits
-          await new Promise(resolve => setTimeout(resolve, 500));
+          if (success) {
+            successfulCalls++;
+          } else {
+            failedCalls++;
+          }
+          
+          // Pequeno delay entre chamadas para respeitar rate limits (300ms)
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
       }
     }
 
-    // Contar sucessos e falhas das chamadas
-    const { data: recentLogs } = await supabase
-      .from('facebook_api_audit')
-      .select('status')
-      .gte('created_at', new Date(Date.now() - 60000).toISOString());
-
-    if (recentLogs) {
-      successfulCalls = recentLogs.filter(log => log.status === 'success').length;
-      failedCalls = recentLogs.filter(log => log.status === 'error').length;
-    }
+    const successRate = totalCalls > 0 ? ((successfulCalls / totalCalls) * 100).toFixed(2) : '0';
 
     const result = {
       success: true,
@@ -205,7 +220,7 @@ Deno.serve(async (req) => {
       total_calls: totalCalls,
       successful_calls: successfulCalls,
       failed_calls: failedCalls,
-      success_rate: totalCalls > 0 ? ((successfulCalls / totalCalls) * 100).toFixed(2) + '%' : '0%',
+      success_rate: `${successRate}%`,
     };
 
     console.log('\n[HEARTBEAT] Summary:', result);
