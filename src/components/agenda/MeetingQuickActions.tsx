@@ -1,4 +1,11 @@
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Meeting, useMeetings } from "@/hooks/useMeetings";
 import {
   Video,
@@ -9,6 +16,8 @@ import {
   CheckCircle,
   UserX,
   ExternalLink,
+  MoreHorizontal,
+  Flag,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,9 +55,11 @@ export const MeetingQuickActions = ({
   };
 
   const hasGoogleMeet = !!meeting.google_meet_link;
+  const isScheduled = meeting.status === "scheduled";
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex items-center gap-2">
+      {/* Main Action: Join Meeting */}
       {hasGoogleMeet && (
         <Button
           variant="default"
@@ -68,60 +79,58 @@ export const MeetingQuickActions = ({
         </Button>
       )}
 
-      {meeting.status === "scheduled" && (
-        <>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={handleMarkCompleted}
-          >
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            Concluída
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={handleMarkNoShow}
-          >
-            <UserX className="h-4 w-4 text-orange-600" />
-            Não Compareceu
-          </Button>
-        </>
+      {/* Status Actions Dropdown */}
+      {isScheduled && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Flag className="h-4 w-4" />
+              Status
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={handleMarkCompleted} className="gap-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              Marcar como Concluída
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleMarkNoShow} className="gap-2">
+              <UserX className="h-4 w-4 text-orange-600" />
+              Não Compareceu
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onCancel} className="gap-2 text-orange-600">
+              <XCircle className="h-4 w-4" />
+              Cancelar Reunião
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
 
+      {/* Edit Button */}
       <Button variant="outline" size="sm" className="gap-2" onClick={onEdit}>
         <Edit className="h-4 w-4" />
         Editar
       </Button>
 
-      <Button variant="outline" size="sm" className="gap-2" onClick={onDuplicate}>
-        <Copy className="h-4 w-4" />
-        Duplicar
-      </Button>
-
-      {meeting.status === "scheduled" && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2 text-orange-600 hover:text-orange-700"
-          onClick={onCancel}
-        >
-          <XCircle className="h-4 w-4" />
-          Cancelar
-        </Button>
-      )}
-
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-2 text-destructive hover:text-destructive"
-        onClick={onDelete}
-      >
-        <Trash2 className="h-4 w-4" />
-        Excluir
-      </Button>
+      {/* More Actions Dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="icon" className="h-8 w-8">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={onDuplicate} className="gap-2">
+            <Copy className="h-4 w-4" />
+            Duplicar
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={onDelete} className="gap-2 text-destructive focus:text-destructive">
+            <Trash2 className="h-4 w-4" />
+            Excluir
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 };
