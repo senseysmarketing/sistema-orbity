@@ -1864,6 +1864,44 @@ export type Database = {
         }
         Relationships: []
       }
+      meeting_calendar_events: {
+        Row: {
+          calendar_id: string | null
+          created_at: string | null
+          google_calendar_event_id: string
+          id: string
+          meeting_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          calendar_id?: string | null
+          created_at?: string | null
+          google_calendar_event_id: string
+          id?: string
+          meeting_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          calendar_id?: string | null
+          created_at?: string | null
+          google_calendar_event_id?: string
+          id?: string
+          meeting_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_calendar_events_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meetings: {
         Row: {
           action_items: Json | null
