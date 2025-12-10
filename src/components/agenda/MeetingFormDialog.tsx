@@ -6,11 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Meeting, useMeetings } from "@/hooks/useMeetings";
+import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
-import { Plus, X, ChevronDown, Video, Wand2 } from "lucide-react";
+import { Plus, X, ChevronDown, Video, Wand2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { format, addMinutes } from "date-fns";
@@ -82,6 +84,7 @@ export const MeetingFormDialog = ({
 }: MeetingFormDialogProps) => {
   const { createMeeting, updateMeeting, meetings } = useMeetings();
   const { currentAgency } = useAgency();
+  const { isConnected, isSyncEnabled, syncMeeting, calendars, selectedCalendarId } = useGoogleCalendar();
   
   const [formData, setFormData] = useState({
     title: "",
@@ -97,12 +100,20 @@ export const MeetingFormDialog = ({
 
   const [externalParticipants, setExternalParticipants] = useState<Array<{ name: string; email: string }>>([]);
   const [selectedDuration, setSelectedDuration] = useState<number | null>(60);
+  const [syncToGoogleCalendar, setSyncToGoogleCalendar] = useState(false);
   const [sectionsOpen, setSectionsOpen] = useState({
     basic: true,
     time: true,
     participants: true,
     location: false,
   });
+
+  // Initialize sync checkbox based on Google Calendar connection
+  useEffect(() => {
+    if (isConnected && isSyncEnabled && !meeting) {
+      setSyncToGoogleCalendar(true);
+    }
+  }, [isConnected, isSyncEnabled, meeting]);
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clients", currentAgency?.id],
@@ -169,6 +180,7 @@ export const MeetingFormDialog = ({
         lead_id: meeting.lead_id || "",
       });
       setExternalParticipants(meeting.external_participants || []);
+      setSyncToGoogleCalendar(meeting.sync_to_google_calendar ?? false);
     } else if (duplicateFrom) {
       const now = new Date();
       now.setMinutes(0, 0, 0);
@@ -191,6 +203,7 @@ export const MeetingFormDialog = ({
       });
       setExternalParticipants(duplicateFrom.external_participants || []);
       setSelectedDuration([15, 30, 45, 60, 90, 120].includes(duration) ? duration : null);
+      setSyncToGoogleCalendar(isConnected && isSyncEnabled);
     } else if (prefilledDateTime) {
       const startDate = new Date(prefilledDateTime.date);
       startDate.setHours(prefilledDateTime.hour, 0, 0, 0);
@@ -282,12 +295,39 @@ export const MeetingFormDialog = ({
       external_participants: externalParticipants.filter(p => p.name && p.email),
       client_id: formData.client_id || null,
       lead_id: formData.lead_id || null,
+      sync_to_google_calendar: syncToGoogleCalendar,
     };
 
-    if (meeting) {
-      await updateMeeting.mutateAsync({ id: meeting.id, ...meetingData });
-    } else {
-      await createMeeting.mutateAsync(meetingData);
+    try {
+      if (meeting) {
+        const updatedMeeting = await updateMeeting.mutateAsync({ id: meeting.id, ...meetingData });
+        
+        // Sync update to Google Calendar
+        if (syncToGoogleCalendar && meeting.google_calendar_event_id) {
+          const syncResult = await syncMeeting("update", {
+            ...updatedMeeting,
+            google_calendar_event_id: meeting.google_calendar_event_id,
+          });
+          if (syncResult?.synced) {
+            toast.success("Reunião atualizada e sincronizada com Google Calendar");
+          }
+        }
+      } else {
+        const createdMeeting = await createMeeting.mutateAsync(meetingData);
+        
+        // Sync to Google Calendar after creation
+        if (syncToGoogleCalendar && createdMeeting) {
+          const syncResult = await syncMeeting("create", createdMeeting);
+          if (syncResult?.synced) {
+            toast.success("Reunião criada e sincronizada com Google Calendar");
+          } else if (syncResult?.reason === "no_connection") {
+            toast.info("Reunião criada. Configure a integração com Google Calendar para sincronizar.");
+          }
+        }
+      }
+    } catch (error) {
+      // Error handling is done by the mutation onError
+      return;
     }
     
     onOpenChange(false);
@@ -308,6 +348,7 @@ export const MeetingFormDialog = ({
     });
     setExternalParticipants([]);
     setSelectedDuration(60);
+    setSyncToGoogleCalendar(isConnected && isSyncEnabled);
   };
 
   const addExternalParticipant = () => {
@@ -527,6 +568,29 @@ export const MeetingFormDialog = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Google Calendar Sync Option */}
+                {isConnected && (
+                  <div className="flex items-start space-x-3 p-3 rounded-lg bg-muted/50 border">
+                    <Checkbox
+                      id="sync_google_calendar"
+                      checked={syncToGoogleCalendar}
+                      onCheckedChange={(checked) => setSyncToGoogleCalendar(checked === true)}
+                    />
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="sync_google_calendar"
+                        className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                      >
+                        <Calendar className="h-4 w-4 text-primary" />
+                        Sincronizar com Google Calendar
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Calendário: {calendars.find(c => c.id === selectedCalendarId)?.summary || "Principal"}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </CollapsibleContent>
             </Collapsible>
 

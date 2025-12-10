@@ -88,6 +88,7 @@ export const useMeetings = () => {
           external_participants: meeting.external_participants,
           client_id: meeting.client_id,
           lead_id: meeting.lead_id,
+          sync_to_google_calendar: meeting.sync_to_google_calendar ?? false,
           agency_id: currentAgency.id,
           organizer_id: user.id,
           created_by: user.id,
@@ -96,7 +97,7 @@ export const useMeetings = () => {
         .single();
 
       if (error) throw error;
-      return data;
+      return data as Meeting;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
