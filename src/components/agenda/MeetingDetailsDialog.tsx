@@ -12,6 +12,7 @@ import {
   User,
   Users,
   Clock,
+  Video,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { MeetingNotesTab } from "./MeetingNotesTab";
@@ -164,6 +165,26 @@ export const MeetingDetailsDialog = ({
                         <div>
                           <p className="text-xs text-muted-foreground">Local</p>
                           <p className="text-sm font-medium">{meeting.location}</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {meeting.google_meet_link && (
+                    <>
+                      <Separator />
+                      <div className="flex items-center gap-2">
+                        <Video className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Google Meet</p>
+                          <a 
+                            href={meeting.google_meet_link} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium text-primary hover:underline"
+                          >
+                            {meeting.google_meet_link}
+                          </a>
                         </div>
                       </div>
                     </>
