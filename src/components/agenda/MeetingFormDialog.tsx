@@ -6,12 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Meeting, useMeetings } from "@/hooks/useMeetings";
 import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
+import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
-import { Plus, X, Wand2, Calendar } from "lucide-react";
+import { Plus, X, Wand2, Calendar, Users, Check } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { format, addMinutes } from "date-fns";
@@ -19,6 +22,8 @@ import { toZonedTime } from "date-fns-tz";
 import { MeetingDurationSelector } from "./MeetingDurationSelector";
 import { MeetingConflictAlert } from "./MeetingConflictAlert";
 import { MeetingTemplateSelector } from "./MeetingTemplateSelector";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 const TIMEZONE = "America/Sao_Paulo";
 
@@ -73,6 +78,7 @@ export const MeetingFormDialog = ({
 }: MeetingFormDialogProps) => {
   const { createMeeting, updateMeeting, meetings } = useMeetings();
   const { currentAgency } = useAgency();
+  const { user } = useAuth();
   const { isConnected, isSyncEnabled, syncMeeting, calendars, selectedCalendarId } = useGoogleCalendar();
   
   const [formData, setFormData] = useState({
@@ -88,8 +94,10 @@ export const MeetingFormDialog = ({
   });
 
   const [externalParticipants, setExternalParticipants] = useState<Array<{ name: string; email: string }>>([]);
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [selectedDuration, setSelectedDuration] = useState<number | null>(60);
   const [syncToGoogleCalendar, setSyncToGoogleCalendar] = useState(false);
+  const [participantsPopoverOpen, setParticipantsPopoverOpen] = useState(false);
 
   // Initialize sync checkbox based on Google Calendar connection
   useEffect(() => {
@@ -97,6 +105,29 @@ export const MeetingFormDialog = ({
       setSyncToGoogleCalendar(true);
     }
   }, [isConnected, isSyncEnabled, meeting]);
+
+  // Fetch agency team members
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ["agency-users", currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data } = await supabase
+        .from("agency_users")
+        .select(`
+          user_id,
+          role,
+          profiles:profiles!agency_users_user_id_fkey(name, email)
+        `)
+        .eq("agency_id", currentAgency.id);
+      return (data || []).map(item => ({
+        id: item.user_id,
+        name: (item.profiles as any)?.name || "Usuário",
+        email: (item.profiles as any)?.email || "",
+        role: item.role,
+      }));
+    },
+    enabled: !!currentAgency?.id,
+  });
 
   const { data: clients = [] } = useQuery({
     queryKey: ["clients", currentAgency?.id],
@@ -163,6 +194,7 @@ export const MeetingFormDialog = ({
         lead_id: meeting.lead_id || "",
       });
       setExternalParticipants(meeting.external_participants || []);
+      setSelectedParticipants(meeting.participants || []);
       setSyncToGoogleCalendar(meeting.sync_to_google_calendar ?? false);
     } else if (duplicateFrom) {
       const now = new Date();
@@ -185,6 +217,7 @@ export const MeetingFormDialog = ({
         lead_id: duplicateFrom.lead_id || "",
       });
       setExternalParticipants(duplicateFrom.external_participants || []);
+      setSelectedParticipants(duplicateFrom.participants || []);
       setSelectedDuration([15, 30, 45, 60, 90, 120].includes(duration) ? duration : null);
       setSyncToGoogleCalendar(isConnected && isSyncEnabled);
     } else if (prefilledDateTime) {
@@ -276,6 +309,7 @@ export const MeetingFormDialog = ({
       start_time: startDate.toISOString(),
       end_time: endDate.toISOString(),
       external_participants: externalParticipants.filter(p => p.name && p.email),
+      participants: selectedParticipants,
       client_id: formData.client_id || null,
       lead_id: formData.lead_id || null,
       sync_to_google_calendar: syncToGoogleCalendar,
@@ -330,6 +364,7 @@ export const MeetingFormDialog = ({
       lead_id: "",
     });
     setExternalParticipants([]);
+    setSelectedParticipants([]);
     setSelectedDuration(60);
     setSyncToGoogleCalendar(isConnected && isSyncEnabled);
   };
@@ -548,6 +583,99 @@ export const MeetingFormDialog = ({
               </div>
             </div>
           )}
+
+          {/* Internal Participants (Team Members) */}
+          <div className="space-y-3">
+            <Label className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Participantes da Equipe
+            </Label>
+            
+            <Popover open={participantsPopoverOpen} onOpenChange={setParticipantsPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-start text-left font-normal"
+                >
+                  {selectedParticipants.length > 0 
+                    ? `${selectedParticipants.length} participante(s) selecionado(s)`
+                    : "Selecionar participantes..."}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[400px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar membro da equipe..." />
+                  <CommandList>
+                    <CommandEmpty>Nenhum membro encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {teamMembers
+                        .filter(member => member.id !== user?.id) // Exclude current user (organizer)
+                        .map((member) => (
+                          <CommandItem
+                            key={member.id}
+                            value={member.name}
+                            onSelect={() => {
+                              setSelectedParticipants(prev =>
+                                prev.includes(member.id)
+                                  ? prev.filter(id => id !== member.id)
+                                  : [...prev, member.id]
+                              );
+                            }}
+                          >
+                            <div className="flex items-center gap-3 w-full">
+                              <div className={`flex h-4 w-4 items-center justify-center rounded border ${
+                                selectedParticipants.includes(member.id) 
+                                  ? 'bg-primary border-primary' 
+                                  : 'border-muted-foreground'
+                              }`}>
+                                {selectedParticipants.includes(member.id) && (
+                                  <Check className="h-3 w-3 text-primary-foreground" />
+                                )}
+                              </div>
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {member.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{member.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                              </div>
+                            </div>
+                          </CommandItem>
+                        ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            {/* Selected participants badges */}
+            {selectedParticipants.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {selectedParticipants.map(participantId => {
+                  const member = teamMembers.find(m => m.id === participantId);
+                  if (!member) return null;
+                  return (
+                    <Badge key={participantId} variant="secondary" className="gap-1 pr-1">
+                      {member.name}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 p-0 hover:bg-transparent"
+                        onClick={() => setSelectedParticipants(prev => prev.filter(id => id !== participantId))}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* External Participants */}
           <div className="space-y-3">
