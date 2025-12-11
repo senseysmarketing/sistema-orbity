@@ -112,7 +112,12 @@ export default function Auth() {
           <p className="text-xs text-white/80">🚀 Setup automático • 7 dias grátis • Sem cartão de crédito</p>
         </div>
 
-        <p className="text-center text-sm text-white/80">Sistema desenvolvido por Senseys - Digital Performance</p>
+        <div className="text-center space-y-1">
+          <p className="text-sm text-white/80">Sistema desenvolvido por Senseys - Digital Performance</p>
+          <Link to="/privacy-policy" className="text-xs text-white/60 hover:text-white/90 underline underline-offset-2">
+            Política de Privacidade
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -34,6 +34,7 @@ import LandingPage from "./pages/LandingPage";
 import Import from "./pages/Import";
 import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ const App = () => (
                       <Routes>
                         <Route path="/lp" element={<LandingPage />} />
                         <Route path="/auth" element={<Auth />} />
+                        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                         <Route path="/onboarding" element={<Onboarding />} />
                         <Route path="/welcome" element={<Welcome />} />
                         <Route path="/subscription-success" element={<SubscriptionSuccess />} />
