@@ -4,13 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo } from "lucide-react";
+import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
-
+import { useDeletePermission } from "@/hooks/useDeletePermission";
 interface Subtask {
   id: string;
   title: string;
@@ -64,9 +64,12 @@ const priorityConfig: Record<string, { label: string; color: string }> = {
 
 export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, getClientName, getAssignedUsers, onTaskUpdate }: TaskDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [showNoPermissionAlert, setShowNoPermissionAlert] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [creatorName, setCreatorName] = useState<string>("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  
+  const { canDelete, isCreator, isAdmin, creatorName: permissionCreatorName } = useDeletePermission(task?.created_by);
 
   useEffect(() => {
     const loadTaskDetails = async () => {
@@ -326,7 +329,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
           <DialogFooter className="gap-2">
             <Button
               variant="destructive"
-              onClick={() => setShowDeleteAlert(true)}
+              onClick={() => canDelete ? setShowDeleteAlert(true) : setShowNoPermissionAlert(true)}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Excluir
@@ -339,12 +342,18 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
         </DialogContent>
       </Dialog>
 
+      {/* Dialog de confirmação de exclusão */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir a tarefa "{task.title}"? Esta ação não pode ser desfeita.
+              {isCreator 
+                ? `Tem certeza que deseja excluir sua tarefa "${task.title}"?`
+                : `Você está excluindo uma tarefa criada por ${permissionCreatorName || creatorName}. Tem certeza que deseja excluir "${task.title}"?`
+              }
+              <br /><br />
+              Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -352,6 +361,28 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Excluir
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog de sem permissão */}
+      <AlertDialog open={showNoPermissionAlert} onOpenChange={setShowNoPermissionAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Sem permissão
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Apenas o criador desta tarefa ou um administrador pode excluí-la.
+              <br /><br />
+              <span className="text-muted-foreground">
+                Criado por: <strong>{permissionCreatorName || creatorName || 'Usuário desconhecido'}</strong>
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>Entendi</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

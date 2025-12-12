@@ -4,13 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History, ListTodo, Users } from "lucide-react";
+import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History, ListTodo, Users, Lock } from "lucide-react";
 import { SocialMediaPost, Subtask } from "@/hooks/useSocialMediaPosts";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PostAssignedUsers } from "./PostAssignedUsers";
+import { useDeletePermission } from "@/hooks/useDeletePermission";
 
 interface PostDetailsDialogProps {
   post: SocialMediaPost | null;
@@ -55,9 +56,12 @@ const postTypeConfig: Record<string, string> = {
 
 export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, onPostUpdate }: PostDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [showNoPermissionAlert, setShowNoPermissionAlert] = useState(false);
   const [creatorName, setCreatorName] = useState<string>("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [assignedUsers, setAssignedUsers] = useState<any[]>([]);
+  
+  const { canDelete, isCreator, isAdmin, creatorName: permissionCreatorName } = useDeletePermission(post?.created_by);
 
   useEffect(() => {
     const loadData = async () => {
@@ -342,7 +346,7 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
           <DialogFooter className="gap-2">
             <Button
               variant="destructive"
-              onClick={() => setShowDeleteAlert(true)}
+              onClick={() => canDelete ? setShowDeleteAlert(true) : setShowNoPermissionAlert(true)}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Excluir
@@ -355,12 +359,18 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
         </DialogContent>
       </Dialog>
 
+      {/* Dialog de confirmação de exclusão */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir a postagem "{post.title}"? Esta ação não pode ser desfeita.
+              {isCreator 
+                ? `Tem certeza que deseja excluir sua postagem "${post.title}"?`
+                : `Você está excluindo uma postagem criada por ${permissionCreatorName || creatorName}. Tem certeza que deseja excluir "${post.title}"?`
+              }
+              <br /><br />
+              Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -368,6 +378,28 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Excluir
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog de sem permissão */}
+      <AlertDialog open={showNoPermissionAlert} onOpenChange={setShowNoPermissionAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Sem permissão
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Apenas o criador desta postagem ou um administrador pode excluí-la.
+              <br /><br />
+              <span className="text-muted-foreground">
+                Criado por: <strong>{permissionCreatorName || creatorName || 'Usuário desconhecido'}</strong>
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>Entendi</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
