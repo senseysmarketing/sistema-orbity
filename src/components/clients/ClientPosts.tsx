@@ -46,10 +46,33 @@ export function ClientPosts({ clientId, clientName }: ClientPostsProps) {
   const { data: posts, isLoading } = useQuery({
     queryKey: ["client-posts", clientId],
     queryFn: async () => {
+      // First get post IDs from junction table
+      const { data: postClients, error: junctionError } = await supabase
+        .from("post_clients")
+        .select("post_id")
+        .eq("client_id", clientId);
+      
+      if (junctionError) throw junctionError;
+      
+      if (!postClients || postClients.length === 0) {
+        // Fallback: also check legacy client_id
+        const { data, error } = await supabase
+          .from("social_media_posts")
+          .select("*")
+          .eq("client_id", clientId)
+          .eq("archived", false)
+          .order("scheduled_date", { ascending: false, nullsFirst: false })
+          .limit(20);
+        if (error) throw error;
+        return data;
+      }
+      
+      const postIds = postClients.map((pc) => pc.post_id);
+      
       const { data, error } = await supabase
         .from("social_media_posts")
         .select("*")
-        .eq("client_id", clientId)
+        .in("id", postIds)
         .eq("archived", false)
         .order("scheduled_date", { ascending: false, nullsFirst: false })
         .limit(20);

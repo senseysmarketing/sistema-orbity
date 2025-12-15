@@ -1902,6 +1902,42 @@ export type Database = {
           },
         ]
       }
+      meeting_clients: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          meeting_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          meeting_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          meeting_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_clients_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meetings: {
         Row: {
           action_items: Json | null
@@ -2520,6 +2556,42 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "post_assignments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "social_media_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_clients: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          post_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          post_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_clients_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "social_media_posts"
@@ -3469,6 +3541,42 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "task_assignments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_clients: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          task_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          task_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_clients_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"

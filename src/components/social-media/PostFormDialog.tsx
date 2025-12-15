@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
+import { MultiClientSelector } from "@/components/clients/MultiClientSelector";
+import { useClientRelations } from "@/hooks/useClientRelations";
 
 interface PostFormDialogProps {
   open: boolean;
@@ -29,9 +31,11 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
   const { createPost, updatePost } = useSocialMediaPosts();
   const { currentAgency } = useAgency();
   const { toast } = useToast();
+  const { fetchClientIds, updateClientRelations } = useClientRelations();
   const [clients, setClients] = useState<Client[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Helper para converter Date para formato datetime-local mantendo fuso horário local
@@ -44,7 +48,6 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    client_id: "",
     scheduled_date: defaultDate?.toISOString() || new Date().toISOString(),
     post_type: "feed",
     platform: "instagram",
@@ -60,7 +63,6 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
       setFormData({
         title: editPost.title,
         description: editPost.description || "",
-        client_id: editPost.client_id || "",
         scheduled_date: editPost.scheduled_date,
         post_type: editPost.post_type,
         platform: editPost.platform,
@@ -74,7 +76,6 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
       setFormData({
         title: "",
         description: "",
-        client_id: "",
         scheduled_date: defaultDate?.toISOString() || new Date().toISOString(),
         post_type: "feed",
         platform: "instagram",
@@ -84,6 +85,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         notes: "",
         subtasks: [],
       });
+      setSelectedClientIds([]);
     }
   }, [editPost, defaultDate, open]);
 
@@ -119,24 +121,35 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     fetchData();
   }, [currentAgency?.id]);
 
-  // Carregar atribuições do post sendo editado
+  // Carregar atribuições e clientes do post sendo editado
   useEffect(() => {
-    const fetchAssignments = async () => {
+    const fetchAssignmentsAndClients = async () => {
       if (!editPost?.id) {
         setSelectedUserIds([]);
+        setSelectedClientIds([]);
         return;
       }
 
-      const { data } = await supabase
+      // Fetch user assignments
+      const { data: userAssignments } = await supabase
         .from('post_assignments')
         .select('user_id')
         .eq('post_id', editPost.id);
       
-      if (data) {
-        setSelectedUserIds(data.map(a => a.user_id));
+      if (userAssignments) {
+        setSelectedUserIds(userAssignments.map(a => a.user_id));
+      }
+
+      // Fetch client relations
+      const clientIds = await fetchClientIds("post", editPost.id);
+      if (clientIds.length > 0) {
+        setSelectedClientIds(clientIds);
+      } else if (editPost.client_id) {
+        // Fallback to legacy client_id
+        setSelectedClientIds([editPost.client_id]);
       }
     };
-    fetchAssignments();
+    fetchAssignmentsAndClients();
   }, [editPost?.id]);
 
   // Tipos de conteúdo padrão
@@ -260,6 +273,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     const fetchSchedulePreference = async () => {
       if (!currentAgency?.id || editPost) return;
 
+      const firstClientId = selectedClientIds[0];
+
       // Buscar preferência específica do cliente primeiro
       let query = supabase
         .from('social_media_schedule_preferences')
@@ -268,8 +283,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         .eq('platform', formData.platform);
 
       // Se tiver cliente, buscar preferência específica
-      if (formData.client_id) {
-        query = query.eq('client_id', formData.client_id);
+      if (firstClientId) {
+        query = query.eq('client_id', firstClientId);
       } else {
         // Se não tiver cliente, buscar preferência geral (client_id null)
         query = query.is('client_id', null);
@@ -279,7 +294,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
 
       // Se não encontrou preferência específica e tem cliente, buscar preferência geral
       let preferenceData = data;
-      if (!preferenceData && formData.client_id) {
+      if (!preferenceData && firstClientId) {
         const { data: generalData } = await supabase
           .from('social_media_schedule_preferences')
           .select('preferred_times')
@@ -302,7 +317,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     };
 
     fetchSchedulePreference();
-  }, [formData.platform, formData.client_id, currentAgency?.id, editPost, open]);
+  }, [formData.platform, selectedClientIds, currentAgency?.id, editPost, open]);
 
   // Aplicar horário padrão ao abrir o modal
   useEffect(() => {
@@ -339,7 +354,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     try {
       const data = {
         ...formData,
-        client_id: formData.client_id || null,
+        client_id: selectedClientIds[0] || null, // Keep first client for backward compatibility
         hashtags: formData.hashtags.split(",").map(h => h.trim()).filter(Boolean),
         attachments: [],
         mentions: [],
@@ -441,7 +456,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
           approval_history: [...currentHistory, newHistoryEntry] as any,
         });
 
-        // Atualizar atribuições
+        // Atualizar atribuições de usuários
         await supabase
           .from('post_assignments')
           .delete()
@@ -454,6 +469,9 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
           }));
           await supabase.from('post_assignments').insert(assignments);
         }
+
+        // Atualizar relações de clientes
+        await updateClientRelations("post", editPost.id, selectedClientIds);
         
         toast({ title: "Postagem atualizada com sucesso!" });
       } else {
@@ -466,6 +484,11 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
             user_id: userId
           }));
           await supabase.from('post_assignments').insert(assignments);
+        }
+
+        // Criar relações de clientes para o novo post
+        if (createdPost && selectedClientIds.length > 0) {
+          await updateClientRelations("post", createdPost.id, selectedClientIds);
         }
         
         toast({ title: "Postagem criada com sucesso!" });
@@ -547,19 +570,13 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="client_id">Cliente</Label>
-              <Select value={formData.client_id} onValueChange={(value) => setFormData({ ...formData, client_id: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map(client => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Clientes</Label>
+              <MultiClientSelector
+                clients={clients}
+                selectedClientIds={selectedClientIds}
+                onSelectionChange={setSelectedClientIds}
+                placeholder="Selecionar clientes..."
+              />
             </div>
 
             <div>
