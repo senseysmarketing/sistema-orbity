@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
+import { MultiClientSelector } from "@/components/clients/MultiClientSelector";
 import { TaskAnalytics } from "@/components/tasks/TaskAnalytics";
 import { TaskDetailsDialog } from "@/components/tasks/TaskDetailsDialog";
 import { TaskStatusManager } from "@/components/tasks/TaskStatusManager";
@@ -42,6 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTaskAssignments } from "@/hooks/useTaskAssignments";
 import { useTaskTemplates, TaskTemplate } from "@/hooks/useTaskTemplates";
 import { useTaskStatuses } from "@/hooks/useTaskStatuses";
+import { useClientRelations } from "@/hooks/useClientRelations";
 import { replaceTemplateVariables, calculateDueDate } from "@/lib/templateVariables";
 
 interface Task {
@@ -98,7 +100,7 @@ export default function Tasks() {
     priority: "low" | "medium" | "high";
     assigned_to: string;
     assigned_users: string[];
-    client_id: string;
+    client_ids: string[];
     due_date: string;
     subtasks: Subtask[];
   }>({
@@ -108,10 +110,12 @@ export default function Tasks() {
     priority: "medium",
     assigned_to: "unassigned",
     assigned_users: [],
-    client_id: "no-client",
+    client_ids: [],
     due_date: "",
     subtasks: [],
   });
+
+  const { updateClientRelations } = useClientRelations();
 
   const { profile } = useAuth();
   const { currentAgency } = useAgency();
@@ -428,7 +432,7 @@ export default function Tasks() {
           status: newTask.status as any,
           priority: newTask.priority,
           assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
-          client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
+          client_id: newTask.client_ids[0] || null, // Keep first for backward compatibility
           due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
           created_by: profile?.user_id,
           agency_id: currentAgency?.id,
@@ -443,6 +447,11 @@ export default function Tasks() {
         await assignUsersToTask(taskData.id, newTask.assigned_users);
       }
 
+      // Create client relations
+      if (taskData && newTask.client_ids.length > 0) {
+        await updateClientRelations("task", taskData.id, newTask.client_ids);
+      }
+
       toast({
         title: "Sucesso",
         description: "Tarefa criada com sucesso!",
@@ -455,7 +464,7 @@ export default function Tasks() {
         priority: "medium",
         assigned_to: "unassigned",
         assigned_users: [],
-        client_id: "no-client",
+        client_ids: [],
         due_date: "",
         subtasks: [],
       });
@@ -492,7 +501,7 @@ export default function Tasks() {
       assigned_users: template.auto_assign_creator && profile?.user_id 
         ? [profile.user_id] 
         : [],
-      client_id: template.default_client_id || "no-client",
+      client_ids: template.default_client_id ? [template.default_client_id] : [],
       due_date: calculateDueDate(template.due_date_offset_days),
       subtasks: template.subtasks.map((st) => ({
         ...st,
@@ -520,7 +529,7 @@ export default function Tasks() {
       priority: task.priority as any,
       assigned_to: task.assigned_to || "unassigned",
       assigned_users: getAssignedUsers(task.id).map((u) => u.user_id),
-      client_id: task.client_id || "no-client",
+      client_ids: task.client_id ? [task.client_id] : [],
       due_date: task.due_date ? task.due_date.split("T")[0] : "",
       subtasks: task.subtasks || [],
     });
@@ -563,12 +572,6 @@ export default function Tasks() {
         const newDate = newTask.due_date ? formatDateBR(newTask.due_date) : "Sem data";
         changes.push(`Data de vencimento: ${oldDate} → ${newDate}`);
       }
-      
-      const originalClientId = selectedTask.client_id || "no-client";
-      const newClientId = newTask.client_id;
-      if (originalClientId !== newClientId) {
-        changes.push(`Cliente: ${getClientName(selectedTask.client_id)} → ${getClientName(newTask.client_id === "no-client" ? null : newTask.client_id)}`);
-      }
 
       const updates: any = {
         title: newTask.title,
@@ -576,7 +579,7 @@ export default function Tasks() {
         status: newTask.status,
         priority: newTask.priority,
         assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
-        client_id: newTask.client_id === "no-client" ? null : newTask.client_id,
+        client_id: newTask.client_ids[0] || null,
         due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
         subtasks: newTask.subtasks as any,
       };
@@ -837,23 +840,13 @@ export default function Tasks() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="client_id">Cliente</Label>
-                  <Select
-                    value={newTask.client_id}
-                    onValueChange={(value) => setNewTask({ ...newTask, client_id: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar cliente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="no-client">Sem cliente</SelectItem>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Clientes</Label>
+                  <MultiClientSelector
+                    clients={clients}
+                    selectedClientIds={newTask.client_ids}
+                    onSelectionChange={(ids) => setNewTask({ ...newTask, client_ids: ids })}
+                    placeholder="Selecionar clientes..."
+                  />
                 </div>
               </div>
               <div className="grid gap-2">

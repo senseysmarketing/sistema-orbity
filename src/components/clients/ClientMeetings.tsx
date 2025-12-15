@@ -40,13 +40,37 @@ export function ClientMeetings({ clientId, clientName }: ClientMeetingsProps) {
   const { data: meetings, isLoading } = useQuery({
     queryKey: ["client-meetings", clientId],
     queryFn: async () => {
+      // First get meeting IDs from junction table
+      const { data: meetingClients, error: junctionError } = await supabase
+        .from("meeting_clients")
+        .select("meeting_id")
+        .eq("client_id", clientId);
+      
+      if (junctionError) throw junctionError;
+      
+      if (!meetingClients || meetingClients.length === 0) {
+        // Fallback: also check legacy client_id
+        const { data, error } = await supabase
+          .from("meetings")
+          .select(`
+            *,
+            profiles:organizer_id (name)
+          `)
+          .eq("client_id", clientId)
+          .order("start_time", { ascending: false });
+        if (error) throw error;
+        return data;
+      }
+      
+      const meetingIds = meetingClients.map((mc) => mc.meeting_id);
+      
       const { data, error } = await supabase
         .from("meetings")
         .select(`
           *,
           profiles:organizer_id (name)
         `)
-        .eq("client_id", clientId)
+        .in("id", meetingIds)
         .order("start_time", { ascending: false });
       if (error) throw error;
       return data;

@@ -43,10 +43,31 @@ export function ClientTasks({ clientId, clientName }: ClientTasksProps) {
   const { data: tasks, isLoading } = useQuery({
     queryKey: ["client-tasks", clientId],
     queryFn: async () => {
+      // First get task IDs from junction table
+      const { data: taskClients, error: junctionError } = await supabase
+        .from("task_clients")
+        .select("task_id")
+        .eq("client_id", clientId);
+      
+      if (junctionError) throw junctionError;
+      
+      if (!taskClients || taskClients.length === 0) {
+        // Fallback: also check legacy client_id
+        const { data, error } = await supabase
+          .from("tasks")
+          .select("*")
+          .eq("client_id", clientId)
+          .order("due_date", { ascending: true, nullsFirst: false });
+        if (error) throw error;
+        return data;
+      }
+      
+      const taskIds = taskClients.map((tc) => tc.task_id);
+      
       const { data, error } = await supabase
         .from("tasks")
         .select("*")
-        .eq("client_id", clientId)
+        .in("id", taskIds)
         .order("due_date", { ascending: true, nullsFirst: false });
       if (error) throw error;
       return data;
