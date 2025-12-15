@@ -1113,23 +1113,13 @@ export default function Tasks() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="edit-client_id">Cliente</Label>
-                <Select
-                  value={newTask.client_id}
-                  onValueChange={(value) => setNewTask({ ...newTask, client_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecionar cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="no-client">Sem cliente</SelectItem>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="edit-client_id">Clientes</Label>
+                <MultiClientSelector
+                  clients={clients}
+                  selectedClientIds={newTask.client_ids}
+                  onSelectionChange={(ids) => setNewTask({ ...newTask, client_ids: ids })}
+                  placeholder="Selecionar clientes..."
+                />
               </div>
             </div>
             <div className="grid gap-2">
