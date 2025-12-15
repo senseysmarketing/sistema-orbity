@@ -24,6 +24,8 @@ import { MeetingConflictAlert } from "./MeetingConflictAlert";
 import { MeetingTemplateSelector } from "./MeetingTemplateSelector";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { MultiClientSelector } from "@/components/clients/MultiClientSelector";
+import { useClientRelations } from "@/hooks/useClientRelations";
 
 const TIMEZONE = "America/Sao_Paulo";
 
@@ -80,6 +82,7 @@ export const MeetingFormDialog = ({
   const { currentAgency } = useAgency();
   const { user } = useAuth();
   const { isConnected, isSyncEnabled, syncMeeting, calendars, selectedCalendarId } = useGoogleCalendar();
+  const { fetchClientIds, updateClientRelations } = useClientRelations();
   
   const [formData, setFormData] = useState({
     title: "",
@@ -89,10 +92,10 @@ export const MeetingFormDialog = ({
     end_time: "",
     location: "",
     google_meet_link: "",
-    client_id: "",
     lead_id: "",
   });
 
+  const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [externalParticipants, setExternalParticipants] = useState<Array<{ name: string; email: string }>>([]);
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [selectedDuration, setSelectedDuration] = useState<number | null>(60);
@@ -175,64 +178,76 @@ export const MeetingFormDialog = ({
   }, [formData.start_time, formData.end_time, meetings, meeting]);
 
   useEffect(() => {
-    if (meeting) {
-      const startZoned = toZonedTime(new Date(meeting.start_time), TIMEZONE);
-      const endZoned = toZonedTime(new Date(meeting.end_time), TIMEZONE);
-      
-      const duration = Math.round((endZoned.getTime() - startZoned.getTime()) / 60000);
-      setSelectedDuration([15, 30, 45, 60, 90, 120].includes(duration) ? duration : null);
-      
-      setFormData({
-        title: meeting.title,
-        description: meeting.description || "",
-        meeting_type: meeting.meeting_type,
-        start_time: format(startZoned, "yyyy-MM-dd'T'HH:mm"),
-        end_time: format(endZoned, "yyyy-MM-dd'T'HH:mm"),
-        location: meeting.location || "",
-        google_meet_link: meeting.google_meet_link || "",
-        client_id: meeting.client_id || "",
-        lead_id: meeting.lead_id || "",
-      });
-      setExternalParticipants(meeting.external_participants || []);
-      setSelectedParticipants(meeting.participants || []);
-      setSyncToGoogleCalendar(meeting.sync_to_google_calendar ?? false);
-    } else if (duplicateFrom) {
-      const now = new Date();
-      now.setMinutes(0, 0, 0);
-      now.setHours(now.getHours() + 1);
-      
-      const startZoned = toZonedTime(new Date(duplicateFrom.start_time), TIMEZONE);
-      const endZoned = toZonedTime(new Date(duplicateFrom.end_time), TIMEZONE);
-      const duration = Math.round((endZoned.getTime() - startZoned.getTime()) / 60000);
-      
-      setFormData({
-        title: duplicateFrom.title,
-        description: duplicateFrom.description || "",
-        meeting_type: duplicateFrom.meeting_type,
-        start_time: format(now, "yyyy-MM-dd'T'HH:mm"),
-        end_time: format(addMinutes(now, duration), "yyyy-MM-dd'T'HH:mm"),
-        location: duplicateFrom.location || "",
-        google_meet_link: "",
-        client_id: duplicateFrom.client_id || "",
-        lead_id: duplicateFrom.lead_id || "",
-      });
-      setExternalParticipants(duplicateFrom.external_participants || []);
-      setSelectedParticipants(duplicateFrom.participants || []);
-      setSelectedDuration([15, 30, 45, 60, 90, 120].includes(duration) ? duration : null);
-      setSyncToGoogleCalendar(isConnected && isSyncEnabled);
-    } else if (prefilledDateTime) {
-      const startDate = new Date(prefilledDateTime.date);
-      startDate.setHours(prefilledDateTime.hour, 0, 0, 0);
-      const endDate = addMinutes(startDate, selectedDuration || 60);
-      
-      setFormData(prev => ({
-        ...prev,
-        start_time: format(startDate, "yyyy-MM-dd'T'HH:mm"),
-        end_time: format(endDate, "yyyy-MM-dd'T'HH:mm"),
-      }));
-    } else if (!open) {
-      resetForm();
-    }
+    const loadMeetingData = async () => {
+      if (meeting) {
+        const startZoned = toZonedTime(new Date(meeting.start_time), TIMEZONE);
+        const endZoned = toZonedTime(new Date(meeting.end_time), TIMEZONE);
+        
+        const duration = Math.round((endZoned.getTime() - startZoned.getTime()) / 60000);
+        setSelectedDuration([15, 30, 45, 60, 90, 120].includes(duration) ? duration : null);
+        
+        setFormData({
+          title: meeting.title,
+          description: meeting.description || "",
+          meeting_type: meeting.meeting_type,
+          start_time: format(startZoned, "yyyy-MM-dd'T'HH:mm"),
+          end_time: format(endZoned, "yyyy-MM-dd'T'HH:mm"),
+          location: meeting.location || "",
+          google_meet_link: meeting.google_meet_link || "",
+          lead_id: meeting.lead_id || "",
+        });
+        
+        // Load client relations
+        const clientIds = await fetchClientIds("meeting", meeting.id);
+        setSelectedClientIds(clientIds.length > 0 ? clientIds : (meeting.client_id ? [meeting.client_id] : []));
+        
+        setExternalParticipants(meeting.external_participants || []);
+        setSelectedParticipants(meeting.participants || []);
+        setSyncToGoogleCalendar(meeting.sync_to_google_calendar ?? false);
+      } else if (duplicateFrom) {
+        const now = new Date();
+        now.setMinutes(0, 0, 0);
+        now.setHours(now.getHours() + 1);
+        
+        const startZoned = toZonedTime(new Date(duplicateFrom.start_time), TIMEZONE);
+        const endZoned = toZonedTime(new Date(duplicateFrom.end_time), TIMEZONE);
+        const duration = Math.round((endZoned.getTime() - startZoned.getTime()) / 60000);
+        
+        setFormData({
+          title: duplicateFrom.title,
+          description: duplicateFrom.description || "",
+          meeting_type: duplicateFrom.meeting_type,
+          start_time: format(now, "yyyy-MM-dd'T'HH:mm"),
+          end_time: format(addMinutes(now, duration), "yyyy-MM-dd'T'HH:mm"),
+          location: duplicateFrom.location || "",
+          google_meet_link: "",
+          lead_id: duplicateFrom.lead_id || "",
+        });
+        
+        // Load client relations for duplicate
+        const clientIds = await fetchClientIds("meeting", duplicateFrom.id);
+        setSelectedClientIds(clientIds.length > 0 ? clientIds : (duplicateFrom.client_id ? [duplicateFrom.client_id] : []));
+        
+        setExternalParticipants(duplicateFrom.external_participants || []);
+        setSelectedParticipants(duplicateFrom.participants || []);
+        setSelectedDuration([15, 30, 45, 60, 90, 120].includes(duration) ? duration : null);
+        setSyncToGoogleCalendar(isConnected && isSyncEnabled);
+      } else if (prefilledDateTime) {
+        const startDate = new Date(prefilledDateTime.date);
+        startDate.setHours(prefilledDateTime.hour, 0, 0, 0);
+        const endDate = addMinutes(startDate, selectedDuration || 60);
+        
+        setFormData(prev => ({
+          ...prev,
+          start_time: format(startDate, "yyyy-MM-dd'T'HH:mm"),
+          end_time: format(endDate, "yyyy-MM-dd'T'HH:mm"),
+        }));
+      } else if (!open) {
+        resetForm();
+      }
+    };
+    
+    loadMeetingData();
   }, [meeting, prefilledDateTime, duplicateFrom, open]);
 
   const handleDurationSelect = (minutes: number) => {
@@ -310,7 +325,7 @@ export const MeetingFormDialog = ({
       end_time: endDate.toISOString(),
       external_participants: externalParticipants.filter(p => p.name && p.email),
       participants: selectedParticipants,
-      client_id: formData.client_id || null,
+      client_id: selectedClientIds[0] || null, // Keep first client for backward compatibility
       lead_id: formData.lead_id || null,
       sync_to_google_calendar: syncToGoogleCalendar,
     };
@@ -318,6 +333,9 @@ export const MeetingFormDialog = ({
     try {
       if (meeting) {
         const updatedMeeting = await updateMeeting.mutateAsync({ id: meeting.id, ...meetingData });
+        
+        // Update client relations
+        await updateClientRelations("meeting", meeting.id, selectedClientIds);
         
         // Sync update to Google Calendar
         if (syncToGoogleCalendar && meeting.google_calendar_event_id) {
@@ -331,6 +349,11 @@ export const MeetingFormDialog = ({
         }
       } else {
         const createdMeeting = await createMeeting.mutateAsync(meetingData);
+        
+        // Save client relations for new meeting
+        if (createdMeeting?.id) {
+          await updateClientRelations("meeting", createdMeeting.id, selectedClientIds);
+        }
         
         // Sync to Google Calendar after creation
         if (syncToGoogleCalendar && createdMeeting) {
@@ -360,9 +383,9 @@ export const MeetingFormDialog = ({
       end_time: "",
       location: "",
       google_meet_link: "",
-      client_id: "",
       lead_id: "",
     });
+    setSelectedClientIds([]);
     setExternalParticipants([]);
     setSelectedParticipants([]);
     setSelectedDuration(60);
@@ -448,30 +471,30 @@ export const MeetingFormDialog = ({
           {/* Client and Lead */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="client_id">Cliente</Label>
-              <Select
-                value={formData.client_id || "none"}
-                onValueChange={(value) => setFormData({ ...formData, client_id: value === "none" ? "" : value, lead_id: "" })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="client_id">Clientes</Label>
+              <MultiClientSelector
+                clients={clients}
+                selectedClientIds={selectedClientIds}
+                onSelectionChange={(ids) => {
+                  setSelectedClientIds(ids);
+                  if (ids.length > 0) {
+                    setFormData(prev => ({ ...prev, lead_id: "" }));
+                  }
+                }}
+                placeholder="Selecionar clientes..."
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="lead_id">Lead</Label>
               <Select
                 value={formData.lead_id || "none"}
-                onValueChange={(value) => setFormData({ ...formData, lead_id: value === "none" ? "" : value, client_id: "" })}
+                onValueChange={(value) => {
+                  setFormData({ ...formData, lead_id: value === "none" ? "" : value });
+                  if (value !== "none") {
+                    setSelectedClientIds([]);
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um lead" />
