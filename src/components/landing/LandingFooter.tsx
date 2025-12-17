@@ -90,15 +90,24 @@ export function LandingFooter() {
               © 2025 Plataforma de Gestão para Agências. Todos os direitos reservados.
             </p>
             <div className="flex gap-6 text-sm">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+              <button 
+                onClick={() => navigate("/privacy-policy")} 
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
                 Privacidade
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+              </button>
+              <button 
+                onClick={() => navigate("/privacy-policy")} 
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
                 Termos
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+              </button>
+              <button 
+                onClick={() => navigate("/privacy-policy")} 
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
                 LGPD
-              </a>
+              </button>
             </div>
           </div>
         </div>
