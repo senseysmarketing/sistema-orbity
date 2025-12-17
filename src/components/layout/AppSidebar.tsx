@@ -16,12 +16,12 @@ const menuCategories = [
     items: [
       {
         title: "Dashboard",
-        url: "/",
+        url: "/dashboard",
         icon: LayoutDashboard,
       },
       {
         title: "Relatórios",
-        url: "/reports",
+        url: "/dashboard/reports",
         icon: BarChart3,
       }
     ]
@@ -31,27 +31,27 @@ const menuCategories = [
     items: [
       {
         title: "Clientes",
-        url: "/clients",
+        url: "/dashboard/clients",
         icon: Users,
       },
       {
         title: "Tarefas Gerais",
-        url: "/tasks",
+        url: "/dashboard/tasks",
         icon: CheckSquare,
       },
       {
         title: "Lembretes",
-        url: "/reminders",
+        url: "/dashboard/reminders",
         icon: User,
       },
       {
         title: "Agenda",
-        url: "/agenda",
+        url: "/dashboard/agenda",
         icon: Calendar,
       },
       {
         title: "CRM & Leads",
-        url: "/crm",
+        url: "/dashboard/crm",
         icon: ContactRound,
       }
     ]
@@ -61,17 +61,17 @@ const menuCategories = [
     items: [
       {
         title: "Social Media",
-        url: "/social-media",
+        url: "/dashboard/social-media",
         icon: Instagram,
       },
       {
         title: "Controle de Tráfego",
-        url: "/traffic",
+        url: "/dashboard/traffic",
         icon: TrendingUp,
       },
       {
         title: "Contratos",
-        url: "/contracts",
+        url: "/dashboard/contracts",
         icon: FileText,
       }
     ]
@@ -81,19 +81,19 @@ const menuCategories = [
     items: [
       {
         title: "Administrativo",
-        url: "/admin",
+        url: "/dashboard/admin",
         icon: DollarSign,
         requiresAdmin: true
       },
       {
         title: "Importação",
-        url: "/import",
+        url: "/dashboard/import",
         icon: Upload,
         requiresAdmin: true
       },
       {
         title: "Configurações",
-        url: "/settings",
+        url: "/dashboard/settings",
         icon: Settings,
         requiresAdmin: true
       }
@@ -113,8 +113,8 @@ export function AppSidebar() {
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
   const isActive = (path: string) => {
-    if (path === "/") {
-      return currentPath === "/";
+    if (path === "/dashboard") {
+      return currentPath === "/dashboard";
     }
     return currentPath.startsWith(path);
   };
@@ -139,13 +139,13 @@ export function AppSidebar() {
     return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
   };
   const getTourAttr = (url: string) => {
-    if (url === '/') return 'dashboard';
-    if (url === '/crm') return 'crm';
-    if (url === '/tasks') return 'tasks';
-    if (url === '/agenda') return 'agenda';
-    if (url === '/social-media') return 'social-media';
-    if (url === '/traffic') return 'traffic';
-    if (url === '/admin') return 'admin';
+    if (url === '/dashboard') return 'dashboard';
+    if (url === '/dashboard/crm') return 'crm';
+    if (url === '/dashboard/tasks') return 'tasks';
+    if (url === '/dashboard/agenda') return 'agenda';
+    if (url === '/dashboard/social-media') return 'social-media';
+    if (url === '/dashboard/traffic') return 'traffic';
+    if (url === '/dashboard/admin') return 'admin';
     return undefined;
   };
 
@@ -173,7 +173,7 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild>
                       <NavLink 
                         to={item.url} 
-                        end={item.url === "/"} 
+                        end={item.url === "/dashboard"} 
                         className={({isActive}) => getNavCls({isActive})}
                         data-tour={getTourAttr(item.url)}
                       >
@@ -196,7 +196,7 @@ export function AppSidebar() {
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <NavLink to="/master" className={({ isActive }) => getNavCls({ isActive })}>
+                    <NavLink to="/dashboard/master" className={({ isActive }) => getNavCls({ isActive })}>
                       <Shield className="h-4 w-4" />
                       {!collapsed && <span>Dashboard Master</span>}
                     </NavLink>
@@ -232,7 +232,7 @@ export function AppSidebar() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem asChild>
-                <NavLink to="/settings" className="w-full">
+                <NavLink to="/dashboard/settings" className="w-full">
                   <Settings className="mr-2 h-4 w-4" />
                   Configurações
                 </NavLink>
