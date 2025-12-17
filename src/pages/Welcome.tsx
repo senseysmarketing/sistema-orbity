@@ -68,7 +68,7 @@ export default function Welcome() {
 
     // If user already saw welcome, redirect to dashboard
     if (profile?.welcome_seen) {
-      navigate('/', { replace: true });
+      navigate('/dashboard', { replace: true });
     }
   }, [user, profile, navigate]);
 
@@ -90,7 +90,7 @@ export default function Welcome() {
           .eq('user_id', user.id);
       }
       
-      navigate('/', { replace: true });
+      navigate('/dashboard', { replace: true });
       setTimeout(() => startTour(), 500);
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -110,7 +110,7 @@ export default function Welcome() {
           .eq('user_id', user.id);
       }
       
-      navigate('/', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       console.error('Error updating profile:', error);
       toast.error('Erro ao pular tour');

@@ -55,14 +55,19 @@ const App = () => (
                   }}>
                     <PaymentMiddlewareProvider>
                       <Routes>
-                        <Route path="/lp" element={<LandingPage />} />
+                        {/* Landing Page como página principal */}
+                        <Route path="/" element={<LandingPage />} />
+                        
+                        {/* Páginas públicas */}
                         <Route path="/auth" element={<Auth />} />
                         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                         <Route path="/onboarding" element={<Onboarding />} />
                         <Route path="/welcome" element={<Welcome />} />
                         <Route path="/subscription-success" element={<SubscriptionSuccess />} />
                         <Route path="/subscription-canceled" element={<SubscriptionCanceled />} />
-                        <Route path="/" element={
+                        
+                        {/* Dashboard e páginas protegidas */}
+                        <Route path="/dashboard" element={
                           <PaymentMiddlewareWrapper>
                             <AppLayout />
                           </PaymentMiddlewareWrapper>
@@ -83,6 +88,7 @@ const App = () => (
                           <Route path="settings" element={<Settings />} />
                           <Route path="master" element={<Master />} />
                         </Route>
+                        
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </PaymentMiddlewareProvider>
