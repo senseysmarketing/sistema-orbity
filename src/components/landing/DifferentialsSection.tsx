@@ -1,29 +1,29 @@
-import { Check } from "lucide-react";
+import { Check, Shield } from "lucide-react";
 
 const differentials = [
   {
-    title: "Tudo em Um Lugar",
-    description: "Pare de usar 10 ferramentas diferentes. Centralize toda operação da agência."
+    title: "Integrações Nativas",
+    description: "Conexão direta com Meta (Facebook/Instagram Ads) e Google Calendar sem ferramentas terceiras."
   },
   {
-    title: "Interface Brasileira",
-    description: "Desenvolvido pensando em agências brasileiras, com nosso idioma e cultura."
+    title: "Interface 100% Brasileira",
+    description: "Desenvolvido pensando em agências brasileiras, com nosso idioma, moeda e cultura."
   },
   {
-    title: "Onboarding Guiado",
-    description: "Tour interativo te ensina tudo em 5 minutos. Comece produtivo desde o dia 1."
+    title: "Seus Dados Protegidos",
+    description: "Utilizamos seus dados apenas para o funcionamento das integrações. Nunca vendemos ou compartilhamos suas informações."
   },
   {
     title: "Multi-agência",
     description: "Gerencie várias agências em uma única conta. Ideal para holdings e franquias."
   },
   {
-    title: "Notificações Inteligentes",
-    description: "Nunca mais esqueça um prazo. Sistema configurável de alertas automáticos."
+    title: "Tudo em Um Lugar",
+    description: "CRM, Social Media, Tráfego, Financeiro, Tarefas e Agenda em uma única plataforma."
   },
   {
-    title: "Relatórios Prontos",
-    description: "Analytics que realmente importam. Métricas de churn, receita e produtividade."
+    title: "Suporte Humanizado",
+    description: "Atendimento real e personalizado. Sem bots, sem filas intermináveis."
   }
 ];
 
