@@ -14,7 +14,7 @@ const features = [
   {
     icon: Users,
     title: "CRM Inteligente",
-    description: "Funil visual de vendas, captura automática de leads via webhook, alertas de follow-up",
+    description: "Funil visual de vendas, captura automática de leads do Facebook Lead Ads, alertas de follow-up",
     gradient: "from-blue-500/20 to-cyan-500/20"
   },
   {
@@ -25,8 +25,8 @@ const features = [
   },
   {
     icon: TrendingUp,
-    title: "Tráfego Pago Conectado",
-    description: "Integração nativa com Facebook Ads, dashboard de campanhas, alertas de saldo baixo",
+    title: "Integração Nativa com Meta",
+    description: "Conexão direta com Facebook Ads e Instagram. Dashboard de campanhas, métricas em tempo real e alertas de saldo",
     gradient: "from-green-500/20 to-emerald-500/20"
   },
   {
@@ -38,25 +38,25 @@ const features = [
   {
     icon: CheckSquare,
     title: "Tarefas & Projetos",
-    description: "Kanban inteligente, subtarefas, atribuição multi-usuário, alertas de prazos",
+    description: "Kanban inteligente, subtarefas, templates reutilizáveis, atribuição multi-usuário",
     gradient: "from-red-500/20 to-rose-500/20"
   },
   {
     icon: FileText,
     title: "Contratos Automáticos",
-    description: "Geração de contratos com templates personalizáveis, assinatura digital",
+    description: "Geração de contratos com templates personalizáveis e exportação em PDF",
     gradient: "from-indigo-500/20 to-blue-500/20"
   },
   {
     icon: Calendar,
-    title: "Agenda Integrada",
-    description: "Calendário de reuniões, notas de meeting, lembretes automáticos",
+    title: "Integração com Google Calendar",
+    description: "Sincronização bidirecional de reuniões, criação automática de Google Meet e notificações",
     gradient: "from-teal-500/20 to-cyan-500/20"
   },
   {
     icon: Bell,
     title: "Notificações Inteligentes",
-    description: "Sistema configurável de alertas, modo não perturbe, períodos personalizados",
+    description: "Alertas por email, resumo diário configurável e lembretes automáticos de prazos",
     gradient: "from-violet-500/20 to-purple-500/20"
   }
 ];
