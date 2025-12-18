@@ -132,7 +132,7 @@ export default function Clients() {
             <Card
               key={client.id}
               className="group cursor-pointer transition-all hover:shadow-md hover:border-primary/50"
-              onClick={() => navigate(`/clients/${client.id}`)}
+              onClick={() => navigate(`/dashboard/clients/${client.id}`)}
             >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">

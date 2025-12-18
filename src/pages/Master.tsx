@@ -15,7 +15,7 @@ export default function Master() {
 
   useEffect(() => {
     if (!loading && profile?.role !== 'super_admin') {
-      navigate('/');
+      navigate('/dashboard');
     }
   }, [profile?.role, loading, navigate]);
 

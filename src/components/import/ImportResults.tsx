@@ -16,11 +16,11 @@ export function ImportResults({ successCount, errorCount, importType, onNewImpor
   const isSuccess = errorCount === 0;
 
   const getNavigationPath = () => {
-    if (importType === 'clients_and_payments') return '/admin';
-    if (importType === 'expenses') return '/admin';
-    if (importType === 'salaries') return '/admin';
-    if (importType === 'leads') return '/crm';
-    return '/';
+    if (importType === 'clients_and_payments') return '/dashboard/admin';
+    if (importType === 'expenses') return '/dashboard/admin';
+    if (importType === 'salaries') return '/dashboard/admin';
+    if (importType === 'leads') return '/dashboard/crm';
+    return '/dashboard';
   };
 
   const getImportTypeName = () => {

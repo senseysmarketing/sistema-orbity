@@ -134,7 +134,7 @@ export function ClientTasks({ clientId, clientName }: ClientTasksProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Tarefas do Cliente</CardTitle>
-          <Button size="sm" onClick={() => navigate("/tasks")}>
+          <Button size="sm" onClick={() => navigate("/dashboard/tasks")}>
             <Plus className="h-4 w-4 mr-2" />
             Ver Todas
           </Button>

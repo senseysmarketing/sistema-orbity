@@ -182,7 +182,7 @@ export function ClientMeetings({ clientId, clientName }: ClientMeetingsProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Histórico de Reuniões</CardTitle>
-          <Button size="sm" onClick={() => navigate("/agenda")}>
+          <Button size="sm" onClick={() => navigate("/dashboard/agenda")}>
             <Plus className="h-4 w-4 mr-2" />
             Ver Agenda
           </Button>
