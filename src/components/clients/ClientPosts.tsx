@@ -133,7 +133,7 @@ export function ClientPosts({ clientId, clientName }: ClientPostsProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Posts Recentes</CardTitle>
-          <Button size="sm" onClick={() => navigate("/social-media")}>
+          <Button size="sm" onClick={() => navigate("/dashboard/social-media")}>
             <Plus className="h-4 w-4 mr-2" />
             Ver Todos
           </Button>

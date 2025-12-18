@@ -57,7 +57,7 @@ export default function ClientDetail() {
       <div className="flex flex-col items-center justify-center py-12">
         <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
         <h3 className="text-lg font-semibold">Cliente não encontrado</h3>
-        <Button variant="outline" className="mt-4" onClick={() => navigate("/clients")}>
+        <Button variant="outline" className="mt-4" onClick={() => navigate("/dashboard/clients")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar para clientes
         </Button>
@@ -70,7 +70,7 @@ export default function ClientDetail() {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex items-start gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/clients")}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard/clients")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-4">
