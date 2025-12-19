@@ -55,12 +55,41 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
 
   const fetchAvailableAccounts = async () => {
     try {
+      // Ensure we have a fresh session before calling the function
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Sessão expirada",
+          description: "Por favor, faça login novamente.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       // Chamar edge function para buscar contas disponíveis
       const { data, error } = await supabase.functions.invoke('facebook-accounts', {
         body: { action: 'list_ad_accounts' }
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's an auth error
+        if (error.message?.includes('401') || error.message?.includes('Session expired')) {
+          // Try to refresh the session
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (!refreshError) {
+            // Retry the request
+            const { data: retryData, error: retryError } = await supabase.functions.invoke('facebook-accounts', {
+              body: { action: 'list_ad_accounts' }
+            });
+            if (!retryError) {
+              setAvailableAccounts(retryData?.accounts || []);
+              return;
+            }
+          }
+        }
+        throw error;
+      }
       
       setAvailableAccounts(data?.accounts || []);
     } catch (error: any) {
