@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
       // Buscar ad accounts selecionadas para esta agência
       const { data: selectedAccounts, error: accountsError } = await supabase
         .from('selected_ad_accounts')
-        .select('ad_account_id, name')
+        .select('ad_account_id, ad_account_name')
         .eq('agency_id', connection.agency_id)
         .eq('is_active', true);
 
@@ -163,7 +163,7 @@ Deno.serve(async (req) => {
       // Para cada ad account, fazer chamadas aos principais endpoints
       for (const account of selectedAccounts) {
         const adAccountId = account.ad_account_id;
-        console.log(`\n  [AD ACCOUNT] ${account.name} (${adAccountId})`);
+        console.log(`\n  [AD ACCOUNT] ${account.ad_account_name} (${adAccountId})`);
 
         // Endpoints expandidos para cobrir mais áreas da API (Facebook requer uso real diversificado)
         const endpoints = [
