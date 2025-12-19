@@ -3,6 +3,30 @@ project_id = "ovookkywclrqfmtumelw"
 [functions.google-calendar-list]
 verify_jwt = false
 
+[functions.capture-lead]
+verify_jwt = false
+
+[functions.facebook-auth]
+verify_jwt = false
+
+[functions.monthly-closure]
+verify_jwt = false
+
+[functions.facebook-leads]
+verify_jwt = false
+
+[functions.send-daily-digest]
+verify_jwt = false
+
+[functions.google-calendar-callback]
+verify_jwt = false
+
+[functions.google-calendar-import]
+verify_jwt = false
+
+[functions.facebook-heartbeat]
+verify_jwt = false
+
 [api]
 enabled = true
 port = 54321
@@ -52,24 +76,3 @@ enable_confirmations = false
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
-
-[functions.capture-lead]
-verify_jwt = false
-
-[functions.facebook-auth]
-verify_jwt = false
-
-[functions.monthly-closure]
-verify_jwt = false
-
-[functions.facebook-leads]
-verify_jwt = false
-
-[functions.send-daily-digest]
-verify_jwt = false
-
-[functions.google-calendar-callback]
-verify_jwt = false
-
-[functions.google-calendar-import]
-verify_jwt = false
