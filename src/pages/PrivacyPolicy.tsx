@@ -57,10 +57,56 @@ export default function PrivacyPolicy() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">4. Integrações de Terceiros</h2>
+            <h2 className="text-xl font-semibold text-foreground">4. Compartilhamento, Transferência e Divulgação de Dados</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              A Senseys se compromete com a proteção dos seus dados pessoais. Abaixo descrevemos como tratamos o 
+              compartilhamento, transferência e divulgação das suas informações:
+            </p>
             
             <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-              <h3 className="font-medium text-foreground">4.1 Google Calendar</h3>
+              <h3 className="font-medium text-foreground">4.1 Dados do Usuário Google</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                <strong>Não compartilhamos, vendemos, transferimos ou divulgamos seus dados do Google para terceiros.</strong> 
+                Os dados obtidos através da integração com Google Calendar (como eventos de calendário e informações de e-mail) são:
+              </p>
+              <ul className="list-disc list-inside text-muted-foreground text-sm space-y-1 ml-4">
+                <li>Utilizados <strong>exclusivamente</strong> para fornecer a funcionalidade de sincronização de reuniões dentro do Orbity</li>
+                <li>Armazenados de forma segura em nossos servidores apenas enquanto a integração estiver ativa</li>
+                <li><strong>Nunca</strong> compartilhados com outras empresas, parceiros ou terceiros</li>
+                <li><strong>Nunca</strong> utilizados para publicidade, marketing ou qualquer outro propósito além da funcionalidade do aplicativo</li>
+                <li>Excluídos imediatamente quando você desconecta a integração com o Google</li>
+              </ul>
+            </div>
+
+            <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+              <h3 className="font-medium text-foreground">4.2 Compartilhamento Geral de Dados</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Podemos compartilhar suas informações apenas nas seguintes circunstâncias limitadas:
+              </p>
+              <ul className="list-disc list-inside text-muted-foreground text-sm space-y-1 ml-4">
+                <li><strong>Provedores de Serviço:</strong> Com provedores de infraestrutura (Supabase, serviços de hospedagem) 
+                    que processam dados em nosso nome, sob rigorosos acordos de confidencialidade</li>
+                <li><strong>Requisitos Legais:</strong> Quando exigido por lei, ordem judicial ou processo legal</li>
+                <li><strong>Proteção de Direitos:</strong> Para proteger nossos direitos, privacidade, segurança ou propriedade</li>
+                <li><strong>Com seu Consentimento:</strong> Em qualquer outro caso, apenas com sua autorização expressa</li>
+              </ul>
+            </div>
+
+            <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+              <h3 className="font-medium text-foreground">4.3 Transferência Internacional de Dados</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Seus dados podem ser transferidos para servidores localizados fora do Brasil. Quando isso ocorrer, 
+                garantimos que os dados são tratados de acordo com esta política e protegidos por medidas de segurança 
+                adequadas, incluindo cláusulas contratuais padrão aprovadas para transferências internacionais.
+              </p>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-xl font-semibold text-foreground">5. Integrações de Terceiros</h2>
+            
+            <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+              <h3 className="font-medium text-foreground">5.1 Google Calendar</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">
                 Nossa integração com Google Calendar permite sincronizar reuniões entre o Orbity e seu calendário Google. 
                 Solicitamos os seguintes escopos:
@@ -71,12 +117,13 @@ export default function PrivacyPolicy() {
                 <li><code className="bg-muted px-1 rounded">userinfo.email</code> - Para identificar a conta conectada</li>
               </ul>
               <p className="text-muted-foreground text-sm">
-                Acessamos apenas eventos criados através do Orbity e eventos que você explicitamente escolhe importar.
+                Acessamos apenas eventos criados através do Orbity e eventos que você explicitamente escolhe importar. 
+                <strong> Estes dados não são compartilhados com terceiros.</strong>
               </p>
             </div>
 
             <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-              <h3 className="font-medium text-foreground">4.2 Facebook / Meta</h3>
+              <h3 className="font-medium text-foreground">5.2 Facebook / Meta</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">
                 Nossa integração com Facebook permite gerenciar contas de anúncios e capturar leads. 
                 Solicitamos os seguintes escopos:
@@ -93,7 +140,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">5. Segurança dos Dados</h2>
+            <h2 className="text-xl font-semibold text-foreground">6. Segurança dos Dados</h2>
             <p className="text-muted-foreground leading-relaxed">
               A segurança dos seus dados é importante para nós. Utilizamos medidas de segurança padrão da indústria, 
               incluindo:
@@ -108,7 +155,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">6. Retenção de Dados</h2>
+            <h2 className="text-xl font-semibold text-foreground">7. Retenção de Dados</h2>
             <p className="text-muted-foreground leading-relaxed">
               Retemos seus dados pessoais apenas pelo tempo necessário para os fins estabelecidos nesta política. 
               Quando você solicita a exclusão de sua conta, removemos seus dados pessoais dentro de 30 dias, 
@@ -117,7 +164,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">7. Seus Direitos</h2>
+            <h2 className="text-xl font-semibold text-foreground">8. Seus Direitos</h2>
             <p className="text-muted-foreground leading-relaxed">
               De acordo com a Lei Geral de Proteção de Dados (LGPD), você tem direito a:
             </p>
@@ -132,7 +179,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">8. Alterações nesta Política</h2>
+            <h2 className="text-xl font-semibold text-foreground">9. Alterações nesta Política</h2>
             <p className="text-muted-foreground leading-relaxed">
               Podemos atualizar nossa Política de Privacidade periodicamente. Notificaremos você sobre quaisquer 
               alterações publicando a nova política nesta página e atualizando a data de "última atualização".
@@ -140,7 +187,7 @@ export default function PrivacyPolicy() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-xl font-semibold text-foreground">9. Contato</h2>
+            <h2 className="text-xl font-semibold text-foreground">10. Contato</h2>
             <p className="text-muted-foreground leading-relaxed">
               Se você tiver dúvidas sobre esta Política de Privacidade, entre em contato conosco:
             </p>
