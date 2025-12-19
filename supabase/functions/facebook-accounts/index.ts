@@ -20,14 +20,42 @@ serve(async (req) => {
     // Get JWT from header
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
-      throw new Error('No authorization header');
+      console.error('[FACEBOOK-ACCOUNTS] No authorization header provided');
+      return new Response(JSON.stringify({ 
+        error: 'Authentication required',
+        details: 'No authorization header provided'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const token = authHeader.replace('Bearer ', '');
+    console.log('[FACEBOOK-ACCOUNTS] Validating token...');
+    
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
-    if (authError || !user) {
-      throw new Error('Invalid token');
+    if (authError) {
+      console.error('[FACEBOOK-ACCOUNTS] Auth error:', authError.message);
+      return new Response(JSON.stringify({ 
+        error: 'Session expired',
+        details: 'Please refresh the page and try again',
+        authError: authError.message
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    if (!user) {
+      console.error('[FACEBOOK-ACCOUNTS] No user found for token');
+      return new Response(JSON.stringify({ 
+        error: 'Invalid session',
+        details: 'User not found'
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     console.log('[FACEBOOK-ACCOUNTS] User authenticated:', { userId: user.id, email: user.email });
