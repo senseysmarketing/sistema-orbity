@@ -95,17 +95,21 @@ serve(async (req) => {
                 if (me?.id) fbUserId = String(me.id);
               } catch (_e) {}
               const tokenExpiresAt = tokenData.expires_in ? new Date(Date.now() + Number(tokenData.expires_in) * 1000).toISOString() : null;
-              const { error: insertErr } = await supabaseClientForCallback
+              const { error: upsertErr } = await supabaseClientForCallback
                 .from('facebook_connections')
-                .insert({
+                .upsert({
                   user_id: userData.user.id,
                   agency_id: agencyId,
                   access_token: tokenData.access_token,
                   token_expires_at: tokenExpiresAt,
                   facebook_user_id: fbUserId,
                   is_active: true,
+                  updated_at: new Date().toISOString(),
+                }, { 
+                  onConflict: 'agency_id,facebook_user_id',
+                  ignoreDuplicates: false 
                 });
-              if (!insertErr) saved = true;
+              if (!upsertErr) saved = true;
               else console.warn('Error saving connection during callback:', insertErr);
             }
           }
@@ -210,13 +214,17 @@ serve(async (req) => {
 
         const { error: insertErr } = await supabaseClient
           .from('facebook_connections')
-          .insert({
+          .upsert({
             user_id: userData.user.id,
             agency_id: agencyId,
             access_token,
             token_expires_at: tokenExpiresAt,
             facebook_user_id: fbUserId || 'unknown',
             is_active: true,
+            updated_at: new Date().toISOString(),
+          }, { 
+            onConflict: 'agency_id,facebook_user_id',
+            ignoreDuplicates: false 
           });
 
         if (insertErr) {
