@@ -34,19 +34,19 @@ serve(async (req) => {
 
     if (error) {
       console.error("OAuth error:", error);
-      return Response.redirect(`${appUrl}/settings?google_calendar=error&message=${encodeURIComponent(error)}`);
+      return Response.redirect(`${appUrl}/dashboard/settings?google_calendar=error&message=${encodeURIComponent(error)}`);
     }
 
     if (!code || !state) {
       console.error("Missing code or state");
-      return Response.redirect(`${appUrl}/settings?google_calendar=error&message=missing_params`);
+      return Response.redirect(`${appUrl}/dashboard/settings?google_calendar=error&message=missing_params`);
     }
 
     const { user_id, agency_id } = stateData;
 
     if (!user_id || !agency_id) {
       console.error("Missing user_id or agency_id in state");
-      return Response.redirect(`${appUrl}/settings?google_calendar=error&message=invalid_state_data`);
+      return Response.redirect(`${appUrl}/dashboard/settings?google_calendar=error&message=invalid_state_data`);
     }
 
     // Exchange code for tokens
@@ -68,7 +68,7 @@ serve(async (req) => {
 
     if (tokenData.error) {
       console.error("Token exchange error:", tokenData);
-      return Response.redirect(`${appUrl}/settings?google_calendar=error&message=${encodeURIComponent(tokenData.error)}`);
+      return Response.redirect(`${appUrl}/dashboard/settings?google_calendar=error&message=${encodeURIComponent(tokenData.error)}`);
     }
 
     const { access_token, refresh_token, expires_in } = tokenData;
@@ -102,14 +102,14 @@ serve(async (req) => {
 
     if (upsertError) {
       console.error("Database error:", upsertError);
-      return Response.redirect(`${appUrl}/settings?google_calendar=error&message=database_error`);
+      return Response.redirect(`${appUrl}/dashboard/settings?google_calendar=error&message=database_error`);
     }
 
     console.log("Successfully connected Google Calendar for user:", user_id, "email:", userInfo.email);
 
-    return Response.redirect(`${appUrl}/settings?google_calendar=success`);
+    return Response.redirect(`${appUrl}/dashboard/settings?google_calendar=success`);
   } catch (error) {
     console.error("Callback error:", error);
-    return Response.redirect(`${DEFAULT_APP_URL}/settings?google_calendar=error&message=server_error`);
+    return Response.redirect(`${DEFAULT_APP_URL}/dashboard/settings?google_calendar=error&message=server_error`);
   }
 });
