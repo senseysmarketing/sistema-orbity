@@ -210,23 +210,22 @@ async function processAgencyClosure(supabase: any, agencyId: string): Promise<Mo
     }
   }
 
-  // 4. GERAR SALÁRIOS (baseado nos salários do mês anterior)
-  const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const { data: lastMonthSalaries } = await supabase
-    .from('salaries')
-    .select('employee_name, amount')
+  // 4. GERAR SALÁRIOS (baseado em funcionários ativos na tabela employees)
+  const { data: activeEmployees } = await supabase
+    .from('employees')
+    .select('id, name, base_salary, payment_day')
     .eq('agency_id', agencyId)
-    .gte('due_date', previousMonth.toISOString().split('T')[0])
-    .lt('due_date', currentMonth.toISOString().split('T')[0]);
+    .eq('is_active', true);
 
-  for (const salary of lastMonthSalaries || []) {
-    const dueDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 5); // Dia 5 do mês
+  for (const employee of activeEmployees || []) {
+    const dueDay = employee.payment_day || 5;
+    const dueDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), dueDay);
 
     // Verificar se já existe salário para este funcionário neste mês
     const { data: existingSalary } = await supabase
       .from('salaries')
       .select('id')
-      .eq('employee_name', salary.employee_name)
+      .eq('employee_id', employee.id)
       .eq('agency_id', agencyId)
       .gte('due_date', currentMonth.toISOString().split('T')[0])
       .lt('due_date', new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1).toISOString().split('T')[0])
@@ -235,8 +234,9 @@ async function processAgencyClosure(supabase: any, agencyId: string): Promise<Mo
     if (!existingSalary) {
       await supabase.from('salaries').insert({
         agency_id: agencyId,
-        employee_name: salary.employee_name,
-        amount: salary.amount,
+        employee_id: employee.id,
+        employee_name: employee.name,
+        amount: employee.base_salary,
         due_date: dueDate.toISOString().split('T')[0],
         status: 'pending',
       });
