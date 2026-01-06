@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, CheckCircle, Edit3, TrendingUp, TrendingDown, Clock, DollarSign, BarChart3, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle, Edit3, TrendingUp, Clock, DollarSign, BarChart3, RefreshCw, CreditCard, Calendar, Wallet } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { differenceInDays, format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { differenceInDays } from "date-fns";
 
 export interface ClientData {
   id: string;
@@ -20,6 +19,8 @@ export interface ClientData {
   balance: number;
   min_threshold: number;
   is_prepaid?: boolean;
+  spend_cap?: number;
+  amount_spent?: number;
   active_campaigns_count: number;
   total_daily_budget: number;
   last_7d_spend: number;
@@ -39,15 +40,28 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
   const [editingClient, setEditingClient] = useState<ClientData>(client);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Calcular status do saldo
-  const getBalanceStatus = () => {
-    if (client.balance <= client.min_threshold * 0.5) {
-      return 'critical';
-    } else if (client.balance <= client.min_threshold) {
-      return 'warning';
-    }
+  const isPrepaid = client.is_prepaid !== false; // Default to prepaid if not specified
+
+  // Lógica de status para contas PRÉ-PAGAS
+  const getPrepaidBalanceStatus = () => {
+    if (client.min_threshold <= 0) return 'healthy';
+    if (client.balance < client.min_threshold) return 'critical';
+    if (client.balance < client.min_threshold * 3) return 'warning';
     return 'healthy';
   };
+
+  // Lógica de status para contas PÓS-PAGAS
+  const getPostpaidBalanceStatus = () => {
+    const spendCap = client.spend_cap || 0;
+    const amountSpent = client.amount_spent || 0;
+    if (spendCap <= 0) return 'healthy';
+    const percentUsed = (amountSpent / spendCap) * 100;
+    if (percentUsed >= 90) return 'critical';
+    if (percentUsed >= 70) return 'warning';
+    return 'healthy';
+  };
+
+  const getBalanceStatus = () => isPrepaid ? getPrepaidBalanceStatus() : getPostpaidBalanceStatus();
 
   // Calcular dias desde última otimização
   const getDaysSinceOptimization = () => {
@@ -55,9 +69,18 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
     return differenceInDays(new Date(), new Date(client.last_campaign_update));
   };
 
+  // Calcular dias restantes de saldo (para pré-pagas)
+  const getEstimatedDaysRemaining = () => {
+    if (!isPrepaid || client.last_7d_spend <= 0) return null;
+    const avgDailySpend = client.last_7d_spend / 7;
+    if (avgDailySpend <= 0) return null;
+    return Math.floor(client.balance / avgDailySpend);
+  };
+
   const balanceStatus = getBalanceStatus();
   const daysSinceOptimization = getDaysSinceOptimization();
   const needsOptimization = daysSinceOptimization !== null && daysSinceOptimization > 7;
+  const estimatedDays = getEstimatedDaysRemaining();
 
   const getStatusBadge = () => {
     switch (balanceStatus) {
@@ -107,9 +130,12 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
     }).format(value);
   };
 
-  const getBalancePercentage = () => {
-    if (client.min_threshold <= 0) return 100;
-    return Math.min(100, (client.balance / client.min_threshold) * 100);
+  // Porcentagem para contas pós-pagas (limite consumido)
+  const getPostpaidPercentage = () => {
+    const spendCap = client.spend_cap || 0;
+    const amountSpent = client.amount_spent || 0;
+    if (spendCap <= 0) return 0;
+    return Math.min(100, (amountSpent / spendCap) * 100);
   };
 
   const handleSave = () => {
@@ -129,15 +155,24 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
         <CardHeader className="pb-3">
           <div className="flex justify-between items-start">
             <div className="flex-1">
-              <CardTitle className="text-lg flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-1">
                 {balanceStatus === 'critical' && <AlertTriangle className="h-4 w-4 text-red-600" />}
                 {balanceStatus === 'warning' && <AlertTriangle className="h-4 w-4 text-yellow-600" />}
                 {balanceStatus === 'healthy' && <CheckCircle className="h-4 w-4 text-green-600" />}
-                {client.ad_account_name}
-              </CardTitle>
-              <CardDescription className="text-xs">
-                ID: {client.ad_account_id}
-              </CardDescription>
+                <CardTitle className="text-lg">{client.ad_account_name}</CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                <CardDescription className="text-xs">
+                  ID: {client.ad_account_id}
+                </CardDescription>
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                  {isPrepaid ? (
+                    <><Wallet className="h-3 w-3 mr-1" />Pré-paga</>
+                  ) : (
+                    <><CreditCard className="h-3 w-3 mr-1" />Pós-paga</>
+                  )}
+                </Badge>
+              </div>
             </div>
             <div className="flex gap-1">
               <Button
@@ -165,26 +200,76 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Saldo */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Saldo</span>
+          {/* Seção de Saldo - DIFERENTE para cada tipo de conta */}
+          {isPrepaid ? (
+            // === CONTA PRÉ-PAGA ===
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Saldo Atual</span>
+                </div>
+                {getStatusBadge()}
               </div>
-              {getStatusBadge()}
+              
+              <div className="text-3xl font-bold">
+                {formatCurrency(client.balance)}
+              </div>
+              
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  <span>Alertar abaixo de:</span>
+                  <span className="font-medium text-foreground">{formatCurrency(client.min_threshold)}</span>
+                </div>
+              </div>
+              
+              {estimatedDays !== null && (
+                <div className="flex items-center gap-1.5 text-sm">
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className={`font-medium ${estimatedDays <= 3 ? 'text-red-600' : estimatedDays <= 7 ? 'text-yellow-600' : 'text-green-600'}`}>
+                    ~{estimatedDays} dias restantes
+                  </span>
+                  <span className="text-muted-foreground text-xs">(estimativa)</span>
+                </div>
+              )}
             </div>
-            <div className="text-2xl font-bold">
-              {formatCurrency(client.balance)}
-            </div>
-            <div className="space-y-1">
-              <Progress value={getBalancePercentage()} className="h-2" />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Limite: {formatCurrency(client.min_threshold)}</span>
-                <span>{getBalancePercentage().toFixed(0)}%</span>
+          ) : (
+            // === CONTA PÓS-PAGA ===
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Limite Mensal</span>
+                </div>
+                {getStatusBadge()}
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-xs text-muted-foreground">Limite</p>
+                  <p className="font-semibold">{formatCurrency(client.spend_cap || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Gasto</p>
+                  <p className="font-semibold text-orange-600">{formatCurrency(client.amount_spent || 0)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Disponível</p>
+                  <p className="font-semibold text-green-600">
+                    {formatCurrency((client.spend_cap || 0) - (client.amount_spent || 0))}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                <Progress value={getPostpaidPercentage()} className="h-2" />
+                <p className="text-xs text-muted-foreground text-right">
+                  {getPostpaidPercentage().toFixed(0)}% do limite consumido
+                </p>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Métricas automáticas */}
           <div className="grid grid-cols-2 gap-3 text-sm">
@@ -257,15 +342,20 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="min_threshold">Limite para Recarga ({client.currency})</Label>
-              <Input
-                id="min_threshold"
-                type="number"
-                value={editingClient.min_threshold}
-                onChange={(e) => setEditingClient({ ...editingClient, min_threshold: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
+            {isPrepaid && (
+              <div className="space-y-2">
+                <Label htmlFor="min_threshold">Saldo Mínimo para Alerta ({client.currency})</Label>
+                <Input
+                  id="min_threshold"
+                  type="number"
+                  value={editingClient.min_threshold}
+                  onChange={(e) => setEditingClient({ ...editingClient, min_threshold: parseFloat(e.target.value) || 0 })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Você será alertado quando o saldo estiver abaixo deste valor.
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="results">Classificação de Resultados</Label>
