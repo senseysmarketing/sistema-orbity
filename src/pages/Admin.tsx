@@ -128,6 +128,7 @@ export default function Admin() {
   const [salaries, setSalaries] = useState<Salary[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [previousMonthExpenses, setPreviousMonthExpenses] = useState<Expense[]>([]);
+  const [previousMonthSalaries, setPreviousMonthSalaries] = useState<Salary[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
@@ -223,6 +224,7 @@ export default function Admin() {
         fetchSalaries(), 
         fetchExpenseCategories(),
         fetchPreviousMonthExpenses(),
+        fetchPreviousMonthSalaries(),
         fetchEmployees()
       ]);
     } catch (error: any) {
@@ -372,6 +374,31 @@ export default function Admin() {
       return;
     }
     setPreviousMonthExpenses(data || []);
+  };
+
+  const fetchPreviousMonthSalaries = async () => {
+    if (!currentAgency) return;
+    
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    
+    const startDate = `${prevMonthStr}-01`;
+    const endDate = new Date(prevYear, prevMonth, 0).toISOString().split('T')[0];
+
+    const { data, error } = await supabase
+      .from('salaries')
+      .select('*')
+      .eq('agency_id', currentAgency.id)
+      .gte('due_date', startDate)
+      .lte('due_date', endDate);
+    
+    if (error) {
+      console.error('Error fetching previous month salaries:', error);
+      return;
+    }
+    setPreviousMonthSalaries(data || []);
   };
 
   // Removido: limpeza de duplicatas agora é feita por UNIQUE INDEX no banco
@@ -2547,6 +2574,14 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="expenses" className="space-y-6">
+          {/* Cards de Métricas Combinadas */}
+          <ExpenseMetricsCards 
+            expenses={expenses}
+            previousMonthExpenses={previousMonthExpenses}
+            salaries={salaries}
+            previousMonthSalaries={previousMonthSalaries}
+          />
+
           {/* Header com Título, Filtros e Botões */}
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <h2 className="text-2xl font-bold">
