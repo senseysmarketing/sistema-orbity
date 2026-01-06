@@ -243,12 +243,6 @@ export function ExpenseCard({
                       )}
                     </Badge>
                   )}
-                  {isGeneratedInstance && (
-                    <Badge variant="outline" className="text-xs gap-1 border-blue-400 text-blue-600 dark:text-blue-400">
-                      <CalendarCheck className="h-3 w-3" />
-                      Instância {new Date(item.due_date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
-                    </Badge>
-                  )}
                   {category && (
                     <Badge 
                       variant="outline"

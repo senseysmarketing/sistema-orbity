@@ -2449,7 +2449,7 @@ export default function Admin() {
                     <SelectItem value="salary">Salários</SelectItem>
                     <SelectItem value="avulsa">Avulsas</SelectItem>
                     <SelectItem value="recorrente">Recorrentes</SelectItem>
-                    <SelectItem value="recorrente_mestra">🔄 Rec. Mestras</SelectItem>
+                    <SelectItem value="recorrente_mestra">Rec. Mestras</SelectItem>
                     <SelectItem value="parcelada">Parceladas</SelectItem>
                   </SelectContent>
                 </Select>
