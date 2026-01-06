@@ -2931,42 +2931,63 @@ export type Database = {
       }
       selected_ad_accounts: {
         Row: {
+          active_campaigns_count: number | null
           ad_account_id: string
           ad_account_name: string
           agency_id: string
+          balance: number | null
+          cached_at: string | null
           connection_id: string
           created_at: string
           currency: string
           id: string
           is_active: boolean
+          last_7d_spend: number | null
+          last_campaign_update: string | null
           last_sync: string | null
+          min_threshold: number | null
           timezone: string | null
+          total_daily_budget: number | null
           updated_at: string
         }
         Insert: {
+          active_campaigns_count?: number | null
           ad_account_id: string
           ad_account_name: string
           agency_id: string
+          balance?: number | null
+          cached_at?: string | null
           connection_id: string
           created_at?: string
           currency?: string
           id?: string
           is_active?: boolean
+          last_7d_spend?: number | null
+          last_campaign_update?: string | null
           last_sync?: string | null
+          min_threshold?: number | null
           timezone?: string | null
+          total_daily_budget?: number | null
           updated_at?: string
         }
         Update: {
+          active_campaigns_count?: number | null
           ad_account_id?: string
           ad_account_name?: string
           agency_id?: string
+          balance?: number | null
+          cached_at?: string | null
           connection_id?: string
           created_at?: string
           currency?: string
           id?: string
           is_active?: boolean
+          last_7d_spend?: number | null
+          last_campaign_update?: string | null
           last_sync?: string | null
+          min_threshold?: number | null
           timezone?: string | null
+          total_daily_budget?: number | null
           updated_at?: string
         }
         Relationships: [
