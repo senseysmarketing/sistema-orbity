@@ -2935,6 +2935,7 @@ export type Database = {
           ad_account_id: string
           ad_account_name: string
           agency_id: string
+          amount_spent: number | null
           balance: number | null
           cached_at: string | null
           connection_id: string
@@ -2942,10 +2943,12 @@ export type Database = {
           currency: string
           id: string
           is_active: boolean
+          is_prepaid: boolean | null
           last_7d_spend: number | null
           last_campaign_update: string | null
           last_sync: string | null
           min_threshold: number | null
+          spend_cap: number | null
           timezone: string | null
           total_daily_budget: number | null
           updated_at: string
@@ -2955,6 +2958,7 @@ export type Database = {
           ad_account_id: string
           ad_account_name: string
           agency_id: string
+          amount_spent?: number | null
           balance?: number | null
           cached_at?: string | null
           connection_id: string
@@ -2962,10 +2966,12 @@ export type Database = {
           currency?: string
           id?: string
           is_active?: boolean
+          is_prepaid?: boolean | null
           last_7d_spend?: number | null
           last_campaign_update?: string | null
           last_sync?: string | null
           min_threshold?: number | null
+          spend_cap?: number | null
           timezone?: string | null
           total_daily_budget?: number | null
           updated_at?: string
@@ -2975,6 +2981,7 @@ export type Database = {
           ad_account_id?: string
           ad_account_name?: string
           agency_id?: string
+          amount_spent?: number | null
           balance?: number | null
           cached_at?: string | null
           connection_id?: string
@@ -2982,10 +2989,12 @@ export type Database = {
           currency?: string
           id?: string
           is_active?: boolean
+          is_prepaid?: boolean | null
           last_7d_spend?: number | null
           last_campaign_update?: string | null
           last_sync?: string | null
           min_threshold?: number | null
+          spend_cap?: number | null
           timezone?: string | null
           total_daily_budget?: number | null
           updated_at?: string

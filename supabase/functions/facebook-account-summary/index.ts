@@ -144,12 +144,18 @@ serve(async (req) => {
           balance = spendCap - amountSpent
         }
 
+        // Extrair spend_cap e amount_spent para contas pós-pagas
+        const spendCap = accountData.spend_cap ? parseFloat(accountData.spend_cap) / 100 : 0
+        const amountSpent = accountData.amount_spent ? parseFloat(accountData.amount_spent) / 100 : 0
+
         const summary = {
           ad_account_id: accountId,
           ad_account_name: accountData.name || accountId,
           currency: accountData.currency || 'BRL',
           balance: balance,
           is_prepaid: isPrepaid,
+          spend_cap: spendCap,
+          amount_spent: amountSpent,
           active_campaigns_count: activeCampaignsCount,
           total_daily_budget: totalDailyBudget,
           last_7d_spend: last7dSpend,
@@ -169,6 +175,9 @@ serve(async (req) => {
             total_daily_budget: totalDailyBudget,
             last_7d_spend: last7dSpend,
             balance: balance,
+            is_prepaid: isPrepaid,
+            spend_cap: spendCap,
+            amount_spent: amountSpent,
             cached_at: now.toISOString(),
             last_sync: now.toISOString()
           })
