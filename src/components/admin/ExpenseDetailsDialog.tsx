@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Info, History, TrendingUp, BarChart3, Calendar, DollarSign, Repeat } from "lucide-react";
+import { Edit, Trash2, Info, History, TrendingUp, BarChart3, Calendar, DollarSign, Repeat, Power, PowerOff } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { ExpenseHealthIndicator } from "./ExpenseHealthIndicator";
@@ -12,6 +12,7 @@ import { ExpenseAnalytics } from "./ExpenseAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 import { useAgency } from "@/hooks/useAgency";
+import { useToast } from "@/hooks/use-toast";
 
 interface Expense {
   id: string;
@@ -26,6 +27,8 @@ interface Expense {
   installment_current?: number;
   recurrence_day?: number;
   description?: string;
+  is_active?: boolean;
+  parent_expense_id?: string | null;
 }
 
 interface ExpenseCategory {
@@ -41,6 +44,7 @@ interface ExpenseDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   onEdit: (expense: Expense) => void;
   onDelete: (expense: Expense) => void;
+  onRefresh?: () => void;
 }
 
 export function ExpenseDetailsDialog({
@@ -49,11 +53,23 @@ export function ExpenseDetailsDialog({
   onOpenChange,
   onEdit,
   onDelete,
+  onRefresh,
 }: ExpenseDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [relatedExpenses, setRelatedExpenses] = useState<Expense[]>([]);
   const [category, setCategory] = useState<ExpenseCategory | null>(null);
   const { currentAgency } = useAgency();
+  const { toast } = useToast();
+  const [isActive, setIsActive] = useState(expense?.is_active !== false);
+
+  // Verificar se é uma despesa mestra recorrente
+  const isMasterRecurring = expense?.expense_type === 'recorrente' && !expense?.parent_expense_id;
+
+  useEffect(() => {
+    if (expense) {
+      setIsActive(expense.is_active !== false);
+    }
+  }, [expense]);
 
   useEffect(() => {
     if (expense && open) {
@@ -92,6 +108,37 @@ export function ExpenseDetailsDialog({
     if (data) {
       setRelatedExpenses(data);
     }
+  };
+
+  const toggleRecurringStatus = async () => {
+    if (!expense) return;
+
+    const newStatus = !isActive;
+    
+    const { error } = await supabase
+      .from('expenses')
+      .update({ is_active: newStatus })
+      .eq('id', expense.id);
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status da recorrência.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsActive(newStatus);
+    
+    toast({
+      title: newStatus ? "Recorrência ativada" : "Recorrência encerrada",
+      description: newStatus 
+        ? "A despesa voltará a ser gerada automaticamente todo mês."
+        : "A despesa não será mais gerada automaticamente.",
+    });
+
+    onRefresh?.();
   };
 
   if (!expense) return null;
@@ -285,6 +332,53 @@ export function ExpenseDetailsDialog({
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Status de recorrência para despesas mestras */}
+              {isMasterRecurring && (
+                <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Repeat className="h-4 w-4" />
+                    Recorrência Automática
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm">
+                        {isActive 
+                          ? "Esta despesa é gerada automaticamente todo mês."
+                          : "A recorrência está encerrada. Não serão geradas novas instâncias."
+                        }
+                      </p>
+                    </div>
+                    <Button
+                      variant={isActive ? "outline" : "default"}
+                      size="sm"
+                      onClick={toggleRecurringStatus}
+                      className="gap-2"
+                    >
+                      {isActive ? (
+                        <>
+                          <PowerOff className="h-4 w-4" />
+                          Encerrar
+                        </>
+                      ) : (
+                        <>
+                          <Power className="h-4 w-4" />
+                          Reativar
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <Badge 
+                    variant={isActive ? "default" : "secondary"}
+                    className={isActive 
+                      ? "bg-emerald-600 text-white" 
+                      : "bg-muted text-muted-foreground"
+                    }
+                  >
+                    {isActive ? "Ativa" : "Encerrada"}
+                  </Badge>
                 </div>
               )}
 

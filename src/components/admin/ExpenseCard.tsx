@@ -1,14 +1,15 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Calendar, DollarSign, MoreHorizontal, Edit, Eye, Trash2, CheckCircle, Clock, AlertTriangle, Repeat, Wallet, Receipt } from "lucide-react";
+import { Calendar, DollarSign, MoreHorizontal, Edit, Eye, Trash2, CheckCircle, Clock, AlertTriangle, Repeat, Wallet, Receipt, Power, PowerOff } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
 
 interface Expense {
   id: string;
@@ -24,6 +25,8 @@ interface Expense {
   installment_current?: number;
   recurrence_day?: number;
   description?: string;
+  is_active?: boolean;
+  parent_expense_id?: string | null;
 }
 
 interface Salary {
@@ -43,6 +46,7 @@ interface ExpenseCardProps {
   onEdit: (item: any) => void;
   onDelete: (item: any) => void;
   onUpdateStatus: (id: string, status: 'pending' | 'paid' | 'overdue') => void;
+  onRefresh?: () => void;
 }
 
 export function ExpenseCard({
@@ -51,9 +55,50 @@ export function ExpenseCard({
   onEdit,
   onDelete,
   onUpdateStatus,
+  onRefresh,
 }: ExpenseCardProps) {
   const [category, setCategory] = useState<any>(null);
   const { currentAgency } = useAgency();
+  const { toast } = useToast();
+
+  // Verificar se é uma despesa mestra recorrente (sem parent_expense_id)
+  const isMasterRecurring = item.type === 'expense' && 
+    'expense_type' in item && 
+    item.expense_type === 'recorrente' && 
+    !('parent_expense_id' in item && item.parent_expense_id);
+
+  const isActiveRecurring = isMasterRecurring && 
+    ('is_active' in item ? item.is_active !== false : true);
+
+  const toggleRecurringStatus = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (item.type !== 'expense') return;
+
+    const newStatus = !isActiveRecurring;
+    
+    const { error } = await supabase
+      .from('expenses')
+      .update({ is_active: newStatus })
+      .eq('id', item.id);
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status da recorrência.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: newStatus ? "Recorrência ativada" : "Recorrência encerrada",
+      description: newStatus 
+        ? "A despesa voltará a ser gerada automaticamente todo mês."
+        : "A despesa não será mais gerada automaticamente.",
+    });
+
+    onRefresh?.();
+  };
 
   useEffect(() => {
     if (item.type === 'expense' && 'category' in item && item.category && currentAgency) {
@@ -170,6 +215,27 @@ export function ExpenseCard({
                       {getTypeLabel()}
                     </Badge>
                   )}
+                  {isMasterRecurring && (
+                    <Badge 
+                      variant={isActiveRecurring ? "default" : "outline"}
+                      className={isActiveRecurring 
+                        ? "bg-emerald-600 text-white hover:bg-emerald-700" 
+                        : "text-muted-foreground border-muted-foreground/50"
+                      }
+                    >
+                      {isActiveRecurring ? (
+                        <>
+                          <Power className="h-3 w-3 mr-1" />
+                          Ativa
+                        </>
+                      ) : (
+                        <>
+                          <PowerOff className="h-3 w-3 mr-1" />
+                          Encerrada
+                        </>
+                      )}
+                    </Badge>
+                  )}
                   {category && (
                     <Badge 
                       variant="outline"
@@ -223,6 +289,25 @@ export function ExpenseCard({
                   <AlertTriangle className="mr-2 h-4 w-4" />
                   Marcar como Atrasado
                 </DropdownMenuItem>
+                {isMasterRecurring && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={toggleRecurringStatus}>
+                      {isActiveRecurring ? (
+                        <>
+                          <PowerOff className="mr-2 h-4 w-4" />
+                          Encerrar Recorrência
+                        </>
+                      ) : (
+                        <>
+                          <Power className="mr-2 h-4 w-4" />
+                          Reativar Recorrência
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   onClick={(e) => { e.stopPropagation(); onDelete(item); }}
                   className="text-destructive focus:text-destructive"
@@ -297,7 +382,12 @@ export function ExpenseCard({
           {item.type === 'expense' && 'expense_type' in item && item.expense_type === 'recorrente' && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Repeat className="h-3 w-3" />
-              <span>Despesa recorrente mensal</span>
+              <span>
+                {isMasterRecurring 
+                  ? (isActiveRecurring ? 'Despesa recorrente mensal (ativa)' : 'Recorrência encerrada - não será mais gerada')
+                  : 'Instância de despesa recorrente'
+                }
+              </span>
             </div>
           )}
         </div>
