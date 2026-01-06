@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Calendar, DollarSign, MoreHorizontal, Edit, Eye, Trash2, CheckCircle, Clock, AlertTriangle, Repeat, Wallet, Receipt, Power, PowerOff } from "lucide-react";
+import { Calendar, DollarSign, MoreHorizontal, Edit, Eye, Trash2, CheckCircle, Clock, AlertTriangle, Repeat, Wallet, Receipt, Power, PowerOff, Link, CalendarCheck } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
@@ -47,6 +47,7 @@ interface ExpenseCardProps {
   onDelete: (item: any) => void;
   onUpdateStatus: (id: string, status: 'pending' | 'paid' | 'overdue') => void;
   onRefresh?: () => void;
+  onViewMaster?: (masterId: string) => void;
 }
 
 export function ExpenseCard({
@@ -56,6 +57,7 @@ export function ExpenseCard({
   onDelete,
   onUpdateStatus,
   onRefresh,
+  onViewMaster,
 }: ExpenseCardProps) {
   const [category, setCategory] = useState<any>(null);
   const { currentAgency } = useAgency();
@@ -66,6 +68,11 @@ export function ExpenseCard({
     'expense_type' in item && 
     item.expense_type === 'recorrente' && 
     !('parent_expense_id' in item && item.parent_expense_id);
+
+  // Verificar se é uma instância gerada de despesa recorrente
+  const isGeneratedInstance = item.type === 'expense' && 
+    'parent_expense_id' in item && 
+    item.parent_expense_id;
 
   const isActiveRecurring = isMasterRecurring && 
     ('is_active' in item ? item.is_active !== false : true);
@@ -236,6 +243,12 @@ export function ExpenseCard({
                       )}
                     </Badge>
                   )}
+                  {isGeneratedInstance && (
+                    <Badge variant="outline" className="text-xs gap-1 border-blue-400 text-blue-600 dark:text-blue-400">
+                      <CalendarCheck className="h-3 w-3" />
+                      Instância {new Date(item.due_date).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
+                    </Badge>
+                  )}
                   {category && (
                     <Badge 
                       variant="outline"
@@ -380,14 +393,30 @@ export function ExpenseCard({
 
           {/* Informação de despesa recorrente */}
           {item.type === 'expense' && 'expense_type' in item && item.expense_type === 'recorrente' && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Repeat className="h-3 w-3" />
-              <span>
-                {isMasterRecurring 
-                  ? (isActiveRecurring ? 'Despesa recorrente mensal (ativa)' : 'Recorrência encerrada - não será mais gerada')
-                  : 'Instância de despesa recorrente'
-                }
-              </span>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Repeat className="h-3 w-3" />
+                <span>
+                  {isMasterRecurring 
+                    ? (isActiveRecurring ? 'Despesa recorrente mensal (ativa)' : 'Recorrência encerrada - não será mais gerada')
+                    : 'Instância de despesa recorrente'
+                  }
+                </span>
+              </div>
+              {isGeneratedInstance && onViewMaster && (
+                <Button 
+                  variant="link" 
+                  size="sm"
+                  className="h-auto p-0 text-xs text-blue-600 dark:text-blue-400"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewMaster(item.parent_expense_id!);
+                  }}
+                >
+                  <Link className="h-3 w-3 mr-1" />
+                  Ver despesa mestra original
+                </Button>
+              )}
             </div>
           )}
         </div>
