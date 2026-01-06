@@ -1295,6 +1295,7 @@ export type Database = {
           id: string
           installment_current: number | null
           installment_total: number | null
+          is_active: boolean | null
           is_fixed: boolean
           name: string
           notification_sent_at: string | null
@@ -1315,6 +1316,7 @@ export type Database = {
           id?: string
           installment_current?: number | null
           installment_total?: number | null
+          is_active?: boolean | null
           is_fixed?: boolean
           name: string
           notification_sent_at?: string | null
@@ -1335,6 +1337,7 @@ export type Database = {
           id?: string
           installment_current?: number | null
           installment_total?: number | null
+          is_active?: boolean | null
           is_fixed?: boolean
           name?: string
           notification_sent_at?: string | null

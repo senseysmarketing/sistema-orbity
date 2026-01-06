@@ -123,24 +123,25 @@ async function processAgencyClosure(supabase: any, agencyId: string): Promise<Mo
   }
 
   // 2. GERAR DESPESAS RECORRENTES
+  // Buscar APENAS despesas mestras ATIVAS (sem parent_expense_id e is_active = true)
   const { data: recurringExpenses } = await supabase
     .from('expenses')
     .select('*')
     .eq('agency_id', agencyId)
     .eq('expense_type', 'recorrente')
-    .is('parent_expense_id', null);
+    .eq('is_active', true)  // Apenas despesas ativas
+    .is('parent_expense_id', null);  // Apenas mestras
 
   for (const expense of recurringExpenses || []) {
     const dueDay = expense.recurrence_day || new Date(expense.due_date).getDate();
     const dueDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), dueDay);
 
-    // Verificar se já existe despesa recorrente para este mês
+    // Verificar se já existe despesa gerada para este mês usando parent_expense_id
     const { data: existingExpense } = await supabase
       .from('expenses')
       .select('id')
-      .eq('name', expense.name)
+      .eq('parent_expense_id', expense.id)  // Vinculado à mestra pelo ID
       .eq('agency_id', agencyId)
-      .eq('expense_type', 'recorrente')
       .gte('due_date', currentMonth.toISOString().split('T')[0])
       .lt('due_date', new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1).toISOString().split('T')[0])
       .single();
@@ -156,6 +157,8 @@ async function processAgencyClosure(supabase: any, agencyId: string): Promise<Mo
         category: expense.category,
         description: expense.description,
         recurrence_day: dueDay,
+        parent_expense_id: expense.id,  // Vincular à despesa mestra
+        is_active: false,  // Instâncias geradas não são mestras
       });
       stats.recurringExpensesGenerated++;
     }

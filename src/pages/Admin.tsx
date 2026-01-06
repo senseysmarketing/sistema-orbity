@@ -2466,6 +2466,7 @@ export default function Admin() {
                 onEdit={item.type === 'expense' ? handleEditExpense : handleEditSalary}
                 onDelete={item.type === 'expense' ? handleDeleteExpense : handleDeleteSalary}
                 onUpdateStatus={item.type === 'expense' ? handleUpdateExpenseStatus : handleUpdateSalaryStatus}
+                onRefresh={fetchExpenses}
               />
             ))}
           </div>
@@ -2477,6 +2478,7 @@ export default function Admin() {
             onOpenChange={setExpenseDetailsOpen}
             onEdit={handleEditExpense}
             onDelete={handleDeleteExpense}
+            onRefresh={fetchExpenses}
           />
         </TabsContent>
 
