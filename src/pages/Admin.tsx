@@ -65,6 +65,8 @@ interface Expense {
   installment_current?: number;
   recurrence_day?: number;
   description?: string;
+  is_active?: boolean;
+  parent_expense_id?: string | null;
 }
 interface Salary {
   id: string;
@@ -663,6 +665,30 @@ export default function Admin() {
     setSelectedExpense(expense);
     setExpenseDetailsOpen(true);
   };
+  
+  // Função para visualizar despesa mestra a partir de uma instância
+  const handleViewMasterExpense = async (masterId: string) => {
+    if (!currentAgency) return;
+    
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('id', masterId)
+      .eq('agency_id', currentAgency.id)
+      .single();
+    
+    if (error || !data) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível encontrar a despesa mestra.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSelectedExpense(data);
+    setExpenseDetailsOpen(true);
+  };
   const handleDeleteExpense = (expense: Expense) => {
     setExpenseToDelete(expense);
     setExpenseDeleteDialogOpen(true);
@@ -870,6 +896,12 @@ export default function Admin() {
       if (expenseTypeFilter !== 'all') {
         if (expenseTypeFilter === 'salary') {
           matchesType = item.type === 'salary';
+        } else if (expenseTypeFilter === 'recorrente_mestra') {
+          // Filtro especial para despesas mestras recorrentes (sem parent_expense_id)
+          matchesType = item.type === 'expense' && 
+            'expense_type' in item && 
+            item.expense_type === 'recorrente' && 
+            !('parent_expense_id' in item && item.parent_expense_id);
         } else if (item.type === 'expense' && 'expense_type' in item) {
           matchesType = item.expense_type === expenseTypeFilter;
         } else {
@@ -2409,7 +2441,7 @@ export default function Admin() {
                 </Select>
 
                 <Select value={expenseTypeFilter} onValueChange={setExpenseTypeFilter}>
-                  <SelectTrigger className="w-[140px]">
+                  <SelectTrigger className="w-[160px]">
                     <SelectValue placeholder="Tipo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2417,6 +2449,7 @@ export default function Admin() {
                     <SelectItem value="salary">Salários</SelectItem>
                     <SelectItem value="avulsa">Avulsas</SelectItem>
                     <SelectItem value="recorrente">Recorrentes</SelectItem>
+                    <SelectItem value="recorrente_mestra">🔄 Rec. Mestras</SelectItem>
                     <SelectItem value="parcelada">Parceladas</SelectItem>
                   </SelectContent>
                 </Select>
@@ -2467,6 +2500,7 @@ export default function Admin() {
                 onDelete={item.type === 'expense' ? handleDeleteExpense : handleDeleteSalary}
                 onUpdateStatus={item.type === 'expense' ? handleUpdateExpenseStatus : handleUpdateSalaryStatus}
                 onRefresh={fetchExpenses}
+                onViewMaster={handleViewMasterExpense}
               />
             ))}
           </div>
@@ -2479,6 +2513,7 @@ export default function Admin() {
             onEdit={handleEditExpense}
             onDelete={handleDeleteExpense}
             onRefresh={fetchExpenses}
+            onViewMaster={handleViewMasterExpense}
           />
         </TabsContent>
 

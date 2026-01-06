@@ -2,7 +2,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Info, History, TrendingUp, BarChart3, Calendar, DollarSign, Repeat, Power, PowerOff } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Edit, Trash2, Info, History, TrendingUp, BarChart3, Calendar, DollarSign, Repeat, Power, PowerOff, Link, AlertCircle } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { ExpenseHealthIndicator } from "./ExpenseHealthIndicator";
@@ -45,6 +46,7 @@ interface ExpenseDetailsDialogProps {
   onEdit: (expense: Expense) => void;
   onDelete: (expense: Expense) => void;
   onRefresh?: () => void;
+  onViewMaster?: (masterId: string) => void;
 }
 
 export function ExpenseDetailsDialog({
@@ -54,6 +56,7 @@ export function ExpenseDetailsDialog({
   onEdit,
   onDelete,
   onRefresh,
+  onViewMaster,
 }: ExpenseDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [relatedExpenses, setRelatedExpenses] = useState<Expense[]>([]);
@@ -64,6 +67,9 @@ export function ExpenseDetailsDialog({
 
   // Verificar se é uma despesa mestra recorrente
   const isMasterRecurring = expense?.expense_type === 'recorrente' && !expense?.parent_expense_id;
+  
+  // Verificar se é uma instância gerada
+  const isGeneratedInstance = expense?.expense_type === 'recorrente' && !!expense?.parent_expense_id;
 
   useEffect(() => {
     if (expense) {
@@ -239,6 +245,34 @@ export function ExpenseDetailsDialog({
             </TabsList>
 
             <TabsContent value="info" className="space-y-4 mt-4">
+              {/* Alerta para instâncias geradas */}
+              {isGeneratedInstance && (
+                <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-900">
+                  <AlertCircle className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800 dark:text-blue-300">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-sm">
+                        Esta é uma instância mensal de uma despesa recorrente. Para encerrar ou reativar a geração automática, acesse a despesa mestra.
+                      </span>
+                      {onViewMaster && expense?.parent_expense_id && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="shrink-0 border-blue-400 text-blue-700 hover:bg-blue-100 dark:text-blue-300 dark:hover:bg-blue-900"
+                          onClick={() => {
+                            onOpenChange(false);
+                            onViewMaster(expense.parent_expense_id!);
+                          }}
+                        >
+                          <Link className="h-3 w-3 mr-1" />
+                          Ver Mestra
+                        </Button>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Indicador de Saúde */}
               <ExpenseHealthIndicator
                 latePaymentsLast6Months={latePaymentsLast6Months}
