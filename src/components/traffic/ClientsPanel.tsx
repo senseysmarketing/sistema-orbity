@@ -45,10 +45,20 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
   useEffect(() => {
     if (selectedAdAccounts.length > 0 && currentAgency) {
       loadClientsFromCache();
-    } else if (selectedAdAccounts.length === 0) {
-      setInitialLoading(false);
     }
+    // Não desligar loading aqui - esperar os dados chegarem
   }, [selectedAdAccounts, currentAgency]);
+
+  // Fallback: se após 3 segundos não houver contas, desligar o loading
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (initialLoading && selectedAdAccounts.length === 0) {
+        setInitialLoading(false);
+      }
+    }, 3000);
+    
+    return () => clearTimeout(timeout);
+  }, [initialLoading, selectedAdAccounts.length]);
 
   const loadClientsFromCache = async () => {
     if (!currentAgency) return;
