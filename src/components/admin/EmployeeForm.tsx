@@ -82,6 +82,20 @@ export function EmployeeForm({ open, onOpenChange, onSuccess, employee }: Employ
           .update(data)
           .eq('id', employee.id);
         if (error) throw error;
+
+        // Atualizar salários pendentes/atrasados com o novo valor e nome
+        const { error: salaryError } = await supabase
+          .from('salaries')
+          .update({ 
+            amount: parseFloat(formData.base_salary),
+            employee_name: formData.name
+          })
+          .eq('employee_id', employee.id)
+          .in('status', ['pending', 'overdue']);
+
+        if (salaryError) {
+          console.error('Erro ao atualizar salários pendentes:', salaryError);
+        }
       } else {
         const { error } = await supabase
           .from('employees')
