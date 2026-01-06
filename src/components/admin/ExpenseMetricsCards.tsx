@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { DollarSign, CheckCircle, Clock, AlertTriangle, TrendingUp, TrendingDown, Target } from "lucide-react";
+import { DollarSign, CheckCircle, Clock, AlertTriangle, TrendingUp, TrendingDown, Target, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface Expense {
@@ -10,71 +10,119 @@ interface Expense {
   due_date: string;
 }
 
+interface Salary {
+  id: string;
+  amount: number;
+  status: 'pending' | 'paid' | 'overdue';
+  paid_date: string | null;
+  due_date: string;
+}
+
 interface ExpenseMetricsCardsProps {
   expenses: Expense[];
   previousMonthExpenses: Expense[];
+  salaries?: Salary[];
+  previousMonthSalaries?: Salary[];
 }
 
-export function ExpenseMetricsCards({ expenses, previousMonthExpenses }: ExpenseMetricsCardsProps) {
-  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+export function ExpenseMetricsCards({ 
+  expenses, 
+  previousMonthExpenses, 
+  salaries = [], 
+  previousMonthSalaries = [] 
+}: ExpenseMetricsCardsProps) {
+  // Combina despesas e salários para cálculos totais
+  const allCosts = [...expenses, ...salaries];
+  const allPreviousCosts = [...previousMonthExpenses, ...previousMonthSalaries];
+
+  // Totais de despesas
+  const totalExpensesAmount = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+  const totalSalariesAmount = salaries.reduce((sum, sal) => sum + sal.amount, 0);
+  const totalCosts = totalExpensesAmount + totalSalariesAmount;
+
+  // Pagos
   const paidExpenses = expenses.filter(exp => exp.status === 'paid');
-  const totalPaid = paidExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+  const paidSalaries = salaries.filter(sal => sal.status === 'paid');
+  const totalPaid = paidExpenses.reduce((sum, exp) => sum + exp.amount, 0) + 
+                    paidSalaries.reduce((sum, sal) => sum + sal.amount, 0);
+
+  // Pendentes
   const pendingExpenses = expenses.filter(exp => exp.status === 'pending');
-  const totalPending = pendingExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+  const pendingSalaries = salaries.filter(sal => sal.status === 'pending');
+  const totalPending = pendingExpenses.reduce((sum, exp) => sum + exp.amount, 0) + 
+                       pendingSalaries.reduce((sum, sal) => sum + sal.amount, 0);
+
+  // Atrasados
   const overdueExpenses = expenses.filter(exp => exp.status === 'overdue');
-  const totalOverdue = overdueExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+  const overdueSalaries = salaries.filter(sal => sal.status === 'overdue');
+  const totalOverdue = overdueExpenses.reduce((sum, exp) => sum + exp.amount, 0) + 
+                       overdueSalaries.reduce((sum, sal) => sum + sal.amount, 0);
 
   // Comparativo com mês anterior
-  const previousTotal = previousMonthExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-  const variation = previousTotal > 0 ? ((totalExpenses - previousTotal) / previousTotal) * 100 : 0;
+  const previousTotal = allPreviousCosts.reduce((sum, cost) => sum + cost.amount, 0);
+  const variation = previousTotal > 0 ? ((totalCosts - previousTotal) / previousTotal) * 100 : 0;
 
-  // Taxa de adimplência (despesas pagas no prazo)
-  const paidOnTime = paidExpenses.filter(exp => {
+  // Taxa de adimplência (despesas + salários pagos no prazo)
+  const paidOnTimeExpenses = paidExpenses.filter(exp => {
     if (!exp.paid_date) return false;
     const paidDate = new Date(exp.paid_date);
     const dueDate = new Date(exp.due_date);
     return paidDate <= dueDate;
   }).length;
   
-  const complianceRate = expenses.length > 0 ? (paidOnTime / expenses.length) * 100 : 0;
+  const paidOnTimeSalaries = paidSalaries.filter(sal => {
+    if (!sal.paid_date) return false;
+    const paidDate = new Date(sal.paid_date);
+    const dueDate = new Date(sal.due_date);
+    return paidDate <= dueDate;
+  }).length;
+  
+  const totalItems = allCosts.length;
+  const paidOnTimeTotal = paidOnTimeExpenses + paidOnTimeSalaries;
+  const complianceRate = totalItems > 0 ? (paidOnTimeTotal / totalItems) * 100 : 0;
+
+  const paidCount = paidExpenses.length + paidSalaries.length;
+  const pendingCount = pendingExpenses.length + pendingSalaries.length;
+  const overdueCount = overdueExpenses.length + overdueSalaries.length;
 
   const metrics = [
     {
       title: "Total do Mês",
-      value: totalExpenses,
+      value: totalCosts,
       icon: DollarSign,
       bgColor: "bg-blue-50 dark:bg-blue-950/20",
       iconColor: "text-blue-600 dark:text-blue-400",
       borderColor: "border-blue-200 dark:border-blue-900",
       trend: variation,
+      subtitle: salaries.length > 0 ? `Despesas: R$ ${totalExpensesAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Salários: R$ ${totalSalariesAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : undefined,
     },
     {
-      title: "Despesas Pagas",
+      title: "Custos Pagos",
       value: totalPaid,
-      count: paidExpenses.length,
+      count: paidCount,
       icon: CheckCircle,
       bgColor: "bg-green-50 dark:bg-green-950/20",
       iconColor: "text-green-600 dark:text-green-400",
       borderColor: "border-green-200 dark:border-green-900",
     },
     {
-      title: "Despesas Pendentes",
+      title: "Custos Pendentes",
       value: totalPending,
-      count: pendingExpenses.length,
+      count: pendingCount,
       icon: Clock,
       bgColor: "bg-yellow-50 dark:bg-yellow-950/20",
       iconColor: "text-yellow-600 dark:text-yellow-400",
       borderColor: "border-yellow-200 dark:border-yellow-900",
     },
     {
-      title: "Despesas Atrasadas",
+      title: "Custos Atrasados",
       value: totalOverdue,
-      count: overdueExpenses.length,
+      count: overdueCount,
       icon: AlertTriangle,
       bgColor: "bg-red-50 dark:bg-red-950/20",
       iconColor: "text-red-600 dark:text-red-400",
       borderColor: "border-red-200 dark:border-red-900",
-      alert: overdueExpenses.length > 0,
+      alert: overdueCount > 0,
     },
     {
       title: "Taxa de Adimplência",
@@ -123,7 +171,13 @@ export function ExpenseMetricsCards({ expenses, previousMonthExpenses }: Expense
                 
                 {metric.count !== undefined && (
                   <p className="text-xs text-muted-foreground">
-                    {metric.count} {metric.count === 1 ? 'despesa' : 'despesas'}
+                    {metric.count} {metric.count === 1 ? 'item' : 'itens'}
+                  </p>
+                )}
+
+                {metric.subtitle && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {metric.subtitle}
                   </p>
                 )}
 
