@@ -36,6 +36,7 @@ interface ClientsPanelProps {
 export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: ClientsPanelProps) {
   const [clients, setClients] = useState<ClientData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const { toast } = useToast();
   const { currentAgency } = useAgency();
@@ -44,11 +45,16 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
   useEffect(() => {
     if (selectedAdAccounts.length > 0) {
       loadClientsFromCache();
+    } else {
+      setInitialLoading(false);
     }
   }, [selectedAdAccounts]);
 
   const loadClientsFromCache = async () => {
-    if (!currentAgency) return;
+    if (!currentAgency) {
+      setInitialLoading(false);
+      return;
+    }
 
     try {
       // Buscar dados do banco com os campos de cache
@@ -103,6 +109,8 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
       }
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
+    } finally {
+      setInitialLoading(false);
     }
   };
 
@@ -302,6 +310,17 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
       return days > 7;
     }).length,
   };
+
+  if (initialLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center space-y-4">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+          <p className="text-muted-foreground">Carregando dados dos clientes...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
