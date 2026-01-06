@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AlertCircle, Facebook, Plus, Play, Settings, BarChart, FileText, DollarSign, Activity, ExternalLink, Eye, LogOut } from "lucide-react";
+import { AlertCircle, Facebook, Plus, Settings, BarChart, Activity, LogOut, Users, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,14 +11,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
-import { useSubscription } from "@/hooks/useSubscription";
-import { TrafficDashboard } from "@/components/traffic/TrafficDashboard";
-import { CampaignsTab } from "@/components/traffic/CampaignsTab";
-import { ReportsTab } from "@/components/traffic/ReportsTab";
-import { BalanceCheckerTab } from "@/components/traffic/BalanceCheckerTab";
 import { FacebookConnectionDialog } from "@/components/traffic/FacebookConnectionDialog";
 import { AdAccountsManager } from "@/components/traffic/AdAccountsManager";
-import { OverviewTab } from "@/components/traffic/OverviewTab";
+import { ClientsPanel } from "@/components/traffic/ClientsPanel";
+import { CampaignsAndReports } from "@/components/traffic/CampaignsAndReports";
 
 interface FacebookConnection {
   id: string;
@@ -44,16 +40,13 @@ export default function Traffic() {
   const [isManageAccountsOpen, setIsManageAccountsOpen] = useState(false);
   const [isDisconnectDialogOpen, setIsDisconnectDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
-    // Restaurar aba ativa do localStorage
-    return localStorage.getItem('traffic-active-tab') || 'dashboard';
+    return localStorage.getItem('traffic-active-tab') || 'clients';
   });
   
   const { profile } = useAuth();
   const { currentAgency } = useAgency();
   const { toast } = useToast();
-  const { currentSubscription } = useSubscription();
 
-  // Verifica se o usuário tem permissão para acessar a página
   const hasAccess = profile?.role === 'agency_user' || profile?.role === 'agency_admin';
 
   useEffect(() => {
@@ -65,7 +58,6 @@ export default function Traffic() {
     }
   }, [hasAccess, currentAgency?.id]);
 
-  // Salvar aba ativa no localStorage quando mudar
   useEffect(() => {
     localStorage.setItem('traffic-active-tab', activeTab);
   }, [activeTab]);
@@ -114,7 +106,7 @@ export default function Traffic() {
     setIsConnectionDialogOpen(false);
     toast({
       title: "Conexão estabelecida!",
-      description: "Facebook conectado com sucesso. Agora selecione suas contas de anúncios.",
+      description: "Facebook conectado com sucesso.",
     });
   };
 
@@ -122,38 +114,31 @@ export default function Traffic() {
     if (!currentAgency) return;
     
     try {
-      // Desativar todas as conexões do Facebook da agência
-      const { error: connectionError } = await supabase
+      await supabase
         .from('facebook_connections')
         .update({ is_active: false })
         .eq('agency_id', currentAgency.id)
         .eq('is_active', true);
 
-      if (connectionError) throw connectionError;
-
-      // Desativar todas as contas de anúncios selecionadas
-      const { error: accountsError } = await supabase
+      await supabase
         .from('selected_ad_accounts')
         .update({ is_active: false })
         .eq('agency_id', currentAgency.id)
         .eq('is_active', true);
 
-      if (accountsError) throw accountsError;
-
-      // Atualizar estados locais
       setFacebookConnections([]);
       setSelectedAdAccounts([]);
       setIsDisconnectDialogOpen(false);
 
       toast({
         title: "Desconectado com sucesso!",
-        description: "Sua conta do Facebook foi desconectada. Você pode reconectar a qualquer momento.",
+        description: "Sua conta do Facebook foi desconectada.",
       });
     } catch (error: any) {
-      console.error('Erro ao desconectar Facebook:', error);
+      console.error('Erro ao desconectar:', error);
       toast({
         title: "Erro ao desconectar",
-        description: "Não foi possível desconectar sua conta do Facebook. Tente novamente.",
+        description: "Tente novamente.",
         variant: "destructive",
       });
     }
@@ -167,7 +152,7 @@ export default function Traffic() {
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">Acesso Restrito</h3>
             <p className="text-muted-foreground text-center">
-              Esta página é acessível para todos os usuários da agência.
+              Esta página é acessível para usuários da agência.
             </p>
           </CardContent>
         </Card>
@@ -183,14 +168,13 @@ export default function Traffic() {
     );
   }
 
-  // Se não há conexões, mostrar tela de conexão
   if (facebookConnections.length === 0) {
     return (
       <div className="space-y-6">
         <div className="text-center py-12">
           <h1 className="text-3xl font-bold tracking-tight mb-4">Controle de Tráfego</h1>
           <p className="text-muted-foreground mb-8">
-            Conecte suas contas de anúncios para começar a monitorar e otimizar suas campanhas
+            Conecte suas contas de anúncios para monitorar suas campanhas
           </p>
           
           <div className="max-w-2xl mx-auto">
@@ -198,9 +182,9 @@ export default function Traffic() {
               <Card className="border-2 border-dashed">
                 <CardHeader className="text-center">
                   <Facebook className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-                  <CardTitle className="text-xl">Meta Ads (Facebook/Instagram)</CardTitle>
+                  <CardTitle>Meta Ads</CardTitle>
                   <CardDescription>
-                    Conecte suas contas de anúncios do Facebook e Instagram para monitoramento automático
+                    Conecte Facebook e Instagram Ads
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="text-center">
@@ -221,13 +205,9 @@ export default function Traffic() {
 
               <Card className="border-2 border-dashed opacity-60">
                 <CardHeader className="text-center">
-                  <div className="h-12 w-12 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
-                    <Activity className="h-6 w-6 text-gray-500" />
-                  </div>
-                  <CardTitle className="text-xl">Google Ads</CardTitle>
-                  <CardDescription>
-                    Integração com Google Ads em breve
-                  </CardDescription>
+                  <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <CardTitle>Google Ads</CardTitle>
+                  <CardDescription>Em breve</CardDescription>
                 </CardHeader>
                 <CardContent className="text-center">
                   <Button disabled size="lg" className="w-full">
@@ -237,90 +217,26 @@ export default function Traffic() {
                 </CardContent>
               </Card>
             </div>
-            
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-              <strong>Nota:</strong> Você poderá conectar até 10 contas de anúncios 
-              de acordo com seu plano atual.
-              </AlertDescription>
-            </Alert>
           </div>
         </div>
       </div>
     );
   }
 
-  // Se não há contas selecionadas E não há conexões, mostrar gerenciador
-  // (ou seja, só mostrar se o usuário acabou de conectar o Facebook)
-  if (selectedAdAccounts.length === 0 && facebookConnections.length > 0) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Controle de Tráfego</h1>
-            <p className="text-muted-foreground">
-              Selecione as contas de anúncios que deseja monitorar
-            </p>
-          </div>
-        </div>
-
-        <AdAccountsManager
-          onAccountsSelected={fetchSelectedAdAccounts}
-        />
-      </div>
-    );
-  }
-
-  // Se tem conexões mas não tem contas selecionadas, mostrar dashboard vazio
   if (selectedAdAccounts.length === 0) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Controle de Tráfego</h1>
-            <p className="text-muted-foreground">
-              Nenhuma conta de anúncios selecionada
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Dialog open={isManageAccountsOpen} onOpenChange={setIsManageAccountsOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Adicionar Contas
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                  <DialogTitle>Gerenciar Contas de Anúncios</DialogTitle>
-                  <DialogDescription>
-                    Adicione, remova ou configure suas contas de anúncios conectadas
-                  </DialogDescription>
-                </DialogHeader>
-                <AdAccountsManager
-                  onAccountsSelected={() => {
-                    fetchSelectedAdAccounts();
-                    setIsManageAccountsOpen(false);
-                  }}
-                />
-              </DialogContent>
-            </Dialog>
+            <p className="text-muted-foreground">Selecione as contas de anúncios</p>
           </div>
         </div>
-
-        <div className="text-center py-12">
-          <BarChart className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Nenhuma conta selecionada</h3>
-          <p className="text-muted-foreground mb-4">
-            Adicione contas de anúncios para começar a monitorar suas campanhas
-          </p>
-        </div>
+        <AdAccountsManager onAccountsSelected={fetchSelectedAdAccounts} />
       </div>
     );
   }
 
-  // Interface principal do controle de tráfego
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -328,7 +244,7 @@ export default function Traffic() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Controle de Tráfego</h1>
           <p className="text-muted-foreground">
-            Painel completo para monitoramento e gestão de campanhas de Meta Ads
+            Painel de gestão de campanhas Meta Ads
           </p>
         </div>
         <div className="flex gap-2">
@@ -336,23 +252,19 @@ export default function Traffic() {
             <AlertDialogTrigger asChild>
               <Button variant="outline" className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground">
                 <LogOut className="mr-2 h-4 w-4" />
-                Desconectar Facebook
+                Desconectar
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Desconectar conta do Facebook?</AlertDialogTitle>
+                <AlertDialogTitle>Desconectar Facebook?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Esta ação irá desconectar sua conta do Facebook e remover todas as contas de anúncios selecionadas.
-                  Você poderá reconectar ou conectar uma nova conta a qualquer momento.
+                  Isso removerá todas as contas de anúncios selecionadas.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDisconnectFacebook}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
+                <AlertDialogAction onClick={handleDisconnectFacebook} className="bg-destructive text-destructive-foreground">
                   Desconectar
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -370,7 +282,7 @@ export default function Traffic() {
               <DialogHeader>
                 <DialogTitle>Gerenciar Contas de Anúncios</DialogTitle>
                 <DialogDescription>
-                  Adicione, remova ou configure suas contas de anúncios conectadas
+                  Adicione ou remova contas de anúncios
                 </DialogDescription>
               </DialogHeader>
               <AdAccountsManager
@@ -384,7 +296,7 @@ export default function Traffic() {
         </div>
       </div>
 
-      {/* Status das conexões */}
+      {/* Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="flex items-center justify-between p-4">
@@ -392,9 +304,7 @@ export default function Traffic() {
               <Facebook className="h-5 w-5 text-blue-600" />
               <span className="font-medium">Facebook</span>
             </div>
-            <Badge variant="outline" className="text-green-600 border-green-600">
-              Conectado
-            </Badge>
+            <Badge variant="outline" className="text-green-600 border-green-600">Conectado</Badge>
           </CardContent>
         </Card>
         
@@ -414,58 +324,33 @@ export default function Traffic() {
               <BarChart className="h-5 w-5 text-primary" />
               <span className="font-medium">Contas Ativas</span>
             </div>
-            <Badge variant="outline">
-              {selectedAdAccounts.length}
-            </Badge>
+            <Badge variant="outline">{selectedAdAccounts.length}</Badge>
           </CardContent>
         </Card>
       </div>
 
-      {/* Abas principais */}
+      {/* Tabs - 2 abas */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="dashboard" className="flex items-center gap-2">
-            <BarChart className="h-4 w-4" />
-            Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <Eye className="h-4 w-4" />
-            Overview
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="clients" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Painel de Clientes
           </TabsTrigger>
           <TabsTrigger value="campaigns" className="flex items-center gap-2">
-            <Play className="h-4 w-4" />
-            Campanhas
-          </TabsTrigger>
-          <TabsTrigger value="reports" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Relatórios
-          </TabsTrigger>
-          <TabsTrigger value="balance" className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            Verificador de Saldo
+            <TrendingUp className="h-4 w-4" />
+            Campanhas e Relatórios
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="space-y-6">
-          <TrafficDashboard selectedAdAccounts={selectedAdAccounts} />
-        </TabsContent>
-
-        <TabsContent value="overview" className="space-y-6">
-          <OverviewTab selectedAdAccounts={selectedAdAccounts} />
-        </TabsContent>
-
-        <TabsContent value="campaigns" className="space-y-6">
-          <CampaignsTab 
-            selectedAdAccounts={selectedAdAccounts}
+        <TabsContent value="clients" className="space-y-6">
+          <ClientsPanel 
+            selectedAdAccounts={selectedAdAccounts} 
+            onNavigateToCampaigns={() => setActiveTab('campaigns')}
           />
         </TabsContent>
 
-        <TabsContent value="reports" className="space-y-6">
-          <ReportsTab selectedAdAccounts={selectedAdAccounts} />
-        </TabsContent>
-
-        <TabsContent value="balance" className="space-y-6">
-          <BalanceCheckerTab selectedAdAccounts={selectedAdAccounts} />
+        <TabsContent value="campaigns" className="space-y-6">
+          <CampaignsAndReports selectedAdAccounts={selectedAdAccounts} />
         </TabsContent>
       </Tabs>
     </div>

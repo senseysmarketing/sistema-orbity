@@ -84,8 +84,8 @@ serve(async (req) => {
         try {
           console.log(`Fetching campaigns for account: ${accountId}`)
           
-          // Construir URL com filtros de data se fornecidos
-          let campaignsUrl = `https://graph.facebook.com/v18.0/${accountId}/campaigns?fields=id,name,status,objective`
+          // Construir URL com campos expandidos incluindo updated_time, daily_budget, lifetime_budget
+          let campaignsUrl = `https://graph.facebook.com/v18.0/${accountId}/campaigns?fields=id,name,status,objective,updated_time,daily_budget,lifetime_budget,effective_status`
           
           if (finalDateRange) {
             campaignsUrl += `,insights.time_range({'since':'${finalDateRange.from}','until':'${finalDateRange.to}'}){spend,impressions,clicks,actions,cost_per_action_type,cpm,cpc,ctr}`
@@ -119,11 +119,19 @@ serve(async (req) => {
                 }
               }
 
+              // Converter daily_budget de centavos para reais (API retorna em centavos)
+              const dailyBudget = campaign.daily_budget ? parseFloat(campaign.daily_budget) / 100 : null
+              const lifetimeBudget = campaign.lifetime_budget ? parseFloat(campaign.lifetime_budget) / 100 : null
+
               campaigns.push({
                 id: campaign.id,
                 name: campaign.name,
                 status: campaign.status,
+                effective_status: campaign.effective_status,
                 objective: campaign.objective,
+                updated_time: campaign.updated_time, // Data da última modificação
+                daily_budget: dailyBudget,
+                lifetime_budget: lifetimeBudget,
                 spend: parseFloat(insights.spend || '0'),
                 impressions: parseInt(insights.impressions || '0'),
                 clicks: parseInt(insights.clicks || '0'),
