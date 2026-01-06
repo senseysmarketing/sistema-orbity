@@ -1253,6 +1253,63 @@ export type Database = {
           },
         ]
       }
+      employees: {
+        Row: {
+          agency_id: string
+          base_salary: number
+          created_at: string
+          end_date: string | null
+          id: string
+          is_active: boolean
+          name: string
+          payment_day: number
+          role: string | null
+          start_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          base_salary?: number
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          payment_day?: number
+          role?: string | null
+          start_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          base_salary?: number
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          payment_day?: number
+          role?: string | null
+          start_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       expense_categories: {
         Row: {
           agency_id: string
@@ -2817,6 +2874,7 @@ export type Database = {
           amount: number
           created_at: string
           due_date: string
+          employee_id: string | null
           employee_name: string
           id: string
           paid_date: string | null
@@ -2828,6 +2886,7 @@ export type Database = {
           amount: number
           created_at?: string
           due_date: string
+          employee_id?: string | null
           employee_name: string
           id?: string
           paid_date?: string | null
@@ -2839,6 +2898,7 @@ export type Database = {
           amount?: number
           created_at?: string
           due_date?: string
+          employee_id?: string | null
           employee_name?: string
           id?: string
           paid_date?: string | null
@@ -2859,6 +2919,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "salaries_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
           },
         ]
       }

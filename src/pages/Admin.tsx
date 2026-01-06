@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal, Calendar, ArrowUpDown, Search, BarChart3, Target, Activity, Timer, Users, CreditCard, Receipt, Wallet, PieChart, FileText, AlertTriangle, CheckCircle, TrendingUp as TrendingUpIcon, Settings, Calculator, UserX, ShieldAlert } from "lucide-react";
+import { Plus, DollarSign, TrendingUp, TrendingDown, AlertCircle, Building, Filter, Banknote, Eye, Edit, Trash2, MoreHorizontal, Calendar, ArrowUpDown, Search, BarChart3, Target, Activity, Timer, Users, CreditCard, Receipt, Wallet, PieChart, FileText, AlertTriangle, CheckCircle, TrendingUp as TrendingUpIcon, Settings, Calculator, UserX, ShieldAlert, Briefcase, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,9 @@ import { ExpenseCard } from "@/components/admin/ExpenseCard";
 import { ExpenseMetricsCards } from "@/components/admin/ExpenseMetricsCards";
 import { ExpenseDetailsDialog } from "@/components/admin/ExpenseDetailsDialog";
 import { SalaryDetailsDialog } from "@/components/admin/SalaryDetailsDialog";
+import { EmployeeCard } from "@/components/admin/EmployeeCard";
+import { EmployeeForm } from "@/components/admin/EmployeeForm";
+import { EmployeeDetailsDialog } from "@/components/admin/EmployeeDetailsDialog";
 interface Client {
   id: string;
   name: string;
@@ -82,6 +85,17 @@ interface ExpenseCategory {
   name: string;
   icon: string;
   color: string;
+}
+
+interface Employee {
+  id: string;
+  name: string;
+  base_salary: number;
+  role?: string;
+  payment_day: number;
+  is_active: boolean;
+  start_date?: string;
+  end_date?: string;
 }
 // Helper function para verificar se cliente estava ativo em determinado mês
 const wasClientActiveInMonth = (client: Client, monthStr: string): boolean => {
@@ -162,6 +176,15 @@ export default function Admin() {
   const [salaryDeleteDialogOpen, setSalaryDeleteDialogOpen] = useState(false);
   const [salaryToDelete, setSalaryToDelete] = useState<Salary | null>(null);
 
+  // Employee states
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [employeeFormOpen, setEmployeeFormOpen] = useState(false);
+  const [employeeDetailsOpen, setEmployeeDetailsOpen] = useState(false);
+  const [employeeDeleteDialogOpen, setEmployeeDeleteDialogOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+  const [runningClosure, setRunningClosure] = useState(false);
+
   // Filtros e busca - Despesas
   const [expenseSearchTerm, setExpenseSearchTerm] = useState("");
   const [expenseStatusFilter, setExpenseStatusFilter] = useState<string>("all");
@@ -199,7 +222,8 @@ export default function Admin() {
         fetchExpenses(), 
         fetchSalaries(), 
         fetchExpenseCategories(),
-        fetchPreviousMonthExpenses()
+        fetchPreviousMonthExpenses(),
+        fetchEmployees()
       ]);
     } catch (error: any) {
       toast({
@@ -307,6 +331,22 @@ export default function Admin() {
     
     if (error) throw error;
     setSalaries(data || []);
+  };
+
+  const fetchEmployees = async () => {
+    if (!currentAgency) return;
+    
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('agency_id', currentAgency.id)
+      .order('name');
+    
+    if (error) {
+      console.error('Erro ao buscar funcionários:', error);
+      return;
+    }
+    setEmployees(data || []);
   };
 
   const fetchPreviousMonthExpenses = async () => {
@@ -817,6 +857,102 @@ export default function Admin() {
     }
   };
 
+  // Employee handlers
+  const handleViewEmployee = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setEmployeeDetailsOpen(true);
+  };
+
+  const handleEditEmployee = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setEmployeeFormOpen(true);
+  };
+
+  const handleDeleteEmployee = (employee: Employee) => {
+    setEmployeeToDelete(employee);
+    setEmployeeDeleteDialogOpen(true);
+  };
+
+  const handleToggleEmployeeActive = async (employee: Employee) => {
+    try {
+      const newStatus = !employee.is_active;
+      const { error } = await supabase
+        .from('employees')
+        .update({ 
+          is_active: newStatus,
+          end_date: newStatus ? null : new Date().toISOString().split('T')[0]
+        })
+        .eq('id', employee.id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: newStatus ? "Funcionário ativado" : "Funcionário desativado",
+        description: `${employee.name} foi ${newStatus ? 'ativado' : 'desativado'} com sucesso!`,
+      });
+      
+      fetchEmployees();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const confirmDeleteEmployee = async () => {
+    if (!employeeToDelete) return;
+    try {
+      const { error } = await supabase
+        .from('employees')
+        .delete()
+        .eq('id', employeeToDelete.id);
+      if (error) throw error;
+      toast({
+        title: "Funcionário excluído",
+        description: "Funcionário excluído com sucesso!",
+      });
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setEmployeeDeleteDialogOpen(false);
+      setEmployeeToDelete(null);
+    }
+  };
+
+  // Executar fechamento mensal manualmente
+  const handleRunMonthlyClosure = async () => {
+    if (!currentAgency) return;
+    
+    setRunningClosure(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('monthly-closure');
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Fechamento executado",
+        description: `Fechamento mensal executado com sucesso!`,
+      });
+      
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro no fechamento",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setRunningClosure(false);
+    }
+  };
+
   // Dados filtrados
   // Pagamentos do mês selecionado (apenas com vencimento no mês)
   const paymentsInSelectedMonth = useMemo(() => {
@@ -1187,22 +1323,26 @@ export default function Admin() {
 
       {/* Tabs principais */}
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            <span>Dashboard</span>
+            <span className="hidden sm:inline">Dashboard</span>
           </TabsTrigger>
           <TabsTrigger value="clients-payments" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            <span>Clientes & Pagamentos</span>
+            <span className="hidden sm:inline">Clientes</span>
           </TabsTrigger>
           <TabsTrigger value="expenses" className="flex items-center gap-2">
             <Receipt className="h-4 w-4" />
-            <span>Despesas</span>
+            <span className="hidden sm:inline">Despesas</span>
+          </TabsTrigger>
+          <TabsTrigger value="employees" className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4" />
+            <span className="hidden sm:inline">Funcionários</span>
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <PieChart className="h-4 w-4" />
-            <span>Análises</span>
+            <span className="hidden sm:inline">Análises</span>
           </TabsTrigger>
         </TabsList>
 
@@ -2515,6 +2655,89 @@ export default function Admin() {
             onRefresh={fetchExpenses}
             onViewMaster={handleViewMasterExpense}
           />
+        </TabsContent>
+
+        <TabsContent value="employees" className="space-y-6">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <h2 className="text-2xl font-bold">
+              Funcionários ({employees.length})
+            </h2>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleRunMonthlyClosure}
+                disabled={runningClosure}
+                className="flex items-center gap-2"
+              >
+                <Play className="h-4 w-4" />
+                {runningClosure ? 'Executando...' : 'Executar Fechamento Mensal'}
+              </Button>
+              <Button onClick={() => { setSelectedEmployee(null); setEmployeeFormOpen(true); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Funcionário
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {employees.map(employee => (
+              <EmployeeCard
+                key={employee.id}
+                employee={employee}
+                onView={handleViewEmployee}
+                onEdit={handleEditEmployee}
+                onDelete={handleDeleteEmployee}
+                onToggleActive={handleToggleEmployeeActive}
+              />
+            ))}
+          </div>
+
+          {employees.length === 0 && (
+            <Card className="p-8 text-center">
+              <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Nenhum funcionário cadastrado</h3>
+              <p className="text-muted-foreground mb-4">
+                Adicione funcionários para gerar salários automaticamente todo mês.
+              </p>
+              <Button onClick={() => setEmployeeFormOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Funcionário
+              </Button>
+            </Card>
+          )}
+
+          <EmployeeForm
+            open={employeeFormOpen}
+            onOpenChange={(open) => { setEmployeeFormOpen(open); if (!open) setSelectedEmployee(null); }}
+            employee={selectedEmployee}
+            onSuccess={fetchData}
+          />
+
+          <EmployeeDetailsDialog
+            employee={selectedEmployee}
+            open={employeeDetailsOpen}
+            onOpenChange={setEmployeeDetailsOpen}
+            onEdit={handleEditEmployee}
+            onDelete={handleDeleteEmployee}
+            onToggleActive={handleToggleEmployeeActive}
+          />
+
+          <AlertDialog open={employeeDeleteDialogOpen} onOpenChange={setEmployeeDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza que deseja excluir o funcionário "{employeeToDelete?.name}"? Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeleteEmployee} className="bg-red-600 hover:bg-red-700">
+                  Excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6 bg-[7dafd8] bg-white">
