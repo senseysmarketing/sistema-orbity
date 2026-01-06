@@ -43,18 +43,15 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
 
   // Carregar dados iniciais do cache
   useEffect(() => {
-    if (selectedAdAccounts.length > 0) {
+    if (selectedAdAccounts.length > 0 && currentAgency) {
       loadClientsFromCache();
-    } else {
+    } else if (selectedAdAccounts.length === 0) {
       setInitialLoading(false);
     }
-  }, [selectedAdAccounts]);
+  }, [selectedAdAccounts, currentAgency]);
 
   const loadClientsFromCache = async () => {
-    if (!currentAgency) {
-      setInitialLoading(false);
-      return;
-    }
+    if (!currentAgency) return;
 
     try {
       // Buscar dados do banco com os campos de cache
