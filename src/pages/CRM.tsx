@@ -1,24 +1,16 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, Users, DollarSign, Target, Calendar, Webhook, Grid, List, AlertTriangle, TrendingUp, Activity, Eye, Settings, LayoutGrid, Download, Filter } from "lucide-react";
+import { Plus, Search, Users, DollarSign, Target, Calendar, Grid, List, AlertTriangle, TrendingUp, Settings, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { LeadsKanban } from "@/components/crm/LeadsKanban";
 import { LeadsList } from "@/components/crm/LeadsList";
 import { LeadForm } from "@/components/crm/LeadForm";
 import { LeadDetailsDialog } from "@/components/crm/LeadDetailsDialog";
-import { WebhooksManager } from "@/components/crm/WebhooksManager";
-import { CRMAlerts } from "@/components/crm/CRMAlerts";
-import { CustomStatusManager } from "@/components/crm/CustomStatusManager";
-
-import { CRMAnalytics } from "@/components/crm/CRMAnalytics";
-import { CRMMetrics } from "@/components/crm/CRMMetrics";
-import { FacebookLeadsIntegration } from "@/components/crm/FacebookLeadsIntegration";
+import { CRMDashboard } from "@/components/crm/CRMDashboard";
 import { CRMSettings } from "@/components/crm/CRMSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -115,81 +107,12 @@ export default function CRM() {
     });
   }, [leads, searchQuery, statusFilter, priorityFilter, sourceFilter, dateFilter]);
 
-  // Análises e métricas
-  const analytics = useMemo(() => {
-    const total = filteredLeads.length;
-    const newLeads = filteredLeads.filter(lead => lead.status === 'new').length;
-    const qualifiedLeads = filteredLeads.filter(lead => lead.status === 'qualified').length;
-    const wonLeads = filteredLeads.filter(lead => lead.status === 'won').length;
-    const lostLeads = filteredLeads.filter(lead => lead.status === 'lost').length;
-    
-    const totalValue = filteredLeads.reduce((sum, lead) => sum + (lead.value || 0), 0);
-    const wonValue = filteredLeads
-      .filter(lead => lead.status === 'won')
-      .reduce((sum, lead) => sum + (lead.value || 0), 0);
-    
-    const conversionRate = total > 0 ? Math.round((wonLeads / total) * 100) : 0;
-    const averageValue = total > 0 ? totalValue / total : 0;
-    
-    // Leads with follow-up needed (next_contact is today or past) - usando todos os leads, não filtrados
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Zera as horas para comparação apenas de data
-    
-    const followUpNeeded = leads.filter(lead => {
-      if (!lead.next_contact || ['won', 'lost'].includes(lead.status)) {
-        return false;
-      }
-      
-      const nextContactDate = new Date(lead.next_contact);
-      nextContactDate.setHours(0, 0, 0, 0);
-      
-      return nextContactDate <= today;
-    }).length;
-
-    // Build status stats from actual statuses in use
-    const statusStats: { [key: string]: number } = {};
-    filteredLeads.forEach(lead => {
-      const displayStatus = mapDatabaseStatusToDisplay(lead.status);
-      statusStats[displayStatus] = (statusStats[displayStatus] || 0) + 1;
-    });
-
-    const priorityStats = {
-      high: filteredLeads.filter(l => l.priority === 'high').length,
-      medium: filteredLeads.filter(l => l.priority === 'medium').length,
-      low: filteredLeads.filter(l => l.priority === 'low').length,
-    };
-
-    const sourceStats: { [key: string]: number } = {};
-    filteredLeads.forEach(lead => {
-      sourceStats[lead.source] = (sourceStats[lead.source] || 0) + 1;
-    });
-
-    return {
-      total,
-      newLeads,
-      qualifiedLeads,
-      wonLeads,
-      lostLeads,
-      totalValue,
-      wonValue,
-      conversionRate,
-      averageValue,
-      followUpNeeded,
-      statusStats,
-      priorityStats,
-      sourceStats
-    };
-  }, [filteredLeads, leads, mapDatabaseStatusToDisplay]);
-
   const handleLeadSave = async (savedLead: Lead) => {
-    // Update local cache optimistically
     setLeads(prev => {
       const exists = prev.find(l => l.id === savedLead.id);
       if (exists) {
-        // Update existing lead
         return prev.map(l => l.id === savedLead.id ? savedLead : l);
       } else {
-        // Add new lead
         return [savedLead, ...prev];
       }
     });
@@ -218,19 +141,16 @@ export default function CRM() {
 
       if (error) throw error;
       
-      // Update local state optimistically
       setLeads(prev => prev.filter(l => l.id !== leadId));
       toast.success('Lead excluído com sucesso');
     } catch (error) {
       console.error('Error deleting lead:', error);
       toast.error('Erro ao excluir lead');
-      // Refresh on error
       fetchLeads();
     }
   };
 
   const handleLeadMove = (leadId: string, newStatus: string) => {
-    // Optimistic update - update local state immediately
     setLeads(prev => prev.map(lead => 
       lead.id === leadId 
         ? { ...lead, status: newStatus as Lead['status'], updated_at: new Date().toISOString() }
@@ -270,7 +190,6 @@ export default function CRM() {
     toast.success(`${filteredLeads.length} leads exportados com sucesso`);
   };
 
-
   if (loading) {
     return (
       <div className="flex-1 space-y-4 p-8 pt-6">
@@ -287,263 +206,70 @@ export default function CRM() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between space-y-2">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">CRM & Leads</h2>
           <p className="text-muted-foreground">
-            Sistema completo para gestão de relacionamento com clientes e leads
+            Gestão comercial com funil de vendas e métricas de investimento
           </p>
         </div>
-        <div className="flex items-center space-x-2">
-          <Dialog open={showLeadForm} onOpenChange={setShowLeadForm}>
-            <DialogTrigger asChild>
-              <Button variant="action">
-                <Plus className="mr-2 h-4 w-4" />
-                Novo Lead
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>
-                  {selectedLead ? 'Editar Lead' : 'Novo Lead'}
-                </DialogTitle>
-                <DialogDescription>
-                  Preencha as informações do lead
-                </DialogDescription>
-              </DialogHeader>
-              <LeadForm 
-                lead={selectedLead} 
-                onSave={handleLeadSave}
-                onCancel={() => {
-                  setShowLeadForm(false);
-                  setSelectedLead(null);
-                }}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
+        <Dialog open={showLeadForm} onOpenChange={setShowLeadForm}>
+          <DialogTrigger asChild>
+            <Button variant="action">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Lead
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {selectedLead ? 'Editar Lead' : 'Novo Lead'}
+              </DialogTitle>
+              <DialogDescription>
+                Preencha as informações do lead
+              </DialogDescription>
+            </DialogHeader>
+            <LeadForm 
+              lead={selectedLead} 
+              onSave={handleLeadSave}
+              onCancel={() => {
+                setShowLeadForm(false);
+                setSelectedLead(null);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* Métricas Principais */}
-      <CRMMetrics leads={filteredLeads} />
-
-      {/* Intelligent Alerts */}
-      {analytics.followUpNeeded > 0 && (
-        <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-400">
-              <AlertTriangle className="h-5 w-5" />
-              Atenção Necessária
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="p-3 bg-white dark:bg-background rounded-lg border border-orange-200 dark:border-orange-900">
-                <div className="text-sm text-muted-foreground mb-1">Follow-ups Atrasados</div>
-                <div className="text-2xl font-bold text-orange-600">{analytics.followUpNeeded}</div>
-                <p className="text-xs text-muted-foreground mt-1">Requerem ação imediata</p>
-              </div>
-              
-              <div className="p-3 bg-white dark:bg-background rounded-lg border border-orange-200 dark:border-orange-900">
-                <div className="text-sm text-muted-foreground mb-1">Alta Prioridade</div>
-                <div className="text-2xl font-bold text-red-600">{analytics.priorityStats.high}</div>
-                <p className="text-xs text-muted-foreground mt-1">Leads urgentes</p>
-              </div>
-
-              <div className="p-3 bg-white dark:bg-background rounded-lg border border-orange-200 dark:border-orange-900">
-                <div className="text-sm text-muted-foreground mb-1">Novos Leads</div>
-                <div className="text-2xl font-bold text-blue-600">{analytics.newLeads}</div>
-                <p className="text-xs text-muted-foreground mt-1">Aguardando contato</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Distribution Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Activity className="h-5 w-5" />
-              Distribuição por Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {Object.entries(analytics.statusStats)
-              .filter(([_, count]) => count > 0)
-              .sort(([, a], [, b]) => b - a) // Sort by count descending
-              .map(([status, count]) => {
-                const total = analytics.total || 1;
-                const percentage = (count / total) * 100;
-                
-                // Get status color from config
-                const statusInfo = Object.values(getStatusConfig()).find(
-                  config => config.title === status
-                );
-                const statusColor = statusInfo?.color || 'bg-gray-500';
-                
-                return (
-                  <div key={status}>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-3 h-3 rounded-full ${statusColor}`} />
-                        <span className="text-sm font-medium">{status}</span>
-                      </div>
-                      <Badge variant="secondary">{count}</Badge>
-                    </div>
-                    <Progress value={percentage} className="h-2" />
-                  </div>
-                );
-              })}
-            {Object.keys(analytics.statusStats).length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Nenhum lead cadastrado
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Target className="h-5 w-5" />
-              Distribuição por Prioridade
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {Object.entries(analytics.priorityStats).map(([priority, count]) => {
-              const total = analytics.total || 1;
-              const percentage = (count / total) * 100;
-              return (
-                <div key={priority}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm capitalize">{priority === 'high' ? 'Alta' : priority === 'medium' ? 'Média' : 'Baixa'}</span>
-                    <Badge variant="secondary">{count}</Badge>
-                  </div>
-                  <Progress value={percentage} className="h-2" />
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <TrendingUp className="h-5 w-5" />
-              Principais Origens
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {Object.entries(analytics.sourceStats)
-              .sort(([,a], [,b]) => b - a)
-              .slice(0, 5)
-              .map(([source, count]) => {
-                const total = analytics.total || 1;
-                const percentage = (count / total) * 100;
-                const isMetaAds = source === 'facebook_leads';
-                return (
-                  <div key={source}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm capitalize flex items-center gap-1">
-                        {isMetaAds && '📱'} {source}
-                      </span>
-                      <Badge variant={isMetaAds ? "default" : "secondary"} className={isMetaAds ? 'bg-blue-600' : ''}>
-                        {count}
-                      </Badge>
-                    </div>
-                    <Progress value={percentage} className="h-2" />
-                  </div>
-                );
-              })}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Alertas do CRM */}
-      <CRMAlerts 
-        leads={filteredLeads} 
-        onEdit={handleLeadEdit}
-        onViewDetails={(lead) => {
-          setSelectedLead(lead as Lead);
-          setShowLeadDetails(true);
-        }}
-      />
-
-
-      {/* Filtros e Leads */}
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <Eye className="h-4 w-4" />
-            <span className="hidden sm:inline">Visão Geral</span>
-          </TabsTrigger>
-          <TabsTrigger value="leads" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Leads</span>
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2">
+      {/* Main Tabs - 3 tabs: Dashboard, Pipeline, Settings */}
+      <Tabs defaultValue="dashboard" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Análises</span>
+            <span className="hidden sm:inline">Dashboard</span>
+          </TabsTrigger>
+          <TabsTrigger value="pipeline" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Pipeline</span>
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">Configurações</span>
           </TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="overview" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pipeline de Vendas</CardTitle>
-              <CardDescription>
-                Visão detalhada do funil de vendas e métricas de conversão
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <div className="text-center p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
-                    <div className="text-2xl font-bold text-blue-600">{analytics.newLeads}</div>
-                    <div className="text-sm text-muted-foreground">Novos Leads</div>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg bg-orange-50 dark:bg-orange-950/20">
-                    <div className="text-2xl font-bold text-orange-600">{analytics.qualifiedLeads}</div>
-                    <div className="text-sm text-muted-foreground">Qualificados</div>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg bg-purple-50 dark:bg-purple-950/20">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {filteredLeads.filter(l => !['new', 'qualified', 'won', 'lost'].includes(l.status)).length}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Em Negociação</div>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg bg-green-50 dark:bg-green-950/20">
-                    <div className="text-2xl font-bold text-green-600">{analytics.wonLeads}</div>
-                    <div className="text-sm text-muted-foreground">Fechados</div>
-                  </div>
-                </div>
-                
-                <div className="text-center p-4 border rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
-                  <div className="text-3xl font-bold text-green-600">
-                    {new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL'
-                    }).format(analytics.wonValue)}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Receita Confirmada</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+
+        {/* Dashboard Tab */}
+        <TabsContent value="dashboard" className="space-y-4">
+          <CRMDashboard leads={leads} />
         </TabsContent>
 
-        <TabsContent value="leads" className="space-y-4">
+        {/* Pipeline Tab */}
+        <TabsContent value="pipeline" className="space-y-4">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Leads</CardTitle>
+                  <CardTitle>Pipeline de Leads</CardTitle>
                   <CardDescription>
                     Gerencie seus leads em formato kanban ou lista
                   </CardDescription>
@@ -568,7 +294,7 @@ export default function CRM() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Search and Main Filters */}
+                {/* Search and Filters */}
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -595,11 +321,11 @@ export default function CRM() {
                   </Select>
                   
                   <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectTrigger className="w-full md:w-[150px]">
                       <SelectValue placeholder="Prioridade" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todas as Prioridades</SelectItem>
+                      <SelectItem value="all">Todas</SelectItem>
                       <SelectItem value="high">Alta</SelectItem>
                       <SelectItem value="medium">Média</SelectItem>
                       <SelectItem value="low">Baixa</SelectItem>
@@ -607,72 +333,49 @@ export default function CRM() {
                   </Select>
                   
                   <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                    <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectTrigger className="w-full md:w-[150px]">
                       <SelectValue placeholder="Origem" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todas as Origens</SelectItem>
+                      <SelectItem value="all">Todas</SelectItem>
                       {uniqueSources.map(source => (
                         <SelectItem key={source} value={source}>
-                          {source === 'facebook_leads' ? 'Meta Ads' : 
-                           source.charAt(0).toUpperCase() + source.slice(1).replace('_', ' ')}
+                          {source === 'facebook_leads' ? 'Meta Ads' : source}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
-                {/* Date Filter and Export */}
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Data inicial</label>
-                      <Input
-                        type="date"
-                        value={dateFilter.from ? dateFilter.from.toISOString().split('T')[0] : ''}
-                        onChange={(e) => setDateFilter(prev => ({ 
-                          ...prev, 
-                          from: e.target.value ? new Date(e.target.value) : null 
-                        }))}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium mb-2 block">Data final</label>
-                      <Input
-                        type="date"
-                        value={dateFilter.to ? dateFilter.to.toISOString().split('T')[0] : ''}
-                        onChange={(e) => setDateFilter(prev => ({ 
-                          ...prev, 
-                          to: e.target.value ? new Date(e.target.value) : null 
-                        }))}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-2 items-end md:pb-0 pb-0">
-                    {(dateFilter.from || dateFilter.to || statusFilter !== 'all' || priorityFilter !== 'all' || sourceFilter !== 'all') && (
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setDateFilter({ from: null, to: null });
-                          setStatusFilter('all');
-                          setPriorityFilter('all');
-                          setSourceFilter('all');
-                          setSearchQuery('');
-                        }}
-                      >
-                        Limpar Filtros
-                      </Button>
-                    )}
+                {/* Actions Row */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {(statusFilter !== 'all' || priorityFilter !== 'all' || sourceFilter !== 'all' || searchQuery) && (
                     <Button
                       variant="outline"
-                      onClick={exportToCSV}
-                      disabled={filteredLeads.length === 0}
+                      size="sm"
+                      onClick={() => {
+                        setStatusFilter('all');
+                        setPriorityFilter('all');
+                        setSourceFilter('all');
+                        setSearchQuery('');
+                      }}
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Exportar ({filteredLeads.length})
+                      Limpar Filtros
                     </Button>
-                  </div>
+                  )}
+                  <div className="flex-1" />
+                  <span className="text-sm text-muted-foreground">
+                    {filteredLeads.length} leads
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={exportToCSV}
+                    disabled={filteredLeads.length === 0}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
                 </div>
               </div>
 
@@ -700,10 +403,7 @@ export default function CRM() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="analytics" className="space-y-4">
-          <CRMAnalytics leads={filteredLeads} />
-        </TabsContent>
-
+        {/* Settings Tab */}
         <TabsContent value="settings" className="space-y-4">
           <CRMSettings />
         </TabsContent>
