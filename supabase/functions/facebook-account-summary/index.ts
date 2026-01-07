@@ -154,6 +154,23 @@ serve(async (req) => {
         
         console.log(`Account ${accountId}: funding_type="${fundingType}", funding_display="${fundingDisplay}", is_prepaid=${isPrepaid}`)
 
+        // =============================================
+        // EXTRAIR SALDO DO display_string (mais confiável para BR)
+        // =============================================
+        // Regex para pegar valores como: R$0,07 ou R$ 1.234,56
+        const balanceMatch = fundingDisplay.match(/R\$\s*([\d.,]+)/i)
+        let extractedBalance: number | null = null
+
+        if (balanceMatch && balanceMatch[1]) {
+          // Converter formato brasileiro (1.234,56) para número (1234.56)
+          const balanceStr = balanceMatch[1]
+            .replace(/\./g, '')   // Remove separador de milhar
+            .replace(',', '.')    // Troca vírgula por ponto
+          extractedBalance = parseFloat(balanceStr)
+          
+          console.log(`Account ${accountId}: Extracted balance from display_string: ${extractedBalance}`)
+        }
+
         // Extrair valores do Facebook (todos vêm em centavos)
         const spendCap = accountData.spend_cap ? parseFloat(accountData.spend_cap) / 100 : 0
         const amountSpent = accountData.amount_spent ? parseFloat(accountData.amount_spent) / 100 : 0
@@ -165,21 +182,27 @@ serve(async (req) => {
         let balance = 0
 
         if (isPrepaid) {
-          // Fórmula da comunidade Meta para contas pré-pagas:
-          // saldo_disponivel = (spend_cap - amount_spent) + balance
-          // onde balance é o saldo de conta (pode ser negativo em alguns casos)
-          if (spendCap > 0) {
+          // PRIORIDADE 1: Usar o saldo extraído do display_string (mais confiável para contas BR)
+          if (extractedBalance !== null && !isNaN(extractedBalance)) {
+            balance = extractedBalance
+            console.log(`Account ${accountId}: Using extracted balance from display_string: ${balance}`)
+          } 
+          // PRIORIDADE 2: Tentar a fórmula alternativa (fallback)
+          else if (spendCap > 0) {
             balance = (spendCap - amountSpent) + billBalance
-          } else {
-            // Se não tem spend_cap, usar o balance direto
+            console.log(`Account ${accountId}: Using formula (spend_cap - amount_spent + bill_balance): ${balance}`)
+          } 
+          // PRIORIDADE 3: Usar bill_balance diretamente (último recurso)
+          else {
             balance = billBalance
+            console.log(`Account ${accountId}: Using bill_balance directly: ${balance}`)
           }
         } else {
           // Para contas pós-pagas: limite - gasto
           balance = spendCap - amountSpent
         }
 
-        console.log(`Account ${accountId}: spend_cap=${spendCap}, amount_spent=${amountSpent}, bill_balance=${billBalance}, calculated_balance=${balance}`)
+        console.log(`Account ${accountId}: FINAL - is_prepaid=${isPrepaid}, extracted=${extractedBalance}, formula=${(spendCap - amountSpent) + billBalance}, bill_balance=${billBalance}, USING=${balance}`)
 
         const summary = {
           ad_account_id: accountId,
