@@ -40,7 +40,8 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
   const [editingClient, setEditingClient] = useState<ClientData>(client);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const isPrepaid = client.is_prepaid !== false; // Default to prepaid if not specified
+  // IMPORTANTE: Agora usamos o valor retornado pela API, não assumimos mais padrão
+  const isPrepaid = client.is_prepaid === true;
 
   // Lógica de status para contas PRÉ-PAGAS
   const getPrepaidBalanceStatus = () => {
@@ -207,14 +208,32 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Wallet className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Saldo Atual</span>
+                  <span className="text-sm font-medium">Saldo Disponível</span>
                 </div>
                 {getStatusBadge()}
               </div>
               
-              <div className="text-3xl font-bold">
+              <div className="text-3xl font-bold text-green-600">
                 {formatCurrency(client.balance)}
               </div>
+              
+              {/* Mostrar detalhes de depósito/gasto para pré-pagas */}
+              {client.spend_cap && client.spend_cap > 0 && (
+                <div className="grid grid-cols-3 gap-2 text-center text-xs border-t pt-2">
+                  <div>
+                    <p className="text-muted-foreground">Depositado</p>
+                    <p className="font-semibold">{formatCurrency(client.spend_cap)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Gasto</p>
+                    <p className="font-semibold text-orange-600">{formatCurrency(client.amount_spent || 0)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Disponível</p>
+                    <p className="font-semibold text-green-600">{formatCurrency(client.balance)}</p>
+                  </div>
+                </div>
+              )}
               
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1.5 text-muted-foreground">
