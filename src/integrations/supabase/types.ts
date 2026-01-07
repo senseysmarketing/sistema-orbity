@@ -1537,6 +1537,7 @@ export type Database = {
           last_sync_at: string | null
           page_id: string
           page_name: string
+          pixel_id: string | null
           sync_method: string
           updated_at: string
           webhook_url: string | null
@@ -1557,6 +1558,7 @@ export type Database = {
           last_sync_at?: string | null
           page_id: string
           page_name: string
+          pixel_id?: string | null
           sync_method?: string
           updated_at?: string
           webhook_url?: string | null
@@ -1577,6 +1579,7 @@ export type Database = {
           last_sync_at?: string | null
           page_id?: string
           page_name?: string
+          pixel_id?: string | null
           sync_method?: string
           updated_at?: string
           webhook_url?: string | null
