@@ -16,10 +16,12 @@ interface LeadStatus {
 
 // Status padrão obrigatórios para relatórios e análises - NÃO PODEM SER EDITADOS/DELETADOS
 const defaultStatuses: Omit<LeadStatus, 'id' | 'agency_id' | 'created_at' | 'updated_at'>[] = [
-  { name: 'Novo', color: 'bg-blue-500', is_default: true, is_system: true, order_position: 1 },
-  { name: 'Qualificado', color: 'bg-orange-500', is_default: true, is_system: true, order_position: 2 },
-  { name: 'Ganho', color: 'bg-green-500', is_default: true, is_system: true, order_position: 3 },
-  { name: 'Perdido', color: 'bg-red-500', is_default: true, is_system: true, order_position: 4 },
+  { name: 'Leads', color: 'bg-blue-500', is_default: true, is_system: true, order_position: 1 },
+  { name: 'Qualificados', color: 'bg-purple-500', is_default: true, is_system: true, order_position: 2 },
+  { name: 'Agendamentos', color: 'bg-yellow-500', is_default: true, is_system: true, order_position: 3 },
+  { name: 'Reuniões', color: 'bg-orange-500', is_default: true, is_system: true, order_position: 4 },
+  { name: 'Propostas', color: 'bg-pink-500', is_default: true, is_system: true, order_position: 5 },
+  { name: 'Vendas', color: 'bg-green-500', is_default: true, is_system: true, order_position: 6 },
 ];
 
 export function useLeadStatuses() {
@@ -110,10 +112,15 @@ export function useLeadStatuses() {
   // Map database status to display status (English to Portuguese)
   const mapDatabaseStatusToDisplay = (dbStatus: string) => {
     const statusMap: Record<string, string> = {
-      'new': 'Novo',
-      'qualified': 'Qualificado', 
-      'won': 'Ganho',
-      'lost': 'Perdido'
+      'leads': 'Leads',
+      'qualified': 'Qualificados',
+      'scheduled': 'Agendamentos',
+      'meeting': 'Reuniões',
+      'proposal': 'Propostas',
+      'won': 'Vendas',
+      'lost': 'Perdido',
+      // Manter compatibilidade com antigos
+      'new': 'Leads',
     };
     return statusMap[dbStatus] || dbStatus;
   };
@@ -121,10 +128,13 @@ export function useLeadStatuses() {
   // Map display status to database status (Portuguese to English)
   const mapDisplayStatusToDatabase = (displayStatus: string) => {
     const statusMap: Record<string, string> = {
-      'Novo': 'new',
-      'Qualificado': 'qualified',
-      'Ganho': 'won', 
-      'Perdido': 'lost'
+      'Leads': 'leads',
+      'Qualificados': 'qualified',
+      'Agendamentos': 'scheduled',
+      'Reuniões': 'meeting',
+      'Propostas': 'proposal',
+      'Vendas': 'won',
+      'Perdido': 'lost',
     };
     return statusMap[displayStatus] || displayStatus;
   };
