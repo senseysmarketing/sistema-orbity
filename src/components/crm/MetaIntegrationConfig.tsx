@@ -91,7 +91,7 @@ export function MetaIntegrationConfig() {
   const [pixelId, setPixelId] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [defaultStatus, setDefaultStatus] = useState("leads");
-  const [defaultPriority, setDefaultPriority] = useState("medium");
+  const [defaultTemperature, setDefaultTemperature] = useState("cold");
 
   const [loadingPages, setLoadingPages] = useState(false);
   const [loadingForms, setLoadingForms] = useState(false);
@@ -299,7 +299,7 @@ export function MetaIntegrationConfig() {
       setPixelId(currentIntegration.pixel_id || "");
       setIsActive(currentIntegration.is_active);
       setDefaultStatus(currentIntegration.default_status);
-      setDefaultPriority(currentIntegration.default_priority);
+      setDefaultTemperature(currentIntegration.default_priority);
     }
   };
 
@@ -372,7 +372,7 @@ export function MetaIntegrationConfig() {
           formId: selectedForm === 'all' ? 'all' : selectedForm,
           formName: selectedForm === 'all' ? 'Todos os formulários' : (form?.name || ''),
           defaultStatus,
-          defaultPriority,
+          defaultPriority: defaultTemperature,
           pixelId: pixelId || null
         }
       });
@@ -715,15 +715,15 @@ export function MetaIntegrationConfig() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Prioridade Padrão</Label>
-                <Select value={defaultPriority} onValueChange={setDefaultPriority}>
+                <Label>Temperatura Padrão</Label>
+                <Select value={defaultTemperature} onValueChange={setDefaultTemperature}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="low">Baixa</SelectItem>
-                    <SelectItem value="medium">Média</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="cold">❄️ Frio</SelectItem>
+                    <SelectItem value="warm">🌡️ Morno</SelectItem>
+                    <SelectItem value="hot">🔥 Quente</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -226,7 +226,7 @@ async function saveIntegration(supabase: any, userId: string, params: any) {
       form_name: formName,
       sync_method: syncMethod || 'webhook',
       default_status: defaultStatus || 'new',
-      default_priority: defaultPriority || 'medium',
+      default_priority: defaultPriority || 'cold',
       field_mapping: fieldMapping || {},
       created_by: userId
     })

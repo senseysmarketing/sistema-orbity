@@ -11,6 +11,8 @@ import { useAgency } from "@/hooks/useAgency";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LEAD_TEMPERATURES } from "@/lib/leadTemperature";
 
 interface WebhookConfig {
   id: string;
@@ -40,7 +42,7 @@ export function WebhooksManager() {
   });
   const [defaultValues, setDefaultValues] = useState({
     status: 'new',
-    priority: 'medium',
+    temperature: 'cold',
     source: 'webhook'
   });
 
@@ -481,14 +483,25 @@ Data: ${new Date().toLocaleString('pt-BR')}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Prioridade Padrão</Label>
-                <Input
-                  value={defaultValues.priority}
-                  onChange={(e) => setDefaultValues(prev => ({
+                <Label>Temperatura Padrão</Label>
+                <Select
+                  value={defaultValues.temperature}
+                  onValueChange={(value) => setDefaultValues(prev => ({
                     ...prev,
-                    priority: e.target.value
+                    temperature: value
                   }))}
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(LEAD_TEMPERATURES).map(([key, temp]) => (
+                      <SelectItem key={key} value={key}>
+                        {temp.emoji} {temp.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Origem Padrão</Label>
