@@ -240,29 +240,30 @@ export function TaskAnalytics({ tasks: currentTasks, profiles, clients, getAssig
         </div>
         
         {/* Seletor de Mês */}
-        <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={handlePreviousMonth}
-            className="h-8 w-8"
-          >
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={handlePreviousMonth}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm font-medium min-w-[140px] text-center capitalize">
-            {format(selectedMonth, "MMMM yyyy", { locale: ptBR })}
-          </span>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleNextMonth}
-            disabled={isSameMonth(selectedMonth, new Date())}
-            className="h-8 w-8"
-          >
+          <div className="min-w-[150px] text-center">
+            <span className="text-lg font-semibold capitalize">
+              {format(selectedMonth, "MMMM yyyy", { locale: ptBR })}
+            </span>
+          </div>
+          <Button variant="outline" size="icon" onClick={handleNextMonth} disabled={isSameMonth(selectedMonth, new Date())}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      {/* Indicador de mês histórico */}
+      {!isCurrentMonth && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            Visualizando dados de {format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
+          </span>
+        </div>
+      )}
 
       {loadingMonthTasks && (
         <div className="flex items-center justify-center py-8">
