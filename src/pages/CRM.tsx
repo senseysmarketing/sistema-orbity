@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 import { toast } from "sonner";
+import { getTemperatureLabel } from "@/lib/leadTemperature";
 
 interface Lead {
   id: string;
@@ -27,7 +28,7 @@ interface Lead {
   position: string | null;
   source: string;
   status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  priority: 'low' | 'medium' | 'high';
+  priority: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
   assigned_to: string | null;
@@ -159,14 +160,14 @@ export default function CRM() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Nome', 'Email', 'Telefone', 'Empresa', 'Status', 'Prioridade', 'Origem', 'Valor', 'Criado em'];
+    const headers = ['Nome', 'Email', 'Telefone', 'Empresa', 'Status', 'Temperatura', 'Origem', 'Valor', 'Criado em'];
     const csvData = filteredLeads.map(lead => [
       lead.name,
       lead.email || '',
       lead.phone || '',
       lead.company || '',
       mapDatabaseStatusToDisplay(lead.status),
-      lead.priority === 'high' ? 'Alta' : lead.priority === 'medium' ? 'Média' : 'Baixa',
+      getTemperatureLabel(lead.priority),
       lead.source,
       lead.value.toString(),
       new Date(lead.created_at).toLocaleDateString('pt-BR')
@@ -322,13 +323,13 @@ export default function CRM() {
                   
                   <Select value={priorityFilter} onValueChange={setPriorityFilter}>
                     <SelectTrigger className="w-full md:w-[150px]">
-                      <SelectValue placeholder="Prioridade" />
+                      <SelectValue placeholder="Temperatura" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                      <SelectItem value="medium">Média</SelectItem>
-                      <SelectItem value="low">Baixa</SelectItem>
+                      <SelectItem value="hot">🔥 Quente</SelectItem>
+                      <SelectItem value="warm">🌡️ Morno</SelectItem>
+                      <SelectItem value="cold">❄️ Frio</SelectItem>
                     </SelectContent>
                   </Select>
                   

@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Edit, Trash2, Eye, Building, Mail, Phone, Calendar, DollarSign } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
 
 interface Lead {
   id: string;
@@ -15,7 +15,7 @@ interface Lead {
   position: string | null;
   source: string;
   status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  priority: 'low' | 'medium' | 'high';
+  priority: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
   assigned_to: string | null;
@@ -64,21 +64,13 @@ export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
   };
 
   const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+    const temp = LEAD_TEMPERATURES[priority as LeadTemperature];
+    return temp?.bgLight || 'bg-gray-100 text-gray-800';
   };
 
   const getPriorityLabel = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'Alta';
-      case 'medium': return 'Média';
-      case 'low': return 'Baixa';
-      default: return priority;
-    }
+    const temp = LEAD_TEMPERATURES[priority as LeadTemperature];
+    return temp?.label || priority;
   };
 
   const formatCurrency = (value: number) => {
@@ -119,7 +111,7 @@ export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
                 <TableHead>Empresa</TableHead>
                 <TableHead>Contato</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Prioridade</TableHead>
+                <TableHead>Temperatura</TableHead>
                 <TableHead>Valor</TableHead>
                 <TableHead>Próximo Contato</TableHead>
                 <TableHead>Origem</TableHead>
@@ -173,9 +165,16 @@ export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={getPriorityColor(lead.priority)}>
-                      {getPriorityLabel(lead.priority)}
-                    </Badge>
+                    {(() => {
+                      const temp = LEAD_TEMPERATURES[lead.priority as LeadTemperature];
+                      const TempIcon = temp?.icon;
+                      return (
+                        <Badge variant="outline" className={`${temp?.bgLight} flex items-center gap-1`}>
+                          {TempIcon && <TempIcon className="h-3 w-3" />}
+                          {temp?.label || lead.priority}
+                        </Badge>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     {lead.value > 0 ? (

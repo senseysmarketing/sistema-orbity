@@ -7,6 +7,7 @@ import { SortableLeadCard } from "./SortableLeadCard";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
+import { getTemperatureForStatus, getTemperatureLabel, LEAD_TEMPERATURES } from "@/lib/leadTemperature";
 
 interface Lead {
   id: string;
@@ -17,7 +18,7 @@ interface Lead {
   position: string | null;
   source: string;
   status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  priority: 'low' | 'medium' | 'high';
+  priority: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
   assigned_to: string | null;
@@ -57,20 +58,15 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
+      case 'hot': return 'bg-red-100 text-red-800 border-red-200';
+      case 'warm': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'cold': return 'bg-blue-100 text-blue-800 border-blue-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const getPriorityLabel = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'Alta';
-      case 'medium': return 'Média';
-      case 'low': return 'Baixa';
-      default: return priority;
-    }
+    return getTemperatureLabel(priority);
   };
 
   const formatCurrency = (value: number) => {
@@ -93,8 +89,8 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
       return { level: 'urgent', label: 'Urgente', color: 'bg-red-100 text-red-800' };
     } else if (nextContact && nextContact.getTime() - today.getTime() <= 86400000) {
       return { level: 'today', label: 'Hoje', color: 'bg-yellow-100 text-yellow-800' };
-    } else if (lead.priority === 'high') {
-      return { level: 'high', label: 'Alta Prioridade', color: 'bg-orange-100 text-orange-800' };
+    } else if (lead.priority === 'hot') {
+      return { level: 'high', label: 'Quente', color: 'bg-orange-100 text-orange-800' };
     }
     return { level: 'normal', label: 'Normal', color: 'bg-gray-100 text-gray-800' };
   };
@@ -138,6 +134,10 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
       const displayStatus = statusConfig[newStatus].title;
       const dbStatus = mapDisplayStatusToDatabase(displayStatus);
       
+      // Calculate new temperature based on status
+      const newTemperature = getTemperatureForStatus(dbStatus);
+      const tempConfig = LEAD_TEMPERATURES[newTemperature];
+      
       // Update local cache immediately (optimistic update)
       if (onLeadMove) {
         onLeadMove(leadId, dbStatus);
@@ -148,13 +148,14 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
         .from('leads')
         .update({ 
           status: dbStatus,
+          priority: newTemperature,
           updated_at: new Date().toISOString()
         })
         .eq('id', leadId);
 
       if (error) throw error;
       
-      toast.success('Status do lead atualizado com sucesso');
+      toast.success(`Lead movido para ${displayStatus} • ${tempConfig.emoji} ${tempConfig.label}`);
     } catch (error) {
       console.error('Error updating lead status:', error);
       toast.error('Erro ao atualizar status do lead');

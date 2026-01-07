@@ -13,7 +13,7 @@ interface Lead {
   position: string | null;
   source: string;
   status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  priority: 'low' | 'medium' | 'high';
+  priority: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
   assigned_to: string | null;
