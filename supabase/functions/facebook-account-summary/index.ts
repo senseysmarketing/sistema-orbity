@@ -136,8 +136,9 @@ serve(async (req) => {
         // Uma conta é PÓS-PAGA se tiver cartão de crédito associado
         // Caso contrário, é PRÉ-PAGA (Boleto, Pix, fundos depositados)
         
-        const fundingType = accountData.funding_source_details?.type || ''
-        const fundingDisplay = accountData.funding_source_details?.display_string || ''
+        // Garantir que são strings antes de usar métodos de string
+        const fundingType = String(accountData.funding_source_details?.type || '')
+        const fundingDisplay = String(accountData.funding_source_details?.display_string || '')
         
         // Verificar se é pós-paga (tem cartão/crédito)
         const isPostpaid = 
