@@ -64,7 +64,7 @@ export function FacebookLeadsIntegration() {
   const [selectedPageToken, setSelectedPageToken] = useState<string>("");
   const [selectedForm, setSelectedForm] = useState<string>("");
   const [defaultStatus, setDefaultStatus] = useState("new");
-  const [defaultPriority, setDefaultPriority] = useState("medium");
+  const [defaultTemperature, setDefaultTemperature] = useState("cold");
   
   const [pageSearch, setPageSearch] = useState("");
 
@@ -236,7 +236,7 @@ export function FacebookLeadsIntegration() {
           formId: selectedForm,
           formName: form.name,
           defaultStatus,
-          defaultPriority
+          defaultPriority: defaultTemperature
         }
       });
 
@@ -452,15 +452,15 @@ export function FacebookLeadsIntegration() {
             </div>
 
             <div className="space-y-2">
-              <Label>Prioridade Padrão</Label>
-              <Select value={defaultPriority} onValueChange={setDefaultPriority}>
+              <Label>Temperatura Padrão</Label>
+              <Select value={defaultTemperature} onValueChange={setDefaultTemperature}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">Baixa</SelectItem>
-                  <SelectItem value="medium">Média</SelectItem>
-                  <SelectItem value="high">Alta</SelectItem>
+                  <SelectItem value="cold">❄️ Frio</SelectItem>
+                  <SelectItem value="warm">🌡️ Morno</SelectItem>
+                  <SelectItem value="hot">🔥 Quente</SelectItem>
                 </SelectContent>
               </Select>
             </div>
