@@ -37,10 +37,10 @@ export function CRMInvestmentMetrics({ leads, investment, dateRange }: CRMInvest
 
     const totalLeads = filteredLeads.length;
     const qualifiedLeads = filteredLeads.filter(l => 
-      ['qualified', 'contacted', 'meeting_scheduled', 'proposal', 'negotiation', 'won'].includes(l.status)
+      ['qualified', 'scheduled', 'meeting', 'proposal', 'won'].includes(l.status)
     ).length;
     const meetings = filteredLeads.filter(l => 
-      ['meeting_scheduled', 'proposal', 'negotiation', 'won'].includes(l.status)
+      ['meeting', 'proposal', 'won'].includes(l.status)
     ).length;
     const wonLeads = filteredLeads.filter(l => l.status === 'won');
     const wonCount = wonLeads.length;

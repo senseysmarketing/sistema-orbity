@@ -80,6 +80,35 @@ export function CRMAdAccountSelector({ onInvestmentChange }: CRMAdAccountSelecto
     }
   };
 
+  const syncAccountData = async (adAccountId: string) => {
+    setSyncing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await supabase.functions.invoke('facebook-account-summary', {
+        body: { accountIds: [adAccountId] },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+
+      if (response.error) throw response.error;
+
+      await fetchAdAccounts();
+      
+      if (onInvestmentChange && response.data?.summaries?.[0]) {
+        onInvestmentChange(response.data.summaries[0].current_month_spend || 0);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error syncing:', error);
+      return false;
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleAccountSelect = async (accountId: string) => {
     if (!currentAgency?.id) return;
 
@@ -93,14 +122,22 @@ export function CRMAdAccountSelector({ onInvestmentChange }: CRMAdAccountSelecto
       
       setSelectedAccountId(accountId === 'none' ? null : accountId);
       
-      if (accountId !== 'none' && onInvestmentChange) {
+      // Sincronizar automaticamente ao selecionar
+      if (accountId !== 'none') {
         const account = adAccounts.find(a => a.id === accountId);
-        onInvestmentChange(account?.current_month_spend || 0);
+        if (account) {
+          toast.info('Sincronizando dados da conta...');
+          const success = await syncAccountData(account.ad_account_id);
+          if (success) {
+            toast.success('Conta selecionada e dados sincronizados!');
+          } else {
+            toast.warning('Conta selecionada, mas houve erro ao sincronizar dados');
+          }
+        }
       } else if (onInvestmentChange) {
         onInvestmentChange(0);
+        toast.success('Conta de anúncios removida');
       }
-
-      toast.success('Conta de anúncios atualizada');
     } catch (error) {
       console.error('Error updating ad account:', error);
       toast.error('Erro ao atualizar conta de anúncios');

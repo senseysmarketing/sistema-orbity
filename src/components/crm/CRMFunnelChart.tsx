@@ -20,6 +20,7 @@ const FUNNEL_COLORS = [
   "hsl(var(--chart-3))",
   "hsl(var(--chart-4))",
   "hsl(var(--chart-5))",
+  "#22c55e", // Verde para Vendas
 ];
 
 export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
@@ -33,22 +34,31 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
       });
     }
 
-    // Count leads by stage
+    // Contagem por estágio do funil (acumulativo - considera que passou pelo estágio anterior)
     const totalLeads = filteredLeads.length;
+    
     const qualified = filteredLeads.filter(l => 
-      ['qualified', 'contacted', 'meeting_scheduled', 'proposal', 'negotiation', 'won'].includes(l.status)
+      ['qualified', 'scheduled', 'meeting', 'proposal', 'won'].includes(l.status)
     ).length;
+    
+    const scheduled = filteredLeads.filter(l => 
+      ['scheduled', 'meeting', 'proposal', 'won'].includes(l.status)
+    ).length;
+    
     const meetings = filteredLeads.filter(l => 
-      ['meeting_scheduled', 'proposal', 'negotiation', 'won'].includes(l.status)
+      ['meeting', 'proposal', 'won'].includes(l.status)
     ).length;
+    
     const proposals = filteredLeads.filter(l => 
-      ['proposal', 'negotiation', 'won'].includes(l.status)
+      ['proposal', 'won'].includes(l.status)
     ).length;
+    
     const won = filteredLeads.filter(l => l.status === 'won').length;
 
-    // Calculate conversion rates
+    // Calculate conversion rates between stages
     const qualifiedRate = totalLeads > 0 ? ((qualified / totalLeads) * 100).toFixed(1) : "0";
-    const meetingsRate = qualified > 0 ? ((meetings / qualified) * 100).toFixed(1) : "0";
+    const scheduledRate = qualified > 0 ? ((scheduled / qualified) * 100).toFixed(1) : "0";
+    const meetingsRate = scheduled > 0 ? ((meetings / scheduled) * 100).toFixed(1) : "0";
     const proposalsRate = meetings > 0 ? ((proposals / meetings) * 100).toFixed(1) : "0";
     const wonRate = proposals > 0 ? ((won / proposals) * 100).toFixed(1) : "0";
 
@@ -66,21 +76,27 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
         conversionRate: `${qualifiedRate}%`
       },
       { 
+        name: "Agendamentos", 
+        value: scheduled, 
+        fill: FUNNEL_COLORS[2],
+        conversionRate: `${scheduledRate}%`
+      },
+      { 
         name: "Reuniões", 
         value: meetings, 
-        fill: FUNNEL_COLORS[2],
+        fill: FUNNEL_COLORS[3],
         conversionRate: `${meetingsRate}%`
       },
       { 
         name: "Propostas", 
         value: proposals, 
-        fill: FUNNEL_COLORS[3],
+        fill: FUNNEL_COLORS[4],
         conversionRate: `${proposalsRate}%`
       },
       { 
         name: "Vendas", 
         value: won, 
-        fill: FUNNEL_COLORS[4],
+        fill: FUNNEL_COLORS[5],
         conversionRate: `${wonRate}%`
       },
     ];
@@ -88,7 +104,7 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
 
   const generalConversionRate = useMemo(() => {
     const total = funnelData[0]?.value || 0;
-    const won = funnelData[4]?.value || 0;
+    const won = funnelData[5]?.value || 0; // Now index 5 for Vendas
     return total > 0 ? ((won / total) * 100).toFixed(1) : "0";
   }, [funnelData]);
 
@@ -156,7 +172,7 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
         </div>
 
         {/* Conversion rates between stages */}
-        <div className="grid grid-cols-4 gap-4 mt-6 pt-4 border-t">
+        <div className="grid grid-cols-5 gap-2 mt-6 pt-4 border-t">
           {funnelData.slice(1).map((stage, index) => {
             const previousStage = funnelData[index];
             const rate = previousStage.value > 0 
@@ -164,10 +180,10 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
               : "0";
             return (
               <div key={stage.name} className="text-center">
-                <div className="text-xs text-muted-foreground mb-1">
+                <div className="text-xs text-muted-foreground mb-1 truncate">
                   {previousStage.name} → {stage.name}
                 </div>
-                <div className="text-lg font-bold" style={{ color: stage.fill }}>
+                <div className="text-base font-bold" style={{ color: stage.fill }}>
                   {rate}%
                 </div>
               </div>
