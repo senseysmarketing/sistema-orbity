@@ -81,8 +81,8 @@ serve(async (req) => {
       try {
         console.log(`Fetching summary for account: ${accountId}`)
         
-        // 1. Buscar informações da conta (incluindo saldo)
-        const accountUrl = `https://graph.facebook.com/v18.0/${accountId}?fields=id,name,account_status,balance,amount_spent,spend_cap,currency,funding_source_details&access_token=${connection.access_token}`
+        // 1. Buscar informações da conta (incluindo saldo e funding_source)
+        const accountUrl = `https://graph.facebook.com/v18.0/${accountId}?fields=id,name,account_status,balance,amount_spent,spend_cap,currency,funding_source_details,funding_source&access_token=${connection.access_token}`
         const accountResponse = await fetch(accountUrl)
         const accountData = await accountResponse.json()
 
@@ -130,23 +130,55 @@ serve(async (req) => {
           last7dSpend = parseFloat(insightsData.data[0].spend || '0')
         }
 
-        // Calcular saldo (balance vem em centavos para contas pré-pagas)
-        let balance = 0
-        const isPrepaid = accountData.funding_source_details?.type === 'PREPAID_ACCOUNT' || 
-                          accountData.funding_source_details?.display_string?.includes('Prepaid')
+        // =============================================
+        // NOVA LÓGICA: Detectar tipo de conta (pré/pós-paga)
+        // =============================================
+        // Uma conta é PÓS-PAGA se tiver cartão de crédito associado
+        // Caso contrário, é PRÉ-PAGA (Boleto, Pix, fundos depositados)
+        
+        const fundingType = accountData.funding_source_details?.type || ''
+        const fundingDisplay = accountData.funding_source_details?.display_string || ''
+        
+        // Verificar se é pós-paga (tem cartão/crédito)
+        const isPostpaid = 
+          fundingType.toUpperCase().includes('CREDIT') ||
+          fundingType.toUpperCase().includes('CARD') ||
+          fundingDisplay.toLowerCase().includes('credit') ||
+          fundingDisplay.toLowerCase().includes('cartão') ||
+          fundingDisplay.toLowerCase().includes('card') ||
+          fundingDisplay.toLowerCase().includes('visa') ||
+          fundingDisplay.toLowerCase().includes('master')
+        
+        const isPrepaid = !isPostpaid
+        
+        console.log(`Account ${accountId}: funding_type="${fundingType}", funding_display="${fundingDisplay}", is_prepaid=${isPrepaid}`)
 
-        if (isPrepaid && accountData.balance) {
-          balance = parseFloat(accountData.balance) / 100
-        } else if (accountData.spend_cap && accountData.amount_spent) {
-          // Para contas pós-pagas, calcular saldo disponível
-          const spendCap = parseFloat(accountData.spend_cap) / 100
-          const amountSpent = parseFloat(accountData.amount_spent) / 100
+        // Extrair valores do Facebook (todos vêm em centavos)
+        const spendCap = accountData.spend_cap ? parseFloat(accountData.spend_cap) / 100 : 0
+        const amountSpent = accountData.amount_spent ? parseFloat(accountData.amount_spent) / 100 : 0
+        const billBalance = accountData.balance ? parseFloat(accountData.balance) / 100 : 0
+
+        // =============================================
+        // NOVA LÓGICA: Calcular saldo disponível
+        // =============================================
+        let balance = 0
+
+        if (isPrepaid) {
+          // Fórmula da comunidade Meta para contas pré-pagas:
+          // saldo_disponivel = (spend_cap - amount_spent) + balance
+          // onde balance é o saldo de conta (pode ser negativo em alguns casos)
+          if (spendCap > 0) {
+            balance = (spendCap - amountSpent) + billBalance
+          } else {
+            // Se não tem spend_cap, usar o balance direto
+            balance = billBalance
+          }
+        } else {
+          // Para contas pós-pagas: limite - gasto
           balance = spendCap - amountSpent
         }
 
-        // Extrair spend_cap e amount_spent para contas pós-pagas
-        const spendCap = accountData.spend_cap ? parseFloat(accountData.spend_cap) / 100 : 0
-        const amountSpent = accountData.amount_spent ? parseFloat(accountData.amount_spent) / 100 : 0
+        console.log(`Account ${accountId}: spend_cap=${spendCap}, amount_spent=${amountSpent}, bill_balance=${billBalance}, calculated_balance=${balance}`)
 
         const summary = {
           ad_account_id: accountId,
