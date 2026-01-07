@@ -2941,6 +2941,7 @@ export type Database = {
           connection_id: string
           created_at: string
           currency: string
+          current_month_spend: number | null
           id: string
           is_active: boolean
           is_prepaid: boolean | null
@@ -2964,6 +2965,7 @@ export type Database = {
           connection_id: string
           created_at?: string
           currency?: string
+          current_month_spend?: number | null
           id?: string
           is_active?: boolean
           is_prepaid?: boolean | null
@@ -2987,6 +2989,7 @@ export type Database = {
           connection_id?: string
           created_at?: string
           currency?: string
+          current_month_spend?: number | null
           id?: string
           is_active?: boolean
           is_prepaid?: boolean | null

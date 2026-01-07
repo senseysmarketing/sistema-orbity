@@ -130,6 +130,22 @@ serve(async (req) => {
           last7dSpend = parseFloat(insightsData.data[0].spend || '0')
         }
 
+        // 4. Buscar gasto do mês atual (para contas pós-pagas)
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        const currentMonthStart = firstDayOfMonth.toISOString().split('T')[0]
+        const today = now.toISOString().split('T')[0]
+        
+        const monthlyInsightsUrl = `https://graph.facebook.com/v18.0/${accountId}/insights?fields=spend&time_range={'since':'${currentMonthStart}','until':'${today}'}&access_token=${connection.access_token}`
+        const monthlyInsightsResponse = await fetch(monthlyInsightsUrl)
+        const monthlyInsightsData = await monthlyInsightsResponse.json()
+
+        let currentMonthSpend = 0
+        if (monthlyInsightsData.data && monthlyInsightsData.data[0]) {
+          currentMonthSpend = parseFloat(monthlyInsightsData.data[0].spend || '0')
+        }
+        
+        console.log(`Account ${accountId}: Current month spend (${currentMonthStart} to ${today}): ${currentMonthSpend}`)
+
         // =============================================
         // NOVA LÓGICA: Detectar tipo de conta (pré/pós-paga)
         // =============================================
@@ -212,6 +228,7 @@ serve(async (req) => {
           is_prepaid: isPrepaid,
           spend_cap: spendCap,
           amount_spent: amountSpent,
+          current_month_spend: currentMonthSpend,
           active_campaigns_count: activeCampaignsCount,
           total_daily_budget: totalDailyBudget,
           last_7d_spend: last7dSpend,
@@ -222,7 +239,7 @@ serve(async (req) => {
 
         accountSummaries.push(summary)
 
-        // 4. Atualizar cache no banco de dados
+        // 5. Atualizar cache no banco de dados
         const { error: updateError } = await supabaseClient
           .from('selected_ad_accounts')
           .update({
@@ -234,6 +251,7 @@ serve(async (req) => {
             is_prepaid: isPrepaid,
             spend_cap: spendCap,
             amount_spent: amountSpent,
+            current_month_spend: currentMonthSpend,
             cached_at: now.toISOString(),
             last_sync: now.toISOString()
           })

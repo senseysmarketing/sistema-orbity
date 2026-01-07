@@ -21,6 +21,7 @@ export interface ClientData {
   is_prepaid?: boolean;
   spend_cap?: number;
   amount_spent?: number;
+  current_month_spend?: number;
   active_campaigns_count: number;
   total_daily_budget: number;
   last_7d_spend: number;
@@ -254,39 +255,25 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
               )}
             </div>
           ) : (
-            // === CONTA PÓS-PAGA ===
+            // === CONTA PÓS-PAGA (SIMPLIFICADO) ===
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CreditCard className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Limite Mensal</span>
+                  <span className="text-sm font-medium">Gasto do Mês</span>
                 </div>
-                {getStatusBadge()}
+                <Badge variant="outline" className="text-[10px]">
+                  {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                </Badge>
               </div>
               
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <p className="text-xs text-muted-foreground">Limite</p>
-                  <p className="font-semibold">{formatCurrency(client.spend_cap || 0)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Gasto</p>
-                  <p className="font-semibold text-orange-600">{formatCurrency(client.amount_spent || 0)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Disponível</p>
-                  <p className="font-semibold text-green-600">
-                    {formatCurrency((client.spend_cap || 0) - (client.amount_spent || 0))}
-                  </p>
-                </div>
+              <div className="text-3xl font-bold text-orange-600">
+                {formatCurrency(client.current_month_spend || 0)}
               </div>
               
-              <div className="space-y-1">
-                <Progress value={getPostpaidPercentage()} className="h-2" />
-                <p className="text-xs text-muted-foreground text-right">
-                  {getPostpaidPercentage().toFixed(0)}% do limite consumido
-                </p>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Total gasto em campanhas desde o dia 1º deste mês
+              </p>
             </div>
           )}
 
