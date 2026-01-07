@@ -93,6 +93,9 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
             balance: summary.balance || 0,
             min_threshold: 100,
             is_prepaid: summary.is_prepaid,
+            current_month_spend: summary.current_month_spend || 0,
+            spend_cap: summary.spend_cap || 0,
+            amount_spent: summary.amount_spent || 0,
             active_campaigns_count: summary.active_campaigns_count || 0,
             total_daily_budget: summary.total_daily_budget || 0,
             last_7d_spend: summary.last_7d_spend || 0,
@@ -146,6 +149,10 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
           currency: account.currency || 'BRL',
           balance: account.balance || 0,
           min_threshold: account.min_threshold || 100,
+          is_prepaid: account.is_prepaid,
+          current_month_spend: account.current_month_spend || 0,
+          spend_cap: account.spend_cap || 0,
+          amount_spent: account.amount_spent || 0,
           active_campaigns_count: account.active_campaigns_count || 0,
           total_daily_budget: account.total_daily_budget || 0,
           last_7d_spend: account.last_7d_spend || 0,
@@ -202,7 +209,6 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
         const updatedClients: ClientData[] = data.summaries.map((summary: any) => {
           const control = controlsMap.get(summary.ad_account_id);
           const existingClient = clients.find(c => c.ad_account_id === summary.ad_account_id);
-          const savedThreshold = control?.observations ? 100 : 100; // Default threshold
           
           return {
             id: existingClient?.id || summary.ad_account_id,
@@ -212,6 +218,9 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
             balance: summary.balance || 0,
             min_threshold: existingClient?.min_threshold || 100,
             is_prepaid: summary.is_prepaid,
+            current_month_spend: summary.current_month_spend || 0,
+            spend_cap: summary.spend_cap || 0,
+            amount_spent: summary.amount_spent || 0,
             active_campaigns_count: summary.active_campaigns_count || 0,
             total_daily_budget: summary.total_daily_budget || 0,
             last_7d_spend: summary.last_7d_spend || 0,
@@ -336,6 +345,10 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
             ? {
                 ...c,
                 balance: summary.balance || 0,
+                is_prepaid: summary.is_prepaid,
+                current_month_spend: summary.current_month_spend || 0,
+                spend_cap: summary.spend_cap || 0,
+                amount_spent: summary.amount_spent || 0,
                 active_campaigns_count: summary.active_campaigns_count || 0,
                 total_daily_budget: summary.total_daily_budget || 0,
                 last_7d_spend: summary.last_7d_spend || 0,
