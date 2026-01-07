@@ -92,11 +92,11 @@ Deno.serve(async (req) => {
       'value': 'value'
     };
 
-    let defaultValues: Record<string, any> = {
-      'status': 'new',
-      'priority': 'medium',
-      'source': 'webhook'
-    };
+  let defaultValues: Record<string, any> = {
+    'status': 'new',
+    'priority': 'cold',
+    'source': 'webhook'
+  };
 
     // Apply custom configuration if exists
     if (webhookConfig?.headers) {
