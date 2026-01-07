@@ -105,7 +105,13 @@ Deno.serve(async (req) => {
         fieldMapping = { ...fieldMapping, ...config.field_mapping };
       }
       if (config.default_values) {
-        defaultValues = { ...defaultValues, ...config.default_values };
+        // Map temperature to priority if present
+        const customDefaults = { ...config.default_values };
+        if (customDefaults.temperature) {
+          customDefaults.priority = customDefaults.temperature;
+          delete customDefaults.temperature;
+        }
+        defaultValues = { ...defaultValues, ...customDefaults };
       }
     }
 
