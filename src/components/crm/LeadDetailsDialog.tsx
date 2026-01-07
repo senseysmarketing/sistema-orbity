@@ -12,6 +12,7 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
+import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
 
 interface Lead {
   id: string;
@@ -121,12 +122,8 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
   };
 
   const getPriorityColor = (priority: string) => {
-    const colors: Record<string, string> = {
-      'high': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-      'medium': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-      'low': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    };
-    return colors[priority] || 'bg-gray-100 text-gray-800';
+    const temp = LEAD_TEMPERATURES[priority as LeadTemperature];
+    return temp?.bgLight || 'bg-gray-100 text-gray-800';
   };
 
   const getStatusLabel = (status: string) => {
@@ -143,12 +140,8 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
   };
 
   const getPriorityLabel = (priority: string) => {
-    const labels: Record<string, string> = {
-      'high': 'Alta',
-      'medium': 'Média',
-      'low': 'Baixa',
-    };
-    return labels[priority] || priority;
+    const temp = LEAD_TEMPERATURES[priority as LeadTemperature];
+    return temp ? `${temp.emoji} ${temp.label}` : priority;
   };
 
   const isMetaAdsLead = lead.source === 'facebook_leads';
@@ -351,7 +344,7 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
                       </Badge>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Prioridade</p>
+                      <p className="text-xs text-muted-foreground mb-1">Temperatura</p>
                       <Badge className={getPriorityColor(lead.priority)}>
                         {getPriorityLabel(lead.priority)}
                       </Badge>

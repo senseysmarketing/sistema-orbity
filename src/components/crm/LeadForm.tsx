@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { toast } from "sonner";
+import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
 
 interface Lead {
   id: string;
@@ -19,7 +20,7 @@ interface Lead {
   position: string | null;
   source: string;
   status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  priority: 'low' | 'medium' | 'high';
+  priority: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
   assigned_to: string | null;
@@ -50,7 +51,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
     position: '',
     source: 'manual',
     status: 'new' as 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost',
-    priority: 'medium' as 'low' | 'medium' | 'high',
+    priority: 'cold' as LeadTemperature,
     value: 0,
     notes: '',
     assigned_to: '',
@@ -69,7 +70,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
         position: lead.position || '',
         source: lead.source || 'manual',
         status: lead.status || 'new',
-        priority: lead.priority || 'medium',
+        priority: (lead.priority || 'cold') as LeadTemperature,
         value: lead.value || 0,
         notes: lead.notes || '',
         assigned_to: lead.assigned_to || '',
@@ -260,15 +261,17 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="priority">Prioridade</Label>
+              <Label htmlFor="priority">Temperatura</Label>
               <Select value={formData.priority} onValueChange={(value: any) => setFormData({ ...formData, priority: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">Baixa</SelectItem>
-                  <SelectItem value="medium">Média</SelectItem>
-                  <SelectItem value="high">Alta</SelectItem>
+                  {Object.entries(LEAD_TEMPERATURES).map(([key, config]) => (
+                    <SelectItem key={key} value={key}>
+                      {config.emoji} {config.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

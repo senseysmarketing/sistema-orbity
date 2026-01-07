@@ -7,13 +7,13 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { 
   MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, 
   DollarSign, Clock, Target, AlertTriangle, GripVertical, 
-  Circle, Star, ArrowUp, ArrowRight, ArrowDown, MessageCircle
+  MessageCircle
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LeadScoring } from "./LeadScoring";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
+import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
 
 interface Lead {
   id: string;
@@ -24,7 +24,7 @@ interface Lead {
   position: string | null;
   source: string;
   status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  priority: 'low' | 'medium' | 'high';
+  priority: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
   assigned_to: string | null;
@@ -190,21 +190,19 @@ export function SortableLeadCard({
                 {displayStatus}
               </Badge>
             )}
-            <Badge variant="outline" className={`${
-              lead.priority === 'high' ? 'bg-red-500' : 
-              lead.priority === 'medium' ? 'bg-yellow-500' : 
-              'bg-green-500'
-            } text-white text-xs border-0 flex items-center gap-1`}>
-              {lead.priority === 'high' && <ArrowUp className="h-3 w-3" />}
-              {lead.priority === 'medium' && <ArrowRight className="h-3 w-3" />}
-              {lead.priority === 'low' && <ArrowDown className="h-3 w-3" />}
-              {getPriorityLabel(lead.priority)}
-            </Badge>
+            {(() => {
+              const temp = LEAD_TEMPERATURES[lead.priority as LeadTemperature];
+              const TempIcon = temp?.icon;
+              return (
+                <Badge variant="outline" className={`${temp?.color || 'bg-gray-500'} text-white text-xs border-0 flex items-center gap-1`}>
+                  {TempIcon && <TempIcon className="h-3 w-3" />}
+                  {temp?.label || lead.priority}
+                </Badge>
+              );
+            })()}
             {urgency.level !== 'normal' && (
               <Badge variant="outline" className={`${
-                urgency.level === 'urgent' ? 'bg-red-500' : 
-                urgency.level === 'today' ? 'bg-orange-500' : 
-                'bg-orange-500'
+                urgency.level === 'urgent' ? 'bg-red-500' : 'bg-orange-500'
               } text-white text-xs border-0 flex items-center gap-1`}>
                 <AlertTriangle className="h-3 w-3" />
                 {urgency.label}
