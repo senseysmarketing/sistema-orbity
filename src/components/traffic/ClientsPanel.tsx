@@ -41,24 +41,78 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
   const { toast } = useToast();
   const { currentAgency } = useAgency();
 
-  // Carregar dados iniciais do cache
-  useEffect(() => {
-    if (selectedAdAccounts.length > 0 && currentAgency) {
-      loadClientsFromCache();
-    }
-    // Não desligar loading aqui - esperar os dados chegarem
-  }, [selectedAdAccounts, currentAgency]);
+  // Flag para evitar chamadas duplicadas
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
-  // Fallback: se após 3 segundos não houver contas, desligar o loading
+  // Carregar dados automaticamente ao entrar na aba (chama a API do Facebook)
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (initialLoading && selectedAdAccounts.length === 0) {
-        setInitialLoading(false);
+    if (selectedAdAccounts.length > 0 && currentAgency && !hasLoadedOnce) {
+      setHasLoadedOnce(true);
+      refreshAllDataOnMount();
+    } else if (selectedAdAccounts.length === 0 && currentAgency) {
+      // Se não há contas selecionadas, desligar loading após verificar
+      const timeout = setTimeout(() => {
+        if (initialLoading) {
+          setInitialLoading(false);
+        }
+      }, 1500);
+      return () => clearTimeout(timeout);
+    }
+  }, [selectedAdAccounts, currentAgency, hasLoadedOnce]);
+
+  // Função separada para carregar na montagem (sem toast de sucesso)
+  const refreshAllDataOnMount = async () => {
+    if (selectedAdAccounts.length === 0) return;
+
+    try {
+      const accountIds = selectedAdAccounts.map(acc => acc.ad_account_id);
+      
+      const { data, error } = await supabase.functions.invoke('facebook-account-summary', {
+        body: { accountIds }
+      });
+
+      if (error) throw error;
+
+      if (data?.summaries) {
+        const { data: controlsData } = await supabase
+          .from('traffic_controls')
+          .select('*')
+          .eq('agency_id', currentAgency?.id);
+
+        const controlsMap = new Map(
+          controlsData?.map(c => [c.ad_account_id, c]) || []
+        );
+
+        const updatedClients: ClientData[] = data.summaries.map((summary: any) => {
+          const control = controlsMap.get(summary.ad_account_id);
+          return {
+            id: summary.ad_account_id,
+            ad_account_id: summary.ad_account_id,
+            ad_account_name: summary.ad_account_name,
+            currency: summary.currency || 'BRL',
+            balance: summary.balance || 0,
+            min_threshold: 100,
+            is_prepaid: summary.is_prepaid,
+            active_campaigns_count: summary.active_campaigns_count || 0,
+            total_daily_budget: summary.total_daily_budget || 0,
+            last_7d_spend: summary.last_7d_spend || 0,
+            last_campaign_update: summary.last_campaign_update,
+            results: control?.results || null,
+            observations: control?.observations || null,
+          };
+        });
+
+        setClients(updatedClients);
+        setLastUpdate(new Date());
       }
-    }, 3000);
-    
-    return () => clearTimeout(timeout);
-  }, [initialLoading, selectedAdAccounts.length]);
+    } catch (error: any) {
+      console.error('Erro ao carregar dados iniciais:', error);
+      // Em caso de erro, tentar carregar do cache
+      await loadClientsFromCache();
+    } finally {
+      setInitialLoading(false);
+    }
+  };
 
   const loadClientsFromCache = async () => {
     if (!currentAgency) return;
@@ -345,9 +399,9 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
               Última atualização: {format(lastUpdate, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
             </span>
           )}
-          <Button onClick={refreshAllData} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Atualizando...' : 'Atualizar Todos'}
+          <Button onClick={refreshAllData} disabled={loading || initialLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${(loading || initialLoading) ? 'animate-spin' : ''}`} />
+            {(loading || initialLoading) ? 'Atualizando...' : 'Atualizar Todos'}
           </Button>
         </div>
       </div>
