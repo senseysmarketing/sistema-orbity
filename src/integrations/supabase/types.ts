@@ -1264,6 +1264,60 @@ export type Database = {
           },
         ]
       }
+      crm_investments: {
+        Row: {
+          agency_id: string
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notes: string | null
+          reference_month: string
+          source: string
+          source_name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          agency_id: string
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          reference_month: string
+          source: string
+          source_name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          agency_id?: string
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          reference_month?: string
+          source?: string
+          source_name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_investments_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_investments_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           agency_id: string

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -8,7 +9,8 @@ import {
   Calculator,
   Percent,
   UserCheck,
-  Handshake
+  Handshake,
+  Info
 } from "lucide-react";
 
 interface Lead {
@@ -22,9 +24,17 @@ interface CRMInvestmentMetricsProps {
   leads: Lead[];
   investment: number;
   dateRange?: { from: Date; to: Date };
+  metaInvestment?: number;
+  manualInvestment?: number;
 }
 
-export function CRMInvestmentMetrics({ leads, investment, dateRange }: CRMInvestmentMetricsProps) {
+export function CRMInvestmentMetrics({ 
+  leads, 
+  investment, 
+  dateRange,
+  metaInvestment = 0,
+  manualInvestment = 0,
+}: CRMInvestmentMetricsProps) {
   const metrics = useMemo(() => {
     // Filter by date range if provided
     let filteredLeads = leads;
@@ -81,6 +91,8 @@ export function CRMInvestmentMetrics({ leads, investment, dateRange }: CRMInvest
     }).format(value);
   };
 
+  const hasBreakdown = metaInvestment > 0 || manualInvestment > 0;
+
   const leftMetrics = [
     {
       label: "Investimento",
@@ -88,6 +100,7 @@ export function CRMInvestmentMetrics({ leads, investment, dateRange }: CRMInvest
       icon: DollarSign,
       color: "text-blue-600",
       bgColor: "bg-blue-50 dark:bg-blue-950/30",
+      hasTooltip: hasBreakdown,
     },
     {
       label: "Faturamento",
@@ -172,17 +185,36 @@ export function CRMInvestmentMetrics({ leads, investment, dateRange }: CRMInvest
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {leftMetrics.map((metric) => (
-            <div key={metric.label} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${metric.bgColor}`}>
-                  <metric.icon className={`h-4 w-4 ${metric.color}`} />
+          <TooltipProvider>
+            {leftMetrics.map((metric) => (
+              <div key={metric.label} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${metric.bgColor}`}>
+                    <metric.icon className={`h-4 w-4 ${metric.color}`} />
+                  </div>
+                  <span className="text-sm font-medium">{metric.label}</span>
+                  {metric.hasTooltip && hasBreakdown && (
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="text-xs">
+                        <div className="space-y-1">
+                          {metaInvestment > 0 && (
+                            <div>Meta Ads: {formatCurrency(metaInvestment)}</div>
+                          )}
+                          {manualInvestment > 0 && (
+                            <div>Manual: {formatCurrency(manualInvestment)}</div>
+                          )}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
-                <span className="text-sm font-medium">{metric.label}</span>
+                <span className="font-bold">{metric.value}</span>
               </div>
-              <span className="font-bold">{metric.value}</span>
-            </div>
-          ))}
+            ))}
+          </TooltipProvider>
         </CardContent>
       </Card>
 

@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomStatusManager } from "./CustomStatusManager";
 import { MetaIntegrationConfig } from "./MetaIntegrationConfig";
 import { WebhooksManager } from "./WebhooksManager";
+import { ManualInvestmentManager } from "./ManualInvestmentManager";
 
 export function CRMSettings() {
   return (
@@ -14,14 +15,19 @@ export function CRMSettings() {
       </div>
 
       <Tabs defaultValue="integration" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="integration">Integração</TabsTrigger>
+          <TabsTrigger value="investments">Investimentos</TabsTrigger>
           <TabsTrigger value="status">Status</TabsTrigger>
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
         </TabsList>
 
         <TabsContent value="integration">
           <MetaIntegrationConfig />
+        </TabsContent>
+
+        <TabsContent value="investments">
+          <ManualInvestmentManager />
         </TabsContent>
 
         <TabsContent value="status">
