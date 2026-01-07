@@ -30,6 +30,7 @@ export interface SocialMediaPost {
   agency_id: string;
   created_at: string;
   updated_at: string;
+  archived?: boolean;
   subtasks?: Subtask[];
   clients?: {
     name: string;
@@ -50,6 +51,7 @@ const postsCache: Record<string, SocialMediaPost[]> = {};
 export function useSocialMediaPosts() {
   const { currentAgency } = useAgency();
   const [posts, setPosts] = useState<SocialMediaPost[]>([]);
+  const [allPosts, setAllPosts] = useState<SocialMediaPost[]>([]); // Inclui arquivados (para calendário)
   const [loading, setLoading] = useState(true);
   const [minLoadTime, setMinLoadTime] = useState(true);
   const cache = useCache<SocialMediaPost[]>(5 * 60 * 1000); // 5 minutos
@@ -70,7 +72,8 @@ export function useSocialMediaPosts() {
       const cached = cache.get(cacheKey);
       
       if (cached.exists && cached.data) {
-        setPosts(cached.data);
+        setPosts(cached.data.filter(p => !p.archived));
+        setAllPosts(cached.data);
         // Se dados estão em cache e não estão obsoletos, mostrar imediatamente
         if (!cached.isStale) {
           setLoading(false);
@@ -81,7 +84,9 @@ export function useSocialMediaPosts() {
       }
 
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Buscar TODOS os posts (incluindo arquivados) - para calendário e analytics
+      const { data: allData, error: allError } = await supabase
         .from('social_media_posts')
         .select(`
           *,
@@ -89,13 +94,12 @@ export function useSocialMediaPosts() {
           campaigns(name)
         `)
         .eq('agency_id', currentAgency.id)
-        .eq('archived', false)
         .order('scheduled_date', { ascending: true });
 
-      if (error) throw error;
+      if (allError) throw allError;
 
       // Buscar atribuições para todos os posts
-      const postIds = (data || []).map(post => post.id);
+      const postIds = (allData || []).map(post => post.id);
       let assignmentsMap: Record<string, any[]> = {};
 
       if (postIds.length > 0) {
@@ -130,19 +134,24 @@ export function useSocialMediaPosts() {
         }
       }
 
-      const formattedData = (data || []).map(post => ({
+      const formattedAllData = (allData || []).map(post => ({
         ...post,
         subtasks: Array.isArray(post.subtasks) ? post.subtasks as unknown as Subtask[] : [],
-        assigned_users: assignmentsMap[post.id] || []
+        assigned_users: assignmentsMap[post.id] || [],
+        archived: post.archived || false
       })) as SocialMediaPost[];
       
-      setPosts(formattedData);
+      // Posts ativos (não arquivados) - para Kanban
+      const activePosts = formattedAllData.filter(p => !p.archived);
       
-      // Atualizar cache
+      setPosts(activePosts);
+      setAllPosts(formattedAllData);
+      
+      // Atualizar cache com TODOS os posts
       if (currentAgency?.id) {
         const cacheKey = `posts-${currentAgency.id}`;
-        cache.set(cacheKey, formattedData);
-        postsCache[currentAgency.id] = formattedData;
+        cache.set(cacheKey, formattedAllData);
+        postsCache[currentAgency.id] = activePosts; // Cache global só para ativos
       }
     } catch (error: any) {
       toast.error('Erro ao carregar postagens: ' + error.message);
@@ -306,6 +315,7 @@ export function useSocialMediaPosts() {
 
   return {
     posts,
+    allPosts, // Incluindo arquivados para calendário
     loading: loading || minLoadTime,
     fetchPosts,
     createPost,

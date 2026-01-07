@@ -1,10 +1,10 @@
 import { useMemo, useEffect, useState } from "react";
-import { useSocialMediaPosts } from "@/hooks/useSocialMediaPosts";
 import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { 
   Calendar, 
   Clock, 
@@ -17,13 +17,81 @@ import {
   Activity,
   Zap,
   AlertTriangle,
-  Archive
+  Archive,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
+import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+interface PostData {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  platform: string;
+  post_type: string;
+  client_id: string | null;
+  scheduled_date: string;
+  archived?: boolean;
+  clients?: { name: string } | null;
+}
 
 export function SocialMediaAnalytics() {
-  const { posts } = useSocialMediaPosts();
   const { currentAgency } = useAgency();
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [monthPosts, setMonthPosts] = useState<PostData[]>([]);
+  const [loading, setLoading] = useState(true);
   const [yesterdayArchivedCount, setYesterdayArchivedCount] = useState(0);
+
+  // Navegar entre meses
+  const handlePreviousMonth = () => {
+    const newDate = new Date(selectedMonth);
+    newDate.setMonth(newDate.getMonth() - 1);
+    setSelectedMonth(newDate);
+  };
+
+  const handleNextMonth = () => {
+    const newDate = new Date(selectedMonth);
+    newDate.setMonth(newDate.getMonth() + 1);
+    setSelectedMonth(newDate);
+  };
+
+  // Buscar posts do mês selecionado (incluindo arquivados)
+  useEffect(() => {
+    const fetchMonthPosts = async () => {
+      if (!currentAgency?.id) return;
+
+      setLoading(true);
+      const monthStart = startOfMonth(selectedMonth);
+      const monthEnd = endOfMonth(selectedMonth);
+
+      const { data, error } = await supabase
+        .from('social_media_posts')
+        .select(`
+          id,
+          title,
+          status,
+          priority,
+          platform,
+          post_type,
+          client_id,
+          scheduled_date,
+          archived,
+          clients(name)
+        `)
+        .eq('agency_id', currentAgency.id)
+        .gte('scheduled_date', monthStart.toISOString())
+        .lte('scheduled_date', monthEnd.toISOString());
+
+      if (!error && data) {
+        setMonthPosts(data);
+      }
+      setLoading(false);
+    };
+
+    fetchMonthPosts();
+  }, [currentAgency?.id, selectedMonth]);
 
   // Buscar posts arquivados no dia anterior
   useEffect(() => {
@@ -53,7 +121,11 @@ export function SocialMediaAnalytics() {
     fetchArchivedYesterday();
   }, [currentAgency?.id]);
 
+  // Verificar se é o mês atual
+  const isCurrentMonth = isSameMonth(selectedMonth, new Date());
+
   const analytics = useMemo(() => {
+    const posts = monthPosts;
     const today = new Date();
     const thisWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
     const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
@@ -79,31 +151,31 @@ export function SocialMediaAnalytics() {
       contentTypeStats[post.post_type] = (contentTypeStats[post.post_type] || 0) + 1;
     });
 
-    // Postagens agendadas para hoje
-    const scheduledToday = posts.filter(p => {
+    // Postagens agendadas para hoje (apenas no mês atual)
+    const scheduledToday = isCurrentMonth ? posts.filter(p => {
       const scheduledDate = new Date(p.scheduled_date);
       return scheduledDate.toDateString() === today.toDateString() && 
              p.status !== 'published';
-    });
+    }) : [];
 
     // Postagens agendadas para amanhã
-    const scheduledTomorrow = posts.filter(p => {
+    const scheduledTomorrow = isCurrentMonth ? posts.filter(p => {
       const scheduledDate = new Date(p.scheduled_date);
       return scheduledDate.toDateString() === tomorrow.toDateString() && 
              p.status !== 'published';
-    });
+    }) : [];
 
     // Postagens agendadas para esta semana
-    const scheduledThisWeek = posts.filter(p => {
+    const scheduledThisWeek = isCurrentMonth ? posts.filter(p => {
       const scheduledDate = new Date(p.scheduled_date);
       return scheduledDate >= today && scheduledDate <= thisWeek && 
              p.status !== 'published';
-    });
+    }) : [];
 
     // Postagens atrasadas (deveriam ter sido publicadas mas ainda não foram)
     const overduePosts = posts.filter(p => {
       const scheduledDate = new Date(p.scheduled_date);
-      return scheduledDate < today && p.status !== 'published';
+      return scheduledDate < today && p.status !== 'published' && !p.archived;
     });
 
     // Postagens aguardando aprovação
@@ -135,6 +207,10 @@ export function SocialMediaAnalytics() {
       low: posts.filter(p => p.priority === 'low').length,
     };
 
+    // Contadores de arquivados
+    const archivedCount = posts.filter(p => p.archived).length;
+    const activeCount = posts.filter(p => !p.archived).length;
+
     return {
       total,
       statusStats,
@@ -148,8 +224,10 @@ export function SocialMediaAnalytics() {
       completionRate,
       clientStats,
       priorityStats,
+      archivedCount,
+      activeCount,
     };
-  }, [posts]);
+  }, [monthPosts, isCurrentMonth]);
 
   const getPlatformIcon = (platform: string) => {
     const icons: { [key: string]: string } = {
@@ -163,14 +241,49 @@ export function SocialMediaAnalytics() {
     return icons[platform] || '📱';
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Análises e Insights</h2>
-        <p className="text-muted-foreground">
-          Visão geral do desempenho e status das postagens
-        </p>
+      {/* Header com seletor de mês */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Análises e Insights</h2>
+          <p className="text-muted-foreground">
+            Visão geral do desempenho e status das postagens
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={handlePreviousMonth}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="min-w-[150px] text-center">
+            <span className="text-lg font-semibold capitalize">
+              {format(selectedMonth, "MMMM yyyy", { locale: ptBR })}
+            </span>
+          </div>
+          <Button variant="outline" size="icon" onClick={handleNextMonth}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
+
+      {/* Indicador de mês histórico */}
+      {!isCurrentMonth && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border">
+          <Archive className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            Visualizando dados de {format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })} 
+            {analytics.archivedCount > 0 && ` (${analytics.archivedCount} arquivado${analytics.archivedCount > 1 ? 's' : ''})`}
+          </span>
+        </div>
+      )}
 
       {/* Cards principais de métricas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -221,128 +334,130 @@ export function SocialMediaAnalytics() {
               {analytics.overduePosts.length}
             </div>
             <p className="text-xs text-muted-foreground">
-              Necessitam atenção urgente
+              {isCurrentMonth ? "Necessitam atenção urgente" : "Do período selecionado"}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Vencimentos próximos */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Agendamentos Próximos
-            </CardTitle>
-            <CardDescription>
-              Postagens programadas para os próximos dias
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Hoje</span>
-                <Badge variant={analytics.scheduledToday.length > 0 ? "default" : "secondary"}>
-                  {analytics.scheduledToday.length} postagens
-                </Badge>
+      {/* Vencimentos próximos - apenas no mês atual */}
+      {isCurrentMonth && (
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Agendamentos Próximos
+              </CardTitle>
+              <CardDescription>
+                Postagens programadas para os próximos dias
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Hoje</span>
+                  <Badge variant={analytics.scheduledToday.length > 0 ? "default" : "secondary"}>
+                    {analytics.scheduledToday.length} postagens
+                  </Badge>
+                </div>
+                {analytics.scheduledToday.length > 0 && (
+                  <div className="space-y-1 pl-4">
+                    {analytics.scheduledToday.slice(0, 3).map(post => (
+                      <div key={post.id} className="flex items-center gap-2 text-sm">
+                        <span>{getPlatformIcon(post.platform)}</span>
+                        <span className="truncate">{post.title}</span>
+                      </div>
+                    ))}
+                    {analytics.scheduledToday.length > 3 && (
+                      <p className="text-xs text-muted-foreground">
+                        +{analytics.scheduledToday.length - 3} mais
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
-              {analytics.scheduledToday.length > 0 && (
-                <div className="space-y-1 pl-4">
-                  {analytics.scheduledToday.slice(0, 3).map(post => (
-                    <div key={post.id} className="flex items-center gap-2 text-sm">
-                      <span>{getPlatformIcon(post.platform)}</span>
-                      <span className="truncate">{post.title}</span>
-                    </div>
-                  ))}
-                  {analytics.scheduledToday.length > 3 && (
-                    <p className="text-xs text-muted-foreground">
-                      +{analytics.scheduledToday.length - 3} mais
-                    </p>
-                  )}
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Amanhã</span>
+                  <Badge variant="secondary">
+                    {analytics.scheduledTomorrow.length} postagens
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Esta Semana</span>
+                  <Badge variant="secondary">
+                    {analytics.scheduledThisWeek.length} postagens
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" />
+                Itens que Precisam de Atenção
+              </CardTitle>
+              <CardDescription>
+                Postagens com alertas ou pendências
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {analytics.overduePosts.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-destructive">Atrasadas</span>
+                    <Badge variant="destructive">
+                      {analytics.overduePosts.length}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1 pl-4">
+                    {analytics.overduePosts.slice(0, 3).map(post => (
+                      <div key={post.id} className="flex items-center gap-2 text-sm">
+                        <span>{getPlatformIcon(post.platform)}</span>
+                        <span className="truncate">{post.title}</span>
+                      </div>
+                    ))}
+                    {analytics.overduePosts.length > 3 && (
+                      <p className="text-xs text-muted-foreground">
+                        +{analytics.overduePosts.length - 3} mais
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Amanhã</span>
-                <Badge variant="secondary">
-                  {analytics.scheduledTomorrow.length} postagens
-                </Badge>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Esta Semana</span>
-                <Badge variant="secondary">
-                  {analytics.scheduledThisWeek.length} postagens
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              Itens que Precisam de Atenção
-            </CardTitle>
-            <CardDescription>
-              Postagens com alertas ou pendências
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {analytics.overduePosts.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-destructive">Atrasadas</span>
-                  <Badge variant="destructive">
-                    {analytics.overduePosts.length}
-                  </Badge>
+              {analytics.pendingApproval.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Aguardando Aprovação</span>
+                    <Badge variant="outline">
+                      {analytics.pendingApproval.length}
+                    </Badge>
+                  </div>
                 </div>
-                <div className="space-y-1 pl-4">
-                  {analytics.overduePosts.slice(0, 3).map(post => (
-                    <div key={post.id} className="flex items-center gap-2 text-sm">
-                      <span>{getPlatformIcon(post.platform)}</span>
-                      <span className="truncate">{post.title}</span>
-                    </div>
-                  ))}
-                  {analytics.overduePosts.length > 3 && (
-                    <p className="text-xs text-muted-foreground">
-                      +{analytics.overduePosts.length - 3} mais
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
+              )}
 
-            {analytics.pendingApproval.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Aguardando Aprovação</span>
-                  <Badge variant="outline">
-                    {analytics.pendingApproval.length}
-                  </Badge>
+              {analytics.statusStats.draft > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Em Briefing</span>
+                    <Badge variant="secondary">
+                      {analytics.statusStats.draft}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
-            )}
-
-            {analytics.statusStats.draft > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Em Briefing</span>
-                  <Badge variant="secondary">
-                    {analytics.statusStats.draft}
-                  </Badge>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Estatísticas detalhadas */}
       <div className="grid gap-4 md:grid-cols-3">
