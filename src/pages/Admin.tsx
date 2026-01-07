@@ -185,6 +185,7 @@ export default function Admin() {
   const [employeeDeleteDialogOpen, setEmployeeDeleteDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
   const [runningClosure, setRunningClosure] = useState(false);
+  const [generatingSalaries, setGeneratingSalaries] = useState(false);
 
   // Filtros e busca - Despesas
   const [expenseSearchTerm, setExpenseSearchTerm] = useState("");
@@ -977,6 +978,95 @@ export default function Admin() {
       });
     } finally {
       setRunningClosure(false);
+    }
+  };
+
+  // Gerar salários do mês selecionado para funcionários ativos
+  const handleGenerateSalaries = async () => {
+    if (!currentAgency) return;
+    
+    setGeneratingSalaries(true);
+    try {
+      const [year, month] = selectedMonth.split('-').map(Number);
+      
+      // Buscar funcionários ativos que ainda não têm salário no mês selecionado
+      const { data: activeEmployees, error: empError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('agency_id', currentAgency.id)
+        .eq('is_active', true);
+      
+      if (empError) throw empError;
+      
+      if (!activeEmployees || activeEmployees.length === 0) {
+        toast({
+          title: "Nenhum funcionário ativo",
+          description: "Não há funcionários ativos para gerar salários.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Verificar quais já têm salário no mês
+      const startDate = `${selectedMonth}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endDate = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
+      
+      const { data: existingSalaries, error: salError } = await supabase
+        .from('salaries')
+        .select('employee_id')
+        .eq('agency_id', currentAgency.id)
+        .gte('due_date', startDate)
+        .lte('due_date', endDate);
+      
+      if (salError) throw salError;
+      
+      const existingEmployeeIds = new Set(existingSalaries?.map(s => s.employee_id) || []);
+      const employeesToGenerate = activeEmployees.filter(e => !existingEmployeeIds.has(e.id));
+      
+      if (employeesToGenerate.length === 0) {
+        toast({
+          title: "Salários já gerados",
+          description: `Todos os funcionários já têm salário para ${new Date(year, month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}.`,
+        });
+        return;
+      }
+      
+      // Gerar salários
+      const salariesToInsert = employeesToGenerate.map(emp => {
+        const paymentDay = Math.min(emp.payment_day || 5, lastDay);
+        const dueDate = `${selectedMonth}-${String(paymentDay).padStart(2, '0')}`;
+        
+        return {
+          agency_id: currentAgency.id,
+          employee_id: emp.id,
+          employee_name: emp.name,
+          amount: emp.base_salary,
+          due_date: dueDate,
+          status: 'pending' as const
+        };
+      });
+      
+      const { error: insertError } = await supabase
+        .from('salaries')
+        .insert(salariesToInsert);
+      
+      if (insertError) throw insertError;
+      
+      toast({
+        title: "Salários gerados",
+        description: `${salariesToInsert.length} salário(s) gerado(s) para ${new Date(year, month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}.`,
+      });
+      
+      fetchData();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao gerar salários",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingSalaries(false);
     }
   };
 
@@ -2697,7 +2787,16 @@ export default function Admin() {
             <h2 className="text-2xl font-bold">
               Funcionários ({employees.length})
             </h2>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={handleGenerateSalaries}
+                disabled={generatingSalaries}
+                className="flex items-center gap-2"
+              >
+                <DollarSign className="h-4 w-4" />
+                {generatingSalaries ? 'Gerando...' : 'Gerar Salários do Mês'}
+              </Button>
               <Button
                 variant="outline"
                 onClick={handleRunMonthlyClosure}
@@ -2705,7 +2804,7 @@ export default function Admin() {
                 className="flex items-center gap-2"
               >
                 <Play className="h-4 w-4" />
-                {runningClosure ? 'Executando...' : 'Executar Fechamento Mensal'}
+                {runningClosure ? 'Executando...' : 'Fechamento Mensal'}
               </Button>
               <Button onClick={() => { setSelectedEmployee(null); setEmployeeFormOpen(true); }}>
                 <Plus className="h-4 w-4 mr-2" />
