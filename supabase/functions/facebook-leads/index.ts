@@ -228,7 +228,6 @@ async function saveIntegration(supabase: any, userId: string, params: any) {
       default_status: defaultStatus || 'new',
       default_priority: defaultPriority || 'medium',
       field_mapping: fieldMapping || {},
-      webhook_active: false,
       created_by: userId
     })
     .select()
