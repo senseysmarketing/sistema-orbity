@@ -17,7 +17,8 @@ export function SocialMediaCalendar() {
   const [selectedPost, setSelectedPost] = useState<SocialMediaPost | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<SocialMediaPost | null>(null);
-  const { posts, loading, deletePost, fetchPosts } = useSocialMediaPosts();
+  // Usar allPosts para mostrar arquivados no calendário
+  const { allPosts, loading, deletePost, fetchPosts } = useSocialMediaPosts();
 
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
@@ -29,8 +30,9 @@ export function SocialMediaCalendar() {
   const weekEnd = endOfWeek(selectedDate, { locale: ptBR });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
+  // Usar allPosts para incluir arquivados
   const getPostsForDate = (date: Date) => {
-    return posts.filter(post => 
+    return allPosts.filter(post => 
       isSameDay(new Date(post.scheduled_date), date)
     );
   };
@@ -134,6 +136,7 @@ export function SocialMediaCalendar() {
                       key={post.id} 
                       post={post} 
                       compact 
+                      showArchived
                       onClick={() => handlePostClick(post)}
                     />
                   ))}
@@ -176,6 +179,7 @@ export function SocialMediaCalendar() {
                         key={post.id} 
                         post={post} 
                         compact 
+                        showArchived
                         onClick={() => handlePostClick(post)}
                       />
                     ))}
@@ -207,6 +211,7 @@ export function SocialMediaCalendar() {
                     <PostCard 
                       key={post.id} 
                       post={post} 
+                      showArchived
                       onClick={() => handlePostClick(post)}
                     />
                   ))}

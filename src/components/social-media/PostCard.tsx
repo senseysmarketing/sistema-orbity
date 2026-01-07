@@ -1,13 +1,15 @@
 import { Badge } from "@/components/ui/badge";
 import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
-import { Instagram, Facebook, Linkedin, Twitter, Youtube, Image, Film, LayoutGrid, Zap, Clock, AlertCircle, Users } from "lucide-react";
+import { Instagram, Facebook, Linkedin, Twitter, Youtube, Image, Film, LayoutGrid, Zap, Clock, AlertCircle, Users, Archive } from "lucide-react";
 import { format, isToday, isBefore, startOfDay, addDays, isBefore as isBeforeDate } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface PostCardProps {
   post: SocialMediaPost;
   compact?: boolean;
   onClick?: (e?: React.MouseEvent) => void;
+  showArchived?: boolean; // Mostra indicador de arquivado
 }
 
 const platformIcons = {
@@ -94,21 +96,26 @@ const getUrgencyBadge = (scheduledDate: string) => {
   return null;
 };
 
-export function PostCard({ post, compact = false, onClick }: PostCardProps) {
+export function PostCard({ post, compact = false, onClick, showArchived = false }: PostCardProps) {
   const PlatformIcon = platformIcons[post.platform as keyof typeof platformIcons] || Instagram;
   const ContentTypeIcon = contentTypeIcons[post.post_type as keyof typeof contentTypeIcons] || Image;
   const clientColor = getClientColor(post.client_id);
   const statusInfo = statusConfig[post.status as keyof typeof statusConfig] || statusConfig.draft;
   const urgencyBadge = getUrgencyBadge(post.scheduled_date);
+  const isArchived = showArchived && post.archived;
 
   if (compact) {
     return (
       <div 
-        className="text-xs p-1.5 rounded border cursor-pointer hover:brightness-95 transition-all"
+        className={cn(
+          "text-xs p-1.5 rounded border cursor-pointer hover:brightness-95 transition-all",
+          isArchived && "opacity-60 border-dashed"
+        )}
         onClick={(e) => onClick?.(e)}
         style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
       >
         <div className="flex items-center gap-1">
+          {isArchived && <Archive className="h-3 w-3 text-muted-foreground" />}
           <ContentTypeIcon className="h-3 w-3" />
           <span className="truncate flex-1">{post.title}</span>
           <div className={`h-2 w-2 rounded-full ${statusInfo.color}`} />
@@ -121,10 +128,23 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
 
   return (
     <div 
-      className="p-4 rounded-lg border cursor-pointer hover:shadow-md hover:brightness-95 transition-all"
+      className={cn(
+        "p-4 rounded-lg border cursor-pointer hover:shadow-md hover:brightness-95 transition-all",
+        isArchived && "opacity-60 border-dashed"
+      )}
       onClick={(e) => onClick?.(e)}
       style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
     >
+      {/* Badge de arquivado */}
+      {isArchived && (
+        <div className="flex items-center gap-1 mb-2">
+          <Badge variant="secondary" className="text-[10px] flex items-center gap-1">
+            <Archive className="h-3 w-3" />
+            Arquivado
+          </Badge>
+        </div>
+      )}
+      
       {/* Linha 1: Ícone + Badges */}
       <div className="flex items-center justify-between gap-2 mb-2">
         <ContentTypeIcon className="h-5 w-5 flex-shrink-0" />
@@ -132,7 +152,7 @@ export function PostCard({ post, compact = false, onClick }: PostCardProps) {
           <Badge variant="outline" className={`${getPriorityColor(post.priority)} text-white text-xs`}>
             {getPriorityLabel(post.priority)}
           </Badge>
-          {urgencyBadge && UrgencyIcon && post.status !== 'published' && (
+          {urgencyBadge && UrgencyIcon && post.status !== 'published' && !isArchived && (
             <Badge variant="outline" className={`${urgencyBadge.color} text-white text-xs flex items-center gap-1`}>
               <UrgencyIcon className="h-3 w-3" />
               {urgencyBadge.label}
