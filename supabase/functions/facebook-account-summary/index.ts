@@ -239,7 +239,9 @@ serve(async (req) => {
 
         accountSummaries.push(summary)
 
-        // 5. Atualizar cache no banco de dados
+        // 5. Atualizar cache no banco de dados (ad_account_id é único, não precisa de agency_id)
+        console.log(`Account ${accountId}: Updating cache in DB with current_month_spend=${currentMonthSpend}`)
+        
         const { error: updateError } = await supabaseClient
           .from('selected_ad_accounts')
           .update({
@@ -256,7 +258,6 @@ serve(async (req) => {
             last_sync: now.toISOString()
           })
           .eq('ad_account_id', accountId)
-          .eq('agency_id', agencyUser.agency_id)
 
         if (updateError) {
           console.error(`Error updating cache for ${accountId}:`, updateError)
