@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Users, Target, DollarSign, AlertTriangle, TrendingUp, TrendingDown, Settings } from "lucide-react";
+import { CalendarIcon, Users, Target, DollarSign, AlertTriangle, TrendingUp, TrendingDown, Settings, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CRMFunnelChart } from "./CRMFunnelChart";
 import { CRMInvestmentMetrics } from "./CRMInvestmentMetrics";
@@ -35,15 +36,17 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
-  const [investment, setInvestment] = useState(0);
+  const [metaInvestment, setMetaInvestment] = useState(0);
+  const [manualInvestment, setManualInvestment] = useState(0);
   const [hasMetaIntegration, setHasMetaIntegration] = useState<boolean | null>(null);
 
-  // Check if Meta integration is configured
+  // Fetch investments (Meta + Manual)
   useEffect(() => {
-    const checkIntegration = async () => {
+    const fetchInvestments = async () => {
       if (!currentAgency?.id) return;
 
       try {
+        // Check Meta integration and get spend
         const { data: agency } = await supabase
           .from('agencies')
           .select('crm_ad_account_id')
@@ -60,17 +63,32 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
             .single();
 
           if (account) {
-            setInvestment(account.current_month_spend || 0);
+            setMetaInvestment(account.current_month_spend || 0);
           }
         }
+
+        // Fetch manual investments for current month
+        const monthStr = format(startOfMonth(new Date()), 'yyyy-MM-01');
+        const { data: manualData } = await supabase
+          .from('crm_investments')
+          .select('amount')
+          .eq('agency_id', currentAgency.id)
+          .eq('reference_month', monthStr);
+
+        if (manualData) {
+          const total = manualData.reduce((sum, inv) => sum + Number(inv.amount), 0);
+          setManualInvestment(total);
+        }
       } catch (error) {
-        console.error('Error checking integration:', error);
+        console.error('Error fetching investments:', error);
         setHasMetaIntegration(false);
       }
     };
 
-    checkIntegration();
+    fetchInvestments();
   }, [currentAgency?.id]);
+
+  const totalInvestment = metaInvestment + manualInvestment;
 
   const metrics = useMemo(() => {
     const filteredLeads = leads.filter(lead => {
@@ -269,8 +287,10 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
       {/* Investment Metrics */}
       <CRMInvestmentMetrics 
         leads={leads} 
-        investment={investment} 
+        investment={totalInvestment} 
         dateRange={dateRange} 
+        metaInvestment={metaInvestment}
+        manualInvestment={manualInvestment}
       />
     </div>
   );
