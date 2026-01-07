@@ -1,6 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomStatusManager } from "./CustomStatusManager";
-import { FacebookLeadsIntegration } from "./FacebookLeadsIntegration";
+import { MetaIntegrationConfig } from "./MetaIntegrationConfig";
 import { WebhooksManager } from "./WebhooksManager";
 
 export function CRMSettings() {
@@ -13,19 +13,19 @@ export function CRMSettings() {
         </p>
       </div>
 
-      <Tabs defaultValue="status" className="space-y-4">
+      <Tabs defaultValue="integration" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="status">Status</TabsTrigger>
           <TabsTrigger value="integration">Integração</TabsTrigger>
+          <TabsTrigger value="status">Status</TabsTrigger>
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="status">
-          <CustomStatusManager />
+        <TabsContent value="integration">
+          <MetaIntegrationConfig />
         </TabsContent>
 
-        <TabsContent value="integration">
-          <FacebookLeadsIntegration />
+        <TabsContent value="status">
+          <CustomStatusManager />
         </TabsContent>
 
         <TabsContent value="webhooks">

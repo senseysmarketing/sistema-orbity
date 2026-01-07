@@ -4,15 +4,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Users, Target, DollarSign, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react";
+import { CalendarIcon, Users, Target, DollarSign, AlertTriangle, TrendingUp, TrendingDown, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CRMFunnelChart } from "./CRMFunnelChart";
 import { CRMInvestmentMetrics } from "./CRMInvestmentMetrics";
-import { CRMAdAccountSelector } from "./CRMAdAccountSelector";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
+import { useNavigate } from "react-router-dom";
 
 interface Lead {
   id: string;
@@ -29,15 +30,17 @@ interface CRMDashboardProps {
 
 export function CRMDashboard({ leads }: CRMDashboardProps) {
   const { currentAgency } = useAgency();
+  const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
   const [investment, setInvestment] = useState(0);
+  const [hasMetaIntegration, setHasMetaIntegration] = useState<boolean | null>(null);
 
-  // Fetch investment from selected ad account
+  // Check if Meta integration is configured
   useEffect(() => {
-    const fetchInvestment = async () => {
+    const checkIntegration = async () => {
       if (!currentAgency?.id) return;
 
       try {
@@ -46,6 +49,8 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
           .select('crm_ad_account_id')
           .eq('id', currentAgency.id)
           .single();
+
+        setHasMetaIntegration(!!agency?.crm_ad_account_id);
 
         if (agency?.crm_ad_account_id) {
           const { data: account } = await supabase
@@ -59,11 +64,12 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
           }
         }
       } catch (error) {
-        console.error('Error fetching investment:', error);
+        console.error('Error checking integration:', error);
+        setHasMetaIntegration(false);
       }
     };
 
-    fetchInvestment();
+    checkIntegration();
   }, [currentAgency?.id]);
 
   const metrics = useMemo(() => {
@@ -113,10 +119,6 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
     };
   }, [leads, dateRange]);
 
-  const handleInvestmentChange = (value: number) => {
-    setInvestment(value);
-  };
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -133,6 +135,27 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
 
   return (
     <div className="space-y-6">
+      {/* Meta Integration Alert */}
+      {hasMetaIntegration === false && (
+        <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="flex items-center justify-between">
+            <span className="text-amber-800 dark:text-amber-200">
+              Configure sua integração com Meta Ads para acompanhar investimento e leads automaticamente.
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate('/dashboard/crm?tab=settings')}
+              className="ml-4 shrink-0"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Configurar
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Period Selector */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted-foreground">Período:</span>
@@ -240,15 +263,8 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
         </Card>
       </div>
 
-      {/* Funnel and Investment Metrics */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <CRMFunnelChart leads={leads} dateRange={dateRange} />
-        </div>
-        <div className="space-y-4">
-          <CRMAdAccountSelector onInvestmentChange={handleInvestmentChange} />
-        </div>
-      </div>
+      {/* Funnel Chart - Full Width */}
+      <CRMFunnelChart leads={leads} dateRange={dateRange} />
 
       {/* Investment Metrics */}
       <CRMInvestmentMetrics 
