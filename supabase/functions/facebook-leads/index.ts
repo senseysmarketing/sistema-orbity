@@ -39,55 +39,77 @@ serve(async (req) => {
       }
     }
     
-    // Facebook webhook notification (POST request) - accept all POST requests
+    // POST requests - can be API calls OR Facebook webhooks
     if (req.method === 'POST') {
       const body = await req.json();
-      console.log('[WEBHOOK] 📥 POST received:', JSON.stringify(body, null, 2));
+      
+      // If body has 'action' field, it's an API call from our app
+      if (body.action) {
+        console.log('[API] Action:', body.action);
+        
+        // API calls require authentication
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader) {
+          return new Response(
+            JSON.stringify({ error: 'No authorization header' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser(
+          authHeader.replace('Bearer ', '')
+        );
+
+        if (authError || !user) {
+          return new Response(
+            JSON.stringify({ error: 'Unauthorized' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const { action, ...params } = body;
+        console.log('[API] Processing action:', action, 'User:', user.id);
+
+        switch (action) {
+          case 'list_pages':
+            return await listPages(supabase, user.id, params);
+          
+          case 'list_forms':
+            return await listForms(supabase, user.id, params);
+          
+          case 'save_integration':
+            return await saveIntegration(supabase, user.id, params);
+          
+          case 'get_integrations':
+            return await getIntegrations(supabase, user.id, params);
+          
+          case 'delete_integration':
+            return await deleteIntegration(supabase, user.id, params);
+          
+          case 'sync_leads':
+            return await syncLeads(supabase, user.id, params);
+          
+          case 'subscribe_webhook':
+            return await subscribeWebhook(supabase, user.id, params);
+          
+          default:
+            return new Response(
+              JSON.stringify({ error: 'Invalid action' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+        }
+      }
+      
+      // No 'action' field = Facebook webhook
+      console.log('[WEBHOOK] 📥 Facebook webhook received:', JSON.stringify(body, null, 2));
       return await handleWebhook(supabase, body);
     }
 
-    // Regular API calls require authentication
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
+    // Any other method
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
-    if (authError || !user) {
-      throw new Error('Unauthorized');
-    }
-
-    const { action, ...params } = await req.json();
-    console.log('Facebook Leads action:', action, 'User:', user.id);
-
-    switch (action) {
-      case 'list_pages':
-        return await listPages(supabase, user.id, params);
-      
-      case 'list_forms':
-        return await listForms(supabase, user.id, params);
-      
-      case 'save_integration':
-        return await saveIntegration(supabase, user.id, params);
-      
-      case 'get_integrations':
-        return await getIntegrations(supabase, user.id, params);
-      
-      case 'delete_integration':
-        return await deleteIntegration(supabase, user.id, params);
-      
-      case 'sync_leads':
-        return await syncLeads(supabase, user.id, params);
-      
-      case 'subscribe_webhook':
-        return await subscribeWebhook(supabase, user.id, params);
-      
-      default:
-        throw new Error('Invalid action');
-    }
   } catch (error) {
     console.error('Error:', error);
     return new Response(

@@ -95,6 +95,8 @@ export function MetaIntegrationConfig() {
 
   const [loadingPages, setLoadingPages] = useState(false);
   const [loadingForms, setLoadingForms] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<string | null>(null);
 
   useEffect(() => {
     checkConnection();
@@ -150,9 +152,44 @@ export function MetaIntegrationConfig() {
 
       if (agency?.crm_ad_account_id) {
         setSelectedAdAccount(agency.crm_ad_account_id);
+        
+        // Get last sync time
+        const selectedAcc = (data || []).find((a: AdAccount) => a.id === agency.crm_ad_account_id);
+        if (selectedAcc && (selectedAcc as any).last_sync) {
+          setLastSync((selectedAcc as any).last_sync);
+        }
       }
     } catch (error) {
       console.error('Error fetching ad accounts:', error);
+    }
+  };
+
+  const handleManualSync = async () => {
+    if (!selectedAdAccount || syncing) return;
+
+    const account = adAccounts.find(a => a.id === selectedAdAccount);
+    if (!account) return;
+
+    setSyncing(true);
+    try {
+      const success = await syncAccountData(account.ad_account_id);
+      if (success) {
+        toast({
+          title: "✅ Sincronização concluída",
+          description: "Dados atualizados com sucesso."
+        });
+        await fetchAdAccounts();
+      } else {
+        throw new Error('Sync failed');
+      }
+    } catch (error) {
+      toast({
+        title: "Erro na sincronização",
+        description: "Não foi possível atualizar os dados.",
+        variant: "destructive"
+      });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -510,6 +547,33 @@ export function MetaIntegrationConfig() {
                     )}
                   </>
                 )}
+
+                {/* Last Sync Info */}
+                {lastSync && (
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <span className="text-xs text-muted-foreground">Última sincronização</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(lastSync).toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={handleManualSync} 
+                  disabled={syncing || !selectedAdAccount}
+                  className="flex-1"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                  {syncing ? 'Sincronizando...' : 'Sincronizar Agora'}
+                </Button>
               </div>
 
               <div className="flex gap-2">
