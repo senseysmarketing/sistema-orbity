@@ -158,6 +158,7 @@ export type Database = {
           contact_email: string | null
           contact_phone: string | null
           created_at: string
+          crm_ad_account_id: string | null
           description: string | null
           id: string
           is_active: boolean
@@ -176,6 +177,7 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
+          crm_ad_account_id?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -194,6 +196,7 @@ export type Database = {
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
+          crm_ad_account_id?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
@@ -208,7 +211,15 @@ export type Database = {
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "agencies_crm_ad_account_id_fkey"
+            columns: ["crm_ad_account_id"]
+            isOneToOne: false
+            referencedRelation: "selected_ad_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       agency_onboarding: {
         Row: {
