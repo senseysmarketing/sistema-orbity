@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { 
   Calendar, 
   Clock, 
@@ -14,8 +15,14 @@ import {
   Activity,
   Zap,
   AlertTriangle,
-  UserCheck
+  UserCheck,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
+import { format, startOfMonth, endOfMonth, isSameMonth } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import { useAgency } from "@/hooks/useAgency";
 
 interface Task {
   id: string;
@@ -50,7 +57,65 @@ interface TaskAnalyticsProps {
   getAssignedUsers: (taskId: string) => any[];
 }
 
-export function TaskAnalytics({ tasks, profiles, clients, getAssignedUsers }: TaskAnalyticsProps) {
+export function TaskAnalytics({ tasks: currentTasks, profiles, clients, getAssignedUsers }: TaskAnalyticsProps) {
+  const { currentAgency } = useAgency();
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  const [monthTasks, setMonthTasks] = useState<Task[]>([]);
+  const [loadingMonthTasks, setLoadingMonthTasks] = useState(false);
+  
+  const isCurrentMonth = isSameMonth(selectedMonth, new Date());
+
+  // Buscar tarefas do mês selecionado (incluindo arquivadas)
+  useEffect(() => {
+    const fetchMonthTasks = async () => {
+      if (!currentAgency?.id) return;
+      
+      // Se for o mês atual, usa as tarefas passadas por props
+      if (isCurrentMonth) {
+        setMonthTasks(currentTasks);
+        return;
+      }
+      
+      setLoadingMonthTasks(true);
+      
+      const monthStart = startOfMonth(selectedMonth);
+      const monthEnd = endOfMonth(selectedMonth);
+      
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('agency_id', currentAgency.id)
+        .or(`due_date.gte.${monthStart.toISOString()},created_at.gte.${monthStart.toISOString()}`)
+        .or(`due_date.lte.${monthEnd.toISOString()},created_at.lte.${monthEnd.toISOString()}`);
+      
+      if (!error && data) {
+        // Filtrar para pegar apenas tarefas que realmente pertencem ao mês
+        const filteredTasks = data.filter(task => {
+          const taskDate = task.due_date ? new Date(task.due_date) : new Date(task.created_at);
+          return taskDate >= monthStart && taskDate <= monthEnd;
+        });
+        setMonthTasks(filteredTasks as Task[]);
+      }
+      
+      setLoadingMonthTasks(false);
+    };
+    
+    fetchMonthTasks();
+  }, [currentAgency?.id, selectedMonth, isCurrentMonth, currentTasks]);
+
+  const handlePreviousMonth = () => {
+    setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    const nextMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 1);
+    if (nextMonth <= new Date()) {
+      setSelectedMonth(nextMonth);
+    }
+  };
+
+  // Usar monthTasks para analytics
+  const tasks = monthTasks;
 
   const analytics = useMemo(() => {
     const today = new Date();
@@ -166,12 +231,44 @@ export function TaskAnalytics({ tasks, profiles, clients, getAssignedUsers }: Ta
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Análises e Insights</h2>
-        <p className="text-muted-foreground">
-          Visão geral do desempenho e status das tarefas
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Análises e Insights</h2>
+          <p className="text-muted-foreground">
+            Visão geral do desempenho e status das tarefas
+          </p>
+        </div>
+        
+        {/* Seletor de Mês */}
+        <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handlePreviousMonth}
+            className="h-8 w-8"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm font-medium min-w-[140px] text-center capitalize">
+            {format(selectedMonth, "MMMM yyyy", { locale: ptBR })}
+          </span>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleNextMonth}
+            disabled={isSameMonth(selectedMonth, new Date())}
+            className="h-8 w-8"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
+
+      {loadingMonthTasks && (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      )}
 
       {/* Cards principais de métricas */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -228,16 +325,19 @@ export function TaskAnalytics({ tasks, profiles, clients, getAssignedUsers }: Ta
         </Card>
       </div>
 
-      {/* Vencimentos próximos */}
+      {/* Vencimentos próximos / Resumo do Mês */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Vencimentos Próximos
+              {isCurrentMonth ? "Vencimentos Próximos" : "Resumo do Período"}
             </CardTitle>
             <CardDescription>
-              Tarefas com prazo nos próximos dias
+              {isCurrentMonth 
+                ? "Tarefas com prazo nos próximos dias"
+                : `Tarefas do mês de ${format(selectedMonth, "MMMM yyyy", { locale: ptBR })}`
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -288,17 +388,19 @@ export function TaskAnalytics({ tasks, profiles, clients, getAssignedUsers }: Ta
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
-              Itens que Precisam de Atenção
+              {isCurrentMonth ? "Itens que Precisam de Atenção" : "Status das Tarefas"}
             </CardTitle>
             <CardDescription>
-              Tarefas com alertas ou pendências
+              {isCurrentMonth ? "Tarefas com alertas ou pendências" : "Distribuição do período"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {analytics.overdueTasks.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-destructive">Atrasadas</span>
+                  <span className="text-sm font-medium text-destructive">
+                    {isCurrentMonth ? "Atrasadas" : "Não concluídas no prazo"}
+                  </span>
                   <Badge variant="destructive">
                     {analytics.overdueTasks.length}
                   </Badge>
