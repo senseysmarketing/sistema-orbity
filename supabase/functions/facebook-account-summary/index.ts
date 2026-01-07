@@ -97,7 +97,7 @@ serve(async (req) => {
         const campaignsData = await campaignsResponse.json()
 
         let activeCampaignsCount = 0
-        let totalDailyBudget = 0
+        let campaignDailyBudget = 0
         let lastCampaignUpdate: string | null = null
 
         if (campaignsData.data) {
@@ -107,7 +107,7 @@ serve(async (req) => {
               
               // Somar orçamento diário (converter de centavos para reais)
               if (campaign.daily_budget) {
-                totalDailyBudget += parseFloat(campaign.daily_budget) / 100
+                campaignDailyBudget += parseFloat(campaign.daily_budget) / 100
               }
             }
             
@@ -119,6 +119,68 @@ serve(async (req) => {
             }
           }
         }
+
+        // 2.1 Buscar ad sets para orçamento e última atualização
+        const adsetsUrl = `https://graph.facebook.com/v18.0/${accountId}/adsets?fields=id,status,effective_status,daily_budget,updated_time&limit=500&access_token=${connection.access_token}`
+        const adsetsResponse = await fetch(adsetsUrl)
+        const adsetsData = await adsetsResponse.json()
+
+        let adsetDailyBudget = 0
+        let lastAdsetUpdate: string | null = null
+
+        if (adsetsData.data) {
+          for (const adset of adsetsData.data) {
+            // Somar orçamento diário dos ad sets ativos
+            if (adset.status === 'ACTIVE' || adset.effective_status === 'ACTIVE') {
+              if (adset.daily_budget) {
+                adsetDailyBudget += parseFloat(adset.daily_budget) / 100
+              }
+            }
+            
+            // Encontrar data mais recente de atualização
+            if (adset.updated_time) {
+              if (!lastAdsetUpdate || new Date(adset.updated_time) > new Date(lastAdsetUpdate)) {
+                lastAdsetUpdate = adset.updated_time
+              }
+            }
+          }
+        }
+
+        // 2.2 Buscar ads para pegar updated_time mais recente
+        const adsUrl = `https://graph.facebook.com/v18.0/${accountId}/ads?fields=id,updated_time&limit=500&access_token=${connection.access_token}`
+        const adsResponse = await fetch(adsUrl)
+        const adsData = await adsResponse.json()
+
+        let lastAdUpdate: string | null = null
+
+        if (adsData.data) {
+          for (const ad of adsData.data) {
+            if (ad.updated_time) {
+              if (!lastAdUpdate || new Date(ad.updated_time) > new Date(lastAdUpdate)) {
+                lastAdUpdate = ad.updated_time
+              }
+            }
+          }
+        }
+
+        // Determinar orçamento diário final (usar ad sets se campanha = 0)
+        let totalDailyBudget = campaignDailyBudget
+        if (totalDailyBudget === 0 && adsetDailyBudget > 0) {
+          totalDailyBudget = adsetDailyBudget
+          console.log(`Account ${accountId}: Using adset-level budget: ${totalDailyBudget}`)
+        }
+
+        // Determinar última atualização mais recente entre campanhas, ad sets e ads
+        let lastUpdate: string | null = null
+        const updates = [lastCampaignUpdate, lastAdsetUpdate, lastAdUpdate].filter(Boolean) as string[]
+        for (const update of updates) {
+          if (!lastUpdate || new Date(update) > new Date(lastUpdate)) {
+            lastUpdate = update
+          }
+        }
+
+        console.log(`Account ${accountId}: Budget - Campaign: ${campaignDailyBudget}, AdSet: ${adsetDailyBudget}, Using: ${totalDailyBudget}`)
+        console.log(`Account ${accountId}: Last update - Campaign: ${lastCampaignUpdate}, AdSet: ${lastAdsetUpdate}, Ad: ${lastAdUpdate} -> Using: ${lastUpdate}`)
 
         // 3. Buscar gasto dos últimos 7 dias
         const insightsUrl = `https://graph.facebook.com/v18.0/${accountId}/insights?fields=spend&time_range={'since':'${sevenDaysAgo.toISOString().split('T')[0]}','until':'${now.toISOString().split('T')[0]}'}&access_token=${connection.access_token}`
@@ -232,7 +294,7 @@ serve(async (req) => {
           active_campaigns_count: activeCampaignsCount,
           total_daily_budget: totalDailyBudget,
           last_7d_spend: last7dSpend,
-          last_campaign_update: lastCampaignUpdate,
+          last_campaign_update: lastUpdate,
           account_status: accountData.account_status,
           cached_at: now.toISOString()
         }
@@ -245,7 +307,7 @@ serve(async (req) => {
         const { error: updateError } = await supabaseClient
           .from('selected_ad_accounts')
           .update({
-            last_campaign_update: lastCampaignUpdate,
+            last_campaign_update: lastUpdate,
             active_campaigns_count: activeCampaignsCount,
             total_daily_budget: totalDailyBudget,
             last_7d_spend: last7dSpend,
