@@ -494,10 +494,13 @@ async function handleWebhook(supabase: any, body: any) {
 
       console.log(`[WEBHOOK] 🎯 New lead detected - Page: ${pageId}, Form: ${formId}, Lead: ${leadgenId}`);
 
-      // Find matching integration
+      // Find matching integration - support exact form_id OR 'all' forms
       console.log(`[WEBHOOK] 🔎 Looking for integration - Page: ${pageId}, Form: ${formId}`);
       
-      const { data: integration, error: intError } = await supabase
+      let integration = null;
+
+      // First try exact form match
+      const { data: exactMatch, error: exactError } = await supabase
         .from('facebook_lead_integrations')
         .select('*, facebook_connections(*)')
         .eq('page_id', pageId)
@@ -505,13 +508,36 @@ async function handleWebhook(supabase: any, body: any) {
         .eq('is_active', true)
         .maybeSingle();
 
-      if (intError) {
-        console.error('[WEBHOOK] ❌ Error fetching integration:', intError);
-        continue;
+      if (exactError) {
+        console.error('[WEBHOOK] ❌ Error fetching exact integration:', exactError);
+      }
+
+      if (exactMatch) {
+        integration = exactMatch;
+        console.log('[WEBHOOK] ✅ Found exact form match');
+      } else {
+        // Try 'all' forms fallback
+        console.log('[WEBHOOK] 🔄 No exact match, trying form_id = "all"...');
+        const { data: allMatch, error: allError } = await supabase
+          .from('facebook_lead_integrations')
+          .select('*, facebook_connections(*)')
+          .eq('page_id', pageId)
+          .eq('form_id', 'all')
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (allError) {
+          console.error('[WEBHOOK] ❌ Error fetching all-forms integration:', allError);
+        }
+
+        if (allMatch) {
+          integration = allMatch;
+          console.log('[WEBHOOK] ✅ Found "all forms" integration');
+        }
       }
 
       if (!integration) {
-        console.error('[WEBHOOK] ❌ No active integration found for this form');
+        console.error('[WEBHOOK] ❌ No active integration found for this page/form');
         continue;
       }
 
