@@ -77,7 +77,8 @@ serve(async (req) => {
     const now = new Date()
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    for (const accountId of accountIds) {
+    // Função para processar uma única conta
+    const processAccount = async (accountId: string) => {
       try {
         console.log(`Fetching summary for account: ${accountId}`)
         
@@ -88,7 +89,7 @@ serve(async (req) => {
 
         if (accountData.error) {
           console.error(`Error fetching account ${accountId}:`, accountData.error)
-          continue
+          return null
         }
 
         // 2. Buscar campanhas ativas com updated_time e daily_budget
@@ -208,12 +209,6 @@ serve(async (req) => {
         
         console.log(`Account ${accountId}: Current month spend (${currentMonthStart} to ${today}): ${currentMonthSpend}`)
 
-        // =============================================
-        // NOVA LÓGICA: Detectar tipo de conta (pré/pós-paga)
-        // =============================================
-        // Uma conta é PÓS-PAGA se tiver cartão de crédito associado
-        // Caso contrário, é PRÉ-PAGA (Boleto, Pix, fundos depositados)
-        
         // Garantir que são strings antes de usar métodos de string
         const fundingType = String(accountData.funding_source_details?.type || '')
         const fundingDisplay = String(accountData.funding_source_details?.display_string || '')
@@ -232,18 +227,14 @@ serve(async (req) => {
         
         console.log(`Account ${accountId}: funding_type="${fundingType}", funding_display="${fundingDisplay}", is_prepaid=${isPrepaid}`)
 
-        // =============================================
-        // EXTRAIR SALDO DO display_string (mais confiável para BR)
-        // =============================================
         // Regex para pegar valores como: R$0,07 ou R$ 1.234,56
         const balanceMatch = fundingDisplay.match(/R\$\s*([\d.,]+)/i)
         let extractedBalance: number | null = null
 
         if (balanceMatch && balanceMatch[1]) {
-          // Converter formato brasileiro (1.234,56) para número (1234.56)
           const balanceStr = balanceMatch[1]
-            .replace(/\./g, '')   // Remove separador de milhar
-            .replace(',', '.')    // Troca vírgula por ponto
+            .replace(/\./g, '')
+            .replace(',', '.')
           extractedBalance = parseFloat(balanceStr)
           
           console.log(`Account ${accountId}: Extracted balance from display_string: ${extractedBalance}`)
@@ -254,29 +245,23 @@ serve(async (req) => {
         const amountSpent = accountData.amount_spent ? parseFloat(accountData.amount_spent) / 100 : 0
         const billBalance = accountData.balance ? parseFloat(accountData.balance) / 100 : 0
 
-        // =============================================
-        // NOVA LÓGICA: Calcular saldo disponível
-        // =============================================
+        // Calcular saldo disponível
         let balance = 0
 
         if (isPrepaid) {
-          // PRIORIDADE 1: Usar o saldo extraído do display_string (mais confiável para contas BR)
           if (extractedBalance !== null && !isNaN(extractedBalance)) {
             balance = extractedBalance
             console.log(`Account ${accountId}: Using extracted balance from display_string: ${balance}`)
           } 
-          // PRIORIDADE 2: Tentar a fórmula alternativa (fallback)
           else if (spendCap > 0) {
             balance = (spendCap - amountSpent) + billBalance
             console.log(`Account ${accountId}: Using formula (spend_cap - amount_spent + bill_balance): ${balance}`)
           } 
-          // PRIORIDADE 3: Usar bill_balance diretamente (último recurso)
           else {
             balance = billBalance
             console.log(`Account ${accountId}: Using bill_balance directly: ${balance}`)
           }
         } else {
-          // Para contas pós-pagas: limite - gasto
           balance = spendCap - amountSpent
         }
 
@@ -299,9 +284,7 @@ serve(async (req) => {
           cached_at: now.toISOString()
         }
 
-        accountSummaries.push(summary)
-
-        // 5. Atualizar cache no banco de dados (ad_account_id é único, não precisa de agency_id)
+        // 5. Atualizar cache no banco de dados
         console.log(`Account ${accountId}: Updating cache in DB with current_month_spend=${currentMonthSpend}`)
         
         const { error: updateError } = await supabaseClient
@@ -325,9 +308,28 @@ serve(async (req) => {
           console.error(`Error updating cache for ${accountId}:`, updateError)
         }
 
+        return summary
+
       } catch (error) {
         console.error(`Error processing account ${accountId}:`, error)
+        return null
       }
+    }
+
+    // Processar contas em lotes paralelos de 5 para melhor performance
+    const BATCH_SIZE = 5
+    console.log(`Processing ${accountIds.length} accounts in batches of ${BATCH_SIZE}`)
+    
+    for (let i = 0; i < accountIds.length; i += BATCH_SIZE) {
+      const batch = accountIds.slice(i, i + BATCH_SIZE)
+      console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1}: accounts ${i + 1} to ${Math.min(i + BATCH_SIZE, accountIds.length)}`)
+      
+      const batchResults = await Promise.all(
+        batch.map(accountId => processAccount(accountId))
+      )
+      
+      // Filtrar resultados nulos e adicionar ao array
+      accountSummaries.push(...batchResults.filter(Boolean))
     }
 
     console.log(`Processed ${accountSummaries.length} account summaries`)

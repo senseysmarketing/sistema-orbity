@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { RefreshCw, BarChart3, AlertTriangle, DollarSign, Clock, CheckCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
@@ -38,26 +39,53 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [isBackgroundRefresh, setIsBackgroundRefresh] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0, phase: 'connecting' as 'connecting' | 'processing' | 'done' });
   const { toast } = useToast();
   const { currentAgency } = useAgency();
 
   // Flag para evitar chamadas duplicadas
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const mountedRef = useRef(true);
 
-  // Carregar dados automaticamente ao entrar na aba (chama a API do Facebook)
+  // Carregar dados do cache primeiro, depois atualizar em background
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (selectedAdAccounts.length > 0 && currentAgency && !hasLoadedOnce) {
       setHasLoadedOnce(true);
-      refreshAllDataOnMount();
+      setLoadingProgress({ current: 0, total: selectedAdAccounts.length, phase: 'connecting' });
+      
+      // 1. PRIMEIRO: Carregar dados do cache (instantâneo)
+      loadClientsFromCache().then((hasCache) => {
+        if (!mountedRef.current) return;
+        
+        if (hasCache) {
+          // Se tem cache, mostra dados e atualiza em background
+          setInitialLoading(false);
+          setIsBackgroundRefresh(true);
+          refreshAllDataOnMount().finally(() => {
+            if (mountedRef.current) {
+              setIsBackgroundRefresh(false);
+            }
+          });
+        } else {
+          // Sem cache, mostra loading completo
+          refreshAllDataOnMount();
+        }
+      });
     } else if (selectedAdAccounts.length === 0 && currentAgency) {
-      // Se não há contas selecionadas, desligar loading após verificar
       const timeout = setTimeout(() => {
-        if (initialLoading) {
+        if (initialLoading && mountedRef.current) {
           setInitialLoading(false);
         }
       }, 1500);
       return () => clearTimeout(timeout);
     }
+    
+    return () => {
+      mountedRef.current = false;
+    };
   }, [selectedAdAccounts, currentAgency, hasLoadedOnce]);
 
   // Função separada para carregar na montagem (sem toast de sucesso)
@@ -66,6 +94,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
 
     try {
       const accountIds = selectedAdAccounts.map(acc => acc.ad_account_id);
+      setLoadingProgress({ current: 0, total: accountIds.length, phase: 'processing' });
       
       const { data, error } = await supabase.functions.invoke('facebook-account-summary', {
         body: { accountIds }
@@ -73,7 +102,10 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
 
       if (error) throw error;
 
-      if (data?.summaries) {
+      if (data?.summaries && mountedRef.current) {
+        // Atualizar progresso conforme recebe dados
+        setLoadingProgress({ current: data.summaries.length, total: accountIds.length, phase: 'done' });
+        
         const { data: controlsData } = await supabase
           .from('traffic_controls')
           .select('*')
@@ -113,12 +145,15 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
       // Em caso de erro, tentar carregar do cache
       await loadClientsFromCache();
     } finally {
-      setInitialLoading(false);
+      if (mountedRef.current) {
+        setInitialLoading(false);
+        setLoadingProgress(prev => ({ ...prev, phase: 'done' }));
+      }
     }
   };
 
-  const loadClientsFromCache = async () => {
-    if (!currentAgency) return;
+  const loadClientsFromCache = async (): Promise<boolean> => {
+    if (!currentAgency) return false;
 
     try {
       // Buscar dados do banco com os campos de cache
@@ -162,9 +197,11 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
         };
       });
 
-      setClients(clientsData);
+      if (mountedRef.current) {
+        setClients(clientsData);
+      }
       
-      // Verificar se há dados em cache
+      // Verificar se há dados em cache válidos
       const latestCache = accountsData?.reduce((latest, acc) => {
         if (acc.cached_at && (!latest || new Date(acc.cached_at) > new Date(latest))) {
           return acc.cached_at;
@@ -172,13 +209,16 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
         return latest;
       }, null as string | null);
 
-      if (latestCache) {
+      if (latestCache && mountedRef.current) {
         setLastUpdate(new Date(latestCache));
       }
+      
+      // Retorna true se tem dados em cache
+      const hasValidCache = clientsData.length > 0 && latestCache !== null;
+      return hasValidCache;
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-    } finally {
-      setInitialLoading(false);
+      return false;
     }
   };
 
@@ -386,17 +426,51 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
   };
 
   if (initialLoading) {
+    const progressPercent = loadingProgress.total > 0 
+      ? Math.round((loadingProgress.current / loadingProgress.total) * 100) 
+      : 0;
+    
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex flex-col items-center justify-center p-8 space-y-6">
         <div className="text-center space-y-4">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-          <p className="text-muted-foreground">Carregando dados dos clientes...</p>
+          <RefreshCw className="h-10 w-10 animate-spin mx-auto text-primary" />
+          <div className="space-y-2">
+            <h3 className="text-lg font-medium">Sincronizando contas de anúncios</h3>
+            <p className="text-muted-foreground">
+              {loadingProgress.phase === 'connecting' && 'Conectando com o Facebook...'}
+              {loadingProgress.phase === 'processing' && `Processando ${loadingProgress.current} de ${loadingProgress.total} contas...`}
+              {loadingProgress.phase === 'done' && 'Finalizando...'}
+            </p>
+          </div>
+          
+          {/* Barra de Progresso */}
+          <div className="w-64 mx-auto space-y-2">
+            <Progress value={progressPercent} className="h-2" />
+            <p className="text-xs text-muted-foreground">
+              {progressPercent}% concluído
+            </p>
+          </div>
+          
+          {/* Estimativa de tempo */}
+          {loadingProgress.phase === 'processing' && loadingProgress.total > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Tempo estimado: ~{Math.max(5, Math.ceil((loadingProgress.total - loadingProgress.current) * 0.5))} segundos
+            </p>
+          )}
         </div>
       </div>
     );
   }
 
   return (
+    <>
+      {/* Indicador de refresh em background */}
+      {isBackgroundRefresh && (
+        <div className="fixed bottom-4 right-4 bg-primary/10 text-primary px-4 py-2 rounded-full flex items-center gap-2 text-sm z-50 shadow-lg border border-primary/20">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          Atualizando em segundo plano...
+        </div>
+      )}
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -495,5 +569,6 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
         </div>
       )}
     </div>
+    </>
   );
 }
