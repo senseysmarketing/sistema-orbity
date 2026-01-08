@@ -33,6 +33,9 @@ verify_jwt = false
 [functions.facebook-sync-cron]
 verify_jwt = false
 
+[functions.setup-demo-account]
+verify_jwt = false
+
 [api]
 enabled = true
 port = 54321
@@ -76,9 +79,4 @@ site_url = "http://127.0.0.1:3000"
 additional_redirect_urls = ["https://127.0.0.1:3000"]
 jwt_expiry = 3600
 enable_signup = true
-enable_confirmations = false
-
-[auth.email]
-enable_signup = true
-double_confirm_changes = true
 enable_confirmations = false
