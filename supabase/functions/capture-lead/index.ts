@@ -108,8 +108,30 @@ Deno.serve(async (req) => {
         // Map temperature to priority if present
         const customDefaults = { ...config.default_values };
         if (customDefaults.temperature) {
-          customDefaults.priority = customDefaults.temperature;
+          // Convert old values (low/medium/high) to new values (cold/warm/hot)
+          const tempValue = customDefaults.temperature;
+          const tempMapping: Record<string, string> = {
+            'low': 'cold',
+            'medium': 'warm',
+            'high': 'hot',
+            'cold': 'cold',
+            'warm': 'warm',
+            'hot': 'hot'
+          };
+          customDefaults.priority = tempMapping[tempValue] || 'cold';
           delete customDefaults.temperature;
+        }
+        // Also convert priority if it uses old values
+        if (customDefaults.priority) {
+          const priorityMapping: Record<string, string> = {
+            'low': 'cold',
+            'medium': 'warm',
+            'high': 'hot',
+            'cold': 'cold',
+            'warm': 'warm',
+            'hot': 'hot'
+          };
+          customDefaults.priority = priorityMapping[customDefaults.priority] || 'cold';
         }
         defaultValues = { ...defaultValues, ...customDefaults };
       }
