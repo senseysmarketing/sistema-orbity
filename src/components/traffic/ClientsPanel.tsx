@@ -466,7 +466,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
     <>
       {/* Indicador de refresh em background */}
       {isBackgroundRefresh && (
-        <div className="fixed bottom-4 right-4 bg-primary/10 text-primary px-4 py-2 rounded-full flex items-center gap-2 text-sm z-50 shadow-lg border border-primary/20">
+        <div className="fixed bottom-4 left-4 bg-white text-primary px-4 py-2 rounded-full flex items-center gap-2 text-sm z-50 shadow-lg border border-gray-200">
           <RefreshCw className="h-4 w-4 animate-spin" />
           Atualizando em segundo plano...
         </div>
