@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { RefreshCw, FileText, TrendingUp, DollarSign, Eye, Target, BarChart, Play } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +68,9 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
   });
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 2, step: '' });
+  const [isBackgroundRefresh, setIsBackgroundRefresh] = useState(false);
+  const [hasInitialData, setHasInitialData] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
@@ -93,12 +97,22 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
     }
   }, [selectedAccount, dateRange]);
 
-  const fetchAllData = async () => {
+  const fetchAllData = async (isBackground = false) => {
     if (!selectedAccount || !dateRange?.from || !dateRange?.to) return;
 
-    setLoading(true);
+    if (isBackground) {
+      setIsBackgroundRefresh(true);
+    } else {
+      setLoading(true);
+      setLoadingProgress({ current: 0, total: 2, step: 'Conectando com o Facebook...' });
+    }
+
     try {
-      // Buscar campanhas
+      // Etapa 1: Buscar campanhas
+      if (!isBackground) {
+        setLoadingProgress({ current: 1, total: 2, step: 'Carregando campanhas...' });
+      }
+
       const { data: campaignsData, error: campaignsError } = await supabase.functions.invoke('facebook-campaigns', {
         body: { 
           action: 'list_campaigns',
@@ -113,7 +127,11 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
       if (campaignsError) throw campaignsError;
       setCampaigns(campaignsData?.campaigns || []);
 
-      // Buscar métricas agregadas
+      // Etapa 2: Buscar métricas agregadas
+      if (!isBackground) {
+        setLoadingProgress({ current: 2, total: 2, step: 'Processando métricas...' });
+      }
+
       const { data: metricsData, error: metricsError } = await supabase.functions.invoke('facebook-sync', {
         body: { 
           action: 'get_metrics',
@@ -149,6 +167,8 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
         // Gerar dados de gráfico mock se não vier da API
         generateMockChartData();
       }
+
+      setHasInitialData(true);
     } catch (error: any) {
       console.error('Erro ao buscar dados:', error);
       toast({
@@ -158,6 +178,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
       });
     } finally {
       setLoading(false);
+      setIsBackgroundRefresh(false);
     }
   };
 
@@ -268,19 +289,49 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
     avgCPM: metrics.cpm,
   };
 
-  if (loading) {
+  if (loading && !hasInitialData) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex flex-col items-center justify-center p-8 space-y-6">
         <div className="text-center space-y-4">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
-          <p className="text-muted-foreground">Carregando dados...</p>
+          <RefreshCw className="h-10 w-10 animate-spin mx-auto text-primary" />
+          <div className="space-y-2">
+            <h3 className="text-lg font-medium">Carregando campanhas e métricas</h3>
+            <p className="text-muted-foreground">
+              {loadingProgress.step || 'Conectando com o Facebook...'}
+            </p>
+          </div>
+          
+          {/* Barra de Progresso */}
+          <div className="w-64 mx-auto">
+            <Progress 
+              value={(loadingProgress.current / loadingProgress.total) * 100} 
+              className="h-2"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Etapa {loadingProgress.current} de {loadingProgress.total}
+            </p>
+          </div>
+          
+          {/* Dica de espera */}
+          <p className="text-xs text-muted-foreground">
+            Isso pode levar alguns segundos dependendo da quantidade de dados...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      {/* Indicador de refresh em background */}
+      {isBackgroundRefresh && (
+        <div className="fixed bottom-4 left-4 bg-white text-primary px-4 py-2 rounded-full flex items-center gap-2 text-sm z-50 shadow-lg border border-gray-200">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          Atualizando campanhas...
+        </div>
+      )}
+
+      <div className="space-y-6">
       {/* Filtros e Controles */}
       <div className="flex flex-wrap gap-4 items-center justify-between">
         <div className="flex flex-wrap gap-4 items-center">
@@ -304,7 +355,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
         </div>
 
         <div className="flex gap-2">
-          <Button onClick={fetchAllData} disabled={loading} variant="outline">
+          <Button onClick={() => fetchAllData()} disabled={loading} variant="outline">
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
@@ -513,12 +564,13 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
         </CardContent>
       </Card>
 
-      {/* Modal de Relatórios */}
-      <ReportGeneratorModal
-        isOpen={isReportModalOpen}
-        onClose={() => setIsReportModalOpen(false)}
-        reportData={reportData}
-      />
-    </div>
+        {/* Modal de Relatórios */}
+        <ReportGeneratorModal
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+          reportData={reportData}
+        />
+      </div>
+    </>
   );
 }
