@@ -70,10 +70,25 @@ export function WebhooksManager() {
       if (leadWebhook?.headers) {
         const config = leadWebhook.headers as any;
         if (config.field_mapping) {
-          setFieldMapping({ ...fieldMapping, ...config.field_mapping });
+          setFieldMapping(prev => ({ ...prev, ...config.field_mapping }));
         }
         if (config.default_values) {
-          setDefaultValues({ ...defaultValues, ...config.default_values });
+          const loadedDefaults = { ...config.default_values };
+          // Garantir que temperature existe (converter de priority legado se necessário)
+          if (!loadedDefaults.temperature && loadedDefaults.priority) {
+            loadedDefaults.temperature = loadedDefaults.priority;
+          }
+          // Garantir valor válido para temperature
+          const validTemps = ['cold', 'warm', 'hot'];
+          if (!validTemps.includes(loadedDefaults.temperature)) {
+            loadedDefaults.temperature = 'cold';
+          }
+          setDefaultValues(prev => ({ 
+            ...prev, 
+            status: loadedDefaults.status || 'new',
+            temperature: loadedDefaults.temperature || 'cold',
+            source: loadedDefaults.source || 'webhook'
+          }));
         }
       }
     } catch (error) {
@@ -86,9 +101,14 @@ export function WebhooksManager() {
 
   const saveConfiguration = async () => {
     try {
+      // Salvar temperature como temperature (a edge function vai converter para priority)
       const config = {
         field_mapping: fieldMapping,
-        default_values: defaultValues
+        default_values: {
+          status: defaultValues.status,
+          temperature: defaultValues.temperature,
+          source: defaultValues.source
+        }
       };
 
       // Check if lead capture webhook exists
@@ -116,7 +136,7 @@ export function WebhooksManager() {
             events: ['lead_capture'],
             headers: config,
             is_active: true,
-            created_by: currentAgency?.id // Using agency id as fallback
+            created_by: currentAgency?.id
           });
 
         if (error) throw error;
@@ -153,81 +173,42 @@ export function WebhooksManager() {
   };
 
   const testWebhook = async () => {
-    // Verificar se o webhook está configurado
     if (!currentAgency?.id) {
       toast.error('Agência não encontrada');
       return;
     }
 
-    if (!leadWebhook) {
-      toast.error('Configure o webhook antes de testá-lo');
-      return;
-    }
-
-    if (!leadWebhook.is_active) {
-      toast.error('Ative o webhook antes de testá-lo');
-      return;
-    }
-
     try {
-      // Dados de teste baseados no mapeamento de campos configurado
+      // Dados de teste simples
       const testData = {
-        [fieldMapping.name]: 'João Silva - Teste',
-        [fieldMapping.email]: 'joao.teste@email.com',
-        [fieldMapping.phone]: '(11) 99999-9999',
-        [fieldMapping.company]: 'Empresa Teste Ltda',
-        [fieldMapping.position]: 'Diretor',
-        [fieldMapping.notes]: 'Lead de teste criado automaticamente pelo sistema CRM',
-        [fieldMapping.value]: '1500.00',
-        [fieldMapping.source]: 'teste_webhook',
-        timestamp: new Date().toISOString(),
-        test_mode: true
+        name: 'João Silva - Teste Webhook',
+        email: 'joao.teste@email.com',
+        phone: '(11) 99999-9999',
+        company: 'Empresa Teste Ltda',
+        position: 'Diretor',
+        notes: 'Lead de teste criado via botão de teste do CRM',
+        value: '1500',
+        source: 'teste_webhook'
       };
 
-      console.log('Enviando dados de teste para:', webhookUrl);
-      console.log('Dados:', testData);
-
-      toast.info('Enviando dados de teste...');
+      toast.info('Enviando lead de teste...');
 
       const response = await fetch(webhookUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'CRM-Webhook-Test/1.0'
-        },
-        body: JSON.stringify(testData),
-        mode: 'cors' // Explicitamente definir modo CORS
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testData)
       });
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Success result:', result);
-        toast.success(`✅ Teste realizado com sucesso! Lead ID: ${result.lead_id}`);
-        
-        // Recarregar dados para mostrar estatísticas atualizadas
-        setTimeout(() => {
-          fetchWebhooks();
-        }, 1000);
+        toast.success(`✅ Lead de teste criado! ID: ${result.lead_id}`);
+        fetchWebhooks();
       } else {
-        const errorText = await response.text();
-        console.error('Error response:', { status: response.status, body: errorText });
-        
-        let errorMessage = 'Falha na requisição';
-        
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.error || errorMessage;
-        } catch (e) {
-          errorMessage = errorText || errorMessage;
-        }
-        
-        toast.error(`❌ Erro no teste: ${errorMessage} (Status: ${response.status})`);
+        const error = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
+        toast.error(`❌ Erro: ${error.error || error.details || 'Falha ao criar lead'}`);
       }
-    } catch (error) {
-      console.error('Network error testing webhook:', error);
+    } catch (error: any) {
+      console.error('Erro no teste:', error);
       toast.error(`❌ Erro de conexão: ${error.message}`);
     }
   };

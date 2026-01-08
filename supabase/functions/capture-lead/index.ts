@@ -105,34 +105,25 @@ Deno.serve(async (req) => {
         fieldMapping = { ...fieldMapping, ...config.field_mapping };
       }
       if (config.default_values) {
-        // Map temperature to priority if present
         const customDefaults = { ...config.default_values };
+        
+        // Converter temperature para priority
         if (customDefaults.temperature) {
-          // Convert old values (low/medium/high) to new values (cold/warm/hot)
-          const tempValue = customDefaults.temperature;
-          const tempMapping: Record<string, string> = {
-            'low': 'cold',
-            'medium': 'warm',
-            'high': 'hot',
-            'cold': 'cold',
-            'warm': 'warm',
-            'hot': 'hot'
-          };
-          customDefaults.priority = tempMapping[tempValue] || 'cold';
+          const validTemps = ['cold', 'warm', 'hot'];
+          customDefaults.priority = validTemps.includes(customDefaults.temperature) 
+            ? customDefaults.temperature 
+            : 'cold';
           delete customDefaults.temperature;
         }
-        // Also convert priority if it uses old values
+        
+        // Garantir que priority seja válido
         if (customDefaults.priority) {
-          const priorityMapping: Record<string, string> = {
-            'low': 'cold',
-            'medium': 'warm',
-            'high': 'hot',
-            'cold': 'cold',
-            'warm': 'warm',
-            'hot': 'hot'
-          };
-          customDefaults.priority = priorityMapping[customDefaults.priority] || 'cold';
+          const validPriorities = ['cold', 'warm', 'hot'];
+          if (!validPriorities.includes(customDefaults.priority)) {
+            customDefaults.priority = 'cold';
+          }
         }
+        
         defaultValues = { ...defaultValues, ...customDefaults };
       }
     }
