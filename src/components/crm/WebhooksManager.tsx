@@ -41,7 +41,7 @@ export function WebhooksManager() {
     value: 'value'
   });
   const [defaultValues, setDefaultValues] = useState({
-    status: 'new',
+    status: 'leads',
     temperature: 'cold',
     source: 'webhook'
   });
@@ -85,7 +85,7 @@ export function WebhooksManager() {
           }
           setDefaultValues(prev => ({ 
             ...prev, 
-            status: loadedDefaults.status || 'new',
+            status: loadedDefaults.status || 'leads',
             temperature: loadedDefaults.temperature || 'cold',
             source: loadedDefaults.source || 'webhook'
           }));
