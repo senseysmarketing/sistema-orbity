@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
     };
 
   let defaultValues: Record<string, any> = {
-    'status': 'new',
+    'status': 'leads',
     'priority': 'cold',
     'source': 'webhook'
   };
