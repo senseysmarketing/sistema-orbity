@@ -1,13 +1,10 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, ArrowRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DemoSidebar } from "./demo/DemoSidebar";
-import { DemoDashboard } from "./demo/DemoDashboard";
+import { DemoCarousel } from "./DemoCarousel";
 
 export function DemoSection() {
-  const [activeTab, setActiveTab] = useState("dashboard");
   const navigate = useNavigate();
 
   return (
@@ -17,27 +14,27 @@ export function DemoSection() {
         <div className="text-center mb-10">
           <Badge className="mb-4 bg-[#1c102f]/10 text-[#1c102f] border-[#1c102f]/20 hover:bg-[#1c102f]/20">
             <Sparkles className="h-3 w-3 mr-1" />
-            Demonstração Interativa
+            Conheça o Sistema
           </Badge>
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             Veja o Sistema{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#1c102f] to-purple-600">
-              em Ação
+              por Dentro
             </span>
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Explore um dashboard real com dados fictícios. Navegue entre as seções e descubra 
-            como a Senseys pode transformar a gestão da sua agência.
+            Navegue pelas principais funcionalidades e descubra como a Orbity 
+            pode transformar a gestão da sua agência.
           </p>
         </div>
 
         {/* Demo Container */}
-        <div className="relative max-w-5xl mx-auto">
+        <div className="relative max-w-4xl mx-auto">
           {/* Badge de Demo */}
           <div className="absolute -top-3 right-4 z-20">
             <Badge className="bg-[#1c102f] text-white px-3 py-1 shadow-lg">
               <Eye className="h-3 w-3 mr-1" />
-              Modo Demonstração
+              Preview do Sistema
             </Badge>
           </div>
 
@@ -50,23 +47,15 @@ export function DemoSection() {
             </div>
             <div className="flex-1 bg-white dark:bg-gray-700 rounded-lg px-4 py-1.5 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
               <div className="h-4 w-4 rounded bg-[#1c102f]/20 flex items-center justify-center">
-                <span className="text-[8px] font-bold text-[#1c102f]">S</span>
+                <span className="text-[8px] font-bold text-[#1c102f]">O</span>
               </div>
-              app.senseys.com/dashboard
+              https://orbityapp.com.br/
             </div>
           </div>
 
-          {/* Dashboard Content */}
-          <div className="bg-background rounded-b-xl border border-t-0 border-gray-200 dark:border-gray-700 overflow-hidden shadow-2xl">
-            <div className="flex h-[500px] md:h-[550px]">
-              {/* Sidebar */}
-              <DemoSidebar activeTab={activeTab} onTabChange={setActiveTab} />
-              
-              {/* Main Content */}
-              <div className="flex-1 overflow-hidden bg-muted/30">
-                <DemoDashboard activeTab={activeTab} />
-              </div>
-            </div>
+          {/* Carousel Content */}
+          <div className="bg-background rounded-b-xl border border-t-0 border-gray-200 dark:border-gray-700 overflow-hidden shadow-2xl p-6 md:p-8">
+            <DemoCarousel />
           </div>
 
           {/* Decorative elements */}
