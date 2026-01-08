@@ -99,8 +99,8 @@ export function DemoCarousel() {
           ))}
         </CarouselContent>
         
-        <CarouselPrevious className="left-2 md:-left-12 bg-white/90 hover:bg-white border-gray-200" />
-        <CarouselNext className="right-2 md:-right-12 bg-white/90 hover:bg-white border-gray-200" />
+        <CarouselPrevious className="left-4 md:left-6 h-10 w-10 bg-white/95 hover:bg-white border-gray-200 shadow-lg z-10" />
+        <CarouselNext className="right-4 md:right-6 h-10 w-10 bg-white/95 hover:bg-white border-gray-200 shadow-lg z-10" />
       </Carousel>
 
       {/* Info da screenshot atual */}
