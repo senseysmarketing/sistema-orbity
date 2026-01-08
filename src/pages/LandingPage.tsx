@@ -1,6 +1,7 @@
 import { HeroSection } from "@/components/landing/HeroSection";
 import { ProblemSection } from "@/components/landing/ProblemSection";
 import { FeaturesGrid } from "@/components/landing/FeaturesGrid";
+import { DemoSection } from "@/components/landing/DemoSection";
 import { IntegrationsSection } from "@/components/landing/IntegrationsSection";
 import { DifferentialsSection } from "@/components/landing/DifferentialsSection";
 import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
@@ -15,6 +16,7 @@ export default function LandingPage() {
       <HeroSection />
       <ProblemSection />
       <FeaturesGrid />
+      <DemoSection />
       <IntegrationsSection />
       <DifferentialsSection />
       <TestimonialsSection />
