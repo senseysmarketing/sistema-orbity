@@ -12,12 +12,12 @@ interface FeatureCardProps {
 export function FeatureCard({ icon: Icon, title, description, gradient, delay = 0 }: FeatureCardProps) {
   return (
     <Card 
-      className="group hover:shadow-lg hover:border-primary/50 transition-all hover:scale-105 animate-fade-in"
+      className="group hover:shadow-lg hover:shadow-[#1c102f]/10 hover:border-[#1c102f]/40 transition-all hover:scale-105 animate-fade-in border-border/50"
       style={{ animationDelay: `${delay}s` }}
     >
       <CardHeader className="space-y-4">
-        <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${gradient || 'from-primary/20 to-secondary/20'} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-          <Icon className="w-7 h-7 text-primary" />
+        <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${gradient || 'from-[#1c102f]/20 to-violet-500/20'} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+          <Icon className="w-7 h-7 text-[#1c102f] dark:text-violet-400" />
         </div>
         <h3 className="font-semibold text-lg">{title}</h3>
       </CardHeader>

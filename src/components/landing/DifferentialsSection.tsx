@@ -29,11 +29,12 @@ const differentials = [
 
 export function DifferentialsSection() {
   return (
-    <section className="py-20 bg-gradient-to-br from-[#1c102f]/5 via-background to-primary/5">
+    <section className="py-20 bg-gradient-to-br from-[#1c102f]/10 via-background to-violet-500/10">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Por que escolher nossa plataforma?
+            Por que escolher{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#1c102f] to-violet-600">nossa plataforma</span>?
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
             Diferenciais que fazem a diferença no dia a dia da sua agência
@@ -48,8 +49,8 @@ export function DifferentialsSection() {
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <div className="flex-shrink-0">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                  <Check className="w-5 h-5 text-primary" />
+                <div className="w-10 h-10 rounded-full bg-[#1c102f]/15 flex items-center justify-center border border-[#1c102f]/30">
+                  <Check className="w-5 h-5 text-[#1c102f] dark:text-violet-400" />
                 </div>
               </div>
               <div className="space-y-2">

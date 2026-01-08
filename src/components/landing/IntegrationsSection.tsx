@@ -2,11 +2,12 @@ import { Shield, Lock, Eye } from "lucide-react";
 
 export function IntegrationsSection() {
   return (
-    <section className="py-20 bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+    <section className="py-20 bg-gradient-to-br from-[#1c102f]/5 via-background to-violet-500/5">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Integrações Nativas & Seguras
+            Integrações{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#1c102f] to-violet-600">Nativas & Seguras</span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
             Conecte suas ferramentas favoritas com total segurança e transparência
@@ -86,11 +87,11 @@ export function IntegrationsSection() {
         </div>
 
         {/* Privacy Section */}
-        <div className="bg-card/50 border rounded-2xl p-8 max-w-4xl mx-auto">
+        <div className="bg-card/50 border-2 border-[#1c102f]/20 rounded-2xl p-8 max-w-4xl mx-auto">
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="flex-shrink-0">
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                <Shield className="w-10 h-10 text-primary" />
+              <div className="w-20 h-20 rounded-full bg-[#1c102f]/15 flex items-center justify-center border-2 border-[#1c102f]/30">
+                <Shield className="w-10 h-10 text-[#1c102f] dark:text-violet-400" />
               </div>
             </div>
             <div className="text-center md:text-left space-y-3">
@@ -101,15 +102,15 @@ export function IntegrationsSection() {
               </p>
               <div className="flex flex-wrap justify-center md:justify-start gap-4 pt-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Lock className="w-4 h-4 text-primary" />
+                  <Lock className="w-4 h-4 text-[#1c102f] dark:text-violet-400" />
                   Dados criptografados
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Eye className="w-4 h-4 text-primary" />
+                  <Eye className="w-4 h-4 text-[#1c102f] dark:text-violet-400" />
                   Sem rastreamento
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Shield className="w-4 h-4 text-primary" />
+                  <Shield className="w-4 h-4 text-[#1c102f] dark:text-violet-400" />
                   LGPD Compliant
                 </div>
               </div>
