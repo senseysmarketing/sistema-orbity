@@ -160,7 +160,7 @@ export default function Tasks() {
     return () => {
       window.removeEventListener('task-assignments-updated', handleAssignmentsUpdate);
     };
-  }, []);
+  }, [currentAgency?.id]);
 
   const archiveOldCompletedTasks = async () => {
     if (!currentAgency) return;
