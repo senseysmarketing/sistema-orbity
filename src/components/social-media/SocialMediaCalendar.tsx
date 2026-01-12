@@ -63,6 +63,21 @@ export function SocialMediaCalendar() {
     await deletePost(postId);
   };
 
+  const handleDuplicate = (post: SocialMediaPost) => {
+    const duplicatedPost = {
+      ...post,
+      id: '',
+      title: `${post.title} (Cópia)`,
+      status: 'draft',
+      created_at: '',
+      created_by: '',
+      approval_history: [],
+    };
+    setEditingPost(duplicatedPost as SocialMediaPost);
+    setIsDetailsOpen(false);
+    setIsCreateDialogOpen(true);
+  };
+
   const handleDialogClose = () => {
     setIsCreateDialogOpen(false);
     setEditingPost(null);
@@ -247,6 +262,7 @@ export function SocialMediaCalendar() {
         onOpenChange={setIsDetailsOpen}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onDuplicate={handleDuplicate}
         onPostUpdate={fetchPosts}
       />
     </div>
