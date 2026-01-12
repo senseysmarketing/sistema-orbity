@@ -647,6 +647,29 @@ export default function Tasks() {
     setIsDetailDialogOpen(true);
   };
 
+  const handleDuplicateTask = (task: Task) => {
+    // Buscar os clientes e usuários atribuídos da tarefa original
+    const taskAssignedUsers = getAssignedUsers(task.id);
+    
+    setNewTask({
+      title: `${task.title} (Cópia)`,
+      description: task.description || '',
+      status: 'todo',
+      priority: task.priority || 'medium',
+      assigned_to: 'unassigned',
+      assigned_users: taskAssignedUsers.map((u: any) => u.user_id),
+      client_ids: task.client_id ? [task.client_id] : [],
+      due_date: '',
+      subtasks: task.subtasks?.map(s => ({ 
+        ...s, 
+        id: crypto.randomUUID(), 
+        completed: false 
+      })) || [],
+    });
+    setIsDetailDialogOpen(false);
+    setIsDialogOpen(true);
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
   };
@@ -1151,6 +1174,7 @@ export default function Tasks() {
         onOpenChange={setIsDetailDialogOpen}
         onEdit={handleEditTask}
         onDelete={handleDeleteTask}
+        onDuplicate={handleDuplicateTask}
         getClientName={getClientName}
         getAssignedUsers={getAssignedUsers}
         onTaskUpdate={fetchTasks}

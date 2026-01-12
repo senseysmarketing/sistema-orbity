@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History, ListTodo, Users, Lock } from "lucide-react";
+import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History, ListTodo, Users, Lock, Copy } from "lucide-react";
 import { SocialMediaPost, Subtask } from "@/hooks/useSocialMediaPosts";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
@@ -19,6 +19,7 @@ interface PostDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   onEdit: (post: SocialMediaPost) => void;
   onDelete: (postId: string) => void;
+  onDuplicate?: (post: SocialMediaPost) => void;
   onPostUpdate?: () => void;
 }
 
@@ -54,7 +55,7 @@ const postTypeConfig: Record<string, string> = {
   carrossel: "Carrossel",
 };
 
-export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, onPostUpdate }: PostDetailsDialogProps) {
+export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, onDuplicate, onPostUpdate }: PostDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showNoPermissionAlert, setShowNoPermissionAlert] = useState(false);
   const [creatorName, setCreatorName] = useState<string>("");
@@ -344,6 +345,18 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
           </div>
 
           <DialogFooter className="gap-2">
+            {onDuplicate && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onDuplicate(post);
+                  onOpenChange(false);
+                }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Duplicar
+              </Button>
+            )}
             <Button
               variant="destructive"
               onClick={() => canDelete ? setShowDeleteAlert(true) : setShowNoPermissionAlert(true)}

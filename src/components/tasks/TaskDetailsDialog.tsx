@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock } from "lucide-react";
+import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock, Copy } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
@@ -44,6 +44,7 @@ interface TaskDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   onEdit: (task: Task) => void;
   onDelete: (taskId: string) => void;
+  onDuplicate?: (task: Task) => void;
   getClientName: (clientId: string | null) => string;
   getAssignedUsers: (taskId: string) => any[];
   onTaskUpdate?: () => void;
@@ -62,7 +63,7 @@ const priorityConfig: Record<string, { label: string; color: string }> = {
   high: { label: "Alta", color: "bg-red-500" },
 };
 
-export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, getClientName, getAssignedUsers, onTaskUpdate }: TaskDetailsDialogProps) {
+export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, onDuplicate, getClientName, getAssignedUsers, onTaskUpdate }: TaskDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showNoPermissionAlert, setShowNoPermissionAlert] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
@@ -327,6 +328,18 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
           </div>
 
           <DialogFooter className="gap-2">
+            {onDuplicate && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onDuplicate(task);
+                  onOpenChange(false);
+                }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Duplicar
+              </Button>
+            )}
             <Button
               variant="destructive"
               onClick={() => canDelete ? setShowDeleteAlert(true) : setShowNoPermissionAlert(true)}

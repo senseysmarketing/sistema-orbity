@@ -181,6 +181,21 @@ export function PostKanban() {
     toast.success("Postagem excluída com sucesso");
   };
 
+  const handleDuplicate = (post: SocialMediaPost) => {
+    const duplicatedPost = {
+      ...post,
+      id: '',
+      title: `${post.title} (Cópia)`,
+      status: 'draft',
+      created_at: '',
+      created_by: '',
+      approval_history: [],
+    };
+    setEditingPost(duplicatedPost as SocialMediaPost);
+    setIsDetailsOpen(false);
+    setIsCreateDialogOpen(true);
+  };
+
   return (
     <div className="space-y-4 h-full flex flex-col">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0">
@@ -278,6 +293,7 @@ export function PostKanban() {
         onOpenChange={setIsDetailsOpen}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onDuplicate={handleDuplicate}
         onPostUpdate={fetchPosts}
       />
     </div>
