@@ -161,7 +161,7 @@ serve(async (req) => {
       ],
       mode: "subscription",
       success_url: `${req.headers.get("origin")}/subscription-success?session_id={CHECKOUT_SESSION_ID}&onboarding=true`,
-      cancel_url: `${req.headers.get("origin")}/onboarding`,
+      cancel_url: `${req.headers.get("origin")}/subscription-canceled`,
       metadata: {
         agency_id: agencyData.id,
         user_id: userId,
