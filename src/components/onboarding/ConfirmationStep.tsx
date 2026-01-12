@@ -43,7 +43,7 @@ export function ConfirmationStep() {
     const plans = {
       basic: { name: 'Básico', price: 97 },
       professional: { name: 'Profissional', price: 197 },
-      enterprise: { name: 'Enterprise', price: 397 }
+      enterprise: { name: 'Enterprise', price: 597 }
     };
     return plans[slug as keyof typeof plans] || { name: slug, price: 0 };
   };

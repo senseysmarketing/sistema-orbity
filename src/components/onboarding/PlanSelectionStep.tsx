@@ -58,7 +58,8 @@ export function PlanSelectionStep() {
     } else {
       // Profissional/Enterprise - requer pagamento imediato
       if (!onboardingData.companyData || !onboardingData.adminUser) {
-        toast.error('Complete os dados da empresa e do administrador primeiro');
+        toast.info('Para planos pagos, primeiro complete os dados do administrador na próxima etapa. Clique em "Continuar" para prosseguir.');
+        setSelectedPlan('basic'); // Seleciona básico temporariamente para permitir navegação
         return;
       }
       
