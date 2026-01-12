@@ -1,4 +1,4 @@
-import { PricingCards } from "@/components/subscription/PricingCards";
+import { LandingPricingCards } from "./LandingPricingCards";
 
 export function PricingSection() {
   return (
@@ -13,7 +13,7 @@ export function PricingSection() {
           </p>
         </div>
 
-        <PricingCards />
+        <LandingPricingCards />
 
         <div className="text-center mt-12 space-y-4">
           <p className="text-sm text-muted-foreground">
