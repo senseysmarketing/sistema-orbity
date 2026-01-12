@@ -401,6 +401,12 @@ async function syncLeads(supabase: any, userId: string, params: any) {
       });
     }
 
+    // Mapeamento de valores legados para temperatura válida
+    const temperatureMapping: Record<string, string> = {
+      'cold': 'cold', 'warm': 'warm', 'hot': 'hot',
+      'low': 'cold', 'medium': 'warm', 'high': 'hot'
+    };
+
     // Map to CRM lead fields
     const leadData = {
       agency_id: integration.agency_id,
@@ -409,7 +415,7 @@ async function syncLeads(supabase: any, userId: string, params: any) {
       phone: fieldData.phone_number || null,
       company: fieldData.company_name || null,
       status: integration.default_status,
-      priority: integration.default_priority,
+      priority: temperatureMapping[integration.default_priority] || 'cold',
       source: 'facebook_leads',
       notes: `Lead capturado do formulário: ${integration.form_name}\nData: ${new Date(fbLead.created_time).toLocaleString('pt-BR')}`,
       custom_fields: fieldData,
@@ -575,6 +581,12 @@ async function handleWebhook(supabase: any, body: any) {
         });
       }
 
+      // Mapeamento de valores legados para temperatura válida
+      const temperatureMapping: Record<string, string> = {
+        'cold': 'cold', 'warm': 'warm', 'hot': 'hot',
+        'low': 'cold', 'medium': 'warm', 'high': 'hot'
+      };
+
       // Create lead in CRM
       const crmLeadData = {
         agency_id: integration.agency_id,
@@ -583,7 +595,7 @@ async function handleWebhook(supabase: any, body: any) {
         phone: fieldData.phone_number || null,
         company: fieldData.company_name || null,
         status: integration.default_status,
-        priority: integration.default_priority,
+        priority: temperatureMapping[integration.default_priority] || 'cold',
         source: 'facebook_leads',
         notes: `🚀 Lead capturado automaticamente via webhook\nFormulário: ${integration.form_name}\nPágina: ${integration.page_name}\nData: ${new Date(leadData.created_time).toLocaleString('pt-BR')}`,
         custom_fields: fieldData,
