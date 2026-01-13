@@ -5,6 +5,7 @@ import { useAgency } from '@/hooks/useAgency';
 import { MasterMetricsCards } from '@/components/master/MasterMetricsCards';
 import { AgenciesTable } from '@/components/master/AgenciesTable';
 import { SubscriptionPlansManager } from '@/components/master/SubscriptionPlansManager';
+import { MasterAnalytics } from '@/components/master/MasterAnalytics';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Gauge, BarChart3, Building2, Settings } from 'lucide-react';
 import { isMasterAgencyAdmin } from '@/lib/masterAccess';
@@ -72,19 +73,7 @@ export default function Master() {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Placeholder for analytics charts */}
-            <div className="p-8 border-2 border-dashed border-muted rounded-lg text-center">
-              <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium text-muted-foreground">Gráfico de Receita</h3>
-              <p className="text-sm text-muted-foreground">Em desenvolvimento</p>
-            </div>
-            <div className="p-8 border-2 border-dashed border-muted rounded-lg text-center">
-              <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium text-muted-foreground">Crescimento de Usuários</h3>
-              <p className="text-sm text-muted-foreground">Em desenvolvimento</p>
-            </div>
-          </div>
+          <MasterAnalytics />
         </TabsContent>
 
         <TabsContent value="plans" className="space-y-6">
