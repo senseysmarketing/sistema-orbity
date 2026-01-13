@@ -6,7 +6,7 @@ import { AdminUserStep } from '@/components/onboarding/AdminUserStep';
 import { ConfirmationStep } from '@/components/onboarding/ConfirmationStep';
 import { Card, CardContent } from '@/components/ui/card';
 import { Building2, Sparkles } from 'lucide-react';
-import senseyLogo from '@/assets/senseys-logo.png';
+import orbityLogo from '@/assets/orbity-logo-onboarding.png';
 
 function OnboardingContent() {
   const { currentStep, totalSteps } = useOnboarding();
@@ -33,8 +33,8 @@ function OnboardingContent() {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
             <img 
-              src={senseyLogo} 
-              alt="Senseys Logo" 
+              src={orbityLogo} 
+              alt="Orbity Logo" 
               className="h-12 w-auto"
             />
           </div>
@@ -69,8 +69,8 @@ function OnboardingContent() {
         <div className="text-center mt-12 text-sm text-muted-foreground">
           <p>
             Precisa de ajuda? Entre em contato conosco: 
-            <a href="mailto:suporte@senseys.com" className="text-primary hover:underline ml-1">
-              suporte@senseys.com
+            <a href="mailto:contato@orbityapp.com.br" className="text-primary hover:underline ml-1">
+              contato@orbityapp.com.br
             </a>
           </p>
         </div>
