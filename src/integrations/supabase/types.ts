@@ -4225,18 +4225,34 @@ export type Database = {
         Row: {
           agency_id: string | null
           agency_name: string | null
+          billing_cycle: string | null
           client_count: number | null
           computed_status: string | null
+          contact_email: string | null
+          contact_phone: string | null
           created_at: string | null
           current_period_end: string | null
           is_active: boolean | null
-          stripe_customer_id: string | null
-          subscription_plan: string | null
+          plan_name: string | null
+          plan_slug: string | null
+          price_monthly: number | null
+          price_yearly: number | null
+          slug: string | null
           subscription_status: string | null
           task_count: number | null
           total_revenue: number | null
           trial_end: string | null
+          trial_start: string | null
           user_count: number | null
+        }
+        Relationships: []
+      }
+      master_billing_metrics: {
+        Row: {
+          payments_this_month: number | null
+          revenue_this_month: number | null
+          total_payments: number | null
+          total_revenue_received: number | null
         }
         Relationships: []
       }
