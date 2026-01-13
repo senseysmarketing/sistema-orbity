@@ -1,7 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { useAgency } from './useAgency';
 import { toast } from 'sonner';
+import { isMasterAgencyAdmin } from '@/lib/masterAccess';
 
 interface MasterAgencyOverview {
   agency_id: string;
@@ -37,11 +39,13 @@ interface MasterContextType {
 const MasterContext = createContext<MasterContextType | undefined>(undefined);
 
 export function MasterProvider({ children }: { children: ReactNode }) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const { currentAgency, agencyRole } = useAgency();
   const [agencies, setAgencies] = useState<MasterAgencyOverview[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const isMasterUser = profile?.role === 'super_admin';
+  // Verificar se é admin/owner da agência Senseys (master)
+  const isMasterUser = isMasterAgencyAdmin(currentAgency?.id, agencyRole);
 
   const fetchAgencies = async () => {
     if (!isMasterUser) {

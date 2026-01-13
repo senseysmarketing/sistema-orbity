@@ -1,9 +1,11 @@
 import { ReactNode } from 'react';
 import { usePaymentMiddleware } from '@/hooks/usePaymentMiddleware';
 import { useAuth } from '@/hooks/useAuth';
+import { useAgency } from '@/hooks/useAgency';
 import { BlockedAccessScreen } from '@/components/payment/BlockedAccessScreen';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useLocation } from 'react-router-dom';
+import { isMasterAgencyAdmin } from '@/lib/masterAccess';
 
 interface PaymentMiddlewareWrapperProps {
   children: ReactNode;
@@ -11,9 +13,13 @@ interface PaymentMiddlewareWrapperProps {
 
 export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperProps) {
   const { paymentStatus, loading, isSuperAdmin } = usePaymentMiddleware();
-  const { profile, session } = useAuth();
+  const { session } = useAuth();
+  const { currentAgency, agencyRole } = useAgency();
   const { currentSubscription } = useSubscription();
   const location = useLocation();
+
+  // Verificar se é admin da agência master (Senseys)
+  const isMasterUser = isMasterAgencyAdmin(currentAgency?.id, agencyRole);
 
   // Never block the auth page
   if (location.pathname.startsWith('/auth')) {
@@ -29,8 +35,8 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
     );
   }
 
-  // Super admins bypass all checks
-  if (profile?.role === 'super_admin') {
+  // Master agency admins bypass all checks
+  if (isMasterUser) {
     return <>{children}</>;
   }
 

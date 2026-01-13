@@ -1,11 +1,12 @@
-import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarTrigger, useSidebar, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Shield, ContactRound, FileText, Instagram, Calendar, Upload } from "lucide-react";
+import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Gauge, ContactRound, FileText, Instagram, Calendar, Upload } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAgency } from "@/hooks/useAgency";
+import { isMasterAgencyAdmin } from "@/lib/masterAccess";
 import logoNew from "@/assets/logo-new.png";
 import faviconLogo from "@/assets/favicon-logo.png";
 
@@ -102,16 +103,15 @@ const menuCategories = [
 ];
 
 export function AppSidebar() {
-  const {
-    state
-  } = useSidebar();
+  const { state } = useSidebar();
   const location = useLocation();
-  const {
-    profile,
-    signOut
-  } = useAuth();
+  const { profile, signOut } = useAuth();
+  const { currentAgency, agencyRole } = useAgency();
   const currentPath = location.pathname;
   const collapsed = state === "collapsed";
+  
+  // Verificar se é admin da agência master (Senseys)
+  const isMasterUser = isMasterAgencyAdmin(currentAgency?.id, agencyRole);
   const isActive = (path: string) => {
     if (path === "/dashboard") {
       return currentPath === "/dashboard";
@@ -125,8 +125,6 @@ export function AppSidebar() {
   }) => isActive ? "bg-sidebar-accent text-sidebar-foreground font-medium border-r-2 border-blue-400" : "hover:bg-sidebar-muted text-sidebar-foreground/80 hover:text-sidebar-foreground";
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'super_admin':
-        return 'Super Admin';
       case 'agency_admin':
         return 'Administrador';
       case 'agency_user':
@@ -188,17 +186,17 @@ export function AppSidebar() {
           </SidebarGroup>
         ))}
 
-        {/* Master Section - Only for super admin */}
-        {profile?.role === 'super_admin' && (
+        {/* Painel de Controle - Only for Senseys agency admins */}
+        {isMasterUser && (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-sidebar-foreground/70">Master</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-sidebar-foreground/70">Sistema</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <NavLink to="/dashboard/master" className={({ isActive }) => getNavCls({ isActive })}>
-                      <Shield className="h-4 w-4" />
-                      {!collapsed && <span>Dashboard Master</span>}
+                      <Gauge className="h-4 w-4" />
+                      {!collapsed && <span>Painel de Controle</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

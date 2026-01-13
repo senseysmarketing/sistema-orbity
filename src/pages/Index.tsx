@@ -313,8 +313,6 @@ const Index = () => {
         return `Olá, ${firstName}! 👋`;
       case 'agency_user':
         return `Olá, ${firstName}! 👋`;
-      case 'super_admin':
-        return `Olá, ${firstName}! 🚀`;
       default:
         return `Olá, ${firstName}!`;
     }

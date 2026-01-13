@@ -4323,6 +4323,7 @@ export type Database = {
         Args: { agency_uuid?: string }
         Returns: boolean
       }
+      is_master_agency_admin: { Args: never; Returns: boolean }
       is_master_user: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
       start_agency_trial: {
