@@ -1,25 +1,29 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMaster } from '@/hooks/useMaster';
-import { useAuth } from '@/hooks/useAuth';
+import { useAgency } from '@/hooks/useAgency';
 import { MasterMetricsCards } from '@/components/master/MasterMetricsCards';
 import { AgenciesTable } from '@/components/master/AgenciesTable';
 import { SubscriptionPlansManager } from '@/components/master/SubscriptionPlansManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, BarChart3, Building2, Settings } from 'lucide-react';
+import { Gauge, BarChart3, Building2, Settings } from 'lucide-react';
+import { isMasterAgencyAdmin } from '@/lib/masterAccess';
 
 export default function Master() {
   const navigate = useNavigate();
   const { isMasterUser, loading } = useMaster();
-  const { profile } = useAuth();
+  const { currentAgency, agencyRole, loading: agencyLoading } = useAgency();
+
+  // Verificação de acesso baseada na agência Senseys
+  const hasAccess = isMasterAgencyAdmin(currentAgency?.id, agencyRole);
 
   useEffect(() => {
-    if (!loading && profile?.role !== 'super_admin') {
+    if (!loading && !agencyLoading && !hasAccess) {
       navigate('/dashboard');
     }
-  }, [profile?.role, loading, navigate]);
+  }, [hasAccess, loading, agencyLoading, navigate]);
 
-  if (loading) {
+  if (loading || agencyLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -27,17 +31,17 @@ export default function Master() {
     );
   }
 
-  if (profile?.role !== 'super_admin') {
+  if (!hasAccess) {
     return null;
   }
 
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="flex items-center space-x-4">
-        <Shield className="h-8 w-8 text-primary" />
+        <Gauge className="h-8 w-8 text-primary" />
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard Master</h1>
-          <p className="text-muted-foreground">Controle total sobre todas as agências</p>
+          <h1 className="text-3xl font-bold text-foreground">Painel de Controle</h1>
+          <p className="text-muted-foreground">Controle total sobre todas as agências do sistema</p>
         </div>
       </div>
 
@@ -58,7 +62,7 @@ export default function Master() {
             <span>Planos</span>
           </TabsTrigger>
           <TabsTrigger value="system" className="flex items-center space-x-2">
-            <Shield className="h-4 w-4" />
+            <Settings className="h-4 w-4" />
             <span>Sistema</span>
           </TabsTrigger>
         </TabsList>

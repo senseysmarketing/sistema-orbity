@@ -157,7 +157,7 @@ export default function Admin() {
   const [showInactiveClients, setShowInactiveClients] = useState(false);
 
   // Verificação de permissão (sem retorno antecipado)
-  const hasAccess = profile?.role === 'agency_admin' || profile?.role === 'super_admin';
+  const hasAccess = profile?.role === 'agency_admin';
 
   // Payment states
   const [selectedPayment, setSelectedPayment] = useState<ClientPayment | null>(null);
