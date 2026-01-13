@@ -146,7 +146,7 @@ export default function Welcome() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
             <Sparkles className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-4xl font-bold">Bem-vindo ao Sistema! 🎉</h1>
+          <h1 className="text-4xl font-bold">Bem-vindo a Orbity! 🎉</h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Sua agência de marketing agora tem uma ferramenta completa para gestão de clientes, tarefas, financeiro e muito mais.
           </p>
