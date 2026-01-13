@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { trackLead, trackInitiateCheckout } from '@/lib/metaPixel';
 
 interface CompanyData {
   name: string;
@@ -98,8 +99,15 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       sessionStorage.setItem('onboarding_checkout', JSON.stringify({
         agencyId: data.agencyId,
         email: onboardingData.adminUser.email,
-        password: onboardingData.adminUser.password
+        password: onboardingData.adminUser.password,
+        planSlug: planSlug
       }));
+      
+      // Disparar evento InitiateCheckout para Meta Pixel
+      trackInitiateCheckout({
+        content_name: planSlug,
+        currency: 'BRL'
+      });
       
       toast.success('Redirecionando para checkout...');
       
@@ -154,6 +162,13 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         toast.error('Agência criada, mas falha no login automático. Tente fazer login manualmente.');
         return false;
       }
+
+      // Disparar evento Lead para Meta Pixel após cadastro bem-sucedido
+      trackLead({
+        content_name: onboardingData.planSlug || 'basic',
+        content_category: 'Agency Onboarding',
+        currency: 'BRL'
+      });
 
       // After successful login, user will be redirected to Welcome page by its own useEffect
       return true;

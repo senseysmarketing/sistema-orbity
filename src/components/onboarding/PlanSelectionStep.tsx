@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, ArrowRight, Crown, Star, Zap, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { trackViewContent } from '@/lib/metaPixel';
 
 interface SubscriptionPlan {
   id: string;
@@ -31,6 +32,17 @@ export function PlanSelectionStep() {
   useEffect(() => {
     fetchPlans();
   }, []);
+
+  // Rastrear visualização dos planos quando carregarem
+  useEffect(() => {
+    if (plans.length > 0) {
+      trackViewContent({
+        content_name: 'Pricing Plans',
+        content_category: 'Onboarding',
+        content_ids: plans.map(p => p.slug)
+      });
+    }
+  }, [plans]);
 
   const fetchPlans = async () => {
     try {
