@@ -1,5 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Flame, BarChart3, Clock, DollarSign, Users2, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Flame, BarChart3, Clock, DollarSign, Users2, AlertCircle, ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const problems = [
   {
@@ -35,6 +37,8 @@ const problems = [
 ];
 
 export function ProblemSection() {
+  const navigate = useNavigate();
+
   return (
     <section className="py-20 bg-muted/30">
       <div className="container mx-auto px-4">
@@ -63,6 +67,17 @@ export function ProblemSection() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        <div className="text-center mt-12">
+          <Button 
+            size="lg" 
+            className="bg-[#1c102f] hover:bg-[#1c102f]/90 text-white"
+            onClick={() => navigate("/onboarding")}
+          >
+            Resolva Esses Problemas Agora
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
         </div>
       </div>
     </section>

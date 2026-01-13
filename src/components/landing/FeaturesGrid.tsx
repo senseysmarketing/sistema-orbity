@@ -1,4 +1,5 @@
 import { FeatureCard } from "./FeatureCard";
+import { Button } from "@/components/ui/button";
 import { 
   Users, 
   MessageSquare, 
@@ -7,8 +8,10 @@ import {
   CheckSquare, 
   FileText, 
   Calendar, 
-  Bell 
+  Bell,
+  ArrowRight
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const features = [
   {
@@ -62,6 +65,8 @@ const features = [
 ];
 
 export function FeaturesGrid() {
+  const navigate = useNavigate();
+
   return (
     <section className="py-20">
       <div className="container mx-auto px-4">
@@ -79,6 +84,20 @@ export function FeaturesGrid() {
           {features.map((feature, index) => (
             <FeatureCard key={index} {...feature} delay={index * 0.1} />
           ))}
+        </div>
+
+        <div className="text-center mt-12">
+          <Button 
+            size="lg" 
+            className="bg-[#1c102f] hover:bg-[#1c102f]/90 text-white"
+            onClick={() => navigate("/onboarding")}
+          >
+            Experimente Todas as Funções
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
+          <p className="text-sm text-muted-foreground mt-3">
+            7 dias grátis, sem cartão de crédito
+          </p>
         </div>
       </div>
     </section>

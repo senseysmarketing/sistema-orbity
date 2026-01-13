@@ -10,6 +10,7 @@ import { PricingSection } from "@/components/landing/PricingSection";
 import { FAQSection } from "@/components/landing/FAQSection";
 import { CTASection } from "@/components/landing/CTASection";
 import { LandingFooter } from "@/components/landing/LandingFooter";
+import { WhatsAppFloatingButton } from "@/components/landing/WhatsAppFloatingButton";
 import { trackViewContent } from "@/lib/metaPixel";
 
 export default function LandingPage() {
@@ -33,6 +34,7 @@ export default function LandingPage() {
       <FAQSection />
       <CTASection />
       <LandingFooter />
+      <WhatsAppFloatingButton />
     </div>
   );
 }

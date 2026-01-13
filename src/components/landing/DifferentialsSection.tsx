@@ -1,4 +1,6 @@
-import { Check, Shield } from "lucide-react";
+import { Check, Shield, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 const differentials = [
   {
@@ -28,6 +30,8 @@ const differentials = [
 ];
 
 export function DifferentialsSection() {
+  const navigate = useNavigate();
+
   return (
     <section className="py-20 bg-gradient-to-br from-[#1c102f]/10 via-background to-violet-500/10">
       <div className="container mx-auto px-4">
@@ -59,6 +63,17 @@ export function DifferentialsSection() {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="text-center mt-12">
+          <Button 
+            size="lg" 
+            className="bg-[#1c102f] hover:bg-[#1c102f]/90 text-white"
+            onClick={() => navigate("/onboarding")}
+          >
+            Faça Parte Dessa Mudança
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
         </div>
       </div>
     </section>
