@@ -130,3 +130,102 @@ export const trackCompleteRegistration = (data?: {
     console.log('[Meta Pixel] CompleteRegistration event tracked:', data);
   }
 };
+
+// ========== EVENTOS CUSTOMIZADOS DO ONBOARDING ==========
+
+// Evento para início do onboarding
+export const trackStartOnboarding = () => {
+  if (window.fbq) {
+    window.fbq('trackCustom', 'StartOnboarding', {
+      content_name: 'Agency Onboarding',
+      timestamp: new Date().toISOString(),
+    });
+    console.log('[Meta Pixel] StartOnboarding event tracked');
+  }
+};
+
+// Evento para rastrear progresso do onboarding por etapa
+export const trackOnboardingStep = (data: {
+  step: number;
+  step_name: string;
+  total_steps: number;
+  time_on_previous_step?: number;
+}) => {
+  if (window.fbq) {
+    window.fbq('trackCustom', 'OnboardingStep', {
+      step: data.step,
+      step_name: data.step_name,
+      total_steps: data.total_steps,
+      time_on_previous_step: data.time_on_previous_step,
+    });
+    console.log('[Meta Pixel] OnboardingStep event tracked:', data);
+  }
+};
+
+// Evento para seleção de plano específico
+export const trackPlanSelected = (data: {
+  plan_name: string;
+  plan_slug: string;
+  plan_price: number;
+  is_trial: boolean;
+}) => {
+  if (window.fbq) {
+    window.fbq('trackCustom', 'PlanSelected', data);
+    console.log('[Meta Pixel] PlanSelected event tracked:', data);
+  }
+};
+
+// Evento AddToCart - quando seleciona um plano (padrão Meta)
+export const trackAddToCart = (data: {
+  content_name: string;
+  content_ids: string[];
+  value: number;
+  currency?: string;
+}) => {
+  if (window.fbq) {
+    window.fbq('track', 'AddToCart', {
+      content_name: data.content_name,
+      content_ids: data.content_ids,
+      value: data.value,
+      currency: data.currency || 'BRL',
+      content_type: 'product',
+    });
+    console.log('[Meta Pixel] AddToCart event tracked:', data);
+  }
+};
+
+// Evento para formulário preenchido com sucesso
+export const trackFormCompleted = (data: {
+  form_name: string;
+  step: number;
+  fields_filled: number;
+}) => {
+  if (window.fbq) {
+    window.fbq('trackCustom', 'FormCompleted', data);
+    console.log('[Meta Pixel] FormCompleted event tracked:', data);
+  }
+};
+
+// Evento para erro de validação
+export const trackValidationError = (data: {
+  step: number;
+  field: string;
+  error_message: string;
+}) => {
+  if (window.fbq) {
+    window.fbq('trackCustom', 'ValidationError', data);
+    console.log('[Meta Pixel] ValidationError event tracked:', data);
+  }
+};
+
+// Evento para abandono/saída do onboarding
+export const trackOnboardingAbandoned = (data: {
+  step: number;
+  step_name: string;
+  time_spent_seconds: number;
+}) => {
+  if (window.fbq) {
+    window.fbq('trackCustom', 'OnboardingAbandoned', data);
+    console.log('[Meta Pixel] OnboardingAbandoned event tracked:', data);
+  }
+};

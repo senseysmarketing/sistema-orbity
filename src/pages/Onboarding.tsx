@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { OnboardingProvider, useOnboarding } from '@/hooks/useOnboarding';
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
 import { CompanyDataStep } from '@/components/onboarding/CompanyDataStep';
@@ -7,9 +8,24 @@ import { ConfirmationStep } from '@/components/onboarding/ConfirmationStep';
 import { Card, CardContent } from '@/components/ui/card';
 import { Building2, Sparkles } from 'lucide-react';
 import orbityLogo from '@/assets/orbity-logo-onboarding.png';
+import { trackStartOnboarding, trackOnboardingStep } from '@/lib/metaPixel';
 
 function OnboardingContent() {
   const { currentStep, totalSteps } = useOnboarding();
+  const hasTrackedStart = useRef(false);
+
+  // Rastrear início do onboarding (apenas uma vez)
+  useEffect(() => {
+    if (!hasTrackedStart.current) {
+      trackStartOnboarding();
+      trackOnboardingStep({
+        step: 1,
+        step_name: 'company_data',
+        total_steps: 4,
+      });
+      hasTrackedStart.current = true;
+    }
+  }, []);
 
   const renderStep = () => {
     switch (currentStep) {

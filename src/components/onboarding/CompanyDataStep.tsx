@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Building2, ArrowRight } from 'lucide-react';
 import { z } from 'zod';
+import { trackFormCompleted, trackValidationError } from '@/lib/metaPixel';
 
 const companySchema = z.object({
   name: z.string().min(2, 'Nome da empresa deve ter pelo menos 2 caracteres'),
@@ -31,6 +32,15 @@ export function CompanyDataStep() {
     try {
       const validatedData = companySchema.parse(formData);
       setErrors({});
+      
+      // Rastrear formulário preenchido com sucesso
+      const filledFields = Object.values(formData).filter(v => v && v.trim() !== '').length;
+      trackFormCompleted({
+        form_name: 'company_data',
+        step: 1,
+        fields_filled: filledFields,
+      });
+      
       updateCompanyData(validatedData as any);
       nextStep();
     } catch (error) {
@@ -38,7 +48,15 @@ export function CompanyDataStep() {
         const newErrors: Record<string, string> = {};
         error.errors.forEach((err) => {
           if (err.path[0]) {
-            newErrors[err.path[0] as string] = err.message;
+            const fieldName = err.path[0] as string;
+            newErrors[fieldName] = err.message;
+            
+            // Rastrear erro de validação
+            trackValidationError({
+              step: 1,
+              field: fieldName,
+              error_message: err.message,
+            });
           }
         });
         setErrors(newErrors);
