@@ -16,12 +16,22 @@ interface MasterAgencyOverview {
   client_count: number;
   task_count: number;
   total_revenue: number;
-  subscription_plan: string;
+  plan_name: string;
+  plan_slug: string;
   subscription_status: string;
   current_period_end: string;
-  stripe_customer_id: string;
   trial_end: string | null;
   computed_status: ComputedStatus;
+  billing_cycle: string | null;
+  price_monthly: number | null;
+  price_yearly: number | null;
+}
+
+interface BillingMetrics {
+  total_payments: number;
+  total_revenue_received: number;
+  payments_this_month: number;
+  revenue_this_month: number;
 }
 
 interface StatusCounts {
@@ -43,9 +53,9 @@ interface MasterContextType {
   getMasterMetrics: () => {
     totalAgencies: number;
     activeAgencies: number;
-    totalRevenue: number;
+    mrr: number;
     totalUsers: number;
-    totalClients: number;
+    totalPayments: number;
   };
   getStatusCounts: () => StatusCounts;
 }
@@ -56,6 +66,12 @@ export function MasterProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { currentAgency, agencyRole } = useAgency();
   const [agencies, setAgencies] = useState<MasterAgencyOverview[]>([]);
+  const [billingMetrics, setBillingMetrics] = useState<BillingMetrics>({
+    total_payments: 0,
+    total_revenue_received: 0,
+    payments_this_month: 0,
+    revenue_this_month: 0,
+  });
   const [loading, setLoading] = useState(true);
 
   // Verificar se é admin/owner da agência Senseys (master)
@@ -68,12 +84,18 @@ export function MasterProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('master_agency_overview')
-        .select('*');
+      // Fetch agencies and billing metrics in parallel
+      const [agenciesResult, billingResult] = await Promise.all([
+        supabase.from('master_agency_overview').select('*'),
+        supabase.from('master_billing_metrics').select('*').single(),
+      ]);
 
-      if (error) throw error;
-      setAgencies((data || []) as MasterAgencyOverview[]);
+      if (agenciesResult.error) throw agenciesResult.error;
+      setAgencies((agenciesResult.data || []) as MasterAgencyOverview[]);
+
+      if (billingResult.data) {
+        setBillingMetrics(billingResult.data as BillingMetrics);
+      }
     } catch (error) {
       console.error('Error fetching agencies:', error);
       toast.error('Erro ao carregar dados das agências');
@@ -123,16 +145,26 @@ export function MasterProvider({ children }: { children: ReactNode }) {
   const getMasterMetrics = () => {
     const totalAgencies = agencies.length;
     const activeAgencies = agencies.filter(a => a.computed_status === 'active').length;
-    const totalRevenue = agencies.reduce((sum, a) => sum + Number(a.total_revenue), 0);
     const totalUsers = agencies.reduce((sum, a) => sum + a.user_count, 0);
-    const totalClients = agencies.reduce((sum, a) => sum + a.client_count, 0);
+    
+    // Calculate MRR (Monthly Recurring Revenue)
+    const mrr = agencies
+      .filter(a => a.computed_status === 'active')
+      .reduce((sum, a) => {
+        if (a.billing_cycle === 'yearly' && a.price_yearly) {
+          return sum + (a.price_yearly / 12);
+        } else if (a.price_monthly) {
+          return sum + a.price_monthly;
+        }
+        return sum;
+      }, 0);
 
     return {
       totalAgencies,
       activeAgencies,
-      totalRevenue,
+      mrr,
       totalUsers,
-      totalClients,
+      totalPayments: billingMetrics.total_payments,
     };
   };
 

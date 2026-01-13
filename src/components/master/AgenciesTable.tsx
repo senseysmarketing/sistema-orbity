@@ -224,7 +224,7 @@ export function AgenciesTable() {
                       {getSituationText(agency)}
                     </TableCell>
                     <TableCell>
-                      {agency.subscription_plan || 'Sem plano'}
+                      {agency.plan_name || 'Sem plano'}
                     </TableCell>
                     <TableCell>{agency.user_count}</TableCell>
                     <TableCell>{agency.client_count}</TableCell>

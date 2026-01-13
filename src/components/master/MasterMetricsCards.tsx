@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMaster } from '@/hooks/useMaster';
-import { Building2, Users, DollarSign, UserCheck, Briefcase } from 'lucide-react';
+import { Building2, Users, UserCheck, TrendingUp, CreditCard } from 'lucide-react';
 
 export function MasterMetricsCards() {
   const { getMasterMetrics, loading } = useMaster();
@@ -38,13 +38,13 @@ export function MasterMetricsCards() {
       description: "Com assinaturas ativas"
     },
     {
-      title: "Receita Total",
+      title: "MRR",
       value: new Intl.NumberFormat('pt-BR', {
         style: 'currency',
         currency: 'BRL'
-      }).format(metrics.totalRevenue),
-      icon: DollarSign,
-      description: "Receita acumulada"
+      }).format(metrics.mrr),
+      icon: TrendingUp,
+      description: "Receita recorrente mensal"
     },
     {
       title: "Total de Usuários",
@@ -53,10 +53,10 @@ export function MasterMetricsCards() {
       description: "Usuários ativos"
     },
     {
-      title: "Total de Clientes",
-      value: metrics.totalClients,
-      icon: Briefcase,
-      description: "Clientes gerenciados"
+      title: "Pagamentos Recebidos",
+      value: metrics.totalPayments,
+      icon: CreditCard,
+      description: "Cobranças pagas"
     }
   ];
 
