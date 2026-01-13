@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ import {
   Shield
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { trackViewContent } from '@/lib/metaPixel';
 
 export function ConfirmationStep() {
   const { 
@@ -22,6 +24,20 @@ export function ConfirmationStep() {
     loading 
   } = useOnboarding();
   const navigate = useNavigate();
+  const hasTrackedView = useRef(false);
+
+  // Rastrear visualização da etapa de confirmação
+  useEffect(() => {
+    if (!hasTrackedView.current && onboardingData.planSlug) {
+      trackViewContent({
+        content_name: 'Onboarding Confirmation',
+        content_category: 'Onboarding Final Review',
+        content_ids: [onboardingData.planSlug],
+        value: getPlanInfo(onboardingData.planSlug).price,
+      });
+      hasTrackedView.current = true;
+    }
+  }, [onboardingData.planSlug]);
 
   const handleSubmit = async () => {
     const success = await submitOnboarding();

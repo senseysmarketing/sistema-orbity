@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { UserCheck, ArrowLeft, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
+import { trackFormCompleted, trackValidationError } from '@/lib/metaPixel';
 
 const adminUserSchema = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
@@ -29,6 +30,15 @@ export function AdminUserStep() {
     try {
       const validatedData = adminUserSchema.parse(formData);
       setErrors({});
+      
+      // Rastrear formulário preenchido com sucesso
+      const filledFields = Object.values(formData).filter(v => v && v.trim() !== '').length;
+      trackFormCompleted({
+        form_name: 'admin_user',
+        step: 3,
+        fields_filled: filledFields,
+      });
+      
       updateAdminUser(validatedData as any);
       nextStep();
     } catch (error) {
@@ -36,7 +46,15 @@ export function AdminUserStep() {
         const newErrors: Record<string, string> = {};
         error.errors.forEach((err) => {
           if (err.path[0]) {
-            newErrors[err.path[0] as string] = err.message;
+            const fieldName = err.path[0] as string;
+            newErrors[fieldName] = err.message;
+            
+            // Rastrear erro de validação
+            trackValidationError({
+              step: 3,
+              field: fieldName,
+              error_message: err.message,
+            });
           }
         });
         setErrors(newErrors);

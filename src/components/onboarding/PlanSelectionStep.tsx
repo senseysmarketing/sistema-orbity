@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, ArrowRight, Crown, Star, Zap, Check } from 'lucide-react';
 import { toast } from 'sonner';
-import { trackViewContent } from '@/lib/metaPixel';
+import { trackViewContent, trackAddToCart, trackPlanSelected } from '@/lib/metaPixel';
 
 interface SubscriptionPlan {
   id: string;
@@ -62,7 +62,29 @@ export function PlanSelectionStep() {
     }
   };
 
+  // Rastrear seleção de plano
+  const trackPlanSelection = (plan: SubscriptionPlan) => {
+    // Evento AddToCart (padrão Meta para intenção de compra)
+    trackAddToCart({
+      content_name: plan.name,
+      content_ids: [plan.slug],
+      value: plan.price_monthly,
+      currency: 'BRL',
+    });
+    
+    // Evento customizado com mais detalhes
+    trackPlanSelected({
+      plan_name: plan.name,
+      plan_slug: plan.slug,
+      plan_price: plan.price_monthly,
+      is_trial: plan.slug === 'basic',
+    });
+  };
+
   const handlePlanAction = async (plan: SubscriptionPlan) => {
+    // Rastrear seleção do plano
+    trackPlanSelection(plan);
+    
     if (plan.slug === 'basic') {
       // Plano básico - trial gratuito, apenas seleciona
       setSelectedPlan(plan.slug);
@@ -81,6 +103,12 @@ export function PlanSelectionStep() {
       // Inicia checkout imediatamente
       await initiateCheckout(plan.slug);
     }
+  };
+
+  // Handler para seleção do plano básico (trial)
+  const handleBasicPlanSelect = (plan: SubscriptionPlan) => {
+    trackPlanSelection(plan);
+    setSelectedPlan(plan.slug);
   };
 
   const handleContinue = () => {
@@ -210,7 +238,7 @@ export function PlanSelectionStep() {
                   {/* Botão específico por tipo de plano */}
                   {plan.slug === 'basic' ? (
                     <Button 
-                      onClick={() => setSelectedPlan(plan.slug)}
+                      onClick={() => handleBasicPlanSelect(plan)}
                       variant={isSelected ? "default" : "outline"}
                       className="w-full"
                     >
