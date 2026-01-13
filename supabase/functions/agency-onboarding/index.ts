@@ -224,6 +224,55 @@ serve(async (req) => {
 
     if (onboardingError) throw new Error(`Failed to create onboarding record: ${onboardingError.message}`);
 
+    // Step 8: Disparar webhook para n8n (boas-vindas)
+    logStep("Disparando webhook para n8n");
+    try {
+      const webhookPayload = {
+        // Dados do usuário administrador
+        admin_name: adminUser.name,
+        admin_email: adminUser.email,
+        
+        // Dados da empresa
+        company_name: companyData.name,
+        company_description: companyData.description || '',
+        company_email: companyData.contactEmail,
+        company_phone: companyData.contactPhone || '',
+        
+        // Dados da agência criada
+        agency_id: agencyId,
+        agency_slug: agencySlug,
+        
+        // Dados do plano
+        plan_slug: planSlug,
+        
+        // Timestamps
+        trial_start: new Date().toISOString(),
+        trial_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        created_at: new Date().toISOString()
+      };
+
+      const webhookResponse = await fetch(
+        "https://senseys-n8n.cloudfy.cloud/webhook/onboarding-orbity",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(webhookPayload)
+        }
+      );
+      
+      logStep("Webhook enviado com sucesso", { 
+        status: webhookResponse.status,
+        ok: webhookResponse.ok 
+      });
+    } catch (webhookError) {
+      // Log do erro mas não falha o onboarding
+      logStep("Erro ao enviar webhook (não crítico)", { 
+        error: webhookError instanceof Error ? webhookError.message : String(webhookError) 
+      });
+    }
+
     logStep("Onboarding completed successfully");
 
     return new Response(JSON.stringify({
