@@ -1,6 +1,10 @@
-import { Shield, Lock, Eye } from "lucide-react";
+import { Shield, Lock, Eye, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 export function IntegrationsSection() {
+  const navigate = useNavigate();
+
   return (
     <section className="py-20 bg-gradient-to-br from-[#1c102f]/5 via-background to-violet-500/5">
       <div className="container mx-auto px-4">
@@ -116,6 +120,17 @@ export function IntegrationsSection() {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className="text-center mt-12">
+          <Button 
+            size="lg" 
+            className="bg-[#1c102f] hover:bg-[#1c102f]/90 text-white"
+            onClick={() => navigate("/onboarding")}
+          >
+            Comece a Integrar Agora
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
         </div>
       </div>
     </section>

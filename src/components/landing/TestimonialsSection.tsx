@@ -1,6 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Star } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Star, ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const testimonials = [
   {
@@ -36,6 +38,8 @@ const metrics = [
 ];
 
 export function TestimonialsSection() {
+  const navigate = useNavigate();
+
   return (
     <section className="py-20">
       <div className="container mx-auto px-4">
@@ -93,6 +97,17 @@ export function TestimonialsSection() {
               <div className="text-muted-foreground">{metric.label}</div>
             </div>
           ))}
+        </div>
+
+        <div className="text-center mt-12">
+          <Button 
+            size="lg" 
+            className="bg-[#1c102f] hover:bg-[#1c102f]/90 text-white"
+            onClick={() => navigate("/onboarding")}
+          >
+            Junte-se a Eles
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
         </div>
       </div>
     </section>
