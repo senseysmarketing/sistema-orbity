@@ -1,9 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   TrendingUp, TrendingDown, Users, Calendar, CheckCircle, 
-  AlertCircle, DollarSign, Target, MessageSquare, Monitor 
+  AlertCircle, DollarSign, Target, MessageSquare, Monitor,
+  Eye, EyeOff
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 
 interface MetricCardProps {
   title: string;
@@ -16,9 +18,25 @@ interface MetricCardProps {
   };
   progress?: number;
   variant?: "default" | "success" | "warning" | "danger";
+  isSensitive?: boolean;
+  showValue?: boolean;
+  onToggleVisibility?: () => void;
+  canToggle?: boolean;
 }
 
-export function MetricCard({ title, value, subtitle, icon, trend, progress, variant = "default" }: MetricCardProps) {
+export function MetricCard({ 
+  title, 
+  value, 
+  subtitle, 
+  icon, 
+  trend, 
+  progress, 
+  variant = "default",
+  isSensitive = false,
+  showValue = true,
+  onToggleVisibility,
+  canToggle = false
+}: MetricCardProps) {
   const variantColors = {
     default: "text-primary",
     success: "text-green-600",
@@ -26,14 +44,33 @@ export function MetricCard({ title, value, subtitle, icon, trend, progress, vari
     danger: "text-red-600",
   };
 
+  const displayValue = isSensitive && !showValue ? "••••••" : value;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div className="text-muted-foreground">{icon}</div>
+        <div className="flex items-center gap-2">
+          {canToggle && isSensitive && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onToggleVisibility}
+              title={showValue ? "Ocultar valor" : "Mostrar valor"}
+            >
+              {showValue ? (
+                <Eye className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              ) : (
+                <EyeOff className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              )}
+            </Button>
+          )}
+          <div className="text-muted-foreground">{icon}</div>
+        </div>
       </CardHeader>
       <CardContent>
-        <div className={`text-2xl font-bold ${variantColors[variant]}`}>{value}</div>
+        <div className={`text-2xl font-bold ${variantColors[variant]}`}>{displayValue}</div>
         {subtitle && (
           <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
         )}
@@ -74,9 +111,17 @@ interface DashboardMetricsProps {
     monthlyRevenue: number;
     adSpend?: number;
   };
+  showSensitiveData?: boolean;
+  onToggleSensitiveData?: () => void;
+  isAdmin?: boolean;
 }
 
-export function DashboardMetrics({ metrics }: DashboardMetricsProps) {
+export function DashboardMetrics({ 
+  metrics, 
+  showSensitiveData = true, 
+  onToggleSensitiveData,
+  isAdmin = false
+}: DashboardMetricsProps) {
   const taskCompletionRate = metrics.totalTasks > 0 
     ? Math.round((metrics.completedTasks / metrics.totalTasks) * 100) 
     : 0;
@@ -143,6 +188,10 @@ export function DashboardMetrics({ metrics }: DashboardMetricsProps) {
         subtitle="Contratos ativos"
         icon={<DollarSign className="h-4 w-4" />}
         variant="success"
+        isSensitive={true}
+        showValue={showSensitiveData}
+        onToggleVisibility={onToggleSensitiveData}
+        canToggle={isAdmin}
       />
 
       {metrics.adSpend !== undefined && (
@@ -155,6 +204,10 @@ export function DashboardMetrics({ metrics }: DashboardMetricsProps) {
           subtitle="Gasto mensal em tráfego"
           icon={<Monitor className="h-4 w-4" />}
           variant="default"
+          isSensitive={true}
+          showValue={showSensitiveData}
+          onToggleVisibility={onToggleSensitiveData}
+          canToggle={isAdmin}
         />
       )}
 

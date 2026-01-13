@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,13 +16,16 @@ import { QuickActions } from '@/components/dashboard/QuickActions';
 import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { UpcomingTasks } from '@/components/dashboard/UpcomingTasks';
 import { useNavigate } from 'react-router-dom';
+import { startOfMonth, format } from 'date-fns';
 
 const Index = () => {
   const { profile } = useAuth();
-  const { currentAgency } = useAgency();
+  const { currentAgency, isAgencyAdmin } = useAgency();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [showSensitiveData, setShowSensitiveData] = useState(true);
+  const [realAdSpend, setRealAdSpend] = useState(0);
   const [data, setData] = useState({
     clients: [],
     leads: [],
@@ -34,9 +37,51 @@ const Index = () => {
     campaigns: [],
   });
 
+  const fetchRealInvestments = useCallback(async () => {
+    if (!currentAgency?.id) return;
+    
+    try {
+      let totalSpend = 0;
+      
+      // 1. Buscar Meta Ads spend da conta selecionada
+      const { data: agency } = await supabase
+        .from('agencies')
+        .select('crm_ad_account_id')
+        .eq('id', currentAgency.id)
+        .single();
+
+      if (agency?.crm_ad_account_id) {
+        const { data: account } = await supabase
+          .from('selected_ad_accounts')
+          .select('current_month_spend')
+          .eq('id', agency.crm_ad_account_id)
+          .single();
+        
+        totalSpend += Number(account?.current_month_spend || 0);
+      }
+
+      // 2. Buscar investimentos manuais do mês
+      const monthStr = format(startOfMonth(new Date()), 'yyyy-MM-01');
+      const { data: manualData } = await supabase
+        .from('crm_investments')
+        .select('amount')
+        .eq('agency_id', currentAgency.id)
+        .eq('reference_month', monthStr);
+      
+      if (manualData) {
+        totalSpend += manualData.reduce((sum, inv) => sum + Number(inv.amount), 0);
+      }
+
+      setRealAdSpend(totalSpend);
+    } catch (error) {
+      console.error('Error fetching real investments:', error);
+    }
+  }, [currentAgency?.id]);
+
   useEffect(() => {
     fetchDashboardData();
-  }, [profile, currentAgency?.id]);
+    fetchRealInvestments();
+  }, [profile, currentAgency?.id, fetchRealInvestments]);
 
   const fetchDashboardData = async () => {
     if (!profile || !currentAgency) {
@@ -141,10 +186,8 @@ const Index = () => {
     const totalSocialPosts = data.socialPosts.length;
     const publishedPosts = data.socialPosts.filter((p: any) => p.status === 'published').length;
 
-    // Investimento em ads (estimado pelos contratos)
-    const adSpend = data.campaigns
-      .filter((c: any) => c.status === 'active')
-      .reduce((sum: number, c: any) => sum + (c.budget || 0), 0);
+    // Investimento em ads (dados reais do CRM)
+    const adSpend = realAdSpend;
 
     return {
       totalClients: data.clients.length,
@@ -161,7 +204,7 @@ const Index = () => {
       monthlyRevenue,
       adSpend,
     };
-  }, [data]);
+  }, [data, realAdSpend]);
 
   // Atividades recentes
   const recentActivities = useMemo(() => {
@@ -308,7 +351,12 @@ const Index = () => {
       </div>
 
       {/* Métricas Principais */}
-      <DashboardMetrics metrics={metrics} />
+      <DashboardMetrics 
+        metrics={metrics} 
+        showSensitiveData={showSensitiveData}
+        onToggleSensitiveData={() => setShowSensitiveData(!showSensitiveData)}
+        isAdmin={isAgencyAdmin()}
+      />
 
       {/* Conteúdo por Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
