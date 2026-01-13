@@ -77,13 +77,13 @@ export const LeadImportSchema = z.object({
   }).optional().nullable(),
   empresa: z.string().optional().nullable(),
   cargo: z.string().optional().nullable(),
-  origem: z.enum(['MANUAL', 'SITE', 'INDICACAO', 'REDES_SOCIAIS', 'FACEBOOK_LEADS'], { 
-    errorMap: () => ({ message: "Origem inválida" }) 
+  origem: z.enum(['SITE', 'INDICACAO', 'GOOGLE_ADS', 'FACEBOOK_ADS', 'INSTAGRAM', 'LINKEDIN', 'WHATSAPP', 'MANUAL'], { 
+    errorMap: () => ({ message: "Origem inválida. Valores aceitos: SITE, INDICACAO, GOOGLE_ADS, FACEBOOK_ADS, INSTAGRAM, LINKEDIN, WHATSAPP, MANUAL" }) 
   }),
-  status: z.enum(['NOVO', 'CONTATO', 'QUALIFICADO', 'PROPOSTA', 'NEGOCIACAO', 'GANHO', 'PERDIDO'], {
-    errorMap: () => ({ message: "Status inválido" })
+  status: z.enum(['LEADS', 'QUALIFICADO', 'AGENDAMENTO', 'REUNIAO', 'PROPOSTA', 'GANHO', 'PERDIDO'], {
+    errorMap: () => ({ message: "Status inválido. Valores aceitos: LEADS, QUALIFICADO, AGENDAMENTO, REUNIAO, PROPOSTA, GANHO, PERDIDO" })
   }),
-  prioridade: z.enum(['BAIXA', 'MEDIA', 'ALTA'], { errorMap: () => ({ message: "Prioridade deve ser BAIXA, MEDIA ou ALTA" }) }),
+  prioridade: z.enum(['FRIO', 'MORNO', 'QUENTE'], { errorMap: () => ({ message: "Prioridade deve ser FRIO, MORNO ou QUENTE" }) }),
   valorEstimado: z.number().nonnegative().optional().nullable(),
   notas: z.string().optional().nullable()
 });
