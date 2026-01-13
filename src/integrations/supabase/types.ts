@@ -155,6 +155,13 @@ export type Database = {
             foreignKeyName: "admin_notes_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "admin_notes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -451,7 +458,21 @@ export type Database = {
             foreignKeyName: "agency_users_invited_by_fkey"
             columns: ["invited_by"]
             isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "agency_users_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "agency_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "master_users"
             referencedColumns: ["user_id"]
           },
           {
@@ -789,6 +810,13 @@ export type Database = {
             foreignKeyName: "client_credentials_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "client_credentials_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -870,6 +898,13 @@ export type Database = {
             foreignKeyName: "client_files_uploaded_by_fkey"
             columns: ["uploaded_by"]
             isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "client_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -934,6 +969,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_notes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "client_notes_created_by_fkey"
@@ -1352,6 +1394,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contracts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "contracts_created_by_fkey"
@@ -2310,6 +2359,13 @@ export type Database = {
             foreignKeyName: "meetings_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "meetings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -2319,6 +2375,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "leads"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meetings_organizer_id_fkey"
+            columns: ["organizer_id"]
+            isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "meetings_organizer_id_fkey"
@@ -4118,6 +4181,13 @@ export type Database = {
             foreignKeyName: "task_templates_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "task_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -4211,6 +4281,13 @@ export type Database = {
             foreignKeyName: "tasks_assigned_to_fkey"
             columns: ["assigned_to"]
             isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -4220,6 +4297,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "tasks_created_by_fkey"
@@ -4555,6 +4639,17 @@ export type Database = {
           month: string | null
           payment_count: number | null
           revenue: number | null
+        }
+        Relationships: []
+      }
+      master_users: {
+        Row: {
+          email: string | null
+          joined_at: string | null
+          last_activity: string | null
+          name: string | null
+          role: string | null
+          user_id: string | null
         }
         Relationships: []
       }
