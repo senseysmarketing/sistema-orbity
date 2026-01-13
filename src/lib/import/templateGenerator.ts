@@ -210,15 +210,15 @@ const TEMPLATES: Record<ImportType, TemplateConfig> = {
           'Empresa': 'Empresa ABC',
           'Cargo': 'Diretora de Marketing',
           'Origem*': 'INDICACAO',
-          'Status*': 'NOVO',
-          'Prioridade*': 'ALTA',
+          'Status*': 'LEADS',
+          'Prioridade*': 'QUENTE',
           'Valor Estimado': 5000.00,
           'Notas': 'Interessada em gestão de tráfego'
         }],
         validations: {
-          'Origem*': ['MANUAL', 'SITE', 'INDICACAO', 'REDES_SOCIAIS', 'FACEBOOK_LEADS'],
-          'Status*': ['NOVO', 'CONTATO', 'QUALIFICADO', 'PROPOSTA', 'NEGOCIACAO', 'GANHO', 'PERDIDO'],
-          'Prioridade*': ['BAIXA', 'MEDIA', 'ALTA']
+          'Origem*': ['SITE', 'INDICACAO', 'GOOGLE_ADS', 'FACEBOOK_ADS', 'INSTAGRAM', 'LINKEDIN', 'WHATSAPP', 'MANUAL'],
+          'Status*': ['LEADS', 'QUALIFICADO', 'AGENDAMENTO', 'REUNIAO', 'PROPOSTA', 'GANHO', 'PERDIDO'],
+          'Prioridade*': ['FRIO', 'MORNO', 'QUENTE']
         }
       }
     ],
@@ -229,13 +229,24 @@ const TEMPLATES: Record<ImportType, TemplateConfig> = {
       '   - Email ou Telefone: Pelo menos um é recomendado',
       '   - Origem: De onde veio o lead',
       '   - Status: Estágio atual no funil',
-      '   - Prioridade: BAIXA, MEDIA ou ALTA',
+      '   - Prioridade: FRIO, MORNO ou QUENTE (temperatura do lead)',
       '',
       '2. ORIGENS VÁLIDAS:',
-      '   - MANUAL, SITE, INDICACAO, REDES_SOCIAIS, FACEBOOK_LEADS',
+      '   - SITE, INDICACAO, GOOGLE_ADS, FACEBOOK_ADS, INSTAGRAM, LINKEDIN, WHATSAPP, MANUAL',
       '',
-      '3. STATUS VÁLIDOS:',
-      '   - NOVO, CONTATO, QUALIFICADO, PROPOSTA, NEGOCIACAO, GANHO, PERDIDO'
+      '3. STATUS VÁLIDOS (estágios do funil):',
+      '   - LEADS: Novo lead (entrada no funil)',
+      '   - QUALIFICADO: Lead qualificado para avançar',
+      '   - AGENDAMENTO: Reunião agendada',
+      '   - REUNIAO: Em reunião / apresentação',
+      '   - PROPOSTA: Proposta enviada',
+      '   - GANHO: Venda fechada',
+      '   - PERDIDO: Lead perdido',
+      '',
+      '4. PRIORIDADE (temperatura):',
+      '   - FRIO: Lead frio, menor interesse',
+      '   - MORNO: Lead morno, interesse moderado',
+      '   - QUENTE: Lead quente, alto interesse'
     ]
   }
 };

@@ -117,37 +117,40 @@ export default function Import() {
   // Map Portuguese source to database values
   const mapSource = (origem: string): string => {
     const origemMap: Record<string, string> = {
-      'MANUAL': 'manual',
       'SITE': 'site',
       'INDICACAO': 'indicacao',
-      'REDES_SOCIAIS': 'redes_sociais',
-      'FACEBOOK_LEADS': 'facebook_leads'
+      'GOOGLE_ADS': 'google_ads',
+      'FACEBOOK_ADS': 'facebook_ads',
+      'INSTAGRAM': 'instagram',
+      'LINKEDIN': 'linkedin',
+      'WHATSAPP': 'whatsapp',
+      'MANUAL': 'manual'
     };
     return origemMap[origem.toUpperCase()] || 'manual';
   };
 
-  // Map Portuguese priority to database values
-  const mapPriority = (prioridade: string): 'low' | 'medium' | 'high' => {
-    const prioridadeMap: Record<string, 'low' | 'medium' | 'high'> = {
-      'BAIXA': 'low',
-      'MEDIA': 'medium',
-      'ALTA': 'high'
+  // Map Portuguese priority to database values (cold/warm/hot)
+  const mapPriority = (prioridade: string): 'cold' | 'warm' | 'hot' => {
+    const prioridadeMap: Record<string, 'cold' | 'warm' | 'hot'> = {
+      'FRIO': 'cold',
+      'MORNO': 'warm',
+      'QUENTE': 'hot'
     };
-    return prioridadeMap[prioridade.toUpperCase()] || 'medium';
+    return prioridadeMap[prioridade.toUpperCase()] || 'cold';
   };
 
   // Map Portuguese lead status to database values
   const mapLeadStatus = (status: string): string => {
     const statusMap: Record<string, string> = {
-      'NOVO': 'new',
-      'CONTATO': 'contato',
-      'QUALIFICADO': 'qualificado',
-      'PROPOSTA': 'proposta',
-      'NEGOCIACAO': 'negociacao',
-      'GANHO': 'ganho',
-      'PERDIDO': 'perdido'
+      'LEADS': 'leads',
+      'QUALIFICADO': 'qualified',
+      'AGENDAMENTO': 'scheduled',
+      'REUNIAO': 'meeting',
+      'PROPOSTA': 'proposal',
+      'GANHO': 'won',
+      'PERDIDO': 'lost'
     };
-    return statusMap[status.toUpperCase()] || 'new';
+    return statusMap[status.toUpperCase()] || 'leads';
   };
 
   const handleConfirmImport = async () => {
