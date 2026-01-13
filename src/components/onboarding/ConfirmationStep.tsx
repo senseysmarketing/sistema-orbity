@@ -42,8 +42,8 @@ export function ConfirmationStep() {
   const handleSubmit = async () => {
     const success = await submitOnboarding();
     if (success) {
-      // Navigate to main dashboard after successful onboarding
-      navigate('/');
+      // Navigate to welcome page for guided tour after successful onboarding
+      navigate('/welcome');
     }
   };
 
