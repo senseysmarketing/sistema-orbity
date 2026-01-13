@@ -145,6 +145,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "admin_notes_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "admin_notes_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -279,6 +286,13 @@ export type Database = {
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
           },
+          {
+            foreignKeyName: "agency_onboarding_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
       agency_subscriptions: {
@@ -358,6 +372,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "agency_subscriptions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "agency_subscriptions_plan_id_fkey"
             columns: ["plan_id"]
             isOneToOne: false
@@ -417,6 +438,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "agency_users_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
           {
@@ -551,6 +579,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "billing_history_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "billing_history_subscription_id_fkey"
             columns: ["subscription_id"]
             isOneToOne: false
@@ -612,6 +647,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "campaigns_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
           {
@@ -730,6 +772,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "client_credentials_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "client_credentials_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -804,6 +853,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "client_files_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "client_files_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -863,6 +919,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "client_notes_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
           {
@@ -931,6 +994,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "client_payments_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
           {
@@ -1012,6 +1082,13 @@ export type Database = {
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
           },
+          {
+            foreignKeyName: "clients_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
       content_library: {
@@ -1076,6 +1153,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "content_library_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "content_library_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
@@ -1135,6 +1219,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "contract_services_templates_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
         ]
@@ -1249,6 +1340,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "contracts_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "contracts_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -1316,6 +1414,13 @@ export type Database = {
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
           },
+          {
+            foreignKeyName: "crm_investments_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
       employees: {
@@ -1371,6 +1476,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "employees_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
         ]
@@ -1482,6 +1594,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "expenses_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
           {
@@ -1788,6 +1907,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "import_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
         ]
@@ -2167,6 +2293,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "meetings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "meetings_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -2339,6 +2472,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "notification_delivery_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "notification_delivery_logs_notification_id_fkey"
             columns: ["notification_id"]
             isOneToOne: false
@@ -2430,6 +2570,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: true
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "notification_integrations_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
         ]
@@ -2552,6 +2699,13 @@ export type Database = {
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
           },
+          {
+            foreignKeyName: "notification_preferences_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
       notification_tracking: {
@@ -2649,6 +2803,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "notifications_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
         ]
@@ -2821,6 +2982,13 @@ export type Database = {
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
           },
+          {
+            foreignKeyName: "reminder_lists_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
       reminders: {
@@ -2921,6 +3089,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "reminders_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "reminders_list_id_fkey"
             columns: ["list_id"]
             isOneToOne: false
@@ -2986,6 +3161,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "salaries_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
           {
@@ -3132,6 +3314,13 @@ export type Database = {
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
           },
+          {
+            foreignKeyName: "social_media_approval_rules_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
       social_media_assignments: {
@@ -3221,6 +3410,13 @@ export type Database = {
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
           },
+          {
+            foreignKeyName: "social_media_content_types_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
       social_media_custom_statuses: {
@@ -3273,6 +3469,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "social_media_custom_statuses_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
         ]
@@ -3364,6 +3567,13 @@ export type Database = {
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
           },
+          {
+            foreignKeyName: "social_media_platforms_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
       social_media_post_templates: {
@@ -3422,6 +3632,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "social_media_post_templates_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
         ]
@@ -3518,6 +3735,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "social_media_posts_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "social_media_posts_campaign_id_fkey"
             columns: ["campaign_id"]
             isOneToOne: false
@@ -3580,6 +3804,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "social_media_schedule_preferences_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
           {
@@ -3877,6 +4108,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "task_templates_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "task_templates_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -3963,6 +4201,13 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "tasks_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
             foreignKeyName: "tasks_assigned_to_fkey"
             columns: ["assigned_to"]
             isOneToOne: false
@@ -4043,6 +4288,13 @@ export type Database = {
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
           },
+          {
+            foreignKeyName: "traffic_controls_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
       usage_metrics: {
@@ -4100,6 +4352,13 @@ export type Database = {
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
           },
+          {
+            foreignKeyName: "usage_metrics_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
       user_achievements: {
@@ -4143,6 +4402,13 @@ export type Database = {
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "user_achievements_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
         ]
@@ -4217,6 +4483,13 @@ export type Database = {
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
           },
+          {
+            foreignKeyName: "user_notification_channels_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
         ]
       }
     }
@@ -4247,12 +4520,41 @@ export type Database = {
         }
         Relationships: []
       }
+      master_agency_usage: {
+        Row: {
+          agency_id: string | null
+          agency_name: string | null
+          computed_status: string | null
+          created_at: string | null
+          plan_name: string | null
+          post_count: number | null
+          task_count: number | null
+          user_count: number | null
+        }
+        Relationships: []
+      }
       master_billing_metrics: {
         Row: {
           payments_this_month: number | null
           revenue_this_month: number | null
           total_payments: number | null
           total_revenue_received: number | null
+        }
+        Relationships: []
+      }
+      master_monthly_metrics: {
+        Row: {
+          converted_to_paid: number | null
+          month: string | null
+          new_agencies: number | null
+        }
+        Relationships: []
+      }
+      master_monthly_revenue: {
+        Row: {
+          month: string | null
+          payment_count: number | null
+          revenue: number | null
         }
         Relationships: []
       }
