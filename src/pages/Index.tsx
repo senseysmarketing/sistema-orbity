@@ -450,7 +450,7 @@ const Index = () => {
           <UpcomingTasks tasks={upcomingTasks} />
           
           <div className="flex justify-end">
-            <Button onClick={() => navigate('/tasks')}>
+            <Button onClick={() => navigate('/dashboard/tasks')}>
               Ver Todas as Tarefas
             </Button>
           </div>
@@ -502,10 +502,10 @@ const Index = () => {
           </div>
 
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => navigate('/crm')}>
+            <Button variant="outline" onClick={() => navigate('/dashboard/crm')}>
               Acessar CRM
             </Button>
-            <Button onClick={() => navigate('/agenda')}>
+            <Button onClick={() => navigate('/dashboard/agenda')}>
               Ver Agenda
             </Button>
           </div>
@@ -557,7 +557,7 @@ const Index = () => {
           </div>
 
           <div className="flex justify-end">
-            <Button onClick={() => navigate('/social-media')}>
+            <Button onClick={() => navigate('/dashboard/social-media')}>
               Acessar Social Media
             </Button>
           </div>
