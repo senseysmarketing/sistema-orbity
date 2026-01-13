@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { CheckCircle, ArrowRight } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
+import { trackPurchase, trackLead } from '@/lib/metaPixel';
 
 export default function SubscriptionSuccess() {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ export default function SubscriptionSuccess() {
       const onboardingData = sessionStorage.getItem('onboarding_checkout');
       
       if (isFromOnboarding && onboardingData) {
-        const { email, password } = JSON.parse(onboardingData);
+        const { email, password, planSlug } = JSON.parse(onboardingData);
         
         // Auto-login the user
         const { supabase } = await import('@/integrations/supabase/client');
@@ -28,6 +29,21 @@ export default function SubscriptionSuccess() {
         });
         
         if (!error) {
+          // Disparar evento Purchase para Meta Pixel
+          trackPurchase({
+            value: 0, // Valor será preenchido pelo plano selecionado
+            currency: 'BRL',
+            content_name: planSlug || 'subscription',
+            content_type: 'subscription'
+          });
+          
+          // Também disparar Lead pois completou o cadastro com pagamento
+          trackLead({
+            content_name: planSlug || 'paid_plan',
+            content_category: 'Paid Subscription',
+            currency: 'BRL'
+          });
+          
           // Clear onboarding data
           sessionStorage.removeItem('onboarding_checkout');
           
@@ -38,7 +54,14 @@ export default function SubscriptionSuccess() {
           }, 2000);
         }
       } else if (sessionId) {
-        // Regular subscription flow
+        // Regular subscription flow - upgrade de plano
+        trackPurchase({
+          value: 0,
+          currency: 'BRL',
+          content_name: 'subscription_upgrade',
+          content_type: 'subscription'
+        });
+        
         setTimeout(() => {
           checkSubscription();
         }, 2000);

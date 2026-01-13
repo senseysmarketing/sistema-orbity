@@ -1,8 +1,9 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProductTourProvider } from "@/hooks/useProductTour";
@@ -12,6 +13,7 @@ import { MasterProvider } from "@/hooks/useMaster";
 import { PaymentMiddlewareProvider } from "@/hooks/usePaymentMiddleware";
 import { PaymentMiddlewareWrapper } from "@/components/payment/PaymentMiddlewareWrapper";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { initMetaPixel, trackPageView } from "@/lib/metaPixel";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -38,6 +40,20 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const queryClient = new QueryClient();
 
+// Componente para rastrear PageViews em navegação SPA
+function PageViewTracker() {
+  const location = useLocation();
+  
+  useEffect(() => {
+    trackPageView();
+  }, [location.pathname]);
+  
+  return null;
+}
+
+// Inicializar Meta Pixel
+initMetaPixel();
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="light" storageKey="senseys-ui-theme">
@@ -54,6 +70,7 @@ const App = () => (
                     v7_relativeSplatPath: true 
                   }}>
                     <PaymentMiddlewareProvider>
+                      <PageViewTracker />
                       <Routes>
                         {/* Landing Page como página principal */}
                         <Route path="/" element={<LandingPage />} />
