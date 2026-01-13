@@ -5,6 +5,8 @@ import { useAgency } from './useAgency';
 import { toast } from 'sonner';
 import { isMasterAgencyAdmin } from '@/lib/masterAccess';
 
+type ComputedStatus = 'active' | 'trialing' | 'trial_expired' | 'past_due' | 'canceled' | 'suspended' | 'unknown';
+
 interface MasterAgencyOverview {
   agency_id: string;
   agency_name: string;
@@ -18,6 +20,17 @@ interface MasterAgencyOverview {
   subscription_status: string;
   current_period_end: string;
   stripe_customer_id: string;
+  trial_end: string | null;
+  computed_status: ComputedStatus;
+}
+
+interface StatusCounts {
+  active: number;
+  trialing: number;
+  trial_expired: number;
+  past_due: number;
+  canceled: number;
+  suspended: number;
 }
 
 interface MasterContextType {
@@ -34,6 +47,7 @@ interface MasterContextType {
     totalUsers: number;
     totalClients: number;
   };
+  getStatusCounts: () => StatusCounts;
 }
 
 const MasterContext = createContext<MasterContextType | undefined>(undefined);
@@ -59,7 +73,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         .select('*');
 
       if (error) throw error;
-      setAgencies(data || []);
+      setAgencies((data || []) as MasterAgencyOverview[]);
     } catch (error) {
       console.error('Error fetching agencies:', error);
       toast.error('Erro ao carregar dados das agências');
@@ -108,7 +122,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
 
   const getMasterMetrics = () => {
     const totalAgencies = agencies.length;
-    const activeAgencies = agencies.filter(a => a.is_active).length;
+    const activeAgencies = agencies.filter(a => a.computed_status === 'active').length;
     const totalRevenue = agencies.reduce((sum, a) => sum + Number(a.total_revenue), 0);
     const totalUsers = agencies.reduce((sum, a) => sum + a.user_count, 0);
     const totalClients = agencies.reduce((sum, a) => sum + a.client_count, 0);
@@ -119,6 +133,17 @@ export function MasterProvider({ children }: { children: ReactNode }) {
       totalRevenue,
       totalUsers,
       totalClients,
+    };
+  };
+
+  const getStatusCounts = (): StatusCounts => {
+    return {
+      active: agencies.filter(a => a.computed_status === 'active').length,
+      trialing: agencies.filter(a => a.computed_status === 'trialing').length,
+      trial_expired: agencies.filter(a => a.computed_status === 'trial_expired').length,
+      past_due: agencies.filter(a => a.computed_status === 'past_due').length,
+      canceled: agencies.filter(a => a.computed_status === 'canceled').length,
+      suspended: agencies.filter(a => a.computed_status === 'suspended').length,
     };
   };
 
@@ -141,6 +166,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         suspendAgency,
         reactivateAgency,
         getMasterMetrics,
+        getStatusCounts,
       }}
     >
       {children}
