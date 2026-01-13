@@ -54,12 +54,15 @@ const checklist = [
 
 export default function Welcome() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const { startTour } = useProductTour();
   const [completedItems, setCompletedItems] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    // Don't do anything while auth is loading
+    if (authLoading) return;
+
     // If no user, redirect to auth
     if (!user) {
       navigate('/auth', { replace: true });
@@ -70,7 +73,7 @@ export default function Welcome() {
     if (profile?.welcome_seen) {
       navigate('/dashboard', { replace: true });
     }
-  }, [user, profile, navigate]);
+  }, [user, profile, authLoading, navigate]);
 
   const handleToggleItem = (itemId: string) => {
     setCompletedItems(prev => 
@@ -118,6 +121,15 @@ export default function Welcome() {
       setIsLoading(false);
     }
   };
+
+  // Show loading while auth is loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   // Don't render if no profile or already seen welcome
   if (!profile || profile.welcome_seen) {
