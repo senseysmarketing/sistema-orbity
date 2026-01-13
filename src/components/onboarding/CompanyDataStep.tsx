@@ -53,6 +53,26 @@ export function CompanyDataStep() {
     }
   };
 
+  const formatPhoneNumber = (value: string): string => {
+    const numbers = value.replace(/\D/g, '');
+    const limited = numbers.slice(0, 11);
+    
+    if (limited.length <= 2) {
+      return limited.length ? `(${limited}` : '';
+    } else if (limited.length <= 6) {
+      return `(${limited.slice(0, 2)}) ${limited.slice(2)}`;
+    } else if (limited.length <= 10) {
+      return `(${limited.slice(0, 2)}) ${limited.slice(2, 6)}-${limited.slice(6)}`;
+    } else {
+      return `(${limited.slice(0, 2)}) ${limited.slice(2, 7)}-${limited.slice(7)}`;
+    }
+  };
+
+  const handlePhoneChange = (value: string) => {
+    const formattedPhone = formatPhoneNumber(value);
+    handleChange('contactPhone', formattedPhone);
+  };
+
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader className="text-center space-y-4">
@@ -110,9 +130,11 @@ export function CompanyDataStep() {
             <Label htmlFor="contactPhone">Telefone de Contato</Label>
             <Input
               id="contactPhone"
+              type="tel"
               value={formData.contactPhone}
-              onChange={(e) => handleChange('contactPhone', e.target.value)}
-              placeholder="(11) 99999-9999"
+              onChange={(e) => handlePhoneChange(e.target.value)}
+              placeholder="(16) 98889-1234"
+              maxLength={16}
             />
           </div>
 
