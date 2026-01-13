@@ -4226,6 +4226,7 @@ export type Database = {
           agency_id: string | null
           agency_name: string | null
           client_count: number | null
+          computed_status: string | null
           created_at: string | null
           current_period_end: string | null
           is_active: boolean | null
@@ -4234,6 +4235,7 @@ export type Database = {
           subscription_status: string | null
           task_count: number | null
           total_revenue: number | null
+          trial_end: string | null
           user_count: number | null
         }
         Relationships: []
