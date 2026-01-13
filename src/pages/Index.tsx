@@ -24,7 +24,16 @@ const Index = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [showSensitiveData, setShowSensitiveData] = useState(true);
+  const [showSensitiveData, setShowSensitiveData] = useState(() => {
+    const saved = localStorage.getItem('dashboard_show_sensitive_data');
+    // Se não houver preferência salva, padrão é FALSE (oculto)
+    return saved !== null ? saved === 'true' : false;
+  });
+
+  // Salvar preferência de privacidade no localStorage
+  useEffect(() => {
+    localStorage.setItem('dashboard_show_sensitive_data', String(showSensitiveData));
+  }, [showSensitiveData]);
   const [realAdSpend, setRealAdSpend] = useState(0);
   const [data, setData] = useState({
     clients: [],
