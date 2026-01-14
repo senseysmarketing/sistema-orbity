@@ -32,6 +32,7 @@ export function UsersManagement() {
   const [users, setUsers] = useState<AgencyUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePassword, setInvitePassword] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
@@ -155,12 +156,14 @@ export function UsersManagement() {
       // Criar usuário usando edge function
       const trimmedEmail = inviteEmail.trim().toLowerCase();
       const trimmedPassword = invitePassword.trim();
+      const trimmedName = inviteName.trim();
       const { data, error } = await supabase.functions.invoke('create-user', {
         body: {
           email: trimmedEmail,
           password: trimmedPassword,
           role: inviteRole,
-          agency_id: currentAgency?.id
+          agency_id: currentAgency?.id,
+          name: trimmedName || null
         }
       });
 
@@ -178,6 +181,7 @@ export function UsersManagement() {
       });
 
       setInviteDialogOpen(false);
+      setInviteName("");
       setInviteEmail("");
       setInvitePassword("");
       setInviteRole("member");
@@ -340,6 +344,16 @@ export function UsersManagement() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="invite-name">Nome Completo</Label>
+                    <Input
+                      id="invite-name"
+                      type="text"
+                      placeholder="Nome do usuário"
+                      value={inviteName}
+                      onChange={(e) => setInviteName(e.target.value)}
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="invite-email">Email</Label>
                     <Input
