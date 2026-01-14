@@ -54,13 +54,13 @@ serve(async (req) => {
     logStep("User authenticated", { userId: user.id });
 
     // Get request body
-    const { email, password, role, agency_id } = await req.json();
+    const { email, password, role, agency_id, name } = await req.json();
     
     if (!email || !password || !role || !agency_id) {
       throw new Error('Missing required fields: email, password, role, agency_id');
     }
 
-    logStep("Request data received", { email, role, agency_id });
+    logStep("Request data received", { email, role, agency_id, name });
 
     // Verify the user is an admin of the agency using direct query
     const { data: adminCheck, error: adminError } = await supabaseAdmin
@@ -135,7 +135,8 @@ serve(async (req) => {
       password,
       email_confirm: true, // Skip email confirmation
       user_metadata: {
-        role: metadataRole
+        role: metadataRole,
+        name: name || null
       }
     });
 
