@@ -124,6 +124,15 @@ Deno.serve(async (req) => {
           }
         }
         
+        // Garantir que status seja válido (constraint da tabela leads)
+        if (customDefaults.status) {
+          const validStatuses = ['leads', 'qualified', 'scheduled', 'meeting', 'proposal', 'won', 'lost'];
+          if (!validStatuses.includes(customDefaults.status)) {
+            console.warn(`[CAPTURE-LEAD] Invalid status "${customDefaults.status}", using "leads"`);
+            customDefaults.status = 'leads';
+          }
+        }
+        
         defaultValues = { ...defaultValues, ...customDefaults };
       }
     }
