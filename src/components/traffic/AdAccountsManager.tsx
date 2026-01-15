@@ -153,6 +153,37 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
     setSaving(true);
     
     try {
+      // Validar que temos uma agência selecionada
+      if (!currentAgency?.id) {
+        toast({
+          title: 'Erro',
+          description: 'Nenhuma agência selecionada.',
+          variant: 'destructive',
+        });
+        setSaving(false);
+        return;
+      }
+
+      // Buscar o connection_id real da agência
+      const { data: connection, error: connectionError } = await supabase
+        .from('facebook_connections')
+        .select('id')
+        .eq('agency_id', currentAgency.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (connectionError || !connection) {
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível encontrar a conexão do Facebook para esta agência.',
+          variant: 'destructive',
+        });
+        setSaving(false);
+        return;
+      }
+
       const selectedIds = [...tempSelectedIds];
 
       if (selectedIds.length > 0) {
@@ -165,9 +196,8 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
             currency: account?.currency || 'USD',
             timezone: account?.timezone || null,
             is_active: true,
-            // Placeholders apenas para satisfazer TS; o trigger define os valores corretos
-            agency_id: '00000000-0000-0000-0000-000000000000',
-            connection_id: '00000000-0000-0000-0000-000000000000',
+            agency_id: currentAgency.id,
+            connection_id: connection.id,
           };
         });
 
