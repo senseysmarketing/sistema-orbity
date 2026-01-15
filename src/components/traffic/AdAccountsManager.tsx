@@ -49,11 +49,19 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
   const isUnlimited = senseysUnlimited || !Number.isFinite(maxAccounts) || maxAccounts >= 999999;
 
   useEffect(() => {
-    fetchAvailableAccounts();
-    fetchSelectedAccounts();
-  }, []);
+    if (currentAgency?.id) {
+      fetchAvailableAccounts();
+      fetchSelectedAccounts();
+    }
+  }, [currentAgency?.id]);
 
   const fetchAvailableAccounts = async () => {
+    if (!currentAgency?.id) {
+      console.log('[AdAccountsManager] No agency selected, skipping fetch');
+      setLoading(false);
+      return;
+    }
+
     try {
       // Ensure we have a fresh session before calling the function
       const { data: { session } } = await supabase.auth.getSession();
@@ -67,9 +75,11 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
         return;
       }
 
+      console.log('[AdAccountsManager] Fetching accounts for agency:', currentAgency.id);
+
       // Chamar edge function para buscar contas disponíveis
       const { data, error } = await supabase.functions.invoke('facebook-accounts', {
-        body: { action: 'list_ad_accounts' }
+        body: { action: 'list_ad_accounts', agencyId: currentAgency.id }
       });
 
       if (error) {
@@ -80,7 +90,7 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
           if (!refreshError) {
             // Retry the request
             const { data: retryData, error: retryError } = await supabase.functions.invoke('facebook-accounts', {
-              body: { action: 'list_ad_accounts' }
+              body: { action: 'list_ad_accounts', agencyId: currentAgency.id }
             });
             if (!retryError) {
               setAvailableAccounts(retryData?.accounts || []);
@@ -96,7 +106,7 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
       console.error('Erro ao buscar contas:', error);
       toast({
         title: "Erro ao carregar contas",
-        description: "Não foi possível carregar as contas de anúncios disponíveis.",
+        description: error?.message || "Não foi possível carregar as contas de anúncios disponíveis.",
         variant: "destructive",
       });
     } finally {
@@ -105,7 +115,7 @@ export function AdAccountsManager({ onAccountsSelected }: AdAccountsManagerProps
   };
 
   const fetchSelectedAccounts = async () => {
-    if (!currentAgency) return;
+    if (!currentAgency?.id) return;
     
     try {
       const { data, error } = await supabase

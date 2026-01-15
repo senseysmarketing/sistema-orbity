@@ -60,25 +60,74 @@ serve(async (req) => {
 
     console.log('[FACEBOOK-ACCOUNTS] User authenticated:', { userId: user.id, email: user.email });
 
-    const { action } = await req.json();
+    const { action, agencyId } = await req.json();
+
+    // Validar agencyId
+    if (!agencyId) {
+      console.error('[FACEBOOK-ACCOUNTS] No agency ID provided');
+      return new Response(JSON.stringify({ 
+        error: 'Agency ID is required',
+        details: 'Please provide an agency ID'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validar que o usuário pertence à agência informada
+    const { data: agencyUser, error: agencyUserError } = await supabase
+      .from('agency_users')
+      .select('agency_id, role')
+      .eq('user_id', user.id)
+      .eq('agency_id', agencyId)
+      .maybeSingle();
+
+    if (agencyUserError) {
+      console.error('[FACEBOOK-ACCOUNTS] Error validating agency access:', agencyUserError);
+      return new Response(JSON.stringify({ 
+        error: 'Error validating agency access',
+        details: agencyUserError.message
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!agencyUser) {
+      console.error('[FACEBOOK-ACCOUNTS] User not authorized for agency:', agencyId);
+      return new Response(JSON.stringify({ 
+        error: 'User not authorized for this agency',
+        details: 'You do not have access to this agency'
+      }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('[FACEBOOK-ACCOUNTS] User authorized for agency:', agencyId);
 
     switch (action) {
       case 'list_ad_accounts':
-        console.log('[FACEBOOK-ACCOUNTS] Fetching ad accounts for user:', user.id);
+        console.log('[FACEBOOK-ACCOUNTS] Fetching ad accounts for agency:', agencyId);
         
-        // Get user's Facebook connection
+        // Get agency's Facebook connection (busca por agency_id, não user_id)
         const { data: connections, error: connectionError } = await supabase
           .from('facebook_connections')
           .select('access_token, user_id')
-          .eq('user_id', user.id)
+          .eq('agency_id', agencyId)
           .eq('is_active', true)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
-        if (connectionError || !connections) {
-          console.error('[FACEBOOK-ACCOUNTS] No Facebook connection found:', connectionError);
-          throw new Error('No active Facebook connection found');
+        if (connectionError) {
+          console.error('[FACEBOOK-ACCOUNTS] Error fetching Facebook connection:', connectionError);
+          throw new Error('Error fetching Facebook connection');
+        }
+
+        if (!connections) {
+          console.error('[FACEBOOK-ACCOUNTS] No Facebook connection found for agency:', agencyId);
+          throw new Error('No active Facebook connection found for this agency');
         }
 
         const accessToken = (connections as any).access_token;
