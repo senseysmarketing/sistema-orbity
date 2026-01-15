@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
 
   let defaultValues: Record<string, any> = {
     'status': 'leads',
-    'priority': 'cold',
+    'temperature': 'cold',
     'source': 'webhook'
   };
 
@@ -107,20 +107,11 @@ Deno.serve(async (req) => {
       if (config.default_values) {
         const customDefaults = { ...config.default_values };
         
-        // Converter temperature para priority
+        // Garantir que temperature seja válido
         if (customDefaults.temperature) {
           const validTemps = ['cold', 'warm', 'hot'];
-          customDefaults.priority = validTemps.includes(customDefaults.temperature) 
-            ? customDefaults.temperature 
-            : 'cold';
-          delete customDefaults.temperature;
-        }
-        
-        // Garantir que priority seja válido
-        if (customDefaults.priority) {
-          const validPriorities = ['cold', 'warm', 'hot'];
-          if (!validPriorities.includes(customDefaults.priority)) {
-            customDefaults.priority = 'cold';
+          if (!validTemps.includes(customDefaults.temperature)) {
+            customDefaults.temperature = 'cold';
           }
         }
         

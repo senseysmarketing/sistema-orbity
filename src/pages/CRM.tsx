@@ -27,8 +27,8 @@ interface Lead {
   company: string | null;
   position: string | null;
   source: string;
-  status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  priority: 'cold' | 'warm' | 'hot';
+  status: 'leads' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost';
+  temperature: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
   assigned_to: string | null;
@@ -96,7 +96,7 @@ export default function CRM() {
         lead.company?.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
-      const matchesPriority = priorityFilter === 'all' || lead.priority === priorityFilter;
+      const matchesTemperature = priorityFilter === 'all' || lead.temperature === priorityFilter;
       const matchesSource = sourceFilter === 'all' || lead.source === sourceFilter;
 
       // Date filter
@@ -104,7 +104,7 @@ export default function CRM() {
         (!dateFilter.from || new Date(lead.created_at) >= dateFilter.from) &&
         (!dateFilter.to || new Date(lead.created_at) <= dateFilter.to);
       
-      return matchesSearch && matchesStatus && matchesPriority && matchesSource && matchesDateRange;
+      return matchesSearch && matchesStatus && matchesTemperature && matchesSource && matchesDateRange;
     });
   }, [leads, searchQuery, statusFilter, priorityFilter, sourceFilter, dateFilter]);
 
@@ -167,7 +167,7 @@ export default function CRM() {
       lead.phone || '',
       lead.company || '',
       mapDatabaseStatusToDisplay(lead.status),
-      getTemperatureLabel(lead.priority),
+      getTemperatureLabel(lead.temperature),
       lead.source,
       lead.value.toString(),
       new Date(lead.created_at).toLocaleDateString('pt-BR')

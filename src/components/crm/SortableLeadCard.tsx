@@ -23,8 +23,8 @@ interface Lead {
   company: string | null;
   position: string | null;
   source: string;
-  status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  priority: 'cold' | 'warm' | 'hot';
+  status: 'leads' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost';
+  temperature: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
   assigned_to: string | null;
@@ -191,12 +191,12 @@ export function SortableLeadCard({
               </Badge>
             )}
             {(() => {
-              const temp = LEAD_TEMPERATURES[lead.priority as LeadTemperature];
+              const temp = LEAD_TEMPERATURES[lead.temperature as LeadTemperature];
               const TempIcon = temp?.icon;
               return (
                 <Badge variant="outline" className={`${temp?.color || 'bg-gray-500'} text-white text-xs border-0 flex items-center gap-1`}>
                   {TempIcon && <TempIcon className="h-3 w-3" />}
-                  {temp?.label || lead.priority}
+                  {temp?.label || lead.temperature}
                 </Badge>
               );
             })()}

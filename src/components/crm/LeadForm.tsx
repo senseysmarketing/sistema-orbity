@@ -19,8 +19,8 @@ interface Lead {
   company: string | null;
   position: string | null;
   source: string;
-  status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  priority: 'cold' | 'warm' | 'hot';
+  status: 'leads' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost';
+  temperature: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
   assigned_to: string | null;
@@ -50,8 +50,8 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
     company: '',
     position: '',
     source: 'manual',
-    status: 'new' as 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost',
-    priority: 'cold' as LeadTemperature,
+    status: 'leads' as 'leads' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost',
+    temperature: 'cold' as LeadTemperature,
     value: 0,
     notes: '',
     assigned_to: '',
@@ -69,8 +69,8 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
         company: lead.company || '',
         position: lead.position || '',
         source: lead.source || 'manual',
-        status: lead.status || 'new',
-        priority: (lead.priority || 'cold') as LeadTemperature,
+        status: lead.status || 'leads',
+        temperature: (lead.temperature || 'cold') as LeadTemperature,
         value: lead.value || 0,
         notes: lead.notes || '',
         assigned_to: lead.assigned_to || '',
@@ -106,7 +106,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
         position: formData.position || null,
         source: formData.source,
         status: formData.status,
-        priority: formData.priority,
+        temperature: formData.temperature,
         value: formData.value,
         notes: formData.notes || null,
         assigned_to: formData.assigned_to || null,
@@ -244,25 +244,25 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status">Etapa do Funil</Label>
               <Select value={formData.status} onValueChange={(value: any) => setFormData({ ...formData, status: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="new">Novo</SelectItem>
-                  <SelectItem value="contacted">Contatado</SelectItem>
+                  <SelectItem value="leads">Novo Lead</SelectItem>
                   <SelectItem value="qualified">Qualificado</SelectItem>
+                  <SelectItem value="scheduled">Agendamento</SelectItem>
+                  <SelectItem value="meeting">Reunião</SelectItem>
                   <SelectItem value="proposal">Proposta</SelectItem>
-                  <SelectItem value="negotiation">Negociação</SelectItem>
                   <SelectItem value="won">Ganho</SelectItem>
                   <SelectItem value="lost">Perdido</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="priority">Temperatura</Label>
-              <Select value={formData.priority} onValueChange={(value: any) => setFormData({ ...formData, priority: value })}>
+              <Label htmlFor="temperature">Temperatura</Label>
+              <Select value={formData.temperature} onValueChange={(value: any) => setFormData({ ...formData, temperature: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

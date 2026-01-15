@@ -129,20 +129,20 @@ export default function Import() {
     return origemMap[origem.toUpperCase()] || 'manual';
   };
 
-  // Map Portuguese priority to database values (cold/warm/hot)
-  const mapPriority = (prioridade: string): 'cold' | 'warm' | 'hot' => {
-    const prioridadeMap: Record<string, 'cold' | 'warm' | 'hot'> = {
+  // Map Portuguese temperature to database values (cold/warm/hot)
+  const mapTemperature = (temperatura: string): 'cold' | 'warm' | 'hot' => {
+    const temperaturaMap: Record<string, 'cold' | 'warm' | 'hot'> = {
       'FRIO': 'cold',
       'MORNO': 'warm',
       'QUENTE': 'hot'
     };
-    return prioridadeMap[prioridade.toUpperCase()] || 'cold';
+    return temperaturaMap[temperatura?.toUpperCase()] || 'cold';
   };
 
-  // Map Portuguese lead status to database values
-  const mapLeadStatus = (status: string): string => {
+  // Map Portuguese lead status (etapa) to database values
+  const mapLeadStatus = (etapa: string): string => {
     const statusMap: Record<string, string> = {
-      'LEADS': 'leads',
+      'NOVO_LEAD': 'leads',
       'QUALIFICADO': 'qualified',
       'AGENDAMENTO': 'scheduled',
       'REUNIAO': 'meeting',
@@ -150,7 +150,7 @@ export default function Import() {
       'GANHO': 'won',
       'PERDIDO': 'lost'
     };
-    return statusMap[status.toUpperCase()] || 'leads';
+    return statusMap[etapa?.toUpperCase()] || 'leads';
   };
 
   const handleConfirmImport = async () => {
@@ -335,8 +335,8 @@ export default function Import() {
           company: l.empresa || null,
           position: l.cargo || null,
           source: mapSource(l.origem),
-          status: mapLeadStatus(l.status),
-          priority: mapPriority(l.prioridade),
+          status: mapLeadStatus(l.etapa),
+          temperature: mapTemperature(l.temperatura),
           value: l.valorEstimado || 0,
           notes: l.notas || null
         }));

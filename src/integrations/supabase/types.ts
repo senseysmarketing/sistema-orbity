@@ -2112,10 +2112,10 @@ export type Database = {
           notes: string | null
           phone: string | null
           position: string | null
-          priority: string
           source: string | null
           status: string
           tags: string[] | null
+          temperature: string
           updated_at: string
           value: number | null
         }
@@ -2135,10 +2135,10 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           position?: string | null
-          priority?: string
           source?: string | null
           status?: string
           tags?: string[] | null
+          temperature?: string
           updated_at?: string
           value?: number | null
         }
@@ -2158,10 +2158,10 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           position?: string | null
-          priority?: string
           source?: string | null
           status?: string
           tags?: string[] | null
+          temperature?: string
           updated_at?: string
           value?: number | null
         }

@@ -17,8 +17,8 @@ interface Lead {
   company: string | null;
   position: string | null;
   source: string;
-  status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  priority: 'cold' | 'warm' | 'hot';
+  status: 'leads' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost';
+  temperature: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
   assigned_to: string | null;
@@ -89,7 +89,7 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
       return { level: 'urgent', label: 'Urgente', color: 'bg-red-100 text-red-800' };
     } else if (nextContact && nextContact.getTime() - today.getTime() <= 86400000) {
       return { level: 'today', label: 'Hoje', color: 'bg-yellow-100 text-yellow-800' };
-    } else if (lead.priority === 'hot') {
+    } else if (lead.temperature === 'hot') {
       return { level: 'high', label: 'Quente', color: 'bg-orange-100 text-orange-800' };
     }
     return { level: 'normal', label: 'Normal', color: 'bg-gray-100 text-gray-800' };
@@ -148,7 +148,7 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
         .from('leads')
         .update({ 
           status: dbStatus,
-          priority: newTemperature,
+          temperature: newTemperature,
           updated_at: new Date().toISOString()
         })
         .eq('id', leadId);

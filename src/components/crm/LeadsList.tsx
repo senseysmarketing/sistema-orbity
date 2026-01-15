@@ -14,8 +14,8 @@ interface Lead {
   company: string | null;
   position: string | null;
   source: string;
-  status: 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
-  priority: 'cold' | 'warm' | 'hot';
+  status: 'leads' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost';
+  temperature: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
   assigned_to: string | null;
@@ -39,11 +39,11 @@ interface LeadsListProps {
 export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'new': return 'bg-blue-100 text-blue-800';
-      case 'contacted': return 'bg-yellow-100 text-yellow-800';
+      case 'leads': return 'bg-blue-100 text-blue-800';
       case 'qualified': return 'bg-orange-100 text-orange-800';
-      case 'proposal': return 'bg-purple-100 text-purple-800';
-      case 'negotiation': return 'bg-indigo-100 text-indigo-800';
+      case 'scheduled': return 'bg-yellow-100 text-yellow-800';
+      case 'meeting': return 'bg-purple-100 text-purple-800';
+      case 'proposal': return 'bg-pink-100 text-pink-800';
       case 'won': return 'bg-green-100 text-green-800';
       case 'lost': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -52,25 +52,25 @@ export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'new': return 'Novo';
-      case 'contacted': return 'Contatado';
+      case 'leads': return 'Novo Lead';
       case 'qualified': return 'Qualificado';
+      case 'scheduled': return 'Agendamento';
+      case 'meeting': return 'Reunião';
       case 'proposal': return 'Proposta';
-      case 'negotiation': return 'Negociação';
       case 'won': return 'Ganho';
       case 'lost': return 'Perdido';
       default: return status;
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    const temp = LEAD_TEMPERATURES[priority as LeadTemperature];
+  const getTemperatureColor = (temperature: string) => {
+    const temp = LEAD_TEMPERATURES[temperature as LeadTemperature];
     return temp?.bgLight || 'bg-gray-100 text-gray-800';
   };
 
-  const getPriorityLabel = (priority: string) => {
-    const temp = LEAD_TEMPERATURES[priority as LeadTemperature];
-    return temp?.label || priority;
+  const getTemperatureLabel = (temperature: string) => {
+    const temp = LEAD_TEMPERATURES[temperature as LeadTemperature];
+    return temp?.label || temperature;
   };
 
   const formatCurrency = (value: number) => {
@@ -166,12 +166,12 @@ export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
                   </TableCell>
                   <TableCell>
                     {(() => {
-                      const temp = LEAD_TEMPERATURES[lead.priority as LeadTemperature];
+                      const temp = LEAD_TEMPERATURES[lead.temperature as LeadTemperature];
                       const TempIcon = temp?.icon;
                       return (
                         <Badge variant="outline" className={`${temp?.bgLight} flex items-center gap-1`}>
                           {TempIcon && <TempIcon className="h-3 w-3" />}
-                          {temp?.label || lead.priority}
+                          {temp?.label || lead.temperature}
                         </Badge>
                       );
                     })()}

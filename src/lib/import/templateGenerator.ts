@@ -198,8 +198,8 @@ const TEMPLATES: Record<ImportType, TemplateConfig> = {
           'Empresa',
           'Cargo',
           'Origem*',
-          'Status*',
-          'Prioridade*',
+          'Etapa do Funil*',
+          'Temperatura*',
           'Valor Estimado',
           'Notas'
         ],
@@ -210,15 +210,15 @@ const TEMPLATES: Record<ImportType, TemplateConfig> = {
           'Empresa': 'Empresa ABC',
           'Cargo': 'Diretora de Marketing',
           'Origem*': 'INDICACAO',
-          'Status*': 'LEADS',
-          'Prioridade*': 'QUENTE',
+          'Etapa do Funil*': 'NOVO_LEAD',
+          'Temperatura*': 'QUENTE',
           'Valor Estimado': 5000.00,
           'Notas': 'Interessada em gestão de tráfego'
         }],
         validations: {
           'Origem*': ['SITE', 'INDICACAO', 'GOOGLE_ADS', 'FACEBOOK_ADS', 'INSTAGRAM', 'LINKEDIN', 'WHATSAPP', 'MANUAL'],
-          'Status*': ['LEADS', 'QUALIFICADO', 'AGENDAMENTO', 'REUNIAO', 'PROPOSTA', 'GANHO', 'PERDIDO'],
-          'Prioridade*': ['FRIO', 'MORNO', 'QUENTE']
+          'Etapa do Funil*': ['NOVO_LEAD', 'QUALIFICADO', 'AGENDAMENTO', 'REUNIAO', 'PROPOSTA', 'GANHO', 'PERDIDO'],
+          'Temperatura*': ['FRIO', 'MORNO', 'QUENTE']
         }
       }
     ],
@@ -228,14 +228,14 @@ const TEMPLATES: Record<ImportType, TemplateConfig> = {
       '1. CAMPOS:',
       '   - Email ou Telefone: Pelo menos um é recomendado',
       '   - Origem: De onde veio o lead',
-      '   - Status: Estágio atual no funil',
-      '   - Prioridade: FRIO, MORNO ou QUENTE (temperatura do lead)',
+      '   - Etapa do Funil: Estágio atual no funil de vendas',
+      '   - Temperatura: FRIO, MORNO ou QUENTE (nível de interesse do lead)',
       '',
       '2. ORIGENS VÁLIDAS:',
       '   - SITE, INDICACAO, GOOGLE_ADS, FACEBOOK_ADS, INSTAGRAM, LINKEDIN, WHATSAPP, MANUAL',
       '',
-      '3. STATUS VÁLIDOS (estágios do funil):',
-      '   - LEADS: Novo lead (entrada no funil)',
+      '3. ETAPAS DO FUNIL (estágios de venda):',
+      '   - NOVO_LEAD: Novo lead (entrada no funil)',
       '   - QUALIFICADO: Lead qualificado para avançar',
       '   - AGENDAMENTO: Reunião agendada',
       '   - REUNIAO: Em reunião / apresentação',
@@ -243,7 +243,7 @@ const TEMPLATES: Record<ImportType, TemplateConfig> = {
       '   - GANHO: Venda fechada',
       '   - PERDIDO: Lead perdido',
       '',
-      '4. PRIORIDADE (temperatura):',
+      '4. TEMPERATURA (interesse do lead):',
       '   - FRIO: Lead frio, menor interesse',
       '   - MORNO: Lead morno, interesse moderado',
       '   - QUENTE: Lead quente, alto interesse'
