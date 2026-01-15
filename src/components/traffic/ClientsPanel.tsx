@@ -97,7 +97,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
       setLoadingProgress({ current: 0, total: accountIds.length, phase: 'processing' });
       
       const { data, error } = await supabase.functions.invoke('facebook-account-summary', {
-        body: { accountIds }
+        body: { accountIds, agencyId: currentAgency?.id }
       });
 
       if (error) throw error;
@@ -230,7 +230,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
       const accountIds = selectedAdAccounts.map(acc => acc.ad_account_id);
       
       const { data, error } = await supabase.functions.invoke('facebook-account-summary', {
-        body: { accountIds }
+        body: { accountIds, agencyId: currentAgency?.id }
       });
 
       if (error) throw error;
@@ -373,7 +373,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
   const handleRefreshBalance = async (accountId: string) => {
     try {
       const { data, error } = await supabase.functions.invoke('facebook-account-summary', {
-        body: { accountIds: [accountId] }
+        body: { accountIds: [accountId], agencyId: currentAgency?.id }
       });
 
       if (error) throw error;

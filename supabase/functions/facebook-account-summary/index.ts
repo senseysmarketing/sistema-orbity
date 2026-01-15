@@ -18,13 +18,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { accountIds } = await req.json()
+    const { accountIds, agencyId } = await req.json()
     
-    console.log('Fetching account summaries for:', accountIds)
+    console.log('Fetching account summaries for:', accountIds, 'agencyId:', agencyId)
 
     if (!accountIds || accountIds.length === 0) {
       return new Response(
         JSON.stringify({ error: 'No account IDs provided' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      )
+    }
+
+    if (!agencyId) {
+      return new Response(
+        JSON.stringify({ error: 'Agency ID is required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
@@ -42,26 +49,37 @@ serve(async (req) => {
       )
     }
 
-    // Buscar agency_id do usuário
+    // Validar que o usuário pertence à agência informada
     const { data: agencyUser, error: agencyError } = await supabaseClient
       .from('agency_users')
-      .select('agency_id')
+      .select('agency_id, role')
       .eq('user_id', authUser.user.id)
-      .single()
+      .eq('agency_id', agencyId)
+      .maybeSingle()
 
-    if (agencyError || !agencyUser) {
+    if (agencyError) {
       console.error('Agency error:', agencyError)
       return new Response(
-        JSON.stringify({ error: 'User not associated with any agency' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        JSON.stringify({ error: 'Error validating agency access' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       )
     }
+
+    if (!agencyUser) {
+      console.error('User not authorized for agency:', agencyId)
+      return new Response(
+        JSON.stringify({ error: 'User not authorized for this agency' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+      )
+    }
+    
+    const validatedAgencyId = agencyUser.agency_id
 
     // Buscar conexão Facebook ativa da agência
     const { data: connection, error: connectionError } = await supabaseClient
       .from('facebook_connections')
       .select('access_token')
-      .eq('agency_id', agencyUser.agency_id)
+      .eq('agency_id', validatedAgencyId)
       .eq('is_active', true)
       .single()
 

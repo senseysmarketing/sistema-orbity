@@ -26,7 +26,7 @@ export function NotificationSummaryCard() {
   }, [user, currentAgency]);
 
   const fetchSummary = async () => {
-    if (!user || !currentAgency) return;
+    if (!user || !currentAgency?.id) return;
 
     try {
       // Fetch notification preferences
