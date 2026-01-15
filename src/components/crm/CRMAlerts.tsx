@@ -13,7 +13,7 @@ interface Lead {
   phone: string | null;
   company: string | null;
   status: string;
-  priority: string;
+  temperature: string;
   value: number;
   last_contact: string | null;
   next_contact: string | null;
@@ -30,7 +30,7 @@ export function CRMAlerts({ leads, onEdit, onViewDetails }: CRMAlertsProps) {
   const [alerts, setAlerts] = useState({
     overdueFollowUp: [] as Lead[],
     todayFollowUp: [] as Lead[],
-    highPriorityNew: [] as Lead[],
+    hotNewLeads: [] as Lead[],
     coldLeads: [] as Lead[],
     staleLeads: [] as Lead[],
     highValueNoFollowUp: [] as Lead[],
@@ -61,9 +61,9 @@ export function CRMAlerts({ leads, onEdit, onViewDetails }: CRMAlertsProps) {
       return nextContact.toDateString() === today.toDateString();
     });
 
-    const highPriorityNew = leads.filter(lead => 
+    const hotNewLeads = leads.filter(lead => 
       lead.status === 'new' && 
-      lead.priority === 'high' && 
+      lead.temperature === 'hot' && 
       new Date(lead.created_at) > sevenDaysAgo
     );
 
@@ -96,11 +96,11 @@ export function CRMAlerts({ leads, onEdit, onViewDetails }: CRMAlertsProps) {
       return createdAt < fourteenDaysAgo;
     });
 
-    // Leads que precisam de atenção urgente: alta prioridade + atrasados OU alto valor + parados
+    // Leads que precisam de atenção urgente: leads quentes + atrasados OU alto valor + parados
     const urgentAttention = leads.filter(lead => {
       if (['won', 'lost'].includes(lead.status)) return false;
       
-      const isHighPriorityOverdue = lead.priority === 'high' && 
+      const isHotOverdue = lead.temperature === 'hot' && 
         lead.next_contact && 
         new Date(lead.next_contact) < yesterday;
       
@@ -108,13 +108,13 @@ export function CRMAlerts({ leads, onEdit, onViewDetails }: CRMAlertsProps) {
         lead.last_contact && 
         new Date(lead.last_contact) < sevenDaysAgo;
       
-      return isHighPriorityOverdue || isHighValueStale;
+      return isHotOverdue || isHighValueStale;
     });
 
     setAlerts({
       overdueFollowUp,
       todayFollowUp,
-      highPriorityNew,
+      hotNewLeads,
       coldLeads,
       staleLeads,
       highValueNoFollowUp,
@@ -164,7 +164,7 @@ export function CRMAlerts({ leads, onEdit, onViewDetails }: CRMAlertsProps) {
   const getAlertPriority = () => {
     if (alerts.urgentAttention.length > 0) return 'urgent';
     if (alerts.overdueFollowUp.length > 0) return 'high';
-    if (alerts.todayFollowUp.length > 0 || alerts.highPriorityNew.length > 0) return 'medium';
+    if (alerts.todayFollowUp.length > 0 || alerts.hotNewLeads.length > 0) return 'medium';
     return 'low';
   };
 
@@ -201,8 +201,8 @@ export function CRMAlerts({ leads, onEdit, onViewDetails }: CRMAlertsProps) {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{lead.name}</span>
-                        {lead.priority === 'high' && (
-                          <Badge variant="destructive" className="text-xs">Alta Prioridade</Badge>
+                        {lead.temperature === 'hot' && (
+                          <Badge variant="destructive" className="text-xs">Lead Quente</Badge>
                         )}
                       </div>
                       {lead.company && <span className="text-sm text-muted-foreground">({lead.company})</span>}
@@ -396,13 +396,13 @@ export function CRMAlerts({ leads, onEdit, onViewDetails }: CRMAlertsProps) {
           </Alert>
         )}
 
-        {alerts.highPriorityNew.length > 0 && (
+        {alerts.hotNewLeads.length > 0 && (
           <Alert>
             <Users className="h-4 w-4 text-purple-600" />
-            <AlertTitle>⭐ Leads de Alta Prioridade Novos ({alerts.highPriorityNew.length})</AlertTitle>
+            <AlertTitle>🔥 Leads Quentes Novos ({alerts.hotNewLeads.length})</AlertTitle>
             <AlertDescription>
               <div className="mt-2 space-y-2">
-                {alerts.highPriorityNew.slice(0, 3).map((lead) => (
+                {alerts.hotNewLeads.slice(0, 3).map((lead) => (
                   <div key={lead.id} className="flex items-center justify-between bg-purple-50 dark:bg-purple-950/20 p-3 rounded border border-purple-200">
                     <div className="flex-1">
                       <span className="font-medium">{lead.name}</span>
