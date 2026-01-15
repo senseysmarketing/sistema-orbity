@@ -19,7 +19,7 @@ import { useNavigate } from "react-router-dom";
 interface Lead {
   id: string;
   status: string;
-  priority: string;
+  temperature: string;
   value: number;
   created_at: string;
   next_contact: string | null;
@@ -122,9 +122,9 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
       !['won', 'lost'].includes(lead.status)
     ).length;
 
-    // High priority
-    const highPriority = filteredLeads.filter(l => 
-      l.priority === 'high' && !['won', 'lost'].includes(l.status)
+    // Hot leads (high temperature)
+    const hotLeads = filteredLeads.filter(l => 
+      l.temperature === 'hot' && !['won', 'lost'].includes(l.status)
     ).length;
 
     return {
@@ -132,7 +132,7 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
       conversionRate,
       revenue,
       followUpNeeded,
-      highPriority,
+      hotLeads,
       leadsGrowth,
     };
   }, [leads, dateRange]);
@@ -264,16 +264,16 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
             <AlertTriangle className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.followUpNeeded + metrics.highPriority}</div>
+            <div className="text-2xl font-bold">{metrics.followUpNeeded + metrics.hotLeads}</div>
             <div className="flex gap-2 mt-1">
               {metrics.followUpNeeded > 0 && (
                 <Badge variant="outline" className="text-xs">
                   {metrics.followUpNeeded} follow-ups
                 </Badge>
               )}
-              {metrics.highPriority > 0 && (
+              {metrics.hotLeads > 0 && (
                 <Badge variant="destructive" className="text-xs">
-                  {metrics.highPriority} alta prioridade
+                  {metrics.hotLeads} leads quentes
                 </Badge>
               )}
             </div>

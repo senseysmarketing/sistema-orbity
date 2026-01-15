@@ -11,7 +11,7 @@ interface Lead {
   phone: string | null;
   company: string | null;
   status: string;
-  priority: string;
+  temperature: string;
   value: number;
   source: string;
   last_contact: string | null;
@@ -93,7 +93,7 @@ export function CRMAnalytics({ leads }: CRMAnalyticsProps) {
       .slice(0, 3);
 
     // Activity analysis
-    const highPriorityLeads = leads.filter(l => l.priority === 'high').length;
+    const hotLeads = leads.filter(l => l.temperature === 'hot').length;
     const activeLeads = leads.filter(l => !['won', 'lost'].includes(l.status)).length;
 
     // Lead velocity (average time in pipeline)
@@ -127,7 +127,7 @@ export function CRMAnalytics({ leads }: CRMAnalyticsProps) {
       overdueFollowUp,
       sourcePerformance,
       topSources,
-      highPriorityLeads,
+      hotLeads,
       activeLeads,
       averageTimeInPipeline
     };
@@ -311,8 +311,8 @@ export function CRMAnalytics({ leads }: CRMAnalyticsProps) {
               <Badge variant="secondary">{analytics.activeLeads}</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm">Alta Prioridade</span>
-              <Badge variant="destructive">{analytics.highPriorityLeads}</Badge>
+              <span className="text-sm">Leads Quentes</span>
+              <Badge variant="destructive">{analytics.hotLeads}</Badge>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">Novos esta Semana</span>

@@ -6,7 +6,7 @@ import { Users, Target, DollarSign, Calendar, TrendingUp, TrendingDown } from "l
 interface Lead {
   id: string;
   status: string;
-  priority: string;
+  temperature: string;
   value: number;
   created_at: string;
   next_contact: string | null;
