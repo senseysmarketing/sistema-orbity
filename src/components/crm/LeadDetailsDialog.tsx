@@ -23,7 +23,7 @@ interface Lead {
   position: string | null;
   source: string;
   status: string;
-  priority: string;
+  temperature: string;
   value: number;
   notes: string | null;
   assigned_to: string | null;
@@ -110,38 +110,38 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      'new': 'bg-blue-500',
-      'contacted': 'bg-yellow-500',
+      'leads': 'bg-blue-500',
       'qualified': 'bg-orange-500',
-      'proposal': 'bg-purple-500',
-      'negotiation': 'bg-indigo-500',
+      'scheduled': 'bg-yellow-500',
+      'meeting': 'bg-purple-500',
+      'proposal': 'bg-pink-500',
       'won': 'bg-green-500',
       'lost': 'bg-red-500',
     };
     return colors[status] || 'bg-gray-500';
   };
 
-  const getPriorityColor = (priority: string) => {
-    const temp = LEAD_TEMPERATURES[priority as LeadTemperature];
+  const getTemperatureColor = (temperature: string) => {
+    const temp = LEAD_TEMPERATURES[temperature as LeadTemperature];
     return temp?.bgLight || 'bg-gray-100 text-gray-800';
   };
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      'new': 'Novo',
-      'contacted': 'Contatado',
+      'leads': 'Novo Lead',
       'qualified': 'Qualificado',
+      'scheduled': 'Agendamento',
+      'meeting': 'Reunião',
       'proposal': 'Proposta',
-      'negotiation': 'Negociação',
       'won': 'Ganho',
       'lost': 'Perdido',
     };
     return labels[status] || status;
   };
 
-  const getPriorityLabel = (priority: string) => {
-    const temp = LEAD_TEMPERATURES[priority as LeadTemperature];
-    return temp ? `${temp.emoji} ${temp.label}` : priority;
+  const getTemperatureLabel = (temperature: string) => {
+    const temp = LEAD_TEMPERATURES[temperature as LeadTemperature];
+    return temp ? `${temp.emoji} ${temp.label}` : temperature;
   };
 
   const isMetaAdsLead = lead.source === 'facebook_leads';
@@ -171,8 +171,8 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
               <Badge className={getStatusColor(lead.status)}>
                 {getStatusLabel(lead.status)}
               </Badge>
-              <Badge variant="outline" className={getPriorityColor(lead.priority)}>
-                {getPriorityLabel(lead.priority)}
+              <Badge variant="outline" className={getTemperatureColor(lead.temperature)}>
+                {getTemperatureLabel(lead.temperature)}
               </Badge>
             </div>
           </div>
@@ -345,8 +345,8 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Temperatura</p>
-                      <Badge className={getPriorityColor(lead.priority)}>
-                        {getPriorityLabel(lead.priority)}
+                      <Badge className={getTemperatureColor(lead.temperature)}>
+                        {getTemperatureLabel(lead.temperature)}
                       </Badge>
                     </div>
                     <div>

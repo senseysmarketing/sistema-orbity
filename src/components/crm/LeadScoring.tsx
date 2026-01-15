@@ -13,7 +13,7 @@ interface Lead {
   last_contact: string | null;
   next_contact: string | null;
   created_at: string;
-  priority: string;
+  temperature: string;
 }
 
 interface LeadScoringProps {
@@ -52,9 +52,9 @@ export function LeadScoring({ lead, showLabel = true }: LeadScoringProps) {
     if (daysInFunnel < 7) points += 10;
     else if (daysInFunnel < 30) points += 5;
     
-    // Prioridade
-    if (lead.priority === 'high') points += 10;
-    else if (lead.priority === 'medium') points += 5;
+    // Temperatura
+    if (lead.temperature === 'hot') points += 10;
+    else if (lead.temperature === 'warm') points += 5;
     
     return Math.min(points, 100);
   }, [lead]);

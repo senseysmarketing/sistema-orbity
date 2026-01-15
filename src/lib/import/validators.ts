@@ -80,10 +80,10 @@ export const LeadImportSchema = z.object({
   origem: z.enum(['SITE', 'INDICACAO', 'GOOGLE_ADS', 'FACEBOOK_ADS', 'INSTAGRAM', 'LINKEDIN', 'WHATSAPP', 'MANUAL'], { 
     errorMap: () => ({ message: "Origem inválida. Valores aceitos: SITE, INDICACAO, GOOGLE_ADS, FACEBOOK_ADS, INSTAGRAM, LINKEDIN, WHATSAPP, MANUAL" }) 
   }),
-  status: z.enum(['LEADS', 'QUALIFICADO', 'AGENDAMENTO', 'REUNIAO', 'PROPOSTA', 'GANHO', 'PERDIDO'], {
-    errorMap: () => ({ message: "Status inválido. Valores aceitos: LEADS, QUALIFICADO, AGENDAMENTO, REUNIAO, PROPOSTA, GANHO, PERDIDO" })
+  etapa: z.enum(['NOVO_LEAD', 'QUALIFICADO', 'AGENDAMENTO', 'REUNIAO', 'PROPOSTA', 'GANHO', 'PERDIDO'], {
+    errorMap: () => ({ message: "Etapa do Funil inválida. Valores aceitos: NOVO_LEAD, QUALIFICADO, AGENDAMENTO, REUNIAO, PROPOSTA, GANHO, PERDIDO" })
   }),
-  prioridade: z.enum(['FRIO', 'MORNO', 'QUENTE'], { errorMap: () => ({ message: "Prioridade deve ser FRIO, MORNO ou QUENTE" }) }),
+  temperatura: z.enum(['FRIO', 'MORNO', 'QUENTE'], { errorMap: () => ({ message: "Temperatura deve ser FRIO, MORNO ou QUENTE" }) }),
   valorEstimado: z.number().nonnegative().optional().nullable(),
   notas: z.string().optional().nullable()
 });

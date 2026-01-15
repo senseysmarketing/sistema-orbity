@@ -31,14 +31,11 @@ export const LEAD_TEMPERATURES = {
 
 // Mapping status to automatic temperature
 export const STATUS_TO_TEMPERATURE: Record<string, LeadTemperature> = {
-  'new': 'cold',
   'leads': 'cold',
-  'contacted': 'warm',
   'qualified': 'warm',
   'scheduled': 'warm',
   'meeting': 'hot',
   'proposal': 'hot',
-  'negotiation': 'hot',
   'won': 'hot',
   'lost': 'cold',
 };

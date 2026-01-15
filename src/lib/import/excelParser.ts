@@ -54,7 +54,8 @@ function mapHeaders(headers: string[]): Record<string, string> {
     'empresa': 'empresa',
     'cargo': 'cargo',
     'origem': 'origem',
-    'prioridade': 'prioridade',
+    'etapadofunil': 'etapa',
+    'temperatura': 'temperatura',
     'valorestimado': 'valorEstimado',
     'notas': 'notas'
   };
@@ -109,7 +110,7 @@ function transformRow(row: any, headerMap: Record<string, string>): any {
       }
       // Handle status and enum values
       else if (mappedKey === 'status' || mappedKey === 'tipo' || 
-               mappedKey === 'origem' || mappedKey === 'prioridade') {
+               mappedKey === 'origem' || mappedKey === 'etapa' || mappedKey === 'temperatura') {
         transformed[mappedKey] = String(value).toUpperCase().replace(/\s+/g, '_');
       }
       else {
