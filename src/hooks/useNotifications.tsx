@@ -222,7 +222,7 @@ export function useNotifications() {
   }, [currentAgency?.id]);
 
   const enableDoNotDisturb = async (hours: number) => {
-    if (!user) return;
+    if (!user || !currentAgency?.id) return;
 
     try {
       const now = new Date();

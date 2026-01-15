@@ -82,7 +82,7 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
   }, [open, user, currentAgency]);
 
   const fetchPreferences = async () => {
-    if (!user || !currentAgency) return;
+    if (!user || !currentAgency?.id) return;
 
     try {
       setLoading(true);
@@ -163,7 +163,7 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
   };
 
   const handleSave = async () => {
-    if (!user || !currentAgency) return;
+    if (!user || !currentAgency?.id) return;
 
     try {
       setLoading(true);
