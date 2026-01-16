@@ -13,7 +13,26 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LeadScoring } from "./LeadScoring";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
-import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
+
+// Mapeamento de tradução de origens de leads
+const sourceTranslations: Record<string, string> = {
+  'referral': 'Indicação',
+  'facebook_leads': 'Facebook Ads',
+  'instagram_leads': 'Instagram Ads',
+  'google_ads': 'Google Ads',
+  'website': 'Site',
+  'landing_page': 'Landing Page',
+  'cold_call': 'Prospecção Ativa',
+  'email': 'E-mail',
+  'whatsapp': 'WhatsApp',
+  'linkedin': 'LinkedIn',
+  'event': 'Evento',
+  'other': 'Outro',
+};
+
+const translateSource = (source: string): string => {
+  return sourceTranslations[source.toLowerCase()] || source;
+};
 
 interface Lead {
   id: string;
@@ -190,16 +209,6 @@ export function SortableLeadCard({
                 {displayStatus}
               </Badge>
             )}
-            {(() => {
-              const temp = LEAD_TEMPERATURES[lead.temperature as LeadTemperature];
-              const TempIcon = temp?.icon;
-              return (
-                <Badge variant="outline" className={`${temp?.color || 'bg-gray-500'} text-white text-xs border-0 flex items-center gap-1`}>
-                  {TempIcon && <TempIcon className="h-3 w-3" />}
-                  {temp?.label || lead.temperature}
-                </Badge>
-              );
-            })()}
             {urgency.level !== 'normal' && (
               <Badge variant="outline" className={`${
                 urgency.level === 'urgent' ? 'bg-red-500' : 'bg-orange-500'
@@ -243,7 +252,7 @@ export function SortableLeadCard({
             )}
             <div className="flex items-center gap-1.5 text-muted-foreground/70">
               <Target className="h-3.5 w-3.5 flex-shrink-0" />
-              <span className="capitalize">{lead.source}</span>
+              <span className="capitalize">{translateSource(lead.source)}</span>
             </div>
             <div className="flex items-center gap-1.5 text-muted-foreground/70">
               <Clock className="h-3.5 w-3.5 flex-shrink-0" />
