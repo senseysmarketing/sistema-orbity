@@ -13,6 +13,7 @@ import {
   Paperclip
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ImageLightbox } from "./image-lightbox";
 
 export interface Attachment {
   id: string;
@@ -64,6 +65,8 @@ export function FileAttachments({
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getFileIcon = (type: string) => {
@@ -241,7 +244,12 @@ export function FileAttachments({
   }, []);
 
   const isImage = (type: string) => type.startsWith("image/");
+  const imageAttachments = attachments.filter(a => isImage(a.type));
 
+  const openLightbox = (index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
   return (
     <div className={cn("space-y-3", className)}>
       {/* Drop zone */}
@@ -294,30 +302,20 @@ export function FileAttachments({
           </div>
           
           {/* Grid de imagens */}
-          {attachments.filter(a => isImage(a.type)).length > 0 && (
+          {imageAttachments.length > 0 && (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {attachments
-                .filter(a => isImage(a.type))
-                .map((attachment) => (
+              {imageAttachments.map((attachment, index) => (
                   <div
                     key={attachment.id}
-                    className="relative group aspect-square rounded-lg overflow-hidden border bg-muted"
+                    className="relative group aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer"
+                    onClick={() => openLightbox(index)}
                   >
                     <img
                       src={attachment.url}
                       alt={attachment.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <a
-                        href={attachment.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 bg-white/20 rounded-full hover:bg-white/30"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Download className="h-4 w-4 text-white" />
-                      </a>
                       {!disabled && (
                         <button
                           type="button"
@@ -379,6 +377,14 @@ export function FileAttachments({
           )}
         </div>
       )}
+
+      {/* Lightbox para imagens */}
+      <ImageLightbox
+        images={imageAttachments.map(a => ({ url: a.url, name: a.name }))}
+        initialIndex={lightboxIndex}
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+      />
     </div>
   );
 }
@@ -390,6 +396,9 @@ interface AttachmentsDisplayProps {
 }
 
 export function AttachmentsDisplay({ attachments, className }: AttachmentsDisplayProps) {
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
   if (!attachments || attachments.length === 0) return null;
 
   const getFileIcon = (type: string) => {
@@ -418,6 +427,11 @@ export function AttachmentsDisplay({ attachments, className }: AttachmentsDispla
   const images = attachments.filter(a => isImage(a.type));
   const documents = attachments.filter(a => !isImage(a.type));
 
+  const openLightbox = (index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
   return (
     <div className={cn("space-y-3", className)}>
       <div className="flex items-center gap-2 text-sm font-medium">
@@ -428,13 +442,11 @@ export function AttachmentsDisplay({ attachments, className }: AttachmentsDispla
       {/* Grid de imagens */}
       {images.length > 0 && (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-          {images.map((attachment) => (
-            <a
+          {images.map((attachment, index) => (
+            <div
               key={attachment.id}
-              href={attachment.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="relative aspect-square rounded-lg overflow-hidden border bg-muted group"
+              className="relative aspect-square rounded-lg overflow-hidden border bg-muted group cursor-pointer"
+              onClick={() => openLightbox(index)}
             >
               <img
                 src={attachment.url}
@@ -442,9 +454,9 @@ export function AttachmentsDisplay({ attachments, className }: AttachmentsDispla
                 className="w-full h-full object-cover transition-transform group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <Download className="h-6 w-6 text-white" />
+                <ImageIcon className="h-6 w-6 text-white" />
               </div>
-            </a>
+            </div>
           ))}
         </div>
       )}
@@ -472,6 +484,14 @@ export function AttachmentsDisplay({ attachments, className }: AttachmentsDispla
           ))}
         </div>
       )}
+
+      {/* Lightbox para imagens */}
+      <ImageLightbox
+        images={images.map(a => ({ url: a.url, name: a.name }))}
+        initialIndex={lightboxIndex}
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+      />
     </div>
   );
 }
