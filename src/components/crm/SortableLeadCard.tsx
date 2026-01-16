@@ -13,6 +13,7 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LeadScoring } from "./LeadScoring";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
+import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
 
 // Mapeamento de tradução de origens de leads
 const sourceTranslations: Record<string, string> = {
@@ -209,14 +210,16 @@ export function SortableLeadCard({
                 {displayStatus}
               </Badge>
             )}
-            {urgency.level !== 'normal' && (
-              <Badge variant="outline" className={`${
-                urgency.level === 'urgent' ? 'bg-red-500' : 'bg-orange-500'
-              } text-white text-xs border-0 flex items-center gap-1`}>
-                <AlertTriangle className="h-3 w-3" />
-                {urgency.label}
-              </Badge>
-            )}
+            {(() => {
+              const temp = LEAD_TEMPERATURES[lead.temperature as LeadTemperature];
+              const TempIcon = temp?.icon;
+              return (
+                <Badge variant="outline" className={`${temp?.color || 'bg-gray-500'} text-white text-xs border-0 flex items-center gap-1`}>
+                  {TempIcon && <TempIcon className="h-3 w-3" />}
+                  {temp?.label || lead.temperature}
+                </Badge>
+              );
+            })()}
           </div>
           
           {/* Lead Information */}
