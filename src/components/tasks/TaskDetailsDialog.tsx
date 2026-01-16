@@ -11,6 +11,9 @@ import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useDeletePermission } from "@/hooks/useDeletePermission";
+import { LinkifyText } from "@/lib/linkify";
+import { AttachmentsDisplay, Attachment } from "@/components/ui/file-attachments";
+
 interface Subtask {
   id: string;
   title: string;
@@ -31,6 +34,7 @@ interface Task {
   archived?: boolean;
   history?: any[];
   subtasks?: Subtask[];
+  attachments?: Attachment[];
 }
 
 interface Client {
@@ -247,9 +251,14 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                 <div>
                   <p className="text-sm font-medium mb-1">Descrição</p>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {task.description}
+                    <LinkifyText text={task.description} />
                   </p>
                 </div>
+              )}
+
+              {/* Anexos */}
+              {task.attachments && task.attachments.length > 0 && (
+                <AttachmentsDisplay attachments={task.attachments} />
               )}
             </div>
 

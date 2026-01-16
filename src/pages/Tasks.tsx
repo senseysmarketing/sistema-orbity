@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText } from "lucide-react";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
+import { FileAttachments, Attachment } from "@/components/ui/file-attachments";
 import {
   DndContext,
   DragEndEvent,
@@ -60,6 +61,7 @@ interface Task {
   archived?: boolean;
   history?: any[];
   subtasks?: Subtask[];
+  attachments?: Attachment[];
 }
 
 interface Profile {
@@ -103,6 +105,7 @@ export default function Tasks() {
     client_ids: string[];
     due_date: string;
     subtasks: Subtask[];
+    attachments: Attachment[];
   }>({
     title: "",
     description: "",
@@ -113,6 +116,7 @@ export default function Tasks() {
     client_ids: [],
     due_date: "",
     subtasks: [],
+    attachments: [],
   });
 
   const { updateClientRelations } = useClientRelations();
@@ -432,11 +436,12 @@ export default function Tasks() {
           status: newTask.status as any,
           priority: newTask.priority,
           assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
-          client_id: newTask.client_ids[0] || null, // Keep first for backward compatibility
+          client_id: newTask.client_ids[0] || null,
           due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
           created_by: profile?.user_id,
           agency_id: currentAgency?.id,
           subtasks: newTask.subtasks as any,
+          attachments: newTask.attachments as any,
         }])
         .select()
         .single();
@@ -467,6 +472,7 @@ export default function Tasks() {
         client_ids: [],
         due_date: "",
         subtasks: [],
+        attachments: [],
       });
       setIsDialogOpen(false);
       fetchTasks();
@@ -508,6 +514,7 @@ export default function Tasks() {
         id: crypto.randomUUID(),
         completed: false,
       })),
+      attachments: [],
     });
 
     incrementUsageCount(template.id);
@@ -532,6 +539,7 @@ export default function Tasks() {
       client_ids: task.client_id ? [task.client_id] : [],
       due_date: task.due_date ? task.due_date.split("T")[0] : "",
       subtasks: task.subtasks || [],
+      attachments: task.attachments || [],
     });
     setIsEditDialogOpen(true);
   };
@@ -665,6 +673,7 @@ export default function Tasks() {
         id: crypto.randomUUID(), 
         completed: false 
       })) || [],
+      attachments: [],
     });
     setIsDetailDialogOpen(false);
     setIsDialogOpen(true);
@@ -885,6 +894,15 @@ export default function Tasks() {
                 subtasks={newTask.subtasks}
                 onChange={(subtasks) => setNewTask({ ...newTask, subtasks })}
               />
+              <div className="grid gap-2">
+                <Label>Anexos</Label>
+                <FileAttachments
+                  attachments={newTask.attachments}
+                  onChange={(attachments) => setNewTask({ ...newTask, attachments })}
+                  bucket="task-attachments"
+                  entityId={selectedTask?.id}
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>

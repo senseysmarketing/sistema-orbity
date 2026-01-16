@@ -14,6 +14,7 @@ import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
 import { MultiClientSelector } from "@/components/clients/MultiClientSelector";
 import { useClientRelations } from "@/hooks/useClientRelations";
+import { FileAttachments, Attachment } from "@/components/ui/file-attachments";
 
 interface PostFormDialogProps {
   open: boolean;
@@ -36,6 +37,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
   const [profiles, setProfiles] = useState<any[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Helper para converter Date para formato datetime-local mantendo fuso horário local
@@ -72,6 +74,12 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         notes: editPost.notes || "",
         subtasks: editPost.subtasks || [],
       });
+      // Carregar anexos existentes
+      if (editPost.attachments && Array.isArray(editPost.attachments)) {
+        setAttachments(editPost.attachments as unknown as Attachment[]);
+      } else {
+        setAttachments([]);
+      }
     } else {
       setFormData({
         title: "",
@@ -86,6 +94,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         subtasks: [],
       });
       setSelectedClientIds([]);
+      setAttachments([]);
     }
   }, [editPost, defaultDate, open]);
 
@@ -356,7 +365,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         ...formData,
         client_id: selectedClientIds[0] || null, // Keep first client for backward compatibility
         hashtags: formData.hashtags.split(",").map(h => h.trim()).filter(Boolean),
-        attachments: [],
+        attachments: attachments as any,
         mentions: [],
         approval_history: [],
         subtasks: formData.subtasks,
@@ -658,6 +667,16 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={3}
+            />
+          </div>
+
+          <div>
+            <Label>Anexos</Label>
+            <FileAttachments
+              attachments={attachments}
+              onChange={setAttachments}
+              bucket="post-attachments"
+              entityId={editPost?.id}
             />
           </div>
 

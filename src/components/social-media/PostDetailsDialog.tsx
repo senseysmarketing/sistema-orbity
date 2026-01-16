@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PostAssignedUsers } from "./PostAssignedUsers";
 import { useDeletePermission } from "@/hooks/useDeletePermission";
+import { LinkifyText } from "@/lib/linkify";
+import { AttachmentsDisplay, Attachment } from "@/components/ui/file-attachments";
 
 interface PostDetailsDialogProps {
   post: SocialMediaPost | null;
@@ -223,9 +225,14 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
                 <div>
                   <p className="text-sm font-medium mb-1">Descrição</p>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {post.description}
+                    <LinkifyText text={post.description} />
                   </p>
                 </div>
+              )}
+
+              {/* Anexos */}
+              {post.attachments && post.attachments.length > 0 && (
+                <AttachmentsDisplay attachments={post.attachments as unknown as Attachment[]} />
               )}
 
               {post.hashtags && post.hashtags.length > 0 && (

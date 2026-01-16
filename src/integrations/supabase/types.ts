@@ -4205,6 +4205,7 @@ export type Database = {
           agency_id: string | null
           archived: boolean
           assigned_to: string | null
+          attachments: Json | null
           client_id: string | null
           created_at: string
           created_by: string
@@ -4223,6 +4224,7 @@ export type Database = {
           agency_id?: string | null
           archived?: boolean
           assigned_to?: string | null
+          attachments?: Json | null
           client_id?: string | null
           created_at?: string
           created_by: string
@@ -4241,6 +4243,7 @@ export type Database = {
           agency_id?: string | null
           archived?: boolean
           assigned_to?: string | null
+          attachments?: Json | null
           client_id?: string | null
           created_at?: string
           created_by?: string
