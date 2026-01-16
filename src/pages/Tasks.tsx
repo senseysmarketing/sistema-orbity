@@ -590,6 +590,7 @@ export default function Tasks() {
         client_id: newTask.client_ids[0] || null,
         due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
         subtasks: newTask.subtasks as any,
+        attachments: newTask.attachments as any,
       };
 
       // Reset notification_sent_at if due_date changed
@@ -1176,6 +1177,14 @@ export default function Tasks() {
               subtasks={newTask.subtasks}
               onChange={(subtasks) => setNewTask({ ...newTask, subtasks })}
             />
+            <div className="grid gap-2">
+              <Label>Anexos</Label>
+              <FileAttachments
+                attachments={newTask.attachments}
+                onChange={(attachments) => setNewTask({ ...newTask, attachments })}
+                bucket="task-attachments"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
