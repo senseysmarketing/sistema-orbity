@@ -947,20 +947,6 @@ export default function Tasks() {
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Status</SelectItem>
-                {statuses.map((status) => (
-                  <SelectItem key={status.slug} value={status.slug}>
-                    {status.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Prioridade" />
@@ -988,8 +974,22 @@ export default function Tasks() {
               </SelectContent>
             </Select>
 
+            <Select value={clientFilter} onValueChange={setClientFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Clientes</SelectItem>
+                <SelectItem value="no-client">Sem Cliente</SelectItem>
+                {clients.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             {(searchTerm ||
-              statusFilter !== "all" ||
               priorityFilter !== "all" ||
               assignedFilter !== "all" ||
               clientFilter !== "all") && (
