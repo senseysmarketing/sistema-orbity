@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
+import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 import { toast } from "sonner";
 import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
 
@@ -19,7 +20,7 @@ interface Lead {
   company: string | null;
   position: string | null;
   source: string;
-  status: 'leads' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost';
+  status: string;
   temperature: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
@@ -42,6 +43,7 @@ interface LeadFormProps {
 export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
   const { profile } = useAuth();
   const { currentAgency } = useAgency();
+  const { statuses, getStatusKey } = useLeadStatuses();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -50,7 +52,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
     company: '',
     position: '',
     source: 'manual',
-    status: 'leads' as 'leads' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost',
+    status: 'leads',
     temperature: 'cold' as LeadTemperature,
     value: 0,
     notes: '',
@@ -245,18 +247,21 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="status">Etapa do Funil</Label>
-              <Select value={formData.status} onValueChange={(value: any) => setFormData({ ...formData, status: value })}>
+              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="leads">Novo Lead</SelectItem>
-                  <SelectItem value="qualified">Qualificado</SelectItem>
-                  <SelectItem value="scheduled">Agendamento</SelectItem>
-                  <SelectItem value="meeting">Reunião</SelectItem>
-                  <SelectItem value="proposal">Proposta</SelectItem>
-                  <SelectItem value="won">Ganho</SelectItem>
-                  <SelectItem value="lost">Perdido</SelectItem>
+                  {statuses
+                    .sort((a, b) => a.order_position - b.order_position)
+                    .map((status) => (
+                      <SelectItem key={status.id} value={getStatusKey(status.name)}>
+                        <div className="flex items-center gap-2">
+                          <div className={`h-2 w-2 rounded-full ${status.color}`} />
+                          {status.name}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
