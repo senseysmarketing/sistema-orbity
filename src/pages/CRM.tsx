@@ -56,6 +56,55 @@ export default function CRM() {
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  
+  // Hidden columns state with localStorage persistence
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(() => {
+    if (!currentAgency?.id) return new Set();
+    try {
+      const saved = localStorage.getItem(`crm_hidden_columns_${currentAgency.id}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  
+  // Persist hidden columns to localStorage when they change
+  useEffect(() => {
+    if (currentAgency?.id) {
+      localStorage.setItem(
+        `crm_hidden_columns_${currentAgency.id}`,
+        JSON.stringify([...hiddenColumns])
+      );
+    }
+  }, [hiddenColumns, currentAgency?.id]);
+  
+  // Load hidden columns when agency changes
+  useEffect(() => {
+    if (currentAgency?.id) {
+      try {
+        const saved = localStorage.getItem(`crm_hidden_columns_${currentAgency.id}`);
+        setHiddenColumns(saved ? new Set(JSON.parse(saved)) : new Set());
+      } catch {
+        setHiddenColumns(new Set());
+      }
+    }
+  }, [currentAgency?.id]);
+  
+  const handleToggleColumn = (columnId: string) => {
+    setHiddenColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(columnId)) {
+        next.delete(columnId);
+      } else {
+        next.add(columnId);
+      }
+      return next;
+    });
+  };
+  
+  const handleShowAllColumns = () => {
+    setHiddenColumns(new Set());
+  };
 
   // Get unique sources from existing leads
   const uniqueSources = useMemo(() => {
@@ -389,6 +438,9 @@ export default function CRM() {
                     onUpdate={fetchLeads}
                     onView={handleLeadView}
                     onLeadMove={handleLeadMove}
+                    hiddenColumns={hiddenColumns}
+                    onToggleColumn={handleToggleColumn}
+                    onShowAllColumns={handleShowAllColumns}
                   />
                 ) : (
                   <LeadsList 
