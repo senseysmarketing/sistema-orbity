@@ -11,6 +11,23 @@ import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const colorOptions = [{
   value: "bg-gray-500",
@@ -38,6 +55,78 @@ const colorOptions = [{
   label: "Rosa"
 }];
 
+interface StatusItem {
+  id: string;
+  name: string;
+  color: string;
+  is_default: boolean;
+  is_active: boolean;
+  order_position: number;
+}
+
+interface SortableStatusItemProps {
+  status: StatusItem;
+  onToggle: (id: string, isActive: boolean) => void;
+  onDelete: (id: string) => void;
+}
+
+function SortableStatusItem({ status, onToggle, onDelete }: SortableStatusItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: status.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center justify-between p-3 border rounded-lg bg-card"
+    >
+      <div className="flex items-center gap-3">
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing touch-none"
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+        <div className={`h-3 w-3 rounded-full ${status.color}`} />
+        <span className="font-medium">{status.name}</span>
+        {status.is_default && (
+          <span className="text-xs text-muted-foreground">(Padrão do Sistema)</span>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        {!status.is_default && (
+          <>
+            <Switch
+              checked={status.is_active ?? true}
+              onCheckedChange={(checked) => onToggle(status.id, checked)}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(status.id)}
+            >
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface CustomStatusManagerProps {
   onStatusUpdate?: () => void;
 }
@@ -51,6 +140,13 @@ export function CustomStatusManager({
     name: "",
     color: "bg-blue-500"
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Buscar status do banco de dados (padrão + customizados)
   const { data: statuses = [], isLoading } = useQuery({
@@ -116,6 +212,37 @@ export function CustomStatusManager({
     }
   });
 
+  const reorderMutation = useMutation({
+    mutationFn: async (updates: { id: string; order_position: number }[]) => {
+      const promises = updates.map(({ id, order_position }) =>
+        supabase.from("lead_statuses").update({ order_position }).eq("id", id)
+      );
+      await Promise.all(promises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["lead-statuses"] });
+      toast.success("Ordem das colunas atualizada");
+      onStatusUpdate?.();
+    },
+    onError: () => {
+      toast.error("Erro ao atualizar ordem");
+    },
+  });
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = statuses.findIndex((s: any) => s.id === active.id);
+      const newIndex = statuses.findIndex((s: any) => s.id === over.id);
+      const reordered = arrayMove(statuses, oldIndex, newIndex);
+      const updates = reordered.map((status: any, index: number) => ({
+        id: status.id,
+        order_position: index,
+      }));
+      reorderMutation.mutate(updates);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -137,7 +264,7 @@ export function CustomStatusManager({
       <CardHeader>
         <CardTitle>Status do Kanban</CardTitle>
         <CardDescription>
-          Visualize os status do seu pipeline e adicione status personalizados
+          Arraste para reordenar as colunas do pipeline. Status padrão não podem ser excluídos, mas podem ser reordenados.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -184,45 +311,27 @@ export function CustomStatusManager({
           </div>
         </div>
 
-        <div className="space-y-2">
-          {statuses.map((status: any) => (
-            <div 
-              key={status.id} 
-              className="flex items-center justify-between p-3 border rounded-lg"
-            >
-              <div className="flex items-center gap-3">
-                {!status.is_default && (
-                  <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                )}
-                <div className={`h-3 w-3 rounded-full ${status.color}`} />
-                <span className="font-medium">{status.name}</span>
-                {status.is_default && (
-                  <span className="text-xs text-muted-foreground">(Padrão do Sistema)</span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                {!status.is_default && (
-                  <>
-                    <Switch 
-                      checked={status.is_active ?? true} 
-                      onCheckedChange={checked => toggleMutation.mutate({
-                        id: status.id,
-                        isActive: checked
-                      })} 
-                    />
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => deleteMutation.mutate(status.id)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </>
-                )}
-              </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={statuses.map((s: any) => s.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-2">
+              {statuses.map((status: any) => (
+                <SortableStatusItem
+                  key={status.id}
+                  status={status}
+                  onToggle={(id, isActive) => toggleMutation.mutate({ id, isActive })}
+                  onDelete={(id) => deleteMutation.mutate(id)}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       </CardContent>
     </Card>
   );
