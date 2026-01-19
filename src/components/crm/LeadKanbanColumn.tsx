@@ -1,6 +1,8 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { SortableLeadCard } from './SortableLeadCard';
 import { DropZoneIndicator } from '@/components/ui/drop-zone-indicator';
 
@@ -35,6 +37,7 @@ interface LeadKanbanColumnProps {
   onEdit: (lead: Lead) => void;
   onDelete: (leadId: string) => void;
   onView?: (lead: Lead) => void;
+  onToggleVisibility?: () => void;
   getPriorityColor: (priority: string) => string;
   getPriorityLabel: (priority: string) => string;
   getUrgencyLevel: (lead: Lead) => { level: string; label: string; color: string };
@@ -51,6 +54,7 @@ export function LeadKanbanColumn({
   onEdit,
   onDelete,
   onView,
+  onToggleVisibility,
   getPriorityColor,
   getPriorityLabel,
   getUrgencyLevel,
@@ -67,6 +71,21 @@ export function LeadKanbanColumn({
         <div className={`w-3 h-3 ${color} rounded-full`}></div>
         <h3 className="font-semibold">{title}</h3>
         <Badge variant="secondary">{count}</Badge>
+        <div className="flex-1" />
+        {onToggleVisibility && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 opacity-40 hover:opacity-100 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleVisibility();
+            }}
+            title="Ocultar coluna"
+          >
+            <EyeOff className="h-4 w-4" />
+          </Button>
+        )}
       </div>
       <div
         ref={setNodeRef}

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { LeadKanbanColumn } from "./LeadKanbanColumn";
 import { SortableLeadCard } from "./SortableLeadCard";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,14 +40,22 @@ interface LeadsKanbanProps {
   onUpdate: () => void;
   onView?: (lead: Lead) => void;
   onLeadMove?: (leadId: string, newStatus: string) => void;
+  hiddenColumns?: Set<string>;
+  onToggleColumn?: (columnId: string) => void;
+  onShowAllColumns?: () => void;
 }
 
-export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadMove }: LeadsKanbanProps) {
+export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadMove, hiddenColumns, onToggleColumn, onShowAllColumns }: LeadsKanbanProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
   const { getStatusConfig, getStatusKey, mapDatabaseStatusToDisplay, mapDisplayStatusToDatabase } = useLeadStatuses();
 
   const statusConfig = getStatusConfig();
+  
+  // Filter visible columns based on hiddenColumns
+  const visibleColumns = Object.entries(statusConfig).filter(
+    ([statusKey]) => !hiddenColumns?.has(statusKey)
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -181,25 +191,46 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
       onDragEnd={handleDragEnd}
       collisionDetection={closestCenter}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {Object.entries(statusConfig).map(([statusKey, config]) => (
-          <LeadKanbanColumn
-            key={statusKey}
-            id={statusKey}
-            title={config.title}
-            leads={groupedLeads[statusKey] || []}
-            color={config.color}
-            count={groupedLeads[statusKey]?.length || 0}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onView={onView}
-            getPriorityColor={getPriorityColor}
-            getPriorityLabel={getPriorityLabel}
-            getUrgencyLevel={getUrgencyLevel}
-            formatCurrency={formatCurrency}
-            formatDate={formatDate}
-          />
-        ))}
+      <div className="space-y-4">
+        {/* Hidden columns indicator */}
+        {hiddenColumns && hiddenColumns.size > 0 && (
+          <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg border border-dashed border-muted-foreground/30">
+            <Eye className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">
+              {hiddenColumns.size} coluna{hiddenColumns.size > 1 ? 's' : ''} oculta{hiddenColumns.size > 1 ? 's' : ''}
+            </span>
+            <Button 
+              variant="link" 
+              size="sm" 
+              className="text-primary h-auto p-0"
+              onClick={onShowAllColumns}
+            >
+              Mostrar todas
+            </Button>
+          </div>
+        )}
+        
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {visibleColumns.map(([statusKey, config]) => (
+            <LeadKanbanColumn
+              key={statusKey}
+              id={statusKey}
+              title={config.title}
+              leads={groupedLeads[statusKey] || []}
+              color={config.color}
+              count={groupedLeads[statusKey]?.length || 0}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onView={onView}
+              onToggleVisibility={() => onToggleColumn?.(statusKey)}
+              getPriorityColor={getPriorityColor}
+              getPriorityLabel={getPriorityLabel}
+              getUrgencyLevel={getUrgencyLevel}
+              formatCurrency={formatCurrency}
+              formatDate={formatDate}
+            />
+          ))}
+        </div>
       </div>
 
       <DragOverlay>
