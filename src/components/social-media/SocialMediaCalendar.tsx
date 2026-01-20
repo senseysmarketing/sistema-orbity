@@ -172,7 +172,7 @@ export function SocialMediaCalendar() {
           {/* Filtro de Cliente - Multi-select com Popover */}
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9">
+              <Button variant="outline">
                 {clientFilter.length === 0 
                   ? "Todos os clientes" 
                   : `${clientFilter.length} cliente(s)`}
@@ -204,7 +204,7 @@ export function SocialMediaCalendar() {
           
           {/* Filtro de Status */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px] h-9">
+            <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -221,8 +221,6 @@ export function SocialMediaCalendar() {
           {hasActiveFilters && (
             <Button 
               variant="ghost" 
-              size="sm"
-              className="h-9"
               onClick={clearFilters}
             >
               <X className="h-4 w-4 mr-1" />
@@ -236,31 +234,25 @@ export function SocialMediaCalendar() {
           {/* Botões de visualização */}
           <Button
             variant={viewMode === "month" ? "default" : "outline"}
-            size="sm"
-            className="h-9"
             onClick={() => setViewMode("month")}
           >
             Mês
           </Button>
           <Button
             variant={viewMode === "week" ? "default" : "outline"}
-            size="sm"
-            className="h-9"
             onClick={() => setViewMode("week")}
           >
             Semana
           </Button>
           <Button
             variant={viewMode === "day" ? "default" : "outline"}
-            size="sm"
-            className="h-9"
             onClick={() => setViewMode("day")}
           >
             Dia
           </Button>
           
           {/* Botão Nova Postagem */}
-          <Button onClick={() => setIsCreateDialogOpen(true)} className="h-9">
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Nova Postagem
           </Button>
