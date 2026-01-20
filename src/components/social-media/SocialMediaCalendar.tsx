@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ChevronLeft, ChevronRight, Filter, X, Instagram, Facebook, Linkedin, Youtube, Twitter } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Filter, X } from "lucide-react";
 import { useSocialMediaPosts, SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 import { PostFormDialog } from "./PostFormDialog";
 import { PostCard } from "./PostCard";
@@ -15,14 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-const PLATFORMS = [
-  { value: "instagram", label: "Instagram", icon: Instagram },
-  { value: "facebook", label: "Facebook", icon: Facebook },
-  { value: "linkedin", label: "LinkedIn", icon: Linkedin },
-  { value: "twitter", label: "Twitter/X", icon: Twitter },
-  { value: "youtube", label: "YouTube", icon: Youtube },
-];
 
 const STATUSES = [
   { value: "draft", label: "Briefing" },
@@ -44,7 +36,6 @@ export function SocialMediaCalendar() {
   
   // Estados de filtro
   const [clientFilter, setClientFilter] = useState<string[]>([]);
-  const [platformFilter, setPlatformFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   
   const { allPosts, loading, deletePost, fetchPosts } = useSocialMediaPosts();
@@ -75,12 +66,11 @@ export function SocialMediaCalendar() {
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
   // Verificar se há filtros ativos
-  const hasActiveFilters = clientFilter.length > 0 || platformFilter !== "all" || statusFilter !== "all";
+  const hasActiveFilters = clientFilter.length > 0 || statusFilter !== "all";
 
   // Limpar todos os filtros
   const clearFilters = () => {
     setClientFilter([]);
-    setPlatformFilter("all");
     setStatusFilter("all");
   };
 
@@ -104,15 +94,11 @@ export function SocialMediaCalendar() {
       const matchesClient = clientFilter.length === 0 || 
         clientFilter.includes(post.client_id || '');
       
-      // Filtro por plataforma
-      const matchesPlatform = platformFilter === "all" || 
-        post.platform === platformFilter;
-      
       // Filtro por status
       const matchesStatus = statusFilter === "all" || 
         post.status === statusFilter;
       
-      return matchesClient && matchesPlatform && matchesStatus;
+      return matchesClient && matchesStatus;
     });
   };
 
@@ -215,24 +201,6 @@ export function SocialMediaCalendar() {
               </ScrollArea>
             </PopoverContent>
           </Popover>
-          
-          {/* Filtro de Plataforma */}
-          <Select value={platformFilter} onValueChange={setPlatformFilter}>
-            <SelectTrigger className="w-[150px] h-9">
-              <SelectValue placeholder="Plataforma" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas plataformas</SelectItem>
-              {PLATFORMS.map(platform => (
-                <SelectItem key={platform.value} value={platform.value}>
-                  <div className="flex items-center gap-2">
-                    <platform.icon className="h-4 w-4" />
-                    {platform.label}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           
           {/* Filtro de Status */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
