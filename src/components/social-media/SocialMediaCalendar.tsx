@@ -1,24 +1,68 @@
 import { useState } from "react";
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Filter, X, Instagram, Facebook, Linkedin, Youtube, Twitter } from "lucide-react";
 import { useSocialMediaPosts, SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 import { PostFormDialog } from "./PostFormDialog";
 import { PostCard } from "./PostCard";
 import { PostDetailsDialog } from "./PostDetailsDialog";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth, addDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAgency } from "@/hooks/useAgency";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+const PLATFORMS = [
+  { value: "instagram", label: "Instagram", icon: Instagram },
+  { value: "facebook", label: "Facebook", icon: Facebook },
+  { value: "linkedin", label: "LinkedIn", icon: Linkedin },
+  { value: "twitter", label: "Twitter/X", icon: Twitter },
+  { value: "youtube", label: "YouTube", icon: Youtube },
+];
+
+const STATUSES = [
+  { value: "draft", label: "Briefing" },
+  { value: "in_creation", label: "Em Criação" },
+  { value: "pending_approval", label: "Aguardando Aprovação" },
+  { value: "approved", label: "Aprovado" },
+  { value: "scheduled", label: "Agendado" },
+  { value: "published", label: "Publicado" },
+];
 
 export function SocialMediaCalendar() {
+  const { currentAgency } = useAgency();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<SocialMediaPost | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<SocialMediaPost | null>(null);
-  // Usar allPosts para mostrar arquivados no calendário
+  
+  // Estados de filtro
+  const [clientFilter, setClientFilter] = useState<string[]>([]);
+  const [platformFilter, setPlatformFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  
   const { allPosts, loading, deletePost, fetchPosts } = useSocialMediaPosts();
+
+  // Buscar clientes para o filtro
+  const { data: clients = [] } = useQuery({
+    queryKey: ["clients-filter", currentAgency?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("clients")
+        .select("id, name")
+        .eq("agency_id", currentAgency?.id)
+        .eq("active", true)
+        .order("name");
+      return data || [];
+    },
+    enabled: !!currentAgency?.id,
+  });
 
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
@@ -30,11 +74,46 @@ export function SocialMediaCalendar() {
   const weekEnd = endOfWeek(selectedDate, { locale: ptBR });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  // Usar allPosts para incluir arquivados
-  const getPostsForDate = (date: Date) => {
-    return allPosts.filter(post => 
-      isSameDay(new Date(post.scheduled_date), date)
+  // Verificar se há filtros ativos
+  const hasActiveFilters = clientFilter.length > 0 || platformFilter !== "all" || statusFilter !== "all";
+
+  // Limpar todos os filtros
+  const clearFilters = () => {
+    setClientFilter([]);
+    setPlatformFilter("all");
+    setStatusFilter("all");
+  };
+
+  // Toggle cliente no filtro
+  const toggleClientFilter = (clientId: string) => {
+    setClientFilter(prev => 
+      prev.includes(clientId) 
+        ? prev.filter(id => id !== clientId)
+        : [...prev, clientId]
     );
+  };
+
+  // Filtrar posts por data e filtros ativos
+  const getFilteredPostsForDate = (date: Date) => {
+    return allPosts.filter(post => {
+      // Filtro por data
+      const matchesDate = isSameDay(new Date(post.scheduled_date), date);
+      if (!matchesDate) return false;
+      
+      // Filtro por cliente
+      const matchesClient = clientFilter.length === 0 || 
+        clientFilter.includes(post.client_id || '');
+      
+      // Filtro por plataforma
+      const matchesPlatform = platformFilter === "all" || 
+        post.platform === platformFilter;
+      
+      // Filtro por status
+      const matchesStatus = statusFilter === "all" || 
+        post.status === statusFilter;
+      
+      return matchesClient && matchesPlatform && matchesStatus;
+    });
   };
 
   const handlePreviousMonth = () => {
@@ -90,7 +169,7 @@ export function SocialMediaCalendar() {
           <Button variant="outline" size="icon" onClick={handlePreviousMonth}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <h2 className="text-xl font-semibold">
+          <h2 className="text-xl font-semibold capitalize">
             {format(selectedDate, "MMMM yyyy", { locale: ptBR })}
           </h2>
           <Button variant="outline" size="icon" onClick={handleNextMonth}>
@@ -124,6 +203,90 @@ export function SocialMediaCalendar() {
         </div>
       </div>
 
+      {/* Barra de Filtros */}
+      <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg border">
+        <Filter className="h-4 w-4 text-muted-foreground" />
+        
+        {/* Filtro de Cliente - Multi-select com Popover */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8">
+              {clientFilter.length === 0 
+                ? "Todos os Clientes" 
+                : `${clientFilter.length} cliente(s)`}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-0" align="start">
+            <ScrollArea className="h-64">
+              <div className="p-2 space-y-1">
+                {clients.map((client) => (
+                  <div 
+                    key={client.id} 
+                    className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
+                    onClick={() => toggleClientFilter(client.id)}
+                  >
+                    <Checkbox 
+                      checked={clientFilter.includes(client.id)}
+                      onCheckedChange={() => toggleClientFilter(client.id)}
+                    />
+                    <span className="text-sm">{client.name}</span>
+                  </div>
+                ))}
+                {clients.length === 0 && (
+                  <p className="text-sm text-muted-foreground p-2">Nenhum cliente encontrado</p>
+                )}
+              </div>
+            </ScrollArea>
+          </PopoverContent>
+        </Popover>
+        
+        {/* Filtro de Plataforma */}
+        <Select value={platformFilter} onValueChange={setPlatformFilter}>
+          <SelectTrigger className="w-40 h-8">
+            <SelectValue placeholder="Plataforma" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas Plataformas</SelectItem>
+            {PLATFORMS.map(platform => (
+              <SelectItem key={platform.value} value={platform.value}>
+                <div className="flex items-center gap-2">
+                  <platform.icon className="h-4 w-4" />
+                  {platform.label}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        {/* Filtro de Status */}
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-44 h-8">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos Status</SelectItem>
+            {STATUSES.map(status => (
+              <SelectItem key={status.value} value={status.value}>
+                {status.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        {/* Botão limpar filtros */}
+        {hasActiveFilters && (
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="h-8"
+            onClick={clearFilters}
+          >
+            <X className="h-4 w-4 mr-1" />
+            Limpar
+          </Button>
+        )}
+      </div>
+
       {viewMode === "month" && (
         <div className="grid grid-cols-7 gap-2">
           {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(day => (
@@ -133,7 +296,7 @@ export function SocialMediaCalendar() {
           ))}
           
           {calendarDays.map(day => {
-            const dayPosts = getPostsForDate(day);
+            const dayPosts = getFilteredPostsForDate(day);
             const isToday = isSameDay(day, new Date());
             const isCurrentMonth = isSameMonth(day, selectedDate);
             
@@ -156,9 +319,37 @@ export function SocialMediaCalendar() {
                     />
                   ))}
                   {dayPosts.length > 3 && (
-                    <p className="text-xs text-muted-foreground">
-                      +{dayPosts.length - 3} mais
-                    </p>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button 
+                          variant="link" 
+                          size="sm" 
+                          className="text-xs text-muted-foreground p-0 h-auto hover:text-primary w-full justify-start"
+                        >
+                          +{dayPosts.length - 3} mais
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-0" align="start">
+                        <div className="p-3 border-b">
+                          <p className="text-sm font-medium">
+                            Postagens em {format(day, "d 'de' MMMM", { locale: ptBR })} ({dayPosts.length})
+                          </p>
+                        </div>
+                        <ScrollArea className="max-h-80">
+                          <div className="p-2 space-y-2">
+                            {dayPosts.map(post => (
+                              <PostCard 
+                                key={post.id} 
+                                post={post} 
+                                compact 
+                                showArchived
+                                onClick={() => handlePostClick(post)}
+                              />
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
                   )}
                 </CardContent>
               </Card>
@@ -177,7 +368,7 @@ export function SocialMediaCalendar() {
             ))}
             
             {weekDays.map(day => {
-              const dayPosts = getPostsForDate(day);
+              const dayPosts = getFilteredPostsForDate(day);
               const isToday = isSameDay(day, new Date());
               
               return (
@@ -189,7 +380,7 @@ export function SocialMediaCalendar() {
                     <CardTitle className="text-lg">{format(day, "d")}</CardTitle>
                   </CardHeader>
                   <CardContent className="p-3 space-y-2">
-                    {dayPosts.map(post => (
+                    {dayPosts.slice(0, 5).map(post => (
                       <PostCard 
                         key={post.id} 
                         post={post} 
@@ -198,6 +389,39 @@ export function SocialMediaCalendar() {
                         onClick={() => handlePostClick(post)}
                       />
                     ))}
+                    {dayPosts.length > 5 && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="text-xs text-muted-foreground p-0 h-auto hover:text-primary w-full justify-start"
+                          >
+                            +{dayPosts.length - 5} mais
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 p-0" align="start">
+                          <div className="p-3 border-b">
+                            <p className="text-sm font-medium">
+                              Postagens em {format(day, "d 'de' MMMM", { locale: ptBR })} ({dayPosts.length})
+                            </p>
+                          </div>
+                          <ScrollArea className="max-h-80">
+                            <div className="p-2 space-y-2">
+                              {dayPosts.map(post => (
+                                <PostCard 
+                                  key={post.id} 
+                                  post={post} 
+                                  compact 
+                                  showArchived
+                                  onClick={() => handlePostClick(post)}
+                                />
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        </PopoverContent>
+                      </Popover>
+                    )}
                     {dayPosts.length === 0 && (
                       <p className="text-xs text-muted-foreground text-center py-4">
                         Nenhuma postagem
@@ -215,14 +439,14 @@ export function SocialMediaCalendar() {
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-2xl capitalize">
                 {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {getPostsForDate(selectedDate).length > 0 ? (
+              {getFilteredPostsForDate(selectedDate).length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {getPostsForDate(selectedDate).map(post => (
+                  {getFilteredPostsForDate(selectedDate).map(post => (
                     <PostCard 
                       key={post.id} 
                       post={post} 
@@ -234,7 +458,9 @@ export function SocialMediaCalendar() {
               ) : (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground text-lg">
-                    Nenhuma postagem agendada para este dia
+                    {hasActiveFilters 
+                      ? "Nenhuma postagem encontrada com os filtros aplicados"
+                      : "Nenhuma postagem agendada para este dia"}
                   </p>
                   <Button 
                     className="mt-4"
