@@ -164,7 +164,8 @@ export function SocialMediaCalendar() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Navegação de mês */}
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={handlePreviousMonth}>
             <ChevronLeft className="h-4 w-4" />
@@ -177,114 +178,125 @@ export function SocialMediaCalendar() {
           </Button>
         </div>
         
-        <div className="flex gap-2">
+        {/* Filtros + Botões de visualização + Nova Postagem */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Filtros */}
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          
+          {/* Filtro de Cliente - Multi-select com Popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9">
+                {clientFilter.length === 0 
+                  ? "Todos os clientes" 
+                  : `${clientFilter.length} cliente(s)`}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-0" align="start">
+              <ScrollArea className="h-64">
+                <div className="p-2 space-y-1">
+                  {clients.map((client) => (
+                    <div 
+                      key={client.id} 
+                      className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
+                      onClick={() => toggleClientFilter(client.id)}
+                    >
+                      <Checkbox 
+                        checked={clientFilter.includes(client.id)}
+                        onCheckedChange={() => toggleClientFilter(client.id)}
+                      />
+                      <span className="text-sm">{client.name}</span>
+                    </div>
+                  ))}
+                  {clients.length === 0 && (
+                    <p className="text-sm text-muted-foreground p-2">Nenhum cliente encontrado</p>
+                  )}
+                </div>
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+          
+          {/* Filtro de Plataforma */}
+          <Select value={platformFilter} onValueChange={setPlatformFilter}>
+            <SelectTrigger className="w-[150px] h-9">
+              <SelectValue placeholder="Plataforma" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas plataformas</SelectItem>
+              {PLATFORMS.map(platform => (
+                <SelectItem key={platform.value} value={platform.value}>
+                  <div className="flex items-center gap-2">
+                    <platform.icon className="h-4 w-4" />
+                    {platform.label}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {/* Filtro de Status */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[150px] h-9">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos status</SelectItem>
+              {STATUSES.map(status => (
+                <SelectItem key={status.value} value={status.value}>
+                  {status.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          {/* Botão limpar filtros */}
+          {hasActiveFilters && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="h-9"
+              onClick={clearFilters}
+            >
+              <X className="h-4 w-4 mr-1" />
+              Limpar
+            </Button>
+          )}
+          
+          {/* Separador visual */}
+          <div className="h-6 w-px bg-border mx-1 hidden sm:block" />
+          
+          {/* Botões de visualização */}
           <Button
             variant={viewMode === "month" ? "default" : "outline"}
+            size="sm"
+            className="h-9"
             onClick={() => setViewMode("month")}
           >
             Mês
           </Button>
           <Button
             variant={viewMode === "week" ? "default" : "outline"}
+            size="sm"
+            className="h-9"
             onClick={() => setViewMode("week")}
           >
             Semana
           </Button>
           <Button
             variant={viewMode === "day" ? "default" : "outline"}
+            size="sm"
+            className="h-9"
             onClick={() => setViewMode("day")}
           >
             Dia
           </Button>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
+          
+          {/* Botão Nova Postagem */}
+          <Button onClick={() => setIsCreateDialogOpen(true)} className="h-9">
             <Plus className="h-4 w-4 mr-2" />
             Nova Postagem
           </Button>
         </div>
-      </div>
-
-      {/* Barra de Filtros */}
-      <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg border">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        
-        {/* Filtro de Cliente - Multi-select com Popover */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8">
-              {clientFilter.length === 0 
-                ? "Todos os Clientes" 
-                : `${clientFilter.length} cliente(s)`}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-0" align="start">
-            <ScrollArea className="h-64">
-              <div className="p-2 space-y-1">
-                {clients.map((client) => (
-                  <div 
-                    key={client.id} 
-                    className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer"
-                    onClick={() => toggleClientFilter(client.id)}
-                  >
-                    <Checkbox 
-                      checked={clientFilter.includes(client.id)}
-                      onCheckedChange={() => toggleClientFilter(client.id)}
-                    />
-                    <span className="text-sm">{client.name}</span>
-                  </div>
-                ))}
-                {clients.length === 0 && (
-                  <p className="text-sm text-muted-foreground p-2">Nenhum cliente encontrado</p>
-                )}
-              </div>
-            </ScrollArea>
-          </PopoverContent>
-        </Popover>
-        
-        {/* Filtro de Plataforma */}
-        <Select value={platformFilter} onValueChange={setPlatformFilter}>
-          <SelectTrigger className="w-40 h-8">
-            <SelectValue placeholder="Plataforma" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas Plataformas</SelectItem>
-            {PLATFORMS.map(platform => (
-              <SelectItem key={platform.value} value={platform.value}>
-                <div className="flex items-center gap-2">
-                  <platform.icon className="h-4 w-4" />
-                  {platform.label}
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        {/* Filtro de Status */}
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-44 h-8">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos Status</SelectItem>
-            {STATUSES.map(status => (
-              <SelectItem key={status.value} value={status.value}>
-                {status.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        {/* Botão limpar filtros */}
-        {hasActiveFilters && (
-          <Button 
-            variant="ghost" 
-            size="sm"
-            className="h-8"
-            onClick={clearFilters}
-          >
-            <X className="h-4 w-4 mr-1" />
-            Limpar
-          </Button>
-        )}
       </div>
 
       {viewMode === "month" && (
