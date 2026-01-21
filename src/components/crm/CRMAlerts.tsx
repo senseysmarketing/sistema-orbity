@@ -62,7 +62,7 @@ export function CRMAlerts({ leads, onEdit, onViewDetails }: CRMAlertsProps) {
     });
 
     const hotNewLeads = leads.filter(lead => 
-      lead.status === 'new' && 
+      ['leads', 'em_contato', 'new'].includes(lead.status) && 
       lead.temperature === 'hot' && 
       new Date(lead.created_at) > sevenDaysAgo
     );
@@ -77,7 +77,7 @@ export function CRMAlerts({ leads, onEdit, onViewDetails }: CRMAlertsProps) {
     const staleLeads = leads.filter(lead => {
       if (['won', 'lost'].includes(lead.status)) return false;
       const createdAt = new Date(lead.created_at);
-      return createdAt < sevenDaysAgo && lead.status === 'new';
+      return createdAt < sevenDaysAgo && ['leads', 'em_contato', 'new'].includes(lead.status);
     });
 
     // Leads de alto valor sem follow-up agendado

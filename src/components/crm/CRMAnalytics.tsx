@@ -33,7 +33,7 @@ export function CRMAnalytics({ leads }: CRMAnalyticsProps) {
     const thisWeek = new Date(today.getTime() - (today.getDay() * 24 * 60 * 60 * 1000));
 
     // Basic metrics
-    const newLeads = leads.filter(l => l.status === 'new').length;
+    const newLeads = leads.filter(l => ['leads', 'em_contato', 'new'].includes(l.status)).length;
     const qualifiedLeads = leads.filter(l => l.status === 'qualified').length;
     const wonLeads = leads.filter(l => l.status === 'won').length;
     const lostLeads = leads.filter(l => l.status === 'lost').length;

@@ -17,11 +17,12 @@ interface LeadStatus {
 // Status padrão obrigatórios para relatórios e análises - NÃO PODEM SER EDITADOS/DELETADOS
 const defaultStatuses: Omit<LeadStatus, 'id' | 'agency_id' | 'created_at' | 'updated_at'>[] = [
   { name: 'Leads', color: 'bg-blue-500', is_default: true, is_system: true, order_position: 1 },
-  { name: 'Qualificados', color: 'bg-purple-500', is_default: true, is_system: true, order_position: 2 },
-  { name: 'Agendamentos', color: 'bg-yellow-500', is_default: true, is_system: true, order_position: 3 },
-  { name: 'Reuniões', color: 'bg-orange-500', is_default: true, is_system: true, order_position: 4 },
-  { name: 'Propostas', color: 'bg-pink-500', is_default: true, is_system: true, order_position: 5 },
-  { name: 'Vendas', color: 'bg-green-500', is_default: true, is_system: true, order_position: 6 },
+  { name: 'Em contato', color: 'bg-sky-500', is_default: true, is_system: true, order_position: 2 },
+  { name: 'Qualificados', color: 'bg-purple-500', is_default: true, is_system: true, order_position: 3 },
+  { name: 'Agendamentos', color: 'bg-yellow-500', is_default: true, is_system: true, order_position: 4 },
+  { name: 'Reuniões', color: 'bg-orange-500', is_default: true, is_system: true, order_position: 5 },
+  { name: 'Propostas', color: 'bg-pink-500', is_default: true, is_system: true, order_position: 6 },
+  { name: 'Vendas', color: 'bg-green-500', is_default: true, is_system: true, order_position: 7 },
 ];
 
 export function useLeadStatuses() {
@@ -113,6 +114,7 @@ export function useLeadStatuses() {
   const mapDatabaseStatusToDisplay = (dbStatus: string) => {
     const statusMap: Record<string, string> = {
       'leads': 'Leads',
+      'em_contato': 'Em contato',
       'qualified': 'Qualificados',
       'scheduled': 'Agendamentos',
       'meeting': 'Reuniões',
@@ -129,6 +131,7 @@ export function useLeadStatuses() {
   const mapDisplayStatusToDatabase = (displayStatus: string) => {
     const statusMap: Record<string, string> = {
       'Leads': 'leads',
+      'Em contato': 'em_contato',
       'Qualificados': 'qualified',
       'Agendamentos': 'scheduled',
       'Reuniões': 'meeting',
