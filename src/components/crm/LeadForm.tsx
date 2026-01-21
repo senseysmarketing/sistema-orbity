@@ -64,6 +64,11 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
 
   useEffect(() => {
     if (lead) {
+      // Normalizar status - garantir que sempre tenha um valor válido
+      const normalizedStatus = lead.status && lead.status.trim() !== '' 
+        ? lead.status 
+        : 'leads';
+      
       setFormData({
         name: lead.name || '',
         email: lead.email || '',
@@ -71,13 +76,13 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
         company: lead.company || '',
         position: lead.position || '',
         source: lead.source || 'manual',
-        status: lead.status || 'leads',
+        status: normalizedStatus,
         temperature: (lead.temperature || 'cold') as LeadTemperature,
         value: lead.value || 0,
         notes: lead.notes || '',
         assigned_to: lead.assigned_to || '',
-        last_contact: lead.last_contact || '',
-        next_contact: lead.next_contact || '',
+        last_contact: lead.last_contact ? lead.last_contact.split('T')[0] : '',
+        next_contact: lead.next_contact ? lead.next_contact.split('T')[0] : '',
         tags: lead.tags ? lead.tags.join(', ') : '',
       });
     }
@@ -99,6 +104,11 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
 
+      // Garantir que status nunca seja vazio
+      const finalStatus = formData.status && formData.status.trim() !== '' 
+        ? formData.status 
+        : 'leads';
+
       const leadData = {
         agency_id: currentAgency.id,
         name: formData.name,
@@ -107,7 +117,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
         company: formData.company || null,
         position: formData.position || null,
         source: formData.source,
-        status: formData.status,
+        status: finalStatus,
         temperature: formData.temperature,
         value: formData.value,
         notes: formData.notes || null,
