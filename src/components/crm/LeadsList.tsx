@@ -14,7 +14,7 @@ interface Lead {
   company: string | null;
   position: string | null;
   source: string;
-  status: 'leads' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost';
+  status: 'leads' | 'em_contato' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost';
   temperature: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
@@ -40,6 +40,7 @@ export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'leads': return 'bg-blue-100 text-blue-800';
+      case 'em_contato': return 'bg-sky-100 text-sky-800';
       case 'qualified': return 'bg-orange-100 text-orange-800';
       case 'scheduled': return 'bg-yellow-100 text-yellow-800';
       case 'meeting': return 'bg-purple-100 text-purple-800';
@@ -53,6 +54,7 @@ export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'leads': return 'Novo Lead';
+      case 'em_contato': return 'Em contato';
       case 'qualified': return 'Qualificado';
       case 'scheduled': return 'Agendamento';
       case 'meeting': return 'Reunião';

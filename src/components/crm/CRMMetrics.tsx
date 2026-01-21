@@ -18,7 +18,7 @@ interface CRMMetricsProps {
 
 export function CRMMetrics({ leads }: CRMMetricsProps) {
   const totalLeads = leads.length;
-  const newLeads = leads.filter(lead => lead.status === 'new').length;
+  const newLeads = leads.filter(lead => ['leads', 'em_contato', 'new'].includes(lead.status)).length;
   const qualifiedLeads = leads.filter(lead => lead.status === 'qualified').length;
   const wonLeads = leads.filter(lead => lead.status === 'won').length;
   const lostLeads = leads.filter(lead => lead.status === 'lost').length;

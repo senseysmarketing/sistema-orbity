@@ -143,6 +143,8 @@ export default function Import() {
   const mapLeadStatus = (etapa: string): string => {
     const statusMap: Record<string, string> = {
       'NOVO_LEAD': 'leads',
+      'EM_CONTATO': 'em_contato',
+      'EM CONTATO': 'em_contato',
       'QUALIFICADO': 'qualified',
       'AGENDAMENTO': 'scheduled',
       'REUNIAO': 'meeting',

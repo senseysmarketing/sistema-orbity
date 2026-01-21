@@ -111,6 +111,7 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       'leads': 'bg-blue-500',
+      'em_contato': 'bg-sky-500',
       'qualified': 'bg-orange-500',
       'scheduled': 'bg-yellow-500',
       'meeting': 'bg-purple-500',
@@ -129,6 +130,7 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
       'leads': 'Novo Lead',
+      'em_contato': 'Em contato',
       'qualified': 'Qualificado',
       'scheduled': 'Agendamento',
       'meeting': 'Reunião',

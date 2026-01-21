@@ -20,6 +20,7 @@ const FUNNEL_COLORS = [
   "hsl(var(--chart-3))",
   "hsl(var(--chart-4))",
   "hsl(var(--chart-5))",
+  "hsl(var(--primary))", // Em contato (estágio novo)
   "#22c55e", // Verde para Vendas
 ];
 
@@ -36,8 +37,12 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
 
     // Contagem por estágio do funil (acumulativo - considera que passou pelo estágio anterior)
     const totalLeads = filteredLeads.length;
+
+    const contacting = filteredLeads.filter(l =>
+      ['em_contato', 'qualified', 'scheduled', 'meeting', 'proposal', 'won'].includes(l.status)
+    ).length;
     
-    const qualified = filteredLeads.filter(l => 
+    const qualified = filteredLeads.filter(l =>
       ['qualified', 'scheduled', 'meeting', 'proposal', 'won'].includes(l.status)
     ).length;
     
@@ -56,7 +61,8 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
     const won = filteredLeads.filter(l => l.status === 'won').length;
 
     // Calculate conversion rates between stages
-    const qualifiedRate = totalLeads > 0 ? ((qualified / totalLeads) * 100).toFixed(1) : "0";
+    const contactingRate = totalLeads > 0 ? ((contacting / totalLeads) * 100).toFixed(1) : "0";
+    const qualifiedRate = contacting > 0 ? ((qualified / contacting) * 100).toFixed(1) : "0";
     const scheduledRate = qualified > 0 ? ((scheduled / qualified) * 100).toFixed(1) : "0";
     const meetingsRate = scheduled > 0 ? ((meetings / scheduled) * 100).toFixed(1) : "0";
     const proposalsRate = meetings > 0 ? ((proposals / meetings) * 100).toFixed(1) : "0";
@@ -69,34 +75,40 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
         fill: FUNNEL_COLORS[0],
         conversionRate: "100%"
       },
+      {
+        name: "Em contato",
+        value: contacting,
+        fill: FUNNEL_COLORS[1],
+        conversionRate: `${contactingRate}%`
+      },
       { 
         name: "Qualificados", 
         value: qualified, 
-        fill: FUNNEL_COLORS[1],
+        fill: FUNNEL_COLORS[2],
         conversionRate: `${qualifiedRate}%`
       },
       { 
         name: "Agendamentos", 
         value: scheduled, 
-        fill: FUNNEL_COLORS[2],
+        fill: FUNNEL_COLORS[3],
         conversionRate: `${scheduledRate}%`
       },
       { 
         name: "Reuniões", 
         value: meetings, 
-        fill: FUNNEL_COLORS[3],
+        fill: FUNNEL_COLORS[4],
         conversionRate: `${meetingsRate}%`
       },
       { 
         name: "Propostas", 
         value: proposals, 
-        fill: FUNNEL_COLORS[4],
+        fill: FUNNEL_COLORS[5],
         conversionRate: `${proposalsRate}%`
       },
       { 
         name: "Vendas", 
         value: won, 
-        fill: FUNNEL_COLORS[5],
+        fill: FUNNEL_COLORS[6],
         conversionRate: `${wonRate}%`
       },
     ];
@@ -104,7 +116,7 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
 
   const generalConversionRate = useMemo(() => {
     const total = funnelData[0]?.value || 0;
-    const won = funnelData[5]?.value || 0; // Now index 5 for Vendas
+    const won = funnelData[6]?.value || 0; // Now index 6 for Vendas
     return total > 0 ? ((won / total) * 100).toFixed(1) : "0";
   }, [funnelData]);
 
@@ -172,7 +184,7 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
         </div>
 
         {/* Conversion rates between stages */}
-        <div className="grid grid-cols-5 gap-2 mt-6 pt-4 border-t">
+        <div className="grid grid-cols-6 gap-2 mt-6 pt-4 border-t">
           {funnelData.slice(1).map((stage, index) => {
             const previousStage = funnelData[index];
             const rate = previousStage.value > 0 
