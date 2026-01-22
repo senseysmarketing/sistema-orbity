@@ -13,6 +13,10 @@ import { useAgency } from "@/hooks/useAgency";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { PostCardSkeleton } from "@/components/ui/post-card-skeleton";
+import { DateRange } from "react-day-picker";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export function PostKanban() {
   const { posts, loading, updatePost, deletePost, fetchPosts } = useSocialMediaPosts();
@@ -24,6 +28,20 @@ export function PostKanban() {
   const [editingPost, setEditingPost] = useState<SocialMediaPost | null>(null);
   const [filterClient, setFilterClient] = useState<string>("all");
   const [filterContentType, setFilterContentType] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [includeNoDate, setIncludeNoDate] = useState(false);
+
+  const toStartOfDay = (d: Date) => {
+    const copy = new Date(d);
+    copy.setHours(0, 0, 0, 0);
+    return copy;
+  };
+
+  const toEndOfDay = (d: Date) => {
+    const copy = new Date(d);
+    copy.setHours(23, 59, 59, 999);
+    return copy;
+  };
 
   // Buscar status customizados
   const { data: customStatuses = [] } = useQuery({
@@ -112,8 +130,23 @@ export function PostKanban() {
       filtered = filtered.filter(post => post.post_type === filterContentType);
     }
 
+    // Filtro por período (scheduled_date)
+    const from = dateRange?.from ? toStartOfDay(dateRange.from) : undefined;
+    const to = dateRange?.to ? toEndOfDay(dateRange.to) : undefined;
+    if (from) {
+      filtered = filtered.filter((post) => {
+        const scheduled = (post as any).scheduled_date as string | null | undefined;
+        if (!scheduled) return includeNoDate;
+        const d = new Date(scheduled);
+        if (isNaN(d.getTime())) return includeNoDate;
+
+        if (to) return d >= from && d <= to;
+        return d >= from;
+      });
+    }
+
     return filtered;
-  }, [posts, filterClient, filterContentType]);
+  }, [posts, filterClient, filterContentType, dateRange, includeNoDate]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const post = posts.find(p => p.id === event.active.id);
@@ -163,7 +196,24 @@ export function PostKanban() {
   const getPostsByStatus = (status: string) => {
     return filteredPosts
       .filter(post => post.status === status)
-      .sort((a, b) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime());
+      .sort((a, b) => {
+        const aTime = a?.scheduled_date ? new Date(a.scheduled_date).getTime() : Number.POSITIVE_INFINITY;
+        const bTime = b?.scheduled_date ? new Date(b.scheduled_date).getTime() : Number.POSITIVE_INFINITY;
+        return aTime - bTime;
+      });
+  };
+
+  const hasActiveFilters =
+    filterClient !== "all" ||
+    filterContentType !== "all" ||
+    !!dateRange?.from ||
+    includeNoDate !== false;
+
+  const clearFilters = () => {
+    setFilterClient("all");
+    setFilterContentType("all");
+    setDateRange(undefined);
+    setIncludeNoDate(false);
   };
 
   const handlePostClick = (post: SocialMediaPost) => {
@@ -231,6 +281,25 @@ export function PostKanban() {
                 ))}
               </SelectContent>
             </Select>
+
+            <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+
+            <div className="flex items-center gap-2">
+              <Switch
+                id="include-no-date-posts"
+                checked={includeNoDate}
+                onCheckedChange={setIncludeNoDate}
+              />
+              <Label htmlFor="include-no-date-posts" className="text-sm text-muted-foreground">
+                Incluir sem data
+              </Label>
+            </div>
+
+            {hasActiveFilters && (
+              <Button variant="outline" onClick={clearFilters}>
+                Limpar
+              </Button>
+            )}
           </div>
 
           <Button onClick={() => setIsCreateDialogOpen(true)}>

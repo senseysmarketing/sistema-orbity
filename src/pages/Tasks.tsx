@@ -28,6 +28,9 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateRange } from "react-day-picker";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Switch } from "@/components/ui/switch";
 import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
 import { MultiClientSelector } from "@/components/clients/MultiClientSelector";
 import { TaskAnalytics } from "@/components/tasks/TaskAnalytics";
@@ -93,7 +96,21 @@ export default function Tasks() {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [assignedFilter, setAssignedFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
+  const [dueDateRange, setDueDateRange] = useState<DateRange | undefined>(undefined);
+  const [includeNoDueDate, setIncludeNoDueDate] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  const toStartOfDay = (d: Date) => {
+    const copy = new Date(d);
+    copy.setHours(0, 0, 0, 0);
+    return copy;
+  };
+
+  const toEndOfDay = (d: Date) => {
+    const copy = new Date(d);
+    copy.setHours(23, 59, 59, 999);
+    return copy;
+  };
 
   const [newTask, setNewTask] = useState<{
     title: string;
@@ -281,11 +298,22 @@ export default function Tasks() {
       const matchesClient =
         clientFilter === "all" || (clientFilter === "no-client" && !task.client_id) || task.client_id === clientFilter;
 
-      return matchesSearch && matchesStatus && matchesPriority && matchesAssigned && matchesClient;
+      const from = dueDateRange?.from ? toStartOfDay(dueDateRange.from) : undefined;
+      const to = dueDateRange?.to ? toEndOfDay(dueDateRange.to) : undefined;
+      const matchesDueDateRange = (() => {
+        if (!from) return true;
+        if (!task.due_date) return includeNoDueDate;
+        const d = new Date(task.due_date);
+        if (isNaN(d.getTime())) return includeNoDueDate;
+        if (to) return d >= from && d <= to;
+        return d >= from;
+      })();
+
+      return matchesSearch && matchesStatus && matchesPriority && matchesAssigned && matchesClient && matchesDueDateRange;
     });
 
     return filtered;
-  }, [tasks, searchTerm, statusFilter, priorityFilter, assignedFilter, clientFilter, getAssignedUsers]);
+  }, [tasks, searchTerm, statusFilter, priorityFilter, assignedFilter, clientFilter, getAssignedUsers, dueDateRange, includeNoDueDate]);
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
@@ -752,6 +780,8 @@ export default function Tasks() {
     setPriorityFilter("all");
     setAssignedFilter("all");
     setClientFilter("all");
+    setDueDateRange(undefined);
+    setIncludeNoDueDate(false);
   };
 
   if (loading) {
@@ -989,10 +1019,25 @@ export default function Tasks() {
               </SelectContent>
             </Select>
 
+            <DateRangePicker date={dueDateRange} onDateChange={setDueDateRange} />
+
+            <div className="flex items-center gap-2">
+              <Switch
+                id="include-no-due-date"
+                checked={includeNoDueDate}
+                onCheckedChange={setIncludeNoDueDate}
+              />
+              <Label htmlFor="include-no-due-date" className="text-sm text-muted-foreground">
+                Incluir sem data
+              </Label>
+            </div>
+
             {(searchTerm ||
               priorityFilter !== "all" ||
               assignedFilter !== "all" ||
-              clientFilter !== "all") && (
+              clientFilter !== "all" ||
+              !!dueDateRange?.from ||
+              includeNoDueDate !== false) && (
               <Button variant="outline" onClick={clearFilters}>
                 Limpar
               </Button>
