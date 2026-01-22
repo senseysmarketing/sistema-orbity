@@ -152,6 +152,19 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
     return percentUsed >= 90;
   };
 
+  // Regra específica do filtro "Sem saldo / Crítico":
+  // - Pré-paga: saldo zerado/negativo OU crítico (abaixo do mínimo)
+  // - Pós-paga: apenas crítico (não considerar balance <= 0, pois pode ser fallback)
+  const getIsCriticalOrZeroForFilter = (c: ClientData) => {
+    const isPrepaid = c.is_prepaid === true;
+    if (isPrepaid) {
+      if (c.balance <= 0) return true;
+      if (c.min_threshold > 0 && c.balance < c.min_threshold) return true;
+      return false;
+    }
+    return getIsCritical(c);
+  };
+
   const getNeedsOptimization = (c: ClientData) => {
     if (!c.last_campaign_update) return true;
     const days = Math.floor((Date.now() - new Date(c.last_campaign_update).getTime()) / (1000 * 60 * 60 * 24));
@@ -160,7 +173,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
 
   const filteredClients = useMemo(() => {
     return clients.filter((c) => {
-      if (onlyCritical && !(getIsCritical(c) || c.balance <= 0)) return false;
+      if (onlyCritical && !getIsCriticalOrZeroForFilter(c)) return false;
       if (onlyNeedsOptimization && !getNeedsOptimization(c)) return false;
 
       if (resultsFilter !== "all") {
