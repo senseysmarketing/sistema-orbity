@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef } from "react";
-import { RefreshCw, BarChart3, AlertTriangle, DollarSign, Clock, CheckCircle } from "lucide-react";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { RefreshCw, BarChart3, AlertTriangle, Clock, CheckCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
@@ -11,6 +14,18 @@ import { ClientCard, ClientData } from "./ClientCard";
 import { OptimizationReminder } from "./OptimizationReminder";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+type ResultsFilter = ClientData["results"] | "all" | "undefined";
+type ManagerFilter = "all" | "unassigned" | string;
+
+type AgencyMember = {
+  user_id: string;
+  role: string;
+  profile?: {
+    name: string | null;
+    email: string | null;
+  } | null;
+};
 
 interface SelectedAdAccount {
   id: string;
@@ -43,6 +58,14 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0, phase: 'connecting' as 'connecting' | 'processing' | 'done' });
   const { toast } = useToast();
   const { currentAgency } = useAgency();
+
+  const [agencyMembers, setAgencyMembers] = useState<AgencyMember[]>([]);
+
+  // Filtros
+  const [onlyCritical, setOnlyCritical] = useState(false);
+  const [onlyNeedsOptimization, setOnlyNeedsOptimization] = useState(false);
+  const [resultsFilter, setResultsFilter] = useState<ResultsFilter>("all");
+  const [managerFilter, setManagerFilter] = useState<ManagerFilter>("all");
 
   // Flag para evitar chamadas duplicadas
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
@@ -87,6 +110,79 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
       mountedRef.current = false;
     };
   }, [selectedAdAccounts, currentAgency, hasLoadedOnce]);
+
+  // Carregar membros da agência (para filtro e atribuição de gestor)
+  useEffect(() => {
+    if (!currentAgency?.id) return;
+
+    (async () => {
+      const { data, error } = await supabase
+        .from("agency_users")
+        .select("user_id, role, profile:profiles!agency_users_user_id_fkey(name, email)")
+        .eq("agency_id", currentAgency.id);
+
+      if (error) {
+        console.error("Erro ao carregar membros da agência:", error);
+        return;
+      }
+
+      setAgencyMembers((data as any) || []);
+    })();
+  }, [currentAgency?.id]);
+
+  const membersMap = useMemo(() => {
+    const map = new Map<string, { name: string }>();
+    for (const m of agencyMembers) {
+      const name = m.profile?.name || m.profile?.email || "(Sem nome)";
+      map.set(m.user_id, { name });
+    }
+    return map;
+  }, [agencyMembers]);
+
+  const getIsCritical = (c: ClientData) => {
+    const isPrepaid = c.is_prepaid === true;
+    if (isPrepaid) {
+      if (c.min_threshold <= 0) return false;
+      return c.balance < c.min_threshold;
+    }
+    const spendCap = c.spend_cap || 0;
+    const amountSpent = c.amount_spent || 0;
+    if (spendCap <= 0) return false;
+    const percentUsed = (amountSpent / spendCap) * 100;
+    return percentUsed >= 90;
+  };
+
+  const getNeedsOptimization = (c: ClientData) => {
+    if (!c.last_campaign_update) return true;
+    const days = Math.floor((Date.now() - new Date(c.last_campaign_update).getTime()) / (1000 * 60 * 60 * 24));
+    return days > 7;
+  };
+
+  const filteredClients = useMemo(() => {
+    return clients.filter((c) => {
+      if (onlyCritical && !(getIsCritical(c) || c.balance <= 0)) return false;
+      if (onlyNeedsOptimization && !getNeedsOptimization(c)) return false;
+
+      if (resultsFilter !== "all") {
+        if (resultsFilter === "undefined") {
+          if (c.results !== null) return false;
+        } else {
+          if (c.results !== resultsFilter) return false;
+        }
+      }
+
+      if (managerFilter !== "all") {
+        const resp = c.responsible_user_id;
+        if (managerFilter === "unassigned") {
+          if (resp) return false;
+        } else {
+          if (resp !== managerFilter) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [clients, onlyCritical, onlyNeedsOptimization, resultsFilter, managerFilter]);
 
   // Função separada para carregar na montagem (sem toast de sucesso)
   const refreshAllDataOnMount = async () => {
@@ -134,6 +230,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
             last_campaign_update: summary.last_campaign_update,
             results: control?.results || null,
             observations: control?.observations || null,
+            responsible_user_id: (control as any)?.responsible_user_id || null,
           };
         });
 
@@ -194,6 +291,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
           last_campaign_update: account.last_campaign_update,
           results: control?.results || null,
           observations: control?.observations || null,
+          responsible_user_id: (control as any)?.responsible_user_id || null,
         };
       });
 
@@ -267,6 +365,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
             last_campaign_update: summary.last_campaign_update,
             results: control?.results || existingClient?.results || null,
             observations: control?.observations || existingClient?.observations || null,
+            responsible_user_id: (control as any)?.responsible_user_id ?? existingClient?.responsible_user_id ?? null,
           };
         });
 
@@ -325,11 +424,12 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
         .eq('agency_id', currentAgency.id)
         .maybeSingle();
 
-      const controlData = {
+      const controlData: any = {
         agency_id: currentAgency.id,
         ad_account_id: updatedClient.ad_account_id,
         results: updatedClient.results,
         observations: updatedClient.observations,
+        responsible_user_id: updatedClient.responsible_user_id,
         min_threshold: updatedClient.min_threshold,
         platform_data: {
           ad_account_name: updatedClient.ad_account_name,
@@ -496,6 +596,84 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
       {/* Banner de Lembrete */}
       <OptimizationReminder onNavigateToCampaigns={onNavigateToCampaigns} />
 
+      {/* Filtros */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Sem saldo / Crítico</Label>
+                  <Switch checked={onlyCritical} onCheckedChange={setOnlyCritical} />
+                </div>
+                <p className="text-xs text-muted-foreground">Mostra apenas contas críticas ou com saldo zerado.</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Resultados</Label>
+                <Select value={resultsFilter} onValueChange={(v) => setResultsFilter(v as ResultsFilter)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="excellent">Excelentes</SelectItem>
+                    <SelectItem value="good">Bons</SelectItem>
+                    <SelectItem value="average">Médios</SelectItem>
+                    <SelectItem value="bad">Ruins</SelectItem>
+                    <SelectItem value="terrible">Péssimos</SelectItem>
+                    <SelectItem value="undefined">Não definido</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Gestor</Label>
+                <Select value={managerFilter} onValueChange={(v) => setManagerFilter(v as ManagerFilter)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="unassigned">Sem gestor</SelectItem>
+                    {agencyMembers.map((m) => (
+                      <SelectItem key={m.user_id} value={m.user_id}>
+                        {membersMap.get(m.user_id)?.name || m.user_id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Precisa otimizar</Label>
+                  <Switch checked={onlyNeedsOptimization} onCheckedChange={setOnlyNeedsOptimization} />
+                </div>
+                <p className="text-xs text-muted-foreground">Filtra contas sem otimização há 7+ dias.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setOnlyCritical(false);
+                  setOnlyNeedsOptimization(false);
+                  setResultsFilter("all");
+                  setManagerFilter("all");
+                }}
+              >
+                Limpar filtros
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                Mostrando <span className="font-medium text-foreground">{filteredClients.length}</span> de {clients.length}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Cards de Resumo */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
@@ -558,10 +736,11 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
         </Alert>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {clients.map((client) => (
+          {filteredClients.map((client) => (
             <ClientCard
               key={client.ad_account_id}
               client={client}
+              agencyMembers={agencyMembers.map((m) => ({ user_id: m.user_id, name: membersMap.get(m.user_id)?.name || m.user_id }))}
               onUpdate={handleUpdateClient}
               onRefreshBalance={handleRefreshBalance}
             />

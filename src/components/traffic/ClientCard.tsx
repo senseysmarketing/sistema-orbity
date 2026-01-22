@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle, Edit3, TrendingUp, Clock, DollarSign, BarChart3, RefreshCw, CreditCard, Calendar, Wallet } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
+import { useAgency } from "@/hooks/useAgency";
+import { useAuth } from "@/hooks/useAuth";
 import { differenceInDays } from "date-fns";
 
 export interface ClientData {
@@ -28,18 +31,43 @@ export interface ClientData {
   last_campaign_update: string | null;
   results: 'excellent' | 'good' | 'average' | 'bad' | 'terrible' | null;
   observations: string | null;
+  responsible_user_id?: string | null;
 }
+
+export type ClientResponsibleOption = { user_id: string; name: string };
 
 interface ClientCardProps {
   client: ClientData;
+  agencyMembers: ClientResponsibleOption[];
   onUpdate: (client: ClientData) => void;
   onRefreshBalance: (accountId: string) => void;
 }
 
-export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardProps) {
+type TrafficControlComment = {
+  id: string;
+  comment: string;
+  created_at: string;
+  author_user_id: string;
+  profiles?: { name: string | null } | null;
+};
+
+export function ClientCard({ client, agencyMembers, onUpdate, onRefreshBalance }: ClientCardProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientData>(client);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const { currentAgency } = useAgency();
+  const { user } = useAuth();
+
+  const [comments, setComments] = useState<TrafficControlComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
+
+  const responsibleLabel = useMemo(() => {
+    if (!client.responsible_user_id) return null;
+    return agencyMembers.find((m) => m.user_id === client.responsible_user_id)?.name || null;
+  }, [agencyMembers, client.responsible_user_id]);
 
   // IMPORTANTE: Agora usamos o valor retornado pela API, não assumimos mais padrão
   const isPrepaid = client.is_prepaid === true;
@@ -132,18 +160,65 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
     }).format(value);
   };
 
-  // Porcentagem para contas pós-pagas (limite consumido)
-  const getPostpaidPercentage = () => {
-    const spendCap = client.spend_cap || 0;
-    const amountSpent = client.amount_spent || 0;
-    if (spendCap <= 0) return 0;
-    return Math.min(100, (amountSpent / spendCap) * 100);
-  };
 
   const handleSave = () => {
     onUpdate(editingClient);
     setIsEditDialogOpen(false);
   };
+
+  const loadComments = async () => {
+    if (!currentAgency?.id) return;
+    setCommentsLoading(true);
+    try {
+      const { data, error } = await supabase
+        // NOTE: types.ts may lag behind migrations; cast to any to avoid TS errors.
+        .from("traffic_control_comments" as any)
+        .select("id, comment, created_at, author_user_id, profiles:profiles!traffic_control_comments_author_user_id_fkey(name)")
+        .eq("agency_id", currentAgency.id)
+        .eq("ad_account_id", client.ad_account_id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setComments(((data as any) || []) as TrafficControlComment[]);
+    } catch (e) {
+      console.error("Erro ao carregar comentários:", e);
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!currentAgency?.id || !user?.id) return;
+    const trimmed = newComment.trim();
+    if (!trimmed) return;
+
+    setPostingComment(true);
+    try {
+      const { error } = await supabase
+        .from("traffic_control_comments" as any)
+        .insert({
+          agency_id: currentAgency.id,
+          ad_account_id: client.ad_account_id,
+          author_user_id: user.id,
+          comment: trimmed,
+        } as any);
+
+      if (error) throw error;
+      setNewComment("");
+      await loadComments();
+    } catch (e) {
+      console.error("Erro ao adicionar comentário:", e);
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isEditDialogOpen) return;
+    setEditingClient(client);
+    loadComments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditDialogOpen]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -163,17 +238,28 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
                 {balanceStatus === 'healthy' && <CheckCircle className="h-4 w-4 text-green-600" />}
                 <CardTitle className="text-lg">{client.ad_account_name}</CardTitle>
               </div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CardDescription className="text-xs">ID: {client.ad_account_id}</CardDescription>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    {isPrepaid ? (
+                      <><Wallet className="h-3 w-3 mr-1" />Pré-paga</>
+                    ) : (
+                      <><CreditCard className="h-3 w-3 mr-1" />Pós-paga</>
+                    )}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Resultados mais visíveis */}
+                  {getResultsBadge(client.results)}
+                </div>
+              </div>
               <div className="flex items-center gap-2">
-                <CardDescription className="text-xs">
-                  ID: {client.ad_account_id}
-                </CardDescription>
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                  {isPrepaid ? (
-                    <><Wallet className="h-3 w-3 mr-1" />Pré-paga</>
-                  ) : (
-                    <><CreditCard className="h-3 w-3 mr-1" />Pós-paga</>
-                  )}
-                </Badge>
+                {responsibleLabel ? (
+                  <p className="text-xs text-muted-foreground">Gestor: <span className="font-medium text-foreground">{responsibleLabel}</span></p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Gestor: <span className="font-medium text-foreground">Sem gestor</span></p>
+                )}
               </div>
             </div>
             <div className="flex gap-1">
@@ -325,14 +411,9 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
           {/* Resultados e Observações */}
           <div className="space-y-2 pt-2 border-t">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Resultados</span>
-              {getResultsBadge(client.results)}
+              <span className="text-sm text-muted-foreground">Comentários</span>
+              <Badge variant="outline">{comments.length}</Badge>
             </div>
-            {client.observations && (
-              <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                {client.observations}
-              </p>
-            )}
           </div>
         </CardContent>
       </Card>
@@ -383,14 +464,68 @@ export function ClientCard({ client, onUpdate, onRefreshBalance }: ClientCardPro
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="observations">Observações</Label>
+              <Label>Gestor responsável</Label>
+              <Select
+                value={editingClient.responsible_user_id || "unassigned"}
+                onValueChange={(value) =>
+                  setEditingClient({
+                    ...editingClient,
+                    responsible_user_id: value === "unassigned" ? null : value,
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar gestor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Sem gestor</SelectItem>
+                  {agencyMembers.map((m) => (
+                    <SelectItem key={m.user_id} value={m.user_id}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Comentários</Label>
+              <ScrollArea className="h-48 rounded-md border bg-muted/30 p-2">
+                <div className="space-y-2">
+                  {commentsLoading ? (
+                    <p className="text-xs text-muted-foreground">Carregando comentários...</p>
+                  ) : comments.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nenhum comentário ainda.</p>
+                  ) : (
+                    comments.map((c) => (
+                      <div key={c.id} className="rounded-md bg-background p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium">
+                            {c.profiles?.name || "Usuário"}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {new Date(c.created_at).toLocaleString("pt-BR")}
+                          </p>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{c.comment}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+
               <Textarea
-                id="observations"
-                value={editingClient.observations || ''}
-                onChange={(e) => setEditingClient({ ...editingClient, observations: e.target.value })}
-                placeholder="Notas sobre este cliente..."
-                rows={3}
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Adicionar comentário..."
+                rows={2}
               />
+
+              <div className="flex justify-end">
+                <Button onClick={handleAddComment} disabled={postingComment || !newComment.trim()}>
+                  {postingComment ? "Adicionando..." : "Adicionar"}
+                </Button>
+              </div>
             </div>
 
             <div className="flex justify-end gap-2">
