@@ -29,8 +29,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRange } from "react-day-picker";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Switch } from "@/components/ui/switch";
+import { DateRangeFilterDialog } from "@/components/filters/DateRangeFilterDialog";
 import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
 import { MultiClientSelector } from "@/components/clients/MultiClientSelector";
 import { TaskAnalytics } from "@/components/tasks/TaskAnalytics";
@@ -1019,18 +1018,15 @@ export default function Tasks() {
               </SelectContent>
             </Select>
 
-            <DateRangePicker date={dueDateRange} onDateChange={setDueDateRange} />
-
-            <div className="flex items-center gap-2">
-              <Switch
-                id="include-no-due-date"
-                checked={includeNoDueDate}
-                onCheckedChange={setIncludeNoDueDate}
-              />
-              <Label htmlFor="include-no-due-date" className="text-sm text-muted-foreground">
-                Incluir sem data
-              </Label>
-            </div>
+            <DateRangeFilterDialog
+              value={dueDateRange}
+              onChange={setDueDateRange}
+              includeNoDate={includeNoDueDate}
+              onIncludeNoDateChange={setIncludeNoDueDate}
+              defaultIncludeNoDate={false}
+              label="Período"
+              active={!!dueDateRange?.from || includeNoDueDate}
+            />
 
             {(searchTerm ||
               priorityFilter !== "all" ||

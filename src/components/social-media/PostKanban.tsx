@@ -14,9 +14,7 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { PostCardSkeleton } from "@/components/ui/post-card-skeleton";
 import { DateRange } from "react-day-picker";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { DateRangeFilterDialog } from "@/components/filters/DateRangeFilterDialog";
 
 export function PostKanban() {
   const { posts, loading, updatePost, deletePost, fetchPosts } = useSocialMediaPosts();
@@ -282,18 +280,15 @@ export function PostKanban() {
               </SelectContent>
             </Select>
 
-            <DateRangePicker date={dateRange} onDateChange={setDateRange} />
-
-            <div className="flex items-center gap-2">
-              <Switch
-                id="include-no-date-posts"
-                checked={includeNoDate}
-                onCheckedChange={setIncludeNoDate}
-              />
-              <Label htmlFor="include-no-date-posts" className="text-sm text-muted-foreground">
-                Incluir sem data
-              </Label>
-            </div>
+            <DateRangeFilterDialog
+              value={dateRange}
+              onChange={setDateRange}
+              includeNoDate={includeNoDate}
+              onIncludeNoDateChange={setIncludeNoDate}
+              defaultIncludeNoDate={false}
+              label="Período"
+              active={!!dateRange?.from || includeNoDate}
+            />
 
             {hasActiveFilters && (
               <Button variant="outline" onClick={clearFilters}>
