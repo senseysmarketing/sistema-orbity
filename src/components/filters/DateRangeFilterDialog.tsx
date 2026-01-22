@@ -2,6 +2,7 @@ import * as React from "react";
 import type { DateRange } from "react-day-picker";
 import { endOfMonth, endOfWeek, startOfMonth, startOfWeek, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -88,18 +89,16 @@ export function DateRangeFilterDialog({
         <Button
           variant="outline"
           className={cn(
-            "relative h-10",
+            "relative h-10 w-[140px] justify-between px-3 py-2 text-sm font-normal",
             active && "ring-1 ring-ring",
             className,
           )}
         >
-          {label}
-          {active && (
-            <span
-              aria-hidden
-              className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-primary"
-            />
-          )}
+          <span className="flex items-center gap-2">
+            {label}
+            {active && <span aria-hidden className="h-2 w-2 rounded-full bg-primary" />}
+          </span>
+          <ChevronDown className="h-4 w-4 opacity-50" />
         </Button>
       </DialogTrigger>
 
