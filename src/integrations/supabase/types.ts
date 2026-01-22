@@ -4317,6 +4317,69 @@ export type Database = {
           },
         ]
       }
+      traffic_control_comments: {
+        Row: {
+          ad_account_id: string
+          agency_id: string
+          author_user_id: string
+          comment: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          ad_account_id: string
+          agency_id: string
+          author_user_id: string
+          comment: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          ad_account_id?: string
+          agency_id?: string
+          author_user_id?: string
+          comment?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "traffic_control_comments_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "traffic_control_comments_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "traffic_control_comments_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "traffic_control_comments_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "traffic_control_comments_author_user_id_fkey"
+            columns: ["author_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       traffic_controls: {
         Row: {
           ad_account_id: string | null
@@ -4328,6 +4391,7 @@ export type Database = {
           observations: string | null
           platform_data: Json | null
           platforms: string[] | null
+          responsible_user_id: string | null
           results: Database["public"]["Enums"]["traffic_result"] | null
           situation: Database["public"]["Enums"]["traffic_situation"] | null
           updated_at: string
@@ -4342,6 +4406,7 @@ export type Database = {
           observations?: string | null
           platform_data?: Json | null
           platforms?: string[] | null
+          responsible_user_id?: string | null
           results?: Database["public"]["Enums"]["traffic_result"] | null
           situation?: Database["public"]["Enums"]["traffic_situation"] | null
           updated_at?: string
@@ -4356,6 +4421,7 @@ export type Database = {
           observations?: string | null
           platform_data?: Json | null
           platforms?: string[] | null
+          responsible_user_id?: string | null
           results?: Database["public"]["Enums"]["traffic_result"] | null
           situation?: Database["public"]["Enums"]["traffic_situation"] | null
           updated_at?: string
@@ -4381,6 +4447,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "traffic_controls_responsible_user_id_fkey"
+            columns: ["responsible_user_id"]
+            isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "traffic_controls_responsible_user_id_fkey"
+            columns: ["responsible_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
