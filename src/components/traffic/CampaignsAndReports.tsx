@@ -11,6 +11,7 @@ import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
 import { Collapsible, CollapsibleContent } from '@radix-ui/react-collapsible';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAgency } from "@/hooks/useAgency";
 import { DateRange } from "react-day-picker";
 import { ReportGeneratorModal } from "./ReportGeneratorModal";
 import { format, differenceInDays } from "date-fns";
@@ -82,6 +83,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   
   const { toast } = useToast();
+  const { currentAgency } = useAgency();
 
   // Selecionar primeira conta automaticamente
   useEffect(() => {
@@ -98,7 +100,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
   }, [selectedAccount, dateRange]);
 
   const fetchAllData = async (isBackground = false) => {
-    if (!selectedAccount || !dateRange?.from || !dateRange?.to) return;
+    if (!selectedAccount || !dateRange?.from || !dateRange?.to || !currentAgency?.id) return;
 
     if (isBackground) {
       setIsBackgroundRefresh(true);
@@ -116,6 +118,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
       const { data: campaignsData, error: campaignsError } = await supabase.functions.invoke('facebook-campaigns', {
         body: { 
           action: 'list_campaigns',
+          agencyId: currentAgency.id,
           accountIds: [selectedAccount],
           dateRange: {
             from: dateRange.from.toISOString().split('T')[0],
@@ -135,6 +138,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
       const { data: metricsData, error: metricsError } = await supabase.functions.invoke('facebook-sync', {
         body: { 
           action: 'get_metrics',
+          agencyId: currentAgency.id,
           accountIds: [selectedAccount],
           dateRange: {
             from: dateRange.from.toISOString().split('T')[0],
@@ -215,6 +219,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
       const { data, error } = await supabase.functions.invoke('facebook-analysis', {
         body: { 
           campaign_id: campaignId,
+          agencyId: currentAgency?.id,
           accounts: [selectedAccount]
         }
       });
