@@ -235,6 +235,64 @@ export type Database = {
           },
         ]
       }
+      agency_notification_rules: {
+        Row: {
+          agency_id: string
+          conditions: Json | null
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          event_key: string
+          id: string
+          recipients_strategy: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          conditions?: Json | null
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          event_key: string
+          id?: string
+          recipients_strategy: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          conditions?: Json | null
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          event_key?: string
+          id?: string
+          recipients_strategy?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_notification_rules_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_notification_rules_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "agency_notification_rules_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       agency_onboarding: {
         Row: {
           agency_id: string | null
@@ -2550,6 +2608,58 @@ export type Database = {
           },
         ]
       }
+      notification_event_preferences: {
+        Row: {
+          agency_id: string
+          created_at: string
+          enabled: boolean
+          event_key: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          enabled?: boolean
+          event_key: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          enabled?: boolean
+          event_key?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_event_preferences_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_event_preferences_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "notification_event_preferences_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       notification_integrations: {
         Row: {
           agency_id: string
@@ -4765,6 +4875,10 @@ export type Database = {
       }
     }
     Functions: {
+      apply_task_event_rules: {
+        Args: { p_agency_id: string; p_event_key: string; p_payload: Json }
+        Returns: undefined
+      }
       archive_old_approved_posts: { Args: never; Returns: number }
       check_agency_limits: {
         Args: {
@@ -4772,6 +4886,10 @@ export type Database = {
           current_count?: number
           limit_type: string
         }
+        Returns: boolean
+      }
+      check_notification_type_enabled: {
+        Args: { p_agency_id: string; p_type: string; p_user_id: string }
         Returns: boolean
       }
       cleanup_old_notification_tracking: { Args: never; Returns: undefined }
@@ -4810,6 +4928,10 @@ export type Database = {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      get_event_pref_enabled: {
+        Args: { p_agency_id: string; p_event_key: string; p_user_id: string }
+        Returns: boolean
+      }
       get_user_agency_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       is_agency_admin: { Args: { agency_uuid?: string }; Returns: boolean }
@@ -4824,6 +4946,15 @@ export type Database = {
       is_master_agency_admin: { Args: never; Returns: boolean }
       is_master_user: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      should_notify_user_for_event: {
+        Args: {
+          p_agency_id: string
+          p_event_key: string
+          p_type: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       start_agency_trial: {
         Args: { p_agency_id: string; p_plan_slug?: string }
         Returns: undefined
