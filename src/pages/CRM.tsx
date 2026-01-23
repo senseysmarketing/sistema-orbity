@@ -18,6 +18,7 @@ import { useAgency } from "@/hooks/useAgency";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 import { toast } from "sonner";
 import { getTemperatureLabel } from "@/lib/leadTemperature";
+import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 
 interface Lead {
   id: string;
@@ -138,14 +139,70 @@ export default function CRM() {
     fetchLeads();
   }, [currentAgency?.id]);
 
+  // Realtime: mantém Pipeline + Dashboard sincronizados instantaneamente (INSERT/UPDATE/DELETE)
+  useEffect(() => {
+    if (!currentAgency?.id) return;
+
+    const channel = supabase
+      .channel(`crm-leads-${currentAgency.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'leads',
+          filter: `agency_id=eq.${currentAgency.id}`,
+        },
+        (payload: any) => {
+          const eventType = payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE';
+          if (eventType === 'INSERT') {
+            const next = payload.new as Lead;
+            if (!next?.id) return;
+            setLeads((prev) => {
+              if (prev.some((l) => l.id === next.id)) return prev;
+              return [next, ...prev];
+            });
+          }
+
+          if (eventType === 'UPDATE') {
+            const next = payload.new as Lead;
+            if (!next?.id) return;
+            setLeads((prev) => prev.map((l) => (l.id === next.id ? next : l)));
+          }
+
+          if (eventType === 'DELETE') {
+            const oldRow = payload.old as Partial<Lead>;
+            if (!oldRow?.id) return;
+            setLeads((prev) => prev.filter((l) => l.id !== oldRow.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentAgency?.id]);
+
   const filteredLeads = useMemo(() => {
+    const statusConfig = getStatusConfig();
+    const filterDbStatus =
+      statusFilter === 'all'
+        ? 'all'
+        : (() => {
+            const cfg = statusConfig[statusFilter as keyof typeof statusConfig];
+            // statusFilter é um statusKey (ex: "vendas"). Convertemos via título + normalização.
+            return normalizeLeadStatusToDb(cfg?.title || statusFilter);
+          })();
+
     return leads.filter(lead => {
       const matchesSearch = searchQuery === '' || 
         lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         lead.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         lead.company?.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
+      const leadDbStatus = normalizeLeadStatusToDb(lead.status);
+      const matchesStatus = filterDbStatus === 'all' || leadDbStatus === filterDbStatus;
       const matchesTemperature = priorityFilter === 'all' || lead.temperature === priorityFilter;
       const matchesSource = sourceFilter === 'all' || lead.source === sourceFilter;
 
@@ -156,7 +213,7 @@ export default function CRM() {
       
       return matchesSearch && matchesStatus && matchesTemperature && matchesSource && matchesDateRange;
     });
-  }, [leads, searchQuery, statusFilter, priorityFilter, sourceFilter, dateFilter]);
+  }, [leads, searchQuery, statusFilter, priorityFilter, sourceFilter, dateFilter, getStatusConfig]);
 
   const handleLeadSave = async (savedLead: Lead) => {
     setLeads(prev => {

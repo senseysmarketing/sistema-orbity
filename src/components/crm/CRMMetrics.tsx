@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Users, Target, DollarSign, Calendar, TrendingUp, TrendingDown } from "lucide-react";
+import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 
 interface Lead {
   id: string;
@@ -18,14 +19,14 @@ interface CRMMetricsProps {
 
 export function CRMMetrics({ leads }: CRMMetricsProps) {
   const totalLeads = leads.length;
-  const newLeads = leads.filter(lead => ['leads', 'em_contato', 'new'].includes(lead.status)).length;
-  const qualifiedLeads = leads.filter(lead => lead.status === 'qualified').length;
-  const wonLeads = leads.filter(lead => lead.status === 'won').length;
-  const lostLeads = leads.filter(lead => lead.status === 'lost').length;
+  const newLeads = leads.filter(lead => ['leads', 'em_contato'].includes(String(normalizeLeadStatusToDb(lead.status)))).length;
+  const qualifiedLeads = leads.filter(lead => normalizeLeadStatusToDb(lead.status) === 'qualified').length;
+  const wonLeads = leads.filter(lead => normalizeLeadStatusToDb(lead.status) === 'won').length;
+  const lostLeads = leads.filter(lead => normalizeLeadStatusToDb(lead.status) === 'lost').length;
   
   const totalValue = leads.reduce((sum, lead) => sum + (lead.value || 0), 0);
   const wonValue = leads
-    .filter(lead => lead.status === 'won')
+    .filter(lead => normalizeLeadStatusToDb(lead.status) === 'won')
     .reduce((sum, lead) => sum + (lead.value || 0), 0);
   
   const conversionRate = totalLeads > 0 ? (wonLeads / totalLeads) * 100 : 0;
@@ -34,7 +35,7 @@ export function CRMMetrics({ leads }: CRMMetricsProps) {
   const today = new Date().toISOString().split('T')[0];
   const followUpNeeded = leads.filter(lead => 
     lead.next_contact && lead.next_contact <= today && 
-    !['won', 'lost'].includes(lead.status)
+    !['won', 'lost'].includes(String(normalizeLeadStatusToDb(lead.status)))
   ).length;
 
   // Calculate this month vs last month
