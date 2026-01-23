@@ -45,8 +45,17 @@ interface DoNotDisturb {
 
 export function NotificationPreferences({ open, onOpenChange }: NotificationPreferencesProps) {
   const { user } = useAuth();
-  const { currentAgency } = useAgency();
+  const { currentAgency, isAgencyAdmin } = useAgency();
   const [loading, setLoading] = useState(false);
+
+  const TASK_EVENT_KEYS = {
+    assigned: 'task.assigned',
+    statusChanged: 'task.status_changed',
+    importantUpdated: 'task.updated_important',
+    commentAdded: 'task.comment_added',
+  } as const;
+
+  type TaskEventKey = (typeof TASK_EVENT_KEYS)[keyof typeof TASK_EVENT_KEYS];
   
   const [types, setTypes] = useState<NotificationTypes>({
     reminders_enabled: true,
@@ -74,6 +83,18 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
   });
 
   const [dndEnabled, setDndEnabled] = useState(false);
+
+  const [taskEvents, setTaskEvents] = useState<Record<TaskEventKey, boolean>>({
+    [TASK_EVENT_KEYS.assigned]: true,
+    [TASK_EVENT_KEYS.statusChanged]: true,
+    [TASK_EVENT_KEYS.importantUpdated]: true,
+    [TASK_EVENT_KEYS.commentAdded]: true,
+  });
+
+  const [agencyTaskRules, setAgencyTaskRules] = useState({
+    notifyAdminsOnDone: false,
+    notifyCreatorOnAssigned: false,
+  });
 
   useEffect(() => {
     if (open && user && currentAgency) {
@@ -143,6 +164,52 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
           email_address: user.email || "",
         }));
       }
+
+      // Fetch per-event task preferences
+      const eventKeys = Object.values(TASK_EVENT_KEYS);
+      const { data: eventPrefs, error: eventPrefsError } = await supabase
+        .from('notification_event_preferences')
+        .select('event_key, enabled')
+        .eq('user_id', user.id)
+        .eq('agency_id', currentAgency.id)
+        .in('event_key', eventKeys);
+
+      if (eventPrefsError) throw eventPrefsError;
+
+      if (eventPrefs) {
+        setTaskEvents(prev => {
+          const next = { ...prev };
+          for (const row of eventPrefs) {
+            const key = row.event_key as TaskEventKey;
+            if (key in next) next[key] = !!row.enabled;
+          }
+          return next;
+        });
+      }
+
+      // Fetch agency rules (admin-only)
+      if (isAgencyAdmin()) {
+        const { data: rules, error: rulesError } = await supabase
+          .from('agency_notification_rules')
+          .select('event_key, recipients_strategy, enabled, conditions')
+          .eq('agency_id', currentAgency.id)
+          .in('event_key', [TASK_EVENT_KEYS.assigned, TASK_EVENT_KEYS.statusChanged]);
+
+        if (rulesError) throw rulesError;
+
+        const notifyCreatorOnAssigned =
+          !!rules?.find(r => r.event_key === TASK_EVENT_KEYS.assigned && r.recipients_strategy === 'creator')
+            ?.enabled;
+
+        const notifyAdminsOnDone =
+          !!rules?.find(r =>
+            r.event_key === TASK_EVENT_KEYS.statusChanged &&
+            r.recipients_strategy === 'admins' &&
+            (r.conditions as any)?.to === 'done'
+          )?.enabled;
+
+        setAgencyTaskRules({ notifyAdminsOnDone, notifyCreatorOnAssigned });
+      }
     } catch (error) {
       console.error("Error fetching preferences:", error);
     } finally {
@@ -200,6 +267,48 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
         .upsert(emailConfigToSave, { onConflict: 'user_id,agency_id' });
 
       if (emailError) throw emailError;
+
+      // Save per-event preferences for tasks
+      const eventPrefsToSave = (Object.values(TASK_EVENT_KEYS) as TaskEventKey[]).map((eventKey) => ({
+        user_id: user.id,
+        agency_id: currentAgency.id,
+        event_key: eventKey,
+        enabled: !!taskEvents[eventKey],
+      }));
+
+      const { error: eventPrefsSaveError } = await supabase
+        .from('notification_event_preferences')
+        .upsert(eventPrefsToSave, { onConflict: 'user_id,agency_id,event_key' });
+
+      if (eventPrefsSaveError) throw eventPrefsSaveError;
+
+      // Save agency rules (admin-only)
+      if (isAgencyAdmin()) {
+        const rulesToUpsert: any[] = [
+          {
+            agency_id: currentAgency.id,
+            event_key: TASK_EVENT_KEYS.assigned,
+            recipients_strategy: 'creator',
+            enabled: agencyTaskRules.notifyCreatorOnAssigned,
+            conditions: null,
+            created_by: user.id,
+          },
+          {
+            agency_id: currentAgency.id,
+            event_key: TASK_EVENT_KEYS.statusChanged,
+            recipients_strategy: 'admins',
+            enabled: agencyTaskRules.notifyAdminsOnDone,
+            conditions: { to: 'done' },
+            created_by: user.id,
+          },
+        ];
+
+        const { error: rulesError } = await supabase
+          .from('agency_notification_rules')
+          .upsert(rulesToUpsert, { onConflict: 'agency_id,event_key,recipients_strategy' });
+
+        if (rulesError) throw rulesError;
+      }
 
       toast.success("Preferências de notificação salvas com sucesso!");
       onOpenChange(false);
@@ -262,6 +371,106 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
               ))}
             </CardContent>
           </Card>
+
+          {/* Seção 1.5: Tarefas por evento */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <span className="text-lg">✅</span>
+                Tarefas (por evento)
+              </CardTitle>
+              <CardDescription>
+                Personalize quais eventos de tarefas disparam notificações para você.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="cursor-pointer">Quando uma tarefa for atribuída a mim</Label>
+                <Switch
+                  checked={taskEvents[TASK_EVENT_KEYS.assigned]}
+                  disabled={!types.tasks_enabled}
+                  onCheckedChange={(checked) =>
+                    setTaskEvents(prev => ({ ...prev, [TASK_EVENT_KEYS.assigned]: checked }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label className="cursor-pointer">Quando o status da tarefa mudar</Label>
+                <Switch
+                  checked={taskEvents[TASK_EVENT_KEYS.statusChanged]}
+                  disabled={!types.tasks_enabled}
+                  onCheckedChange={(checked) =>
+                    setTaskEvents(prev => ({ ...prev, [TASK_EVENT_KEYS.statusChanged]: checked }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label className="cursor-pointer">Quando houver mudanças importantes (prazo/prioridade/título)</Label>
+                <Switch
+                  checked={taskEvents[TASK_EVENT_KEYS.importantUpdated]}
+                  disabled={!types.tasks_enabled}
+                  onCheckedChange={(checked) =>
+                    setTaskEvents(prev => ({ ...prev, [TASK_EVENT_KEYS.importantUpdated]: checked }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between opacity-70">
+                <div>
+                  <Label className="cursor-pointer">Quando alguém comentar/adicionar nota</Label>
+                  <p className="text-xs text-muted-foreground">Em breve (precisamos do módulo de comentários/notas estruturado)</p>
+                </div>
+                <Switch checked={taskEvents[TASK_EVENT_KEYS.commentAdded]} disabled />
+              </div>
+
+              {!types.tasks_enabled && (
+                <p className="text-xs text-muted-foreground">
+                  Ative <strong>Tarefas</strong> em “O que notificar” para habilitar essas opções.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Seção 1.6: Regras do time (Admins) */}
+          {isAgencyAdmin() && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">🏢 Regras do time (Admins)</CardTitle>
+                <CardDescription>
+                  Essas regras afetam toda a agência (automático por regra).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="cursor-pointer">Notificar admins quando tarefa virar Concluída</Label>
+                    <p className="text-xs text-muted-foreground">Evento: mudança de status → done</p>
+                  </div>
+                  <Switch
+                    checked={agencyTaskRules.notifyAdminsOnDone}
+                    onCheckedChange={(checked) =>
+                      setAgencyTaskRules(prev => ({ ...prev, notifyAdminsOnDone: checked }))
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="cursor-pointer">Notificar criador quando a tarefa for atribuída</Label>
+                    <p className="text-xs text-muted-foreground">Útil para acompanhar delegações</p>
+                  </div>
+                  <Switch
+                    checked={agencyTaskRules.notifyCreatorOnAssigned}
+                    onCheckedChange={(checked) =>
+                      setAgencyTaskRules(prev => ({ ...prev, notifyCreatorOnAssigned: checked }))
+                    }
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Seção 2: Onde receber */}
           <Card>
