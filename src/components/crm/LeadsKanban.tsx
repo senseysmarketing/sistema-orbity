@@ -61,6 +61,13 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
   const normalizeStatusToDb = (rawStatus: string) => {
     if (!rawStatus) return 'leads';
 
+    // 0) Compatibilidade: se veio como dbStatus legado (ex.: "new"), converte via mapeadores.
+    // Ex.: "new" -> "Leads" -> "leads"
+    const displayFromDb = mapDatabaseStatusToDisplay(rawStatus);
+    if (displayFromDb !== rawStatus) {
+      return mapDisplayStatusToDatabase(displayFromDb);
+    }
+
     // 1) Se veio como statusKey (ex.: agendamentos) e existe no config, converte via título.
     if (statusConfig[rawStatus as keyof typeof statusConfig]) {
       const display = statusConfig[rawStatus as keyof typeof statusConfig].title;
