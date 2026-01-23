@@ -4875,6 +4875,10 @@ export type Database = {
       }
     }
     Functions: {
+      apply_post_event_rules: {
+        Args: { p_agency_id: string; p_event_key: string; p_payload: Json }
+        Returns: undefined
+      }
       apply_task_event_rules: {
         Args: { p_agency_id: string; p_event_key: string; p_payload: Json }
         Returns: undefined

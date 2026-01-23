@@ -55,7 +55,15 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
     commentAdded: 'task.comment_added',
   } as const;
 
+  const POST_EVENT_KEYS = {
+    assigned: 'post.assigned',
+    statusChanged: 'post.status_changed',
+    importantUpdated: 'post.updated_important',
+    pendingApproval: 'post.pending_approval',
+  } as const;
+
   type TaskEventKey = (typeof TASK_EVENT_KEYS)[keyof typeof TASK_EVENT_KEYS];
+  type PostEventKey = (typeof POST_EVENT_KEYS)[keyof typeof POST_EVENT_KEYS];
   
   const [types, setTypes] = useState<NotificationTypes>({
     reminders_enabled: true,
@@ -91,9 +99,20 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
     [TASK_EVENT_KEYS.commentAdded]: true,
   });
 
+  const [postEvents, setPostEvents] = useState<Record<PostEventKey, boolean>>({
+    [POST_EVENT_KEYS.assigned]: true,
+    [POST_EVENT_KEYS.statusChanged]: true,
+    [POST_EVENT_KEYS.importantUpdated]: true,
+    [POST_EVENT_KEYS.pendingApproval]: true,
+  });
+
   const [agencyTaskRules, setAgencyTaskRules] = useState({
     notifyAdminsOnDone: false,
     notifyCreatorOnAssigned: false,
+  });
+
+  const [agencyPostRules, setAgencyPostRules] = useState({
+    notifyAdminsOnPublished: false,
   });
 
   useEffect(() => {
@@ -187,13 +206,35 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
         });
       }
 
+      // Fetch per-event post preferences
+      const postEventKeys = Object.values(POST_EVENT_KEYS);
+      const { data: postEventPrefs, error: postEventPrefsError } = await supabase
+        .from('notification_event_preferences')
+        .select('event_key, enabled')
+        .eq('user_id', user.id)
+        .eq('agency_id', currentAgency.id)
+        .in('event_key', postEventKeys);
+
+      if (postEventPrefsError) throw postEventPrefsError;
+
+      if (postEventPrefs) {
+        setPostEvents(prev => {
+          const next = { ...prev };
+          for (const row of postEventPrefs) {
+            const key = row.event_key as PostEventKey;
+            if (key in next) next[key] = !!row.enabled;
+          }
+          return next;
+        });
+      }
+
       // Fetch agency rules (admin-only)
       if (isAgencyAdmin()) {
         const { data: rules, error: rulesError } = await supabase
           .from('agency_notification_rules')
           .select('event_key, recipients_strategy, enabled, conditions')
           .eq('agency_id', currentAgency.id)
-          .in('event_key', [TASK_EVENT_KEYS.assigned, TASK_EVENT_KEYS.statusChanged]);
+          .in('event_key', [TASK_EVENT_KEYS.assigned, TASK_EVENT_KEYS.statusChanged, 'post.published']);
 
         if (rulesError) throw rulesError;
 
@@ -208,7 +249,15 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
             (r.conditions as any)?.to === 'done'
           )?.enabled;
 
+        const notifyAdminsOnPublished =
+          !!rules?.find(r =>
+            r.event_key === 'post.published' &&
+            r.recipients_strategy === 'admins' &&
+            (r.conditions as any)?.to === 'published'
+          )?.enabled;
+
         setAgencyTaskRules({ notifyAdminsOnDone, notifyCreatorOnAssigned });
+        setAgencyPostRules({ notifyAdminsOnPublished });
       }
     } catch (error) {
       console.error("Error fetching preferences:", error);
@@ -276,9 +325,17 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
         enabled: !!taskEvents[eventKey],
       }));
 
+      // Save per-event preferences for posts
+      const postEventPrefsToSave = (Object.values(POST_EVENT_KEYS) as PostEventKey[]).map((eventKey) => ({
+        user_id: user.id,
+        agency_id: currentAgency.id,
+        event_key: eventKey,
+        enabled: !!postEvents[eventKey],
+      }));
+
       const { error: eventPrefsSaveError } = await supabase
         .from('notification_event_preferences')
-        .upsert(eventPrefsToSave, { onConflict: 'user_id,agency_id,event_key' });
+        .upsert([...eventPrefsToSave, ...postEventPrefsToSave], { onConflict: 'user_id,agency_id,event_key' });
 
       if (eventPrefsSaveError) throw eventPrefsSaveError;
 
@@ -299,6 +356,14 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
             recipients_strategy: 'admins',
             enabled: agencyTaskRules.notifyAdminsOnDone,
             conditions: { to: 'done' },
+            created_by: user.id,
+          },
+          {
+            agency_id: currentAgency.id,
+            event_key: 'post.published',
+            recipients_strategy: 'admins',
+            enabled: agencyPostRules.notifyAdminsOnPublished,
+            conditions: { to: 'published' },
             created_by: user.id,
           },
         ];
@@ -433,6 +498,70 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
             </CardContent>
           </Card>
 
+          {/* Seção 1.55: Posts por evento */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <span className="text-lg">📱</span>
+                Posts (por evento)
+              </CardTitle>
+              <CardDescription>
+                Personalize quais eventos de posts disparam notificações para você.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="cursor-pointer">Quando um post for atribuído a mim</Label>
+                <Switch
+                  checked={postEvents[POST_EVENT_KEYS.assigned]}
+                  disabled={!types.posts_enabled}
+                  onCheckedChange={(checked) =>
+                    setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.assigned]: checked }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label className="cursor-pointer">Quando o status do post mudar</Label>
+                <Switch
+                  checked={postEvents[POST_EVENT_KEYS.statusChanged]}
+                  disabled={!types.posts_enabled}
+                  onCheckedChange={(checked) =>
+                    setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.statusChanged]: checked }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label className="cursor-pointer">Quando houver mudanças importantes (data/prioridade/título/notas)</Label>
+                <Switch
+                  checked={postEvents[POST_EVENT_KEYS.importantUpdated]}
+                  disabled={!types.posts_enabled}
+                  onCheckedChange={(checked) =>
+                    setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.importantUpdated]: checked }))
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label className="cursor-pointer">Quando um post entrar em “Aguardando Aprovação”</Label>
+                <Switch
+                  checked={postEvents[POST_EVENT_KEYS.pendingApproval]}
+                  disabled={!types.posts_enabled}
+                  onCheckedChange={(checked) =>
+                    setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.pendingApproval]: checked }))
+                  }
+                />
+              </div>
+
+              {!types.posts_enabled && (
+                <p className="text-xs text-muted-foreground">
+                  Ative <strong>Posts de Social Media</strong> em “O que notificar” para habilitar essas opções.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Seção 1.6: Regras do time (Admins) */}
           {isAgencyAdmin() && (
             <Card>
@@ -465,6 +594,21 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
                     checked={agencyTaskRules.notifyCreatorOnAssigned}
                     onCheckedChange={(checked) =>
                       setAgencyTaskRules(prev => ({ ...prev, notifyCreatorOnAssigned: checked }))
+                    }
+                  />
+                </div>
+
+                <Separator />
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="cursor-pointer">Notificar admins quando um post for publicado</Label>
+                    <p className="text-xs text-muted-foreground">Evento: status → published</p>
+                  </div>
+                  <Switch
+                    checked={agencyPostRules.notifyAdminsOnPublished}
+                    onCheckedChange={(checked) =>
+                      setAgencyPostRules({ notifyAdminsOnPublished: checked })
                     }
                   />
                 </div>
