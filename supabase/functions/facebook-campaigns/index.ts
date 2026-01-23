@@ -18,7 +18,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { action, accountIds, accounts, dateRange, date_range } = await req.json()
+    const { action, accountIds, accounts, dateRange, date_range, agencyId, agency_id } = await req.json()
 
     // Aceitar tanto 'list_campaigns' quanto a falta do parâmetro action para compatibilidade
     if (action === 'list_campaigns' || !action) {
@@ -47,26 +47,70 @@ serve(async (req) => {
         )
       }
 
-      // Buscar agency_id do usuário
-      const { data: agencyUser, error: agencyError } = await supabaseClient
-        .from('agency_users')
-        .select('agency_id')
-        .eq('user_id', authUser.user.id)
-        .single()
+      // Resolver agência alvo (multi-agency safe)
+      const requestedAgencyId = agencyId || agency_id
+      let targetAgencyId: string | null = null
 
-      if (agencyError || !agencyUser) {
-        console.error('Agency error:', agencyError)
-        return new Response(
-          JSON.stringify({ error: 'User not associated with any agency' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        )
+      if (requestedAgencyId) {
+        const { data: agencyUser, error: agencyUserError } = await supabaseClient
+          .from('agency_users')
+          .select('agency_id')
+          .eq('user_id', authUser.user.id)
+          .eq('agency_id', requestedAgencyId)
+          .maybeSingle()
+
+        if (agencyUserError) {
+          console.error('Agency membership error:', agencyUserError)
+          return new Response(
+            JSON.stringify({ error: 'Failed to validate agency access' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+          )
+        }
+
+        if (!agencyUser) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+          )
+        }
+
+        targetAgencyId = requestedAgencyId
+      } else {
+        const { data: memberships, error: membershipsError } = await supabaseClient
+          .from('agency_users')
+          .select('agency_id')
+          .eq('user_id', authUser.user.id)
+
+        if (membershipsError) {
+          console.error('Agency memberships error:', membershipsError)
+          return new Response(
+            JSON.stringify({ error: 'Failed to resolve user agency' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+          )
+        }
+
+        if (!memberships || memberships.length === 0) {
+          return new Response(
+            JSON.stringify({ error: 'User not associated with any agency' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          )
+        }
+
+        if (memberships.length > 1) {
+          return new Response(
+            JSON.stringify({ error: 'agencyId is required for multi-agency users' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          )
+        }
+
+        targetAgencyId = memberships[0].agency_id
       }
 
       // Buscar conexão Facebook ativa da agência
       const { data: connection, error: connectionError } = await supabaseClient
         .from('facebook_connections')
         .select('access_token')
-        .eq('agency_id', agencyUser.agency_id)
+        .eq('agency_id', targetAgencyId)
         .eq('is_active', true)
         .single()
 

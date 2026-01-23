@@ -18,7 +18,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { action, accountIds, dateRange } = await req.json()
+    const { action, accountIds, dateRange, agencyId, agency_id } = await req.json()
 
     if (action === 'get_metrics' || action === 'sync_metrics' || action === 'generate_report') {
       console.log(`Processing ${action} for accounts:`, accountIds, 'Date range:', dateRange)
@@ -36,19 +36,63 @@ serve(async (req) => {
         )
       }
 
-      // Buscar agency_id do usuário
-      const { data: agencyUser, error: agencyError } = await supabaseClient
-        .from('agency_users')
-        .select('agency_id')
-        .eq('user_id', authUser.user.id)
-        .single()
+      // Resolver agência alvo (multi-agency safe)
+      const requestedAgencyId = agencyId || agency_id
+      let targetAgencyId: string | null = null
 
-      if (agencyError || !agencyUser) {
-        console.error('Agency error:', agencyError)
-        return new Response(
-          JSON.stringify({ error: 'User not associated with any agency' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        )
+      if (requestedAgencyId) {
+        const { data: agencyUser, error: agencyUserError } = await supabaseClient
+          .from('agency_users')
+          .select('agency_id')
+          .eq('user_id', authUser.user.id)
+          .eq('agency_id', requestedAgencyId)
+          .maybeSingle()
+
+        if (agencyUserError) {
+          console.error('Agency membership error:', agencyUserError)
+          return new Response(
+            JSON.stringify({ error: 'Failed to validate agency access' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+          )
+        }
+
+        if (!agencyUser) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+          )
+        }
+
+        targetAgencyId = requestedAgencyId
+      } else {
+        const { data: memberships, error: membershipsError } = await supabaseClient
+          .from('agency_users')
+          .select('agency_id')
+          .eq('user_id', authUser.user.id)
+
+        if (membershipsError) {
+          console.error('Agency memberships error:', membershipsError)
+          return new Response(
+            JSON.stringify({ error: 'Failed to resolve user agency' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+          )
+        }
+
+        if (!memberships || memberships.length === 0) {
+          return new Response(
+            JSON.stringify({ error: 'User not associated with any agency' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          )
+        }
+
+        if (memberships.length > 1) {
+          return new Response(
+            JSON.stringify({ error: 'agencyId is required for multi-agency users' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          )
+        }
+
+        targetAgencyId = memberships[0].agency_id
       }
 
       if (action === 'get_metrics') {
@@ -68,7 +112,7 @@ serve(async (req) => {
           const { data: connection, error: connectionError } = await supabaseClient
             .from('facebook_connections')
             .select('access_token')
-            .eq('agency_id', agencyUser.agency_id)
+            .eq('agency_id', targetAgencyId)
             .eq('is_active', true)
             .single()
 
@@ -171,22 +215,14 @@ serve(async (req) => {
           
           // Tentar buscar do banco de dados primeiro
           if (accountIds && accountIds.length > 0 && dateRange?.from && dateRange?.to) {
-            // Buscar agency_id do usuário
-            const { data: agencyUser } = await supabaseClient
-              .from('agency_users')
-              .select('agency_id')
-              .eq('user_id', authUser.user.id)
-              .single();
-
-            if (agencyUser) {
-              const { data: dbMetrics } = await supabaseClient
-                .from('ad_account_metrics')
-                .select('*')
-                .eq('ad_account_id', accountIds[0])
-                .eq('agency_id', agencyUser.agency_id)
-                .gte('date_start', dateRange.from)
-                .lte('date_end', dateRange.to)
-                .order('date_start', { ascending: true });
+            const { data: dbMetrics } = await supabaseClient
+              .from('ad_account_metrics')
+              .select('*')
+              .eq('ad_account_id', accountIds[0])
+              .eq('agency_id', targetAgencyId)
+              .gte('date_start', dateRange.from)
+              .lte('date_end', dateRange.to)
+              .order('date_start', { ascending: true });
 
             if (dbMetrics && dbMetrics.length > 0) {
               // Agregar dados do banco
@@ -218,7 +254,6 @@ serve(async (req) => {
               });
 
               console.log('Using data from database');
-            }
             }
           }
 
@@ -327,7 +362,7 @@ serve(async (req) => {
         const { data: connection, error: connectionError } = await supabaseClient
           .from('facebook_connections')
           .select('access_token')
-          .eq('agency_id', agencyUser.agency_id)
+          .eq('agency_id', targetAgencyId)
           .eq('is_active', true)
           .single()
 
@@ -393,21 +428,9 @@ serve(async (req) => {
                   console.error(`Error fetching balance for ${accountId}:`, balanceError)
                 }
 
-                // Buscar agency_id do usuário para as métricas
-                const { data: agencyUser } = await supabaseClient
-                  .from('agency_users')
-                  .select('agency_id')
-                  .eq('user_id', authUser.user.id)
-                  .single();
-
-                if (!agencyUser) {
-                  console.error('User not found in any agency');
-                  continue;
-                }
-
                 // Preparar dados para inserção
                 const metricsData = {
-                  agency_id: agencyUser.agency_id,
+                  agency_id: targetAgencyId,
                   ad_account_id: accountId,
                   date_start: insight.date_start,
                   date_end: insight.date_stop,
@@ -428,10 +451,10 @@ serve(async (req) => {
                   .from('ad_account_metrics')
                   .select('id')
                   .eq('ad_account_id', accountId)
-                  .eq('agency_id', agencyUser.agency_id)
+                  .eq('agency_id', targetAgencyId)
                   .eq('date_start', insight.date_start)
                   .eq('date_end', insight.date_stop)
-                  .single()
+                  .maybeSingle()
 
                 if (existing) {
                   // Atualizar registro existente
