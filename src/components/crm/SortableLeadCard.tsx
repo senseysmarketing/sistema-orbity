@@ -14,6 +14,7 @@ import { ptBR } from "date-fns/locale";
 import { LeadScoring } from "./LeadScoring";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
+import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 
 // Mapeamento de tradução de origens de leads
 const sourceTranslations: Record<string, string> = {
@@ -92,11 +93,12 @@ export function SortableLeadCard({
 
   const { mapDatabaseStatusToDisplay, getStatusConfig } = useLeadStatuses();
   const statusConfig = getStatusConfig();
-  const displayStatus = mapDatabaseStatusToDisplay(lead.status);
+  const normalizedDbStatus = normalizeLeadStatusToDb(lead.status);
+  const displayStatus = mapDatabaseStatusToDisplay(normalizedDbStatus);
   
   // Find status configuration
-  const statusKey = Object.keys(statusConfig).find(
-    key => statusConfig[key].title === displayStatus
+  const statusKey = Object.keys(statusConfig).find((key) =>
+    statusConfig[key].title.toLowerCase() === String(displayStatus).toLowerCase()
   );
   const currentStatusConfig = statusKey ? statusConfig[statusKey] : null;
 
@@ -118,10 +120,10 @@ export function SortableLeadCard({
     if (urgency.level === 'today') {
       return 'bg-orange-50/50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900';
     }
-    if (lead.status === 'won') {
+    if (normalizedDbStatus === 'won') {
       return 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900';
     }
-    if (lead.status === 'lost') {
+    if (normalizedDbStatus === 'lost') {
       return 'bg-gray-50/50 dark:bg-gray-950/20 border-gray-200 dark:border-gray-900';
     }
     return 'bg-card';

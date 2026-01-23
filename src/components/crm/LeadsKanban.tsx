@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 import { getTemperatureForStatus, getTemperatureLabel, LEAD_TEMPERATURES } from "@/lib/leadTemperature";
+import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 
 interface Lead {
   id: string;
@@ -60,6 +61,13 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
   // - display name: "Agendamentos" -> "scheduled"
   const normalizeStatusToDb = (rawStatus: string) => {
     if (!rawStatus) return 'leads';
+
+    // 0) Primeiro, normaliza o que for padrão/legado/PT-BR conhecido.
+    const canonicalOrSame = normalizeLeadStatusToDb(rawStatus);
+    // Se virou canônico (ex.: "vendas" -> "won"), já retorna.
+    if (canonicalOrSame !== rawStatus && typeof canonicalOrSame === 'string') {
+      return canonicalOrSame;
+    }
 
     // 0) Compatibilidade: se veio como dbStatus legado (ex.: "new"), converte via mapeadores.
     // Ex.: "new" -> "Leads" -> "leads"

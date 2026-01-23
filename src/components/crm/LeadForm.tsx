@@ -11,6 +11,7 @@ import { useAgency } from "@/hooks/useAgency";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 import { toast } from "sonner";
 import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
+import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 
 interface Lead {
   id: string;
@@ -45,6 +46,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
   const { currentAgency } = useAgency();
   const {
     statuses,
+    loading: statusesLoading,
     getStatusKey,
     getStatusName,
     mapDatabaseStatusToDisplay,
@@ -72,7 +74,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
     if (lead) {
       // O Select usa "statusKey" (ex.: agendamentos). O banco deve usar "dbStatus" (ex.: scheduled).
       // Aqui normalizamos o status salvo no banco para o formato esperado pelo Select.
-      const normalizedDbStatus = lead.status && lead.status.trim() !== '' ? lead.status : 'leads';
+      const normalizedDbStatus = normalizeLeadStatusToDb(lead.status);
       const displayStatus = mapDatabaseStatusToDisplay(normalizedDbStatus);
       const statusKey = getStatusKey(displayStatus);
       
@@ -117,7 +119,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
       // Converter statusKey -> displayName -> dbStatus
       // Ex.: "agendamentos" -> "Agendamentos" -> "scheduled"
       const displayStatus = getStatusName(finalStatusKey);
-      const dbStatus = mapDisplayStatusToDatabase(displayStatus);
+      const dbStatus = normalizeLeadStatusToDb(mapDisplayStatusToDatabase(displayStatus));
 
       const leadData = {
         agency_id: currentAgency.id,
@@ -358,7 +360,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || statusesLoading || statuses.length === 0}>
               {loading ? 'Salvando...' : (lead ? 'Atualizar' : 'Criar')}
             </Button>
           </div>

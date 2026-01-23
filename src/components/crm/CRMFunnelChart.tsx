@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FunnelChart, Funnel, LabelList, ResponsiveContainer, Tooltip } from "recharts";
+import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 
 interface Lead {
   id: string;
@@ -39,26 +40,26 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
     const totalLeads = filteredLeads.length;
 
     const contacting = filteredLeads.filter(l =>
-      ['em_contato', 'qualified', 'scheduled', 'meeting', 'proposal', 'won'].includes(l.status)
+      ['em_contato', 'qualified', 'scheduled', 'meeting', 'proposal', 'won'].includes(String(normalizeLeadStatusToDb(l.status)))
     ).length;
     
     const qualified = filteredLeads.filter(l =>
-      ['qualified', 'scheduled', 'meeting', 'proposal', 'won'].includes(l.status)
+      ['qualified', 'scheduled', 'meeting', 'proposal', 'won'].includes(String(normalizeLeadStatusToDb(l.status)))
     ).length;
     
     const scheduled = filteredLeads.filter(l => 
-      ['scheduled', 'meeting', 'proposal', 'won'].includes(l.status)
+      ['scheduled', 'meeting', 'proposal', 'won'].includes(String(normalizeLeadStatusToDb(l.status)))
     ).length;
     
     const meetings = filteredLeads.filter(l => 
-      ['meeting', 'proposal', 'won'].includes(l.status)
+      ['meeting', 'proposal', 'won'].includes(String(normalizeLeadStatusToDb(l.status)))
     ).length;
     
     const proposals = filteredLeads.filter(l => 
-      ['proposal', 'won'].includes(l.status)
+      ['proposal', 'won'].includes(String(normalizeLeadStatusToDb(l.status)))
     ).length;
     
-    const won = filteredLeads.filter(l => l.status === 'won').length;
+    const won = filteredLeads.filter(l => normalizeLeadStatusToDb(l.status) === 'won').length;
 
     // Calculate conversion rates between stages
     const contactingRate = totalLeads > 0 ? ((contacting / totalLeads) * 100).toFixed(1) : "0";

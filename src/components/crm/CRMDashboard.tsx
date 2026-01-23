@@ -15,6 +15,7 @@ import { CRMInvestmentMetrics } from "./CRMInvestmentMetrics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useNavigate } from "react-router-dom";
+import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 
 interface Lead {
   id: string;
@@ -97,7 +98,7 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
     });
 
     const totalLeads = filteredLeads.length;
-    const wonLeads = filteredLeads.filter(l => l.status === 'won');
+    const wonLeads = filteredLeads.filter(l => normalizeLeadStatusToDb(l.status) === 'won');
     const wonCount = wonLeads.length;
     const revenue = wonLeads.reduce((sum, l) => sum + (l.value || 0), 0);
     const conversionRate = totalLeads > 0 ? (wonCount / totalLeads) * 100 : 0;
@@ -119,12 +120,12 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
     const today = new Date().toISOString().split('T')[0];
     const followUpNeeded = filteredLeads.filter(lead => 
       lead.next_contact && lead.next_contact <= today && 
-      !['won', 'lost'].includes(lead.status)
+      !['won', 'lost'].includes(String(normalizeLeadStatusToDb(lead.status)))
     ).length;
 
     // Hot leads (high temperature)
     const hotLeads = filteredLeads.filter(l => 
-      l.temperature === 'hot' && !['won', 'lost'].includes(l.status)
+      l.temperature === 'hot' && !['won', 'lost'].includes(String(normalizeLeadStatusToDb(l.status)))
     ).length;
 
     return {
