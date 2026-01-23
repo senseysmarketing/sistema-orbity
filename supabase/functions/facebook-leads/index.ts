@@ -225,7 +225,8 @@ async function saveIntegration(supabase: any, userId: string, params: any) {
       form_id: formId,
       form_name: formName,
       sync_method: syncMethod || 'webhook',
-      default_status: defaultStatus || 'new',
+      // Evita status legado ("new") que pode não existir como coluna no pipeline
+      default_status: defaultStatus || 'leads',
       default_priority: defaultPriority || 'cold',
       field_mapping: fieldMapping || {},
       created_by: userId
@@ -407,6 +408,9 @@ async function syncLeads(supabase: any, userId: string, params: any) {
       'low': 'cold', 'medium': 'warm', 'high': 'hot'
     };
 
+    // Normaliza status legado
+    const normalizedStatus = integration.default_status === 'new' ? 'leads' : integration.default_status;
+
     // Map to CRM lead fields
     const leadData = {
       agency_id: integration.agency_id,
@@ -414,7 +418,7 @@ async function syncLeads(supabase: any, userId: string, params: any) {
       email: fieldData.email || null,
       phone: fieldData.phone_number || null,
       company: fieldData.company_name || null,
-      status: integration.default_status,
+      status: normalizedStatus,
       temperature: temperatureMapping[integration.default_priority] || 'cold',
       source: 'facebook_leads',
       notes: `Lead capturado do formulário: ${integration.form_name}\nData: ${new Date(fbLead.created_time).toLocaleString('pt-BR')}`,
@@ -587,6 +591,9 @@ async function handleWebhook(supabase: any, body: any) {
         'low': 'cold', 'medium': 'warm', 'high': 'hot'
       };
 
+      // Normaliza status legado
+      const normalizedStatus = integration.default_status === 'new' ? 'leads' : integration.default_status;
+
       // Create lead in CRM
       const crmLeadData = {
         agency_id: integration.agency_id,
@@ -594,7 +601,7 @@ async function handleWebhook(supabase: any, body: any) {
         email: fieldData.email || null,
         phone: fieldData.phone_number || null,
         company: fieldData.company_name || null,
-        status: integration.default_status,
+        status: normalizedStatus,
         temperature: temperatureMapping[integration.default_priority] || 'cold',
         source: 'facebook_leads',
         notes: `🚀 Lead capturado automaticamente via webhook\nFormulário: ${integration.form_name}\nPágina: ${integration.page_name}\nData: ${new Date(leadData.created_time).toLocaleString('pt-BR')}`,
