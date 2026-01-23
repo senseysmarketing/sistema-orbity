@@ -14,7 +14,7 @@ interface Lead {
   company: string | null;
   position: string | null;
   source: string;
-  status: 'leads' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost';
+  status: string;
   temperature: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;

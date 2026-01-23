@@ -19,7 +19,8 @@ interface Lead {
   company: string | null;
   position: string | null;
   source: string;
-  status: 'leads' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost';
+  // Status é string no banco (suporta etapas padrão e personalizadas)
+  status: string;
   temperature: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
@@ -51,6 +52,30 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
   const { getStatusConfig, getStatusKey, mapDatabaseStatusToDisplay, mapDisplayStatusToDatabase } = useLeadStatuses();
 
   const statusConfig = getStatusConfig();
+
+  // Normaliza valores legados/variantes de status para o formato que o Kanban usa (dbStatus).
+  // Exemplos:
+  // - dbStatus: "scheduled" -> "scheduled"
+  // - statusKey antigo: "agendamentos" -> "scheduled"
+  // - display name: "Agendamentos" -> "scheduled"
+  const normalizeStatusToDb = (rawStatus: string) => {
+    if (!rawStatus) return 'leads';
+
+    // 1) Se veio como statusKey (ex.: agendamentos) e existe no config, converte via título.
+    if (statusConfig[rawStatus as keyof typeof statusConfig]) {
+      const display = statusConfig[rawStatus as keyof typeof statusConfig].title;
+      return mapDisplayStatusToDatabase(display);
+    }
+
+    // 2) Se veio como display name (ex.: Agendamentos), tenta casar pelo título.
+    const byTitle = Object.values(statusConfig).find(
+      (c) => c.title.toLowerCase() === rawStatus.toLowerCase()
+    );
+    if (byTitle) return mapDisplayStatusToDatabase(byTitle.title);
+
+    // 3) Caso padrão: assume que já é dbStatus ou um status custom (string livre).
+    return rawStatus;
+  };
   
   // Filter visible columns based on hiddenColumns
   const visibleColumns = Object.entries(statusConfig).filter(
@@ -180,7 +205,7 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
   const groupedLeads = Object.keys(statusConfig).reduce((acc, statusKey) => {
     const displayStatus = statusConfig[statusKey].title;
     const dbStatus = mapDisplayStatusToDatabase(displayStatus);
-    acc[statusKey] = leads.filter(lead => lead.status === dbStatus);
+    acc[statusKey] = leads.filter(lead => normalizeStatusToDb(lead.status) === dbStatus);
     return acc;
   }, {} as Record<string, Lead[]>);
 
