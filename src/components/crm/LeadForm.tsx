@@ -43,7 +43,13 @@ interface LeadFormProps {
 export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
   const { profile } = useAuth();
   const { currentAgency } = useAgency();
-  const { statuses, getStatusKey } = useLeadStatuses();
+  const {
+    statuses,
+    getStatusKey,
+    getStatusName,
+    mapDatabaseStatusToDisplay,
+    mapDisplayStatusToDatabase,
+  } = useLeadStatuses();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -64,10 +70,11 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
 
   useEffect(() => {
     if (lead) {
-      // Normalizar status - garantir que sempre tenha um valor válido
-      const normalizedStatus = lead.status && lead.status.trim() !== '' 
-        ? lead.status 
-        : 'leads';
+      // O Select usa "statusKey" (ex.: agendamentos). O banco deve usar "dbStatus" (ex.: scheduled).
+      // Aqui normalizamos o status salvo no banco para o formato esperado pelo Select.
+      const normalizedDbStatus = lead.status && lead.status.trim() !== '' ? lead.status : 'leads';
+      const displayStatus = mapDatabaseStatusToDisplay(normalizedDbStatus);
+      const statusKey = getStatusKey(displayStatus);
       
       setFormData({
         name: lead.name || '',
@@ -76,7 +83,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
         company: lead.company || '',
         position: lead.position || '',
         source: lead.source || 'manual',
-        status: normalizedStatus,
+        status: statusKey,
         temperature: (lead.temperature || 'cold') as LeadTemperature,
         value: lead.value || 0,
         notes: lead.notes || '',
@@ -105,9 +112,12 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
         .filter(tag => tag.length > 0);
 
       // Garantir que status nunca seja vazio
-      const finalStatus = formData.status && formData.status.trim() !== '' 
-        ? formData.status 
-        : 'leads';
+      const finalStatusKey = formData.status && formData.status.trim() !== '' ? formData.status : 'leads';
+
+      // Converter statusKey -> displayName -> dbStatus
+      // Ex.: "agendamentos" -> "Agendamentos" -> "scheduled"
+      const displayStatus = getStatusName(finalStatusKey);
+      const dbStatus = mapDisplayStatusToDatabase(displayStatus);
 
       const leadData = {
         agency_id: currentAgency.id,
@@ -117,7 +127,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
         company: formData.company || null,
         position: formData.position || null,
         source: formData.source,
-        status: finalStatus,
+        status: dbStatus,
         temperature: formData.temperature,
         value: formData.value,
         notes: formData.notes || null,

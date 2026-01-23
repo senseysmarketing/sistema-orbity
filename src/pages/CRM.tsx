@@ -27,7 +27,8 @@ interface Lead {
   company: string | null;
   position: string | null;
   source: string;
-  status: 'leads' | 'qualified' | 'scheduled' | 'meeting' | 'proposal' | 'won' | 'lost';
+  // Status é string no banco (suporta etapas padrão e personalizadas)
+  status: string;
   temperature: 'cold' | 'warm' | 'hot';
   value: number;
   notes: string | null;
@@ -203,7 +204,7 @@ export default function CRM() {
   const handleLeadMove = (leadId: string, newStatus: string) => {
     setLeads(prev => prev.map(lead => 
       lead.id === leadId 
-        ? { ...lead, status: newStatus as Lead['status'], updated_at: new Date().toISOString() }
+        ? { ...lead, status: newStatus, updated_at: new Date().toISOString() }
         : lead
     ));
   };
