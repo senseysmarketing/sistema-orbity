@@ -73,14 +73,13 @@ try {
   importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
   importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
   
-  // These will be replaced at build time or configured via postMessage
   const defaultConfig = {
-    apiKey: "FIREBASE_API_KEY_PLACEHOLDER",
-    authDomain: "FIREBASE_AUTH_DOMAIN_PLACEHOLDER",
-    projectId: "FIREBASE_PROJECT_ID_PLACEHOLDER",
-    storageBucket: "FIREBASE_STORAGE_BUCKET_PLACEHOLDER",
-    messagingSenderId: "FIREBASE_SENDER_ID_PLACEHOLDER",
-    appId: "FIREBASE_APP_ID_PLACEHOLDER"
+    apiKey: "AIzaSyBIDL3R7nd0pE0wzmXdNePWTSyxOvyZ0cY",
+    authDomain: "orbityapp-f710e.firebaseapp.com",
+    projectId: "orbityapp-f710e",
+    storageBucket: "orbityapp-f710e.appspot.com",
+    messagingSenderId: "929526059094",
+    appId: "1:929526059094:web:61fb87a4f693ddd61b2bf7"
   };
   
   // Only initialize if config has real values (not placeholders)
