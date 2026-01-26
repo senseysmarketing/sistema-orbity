@@ -179,10 +179,8 @@ async function sendToFCM(
       },
       webpush: {
         notification: {
-          icon: payload.icon || '/favicon.ico',
-          badge: '/favicon.ico',
-          vibrate: [200, 100, 200],
-          requireInteraction: true,
+          icon: payload.icon || 'https://sistema-orbity.lovable.app/favicon.ico',
+          badge: 'https://sistema-orbity.lovable.app/favicon.ico',
         },
         fcm_options: {
           link: payload.data?.action_url || '/dashboard',
