@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAgency } from './useAgency';
 import { toast } from 'sonner';
@@ -76,9 +76,9 @@ export function useSocialMediaSettings() {
     }
   };
 
-  const getDefaultDueDateDaysBefore = () => {
+  const getDefaultDueDateDaysBefore = useCallback(() => {
     return settings?.default_due_date_days_before ?? 3;
-  };
+  }, [settings?.default_due_date_days_before]);
 
   return {
     settings,
