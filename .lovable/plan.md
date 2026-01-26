@@ -1,242 +1,179 @@
 
 
-# Correção Definitiva para Push Notifications no iOS
+# Correção de Notificações Push Duplicadas
 
-## Diagnóstico Final
+## Diagnóstico
 
-### O que está funcionando
-| Item | Status | Evidência |
-|------|--------|-----------|
-| Backend FCM | ✅ OK | `Message sent successfully: projects/orbityapp-f710e/messages/da2d0550-...` |
-| Token ativo | ✅ OK | `dbipKmw8VHAXWe6UebTSnO:APA91bEvfP2Yi768C9COfVmXg7sPi-...` |
-| Modo standalone | ✅ OK | `device_info.standalone: true, isIOS: true` |
-| Token inválido tratado | ✅ OK | `UNREGISTERED` foi outro usuário cujo token já foi desativado |
+### Causas Identificadas
 
-### O Problema Real: Conflito de Service Workers
+A análise revelou **múltiplas fontes de duplicação**:
 
-A PWA está usando `vite-plugin-pwa` que gera um Service Worker Workbox para cache offline, mas há também o `firebase-messaging-sw.js` separado. Quando o diagnóstico mostra "SW aguardando ativação", significa que:
+| Fonte | Problema | Efeito |
+|-------|----------|--------|
+| **1. Trigger do Banco** | `trg_push_on_new_notification` dispara push quando notificação é inserida na tabela `notifications` | 1x push por INSERT |
+| **2. Edge Function `process-notifications`** | Após inserir notificações, chama `send-push-notification` em loop para cada uma | 1x push adicional por INSERT |
+| **3. Service Worker** | Tem **dois handlers** para push: `messaging.onBackgroundMessage()` E `self.addEventListener('push')` | Pode mostrar 2x a mesma notificação |
 
-1. O Workbox SW está ativo (gerado pelo VitePWA)
-2. O Firebase SW está "waiting" (não consegue assumir controle)
-3. **O push chega ao Workbox SW, que não sabe processar FCM**
+### Fluxo Atual (Problemático)
 
-### Por que o erro UNREGISTERED aparecia como "total: 2"
+```text
+Tarefa criada/atualizada
+       ↓
+┌─────────────────────────────────────────────────┐
+│ Trigger notify_task_assignment                  │
+│    → INSERT INTO notifications                  │
+│         ↓                                       │
+│    Trigger trg_push_on_new_notification         │
+│         → send-push-notification (1ª vez)       │
+└─────────────────────────────────────────────────┘
+                   +
+┌─────────────────────────────────────────────────┐
+│ Cron → process-notifications                    │
+│    → Detecta notificação pendente              │
+│    → INSERT INTO notifications                  │
+│         → Trigger (2ª vez)                      │
+│    → Loop fetch send-push-notification (3ª vez) │
+└─────────────────────────────────────────────────┘
+                   +
+┌─────────────────────────────────────────────────┐
+│ Service Worker                                  │
+│    → messaging.onBackgroundMessage() (1x)       │
+│    → self.addEventListener('push') (1x)         │
+│    = 2 notificações exibidas por push          │
+└─────────────────────────────────────────────────┘
+```
 
-- No momento do teste, haviam 2 tokens ativos no banco
-- Um era válido (seu iPhone), outro era inválido (outro dispositivo/usuário)
-- O token inválido foi automaticamente desativado após o erro 404
-- Agora só resta 1 token ativo (o seu)
+**Resultado**: Uma única ação pode gerar 4-6 notificações exibidas!
 
 ---
 
-## Solução em 2 Partes
+## Solução
 
-### Parte 1: Forçar Ativação Imediata do SW
+### Mudanças Necessárias
 
-Quando um Service Worker está em estado "waiting", ele precisa ser ativado manualmente:
+| Arquivo | Ação |
+|---------|------|
+| `supabase/functions/process-notifications/index.ts` | **Remover** o loop que chama `send-push-notification` (linhas 110-145) |
+| `public/firebase-messaging-sw.js` | **Remover** o `messaging.onBackgroundMessage()` e manter apenas o `push` event listener |
 
-```typescript
-// No PushDiagnostics.tsx - modificar updateServiceWorker
-const updateServiceWorker = async () => {
-  const registrations = await navigator.serviceWorker.getRegistrations();
-  
-  for (const registration of registrations) {
-    // Se há um SW esperando, forçar skipWaiting
-    if (registration.waiting) {
-      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-    }
-    await registration.update();
-  }
-};
-```
+### Por que essas correções?
 
-```javascript
-// No firebase-messaging-sw.js - adicionar handler para SKIP_WAITING
-self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-```
-
-### Parte 2: Garantir que Firebase SW é Registrado Corretamente
-
-O problema pode estar no VitePWA gerando um SW que sobrescreve o Firebase SW. Precisamos garantir que:
-
-1. O `firebase-messaging-sw.js` é registrado com escopo explícito
-2. O SW recebe corretamente os push events
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Modificação |
-|---------|-------------|
-| `public/firebase-messaging-sw.js` | Adicionar handler `SKIP_WAITING` e `install/activate` events |
-| `src/components/notifications/PushDiagnostics.tsx` | Corrigir lógica de verificação de SW e forçar ativação |
-| `src/hooks/usePushNotifications.tsx` | Garantir registro correto do SW e forçar ativação |
+1. **O trigger do banco já envia o push automaticamente** - não há necessidade de chamadas manuais na Edge Function
+2. **O `push` event listener é o handler universal** - funciona em todos os browsers incluindo Safari. O `onBackgroundMessage` do Firebase é redundante e causa duplicação
 
 ---
 
 ## Detalhes Técnicos
 
-### 1. firebase-messaging-sw.js
+### 1. `supabase/functions/process-notifications/index.ts`
 
-Adicionar no início do arquivo:
-
-```javascript
-// Forçar ativação imediata do Service Worker
-self.addEventListener('install', (event) => {
-  console.log('[SW] Installing...');
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating...');
-  event.waitUntil(clients.claim());
-});
-
-// Handler para mensagens do client (forçar skipWaiting)
-self.addEventListener('message', (event) => {
-  console.log('[SW] Message received:', event.data);
-  if (event.data?.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-```
-
-### 2. PushDiagnostics.tsx
-
-Corrigir `checkSwStatus` para detectar corretamente o estado:
+**Remover linhas 110-145** (o loop de push manual):
 
 ```typescript
-const checkSwStatus = useCallback(async () => {
-  if (!('serviceWorker' in navigator)) {
-    setSwStatus('none');
+// ANTES (problemático)
+async function batchCreateNotifications(notifications: NotificationData[]) {
+  if (notifications.length === 0) return;
+
+  const { error } = await supabase
+    .from('notifications')
+    .insert(notifications);
+
+  if (error) {
+    console.error('Error batch creating notifications:', error);
     return;
   }
 
-  try {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    
-    // Procurar especificamente pelo Firebase SW
-    const fcmReg = registrations.find(r => 
-      r.active?.scriptURL?.includes('firebase-messaging-sw.js')
-    );
-    
-    if (!fcmReg) {
-      // Procurar qualquer SW com escopo raiz
-      const anyReg = registrations.find(r => r.scope.endsWith('/'));
-      if (anyReg) {
-        if (anyReg.installing) {
-          setSwStatus('installing');
-          addLog('Service Worker instalando...', 'warning');
-        } else if (anyReg.waiting) {
-          setSwStatus('waiting');
-          addLog('SW aguardando - clique "Atualizar SW" para ativar', 'warning');
-        } else if (anyReg.active) {
-          setSwStatus('active');
-          addLog(`SW ativo: ${anyReg.active.scriptURL}`, 'success');
-        }
-      } else {
-        setSwStatus('none');
-        addLog('Nenhum Service Worker encontrado', 'error');
-      }
-      return;
+  // ❌ REMOVER TUDO ABAIXO - o trigger do banco já faz isso
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  for (const notif of notifications) {
+    try {
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+        // ...
+      });
+    } catch (e) {
+      // ...
     }
-    
-    setSwStatus('active');
-    addLog('Firebase SW ativo ✓', 'success');
-  } catch (error) {
-    setSwStatus('none');
-    addLog(`Erro ao verificar SW: ${error}`, 'error');
   }
-}, [addLog]);
+}
 ```
 
-Melhorar `updateServiceWorker` para forçar ativação:
-
 ```typescript
-const updateServiceWorker = async () => {
-  setIsUpdatingSW(true);
-  addLog('Forçando ativação do Service Worker...', 'info');
+// DEPOIS (correto)
+async function batchCreateNotifications(notifications: NotificationData[]) {
+  if (notifications.length === 0) return;
 
-  try {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    
-    for (const registration of registrations) {
-      // Se há um SW esperando, forçar skipWaiting
-      if (registration.waiting) {
-        addLog('SW em espera encontrado - enviando SKIP_WAITING', 'warning');
-        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      }
-      
-      await registration.update();
-      addLog(`SW atualizado: ${registration.scope}`, 'success');
-    }
+  const { error } = await supabase
+    .from('notifications')
+    .insert(notifications);
 
-    // Aguardar um pouco e verificar novamente
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    await checkSwStatus();
-    
-    toast({ title: "Service Worker atualizado!" });
-  } catch (error: any) {
-    addLog(`Erro: ${error.message}`, 'error');
-  } finally {
-    setIsUpdatingSW(false);
+  if (error) {
+    console.error('Error batch creating notifications:', error);
+    return;
   }
-};
+
+  // Push notification é disparado automaticamente pelo trigger do banco
+  console.log(`[Notifications] ${notifications.length} notificações criadas (push será enviado via trigger)`);
+}
 ```
 
-### 3. usePushNotifications.tsx
+### 2. `public/firebase-messaging-sw.js`
 
-No registro do SW, garantir ativação imediata:
+**Remover o handler duplicado** `messaging.onBackgroundMessage()`:
 
-```typescript
-// Register service worker with explicit scope
-const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-  scope: '/',
+```javascript
+// ANTES (problemático)
+messaging.onBackgroundMessage((payload) => {
+  console.log('[SW] onBackgroundMessage:', payload);
+  // Duplicação! O push event já trata isso
 });
-console.log('[Push] Service worker registered:', registration.scope);
 
-// Forçar ativação se estiver esperando
-if (registration.waiting) {
-  console.log('[Push] SW waiting, sending SKIP_WAITING');
-  registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-}
+self.addEventListener('push', (event) => {
+  // Handler universal
+});
+```
 
-// Aguardar até que o SW esteja ativo
-if (registration.installing) {
-  console.log('[Push] SW installing, waiting for activation...');
-  await new Promise<void>((resolve) => {
-    registration.installing!.addEventListener('statechange', (e) => {
-      if ((e.target as ServiceWorker).state === 'activated') {
-        resolve();
-      }
-    });
-  });
-}
+```javascript
+// DEPOIS (correto)
+// Removido onBackgroundMessage - usando apenas o push event universal
+
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push event recebido');
+  // Handler universal - funciona em todos os browsers
+});
 ```
 
 ---
 
-## Fluxo de Teste Após Implementação
+## Fluxo Corrigido
 
-1. Após o deploy, **Forçar atualização no iPhone**:
-   - Abra a PWA pelo ícone
-   - Vá em Configurações → Notificações
-   - Clique em **"Atualizar Service Worker"**
-   - Verifique se o status muda de "waiting" para "active"
+```text
+Tarefa criada/atualizada
+       ↓
+Trigger notify_task_assignment
+       ↓
+INSERT INTO notifications
+       ↓
+Trigger trg_push_on_new_notification
+       ↓
+send-push-notification (apenas 1x)
+       ↓
+FCM envia para dispositivo
+       ↓
+Service Worker: push event (apenas 1 handler)
+       ↓
+1 notificação exibida ✓
+```
 
-2. **Testar Push**:
-   - Clique em "Testar Push"
-   - Aguarde alguns segundos
-   - A notificação deve aparecer
+---
 
-3. **Se ainda não funcionar**:
-   - Reinstale a PWA (remover da tela inicial → adicionar novamente)
-   - Ative as notificações
-   - Teste novamente
+## Arquivos a Modificar
+
+| Arquivo | Mudança |
+|---------|---------|
+| `supabase/functions/process-notifications/index.ts` | Remover loop de push nas linhas 110-145 |
+| `public/firebase-messaging-sw.js` | Remover `messaging.onBackgroundMessage()` (linhas 48-52) |
 
 ---
 
@@ -244,7 +181,8 @@ if (registration.installing) {
 
 | Antes | Depois |
 |-------|--------|
-| SW status: "waiting" | SW status: "active" |
-| Push não aparece no iOS | Push aparece corretamente |
-| Conflito entre Workbox e Firebase SW | Firebase SW assume controle |
+| 4 notificações por evento | 1 notificação por evento |
+| Push manual + trigger automático | Apenas trigger automático |
+| 2 handlers no SW | 1 handler no SW |
+| Conflito de fontes | Fluxo único e previsível |
 
