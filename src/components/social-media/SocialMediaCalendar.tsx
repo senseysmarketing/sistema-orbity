@@ -84,10 +84,12 @@ export function SocialMediaCalendar() {
   };
 
   // Filtrar posts por data e filtros ativos
+  // IMPORTANTE: Usar post_date para o calendário (ou scheduled_date como fallback)
   const getFilteredPostsForDate = (date: Date) => {
     return allPosts.filter(post => {
-      // Filtro por data
-      const matchesDate = isSameDay(new Date(post.scheduled_date), date);
+      // Filtro por data - usar post_date prioritariamente
+      const effectiveDate = post.post_date || post.scheduled_date;
+      const matchesDate = isSameDay(new Date(effectiveDate), date);
       if (!matchesDate) return false;
       
       // Filtro por cliente

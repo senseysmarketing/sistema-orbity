@@ -5,7 +5,7 @@ import { PostKanbanColumn } from "./PostKanbanColumn";
 import { PostCard } from "./PostCard";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Filter } from "lucide-react";
+import { Plus, Filter, ArrowUpDown } from "lucide-react";
 import { PostFormDialog } from "./PostFormDialog";
 import { PostDetailsDialog } from "./PostDetailsDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -28,6 +28,7 @@ export function PostKanban() {
   const [filterContentType, setFilterContentType] = useState<string>("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [includeNoDate, setIncludeNoDate] = useState(false);
+  const [sortBy, setSortBy] = useState<"post_date" | "due_date">("post_date");
 
   const toStartOfDay = (d: Date) => {
     const copy = new Date(d);
@@ -128,14 +129,15 @@ export function PostKanban() {
       filtered = filtered.filter(post => post.post_type === filterContentType);
     }
 
-    // Filtro por período (scheduled_date)
+    // Filtro por período - usar a data selecionada no sortBy
     const from = dateRange?.from ? toStartOfDay(dateRange.from) : undefined;
     const to = dateRange?.to ? toEndOfDay(dateRange.to) : undefined;
     if (from) {
       filtered = filtered.filter((post) => {
-        const scheduled = (post as any).scheduled_date as string | null | undefined;
-        if (!scheduled) return includeNoDate;
-        const d = new Date(scheduled);
+        // Usar post_date ou due_date dependendo do sortBy
+        const dateField = sortBy === "due_date" ? post.due_date : (post.post_date || post.scheduled_date);
+        if (!dateField) return includeNoDate;
+        const d = new Date(dateField);
         if (isNaN(d.getTime())) return includeNoDate;
 
         if (to) return d >= from && d <= to;
@@ -144,7 +146,7 @@ export function PostKanban() {
     }
 
     return filtered;
-  }, [posts, filterClient, filterContentType, dateRange, includeNoDate]);
+  }, [posts, filterClient, filterContentType, dateRange, includeNoDate, sortBy]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const post = posts.find(p => p.id === event.active.id);
@@ -195,9 +197,15 @@ export function PostKanban() {
     return filteredPosts
       .filter(post => post.status === status)
       .sort((a, b) => {
-        const aTime = a?.scheduled_date ? new Date(a.scheduled_date).getTime() : Number.POSITIVE_INFINITY;
-        const bTime = b?.scheduled_date ? new Date(b.scheduled_date).getTime() : Number.POSITIVE_INFINITY;
-        return aTime - bTime;
+        // Ordenar pela data selecionada
+        const getDate = (post: SocialMediaPost) => {
+          if (sortBy === "due_date") {
+            return post.due_date ? new Date(post.due_date).getTime() : Number.POSITIVE_INFINITY;
+          }
+          const postDate = post.post_date || post.scheduled_date;
+          return postDate ? new Date(postDate).getTime() : Number.POSITIVE_INFINITY;
+        };
+        return getDate(a) - getDate(b);
       });
   };
 
@@ -205,13 +213,15 @@ export function PostKanban() {
     filterClient !== "all" ||
     filterContentType !== "all" ||
     !!dateRange?.from ||
-    includeNoDate !== false;
+    includeNoDate !== false ||
+    sortBy !== "post_date";
 
   const clearFilters = () => {
     setFilterClient("all");
     setFilterContentType("all");
     setDateRange(undefined);
     setIncludeNoDate(false);
+    setSortBy("post_date");
   };
 
   const handlePostClick = (post: SocialMediaPost) => {
@@ -289,6 +299,20 @@ export function PostKanban() {
               label="Período"
               active={!!dateRange?.from || includeNoDate}
             />
+
+            {/* Seletor de ordenação */}
+            <Select value={sortBy} onValueChange={(value) => setSortBy(value as "post_date" | "due_date")}>
+              <SelectTrigger className="w-[180px]">
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="h-4 w-4" />
+                  <SelectValue placeholder="Ordenar por" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="post_date">Data de Postagem</SelectItem>
+                <SelectItem value="due_date">Data de Entrega</SelectItem>
+              </SelectContent>
+            </Select>
 
             {hasActiveFilters && (
               <Button variant="outline" onClick={clearFilters}>

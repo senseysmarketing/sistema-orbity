@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSocialMediaPosts, SocialMediaPost } from "@/hooks/useSocialMediaPosts";
+import { useSocialMediaSettings } from "@/hooks/useSocialMediaSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +16,7 @@ import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
 import { MultiClientSelector } from "@/components/clients/MultiClientSelector";
 import { useClientRelations } from "@/hooks/useClientRelations";
 import { FileAttachments, Attachment } from "@/components/ui/file-attachments";
+import { Info } from "lucide-react";
 
 interface PostFormDialogProps {
   open: boolean;
@@ -30,6 +32,7 @@ interface Client {
 
 export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: PostFormDialogProps) {
   const { createPost, updatePost } = useSocialMediaPosts();
+  const { getDefaultDueDateDaysBefore } = useSocialMediaSettings();
   const { currentAgency } = useAgency();
   const { toast } = useToast();
   const { fetchClientIds, updateClientRelations } = useClientRelations();
@@ -39,6 +42,14 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(false);
+  const [dueDateManuallyEdited, setDueDateManuallyEdited] = useState(false);
+
+  // Helper para calcular due_date baseado em post_date
+  const calculateDueDate = (postDate: string, daysBefore: number): string => {
+    const date = new Date(postDate);
+    date.setDate(date.getDate() - daysBefore);
+    return date.toISOString();
+  };
 
   // Helper para converter Date para formato datetime-local mantendo fuso horário local
   const toLocalDatetimeString = (date: Date) => {
@@ -51,6 +62,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     title: "",
     description: "",
     scheduled_date: defaultDate?.toISOString() || new Date().toISOString(),
+    post_date: defaultDate?.toISOString() || new Date().toISOString(),
+    due_date: "",
     post_type: "feed",
     platform: "instagram",
     status: "draft",
@@ -60,12 +73,24 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     subtasks: [] as Subtask[],
   });
 
+  // Calcular due_date inicial quando post_date muda e não foi editado manualmente
+  useEffect(() => {
+    if (!dueDateManuallyEdited && formData.post_date) {
+      const daysBefore = getDefaultDueDateDaysBefore();
+      const newDueDate = calculateDueDate(formData.post_date, daysBefore);
+      setFormData(prev => ({ ...prev, due_date: newDueDate }));
+    }
+  }, [formData.post_date, dueDateManuallyEdited, getDefaultDueDateDaysBefore]);
+
   useEffect(() => {
     if (editPost) {
+      const effectivePostDate = editPost.post_date || editPost.scheduled_date;
       setFormData({
         title: editPost.title,
         description: editPost.description || "",
         scheduled_date: editPost.scheduled_date,
+        post_date: effectivePostDate,
+        due_date: editPost.due_date || "",
         post_type: editPost.post_type,
         platform: editPost.platform,
         status: editPost.status,
@@ -74,6 +99,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         notes: editPost.notes || "",
         subtasks: editPost.subtasks || [],
       });
+      // Se o post já tem due_date, consideramos que foi editado manualmente
+      setDueDateManuallyEdited(!!editPost.due_date);
       // Carregar anexos existentes
       if (editPost.attachments && Array.isArray(editPost.attachments)) {
         setAttachments(editPost.attachments as unknown as Attachment[]);
@@ -81,10 +108,14 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         setAttachments([]);
       }
     } else {
+      const defaultPostDate = defaultDate?.toISOString() || new Date().toISOString();
+      const daysBefore = getDefaultDueDateDaysBefore();
       setFormData({
         title: "",
         description: "",
-        scheduled_date: defaultDate?.toISOString() || new Date().toISOString(),
+        scheduled_date: defaultPostDate,
+        post_date: defaultPostDate,
+        due_date: calculateDueDate(defaultPostDate, daysBefore),
         post_type: "feed",
         platform: "instagram",
         status: "draft",
@@ -95,6 +126,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
       });
       setSelectedClientIds([]);
       setAttachments([]);
+      setDueDateManuallyEdited(false);
     }
   }, [editPost, defaultDate, open]);
 
@@ -318,10 +350,11 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
       if (preferenceData && preferenceData.preferred_times && Array.isArray(preferenceData.preferred_times) && preferenceData.preferred_times.length > 0) {
         // Pegar o primeiro horário preferido
         const preferredTime = preferenceData.preferred_times[0] as string;
-        const currentDate = new Date(formData.scheduled_date);
+        const currentDate = new Date(formData.post_date);
         const [hours, minutes] = preferredTime.split(':');
         currentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-        setFormData(prev => ({ ...prev, scheduled_date: currentDate.toISOString() }));
+        const newPostDate = currentDate.toISOString();
+        setFormData(prev => ({ ...prev, scheduled_date: newPostDate, post_date: newPostDate }));
       }
     };
 
@@ -348,7 +381,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
           const currentDate = new Date(defaultDate);
           const [hours, minutes] = preferredTime.split(':');
           currentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-          setFormData(prev => ({ ...prev, scheduled_date: currentDate.toISOString() }));
+          const newPostDate = currentDate.toISOString();
+          setFormData(prev => ({ ...prev, scheduled_date: newPostDate, post_date: newPostDate }));
         }
       };
 
@@ -364,6 +398,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
       const data = {
         ...formData,
         client_id: selectedClientIds[0] || null, // Keep first client for backward compatibility
+        scheduled_date: formData.post_date, // Manter scheduled_date sincronizado com post_date para compatibilidade
         hashtags: formData.hashtags.split(",").map(h => h.trim()).filter(Boolean),
         attachments: attachments as any,
         mentions: [],
@@ -577,30 +612,69 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Clientes</Label>
-              <MultiClientSelector
-                clients={clients}
-                selectedClientIds={selectedClientIds}
-                onSelectionChange={setSelectedClientIds}
-                placeholder="Selecionar clientes..."
-              />
-            </div>
+          <div>
+            <Label>Clientes</Label>
+            <MultiClientSelector
+              clients={clients}
+              selectedClientIds={selectedClientIds}
+              onSelectionChange={setSelectedClientIds}
+              placeholder="Selecionar clientes..."
+            />
+          </div>
 
-            <div>
-              <Label htmlFor="scheduled_date">Data/Hora de Publicação *</Label>
-              <Input
-                id="scheduled_date"
-                type="datetime-local"
-                value={toLocalDatetimeString(new Date(formData.scheduled_date))}
-                onChange={(e) => {
-                  // Converter o valor local para ISO mantendo o fuso horário correto
-                  const localDateTime = new Date(e.target.value);
-                  setFormData({ ...formData, scheduled_date: localDateTime.toISOString() });
-                }}
-                required
-              />
+          {/* Seção de Datas */}
+          <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
+            <h4 className="font-medium text-sm flex items-center gap-2">
+              📅 Datas de Publicação e Entrega
+            </h4>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="post_date">Data de Postagem *</Label>
+                <Input
+                  id="post_date"
+                  type="datetime-local"
+                  value={toLocalDatetimeString(new Date(formData.post_date))}
+                  onChange={(e) => {
+                    const localDateTime = new Date(e.target.value);
+                    const newPostDate = localDateTime.toISOString();
+                    setFormData({ 
+                      ...formData, 
+                      post_date: newPostDate,
+                      scheduled_date: newPostDate // Manter sincronizado
+                    });
+                    // Recalcular due_date se não foi editado manualmente
+                    if (!dueDateManuallyEdited) {
+                      const daysBefore = getDefaultDueDateDaysBefore();
+                      const newDueDate = calculateDueDate(newPostDate, daysBefore);
+                      setFormData(prev => ({ ...prev, due_date: newDueDate }));
+                    }
+                  }}
+                  required
+                />
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  Quando o conteúdo vai ao ar
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="due_date">Data Limite da Arte</Label>
+                <Input
+                  id="due_date"
+                  type="datetime-local"
+                  value={formData.due_date ? toLocalDatetimeString(new Date(formData.due_date)) : ""}
+                  onChange={(e) => {
+                    const localDateTime = new Date(e.target.value);
+                    setFormData({ ...formData, due_date: localDateTime.toISOString() });
+                    setDueDateManuallyEdited(true);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  Até quando a arte precisa estar pronta
+                </p>
+              </div>
             </div>
           </div>
 

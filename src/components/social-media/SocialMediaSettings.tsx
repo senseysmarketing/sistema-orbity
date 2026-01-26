@@ -5,6 +5,7 @@ import { PlatformManager } from "./settings/PlatformManager";
 import { ApprovalRulesManager } from "./settings/ApprovalRulesManager";
 import { PostTemplateManager } from "./settings/PostTemplateManager";
 import { SchedulePreferencesManager } from "./settings/SchedulePreferencesManager";
+import { DueDateSettingsManager } from "./settings/DueDateSettingsManager";
 
 export function SocialMediaSettings() {
   return (
@@ -17,13 +18,14 @@ export function SocialMediaSettings() {
       </div>
 
       <Tabs defaultValue="statuses" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-7">
           <TabsTrigger value="statuses">Status</TabsTrigger>
           <TabsTrigger value="content-types">Tipos</TabsTrigger>
           <TabsTrigger value="platforms">Plataformas</TabsTrigger>
           <TabsTrigger value="approval">Aprovação</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="schedule">Horários</TabsTrigger>
+          <TabsTrigger value="deadlines">Prazos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="statuses">
@@ -48,6 +50,10 @@ export function SocialMediaSettings() {
 
         <TabsContent value="schedule">
           <SchedulePreferencesManager />
+        </TabsContent>
+
+        <TabsContent value="deadlines">
+          <DueDateSettingsManager />
         </TabsContent>
       </Tabs>
     </div>
