@@ -1,43 +1,68 @@
 
+# Abreviações Inteligentes nos Badges de Tarefas
 
-# Ajuste de Layout dos Badges no Card de Tarefas
+## Problema
 
-## Problema Identificado
+Quando há múltiplos badges no card (Tipo + Prioridade + Urgência), eles não cabem na mesma linha e ficam visualmente poluídos, mesmo com scroll horizontal.
 
-Os badges (Tipo, Prioridade, Urgência) estão quebrando para múltiplas linhas devido ao `flex-wrap` quando há 3 badges no card. Isso acontece porque a largura do card é fixa (330px) e não há espaço suficiente para todos os badges na mesma linha.
+## Solução
 
-## Solução Proposta
+Usar versões abreviadas para os textos dos badges, mantendo a informação essencial em menos caracteres. Isso garantirá que todos os badges caibam confortavelmente na linha sem necessidade de scroll.
 
-Reorganizar o layout do card para que todos os badges fiquem alinhados horizontalmente, utilizando scroll horizontal quando necessário ou reorganizando a hierarquia visual.
+## Abreviações Propostas
 
-**Opção escolhida**: Manter todos os badges na mesma linha com `overflow-x-auto` e `flex-nowrap`, permitindo scroll horizontal sutil quando necessário. Isso garante que os badges nunca quebrem para uma nova linha.
+### Prioridade
+| Atual | Abreviado |
+|-------|-----------|
+| Baixa | Baixa |
+| Média | Média |
+| Alta | Alta |
+*(Prioridades já são curtas, mantemos como estão)*
 
-## Alterações
+### Urgência
+| Atual | Abreviado |
+|-------|-----------|
+| Atrasada | Atrasada |
+| Hoje | Hoje |
+| Amanhã | Amanhã |
+| Esta Semana | Sem. |
+*(Apenas "Esta Semana" precisa abreviar)*
 
-**Arquivo**: `src/components/ui/task-card.tsx`
+### Tipo de Tarefa
+| Atual | Abreviado |
+|-------|-----------|
+| Reunião | Reunião |
+| Design | Design |
+| Desenvolvimento | Desenv. |
+| Conteúdo | Conteúdo |
+| Suporte | Suporte |
+| Administrativo | Admin. |
+*(Abreviar apenas os mais longos)*
 
-**De**:
-```tsx
-<div className="flex gap-1 flex-wrap">
-```
+## Alterações Técnicas
 
-**Para**:
-```tsx
-<div className="flex gap-1 flex-nowrap overflow-x-auto scrollbar-hide">
-```
+### 1. Hook `useTaskTypes.tsx`
+Adicionar função `getTypeShortName(slug)` que retorna a versão abreviada do nome do tipo.
 
-Também vamos adicionar uma classe utilitária para esconder a scrollbar mantendo a funcionalidade de scroll (para casos extremos onde há muitos badges).
+### 2. `task-card.tsx`
+- Usar `getTypeShortName` ao invés de `getTypeName` no badge
+- Para urgência, mostrar apenas o ícone quando for "Esta Semana" (sem texto) ou abreviar para "Sem."
+
+### 3. Interface `TaskCardProps`
+Adicionar prop opcional `getTypeShortName` para compatibilidade.
 
 ## Resultado Esperado
 
-- Todos os badges (Tipo, Prioridade, Urgência) ficam alinhados na mesma linha
-- Em casos raros com textos muito longos, haverá scroll horizontal discreto
-- Layout mais limpo e consistente visualmente
+- Todos os badges cabem na mesma linha sem scroll
+- Informação mantida de forma legível
+- Layout limpo e consistente
+- Tooltip com nome completo pode ser adicionado para acessibilidade (opcional)
 
 ## Arquivos Afetados
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/ui/task-card.tsx` | Alterar layout dos badges para `flex-nowrap` |
-| `src/index.css` | Adicionar classe utilitária `.scrollbar-hide` (se não existir) |
-
+| `src/hooks/useTaskTypes.tsx` | Adicionar `getTypeShortName()` |
+| `src/components/ui/task-card.tsx` | Usar abreviações nos badges |
+| `src/components/ui/sortable-task-card.tsx` | Passar `getTypeShortName` como prop |
+| `src/pages/Tasks.tsx` | Passar `getTypeShortName` para os componentes |
