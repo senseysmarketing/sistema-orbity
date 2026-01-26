@@ -1,43 +1,83 @@
 
-# Correção do Service Worker para iOS/Safari
 
-## Problema Identificado
+# Correção Definitiva: Push Notifications no iPhone
 
-O **backend está funcionando perfeitamente** - os logs mostram:
-- ✅ `[FCM] Push notifications sent: 4/4`
-- ✅ `[FCM] Message sent successfully`
+## Problemas Identificados
 
-O problema está no **Service Worker** que não processa corretamente as notificações no Safari/iOS.
+### 1. Múltiplos Tokens Obsoletos
+Você tem **5 tokens ativos** para o mesmo usuário, incluindo 4 do iPhone. Cada reinstalação da PWA gera novo token, mas os antigos não são limpos. O FCM envia para todos, mas apenas o token **mais recente** funciona no dispositivo atual.
 
----
+| Token (início) | Plataforma | Status | Problema |
+|----------------|------------|--------|----------|
+| `dzubEJ6e8...` | iPhone 18.7 | ✅ Ativo (mais recente) | Este é o correto |
+| `ec5I6ovvQ...` | iPhone 18.7 | ⚠️ Ativo (obsoleto) | Deve ser desativado |
+| `cuVsf32RF...` | iPhone 18.7 | ⚠️ Ativo (obsoleto) | Deve ser desativado |
+| `e0YBtIy4X...` | iPhone 18.7 | ⚠️ Ativo (obsoleto) | Deve ser desativado |
+| `fljQCFwBr...` | Mac Chrome | ✅ Ativo | Correto para Mac |
 
-## Problemas no Service Worker Atual
+### 2. URL Relativa no FCM Options
+O campo `fcm_options.link` está usando `/dashboard` (relativo) quando deveria usar URL absoluta `https://sistema-orbity.lovable.app/dashboard`. No Safari/iOS isso pode impedir a notificação de funcionar.
 
-| Problema | Impacto no iOS |
-|----------|----------------|
-| Inicialização duplicada do Firebase | Pode causar erros silenciosos no Safari |
-| Sem fallback `push` event listener | Safari pode não chamar `onBackgroundMessage` |
-| Propriedades `vibrate` e `requireInteraction` | Safari ignora ou pode falhar silenciosamente |
-| Ícones com caminho relativo `/favicon.ico` | Safari precisa de URLs absolutas |
+### 3. Falta de Limpeza de Tokens Antigos
+Quando o usuário ativa push notifications novamente após reinstalar, devemos **desativar tokens anteriores do mesmo dispositivo**.
 
 ---
 
 ## Solução
 
-### 1. Corrigir Service Worker (`firebase-messaging-sw.js`)
+### Etapa 1: Limpar Tokens Obsoletos (SQL)
 
-Aplicar as correções sugeridas pelo ChatGPT:
+Executar uma limpeza manual dos tokens antigos para seu usuário, mantendo apenas o mais recente por dispositivo:
 
-- **Inicialização única**: Remover inicialização duplicada
-- **Fallback push listener**: Adicionar `self.addEventListener('push', ...)` para Safari
-- **Remover propriedades problemáticas**: `vibrate`, `requireInteraction`
-- **URLs absolutas para ícones**: Usar `https://sistema-orbity.lovable.app/favicon.ico`
+```sql
+-- Desativar tokens antigos de iPhone, mantendo apenas o mais recente
+UPDATE push_subscriptions 
+SET is_active = false 
+WHERE user_id = '03755812-224d-42d4-b651-bdbc09c323ad'
+  AND device_info->>'platform' = 'iPhone'
+  AND id != '211258a4-6812-491c-85d5-c42ecfeed948'; -- O token mais recente
+```
 
-### 2. Corrigir Edge Function (`send-push-notification`)
+### Etapa 2: Corrigir Edge Function (`send-push-notification`)
 
-Remover propriedades não suportadas do payload FCM:
-- Remover `vibrate` do payload webpush
-- Remover `requireInteraction` do payload webpush
+Atualizar o payload FCM para usar **URL absoluta** no `fcm_options.link`:
+
+```typescript
+webpush: {
+  fcm_options: {
+    link: payload.data?.action_url?.startsWith('http') 
+      ? payload.data.action_url 
+      : `https://sistema-orbity.lovable.app${payload.data?.action_url || '/dashboard'}`,
+  },
+},
+```
+
+### Etapa 3: Melhorar Hook `usePushNotifications`
+
+Adicionar lógica para **desativar tokens anteriores do mesmo dispositivo** antes de salvar um novo:
+
+```typescript
+const saveToken = useCallback(async (fcmToken: string) => {
+  if (!user || !currentAgency) return;
+
+  try {
+    // 1. Desativar tokens anteriores deste dispositivo
+    await supabase
+      .from('push_subscriptions')
+      .update({ is_active: false })
+      .eq('user_id', user.id)
+      .neq('fcm_token', fcmToken);
+
+    // 2. Upsert o novo token
+    await supabase.from('push_subscriptions').upsert({
+      user_id: user.id,
+      agency_id: currentAgency.id,
+      fcm_token: fcmToken,
+      // ... resto do código
+    });
+  } catch (error) { /* ... */ }
+}, [user, currentAgency]);
+```
 
 ---
 
@@ -45,95 +85,28 @@ Remover propriedades não suportadas do payload FCM:
 
 | Arquivo | Ação |
 |---------|------|
-| `public/firebase-messaging-sw.js` | Reescrever com versão robusta para Safari |
-| `supabase/functions/send-push-notification/index.ts` | Remover propriedades problemáticas do payload |
-
----
-
-## Novo Service Worker
-
-```javascript
-// firebase-messaging-sw.js (versão robusta para iOS)
-
-importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBIDL3R7nd0pE0wzmXdNePWTSyxOvyZ0cY",
-  authDomain: "orbityapp-f710e.firebaseapp.com",
-  projectId: "orbityapp-f710e",
-  storageBucket: "orbityapp-f710e.appspot.com",
-  messagingSenderId: "929526059094",
-  appId: "1:929526059094:web:61fb87a4f693ddd61b2bf7"
-};
-
-// Inicialização única e segura
-try {
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-  }
-} catch (e) {
-  console.error('[SW] Firebase init error:', e);
-}
-
-const messaging = firebase.messaging();
-
-// 1) Firebase background handler
-messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] onBackgroundMessage:', payload);
-  // Mostrar notificação via fallback push handler
-});
-
-// 2) Fallback universal - essencial para Safari/iOS
-self.addEventListener('push', (event) => {
-  console.log('[SW] Push event recebido');
-
-  if (!event.data) return;
-
-  event.waitUntil((async () => {
-    let msg = {};
-    try {
-      msg = event.data.json();
-    } catch {
-      msg = { data: { body: event.data.text() } };
-    }
-
-    const title = msg?.notification?.title || msg?.data?.title || 'Nova notificação';
-    const body = msg?.notification?.body || msg?.data?.body || '';
-    const data = msg?.data || {};
-
-    await self.registration.showNotification(title, {
-      body,
-      icon: 'https://sistema-orbity.lovable.app/favicon.ico',
-      badge: 'https://sistema-orbity.lovable.app/favicon.ico',
-      data,
-      tag: 'orbity-notification'
-    });
-  })());
-});
-
-// 3) Click handler
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  // Navegar para URL de ação
-});
-```
+| Nova migration SQL | Limpar tokens obsoletos |
+| `supabase/functions/send-push-notification/index.ts` | Usar URL absoluta no `fcm_options.link` |
+| `src/hooks/usePushNotifications.tsx` | Desativar tokens antigos ao ativar novos |
 
 ---
 
 ## Resultado Esperado
 
-Após as correções:
-
-1. ✅ Push notifications funcionarão no iPhone/Safari
-2. ✅ Inicialização única e estável
-3. ✅ Fallback garante que a notificação sempre aparece
-4. ✅ Sem propriedades problemáticas para iOS
+1. ✅ Apenas o token mais recente do iPhone ficará ativo
+2. ✅ O FCM enviará apenas para o dispositivo correto
+3. ✅ URL absoluta garantirá compatibilidade com Safari/iOS
+4. ✅ Próximas reinstalações limpam tokens automaticamente
 
 ---
 
 ## Teste Após Implementação
 
-1. **Desinstalar e reinstalar PWA** (necessário para atualizar o Service Worker)
-2. Criar uma tarefa atribuída a você
-3. A notificação deve aparecer no iPhone
+1. Executar a migration para limpar tokens
+2. Deploy das alterações
+3. **Desinstalar e reinstalar a PWA** no iPhone
+4. Ativar push notifications
+5. Verificar que só há **1 token ativo** para iPhone
+6. Criar uma tarefa atribuída a você
+7. A notificação deve aparecer no iPhone
+
