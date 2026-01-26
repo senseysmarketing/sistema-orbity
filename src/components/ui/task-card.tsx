@@ -98,9 +98,9 @@ export function TaskCard({
       <div className="flex items-center justify-between gap-2 mb-2">
         <StatusIcon className="h-5 w-5 flex-shrink-0" />
         <div className="flex gap-1 flex-nowrap overflow-x-auto scrollbar-hide">
-          {task.task_type && getTypeName && getTypeIcon && (
+          {task.task_type && getTypeName && (
             <Badge variant="outline" className="text-xs">
-              {getTypeIcon(task.task_type)} {getTypeName(task.task_type)}
+              {getTypeName(task.task_type)}
             </Badge>
           )}
           <Badge variant="outline" className={`${getPriorityColor(task.priority)} text-white text-xs`}>
