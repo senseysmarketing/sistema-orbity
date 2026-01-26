@@ -26,6 +26,7 @@ export function PostKanban() {
   const [editingPost, setEditingPost] = useState<SocialMediaPost | null>(null);
   const [filterClient, setFilterClient] = useState<string>("all");
   const [filterContentType, setFilterContentType] = useState<string>("all");
+  const [filterUser, setFilterUser] = useState<string>("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [includeNoDate, setIncludeNoDate] = useState(false);
   const [sortBy, setSortBy] = useState<"post_date" | "due_date">("post_date");
@@ -89,6 +90,19 @@ export function PostKanban() {
     return Array.from(clientsMap, ([id, name]) => ({ id, name }));
   }, [posts]);
 
+  // Obter lista de usuários únicos atribuídos aos posts
+  const uniqueUsers = useMemo(() => {
+    const usersMap = new Map();
+    posts.forEach(post => {
+      (post.assigned_users || []).forEach(user => {
+        if (user.user_id && !usersMap.has(user.user_id)) {
+          usersMap.set(user.user_id, user.name);
+        }
+      });
+    });
+    return Array.from(usersMap, ([id, name]) => ({ id, name }));
+  }, [posts]);
+
   // Tipos de conteúdo padrão
   const defaultContentTypes = [
     { id: 'feed', label: 'Feed' },
@@ -127,6 +141,12 @@ export function PostKanban() {
 
     if (filterContentType !== "all") {
       filtered = filtered.filter(post => post.post_type === filterContentType);
+    }
+
+    if (filterUser !== "all") {
+      filtered = filtered.filter(post => 
+        (post.assigned_users || []).some(user => user.user_id === filterUser)
+      );
     }
 
     // Filtro por período - usar a data selecionada no sortBy
@@ -212,6 +232,7 @@ export function PostKanban() {
   const hasActiveFilters =
     filterClient !== "all" ||
     filterContentType !== "all" ||
+    filterUser !== "all" ||
     !!dateRange?.from ||
     includeNoDate !== false ||
     sortBy !== "post_date";
@@ -219,6 +240,7 @@ export function PostKanban() {
   const clearFilters = () => {
     setFilterClient("all");
     setFilterContentType("all");
+    setFilterUser("all");
     setDateRange(undefined);
     setIncludeNoDate(false);
     setSortBy("post_date");
@@ -285,6 +307,20 @@ export function PostKanban() {
                 {allContentTypes.map(type => (
                   <SelectItem key={type.id} value={type.id}>
                     {type.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterUser} onValueChange={setFilterUser}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Todos os usuários" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os usuários</SelectItem>
+                {uniqueUsers.map(user => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name}
                   </SelectItem>
                 ))}
               </SelectContent>
