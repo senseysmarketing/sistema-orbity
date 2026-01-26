@@ -3103,6 +3103,64 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          agency_id: string | null
+          created_at: string | null
+          device_info: Json | null
+          fcm_token: string
+          id: string
+          is_active: boolean | null
+          platform: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          agency_id?: string | null
+          created_at?: string | null
+          device_info?: Json | null
+          fcm_token: string
+          id?: string
+          is_active?: boolean | null
+          platform?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          agency_id?: string | null
+          created_at?: string | null
+          device_info?: Json | null
+          fcm_token?: string
+          id?: string
+          is_active?: boolean | null
+          platform?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       reminder_lists: {
         Row: {
           agency_id: string | null
