@@ -170,6 +170,12 @@ async function sendToFCM(
 
   const fcmUrl = `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`;
 
+  // Build absolute URL for fcm_options.link (Safari/iOS requirement)
+  const actionUrl = payload.data?.action_url || '/dashboard';
+  const absoluteActionUrl = actionUrl.startsWith('http') 
+    ? actionUrl 
+    : `https://sistema-orbity.lovable.app${actionUrl}`;
+
   const message = {
     message: {
       token: fcmToken,
@@ -183,12 +189,12 @@ async function sendToFCM(
           badge: 'https://sistema-orbity.lovable.app/favicon.ico',
         },
         fcm_options: {
-          link: payload.data?.action_url || '/dashboard',
+          link: absoluteActionUrl,
         },
       },
       data: {
         ...payload.data,
-        click_action: payload.data?.action_url || '/dashboard',
+        click_action: absoluteActionUrl,
       },
     },
   };
