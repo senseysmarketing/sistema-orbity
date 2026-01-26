@@ -1,15 +1,16 @@
 import { Badge } from "@/components/ui/badge";
 import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
-import { Instagram, Facebook, Linkedin, Twitter, Youtube, Image, Film, LayoutGrid, Zap, Clock, AlertCircle, Users, Archive } from "lucide-react";
-import { format, isToday, isBefore, startOfDay, addDays, isBefore as isBeforeDate } from "date-fns";
+import { Instagram, Facebook, Linkedin, Twitter, Youtube, Image, Film, LayoutGrid, Zap, Clock, AlertCircle, Users, Archive, Calendar } from "lucide-react";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { PostDueDateBadge, getDueDateStatus, formatDueDate, formatPostDate } from "./PostDueDateBadge";
 
 interface PostCardProps {
   post: SocialMediaPost;
   compact?: boolean;
   onClick?: (e?: React.MouseEvent) => void;
-  showArchived?: boolean; // Mostra indicador de arquivado
+  showArchived?: boolean;
 }
 
 const platformIcons = {
@@ -76,24 +77,14 @@ const getPriorityLabel = (priority: string) => {
   return priorityConfig[priority as keyof typeof priorityConfig]?.label || priority;
 };
 
-const getUrgencyBadge = (scheduledDate: string) => {
-  const now = startOfDay(new Date());
-  const postDate = startOfDay(new Date(scheduledDate));
-  
-  if (isBefore(postDate, now)) {
-    return { label: "Atrasado", color: "bg-red-500", icon: AlertCircle };
-  }
-  
-  if (isToday(new Date(scheduledDate))) {
-    return { label: "Hoje", color: "bg-orange-500", icon: Clock };
-  }
-  
-  const weekFromNow = addDays(now, 7);
-  if (isBefore(postDate, weekFromNow)) {
-    return { label: "Esta semana", color: "bg-blue-500", icon: Clock };
-  }
-  
-  return null;
+// Obter data efetiva de postagem (post_date ou scheduled_date como fallback)
+const getEffectivePostDate = (post: SocialMediaPost): string => {
+  return post.post_date || post.scheduled_date;
+};
+
+// Obter data limite de entrega (due_date)
+const getEffectiveDueDate = (post: SocialMediaPost): string | null | undefined => {
+  return post.due_date;
 };
 
 export function PostCard({ post, compact = false, onClick, showArchived = false }: PostCardProps) {
@@ -101,8 +92,11 @@ export function PostCard({ post, compact = false, onClick, showArchived = false 
   const ContentTypeIcon = contentTypeIcons[post.post_type as keyof typeof contentTypeIcons] || Image;
   const clientColor = getClientColor(post.client_id);
   const statusInfo = statusConfig[post.status as keyof typeof statusConfig] || statusConfig.draft;
-  const urgencyBadge = getUrgencyBadge(post.scheduled_date);
   const isArchived = showArchived && post.archived;
+  
+  const effectivePostDate = getEffectivePostDate(post);
+  const effectiveDueDate = getEffectiveDueDate(post);
+  const dueDateStatus = getDueDateStatus(effectiveDueDate, post.status);
 
   if (compact) {
     return (
@@ -120,11 +114,16 @@ export function PostCard({ post, compact = false, onClick, showArchived = false 
           <span className="truncate flex-1">{post.title}</span>
           <div className={`h-2 w-2 rounded-full ${statusInfo.color}`} />
         </div>
+        {/* Mostrar due_date no card compacto se existir e não estiver completo */}
+        {effectiveDueDate && dueDateStatus && dueDateStatus.type !== 'completed' && dueDateStatus.type !== 'on_time' && (
+          <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
+            <Clock className="h-2.5 w-2.5" />
+            <span>Arte: {formatDueDate(effectiveDueDate)}</span>
+          </div>
+        )}
       </div>
     );
   }
-
-  const UrgencyIcon = urgencyBadge?.icon;
 
   return (
     <div 
@@ -152,11 +151,9 @@ export function PostCard({ post, compact = false, onClick, showArchived = false 
           <Badge variant="outline" className={`${getPriorityColor(post.priority)} text-white text-xs`}>
             {getPriorityLabel(post.priority)}
           </Badge>
-          {urgencyBadge && UrgencyIcon && post.status !== 'published' && !isArchived && (
-            <Badge variant="outline" className={`${urgencyBadge.color} text-white text-xs flex items-center gap-1`}>
-              <UrgencyIcon className="h-3 w-3" />
-              {urgencyBadge.label}
-            </Badge>
+          {/* Badge de urgência baseado em due_date */}
+          {!isArchived && (
+            <PostDueDateBadge dueDate={effectiveDueDate} status={post.status} size="sm" />
           )}
         </div>
       </div>
@@ -170,22 +167,33 @@ export function PostCard({ post, compact = false, onClick, showArchived = false 
         </p>
       )}
       
-      {/* Linha 3: Data + Badge Cliente */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-        <span>
-          {format(new Date(post.scheduled_date), "dd/MM/yyyy", { locale: ptBR })}
-        </span>
-        {post.clients && (
+      {/* Linha 3: Datas - Post Date e Due Date */}
+      <div className="flex items-center gap-3 text-xs text-muted-foreground mb-2">
+        <div className="flex items-center gap-1" title="Data de postagem">
+          <Calendar className="h-3.5 w-3.5" />
+          <span>Post: {formatPostDate(effectivePostDate)}</span>
+        </div>
+        {effectiveDueDate && (
+          <div className="flex items-center gap-1" title="Data limite da arte">
+            <Clock className="h-3.5 w-3.5" />
+            <span>Arte até: {formatDueDate(effectiveDueDate)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Linha 4: Cliente */}
+      {post.clients && (
+        <div className="mb-2">
           <span 
-            className="font-medium px-2 py-0.5 rounded"
+            className="font-medium px-2 py-0.5 rounded text-xs"
             style={{ backgroundColor: clientColor, color: 'white' }}
           >
             {post.clients.name}
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Linha 4: Usuários Atribuídos */}
+      {/* Linha 5: Usuários Atribuídos */}
       {post.assigned_users && post.assigned_users.length > 0 && (
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Users className="h-3 w-3" />

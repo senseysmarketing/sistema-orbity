@@ -3828,12 +3828,14 @@ export type Database = {
           created_at: string | null
           created_by: string
           description: string | null
+          due_date: string | null
           hashtags: string[] | null
           id: string
           mentions: string[] | null
           notes: string | null
           notification_sent_at: string | null
           platform: string
+          post_date: string | null
           post_type: string
           priority: string
           scheduled_date: string
@@ -3853,12 +3855,14 @@ export type Database = {
           created_at?: string | null
           created_by: string
           description?: string | null
+          due_date?: string | null
           hashtags?: string[] | null
           id?: string
           mentions?: string[] | null
           notes?: string | null
           notification_sent_at?: string | null
           platform: string
+          post_date?: string | null
           post_type: string
           priority?: string
           scheduled_date: string
@@ -3878,12 +3882,14 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           description?: string | null
+          due_date?: string | null
           hashtags?: string[] | null
           id?: string
           mentions?: string[] | null
           notes?: string | null
           notification_sent_at?: string | null
           platform?: string
+          post_date?: string | null
           post_type?: string
           priority?: string
           scheduled_date?: string
@@ -3992,6 +3998,52 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_media_settings: {
+        Row: {
+          agency_id: string
+          created_at: string
+          default_due_date_days_before: number
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          default_due_date_days_before?: number
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          default_due_date_days_before?: number
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_media_settings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_media_settings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "social_media_settings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
           },
         ]
       }

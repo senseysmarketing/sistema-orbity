@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History, ListTodo, Users, Lock, Copy } from "lucide-react";
+import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History, ListTodo, Users, Lock, Copy, Clock } from "lucide-react";
 import { SocialMediaPost, Subtask } from "@/hooks/useSocialMediaPosts";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
@@ -14,6 +14,7 @@ import { PostAssignedUsers } from "./PostAssignedUsers";
 import { useDeletePermission } from "@/hooks/useDeletePermission";
 import { LinkifyText } from "@/lib/linkify";
 import { AttachmentsDisplay, Attachment } from "@/components/ui/file-attachments";
+import { PostDueDateBadge, getDueDateStatus } from "./PostDueDateBadge";
 
 interface PostDetailsDialogProps {
   post: SocialMediaPost | null;
@@ -181,15 +182,32 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
             <Separator />
 
             <div className="space-y-3">
+              {/* Data de Publicação (post_date) */}
               <div className="flex items-start gap-2">
                 <Calendar className="h-4 w-4 mt-1 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Data de Publicação</p>
                   <p className="text-sm text-muted-foreground">
-                    {format(new Date(post.scheduled_date), "PPP 'às' HH:mm", { locale: ptBR })}
+                    {format(new Date(post.post_date || post.scheduled_date), "PPP 'às' HH:mm", { locale: ptBR })}
                   </p>
                 </div>
               </div>
+
+              {/* Data Limite da Arte (due_date) */}
+              {post.due_date && (
+                <div className="flex items-start gap-2">
+                  <Clock className="h-4 w-4 mt-1 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      Data Limite da Arte
+                      <PostDueDateBadge dueDate={post.due_date} status={post.status} size="sm" />
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {format(new Date(post.due_date), "PPP", { locale: ptBR })}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {post.clients && (
                 <div className="flex items-start gap-2">

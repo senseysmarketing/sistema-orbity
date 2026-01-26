@@ -16,6 +16,8 @@ export interface SocialMediaPost {
   description?: string | null;
   client_id?: string | null;
   scheduled_date: string;
+  post_date?: string | null;
+  due_date?: string | null;
   post_type: string;
   platform: string;
   status: string;
