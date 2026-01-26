@@ -1,118 +1,84 @@
 
-# Plano: Filtro por Usuário no Kanban de Social Media
+# Plano: Adicionar Scroll Vertical ao Modal de Tarefas
 
-## Visão Geral
+## Problema
 
-Adicionar um filtro por usuário atribuído no Kanban de Social Media, permitindo que a equipe visualize apenas os posts atribuídos a um membro específico (ex: Designer, Social Media, etc.).
+Quando o usuário adiciona anexos ou muitas subtarefas no modal de criação/edição de tarefas, o conteúdo cresce verticalmente e o botão "Criar Tarefa" / "Atualizar" desaparece abaixo da tela, impossibilitando salvar a tarefa.
 
----
+## Solução
 
-## Estrutura Atual
-
-O Kanban já possui:
-- Filtro por cliente (`filterClient`)
-- Filtro por tipo de conteúdo (`filterContentType`)
-- Filtro por período de data (`dateRange`)
-- Ordenação por data (`sortBy`)
-
-Os posts já incluem `assigned_users` (array de usuários atribuídos) que é carregado pelo hook `useSocialMediaPosts`.
+Adicionar um sistema de scroll vertical no conteúdo do modal, mantendo o cabeçalho (título) e rodapé (botões) sempre visíveis.
 
 ---
 
-## Implementação
+## Alterações Técnicas
 
-### Arquivo: `src/components/social-media/PostKanban.tsx`
+### Arquivo: `src/pages/Tasks.tsx`
 
-**Mudanças:**
-
-1. **Novo estado para filtro de usuário:**
+**1. Adicionar import do ScrollArea:**
 ```typescript
-const [filterUser, setFilterUser] = useState<string>("all");
+import { ScrollArea } from "@/components/ui/scroll-area";
 ```
 
-2. **Buscar lista de usuários únicos atribuídos aos posts:**
-```typescript
-const uniqueUsers = useMemo(() => {
-  const usersMap = new Map();
-  posts.forEach(post => {
-    (post.assigned_users || []).forEach(user => {
-      if (user.user_id && !usersMap.has(user.user_id)) {
-        usersMap.set(user.user_id, user.name);
-      }
-    });
-  });
-  return Array.from(usersMap, ([id, name]) => ({ id, name }));
-}, [posts]);
-```
+**2. Modal de Criação (linhas ~835-978):**
 
-3. **Adicionar lógica de filtragem no `filteredPosts`:**
-```typescript
-if (filterUser !== "all") {
-  filtered = filtered.filter(post => 
-    (post.assigned_users || []).some(user => user.user_id === filterUser)
-  );
-}
-```
+Modificar a estrutura do DialogContent para:
+- Adicionar `max-h-[90vh]` e `flex flex-col` ao DialogContent
+- Envolver o conteúdo do formulário (`<div className="grid gap-4 py-4">`) em um `<ScrollArea>` com altura máxima
+- DialogHeader e DialogFooter ficam fora do ScrollArea (sempre visíveis)
 
-4. **Adicionar Select de usuário na interface (junto aos outros filtros):**
+**Antes:**
 ```tsx
-<Select value={filterUser} onValueChange={setFilterUser}>
-  <SelectTrigger className="w-[180px]">
-    <SelectValue placeholder="Todos os usuários" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="all">Todos os usuários</SelectItem>
-    {uniqueUsers.map(user => (
-      <SelectItem key={user.id} value={user.id}>
-        {user.name}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+<DialogContent className="sm:max-w-[600px]">
+  <DialogHeader>...</DialogHeader>
+  <div className="grid gap-4 py-4">
+    {/* todos os campos */}
+  </div>
+  <DialogFooter>...</DialogFooter>
+</DialogContent>
 ```
 
-5. **Atualizar `hasActiveFilters` e `clearFilters`:**
-```typescript
-const hasActiveFilters = filterClient !== "all" || 
-  filterContentType !== "all" || 
-  filterUser !== "all" ||  // <-- Adicionar
-  !!dateRange?.from || 
-  includeNoDate !== false || 
-  sortBy !== "post_date";
-
-const clearFilters = () => {
-  setFilterClient("all");
-  setFilterContentType("all");
-  setFilterUser("all");  // <-- Adicionar
-  setDateRange(undefined);
-  setIncludeNoDate(false);
-  setSortBy("post_date");
-};
+**Depois:**
+```tsx
+<DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
+  <DialogHeader>...</DialogHeader>
+  <ScrollArea className="flex-1 max-h-[60vh] pr-4">
+    <div className="grid gap-4 py-4">
+      {/* todos os campos */}
+    </div>
+  </ScrollArea>
+  <DialogFooter>...</DialogFooter>
+</DialogContent>
 ```
+
+**3. Modal de Edição (se houver - verificar linhas ~1186-1316):**
+
+Aplicar a mesma estrutura de scroll ao modal de edição de tarefas.
 
 ---
 
-## Interface Visual
+## Comportamento Esperado
 
-O filtro ficará na mesma linha dos outros filtros existentes:
-
-```
-[🔍 Filtro] [Clientes ▼] [Tipos ▼] [Usuários ▼] [Período] [Ordenar ▼] [Limpar] [+ Nova Postagem]
-```
+| Cenário | Antes | Depois |
+|---------|-------|--------|
+| Poucos campos preenchidos | Modal normal | Modal normal |
+| Muitas subtarefas | Botão some da tela | Scroll aparece, botão visível |
+| Anexos adicionados | Botão some da tela | Scroll aparece, botão visível |
+| Tela pequena | Conteúdo cortado | Scroll funcional |
 
 ---
 
-## Arquivo a Modificar
+## Arquivos a Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/social-media/PostKanban.tsx` | Adicionar estado `filterUser`, memo `uniqueUsers`, lógica de filtragem e Select na UI |
+| `src/pages/Tasks.tsx` | Adicionar import de ScrollArea e aplicar scroll nos modais de criação e edição |
 
 ---
 
-## Resultado Esperado
+## Resultado Visual
 
-- Designer pode filtrar para ver apenas seus posts atribuídos
-- Social Media pode ver apenas os posts que precisa gerenciar
-- Filtro funciona em conjunto com os filtros existentes (cliente, tipo, período)
-- Botão "Limpar" reseta também o filtro de usuário
+- DialogHeader (título "Criar Nova Tarefa") sempre no topo
+- Área de formulário com scroll quando necessário
+- DialogFooter (botões "Cancelar" e "Criar Tarefa") sempre visíveis no rodapé
+- Padding direito no ScrollArea para não cortar o scrollbar
