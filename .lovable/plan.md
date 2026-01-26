@@ -1,112 +1,154 @@
 
+# Diagnóstico Final e Correção Completa para Push Notifications no iPhone
 
-# Correção Definitiva: Push Notifications no iPhone
+## 🔍 Diagnóstico
 
-## Problemas Identificados
+### O que está funcionando
+| Componente | Status | Evidência |
+|------------|--------|-----------|
+| Backend (Edge Function) | ✅ OK | `[FCM] Message sent successfully: projects/orbityapp-f710e/messages/85086501-...` |
+| Firebase Secrets | ✅ OK | Access token gerado com sucesso |
+| Token FCM | ✅ OK | O FCM aceitou a mensagem (status 200) |
 
-### 1. Múltiplos Tokens Obsoletos
-Você tem **5 tokens ativos** para o mesmo usuário, incluindo 4 do iPhone. Cada reinstalação da PWA gera novo token, mas os antigos não são limpos. O FCM envia para todos, mas apenas o token **mais recente** funciona no dispositivo atual.
+### O Problema Real
 
-| Token (início) | Plataforma | Status | Problema |
-|----------------|------------|--------|----------|
-| `dzubEJ6e8...` | iPhone 18.7 | ✅ Ativo (mais recente) | Este é o correto |
-| `ec5I6ovvQ...` | iPhone 18.7 | ⚠️ Ativo (obsoleto) | Deve ser desativado |
-| `cuVsf32RF...` | iPhone 18.7 | ⚠️ Ativo (obsoleto) | Deve ser desativado |
-| `e0YBtIy4X...` | iPhone 18.7 | ⚠️ Ativo (obsoleto) | Deve ser desativado |
-| `fljQCFwBr...` | Mac Chrome | ✅ Ativo | Correto para Mac |
+**O token está sendo gerado no Safari padrão, não na PWA instalada.**
 
-### 2. URL Relativa no FCM Options
-O campo `fcm_options.link` está usando `/dashboard` (relativo) quando deveria usar URL absoluta `https://sistema-orbity.lovable.app/dashboard`. No Safari/iOS isso pode impedir a notificação de funcionar.
+Evidência no banco de dados:
+```
+userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 
+           (KHTML, like Gecko) Version/26.1 Mobile/15E148 Safari/604.1"
+```
 
-### 3. Falta de Limpeza de Tokens Antigos
-Quando o usuário ativa push notifications novamente após reinstalar, devemos **desativar tokens anteriores do mesmo dispositivo**.
+Este userAgent é de **Safari padrão**. Se fosse a PWA standalone, seria diferente (sem "Safari/604.1").
+
+### Por que isso importa?
+
+- No iOS, push notifications só funcionam quando o token é gerado **dentro da PWA instalada** (aberta pelo ícone na tela inicial)
+- Tokens gerados no Safari padrão são descartados pelo iOS quando o Safari fecha
+- O Firebase aceita o token, mas o iOS não entrega a notificação
 
 ---
 
-## Solução
+## 🛠️ Correções Necessárias
 
-### Etapa 1: Limpar Tokens Obsoletos (SQL)
+### 1. Detectar e Validar Contexto PWA
 
-Executar uma limpeza manual dos tokens antigos para seu usuário, mantendo apenas o mais recente por dispositivo:
+Adicionar verificação no `usePushNotifications.tsx` para:
+- Verificar se está em modo `standalone` (PWA)
+- Salvar informação de `displayMode` no `device_info`
+- Mostrar aviso se o usuário tentar ativar push fora da PWA
+
+### 2. Melhorar Registro do Service Worker
+
+Especificar `scope: '/'` explicitamente no registro do Service Worker para garantir que está no escopo correto.
+
+### 3. Adicionar Debug Visual
+
+Criar componente de debug temporário para você verificar:
+- Se está em modo standalone
+- Qual Service Worker está ativo
+- Qual token foi gerado
+
+---
+
+## 📁 Arquivos a Modificar
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/hooks/usePushNotifications.tsx` | Adicionar validação de standalone, melhorar device_info, scope explícito |
+| `src/components/notifications/NotificationPreferences.tsx` | Mostrar aviso se não estiver em PWA standalone |
+
+---
+
+## Código das Correções
+
+### 1. `src/hooks/usePushNotifications.tsx`
+
+```typescript
+// Função auxiliar para detectar modo standalone
+const isStandalone = (): boolean => {
+  // iOS standalone
+  if ((navigator as any).standalone === true) return true;
+  // Android/Desktop PWA
+  if (window.matchMedia('(display-mode: standalone)').matches) return true;
+  // iOS Safari com display-mode
+  if (window.matchMedia('(display-mode: fullscreen)').matches) return true;
+  return false;
+};
+
+// No saveToken, incluir info do displayMode
+const saveToken = useCallback(async (fcmToken: string) => {
+  // ...
+  const { error } = await supabase.from('push_subscriptions').upsert({
+    // ...
+    device_info: {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      language: navigator.language,
+      standalone: isStandalone(),  // NOVO
+      displayMode: isStandalone() ? 'standalone' : 'browser',  // NOVO
+    },
+    // ...
+  });
+});
+
+// No registro do SW, adicionar scope explícito
+const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+  scope: '/',  // NOVO - escopo explícito
+});
+
+// Na função requestPermission, validar contexto
+const requestPermission = useCallback(async () => {
+  // Verificar se está em modo standalone (PWA instalada)
+  if (!isStandalone()) {
+    toast({
+      title: "Abra pela PWA instalada",
+      description: "Para receber notificações, abra o app pelo ícone na tela inicial, não pelo Safari.",
+      variant: "destructive",
+    });
+    return null;
+  }
+  // ... resto do código
+});
+```
+
+### 2. Limpar tokens antigos do Safari (não-standalone)
+
+Executar uma query para desativar tokens gerados fora da PWA:
 
 ```sql
--- Desativar tokens antigos de iPhone, mantendo apenas o mais recente
-UPDATE push_subscriptions 
-SET is_active = false 
-WHERE user_id = '03755812-224d-42d4-b651-bdbc09c323ad'
-  AND device_info->>'platform' = 'iPhone'
-  AND id != '211258a4-6812-491c-85d5-c42ecfeed948'; -- O token mais recente
-```
-
-### Etapa 2: Corrigir Edge Function (`send-push-notification`)
-
-Atualizar o payload FCM para usar **URL absoluta** no `fcm_options.link`:
-
-```typescript
-webpush: {
-  fcm_options: {
-    link: payload.data?.action_url?.startsWith('http') 
-      ? payload.data.action_url 
-      : `https://sistema-orbity.lovable.app${payload.data?.action_url || '/dashboard'}`,
-  },
-},
-```
-
-### Etapa 3: Melhorar Hook `usePushNotifications`
-
-Adicionar lógica para **desativar tokens anteriores do mesmo dispositivo** antes de salvar um novo:
-
-```typescript
-const saveToken = useCallback(async (fcmToken: string) => {
-  if (!user || !currentAgency) return;
-
-  try {
-    // 1. Desativar tokens anteriores deste dispositivo
-    await supabase
-      .from('push_subscriptions')
-      .update({ is_active: false })
-      .eq('user_id', user.id)
-      .neq('fcm_token', fcmToken);
-
-    // 2. Upsert o novo token
-    await supabase.from('push_subscriptions').upsert({
-      user_id: user.id,
-      agency_id: currentAgency.id,
-      fcm_token: fcmToken,
-      // ... resto do código
-    });
-  } catch (error) { /* ... */ }
-}, [user, currentAgency]);
+-- Não há como distinguir agora, mas após a atualização do código,
+-- novos tokens terão device_info.standalone = true/false
 ```
 
 ---
 
-## Arquivos a Modificar
+## 🔄 Fluxo Após Implementação
 
-| Arquivo | Ação |
-|---------|------|
-| Nova migration SQL | Limpar tokens obsoletos |
-| `supabase/functions/send-push-notification/index.ts` | Usar URL absoluta no `fcm_options.link` |
-| `src/hooks/usePushNotifications.tsx` | Desativar tokens antigos ao ativar novos |
+1. **Você desinstala a PWA** do iPhone
+2. **Reinstala** pelo Safari (Compartilhar → Adicionar à Tela de Início)
+3. **Abre pelo ícone** na tela inicial (NÃO pelo Safari)
+4. Vai em Configurações → Notificações → Ativa Push
+5. O sistema detecta `standalone: true` e gera token válido
+6. Notificações funcionam!
+
+---
+
+## ⚠️ Passo Crítico para o Usuário
+
+**Você precisa garantir que está abrindo o app pelo ÍCONE na tela inicial, não pelo Safari.**
+
+- ✅ **Correto**: Tocar no ícone "Orbity" na tela inicial do iPhone
+- ❌ **Incorreto**: Abrir Safari e digitar a URL
 
 ---
 
 ## Resultado Esperado
 
-1. ✅ Apenas o token mais recente do iPhone ficará ativo
-2. ✅ O FCM enviará apenas para o dispositivo correto
-3. ✅ URL absoluta garantirá compatibilidade com Safari/iOS
-4. ✅ Próximas reinstalações limpam tokens automaticamente
-
----
-
-## Teste Após Implementação
-
-1. Executar a migration para limpar tokens
-2. Deploy das alterações
-3. **Desinstalar e reinstalar a PWA** no iPhone
-4. Ativar push notifications
-5. Verificar que só há **1 token ativo** para iPhone
-6. Criar uma tarefa atribuída a você
-7. A notificação deve aparecer no iPhone
-
+| Antes | Depois |
+|-------|--------|
+| Token gerado em Safari padrão | Token gerado apenas em PWA standalone |
+| `standalone: undefined` no device_info | `standalone: true` no device_info |
+| iOS não entrega push | iOS entrega push corretamente |
+| Sem validação de contexto | Aviso se tentar ativar fora da PWA |
