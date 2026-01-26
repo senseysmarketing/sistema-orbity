@@ -37,6 +37,8 @@ import Import from "./pages/Import";
 import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Install from "./pages/Install";
+import { InstallPrompt } from "./components/pwa/InstallPrompt";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +79,7 @@ const App = () => (
                         
                         {/* Páginas públicas */}
                         <Route path="/auth" element={<Auth />} />
+                        <Route path="/install" element={<Install />} />
                         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                         <Route path="/onboarding" element={<Onboarding />} />
                         <Route path="/welcome" element={<Welcome />} />
@@ -108,6 +111,7 @@ const App = () => (
                         
                         <Route path="*" element={<NotFound />} />
                       </Routes>
+                      <InstallPrompt />
                     </PaymentMiddlewareProvider>
                   </BrowserRouter>
                 </TooltipProvider>
