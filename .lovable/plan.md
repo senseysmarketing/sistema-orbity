@@ -1,13 +1,13 @@
 
-# Plano: Adicionar Scroll Vertical ao Modal de Tarefas
+# Correção: Scroll Vertical no Modal de Tarefas
 
-## Problema
+## Problema Identificado
 
-Quando o usuário adiciona anexos ou muitas subtarefas no modal de criação/edição de tarefas, o conteúdo cresce verticalmente e o botão "Criar Tarefa" / "Atualizar" desaparece abaixo da tela, impossibilitando salvar a tarefa.
+O `ScrollArea` do Radix UI não está funcionando porque precisa de uma altura **fixa** ou **calculada** no container pai, não apenas `max-height`. A estrutura atual está cortando o conteúdo sem mostrar a barra de scroll.
 
 ## Solução
 
-Adicionar um sistema de scroll vertical no conteúdo do modal, mantendo o cabeçalho (título) e rodapé (botões) sempre visíveis.
+Usar uma abordagem mais simples e confiável: aplicar `overflow-y-auto` diretamente em uma `div` com altura máxima definida, ao invés de depender do `ScrollArea` do Radix.
 
 ---
 
@@ -15,56 +15,51 @@ Adicionar um sistema de scroll vertical no conteúdo do modal, mantendo o cabeç
 
 ### Arquivo: `src/pages/Tasks.tsx`
 
-**1. Adicionar import do ScrollArea:**
-```typescript
-import { ScrollArea } from "@/components/ui/scroll-area";
-```
-
-**2. Modal de Criação (linhas ~835-978):**
-
-Modificar a estrutura do DialogContent para:
-- Adicionar `max-h-[90vh]` e `flex flex-col` ao DialogContent
-- Envolver o conteúdo do formulário (`<div className="grid gap-4 py-4">`) em um `<ScrollArea>` com altura máxima
-- DialogHeader e DialogFooter ficam fora do ScrollArea (sempre visíveis)
+**Substituir o ScrollArea por uma div com overflow nativo:**
 
 **Antes:**
-```tsx
-<DialogContent className="sm:max-w-[600px]">
-  <DialogHeader>...</DialogHeader>
-  <div className="grid gap-4 py-4">
-    {/* todos os campos */}
-  </div>
-  <DialogFooter>...</DialogFooter>
-</DialogContent>
-```
-
-**Depois:**
 ```tsx
 <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
   <DialogHeader>...</DialogHeader>
   <ScrollArea className="flex-1 max-h-[60vh] pr-4">
     <div className="grid gap-4 py-4">
-      {/* todos os campos */}
+      {/* campos do formulário */}
     </div>
   </ScrollArea>
   <DialogFooter>...</DialogFooter>
 </DialogContent>
 ```
 
-**3. Modal de Edição (se houver - verificar linhas ~1186-1316):**
+**Depois:**
+```tsx
+<DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
+  <DialogHeader className="flex-shrink-0">...</DialogHeader>
+  <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+    <div className="grid gap-4 py-4">
+      {/* campos do formulário */}
+    </div>
+  </div>
+  <DialogFooter className="flex-shrink-0 pt-4 border-t">...</DialogFooter>
+</DialogContent>
+```
 
-Aplicar a mesma estrutura de scroll ao modal de edição de tarefas.
+**Mudanças principais:**
+
+1. **DialogContent**: Adicionar `overflow-hidden` para conter o conteúdo
+2. **DialogHeader**: Adicionar `flex-shrink-0` para não encolher
+3. **Container do formulário**: Usar `overflow-y-auto` nativo com `min-h-0` (necessário para flexbox)
+4. **DialogFooter**: Adicionar `flex-shrink-0`, `pt-4` e `border-t` para separação visual
 
 ---
 
-## Comportamento Esperado
+## Por que essa solução é melhor?
 
-| Cenário | Antes | Depois |
-|---------|-------|--------|
-| Poucos campos preenchidos | Modal normal | Modal normal |
-| Muitas subtarefas | Botão some da tela | Scroll aparece, botão visível |
-| Anexos adicionados | Botão some da tela | Scroll aparece, botão visível |
-| Tela pequena | Conteúdo cortado | Scroll funcional |
+| Abordagem | Problema |
+|-----------|----------|
+| `ScrollArea` com `max-h` | Radix precisa de altura fixa, não funciona bem com flexbox |
+| `overflow-y-auto` nativo | Funciona nativamente com CSS flexbox |
+
+O truque é usar `min-h-0` no container scrollável - isso é necessário porque por padrão flex items têm `min-height: auto`, que impede o overflow de funcionar.
 
 ---
 
@@ -72,13 +67,13 @@ Aplicar a mesma estrutura de scroll ao modal de edição de tarefas.
 
 | Arquivo | Ação |
 |---------|------|
-| `src/pages/Tasks.tsx` | Adicionar import de ScrollArea e aplicar scroll nos modais de criação e edição |
+| `src/pages/Tasks.tsx` | Substituir ScrollArea por overflow-y-auto nativo nos dois modais (criação e edição) |
 
 ---
 
-## Resultado Visual
+## Resultado Esperado
 
-- DialogHeader (título "Criar Nova Tarefa") sempre no topo
-- Área de formulário com scroll quando necessário
-- DialogFooter (botões "Cancelar" e "Criar Tarefa") sempre visíveis no rodapé
-- Padding direito no ScrollArea para não cortar o scrollbar
+- Barra de scroll vertical aparece quando conteúdo excede a altura do modal
+- Seção de "Anexos" sempre visível (com scroll)
+- Botões "Cancelar" e "Atualizar" sempre visíveis no rodapé
+- Funciona em qualquer tamanho de tela
