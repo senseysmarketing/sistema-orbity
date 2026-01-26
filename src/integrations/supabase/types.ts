@@ -4209,6 +4209,7 @@ export type Database = {
           default_description: string | null
           default_priority: string | null
           default_status: string | null
+          default_task_type: string | null
           default_title: string | null
           description: string | null
           due_date_offset_days: number | null
@@ -4231,6 +4232,7 @@ export type Database = {
           default_description?: string | null
           default_priority?: string | null
           default_status?: string | null
+          default_task_type?: string | null
           default_title?: string | null
           description?: string | null
           due_date_offset_days?: number | null
@@ -4253,6 +4255,7 @@ export type Database = {
           default_description?: string | null
           default_priority?: string | null
           default_status?: string | null
+          default_task_type?: string | null
           default_title?: string | null
           description?: string | null
           due_date_offset_days?: number | null
@@ -4310,6 +4313,61 @@ export type Database = {
           },
         ]
       }
+      task_types: {
+        Row: {
+          agency_id: string
+          created_at: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          name: string
+          slug: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name: string
+          slug: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          name?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_types_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_types_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "task_types_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           agency_id: string | null
@@ -4327,6 +4385,7 @@ export type Database = {
           priority: Database["public"]["Enums"]["task_priority"]
           status: string
           subtasks: Json | null
+          task_type: string | null
           title: string
           updated_at: string
         }
@@ -4346,6 +4405,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["task_priority"]
           status?: string
           subtasks?: Json | null
+          task_type?: string | null
           title: string
           updated_at?: string
         }
@@ -4365,6 +4425,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["task_priority"]
           status?: string
           subtasks?: Json | null
+          task_type?: string | null
           title?: string
           updated_at?: string
         }

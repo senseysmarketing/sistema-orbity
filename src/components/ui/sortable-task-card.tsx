@@ -14,6 +14,7 @@ interface Task {
   due_date: string | null;
   created_at: string;
   created_by: string;
+  task_type?: string | null;
 }
 
 interface SortableTaskCardProps {
@@ -28,6 +29,8 @@ interface SortableTaskCardProps {
   getClientName: (clientId: string | null) => string;
   formatDateBR: (date: string | null) => string;
   assignedUsers?: any[];
+  getTypeName?: (slug: string | null) => string;
+  getTypeIcon?: (slug: string | null) => string;
 }
 
 export function SortableTaskCard({
@@ -42,6 +45,8 @@ export function SortableTaskCard({
   getClientName,
   formatDateBR,
   assignedUsers = [],
+  getTypeName,
+  getTypeIcon,
 }: SortableTaskCardProps) {
   const {
     attributes,
@@ -90,6 +95,8 @@ export function SortableTaskCard({
         formatDateBR={formatDateBR}
         assignedUsers={assignedUsers}
         onClick={handleClick}
+        getTypeName={getTypeName}
+        getTypeIcon={getTypeIcon}
       />
     </div>
   );

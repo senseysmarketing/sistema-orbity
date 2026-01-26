@@ -15,6 +15,7 @@ interface Task {
   due_date: string | null;
   created_at: string;
   created_by: string;
+  task_type?: string | null;
 }
 
 interface KanbanColumnProps {
@@ -33,6 +34,8 @@ interface KanbanColumnProps {
   getClientName: (clientId: string | null) => string;
   formatDateBR: (date: string | null) => string;
   getAssignedUsers: (taskId: string) => any[];
+  getTypeName?: (slug: string | null) => string;
+  getTypeIcon?: (slug: string | null) => string;
 }
 
 export function KanbanColumn({
@@ -51,6 +54,8 @@ export function KanbanColumn({
   getClientName,
   formatDateBR,
   getAssignedUsers,
+  getTypeName,
+  getTypeIcon,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: id,
@@ -89,6 +94,8 @@ export function KanbanColumn({
                 getClientName={getClientName}
                 formatDateBR={formatDateBR}
                 assignedUsers={getAssignedUsers(task.id)}
+                getTypeName={getTypeName}
+                getTypeIcon={getTypeIcon}
               />
             ))
           )}

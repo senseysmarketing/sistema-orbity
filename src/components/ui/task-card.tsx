@@ -14,6 +14,7 @@ interface Task {
   due_date: string | null;
   created_at: string;
   created_by: string;
+  task_type?: string | null;
 }
 
 interface TaskCardProps {
@@ -25,6 +26,8 @@ interface TaskCardProps {
   formatDateBR: (date: string | null) => string;
   assignedUsers?: any[];
   onClick?: (e?: React.MouseEvent) => void;
+  getTypeName?: (slug: string | null) => string;
+  getTypeIcon?: (slug: string | null) => string;
 }
 
 // Gera uma cor consistente baseada no client_id
@@ -75,6 +78,8 @@ export function TaskCard({
   formatDateBR,
   assignedUsers = [],
   onClick,
+  getTypeName,
+  getTypeIcon,
 }: TaskCardProps) {
   const clientColor = getClientColor(task.client_id);
   const urgency = getUrgencyLevel(task);
@@ -93,6 +98,11 @@ export function TaskCard({
       <div className="flex items-center justify-between gap-2 mb-2">
         <StatusIcon className="h-5 w-5 flex-shrink-0" />
         <div className="flex gap-1 flex-wrap">
+          {task.task_type && getTypeName && getTypeIcon && (
+            <Badge variant="outline" className="text-xs">
+              {getTypeIcon(task.task_type)} {getTypeName(task.task_type)}
+            </Badge>
+          )}
           <Badge variant="outline" className={`${getPriorityColor(task.priority)} text-white text-xs`}>
             {getPriorityLabel(task.priority)}
           </Badge>
