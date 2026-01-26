@@ -109,6 +109,21 @@ export function usePushNotifications() {
     }
 
     try {
+      // Step 1: Deactivate ALL previous tokens for this user (ensures only latest token is active)
+      const { error: deactivateError } = await supabase
+        .from('push_subscriptions')
+        .update({ is_active: false })
+        .eq('user_id', user.id)
+        .neq('fcm_token', fcmToken);
+
+      if (deactivateError) {
+        console.warn('[Push] Error deactivating old tokens:', deactivateError);
+        // Continue anyway - not critical
+      } else {
+        console.log('[Push] Deactivated previous tokens');
+      }
+
+      // Step 2: Upsert the new token
       const { error } = await supabase.from('push_subscriptions').upsert({
         user_id: user.id,
         agency_id: currentAgency.id,
