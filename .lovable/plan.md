@@ -1,83 +1,118 @@
 
+# Plano: Filtro por Usuário no Kanban de Social Media
 
-# Correção: Loop Infinito no PostFormDialog
+## Visão Geral
 
-## Problema Identificado
+Adicionar um filtro por usuário atribuído no Kanban de Social Media, permitindo que a equipe visualize apenas os posts atribuídos a um membro específico (ex: Designer, Social Media, etc.).
 
-A navegação do sistema está travada devido a um **loop infinito de re-renderizações** no componente `PostFormDialog`. O erro no console confirma:
+---
 
-> "Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn't have a dependency array, or one of the dependencies changes on every render."
+## Estrutura Atual
 
-### Causa Raiz
+O Kanban já possui:
+- Filtro por cliente (`filterClient`)
+- Filtro por tipo de conteúdo (`filterContentType`)
+- Filtro por período de data (`dateRange`)
+- Ordenação por data (`sortBy`)
 
-No arquivo `src/components/social-media/PostFormDialog.tsx`, linha 77-83:
+Os posts já incluem `assigned_users` (array de usuários atribuídos) que é carregado pelo hook `useSocialMediaPosts`.
 
+---
+
+## Implementação
+
+### Arquivo: `src/components/social-media/PostKanban.tsx`
+
+**Mudanças:**
+
+1. **Novo estado para filtro de usuário:**
 ```typescript
-useEffect(() => {
-  if (!dueDateManuallyEdited && formData.post_date) {
-    const daysBefore = getDefaultDueDateDaysBefore();
-    const newDueDate = calculateDueDate(formData.post_date, daysBefore);
-    setFormData(prev => ({ ...prev, due_date: newDueDate }));
-  }
-}, [formData.post_date, dueDateManuallyEdited, getDefaultDueDateDaysBefore]);
+const [filterUser, setFilterUser] = useState<string>("all");
 ```
 
-O problema é que `getDefaultDueDateDaysBefore` (do hook `useSocialMediaSettings`) é **recriada a cada render** porque não está memorizada com `useCallback`. Isso cria uma nova referência a cada render, que dispara o `useEffect`, que chama `setFormData`, que causa novo render → **loop infinito**.
-
----
-
-## Solução
-
-Corrigir o hook `useSocialMediaSettings.tsx` para memorizar a função `getDefaultDueDateDaysBefore` com `useCallback`, evitando que ela mude de referência a cada render.
-
----
-
-## Alterações Técnicas
-
-### Arquivo: `src/hooks/useSocialMediaSettings.tsx`
-
-**Mudança:** Envolver `getDefaultDueDateDaysBefore` em `useCallback` com dependência em `settings?.default_due_date_days_before`.
-
-**Antes:**
+2. **Buscar lista de usuários únicos atribuídos aos posts:**
 ```typescript
-const getDefaultDueDateDaysBefore = () => {
-  return settings?.default_due_date_days_before ?? 3;
+const uniqueUsers = useMemo(() => {
+  const usersMap = new Map();
+  posts.forEach(post => {
+    (post.assigned_users || []).forEach(user => {
+      if (user.user_id && !usersMap.has(user.user_id)) {
+        usersMap.set(user.user_id, user.name);
+      }
+    });
+  });
+  return Array.from(usersMap, ([id, name]) => ({ id, name }));
+}, [posts]);
+```
+
+3. **Adicionar lógica de filtragem no `filteredPosts`:**
+```typescript
+if (filterUser !== "all") {
+  filtered = filtered.filter(post => 
+    (post.assigned_users || []).some(user => user.user_id === filterUser)
+  );
+}
+```
+
+4. **Adicionar Select de usuário na interface (junto aos outros filtros):**
+```tsx
+<Select value={filterUser} onValueChange={setFilterUser}>
+  <SelectTrigger className="w-[180px]">
+    <SelectValue placeholder="Todos os usuários" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all">Todos os usuários</SelectItem>
+    {uniqueUsers.map(user => (
+      <SelectItem key={user.id} value={user.id}>
+        {user.name}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+```
+
+5. **Atualizar `hasActiveFilters` e `clearFilters`:**
+```typescript
+const hasActiveFilters = filterClient !== "all" || 
+  filterContentType !== "all" || 
+  filterUser !== "all" ||  // <-- Adicionar
+  !!dateRange?.from || 
+  includeNoDate !== false || 
+  sortBy !== "post_date";
+
+const clearFilters = () => {
+  setFilterClient("all");
+  setFilterContentType("all");
+  setFilterUser("all");  // <-- Adicionar
+  setDateRange(undefined);
+  setIncludeNoDate(false);
+  setSortBy("post_date");
 };
 ```
 
-**Depois:**
-```typescript
-import { useState, useEffect, useCallback } from 'react';
+---
 
-// ...
+## Interface Visual
 
-const getDefaultDueDateDaysBefore = useCallback(() => {
-  return settings?.default_due_date_days_before ?? 3;
-}, [settings?.default_due_date_days_before]);
+O filtro ficará na mesma linha dos outros filtros existentes:
+
+```
+[🔍 Filtro] [Clientes ▼] [Tipos ▼] [Usuários ▼] [Período] [Ordenar ▼] [Limpar] [+ Nova Postagem]
 ```
 
 ---
 
-## Por que isso resolve?
-
-1. Com `useCallback`, a função `getDefaultDueDateDaysBefore` mantém a **mesma referência** entre renders (a menos que `settings?.default_due_date_days_before` mude)
-2. O `useEffect` no `PostFormDialog` não será mais disparado a cada render
-3. O loop infinito é quebrado
-4. A navegação entre telas volta a funcionar normalmente
-
----
-
-## Arquivos a Modificar
+## Arquivo a Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `src/hooks/useSocialMediaSettings.tsx` | Adicionar `useCallback` à função `getDefaultDueDateDaysBefore` |
+| `src/components/social-media/PostKanban.tsx` | Adicionar estado `filterUser`, memo `uniqueUsers`, lógica de filtragem e Select na UI |
 
 ---
 
 ## Resultado Esperado
 
-- Navegação entre telas do sistema funcionando normalmente
-- Formulário de postagem sem loops infinitos
-- Cálculo automático de `due_date` funcionando corretamente
-
+- Designer pode filtrar para ver apenas seus posts atribuídos
+- Social Media pode ver apenas os posts que precisa gerenciar
+- Filtro funciona em conjunto com os filtros existentes (cliente, tipo, período)
+- Botão "Limpar" reseta também o filtro de usuário
