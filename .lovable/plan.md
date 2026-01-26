@@ -1,188 +1,210 @@
 
 
-# Correção de Notificações Push Duplicadas
+# Correção: Notificações Push Não Chegando no iOS
 
 ## Diagnóstico
 
-### Causas Identificadas
-
-A análise revelou **múltiplas fontes de duplicação**:
-
-| Fonte | Problema | Efeito |
-|-------|----------|--------|
-| **1. Trigger do Banco** | `trg_push_on_new_notification` dispara push quando notificação é inserida na tabela `notifications` | 1x push por INSERT |
-| **2. Edge Function `process-notifications`** | Após inserir notificações, chama `send-push-notification` em loop para cada uma | 1x push adicional por INSERT |
-| **3. Service Worker** | Tem **dois handlers** para push: `messaging.onBackgroundMessage()` E `self.addEventListener('push')` | Pode mostrar 2x a mesma notificação |
-
-### Fluxo Atual (Problemático)
-
-```text
-Tarefa criada/atualizada
-       ↓
-┌─────────────────────────────────────────────────┐
-│ Trigger notify_task_assignment                  │
-│    → INSERT INTO notifications                  │
-│         ↓                                       │
-│    Trigger trg_push_on_new_notification         │
-│         → send-push-notification (1ª vez)       │
-└─────────────────────────────────────────────────┘
-                   +
-┌─────────────────────────────────────────────────┐
-│ Cron → process-notifications                    │
-│    → Detecta notificação pendente              │
-│    → INSERT INTO notifications                  │
-│         → Trigger (2ª vez)                      │
-│    → Loop fetch send-push-notification (3ª vez) │
-└─────────────────────────────────────────────────┘
-                   +
-┌─────────────────────────────────────────────────┐
-│ Service Worker                                  │
-│    → messaging.onBackgroundMessage() (1x)       │
-│    → self.addEventListener('push') (1x)         │
-│    = 2 notificações exibidas por push          │
-└─────────────────────────────────────────────────┘
+### Backend: Funcionando ✅
+```
+[FCM] Push notifications sent: 1/1
+[FCM] Message sent successfully: projects/orbityapp-f710e/messages/bd0a5e64-...
 ```
 
-**Resultado**: Uma única ação pode gerar 4-6 notificações exibidas!
+### O Problema: Service Worker
+
+Há dois problemas no `firebase-messaging-sw.js`:
+
+| Problema | Descrição |
+|----------|-----------|
+| **1. Tag fixa** | `tag: 'orbity-notification'` faz com que notificações substituam as anteriores silenciosamente |
+| **2. Firebase SDK conflito** | Ao remover `onBackgroundMessage`, o SDK pode estar "interceptando" o evento push antes do handler universal |
 
 ---
 
 ## Solução
 
-### Mudanças Necessárias
+### Arquivo: `public/firebase-messaging-sw.js`
 
-| Arquivo | Ação |
-|---------|------|
-| `supabase/functions/process-notifications/index.ts` | **Remover** o loop que chama `send-push-notification` (linhas 110-145) |
-| `public/firebase-messaging-sw.js` | **Remover** o `messaging.onBackgroundMessage()` e manter apenas o `push` event listener |
+**Mudança 1**: Remover a tag fixa ou usar tag dinâmica baseada no ID da notificação
 
-### Por que essas correções?
+```javascript
+// ANTES
+await self.registration.showNotification(title, {
+  body,
+  icon: '...',
+  badge: '...',
+  data,
+  tag: 'orbity-notification'  // ❌ Tag fixa substitui notificações
+});
 
-1. **O trigger do banco já envia o push automaticamente** - não há necessidade de chamadas manuais na Edge Function
-2. **O `push` event listener é o handler universal** - funciona em todos os browsers incluindo Safari. O `onBackgroundMessage` do Firebase é redundante e causa duplicação
+// DEPOIS
+await self.registration.showNotification(title, {
+  body,
+  icon: '...',
+  badge: '...',
+  data,
+  tag: data?.notification_id || `orbity-${Date.now()}`,  // ✅ Tag única por notificação
+  renotify: true  // Força som/vibração mesmo se tag existir
+});
+```
+
+**Mudança 2**: Restaurar `onBackgroundMessage` mas SEM exibir notificação (apenas log), para evitar que o Firebase SDK "engula" o evento
+
+```javascript
+// Manter o Firebase SDK satisfeito mas sem duplicação
+messaging.onBackgroundMessage((payload) => {
+  console.log('[SW] onBackgroundMessage (handled by push event):', payload);
+  // NÃO mostrar notificação aqui - o push event universal cuida disso
+  return;
+});
+```
 
 ---
 
-## Detalhes Técnicos
-
-### 1. `supabase/functions/process-notifications/index.ts`
-
-**Remover linhas 110-145** (o loop de push manual):
-
-```typescript
-// ANTES (problemático)
-async function batchCreateNotifications(notifications: NotificationData[]) {
-  if (notifications.length === 0) return;
-
-  const { error } = await supabase
-    .from('notifications')
-    .insert(notifications);
-
-  if (error) {
-    console.error('Error batch creating notifications:', error);
-    return;
-  }
-
-  // ❌ REMOVER TUDO ABAIXO - o trigger do banco já faz isso
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-  for (const notif of notifications) {
-    try {
-      const response = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
-        // ...
-      });
-    } catch (e) {
-      // ...
-    }
-  }
-}
-```
-
-```typescript
-// DEPOIS (correto)
-async function batchCreateNotifications(notifications: NotificationData[]) {
-  if (notifications.length === 0) return;
-
-  const { error } = await supabase
-    .from('notifications')
-    .insert(notifications);
-
-  if (error) {
-    console.error('Error batch creating notifications:', error);
-    return;
-  }
-
-  // Push notification é disparado automaticamente pelo trigger do banco
-  console.log(`[Notifications] ${notifications.length} notificações criadas (push será enviado via trigger)`);
-}
-```
-
-### 2. `public/firebase-messaging-sw.js`
-
-**Remover o handler duplicado** `messaging.onBackgroundMessage()`:
+## Código Final do Service Worker
 
 ```javascript
-// ANTES (problemático)
+// Firebase Cloud Messaging Service Worker (versão robusta para iOS/Safari)
+
+// Forçar ativação imediata do Service Worker
+self.addEventListener('install', (event) => {
+  console.log('[SW] Installing...');
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating...');
+  event.waitUntil(clients.claim());
+});
+
+// Handler para mensagens do client
+self.addEventListener('message', (event) => {
+  console.log('[SW] Message received:', event.data);
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (event.data?.type === 'FIREBASE_CONFIG') {
+    console.log('[SW] Firebase config received');
+  }
+});
+
+importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBIDL3R7nd0pE0wzmXdNePWTSyxOvyZ0cY",
+  authDomain: "orbityapp-f710e.firebaseapp.com",
+  projectId: "orbityapp-f710e",
+  storageBucket: "orbityapp-f710e.appspot.com",
+  messagingSenderId: "929526059094",
+  appId: "1:929526059094:web:61fb87a4f693ddd61b2bf7"
+};
+
+try {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+} catch (e) {
+  console.error('[SW] Firebase init error:', e);
+}
+
+const messaging = firebase.messaging();
+
+// Manter Firebase SDK satisfeito - não exibe notificação, apenas log
 messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] onBackgroundMessage:', payload);
-  // Duplicação! O push event já trata isso
+  console.log('[SW] onBackgroundMessage recebido (handled by push event)');
+  // Retorna sem fazer nada - o push event universal cuida da exibição
 });
 
-self.addEventListener('push', (event) => {
-  // Handler universal
-});
-```
-
-```javascript
-// DEPOIS (correto)
-// Removido onBackgroundMessage - usando apenas o push event universal
-
+// Handler universal de push - funciona em todos os browsers incluindo Safari/iOS
 self.addEventListener('push', (event) => {
   console.log('[SW] Push event recebido');
-  // Handler universal - funciona em todos os browsers
+
+  if (!event.data) {
+    console.log('[SW] Push event sem dados');
+    return;
+  }
+
+  event.waitUntil((async () => {
+    let msg = {};
+    try {
+      msg = event.data.json();
+    } catch {
+      msg = { data: { body: event.data.text() } };
+    }
+
+    console.log('[SW] Push payload:', JSON.stringify(msg));
+
+    const title = msg?.notification?.title || msg?.data?.title || 'Nova notificação';
+    const body = msg?.notification?.body || msg?.data?.body || '';
+    const data = msg?.data || {};
+
+    // Tag única baseada no ID da notificação ou timestamp
+    const notificationTag = data?.notification_id || `orbity-${Date.now()}`;
+
+    console.log('[SW] Exibindo notificação:', title, 'tag:', notificationTag);
+
+    await self.registration.showNotification(title, {
+      body,
+      icon: 'https://sistema-orbity.lovable.app/favicon.ico',
+      badge: 'https://sistema-orbity.lovable.app/favicon.ico',
+      data,
+      tag: notificationTag,
+      renotify: true  // Força som/vibração mesmo com tag existente
+    });
+
+    console.log('[SW] Notificação exibida com sucesso');
+  })());
+});
+
+// Click handler
+self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notification click:', event);
+  
+  event.notification.close();
+
+  const actionUrl = event.notification.data?.action_url || '/dashboard';
+  const urlToOpen = new URL(actionUrl, self.location.origin).href;
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          client.navigate(urlToOpen);
+          return client.focus();
+        }
+      }
+      return clients.openWindow?.(urlToOpen);
+    })
+  );
 });
 ```
 
 ---
 
-## Fluxo Corrigido
+## Resumo das Mudanças
 
-```text
-Tarefa criada/atualizada
-       ↓
-Trigger notify_task_assignment
-       ↓
-INSERT INTO notifications
-       ↓
-Trigger trg_push_on_new_notification
-       ↓
-send-push-notification (apenas 1x)
-       ↓
-FCM envia para dispositivo
-       ↓
-Service Worker: push event (apenas 1 handler)
-       ↓
-1 notificação exibida ✓
-```
+| Item | Antes | Depois |
+|------|-------|--------|
+| `tag` | Fixo `'orbity-notification'` | Dinâmico baseado em `notification_id` |
+| `renotify` | Não existia | `true` - força som mesmo com tag |
+| `onBackgroundMessage` | Removido | Restaurado (apenas log, sem exibição) |
+| Logs | Básicos | Detalhados para debug |
 
 ---
 
-## Arquivos a Modificar
+## Passos Após Deploy
 
-| Arquivo | Mudança |
-|---------|---------|
-| `supabase/functions/process-notifications/index.ts` | Remover loop de push nas linhas 110-145 |
-| `public/firebase-messaging-sw.js` | Remover `messaging.onBackgroundMessage()` (linhas 48-52) |
+1. **Forçar atualização do SW no iPhone**:
+   - Vá em Configurações → Notificações
+   - Clique em "Atualizar Service Worker"
+   - Aguarde o status mudar para "active"
 
----
+2. **Testar Push**:
+   - Clique em "Testar Push"
+   - A notificação deve aparecer
 
-## Resultado Esperado
-
-| Antes | Depois |
-|-------|--------|
-| 4 notificações por evento | 1 notificação por evento |
-| Push manual + trigger automático | Apenas trigger automático |
-| 2 handlers no SW | 1 handler no SW |
-| Conflito de fontes | Fluxo único e previsível |
+3. **Se ainda não funcionar**:
+   - Reinstale a PWA (remover da tela inicial → adicionar novamente)
+   - Ative as notificações novamente
 
