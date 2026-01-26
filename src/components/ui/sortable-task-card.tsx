@@ -30,6 +30,7 @@ interface SortableTaskCardProps {
   formatDateBR: (date: string | null) => string;
   assignedUsers?: any[];
   getTypeName?: (slug: string | null) => string;
+  getTypeShortName?: (slug: string | null) => string;
   getTypeIcon?: (slug: string | null) => string;
 }
 
@@ -46,6 +47,7 @@ export function SortableTaskCard({
   formatDateBR,
   assignedUsers = [],
   getTypeName,
+  getTypeShortName,
   getTypeIcon,
 }: SortableTaskCardProps) {
   const {
@@ -96,6 +98,7 @@ export function SortableTaskCard({
         assignedUsers={assignedUsers}
         onClick={handleClick}
         getTypeName={getTypeName}
+        getTypeShortName={getTypeShortName}
         getTypeIcon={getTypeIcon}
       />
     </div>

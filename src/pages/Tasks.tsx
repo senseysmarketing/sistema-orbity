@@ -157,7 +157,7 @@ export default function Tasks() {
 
   const { templates, incrementUsageCount } = useTaskTemplates();
   const { statuses, getStatusName, isValidStatus } = useTaskStatuses();
-  const { types, getTypeName, getTypeIcon, isValidType } = useTaskTypes();
+  const { types, getTypeName, getTypeShortName, getTypeIcon, isValidType } = useTaskTypes();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1115,6 +1115,7 @@ export default function Tasks() {
                   formatDateBR={formatDateBR}
                   getAssignedUsers={getAssignedUsers}
                   getTypeName={getTypeName}
+                  getTypeShortName={getTypeShortName}
                   getTypeIcon={getTypeIcon}
                 />
               ))}
@@ -1135,6 +1136,7 @@ export default function Tasks() {
                   formatDateBR={formatDateBR}
                   assignedUsers={activeId ? getAssignedUsers(activeId) : []}
                   getTypeName={getTypeName}
+                  getTypeShortName={getTypeShortName}
                   getTypeIcon={getTypeIcon}
                 />
               ) : null}

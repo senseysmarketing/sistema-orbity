@@ -27,6 +27,7 @@ interface TaskCardProps {
   assignedUsers?: any[];
   onClick?: (e?: React.MouseEvent) => void;
   getTypeName?: (slug: string | null) => string;
+  getTypeShortName?: (slug: string | null) => string;
   getTypeIcon?: (slug: string | null) => string;
 }
 
@@ -69,6 +70,12 @@ const statusConfig: Record<string, { label: string; color: string; icon: any }> 
   done: { label: "Concluída", color: "bg-green-500", icon: CheckCircle2 },
 };
 
+// Abreviação para label de urgência
+const getShortUrgencyLabel = (label: string): string => {
+  if (label === "Esta Semana") return "Sem.";
+  return label;
+};
+
 export function TaskCard({
   task,
   getPriorityColor,
@@ -79,6 +86,7 @@ export function TaskCard({
   assignedUsers = [],
   onClick,
   getTypeName,
+  getTypeShortName,
   getTypeIcon,
 }: TaskCardProps) {
   const clientColor = getClientColor(task.client_id);
@@ -98,9 +106,9 @@ export function TaskCard({
       <div className="flex items-center justify-between gap-2 mb-2">
         <StatusIcon className="h-5 w-5 flex-shrink-0" />
         <div className="flex gap-1 flex-nowrap overflow-x-auto scrollbar-hide">
-          {task.task_type && getTypeName && (
+          {task.task_type && (getTypeShortName || getTypeName) && (
             <Badge variant="outline" className="text-xs">
-              {getTypeName(task.task_type)}
+              {(getTypeShortName || getTypeName)?.(task.task_type)}
             </Badge>
           )}
           <Badge variant="outline" className={`${getPriorityColor(task.priority)} text-white text-xs`}>
@@ -109,7 +117,7 @@ export function TaskCard({
           {urgency.level !== 'normal' && task.status !== 'done' && (
             <Badge variant="outline" className={`${urgency.color} text-xs flex items-center gap-1`}>
               <UrgencyIcon className="h-3 w-3" />
-              {urgency.label}
+              {getShortUrgencyLabel(urgency.label)}
             </Badge>
           )}
         </div>
