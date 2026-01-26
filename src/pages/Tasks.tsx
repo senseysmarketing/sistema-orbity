@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText } from "lucide-react";
+import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag } from "lucide-react";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 import { FileAttachments, Attachment } from "@/components/ui/file-attachments";
 import {
@@ -35,6 +35,7 @@ import { MultiClientSelector } from "@/components/clients/MultiClientSelector";
 import { TaskAnalytics } from "@/components/tasks/TaskAnalytics";
 import { TaskDetailsDialog } from "@/components/tasks/TaskDetailsDialog";
 import { TaskStatusManager } from "@/components/tasks/TaskStatusManager";
+import { TaskTypeManager } from "@/components/tasks/TaskTypeManager";
 import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
 import { TemplateSelector } from "@/components/templates/TemplateSelector";
 import { QuickTemplatesDropdown } from "@/components/templates/QuickTemplatesDropdown";
@@ -46,6 +47,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTaskAssignments } from "@/hooks/useTaskAssignments";
 import { useTaskTemplates, TaskTemplate } from "@/hooks/useTaskTemplates";
 import { useTaskStatuses } from "@/hooks/useTaskStatuses";
+import { useTaskTypes } from "@/hooks/useTaskTypes";
 import { useClientRelations } from "@/hooks/useClientRelations";
 import { replaceTemplateVariables, calculateDueDate } from "@/lib/templateVariables";
 
@@ -64,6 +66,7 @@ interface Task {
   history?: any[];
   subtasks?: Subtask[];
   attachments?: Attachment[];
+  task_type?: string | null;
 }
 
 interface Profile {
@@ -95,6 +98,7 @@ export default function Tasks() {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [assignedFilter, setAssignedFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [dueDateRange, setDueDateRange] = useState<DateRange | undefined>(undefined);
   const [includeNoDueDate, setIncludeNoDueDate] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -122,6 +126,7 @@ export default function Tasks() {
     due_date: string;
     subtasks: Subtask[];
     attachments: Attachment[];
+    task_type: string;
   }>({
     title: "",
     description: "",
@@ -133,6 +138,7 @@ export default function Tasks() {
     due_date: "",
     subtasks: [],
     attachments: [],
+    task_type: "",
   });
 
   const { updateClientRelations } = useClientRelations();
@@ -150,7 +156,8 @@ export default function Tasks() {
   } = useTaskAssignments();
 
   const { templates, incrementUsageCount } = useTaskTemplates();
-  const { statuses, getStatusName, getStatusColor, isValidStatus } = useTaskStatuses();
+  const { statuses, getStatusName, isValidStatus } = useTaskStatuses();
+  const { types, getTypeName, getTypeIcon, isValidType } = useTaskTypes();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -283,6 +290,7 @@ export default function Tasks() {
 
       const matchesStatus = statusFilter === "all" || task.status === statusFilter;
       const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter;
+      const matchesType = typeFilter === "all" || task.task_type === typeFilter;
 
       let matchesAssigned = true;
       if (assignedFilter !== "all") {
@@ -308,7 +316,7 @@ export default function Tasks() {
         return d >= from;
       })();
 
-      return matchesSearch && matchesStatus && matchesPriority && matchesAssigned && matchesClient && matchesDueDateRange;
+      return matchesSearch && matchesStatus && matchesPriority && matchesAssigned && matchesClient && matchesDueDateRange && matchesType;
     });
 
     return filtered;
@@ -469,6 +477,7 @@ export default function Tasks() {
           agency_id: currentAgency?.id,
           subtasks: newTask.subtasks as any,
           attachments: newTask.attachments as any,
+          task_type: newTask.task_type || null,
         }])
         .select()
         .single();
@@ -500,6 +509,7 @@ export default function Tasks() {
         due_date: "",
         subtasks: [],
         attachments: [],
+        task_type: "",
       });
       setIsDialogOpen(false);
       fetchTasks();
@@ -542,6 +552,7 @@ export default function Tasks() {
         completed: false,
       })),
       attachments: [],
+      task_type: (template as any).default_task_type || "",
     });
 
     incrementUsageCount(template.id);
@@ -567,6 +578,7 @@ export default function Tasks() {
       due_date: task.due_date ? task.due_date.split("T")[0] : "",
       subtasks: task.subtasks || [],
       attachments: task.attachments || [],
+      task_type: task.task_type || "",
     });
     setIsEditDialogOpen(true);
   };
@@ -618,6 +630,7 @@ export default function Tasks() {
         due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
         subtasks: newTask.subtasks as any,
         attachments: newTask.attachments as any,
+        task_type: newTask.task_type || null,
       };
 
       // Reset notification_sent_at if due_date changed
@@ -702,6 +715,7 @@ export default function Tasks() {
         completed: false 
       })) || [],
       attachments: [],
+      task_type: task.task_type || "",
     });
     setIsDetailDialogOpen(false);
     setIsDialogOpen(true);
@@ -779,6 +793,7 @@ export default function Tasks() {
     setPriorityFilter("all");
     setAssignedFilter("all");
     setClientFilter("all");
+    setTypeFilter("all");
     setDueDateRange(undefined);
     setIncludeNoDueDate(false);
   };
@@ -889,6 +904,24 @@ export default function Tasks() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="task_type">Tipo *</Label>
+                <Select
+                  value={newTask.task_type}
+                  onValueChange={(value) => setNewTask({ ...newTask, task_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {types.map((type) => (
+                      <SelectItem key={type.slug} value={type.slug}>
+                        {type.icon} {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
@@ -1018,6 +1051,20 @@ export default function Tasks() {
               </SelectContent>
             </Select>
 
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Tipos</SelectItem>
+                {types.map((type) => (
+                  <SelectItem key={type.slug} value={type.slug}>
+                    {type.icon} {type.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <DateRangeFilterDialog
               value={dueDateRange}
               onChange={setDueDateRange}
@@ -1032,6 +1079,7 @@ export default function Tasks() {
               priorityFilter !== "all" ||
               assignedFilter !== "all" ||
               clientFilter !== "all" ||
+              typeFilter !== "all" ||
               !!dueDateRange?.from ||
               includeNoDueDate !== false) && (
               <Button variant="outline" onClick={clearFilters}>
@@ -1066,6 +1114,8 @@ export default function Tasks() {
                   getClientName={getClientName}
                   formatDateBR={formatDateBR}
                   getAssignedUsers={getAssignedUsers}
+                  getTypeName={getTypeName}
+                  getTypeIcon={getTypeIcon}
                 />
               ))}
             </div>
@@ -1084,6 +1134,8 @@ export default function Tasks() {
                   getClientName={getClientName}
                   formatDateBR={formatDateBR}
                   assignedUsers={activeId ? getAssignedUsers(activeId) : []}
+                  getTypeName={getTypeName}
+                  getTypeIcon={getTypeIcon}
                 />
               ) : null}
             </DragOverlay>
@@ -1106,6 +1158,10 @@ export default function Tasks() {
                 <FileText className="h-4 w-4" />
                 Templates
               </TabsTrigger>
+              <TabsTrigger value="types" className="flex items-center gap-2">
+                <Tag className="h-4 w-4" />
+                Tipos
+              </TabsTrigger>
               <TabsTrigger value="statuses" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 Status
@@ -1113,6 +1169,9 @@ export default function Tasks() {
             </TabsList>
             <TabsContent value="templates">
               <TaskTemplateManager />
+            </TabsContent>
+            <TabsContent value="types">
+              <TaskTypeManager />
             </TabsContent>
             <TabsContent value="statuses">
               <TaskStatusManager />
@@ -1183,6 +1242,24 @@ export default function Tasks() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-task_type">Tipo</Label>
+              <Select
+                value={newTask.task_type}
+                onValueChange={(value) => setNewTask({ ...newTask, task_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {types.map((type) => (
+                    <SelectItem key={type.slug} value={type.slug}>
+                      {type.icon} {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
