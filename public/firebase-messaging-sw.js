@@ -45,13 +45,8 @@ try {
 
 const messaging = firebase.messaging();
 
-// 1) Firebase background handler (quando funcionar)
-messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] onBackgroundMessage:', payload);
-  // A notificação será mostrada pelo fallback push handler abaixo
-});
-
-// 2) Fallback universal - essencial para Safari/iOS
+// Handler universal de push - funciona em todos os browsers incluindo Safari/iOS
+// NOTA: Removido messaging.onBackgroundMessage() pois causava notificações duplicadas
 self.addEventListener('push', (event) => {
   console.log('[SW] Push event recebido');
 
