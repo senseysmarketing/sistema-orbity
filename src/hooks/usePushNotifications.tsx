@@ -86,6 +86,28 @@ export function usePushNotifications() {
         });
         console.log('[Push] Service worker registered:', registration.scope);
 
+        // Forçar ativação se estiver esperando
+        if (registration.waiting) {
+          console.log('[Push] SW waiting, sending SKIP_WAITING');
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+
+        // Aguardar até que o SW esteja ativo
+        if (registration.installing) {
+          console.log('[Push] SW installing, waiting for activation...');
+          await new Promise<void>((resolve) => {
+            const sw = registration.installing!;
+            sw.addEventListener('statechange', () => {
+              if (sw.state === 'activated') {
+                console.log('[Push] SW activated successfully');
+                resolve();
+              }
+            });
+            // Timeout fallback
+            setTimeout(resolve, 5000);
+          });
+        }
+
         // Send Firebase config to service worker
         if (registration.active) {
           registration.active.postMessage({

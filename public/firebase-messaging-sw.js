@@ -1,5 +1,27 @@
 // Firebase Cloud Messaging Service Worker (versão robusta para iOS/Safari)
 
+// Forçar ativação imediata do Service Worker
+self.addEventListener('install', (event) => {
+  console.log('[SW] Installing...');
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating...');
+  event.waitUntil(clients.claim());
+});
+
+// Handler para mensagens do client (forçar skipWaiting)
+self.addEventListener('message', (event) => {
+  console.log('[SW] Message received:', event.data);
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (event.data?.type === 'FIREBASE_CONFIG') {
+    console.log('[SW] Firebase config received');
+  }
+});
+
 importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
 

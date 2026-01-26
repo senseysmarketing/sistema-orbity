@@ -63,22 +63,36 @@ export function PushDiagnostics({
 
     try {
       const registrations = await navigator.serviceWorker.getRegistrations();
-      const fcmReg = registrations.find(r => r.scope.includes('/') && r.active);
+      
+      // Procurar especificamente pelo Firebase SW
+      const fcmReg = registrations.find(r => 
+        r.active?.scriptURL?.includes('firebase-messaging-sw.js')
+      );
       
       if (fcmReg) {
-        if (fcmReg.installing) {
+        setSwStatus('active');
+        addLog('Firebase SW ativo ✓', 'success');
+        return;
+      }
+      
+      // Procurar qualquer SW com escopo raiz
+      const anyReg = registrations.find(r => r.scope.endsWith('/'));
+      if (anyReg) {
+        if (anyReg.installing) {
           setSwStatus('installing');
           addLog('Service Worker instalando...', 'warning');
-        } else if (fcmReg.waiting) {
+        } else if (anyReg.waiting) {
           setSwStatus('waiting');
-          addLog('Service Worker aguardando ativação', 'warning');
-        } else if (fcmReg.active) {
+          addLog('SW aguardando - clique "Atualizar SW" para ativar', 'warning');
+        } else if (anyReg.active) {
+          // SW ativo, mas não é o Firebase SW
+          const scriptName = anyReg.active.scriptURL?.split('/').pop() || 'desconhecido';
           setSwStatus('active');
-          addLog('Service Worker ativo ✓', 'success');
+          addLog(`SW ativo: ${scriptName}`, 'success');
         }
       } else {
         setSwStatus('none');
-        addLog('Nenhum Service Worker FCM encontrado', 'error');
+        addLog('Nenhum Service Worker encontrado', 'error');
       }
     } catch (error) {
       console.error('[Diagnostics] SW check error:', error);
@@ -224,20 +238,27 @@ export function PushDiagnostics({
 
   const updateServiceWorker = async () => {
     setIsUpdatingSW(true);
-    addLog('Atualizando Service Worker...', 'info');
+    addLog('Forçando ativação do Service Worker...', 'info');
 
     try {
       const registrations = await navigator.serviceWorker.getRegistrations();
       
       for (const registration of registrations) {
+        // Se há um SW esperando, forçar skipWaiting
+        if (registration.waiting) {
+          addLog('SW em espera encontrado - enviando SKIP_WAITING', 'warning');
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        
         await registration.update();
         addLog(`SW atualizado: ${registration.scope}`, 'success');
       }
 
-      toast({ title: "Service Worker atualizado!" });
+      // Aguardar um pouco e verificar novamente
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await checkSwStatus();
       
-      // Re-check status after update
-      setTimeout(checkSwStatus, 1000);
+      toast({ title: "Service Worker atualizado!" });
     } catch (error: any) {
       addLog(`Erro ao atualizar SW: ${error.message}`, 'error');
     } finally {
