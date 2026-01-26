@@ -54,6 +54,8 @@ function PushNotificationSection() {
     requestPermission,
     disablePushNotifications,
     token,
+    isStandaloneMode,
+    isIOS,
   } = usePushNotifications();
 
   if (!hasFirebaseConfig) {
@@ -91,6 +93,7 @@ function PushNotificationSection() {
   }
 
   const isEnabled = permission === 'granted' && token;
+  const showIOSWarning = isIOS && !isStandaloneMode;
 
   return (
     <div className="space-y-2">
@@ -126,14 +129,37 @@ function PushNotificationSection() {
           </Button>
         )}
       </div>
+      
+      {/* iOS Safari warning - Critical for push to work */}
+      {showIOSWarning && (
+        <div className="ml-6 p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
+          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+            ⚠️ Para receber notificações no iPhone:
+          </p>
+          <ol className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-1 ml-4 list-decimal">
+            <li>Toque em <strong>Compartilhar</strong> (ícone ↑) no Safari</li>
+            <li>Selecione <strong>"Adicionar à Tela de Início"</strong></li>
+            <li>Abra o app pelo <strong>ícone na tela inicial</strong></li>
+            <li>Então ative as notificações aqui</li>
+          </ol>
+        </div>
+      )}
+      
       <p className="text-xs text-muted-foreground ml-6">
         {isEnabled 
-          ? '✓ Notificações push ativadas. Você receberá alertas mesmo com o app em segundo plano.'
+          ? `✓ Notificações push ativadas${isStandaloneMode ? ' (PWA)' : ''}. Você receberá alertas mesmo com o app em segundo plano.`
           : 'Receba alertas no celular mesmo com o app fechado. Ideal para o PWA instalado.'}
       </p>
       {permission === 'denied' && (
         <p className="text-xs text-destructive ml-6">
           Permissão negada. Ative nas configurações do navegador para usar este recurso.
+        </p>
+      )}
+      
+      {/* Debug info for troubleshooting */}
+      {isEnabled && (
+        <p className="text-xs text-muted-foreground/60 ml-6">
+          Modo: {isStandaloneMode ? 'PWA Standalone' : 'Browser'} | {isIOS ? 'iOS' : 'Outro'}
         </p>
       )}
     </div>

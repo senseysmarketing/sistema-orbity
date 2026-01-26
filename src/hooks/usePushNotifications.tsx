@@ -17,11 +17,28 @@ const firebaseConfig = {
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
+// Helper function to detect PWA standalone mode (critical for iOS push)
+const isStandalone = (): boolean => {
+  // iOS standalone (navigator.standalone is iOS-specific)
+  if ((navigator as any).standalone === true) return true;
+  // Android/Desktop PWA via display-mode media query
+  if (window.matchMedia('(display-mode: standalone)').matches) return true;
+  // Fallback for fullscreen PWA mode
+  if (window.matchMedia('(display-mode: fullscreen)').matches) return true;
+  return false;
+};
+
+// Helper to detect iOS
+const isIOS = (): boolean => {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+};
+
 export function usePushNotifications() {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [token, setToken] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isStandaloneMode, setIsStandaloneMode] = useState(false);
   const { user } = useAuth();
   const { currentAgency } = useAgency();
   const { toast } = useToast();
@@ -40,6 +57,11 @@ export function usePushNotifications() {
   // Check support and initialize
   useEffect(() => {
     const checkSupport = async () => {
+      // Check standalone mode
+      const standalone = isStandalone();
+      setIsStandaloneMode(standalone);
+      console.log('[Push] Standalone mode:', standalone);
+
       // Check if browser supports push notifications
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
         console.log('[Push] Browser does not support push notifications');
@@ -57,9 +79,11 @@ export function usePushNotifications() {
       setIsSupported(true);
       setPermission(Notification.permission);
 
-      // Register service worker
+      // Register service worker with explicit scope
       try {
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          scope: '/',
+        });
         console.log('[Push] Service worker registered:', registration.scope);
 
         // Send Firebase config to service worker
@@ -108,6 +132,9 @@ export function usePushNotifications() {
       return;
     }
 
+    const standalone = isStandalone();
+    const ios = isIOS();
+
     try {
       // Step 1: Deactivate ALL previous tokens for this user (ensures only latest token is active)
       const { error: deactivateError } = await supabase
@@ -123,7 +150,7 @@ export function usePushNotifications() {
         console.log('[Push] Deactivated previous tokens');
       }
 
-      // Step 2: Upsert the new token
+      // Step 2: Upsert the new token with enhanced device_info
       const { error } = await supabase.from('push_subscriptions').upsert({
         user_id: user.id,
         agency_id: currentAgency.id,
@@ -132,6 +159,10 @@ export function usePushNotifications() {
           userAgent: navigator.userAgent,
           platform: navigator.platform,
           language: navigator.language,
+          standalone: standalone,
+          displayMode: standalone ? 'standalone' : 'browser',
+          isIOS: ios,
+          generatedAt: new Date().toISOString(),
         },
         platform: 'web',
         is_active: true,
@@ -145,7 +176,7 @@ export function usePushNotifications() {
         throw error;
       }
       
-      console.log('[Push] Token saved successfully');
+      console.log('[Push] Token saved successfully (standalone:', standalone, ', iOS:', ios, ')');
     } catch (error) {
       console.error('[Push] Failed to save token:', error);
     }
@@ -157,6 +188,19 @@ export function usePushNotifications() {
       toast({
         title: "Notificações não suportadas",
         description: "Seu navegador não suporta notificações push.",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    // CRITICAL: On iOS, push notifications ONLY work from installed PWA
+    const ios = isIOS();
+    const standalone = isStandalone();
+    
+    if (ios && !standalone) {
+      toast({
+        title: "Abra pela PWA instalada",
+        description: "No iPhone, notificações só funcionam quando você abre o app pelo ícone na tela inicial (não pelo Safari).",
         variant: "destructive",
       });
       return null;
@@ -178,11 +222,15 @@ export function usePushNotifications() {
         return null;
       }
 
-      // Get FCM token
+      // Get FCM token with explicit service worker registration
       const messaging = getFirebaseMessaging();
+      const swRegistration = await navigator.serviceWorker.ready;
+      
+      console.log('[Push] Using SW registration:', swRegistration.scope);
+      
       const fcmToken = await getToken(messaging, {
         vapidKey: VAPID_KEY,
-        serviceWorkerRegistration: await navigator.serviceWorker.ready,
+        serviceWorkerRegistration: swRegistration,
       });
 
       if (!fcmToken) {
@@ -190,6 +238,7 @@ export function usePushNotifications() {
       }
 
       console.log('[Push] FCM token obtained:', fcmToken.substring(0, 20) + '...');
+      console.log('[Push] Token context - iOS:', ios, ', Standalone:', standalone);
       
       // Save token to database
       await saveToken(fcmToken);
@@ -197,7 +246,9 @@ export function usePushNotifications() {
 
       toast({
         title: "Notificações ativadas! 🔔",
-        description: "Você receberá alertas mesmo com o app em segundo plano.",
+        description: standalone 
+          ? "Você receberá alertas mesmo com o app em segundo plano."
+          : "Notificações ativadas. Para melhor experiência, instale o app.",
       });
 
       return fcmToken;
@@ -301,6 +352,8 @@ export function usePushNotifications() {
     isSupported,
     isLoading,
     hasFirebaseConfig,
+    isStandaloneMode,
+    isIOS: isIOS(),
     requestPermission,
     disablePushNotifications,
   };
