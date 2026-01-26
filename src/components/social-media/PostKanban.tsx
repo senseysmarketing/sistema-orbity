@@ -302,9 +302,9 @@ export function PostKanban() {
 
             {/* Seletor de ordenação */}
             <Select value={sortBy} onValueChange={(value) => setSortBy(value as "post_date" | "due_date")}>
-              <SelectTrigger className="w-[180px]">
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4" />
+              <SelectTrigger className="w-[200px]">
+                <div className="flex items-center gap-2 whitespace-nowrap">
+                  <ArrowUpDown className="h-4 w-4 flex-shrink-0" />
                   <SelectValue placeholder="Ordenar por" />
                 </div>
               </SelectTrigger>
