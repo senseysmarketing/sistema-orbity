@@ -1,121 +1,134 @@
 
-# Plano: Gerar Ícones PWA com o Novo Logo Orbity
+# Diagnóstico: Push Notifications Não Funcionando
 
-## Logo Fornecido
+## Problema Identificado
 
-O logo fornecido (`IconeOrbityApp.png`) é um ícone limpo do Orbity com gradiente azul/roxo/verde, ideal para todos os usos do PWA.
+As notificações push não estão chegando ao seu iPhone porque **falta uma conexão** entre a inserção de notificações no banco de dados e a edge function que envia push.
 
----
-
-## Ícones Necessários
-
-### Ícones do App (Manifest PWA)
-
-| Arquivo | Tamanho | Uso |
-|---------|---------|-----|
-| `icon-192x192.png` | 192x192 | Android, PWA padrão |
-| `icon-512x512.png` | 512x512 | Android, PWA grande, Maskable |
-| `apple-touch-icon.png` | 180x180 | iOS tela inicial |
-
-### Splash Screens iOS
-
-| Arquivo | Tamanho | Dispositivo |
-|---------|---------|-------------|
-| `splash-640x1136.png` | 640x1136 | iPhone SE/5s |
-| `splash-750x1334.png` | 750x1334 | iPhone 8/7/6s |
-| `splash-1125x2436.png` | 1125x2436 | iPhone X/11 Pro |
-| `splash-1242x2208.png` | 1242x2208 | iPhone 8/7/6s Plus |
-| `splash-1284x2778.png` | 1284x2778 | iPhone 12/13/14 Pro Max |
-
-### Favicon
-
-| Arquivo | Tamanho | Uso |
-|---------|---------|-----|
-| `favicon.ico` | 32x32 | Aba do navegador |
-
----
-
-## O Que Será Feito
-
-### 1. Copiar Logo Base para o Projeto
-
-Copiar o arquivo `user-uploads://IconeOrbityApp.png` para `public/icons/` como base.
-
-### 2. Gerar Ícones Redimensionados
-
-Usar a AI de geração de imagens para criar versões otimizadas em cada tamanho:
-
-- **icon-512x512.png**: Logo centralizado em fundo escuro (`#0F0F23`)
-- **icon-192x192.png**: Versão menor, mesma aparência
-- **apple-touch-icon.png**: 180x180 com cantos arredondados para iOS
-
-### 3. Gerar Splash Screens
-
-Criar splash screens com:
-- Fundo gradiente escuro (`#0F0F23` para `#1a1a2e`)
-- Logo centralizado
-- Texto "Orbity" abaixo do logo (opcional)
-
-### 4. Atualizar Favicon
-
-Atualizar o `index.html` para usar favicon local em vez de URL externa.
-
----
-
-## Alterações Técnicas
-
-### Arquivos a Atualizar em `public/icons/`:
+### Fluxo Atual (Incompleto)
 
 ```
-public/icons/
-├── icon-192x192.png       ← Novo (192x192)
-├── icon-512x512.png       ← Novo (512x512) 
-├── apple-touch-icon.png   ← Novo (180x180)
-├── splash-640x1136.png    ← Novo (640x1136)
-├── splash-750x1334.png    ← Novo (750x1334)
-├── splash-1125x2436.png   ← Novo (1125x2436)
-├── splash-1242x2208.png   ← Novo (1242x2208)
-└── splash-1284x2778.png   ← Novo (1284x2778)
+Tarefa Atribuída
+      ↓
+Trigger PostgreSQL (notify_task_assignment)
+      ↓
+Insere na tabela "notifications" ✅
+      ↓
+      ❌ PARA AQUI - Notificação fica só na central
 ```
 
-### Atualizar `public/favicon.ico`
+### O Que Deveria Acontecer
 
-Criar favicon a partir do logo.
-
-### Atualizar `index.html`
-
-Alterar linha do favicon de URL externa para local:
-
-```html
-<!-- De -->
-<link rel="icon" type="image/x-icon" href="https://storage.googleapis.com/...">
-
-<!-- Para -->
-<link rel="icon" type="image/png" href="/icons/favicon.png">
+```
+Tarefa Atribuída
+      ↓
+Trigger PostgreSQL (notify_task_assignment)
+      ↓
+Insere na tabela "notifications"
+      ↓
+Trigger/Webhook dispara edge function "send-push-notification"
+      ↓
+FCM envia push para seu iPhone ✅
 ```
 
 ---
 
-## Especificações de Design
+## Evidências Encontradas
 
-### Ícones do App
-- **Fundo**: Gradiente escuro `#0F0F23` → `#1a1a2e`
-- **Logo**: Centralizado, ocupando ~75% do espaço
-- **Bordas**: Arredondadas para iOS (automático no sistema)
-
-### Splash Screens
-- **Fundo**: Sólido escuro `#0F0F23` 
-- **Logo**: Centralizado verticalmente, ~30% da altura
-- **Estilo**: Minimalista, apenas logo no centro
+| Item | Status |
+|------|--------|
+| Token FCM do seu iPhone | ✅ Registrado corretamente |
+| Permissão de notificação | ✅ Concedida |
+| Notificação no banco | ✅ Criada às 20:48 |
+| Edge function `send-push-notification` | ✅ Funcional |
+| Logs da edge function | ❌ Vazios (nunca foi chamada) |
+| Trigger para chamar push | ❌ **Não existe** |
 
 ---
 
-## Resultado Final
+## Solução Proposta
+
+Criar um **Database Webhook** que chama automaticamente a edge function `send-push-notification` sempre que uma nova notificação é inserida.
+
+### Implementação Técnica
+
+#### 1. Criar Extensão pg_net (se não existir)
+
+Habilitar a extensão `pg_net` no Supabase para fazer chamadas HTTP a partir de triggers.
+
+#### 2. Criar Função que Dispara Push
+
+```sql
+CREATE OR REPLACE FUNCTION trigger_push_on_notification()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- Chama a edge function send-push-notification via pg_net
+  PERFORM net.http_post(
+    url := 'https://ovookkywclrqfmtumelw.supabase.co/functions/v1/send-push-notification',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || current_setting('app.service_role_key', true)
+    ),
+    body := jsonb_build_object(
+      'user_id', NEW.user_id,
+      'title', NEW.title,
+      'body', NEW.message,
+      'data', jsonb_build_object(
+        'type', NEW.type,
+        'action_url', COALESCE(NEW.action_url, '/dashboard'),
+        'notification_id', NEW.id::text,
+        'play_sound', COALESCE((NEW.metadata->>'play_sound')::text, 'false')
+      )
+    )
+  );
+  
+  RETURN NEW;
+END;
+$$;
+```
+
+#### 3. Criar Trigger na Tabela Notifications
+
+```sql
+CREATE TRIGGER trg_push_on_new_notification
+AFTER INSERT ON notifications
+FOR EACH ROW
+EXECUTE FUNCTION trigger_push_on_notification();
+```
+
+### Arquivos a Modificar
+
+| Arquivo | Ação |
+|---------|------|
+| Nova migration SQL | Criar extensão pg_net + função + trigger |
+
+---
+
+## Resultado Esperado
 
 Após a implementação:
 
-- **iOS**: Ícone correto na tela inicial + splash screens com a marca
-- **Android**: Ícone de alta qualidade no launcher
-- **Desktop**: Ícone na barra de tarefas/dock
-- **Notificações**: Push notifications mostrarão o ícone correto
-- **Favicon**: Aba do navegador com ícone atualizado
+1. **Qualquer notificação** (tarefas, posts, reuniões, leads, etc.) que for inserida no banco automaticamente disparará push
+2. As notificações chegarão ao seu iPhone mesmo com o app fechado
+3. O fluxo será instantâneo (tempo real)
+
+---
+
+## Considerações iOS Específicas
+
+Para push notifications funcionarem no iOS:
+
+- ✅ Você está usando iOS 18.7 (suportado desde iOS 16.4)
+- ✅ PWA precisa estar instalado na tela inicial
+- ✅ Token FCM está registrado
+- ⚠️ Certifique-se de que o app foi instalado via Safari (não Chrome/outro)
+- ⚠️ Verifique em Ajustes > Notificações se o Orbity tem permissão
+
+---
+
+## Alternativa Mais Simples (Fallback)
+
+Se a extensão `pg_net` não estiver disponível, podemos usar um **Supabase Database Webhook** configurado via dashboard, ou modificar os triggers existentes para usar a extensão `http` do Supabase.
