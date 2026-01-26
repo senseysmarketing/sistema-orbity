@@ -107,42 +107,8 @@ async function batchCreateNotifications(notifications: NotificationData[]) {
     return;
   }
 
-  // Send push notifications for each created notification
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-  for (const notif of notifications) {
-    try {
-      const response = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${serviceRoleKey}`,
-        },
-        body: JSON.stringify({
-          user_id: notif.user_id,
-          title: notif.title,
-          body: notif.message,
-          data: {
-            type: notif.type,
-            action_url: notif.action_url || '/dashboard',
-            notification_id: crypto.randomUUID(),
-            play_sound: notif.metadata?.play_sound ? 'true' : 'false',
-            ...notif.metadata,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        console.error(`[Push] Failed for user ${notif.user_id}:`, await response.text());
-      } else {
-        const result = await response.json();
-        console.log(`[Push] Sent ${result.sent} push notifications for user ${notif.user_id}`);
-      }
-    } catch (e) {
-      console.error('[Push] Error sending push notification:', e);
-    }
-  }
+  // Push notifications são disparadas automaticamente pelo trigger do banco (trg_push_on_new_notification)
+  console.log(`[Notifications] ${notifications.length} notificações criadas (push será enviado via trigger)`);
 }
 
 // ============================================
