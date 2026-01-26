@@ -221,7 +221,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
           .eq('agency_id', currentAgency?.id);
 
         const controlsMap = new Map(
-          controlsData?.map(c => [c.ad_account_id, c]) || []
+          controlsData?.map(c => [c.ad_account_id || (c.platform_data as any)?.ad_account_id, c]) || []
         );
 
         const updatedClients: ClientData[] = data.summaries.map((summary: any) => {
@@ -282,7 +282,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
         .eq('agency_id', currentAgency.id);
 
       const controlsMap = new Map(
-        controlsData?.map(c => [c.ad_account_id, c]) || []
+        controlsData?.map(c => [c.ad_account_id || (c.platform_data as any)?.ad_account_id, c]) || []
       );
 
       const clientsData: ClientData[] = (accountsData || []).map(account => {
@@ -354,7 +354,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
           .eq('agency_id', currentAgency?.id);
 
         const controlsMap = new Map(
-          controlsData?.map(c => [c.ad_account_id, c]) || []
+          controlsData?.map(c => [c.ad_account_id || (c.platform_data as any)?.ad_account_id, c]) || []
         );
 
         const updatedClients: ClientData[] = data.summaries.map((summary: any) => {
@@ -430,12 +430,16 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
         .eq('agency_id', currentAgency.id);
 
       // Atualizar ou criar registro no traffic_controls
-      const { data: existingControl } = await supabase
+      // Buscar registro existente - considerar coluna OU platform_data
+      const { data: existingControls } = await supabase
         .from('traffic_controls')
-        .select('id')
-        .eq('ad_account_id', updatedClient.ad_account_id)
-        .eq('agency_id', currentAgency.id)
-        .maybeSingle();
+        .select('id, ad_account_id, platform_data')
+        .eq('agency_id', currentAgency.id);
+
+      const existingControl = existingControls?.find(c => 
+        c.ad_account_id === updatedClient.ad_account_id || 
+        (c.platform_data as any)?.ad_account_id === updatedClient.ad_account_id
+      );
 
       const controlData: any = {
         agency_id: currentAgency.id,
