@@ -9,9 +9,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { toast } from "sonner";
-import { Bell, Mail, Volume2, Chrome, Clock } from "lucide-react";
+import { Bell, Mail, Volume2, Chrome, Clock, Smartphone, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 interface NotificationPreferencesProps {
   open: boolean;
@@ -41,6 +42,102 @@ interface DoNotDisturb {
   dnd_start_time: string;
   dnd_end_time: string;
   dnd_weekends: boolean;
+}
+
+// Push Notification Section Component
+function PushNotificationSection() {
+  const { 
+    permission, 
+    isSupported, 
+    isLoading, 
+    hasFirebaseConfig,
+    requestPermission,
+    disablePushNotifications,
+    token,
+  } = usePushNotifications();
+
+  if (!hasFirebaseConfig) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between opacity-60">
+          <Label className="flex items-center gap-2">
+            <Smartphone className="h-4 w-4" />
+            <span>Push no Celular</span>
+          </Label>
+          <span className="text-xs text-muted-foreground">Não configurado</span>
+        </div>
+        <p className="text-xs text-muted-foreground ml-6">
+          Configuração do Firebase necessária para notificações push.
+        </p>
+      </div>
+    );
+  }
+
+  if (!isSupported) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between opacity-60">
+          <Label className="flex items-center gap-2">
+            <Smartphone className="h-4 w-4" />
+            <span>Push no Celular</span>
+          </Label>
+          <span className="text-xs text-muted-foreground">Não suportado</span>
+        </div>
+        <p className="text-xs text-muted-foreground ml-6">
+          Seu navegador não suporta notificações push. Tente usar o app instalado.
+        </p>
+      </div>
+    );
+  }
+
+  const isEnabled = permission === 'granted' && token;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="flex items-center gap-2 cursor-pointer">
+          <Smartphone className="h-4 w-4" />
+          <span>Push no Celular</span>
+        </Label>
+        {isEnabled ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={disablePushNotifications}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              'Desativar'
+            )}
+          </Button>
+        ) : (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={requestPermission}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : null}
+            {isLoading ? 'Ativando...' : 'Ativar'}
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground ml-6">
+        {isEnabled 
+          ? '✓ Notificações push ativadas. Você receberá alertas mesmo com o app em segundo plano.'
+          : 'Receba alertas no celular mesmo com o app fechado. Ideal para o PWA instalado.'}
+      </p>
+      {permission === 'denied' && (
+        <p className="text-xs text-destructive ml-6">
+          Permissão negada. Ative nas configurações do navegador para usar este recurso.
+        </p>
+      )}
+    </div>
+  );
 }
 
 export function NotificationPreferences({ open, onOpenChange }: NotificationPreferencesProps) {
@@ -681,6 +778,11 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
                   </p>
                 )}
               </div>
+
+              <Separator />
+
+              {/* Push Notifications (Celular) */}
+              <PushNotificationSection />
 
               <Separator />
 

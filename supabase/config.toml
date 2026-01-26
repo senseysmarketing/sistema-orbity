@@ -36,6 +36,9 @@ verify_jwt = false
 [functions.setup-demo-account]
 verify_jwt = false
 
+[functions.send-push-notification]
+verify_jwt = false
+
 [api]
 enabled = true
 port = 54321
