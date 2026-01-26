@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag } from "lucide-react";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 import { FileAttachments, Attachment } from "@/components/ui/file-attachments";
@@ -832,11 +833,12 @@ export default function Tasks() {
                 Nova Tarefa
               </Button>
             </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Criar Nova Tarefa</DialogTitle>
               <DialogDescription>Preencha as informações ou use um template.</DialogDescription>
             </DialogHeader>
+            <ScrollArea className="flex-1 max-h-[60vh] pr-4">
             <div className="grid gap-4 py-4">
               {/* Botão de Template */}
               {templates.length > 0 && (
@@ -967,6 +969,7 @@ export default function Tasks() {
                 />
               </div>
             </div>
+            </ScrollArea>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancelar
@@ -1184,11 +1187,12 @@ export default function Tasks() {
 
       {/* Dialogs */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Editar Tarefa</DialogTitle>
             <DialogDescription>Atualize as informações da tarefa.</DialogDescription>
           </DialogHeader>
+          <ScrollArea className="flex-1 max-h-[60vh] pr-4">
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="edit-title">Título *</Label>
@@ -1306,6 +1310,7 @@ export default function Tasks() {
               />
             </div>
           </div>
+          </ScrollArea>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
