@@ -1,200 +1,250 @@
 
-# Painel de Diagnóstico Completo para Push Notifications
 
-## Diagnóstico Atual
+# Correção Definitiva para Push Notifications no iOS
 
-### O que encontrei nos logs
+## Diagnóstico Final
 
-| Situação | Status | Evidência |
-|----------|--------|-----------|
-| Token ativo no banco | ✅ Sim | `cRug8Z9ql80NKV8xGElkEb:APA91bGOXr...` |
-| Modo standalone | ✅ Sim | `device_info.standalone: true` |
-| iOS detectado | ✅ Sim | `device_info.isIOS: true` |
-| FCM aceitou envio | ❌ Parcial | 1 token retornou `UNREGISTERED` (404) |
-| Token entregue ao dispositivo | ❓ Desconhecido | O FCM aceitou, mas iOS pode não entregar |
+### O que está funcionando
+| Item | Status | Evidência |
+|------|--------|-----------|
+| Backend FCM | ✅ OK | `Message sent successfully: projects/orbityapp-f710e/messages/da2d0550-...` |
+| Token ativo | ✅ OK | `dbipKmw8VHAXWe6UebTSnO:APA91bEvfP2Yi768C9COfVmXg7sPi-...` |
+| Modo standalone | ✅ OK | `device_info.standalone: true, isIOS: true` |
+| Token inválido tratado | ✅ OK | `UNREGISTERED` foi outro usuário cujo token já foi desativado |
 
-### Problema identificado
+### O Problema Real: Conflito de Service Workers
 
-Há **2 tokens sendo enviados**, mas o log mostra:
-- Token 1: `UNREGISTERED` (404) - **Token inválido foi desativado automaticamente** ✅
-- Token 2: `Message sent successfully` - **FCM aceitou** ✅
+A PWA está usando `vite-plugin-pwa` que gera um Service Worker Workbox para cache offline, mas há também o `firebase-messaging-sw.js` separado. Quando o diagnóstico mostra "SW aguardando ativação", significa que:
 
-**O FCM diz que enviou com sucesso, mas o iOS não entrega.**
+1. O Workbox SW está ativo (gerado pelo VitePWA)
+2. O Firebase SW está "waiting" (não consegue assumir controle)
+3. **O push chega ao Workbox SW, que não sabe processar FCM**
 
-### Possíveis causas restantes
+### Por que o erro UNREGISTERED aparecia como "total: 2"
 
-1. **Service Worker não está recebendo o push event** - o SW precisa estar ativo e registrado corretamente
-2. **Permissões do iOS** - mesmo com `granted`, pode haver bloqueio nas configurações do iOS
-3. **Token gerado com VAPID/projeto incorreto** - mismatch entre client e servidor
-
----
-
-## Solução: Painel de Diagnóstico Visual
-
-Criar um painel de diagnóstico completo similar ao da imagem de referência, com:
-
-### 1. Status do Dispositivo (em tempo real)
-- Dispositivo iOS: Sim/Não
-- Modo PWA (Tela Início): Sim/Não
-- User ID (Supabase)
-- FCM Token (truncado + cópia completa)
-- Service Worker: status (active/waiting/installing)
-- Permissão: granted/denied/default
-- Inscrito: Sim/Não
-- Última atualização
-
-### 2. Token FCM Completo (para testes)
-- Exibir token completo em caixa de código
-- Botão "Copiar Token"
-
-### 3. Ações de Diagnóstico
-- **Botão "Testar Push"**: Envia notificação de teste para o próprio dispositivo
-- **Botão "Limpar tokens antigos"**: Remove tokens inativos
-- **Botão "Atualizar Service Worker"**: Força atualização do SW
-
-### 4. Logs em Tempo Real
-- Exibir logs do processo de push em tempo real
-- Mostrar respostas do FCM
+- No momento do teste, haviam 2 tokens ativos no banco
+- Um era válido (seu iPhone), outro era inválido (outro dispositivo/usuário)
+- O token inválido foi automaticamente desativado após o erro 404
+- Agora só resta 1 token ativo (o seu)
 
 ---
 
-## Arquivos a Criar/Modificar
+## Solução em 2 Partes
 
-| Arquivo | Ação |
-|---------|------|
-| `src/components/notifications/PushDiagnostics.tsx` | **Criar** - Novo componente de diagnóstico |
-| `src/hooks/usePushNotifications.tsx` | **Modificar** - Adicionar função `sendTestPush` |
-| `src/components/notifications/NotificationPreferences.tsx` | **Modificar** - Integrar painel de diagnóstico |
+### Parte 1: Forçar Ativação Imediata do SW
 
----
-
-## Detalhes Técnicos da Implementação
-
-### 1. PushDiagnostics.tsx
+Quando um Service Worker está em estado "waiting", ele precisa ser ativado manualmente:
 
 ```typescript
-// Estrutura do componente
-interface DiagnosticInfo {
-  isIOS: boolean;
-  isStandalone: boolean;
-  userId: string | null;
-  fcmToken: string | null;
-  swStatus: 'active' | 'installing' | 'waiting' | 'none';
-  permission: NotificationPermission;
-  isSubscribed: boolean;
-  lastUpdate: string;
+// No PushDiagnostics.tsx - modificar updateServiceWorker
+const updateServiceWorker = async () => {
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  
+  for (const registration of registrations) {
+    // Se há um SW esperando, forçar skipWaiting
+    if (registration.waiting) {
+      registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+    await registration.update();
+  }
+};
+```
+
+```javascript
+// No firebase-messaging-sw.js - adicionar handler para SKIP_WAITING
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+```
+
+### Parte 2: Garantir que Firebase SW é Registrado Corretamente
+
+O problema pode estar no VitePWA gerando um SW que sobrescreve o Firebase SW. Precisamos garantir que:
+
+1. O `firebase-messaging-sw.js` é registrado com escopo explícito
+2. O SW recebe corretamente os push events
+
+---
+
+## Arquivos a Modificar
+
+| Arquivo | Modificação |
+|---------|-------------|
+| `public/firebase-messaging-sw.js` | Adicionar handler `SKIP_WAITING` e `install/activate` events |
+| `src/components/notifications/PushDiagnostics.tsx` | Corrigir lógica de verificação de SW e forçar ativação |
+| `src/hooks/usePushNotifications.tsx` | Garantir registro correto do SW e forçar ativação |
+
+---
+
+## Detalhes Técnicos
+
+### 1. firebase-messaging-sw.js
+
+Adicionar no início do arquivo:
+
+```javascript
+// Forçar ativação imediata do Service Worker
+self.addEventListener('install', (event) => {
+  console.log('[SW] Installing...');
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating...');
+  event.waitUntil(clients.claim());
+});
+
+// Handler para mensagens do client (forçar skipWaiting)
+self.addEventListener('message', (event) => {
+  console.log('[SW] Message received:', event.data);
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+```
+
+### 2. PushDiagnostics.tsx
+
+Corrigir `checkSwStatus` para detectar corretamente o estado:
+
+```typescript
+const checkSwStatus = useCallback(async () => {
+  if (!('serviceWorker' in navigator)) {
+    setSwStatus('none');
+    return;
+  }
+
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    
+    // Procurar especificamente pelo Firebase SW
+    const fcmReg = registrations.find(r => 
+      r.active?.scriptURL?.includes('firebase-messaging-sw.js')
+    );
+    
+    if (!fcmReg) {
+      // Procurar qualquer SW com escopo raiz
+      const anyReg = registrations.find(r => r.scope.endsWith('/'));
+      if (anyReg) {
+        if (anyReg.installing) {
+          setSwStatus('installing');
+          addLog('Service Worker instalando...', 'warning');
+        } else if (anyReg.waiting) {
+          setSwStatus('waiting');
+          addLog('SW aguardando - clique "Atualizar SW" para ativar', 'warning');
+        } else if (anyReg.active) {
+          setSwStatus('active');
+          addLog(`SW ativo: ${anyReg.active.scriptURL}`, 'success');
+        }
+      } else {
+        setSwStatus('none');
+        addLog('Nenhum Service Worker encontrado', 'error');
+      }
+      return;
+    }
+    
+    setSwStatus('active');
+    addLog('Firebase SW ativo ✓', 'success');
+  } catch (error) {
+    setSwStatus('none');
+    addLog(`Erro ao verificar SW: ${error}`, 'error');
+  }
+}, [addLog]);
+```
+
+Melhorar `updateServiceWorker` para forçar ativação:
+
+```typescript
+const updateServiceWorker = async () => {
+  setIsUpdatingSW(true);
+  addLog('Forçando ativação do Service Worker...', 'info');
+
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    
+    for (const registration of registrations) {
+      // Se há um SW esperando, forçar skipWaiting
+      if (registration.waiting) {
+        addLog('SW em espera encontrado - enviando SKIP_WAITING', 'warning');
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+      
+      await registration.update();
+      addLog(`SW atualizado: ${registration.scope}`, 'success');
+    }
+
+    // Aguardar um pouco e verificar novamente
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    await checkSwStatus();
+    
+    toast({ title: "Service Worker atualizado!" });
+  } catch (error: any) {
+    addLog(`Erro: ${error.message}`, 'error');
+  } finally {
+    setIsUpdatingSW(false);
+  }
+};
+```
+
+### 3. usePushNotifications.tsx
+
+No registro do SW, garantir ativação imediata:
+
+```typescript
+// Register service worker with explicit scope
+const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+  scope: '/',
+});
+console.log('[Push] Service worker registered:', registration.scope);
+
+// Forçar ativação se estiver esperando
+if (registration.waiting) {
+  console.log('[Push] SW waiting, sending SKIP_WAITING');
+  registration.waiting.postMessage({ type: 'SKIP_WAITING' });
 }
 
-// Features:
-- Card com header "Diagnóstico Firebase" + botão "Atualizar"
-- Grid de informações com labels e valores copiáveis
-- Caixa de código com token completo
-- Seção de ações (Limpar tokens, Atualizar SW)
-- Log de eventos em tempo real (array de mensagens)
-```
-
-### 2. Função sendTestPush
-
-```typescript
-// No hook usePushNotifications
-const sendTestPush = useCallback(async () => {
-  if (!user || !token) return { success: false, error: 'No token' };
-  
-  // Chamar edge function send-push-notification diretamente
-  const { data, error } = await supabase.functions.invoke('send-push-notification', {
-    body: {
-      user_id: user.id,
-      title: '🔔 Teste de Push',
-      body: 'Se você está vendo isso, as notificações funcionam!',
-      data: { action_url: '/settings', test: 'true' },
-    }
+// Aguardar até que o SW esteja ativo
+if (registration.installing) {
+  console.log('[Push] SW installing, waiting for activation...');
+  await new Promise<void>((resolve) => {
+    registration.installing!.addEventListener('statechange', (e) => {
+      if ((e.target as ServiceWorker).state === 'activated') {
+        resolve();
+      }
+    });
   });
-  
-  return { success: !error, data, error };
-}, [user, token]);
-```
-
-### 3. Estrutura Visual (baseada na imagem de referência)
-
-```text
-┌─────────────────────────────────────────────────────────┐
-│ 📱 Push Notifications                                   │
-│ Receba notificações em tempo real no celular            │
-├─────────────────────────────────────────────────────────┤
-│ Status do dispositivo                      [🟢 Ativo]   │
-│ Este dispositivo está recebendo notificações push       │
-│                                                         │
-│ [Desativar Push]  [📤 Testar]                          │
-│                                                         │
-│ 🔊 Som de notificação                           [ON]    │
-│ Tocar som quando novos leads chegarem                   │
-└─────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────┐
-│ ⚙️ Diagnóstico Firebase             [🔄 Atualizar]     │
-│ Informações técnicas para debug                         │
-├─────────────────────────────────────────────────────────┤
-│ Dispositivo iOS          │            Sim ⊞             │
-│ Modo PWA (Tela Início)   │            Sim ⊞             │
-│ User ID (Supabase)       │    03755812-224d... ⊞        │
-│ FCM Token                │    ...APA91bGOXr7... ⊞       │
-│ Service Worker           │           active ⊞           │
-│ Permissão                │          granted ⊞           │
-│ Inscrito                 │              Sim ⊞           │
-│ Última atualização       │         22:46:12 ⊞           │
-├─────────────────────────────────────────────────────────┤
-│ Token FCM Completo (para testes)                        │
-│ ┌─────────────────────────────────────────────────────┐ │
-│ │ cRug8Z9ql80NKV8xGElkEb:APA91bGOXr7OI5_va4Mgt8eXBq │ │
-│ │ 3v5Elgs9E5dqSU5Za2Dn35HbWwEY2Jsq9qFCFditsloXE2Iv │ │
-│ └─────────────────────────────────────────────────────┘ │
-│ [📋 Copiar Token]                                       │
-├─────────────────────────────────────────────────────────┤
-│ Limpar tokens antigos                    [🗑️ Limpar]   │
-│ Remove tokens obsoletos do banco                        │
-│                                                         │
-│ Atualizar Service Worker                [🔄 Atualizar]  │
-│ Força atualização do SW para versão mais recente        │
-├─────────────────────────────────────────────────────────┤
-│ Logs em Tempo Real                                      │
-│ ┌─────────────────────────────────────────────────────┐ │
-│ │ [22:46:12] ✅ FCM reconectado com sucesso           │ │
-│ │ [22:46:11] Token FCM válido, reconectando...        │ │
-│ │ [22:46:10] Inicializando FCM Provider...            │ │
-│ └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
+}
 ```
 
 ---
 
-## Passos de Implementação
+## Fluxo de Teste Após Implementação
 
-1. **Criar `PushDiagnostics.tsx`**
-   - Componente com todas as informações de diagnóstico
-   - Estado local para logs
-   - Botões de ação (testar, limpar, atualizar SW)
-   - Funcionalidade de copiar para clipboard
+1. Após o deploy, **Forçar atualização no iPhone**:
+   - Abra a PWA pelo ícone
+   - Vá em Configurações → Notificações
+   - Clique em **"Atualizar Service Worker"**
+   - Verifique se o status muda de "waiting" para "active"
 
-2. **Modificar `usePushNotifications.tsx`**
-   - Adicionar `sendTestPush()` para enviar notificação de teste
-   - Adicionar `getSwStatus()` para verificar status do Service Worker
-   - Adicionar `clearOldTokens()` para limpar tokens antigos
+2. **Testar Push**:
+   - Clique em "Testar Push"
+   - Aguarde alguns segundos
+   - A notificação deve aparecer
 
-3. **Modificar `NotificationPreferences.tsx`**
-   - Importar e renderizar `PushDiagnostics` dentro de `PushNotificationSection`
-   - Passar props necessárias
-
-4. **Adicionar botão "Testar" na seção principal**
-   - Ao lado do botão "Desativar Push"
-   - Chama `sendTestPush()` e mostra resultado
+3. **Se ainda não funcionar**:
+   - Reinstale a PWA (remover da tela inicial → adicionar novamente)
+   - Ative as notificações
+   - Teste novamente
 
 ---
 
 ## Resultado Esperado
 
-Após implementação:
-- Você terá visibilidade completa do estado do push no dispositivo
-- Poderá enviar notificação de teste diretamente
-- Verá logs em tempo real do processo
-- Poderá limpar tokens antigos e forçar atualização do SW
-- Identificar se o problema é client-side ou server-side
+| Antes | Depois |
+|-------|--------|
+| SW status: "waiting" | SW status: "active" |
+| Push não aparece no iOS | Push aparece corretamente |
+| Conflito entre Workbox e Firebase SW | Firebase SW assume controle |
+
