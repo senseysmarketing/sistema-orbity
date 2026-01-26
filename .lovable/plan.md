@@ -1,78 +1,43 @@
 
-
-# Correção: Push Notifications Não Disparam
+# Correção do Service Worker para iOS/Safari
 
 ## Problema Identificado
 
-O trigger `trigger_push_on_notification` está falhando com o erro:
+O **backend está funcionando perfeitamente** - os logs mostram:
+- ✅ `[FCM] Push notifications sent: 4/4`
+- ✅ `[FCM] Message sent successfully`
 
-```
-WARNING: Push notification trigger failed: function extensions.http_post(url => text, body => text, headers => text) does not exist
-```
+O problema está no **Service Worker** que não processa corretamente as notificações no Safari/iOS.
 
-### Causa Raiz
+---
 
-A função está usando a sintaxe incorreta:
+## Problemas no Service Worker Atual
 
-| Atual (Errado) | Correto |
-|----------------|---------|
-| `extensions.http_post()` | `net.http_post()` |
-| `body := jsonb::text` | `body := jsonb` |
-| `headers := jsonb::text` | `headers := jsonb` |
-
-A extensão `pg_net` (versão 0.19.5) está instalada corretamente, mas a função usa o schema `extensions` ao invés de `net`.
+| Problema | Impacto no iOS |
+|----------|----------------|
+| Inicialização duplicada do Firebase | Pode causar erros silenciosos no Safari |
+| Sem fallback `push` event listener | Safari pode não chamar `onBackgroundMessage` |
+| Propriedades `vibrate` e `requireInteraction` | Safari ignora ou pode falhar silenciosamente |
+| Ícones com caminho relativo `/favicon.ico` | Safari precisa de URLs absolutas |
 
 ---
 
 ## Solução
 
-Atualizar a função `trigger_push_on_notification` para usar a sintaxe correta da extensão `pg_net`.
+### 1. Corrigir Service Worker (`firebase-messaging-sw.js`)
 
-### Nova Função
+Aplicar as correções sugeridas pelo ChatGPT:
 
-```sql
-CREATE OR REPLACE FUNCTION public.trigger_push_on_notification()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public', 'net'
-AS $$
-BEGIN
-  -- Chamar edge function send-push-notification via pg_net
-  PERFORM net.http_post(
-    url := 'https://ovookkywclrqfmtumelw.supabase.co/functions/v1/send-push-notification',
-    body := jsonb_build_object(
-      'user_id', NEW.user_id::text,
-      'title', NEW.title,
-      'body', NEW.message,
-      'data', jsonb_build_object(
-        'type', NEW.type,
-        'action_url', COALESCE(NEW.action_url, '/dashboard'),
-        'notification_id', NEW.id::text,
-        'play_sound', COALESCE((NEW.metadata->>'play_sound')::text, 'false')
-      )
-    ),
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json'
-    ),
-    timeout_milliseconds := 5000
-  );
-  
-  RETURN NEW;
-EXCEPTION
-  WHEN OTHERS THEN
-    RAISE WARNING 'Push notification trigger failed: %', SQLERRM;
-    RETURN NEW;
-END;
-$$;
-```
+- **Inicialização única**: Remover inicialização duplicada
+- **Fallback push listener**: Adicionar `self.addEventListener('push', ...)` para Safari
+- **Remover propriedades problemáticas**: `vibrate`, `requireInteraction`
+- **URLs absolutas para ícones**: Usar `https://sistema-orbity.lovable.app/favicon.ico`
 
-### Mudanças Principais
+### 2. Corrigir Edge Function (`send-push-notification`)
 
-1. **Schema correto**: `net.http_post()` ao invés de `extensions.http_post()`
-2. **Tipos corretos**: `body` e `headers` como `jsonb` direto (sem converter para text)
-3. **URL hardcoded**: Removidas dependências de settings que podem não existir
-4. **Timeout explícito**: 5 segundos para evitar travamentos
+Remover propriedades não suportadas do payload FCM:
+- Remover `vibrate` do payload webpush
+- Remover `requireInteraction` do payload webpush
 
 ---
 
@@ -80,15 +45,95 @@ $$;
 
 | Arquivo | Ação |
 |---------|------|
-| Nova migration SQL | Recriar a função com sintaxe correta |
+| `public/firebase-messaging-sw.js` | Reescrever com versão robusta para Safari |
+| `supabase/functions/send-push-notification/index.ts` | Remover propriedades problemáticas do payload |
 
 ---
 
-## Teste Esperado
+## Novo Service Worker
 
-Após a correção:
+```javascript
+// firebase-messaging-sw.js (versão robusta para iOS)
 
-1. Criar/atualizar uma tarefa atribuída a você
-2. A notificação aparecerá na central E chegará como push no iPhone
-3. Os logs da edge function `send-push-notification` mostrarão a chamada
+importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
 
+const firebaseConfig = {
+  apiKey: "AIzaSyBIDL3R7nd0pE0wzmXdNePWTSyxOvyZ0cY",
+  authDomain: "orbityapp-f710e.firebaseapp.com",
+  projectId: "orbityapp-f710e",
+  storageBucket: "orbityapp-f710e.appspot.com",
+  messagingSenderId: "929526059094",
+  appId: "1:929526059094:web:61fb87a4f693ddd61b2bf7"
+};
+
+// Inicialização única e segura
+try {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+} catch (e) {
+  console.error('[SW] Firebase init error:', e);
+}
+
+const messaging = firebase.messaging();
+
+// 1) Firebase background handler
+messaging.onBackgroundMessage((payload) => {
+  console.log('[SW] onBackgroundMessage:', payload);
+  // Mostrar notificação via fallback push handler
+});
+
+// 2) Fallback universal - essencial para Safari/iOS
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push event recebido');
+
+  if (!event.data) return;
+
+  event.waitUntil((async () => {
+    let msg = {};
+    try {
+      msg = event.data.json();
+    } catch {
+      msg = { data: { body: event.data.text() } };
+    }
+
+    const title = msg?.notification?.title || msg?.data?.title || 'Nova notificação';
+    const body = msg?.notification?.body || msg?.data?.body || '';
+    const data = msg?.data || {};
+
+    await self.registration.showNotification(title, {
+      body,
+      icon: 'https://sistema-orbity.lovable.app/favicon.ico',
+      badge: 'https://sistema-orbity.lovable.app/favicon.ico',
+      data,
+      tag: 'orbity-notification'
+    });
+  })());
+});
+
+// 3) Click handler
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  // Navegar para URL de ação
+});
+```
+
+---
+
+## Resultado Esperado
+
+Após as correções:
+
+1. ✅ Push notifications funcionarão no iPhone/Safari
+2. ✅ Inicialização única e estável
+3. ✅ Fallback garante que a notificação sempre aparece
+4. ✅ Sem propriedades problemáticas para iOS
+
+---
+
+## Teste Após Implementação
+
+1. **Desinstalar e reinstalar PWA** (necessário para atualizar o Service Worker)
+2. Criar uma tarefa atribuída a você
+3. A notificação deve aparecer no iPhone
