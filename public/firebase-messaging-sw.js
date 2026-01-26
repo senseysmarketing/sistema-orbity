@@ -45,12 +45,22 @@ try {
 
 const messaging = firebase.messaging();
 
+// Manter Firebase SDK satisfeito - não exibe notificação, apenas log
+// Isso evita que o SDK "engula" o evento push antes do handler universal
+messaging.onBackgroundMessage((payload) => {
+  console.log('[SW] onBackgroundMessage recebido (handled by push event):', payload);
+  // Retorna sem fazer nada - o push event universal cuida da exibição
+  return;
+});
+
 // Handler universal de push - funciona em todos os browsers incluindo Safari/iOS
-// NOTA: Removido messaging.onBackgroundMessage() pois causava notificações duplicadas
 self.addEventListener('push', (event) => {
   console.log('[SW] Push event recebido');
 
-  if (!event.data) return;
+  if (!event.data) {
+    console.log('[SW] Push event sem dados');
+    return;
+  }
 
   event.waitUntil((async () => {
     let msg = {};
@@ -60,23 +70,31 @@ self.addEventListener('push', (event) => {
       msg = { data: { body: event.data.text() } };
     }
 
-    console.log('[SW] Push payload:', msg);
+    console.log('[SW] Push payload:', JSON.stringify(msg));
 
     const title = msg?.notification?.title || msg?.data?.title || 'Nova notificação';
     const body = msg?.notification?.body || msg?.data?.body || '';
     const data = msg?.data || {};
+
+    // Tag única baseada no ID da notificação ou timestamp
+    const notificationTag = data?.notification_id || `orbity-${Date.now()}`;
+
+    console.log('[SW] Exibindo notificação:', title, 'tag:', notificationTag);
 
     await self.registration.showNotification(title, {
       body,
       icon: 'https://sistema-orbity.lovable.app/favicon.ico',
       badge: 'https://sistema-orbity.lovable.app/favicon.ico',
       data,
-      tag: 'orbity-notification'
+      tag: notificationTag,
+      renotify: true  // Força som/vibração mesmo com tag existente
     });
+
+    console.log('[SW] Notificação exibida com sucesso');
   })());
 });
 
-// 3) Click handler
+// Click handler
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification click:', event);
   
