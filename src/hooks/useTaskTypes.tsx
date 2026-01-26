@@ -168,11 +168,24 @@ export function useTaskTypes() {
     },
   });
 
+  // Mapeamento de abreviações para tipos longos
+  const SHORT_NAME_MAP: Record<string, string> = {
+    "Desenvolvimento": "Desenv.",
+    "Administrativo": "Admin.",
+  };
+
   // Helpers
   const getTypeName = useCallback((slug: string | null): string => {
     if (!slug) return "Sem tipo";
     const type = allTypes.find((t) => t.slug === slug);
     return type?.name || slug;
+  }, [allTypes]);
+
+  const getTypeShortName = useCallback((slug: string | null): string => {
+    if (!slug) return "Sem tipo";
+    const type = allTypes.find((t) => t.slug === slug);
+    const name = type?.name || slug;
+    return SHORT_NAME_MAP[name] || name;
   }, [allTypes]);
 
   const getTypeIcon = useCallback((slug: string | null): string => {
@@ -195,6 +208,7 @@ export function useTaskTypes() {
     updateType: updateTypeMutation.mutateAsync,
     deleteType: deleteTypeMutation.mutateAsync,
     getTypeName,
+    getTypeShortName,
     getTypeIcon,
     isValidType,
     refetch,
