@@ -13,7 +13,7 @@ import { Bell, Mail, Volume2, Chrome, Clock, Smartphone, Loader2 } from "lucide-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-
+import { PushDiagnostics } from "./PushDiagnostics";
 interface NotificationPreferencesProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -156,11 +156,15 @@ function PushNotificationSection() {
         </p>
       )}
       
-      {/* Debug info for troubleshooting */}
+      {/* Diagnostics Panel - Always visible when push is enabled */}
       {isEnabled && (
-        <p className="text-xs text-muted-foreground/60 ml-6">
-          Modo: {isStandaloneMode ? 'PWA Standalone' : 'Browser'} | {isIOS ? 'iOS' : 'Outro'}
-        </p>
+        <PushDiagnostics
+          token={token}
+          permission={permission}
+          isStandaloneMode={isStandaloneMode}
+          isIOS={isIOS}
+          isSupported={isSupported}
+        />
       )}
     </div>
   );
