@@ -1,154 +1,200 @@
 
-# Diagnóstico Final e Correção Completa para Push Notifications no iPhone
+# Painel de Diagnóstico Completo para Push Notifications
 
-## 🔍 Diagnóstico
+## Diagnóstico Atual
 
-### O que está funcionando
-| Componente | Status | Evidência |
-|------------|--------|-----------|
-| Backend (Edge Function) | ✅ OK | `[FCM] Message sent successfully: projects/orbityapp-f710e/messages/85086501-...` |
-| Firebase Secrets | ✅ OK | Access token gerado com sucesso |
-| Token FCM | ✅ OK | O FCM aceitou a mensagem (status 200) |
+### O que encontrei nos logs
 
-### O Problema Real
+| Situação | Status | Evidência |
+|----------|--------|-----------|
+| Token ativo no banco | ✅ Sim | `cRug8Z9ql80NKV8xGElkEb:APA91bGOXr...` |
+| Modo standalone | ✅ Sim | `device_info.standalone: true` |
+| iOS detectado | ✅ Sim | `device_info.isIOS: true` |
+| FCM aceitou envio | ❌ Parcial | 1 token retornou `UNREGISTERED` (404) |
+| Token entregue ao dispositivo | ❓ Desconhecido | O FCM aceitou, mas iOS pode não entregar |
 
-**O token está sendo gerado no Safari padrão, não na PWA instalada.**
+### Problema identificado
 
-Evidência no banco de dados:
-```
-userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 
-           (KHTML, like Gecko) Version/26.1 Mobile/15E148 Safari/604.1"
-```
+Há **2 tokens sendo enviados**, mas o log mostra:
+- Token 1: `UNREGISTERED` (404) - **Token inválido foi desativado automaticamente** ✅
+- Token 2: `Message sent successfully` - **FCM aceitou** ✅
 
-Este userAgent é de **Safari padrão**. Se fosse a PWA standalone, seria diferente (sem "Safari/604.1").
+**O FCM diz que enviou com sucesso, mas o iOS não entrega.**
 
-### Por que isso importa?
+### Possíveis causas restantes
 
-- No iOS, push notifications só funcionam quando o token é gerado **dentro da PWA instalada** (aberta pelo ícone na tela inicial)
-- Tokens gerados no Safari padrão são descartados pelo iOS quando o Safari fecha
-- O Firebase aceita o token, mas o iOS não entrega a notificação
-
----
-
-## 🛠️ Correções Necessárias
-
-### 1. Detectar e Validar Contexto PWA
-
-Adicionar verificação no `usePushNotifications.tsx` para:
-- Verificar se está em modo `standalone` (PWA)
-- Salvar informação de `displayMode` no `device_info`
-- Mostrar aviso se o usuário tentar ativar push fora da PWA
-
-### 2. Melhorar Registro do Service Worker
-
-Especificar `scope: '/'` explicitamente no registro do Service Worker para garantir que está no escopo correto.
-
-### 3. Adicionar Debug Visual
-
-Criar componente de debug temporário para você verificar:
-- Se está em modo standalone
-- Qual Service Worker está ativo
-- Qual token foi gerado
+1. **Service Worker não está recebendo o push event** - o SW precisa estar ativo e registrado corretamente
+2. **Permissões do iOS** - mesmo com `granted`, pode haver bloqueio nas configurações do iOS
+3. **Token gerado com VAPID/projeto incorreto** - mismatch entre client e servidor
 
 ---
 
-## 📁 Arquivos a Modificar
+## Solução: Painel de Diagnóstico Visual
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/hooks/usePushNotifications.tsx` | Adicionar validação de standalone, melhorar device_info, scope explícito |
-| `src/components/notifications/NotificationPreferences.tsx` | Mostrar aviso se não estiver em PWA standalone |
+Criar um painel de diagnóstico completo similar ao da imagem de referência, com:
+
+### 1. Status do Dispositivo (em tempo real)
+- Dispositivo iOS: Sim/Não
+- Modo PWA (Tela Início): Sim/Não
+- User ID (Supabase)
+- FCM Token (truncado + cópia completa)
+- Service Worker: status (active/waiting/installing)
+- Permissão: granted/denied/default
+- Inscrito: Sim/Não
+- Última atualização
+
+### 2. Token FCM Completo (para testes)
+- Exibir token completo em caixa de código
+- Botão "Copiar Token"
+
+### 3. Ações de Diagnóstico
+- **Botão "Testar Push"**: Envia notificação de teste para o próprio dispositivo
+- **Botão "Limpar tokens antigos"**: Remove tokens inativos
+- **Botão "Atualizar Service Worker"**: Força atualização do SW
+
+### 4. Logs em Tempo Real
+- Exibir logs do processo de push em tempo real
+- Mostrar respostas do FCM
 
 ---
 
-## Código das Correções
+## Arquivos a Criar/Modificar
 
-### 1. `src/hooks/usePushNotifications.tsx`
+| Arquivo | Ação |
+|---------|------|
+| `src/components/notifications/PushDiagnostics.tsx` | **Criar** - Novo componente de diagnóstico |
+| `src/hooks/usePushNotifications.tsx` | **Modificar** - Adicionar função `sendTestPush` |
+| `src/components/notifications/NotificationPreferences.tsx` | **Modificar** - Integrar painel de diagnóstico |
+
+---
+
+## Detalhes Técnicos da Implementação
+
+### 1. PushDiagnostics.tsx
 
 ```typescript
-// Função auxiliar para detectar modo standalone
-const isStandalone = (): boolean => {
-  // iOS standalone
-  if ((navigator as any).standalone === true) return true;
-  // Android/Desktop PWA
-  if (window.matchMedia('(display-mode: standalone)').matches) return true;
-  // iOS Safari com display-mode
-  if (window.matchMedia('(display-mode: fullscreen)').matches) return true;
-  return false;
-};
+// Estrutura do componente
+interface DiagnosticInfo {
+  isIOS: boolean;
+  isStandalone: boolean;
+  userId: string | null;
+  fcmToken: string | null;
+  swStatus: 'active' | 'installing' | 'waiting' | 'none';
+  permission: NotificationPermission;
+  isSubscribed: boolean;
+  lastUpdate: string;
+}
 
-// No saveToken, incluir info do displayMode
-const saveToken = useCallback(async (fcmToken: string) => {
-  // ...
-  const { error } = await supabase.from('push_subscriptions').upsert({
-    // ...
-    device_info: {
-      userAgent: navigator.userAgent,
-      platform: navigator.platform,
-      language: navigator.language,
-      standalone: isStandalone(),  // NOVO
-      displayMode: isStandalone() ? 'standalone' : 'browser',  // NOVO
-    },
-    // ...
+// Features:
+- Card com header "Diagnóstico Firebase" + botão "Atualizar"
+- Grid de informações com labels e valores copiáveis
+- Caixa de código com token completo
+- Seção de ações (Limpar tokens, Atualizar SW)
+- Log de eventos em tempo real (array de mensagens)
+```
+
+### 2. Função sendTestPush
+
+```typescript
+// No hook usePushNotifications
+const sendTestPush = useCallback(async () => {
+  if (!user || !token) return { success: false, error: 'No token' };
+  
+  // Chamar edge function send-push-notification diretamente
+  const { data, error } = await supabase.functions.invoke('send-push-notification', {
+    body: {
+      user_id: user.id,
+      title: '🔔 Teste de Push',
+      body: 'Se você está vendo isso, as notificações funcionam!',
+      data: { action_url: '/settings', test: 'true' },
+    }
   });
-});
-
-// No registro do SW, adicionar scope explícito
-const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-  scope: '/',  // NOVO - escopo explícito
-});
-
-// Na função requestPermission, validar contexto
-const requestPermission = useCallback(async () => {
-  // Verificar se está em modo standalone (PWA instalada)
-  if (!isStandalone()) {
-    toast({
-      title: "Abra pela PWA instalada",
-      description: "Para receber notificações, abra o app pelo ícone na tela inicial, não pelo Safari.",
-      variant: "destructive",
-    });
-    return null;
-  }
-  // ... resto do código
-});
+  
+  return { success: !error, data, error };
+}, [user, token]);
 ```
 
-### 2. Limpar tokens antigos do Safari (não-standalone)
+### 3. Estrutura Visual (baseada na imagem de referência)
 
-Executar uma query para desativar tokens gerados fora da PWA:
+```text
+┌─────────────────────────────────────────────────────────┐
+│ 📱 Push Notifications                                   │
+│ Receba notificações em tempo real no celular            │
+├─────────────────────────────────────────────────────────┤
+│ Status do dispositivo                      [🟢 Ativo]   │
+│ Este dispositivo está recebendo notificações push       │
+│                                                         │
+│ [Desativar Push]  [📤 Testar]                          │
+│                                                         │
+│ 🔊 Som de notificação                           [ON]    │
+│ Tocar som quando novos leads chegarem                   │
+└─────────────────────────────────────────────────────────┘
 
-```sql
--- Não há como distinguir agora, mas após a atualização do código,
--- novos tokens terão device_info.standalone = true/false
+┌─────────────────────────────────────────────────────────┐
+│ ⚙️ Diagnóstico Firebase             [🔄 Atualizar]     │
+│ Informações técnicas para debug                         │
+├─────────────────────────────────────────────────────────┤
+│ Dispositivo iOS          │            Sim ⊞             │
+│ Modo PWA (Tela Início)   │            Sim ⊞             │
+│ User ID (Supabase)       │    03755812-224d... ⊞        │
+│ FCM Token                │    ...APA91bGOXr7... ⊞       │
+│ Service Worker           │           active ⊞           │
+│ Permissão                │          granted ⊞           │
+│ Inscrito                 │              Sim ⊞           │
+│ Última atualização       │         22:46:12 ⊞           │
+├─────────────────────────────────────────────────────────┤
+│ Token FCM Completo (para testes)                        │
+│ ┌─────────────────────────────────────────────────────┐ │
+│ │ cRug8Z9ql80NKV8xGElkEb:APA91bGOXr7OI5_va4Mgt8eXBq │ │
+│ │ 3v5Elgs9E5dqSU5Za2Dn35HbWwEY2Jsq9qFCFditsloXE2Iv │ │
+│ └─────────────────────────────────────────────────────┘ │
+│ [📋 Copiar Token]                                       │
+├─────────────────────────────────────────────────────────┤
+│ Limpar tokens antigos                    [🗑️ Limpar]   │
+│ Remove tokens obsoletos do banco                        │
+│                                                         │
+│ Atualizar Service Worker                [🔄 Atualizar]  │
+│ Força atualização do SW para versão mais recente        │
+├─────────────────────────────────────────────────────────┤
+│ Logs em Tempo Real                                      │
+│ ┌─────────────────────────────────────────────────────┐ │
+│ │ [22:46:12] ✅ FCM reconectado com sucesso           │ │
+│ │ [22:46:11] Token FCM válido, reconectando...        │ │
+│ │ [22:46:10] Inicializando FCM Provider...            │ │
+│ └─────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🔄 Fluxo Após Implementação
+## Passos de Implementação
 
-1. **Você desinstala a PWA** do iPhone
-2. **Reinstala** pelo Safari (Compartilhar → Adicionar à Tela de Início)
-3. **Abre pelo ícone** na tela inicial (NÃO pelo Safari)
-4. Vai em Configurações → Notificações → Ativa Push
-5. O sistema detecta `standalone: true` e gera token válido
-6. Notificações funcionam!
+1. **Criar `PushDiagnostics.tsx`**
+   - Componente com todas as informações de diagnóstico
+   - Estado local para logs
+   - Botões de ação (testar, limpar, atualizar SW)
+   - Funcionalidade de copiar para clipboard
 
----
+2. **Modificar `usePushNotifications.tsx`**
+   - Adicionar `sendTestPush()` para enviar notificação de teste
+   - Adicionar `getSwStatus()` para verificar status do Service Worker
+   - Adicionar `clearOldTokens()` para limpar tokens antigos
 
-## ⚠️ Passo Crítico para o Usuário
+3. **Modificar `NotificationPreferences.tsx`**
+   - Importar e renderizar `PushDiagnostics` dentro de `PushNotificationSection`
+   - Passar props necessárias
 
-**Você precisa garantir que está abrindo o app pelo ÍCONE na tela inicial, não pelo Safari.**
-
-- ✅ **Correto**: Tocar no ícone "Orbity" na tela inicial do iPhone
-- ❌ **Incorreto**: Abrir Safari e digitar a URL
+4. **Adicionar botão "Testar" na seção principal**
+   - Ao lado do botão "Desativar Push"
+   - Chama `sendTestPush()` e mostra resultado
 
 ---
 
 ## Resultado Esperado
 
-| Antes | Depois |
-|-------|--------|
-| Token gerado em Safari padrão | Token gerado apenas em PWA standalone |
-| `standalone: undefined` no device_info | `standalone: true` no device_info |
-| iOS não entrega push | iOS entrega push corretamente |
-| Sem validação de contexto | Aviso se tentar ativar fora da PWA |
+Após implementação:
+- Você terá visibilidade completa do estado do push no dispositivo
+- Poderá enviar notificação de teste diretamente
+- Verá logs em tempo real do processo
+- Poderá limpar tokens antigos e forçar atualização do SW
+- Identificar se o problema é client-side ou server-side
