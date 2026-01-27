@@ -1,11 +1,12 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent } from "@dnd-kit/core";
 import { useSocialMediaPosts, SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 import { PostKanbanColumn } from "./PostKanbanColumn";
 import { PostCard } from "./PostCard";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Filter, ArrowUpDown, X } from "lucide-react";
+import { Filter, ArrowUpDown, X, Search } from "lucide-react";
 import { PostFormDialog } from "./PostFormDialog";
 import { PostDetailsDialog } from "./PostDetailsDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,20 +17,30 @@ import { PostCardSkeleton } from "@/components/ui/post-card-skeleton";
 import { DateRange } from "react-day-picker";
 import { DateRangeFilterDialog } from "@/components/filters/DateRangeFilterDialog";
 
-export function PostKanban() {
+interface PostKanbanProps {
+  isCreateDialogOpen?: boolean;
+  onCreateDialogOpenChange?: (open: boolean) => void;
+}
+
+export function PostKanban({ isCreateDialogOpen, onCreateDialogOpenChange }: PostKanbanProps) {
   const { posts, loading, updatePost, deletePost, fetchPosts } = useSocialMediaPosts();
   const { currentAgency } = useAgency();
   const [activePost, setActivePost] = useState<SocialMediaPost | null>(null);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [internalDialogOpen, setInternalDialogOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState<SocialMediaPost | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<SocialMediaPost | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const [filterClient, setFilterClient] = useState<string>("all");
   const [filterContentType, setFilterContentType] = useState<string>("all");
   const [filterUser, setFilterUser] = useState<string>("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [includeNoDate, setIncludeNoDate] = useState(false);
   const [sortBy, setSortBy] = useState<"post_date" | "due_date">("post_date");
+
+  // Usar props externas se disponíveis, senão usar estado interno
+  const dialogOpen = isCreateDialogOpen ?? internalDialogOpen;
+  const setDialogOpen = onCreateDialogOpenChange ?? setInternalDialogOpen;
 
   const toStartOfDay = (d: Date) => {
     const copy = new Date(d);
@@ -135,6 +146,16 @@ export function PostKanban() {
   const filteredPosts = useMemo(() => {
     let filtered = posts;
 
+    // Filtro de busca por título, descrição ou cliente
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(post => 
+        post.title?.toLowerCase().includes(term) ||
+        post.description?.toLowerCase().includes(term) ||
+        post.clients?.name?.toLowerCase().includes(term)
+      );
+    }
+
     if (filterClient !== "all") {
       filtered = filtered.filter(post => post.client_id === filterClient);
     }
@@ -166,7 +187,7 @@ export function PostKanban() {
     }
 
     return filtered;
-  }, [posts, filterClient, filterContentType, dateRange, includeNoDate, sortBy]);
+  }, [posts, searchTerm, filterClient, filterContentType, filterUser, dateRange, includeNoDate, sortBy]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const post = posts.find(p => p.id === event.active.id);
@@ -230,6 +251,7 @@ export function PostKanban() {
   };
 
   const hasActiveFilters =
+    searchTerm !== "" ||
     filterClient !== "all" ||
     filterContentType !== "all" ||
     filterUser !== "all" ||
@@ -238,6 +260,7 @@ export function PostKanban() {
     sortBy !== "post_date";
 
   const clearFilters = () => {
+    setSearchTerm("");
     setFilterClient("all");
     setFilterContentType("all");
     setFilterUser("all");
@@ -253,7 +276,7 @@ export function PostKanban() {
 
   const handleEdit = (post: SocialMediaPost) => {
     setEditingPost(post);
-    setIsCreateDialogOpen(true);
+    setDialogOpen(true);
   };
 
   const handleDelete = async (postId: string) => {
@@ -273,18 +296,20 @@ export function PostKanban() {
     };
     setEditingPost(duplicatedPost as SocialMediaPost);
     setIsDetailsOpen(false);
-    setIsCreateDialogOpen(true);
+    setDialogOpen(true);
   };
 
   return (
     <div className="space-y-3 md:space-y-4 h-full flex flex-col">
-      {/* Linha 1: Título + Botão Nova Postagem */}
-      <div className="flex items-center justify-between flex-shrink-0">
-        <h2 className="text-xl md:text-2xl font-bold">Kanban de Produção</h2>
-        <Button onClick={() => setIsCreateDialogOpen(true)} className="h-9">
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline ml-2">Nova Postagem</span>
-        </Button>
+      {/* Linha 1: Campo de Busca */}
+      <div className="relative flex-shrink-0">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar posts..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-9"
+        />
       </div>
       
       {/* Linha 2: Filtros com scroll horizontal */}
@@ -405,9 +430,9 @@ export function PostKanban() {
       </div>
 
       <PostFormDialog 
-        open={isCreateDialogOpen}
+        open={dialogOpen}
         onOpenChange={(open) => {
-          setIsCreateDialogOpen(open);
+          setDialogOpen(open);
           if (!open) setEditingPost(null);
         }}
         editPost={editingPost}
