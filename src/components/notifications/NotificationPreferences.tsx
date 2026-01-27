@@ -197,7 +197,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
     assigned: 'post.assigned',
     statusChanged: 'post.status_changed',
     importantUpdated: 'post.updated_important',
-    pendingApproval: 'post.pending_approval',
   } as const;
 
   type TaskEventKey = (typeof TASK_EVENT_KEYS)[keyof typeof TASK_EVENT_KEYS];
@@ -241,7 +240,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
     [POST_EVENT_KEYS.assigned]: true,
     [POST_EVENT_KEYS.statusChanged]: true,
     [POST_EVENT_KEYS.importantUpdated]: true,
-    [POST_EVENT_KEYS.pendingApproval]: true,
   });
 
   const [agencyTaskRules, setAgencyTaskRules] = useState({
@@ -694,20 +692,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
               disabled={!types.posts_enabled}
               onCheckedChange={(checked) =>
                 setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.importantUpdated]: checked }))
-              }
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Label className="cursor-pointer text-sm">
-              <span className="hidden md:inline">Quando um post entrar em "Aguardando Aprovação"</span>
-              <span className="md:hidden">Aguardando aprovação</span>
-            </Label>
-            <Switch
-              checked={postEvents[POST_EVENT_KEYS.pendingApproval]}
-              disabled={!types.posts_enabled}
-              onCheckedChange={(checked) =>
-                setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.pendingApproval]: checked }))
               }
             />
           </div>
