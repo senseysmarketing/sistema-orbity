@@ -1038,7 +1038,7 @@ async function archiveReadNotifications() {
 }
 
 async function processDailySummary() {
-  console.log('📊 Processing daily summary notifications...');
+  console.log('📊 Processing daily summary notifications (personalized per user)...');
   
   const todayBrasilia = getTodayInBrasilia();
   const endOfDayBrasilia = new Date(todayBrasilia);
@@ -1061,48 +1061,88 @@ async function processDailySummary() {
   const trackingToCreate: BatchTrackingRecord[] = [];
 
   for (const agency of agencies || []) {
-    // Count tasks due today
-    const { count: tasksCount } = await supabase
-      .from('tasks')
-      .select('*', { count: 'exact', head: true })
-      .eq('agency_id', agency.id)
-      .neq('status', 'done')
-      .eq('archived', false)
-      .gte('due_date', todayBrasilia.toISOString())
-      .lte('due_date', endOfDayBrasilia.toISOString());
+    // Get all agency users first
+    const { data: agencyUsers } = await supabase
+      .from('agency_users')
+      .select('user_id')
+      .eq('agency_id', agency.id);
 
-    // Count posts scheduled for today
-    const { count: postsCount } = await supabase
-      .from('social_media_posts')
-      .select('*', { count: 'exact', head: true })
-      .eq('agency_id', agency.id)
-      .eq('archived', false)
-      .gte('scheduled_date', todayBrasilia.toISOString())
-      .lte('scheduled_date', endOfDayBrasilia.toISOString());
+    if (!agencyUsers || agencyUsers.length === 0) {
+      console.log(`⏭️ Agency ${agency.id} has no users - skipping`);
+      continue;
+    }
 
-    const totalItems = (tasksCount || 0) + (postsCount || 0);
+    // Process each user individually with their own counts
+    for (const user of agencyUsers) {
+      const canSend = await checkUserPreferences(user.user_id, agency.id, 'system');
+      if (!canSend) {
+        console.log(`⏭️ User ${user.user_id} has notifications disabled - skipping`);
+        continue;
+      }
 
-    // Only send notification if there are items to do today
-    if (totalItems > 0) {
-      // Get all agency users
-      const { data: agencyUsers } = await supabase
-        .from('agency_users')
-        .select('user_id')
-        .eq('agency_id', agency.id);
+      // Count tasks assigned to THIS USER due today
+      const { count: userTasksCount, error: tasksError } = await supabase
+        .from('task_assignments')
+        .select(`
+          task_id,
+          tasks!inner(
+            id,
+            due_date,
+            status,
+            archived,
+            agency_id
+          )
+        `, { count: 'exact', head: true })
+        .eq('user_id', user.user_id)
+        .eq('tasks.agency_id', agency.id)
+        .eq('tasks.archived', false)
+        .neq('tasks.status', 'done')
+        .gte('tasks.due_date', todayBrasilia.toISOString())
+        .lte('tasks.due_date', endOfDayBrasilia.toISOString());
 
-      for (const user of agencyUsers || []) {
-        const canSend = await checkUserPreferences(user.user_id, agency.id, 'system');
-        if (!canSend) continue;
+      if (tasksError) {
+        console.error(`Error counting tasks for user ${user.user_id}:`, tasksError);
+      }
 
-        // Build message
+      // Count posts assigned to THIS USER scheduled for today
+      const { count: userPostsCount, error: postsError } = await supabase
+        .from('post_assignments')
+        .select(`
+          post_id,
+          social_media_posts!inner(
+            id,
+            scheduled_date,
+            archived,
+            agency_id
+          )
+        `, { count: 'exact', head: true })
+        .eq('user_id', user.user_id)
+        .eq('social_media_posts.agency_id', agency.id)
+        .eq('social_media_posts.archived', false)
+        .gte('social_media_posts.scheduled_date', todayBrasilia.toISOString())
+        .lte('social_media_posts.scheduled_date', endOfDayBrasilia.toISOString());
+
+      if (postsError) {
+        console.error(`Error counting posts for user ${user.user_id}:`, postsError);
+      }
+
+      const tasksCount = userTasksCount || 0;
+      const postsCount = userPostsCount || 0;
+      const totalItems = tasksCount + postsCount;
+
+      console.log(`📊 User ${user.user_id}: ${tasksCount} tasks, ${postsCount} posts assigned for today`);
+
+      // Only send notification if this user has items assigned to them
+      if (totalItems > 0) {
+        // Build personalized message
         let message = '📋 Resumo do dia: ';
         const parts = [];
         
-        if (tasksCount && tasksCount > 0) {
+        if (tasksCount > 0) {
           parts.push(`${tasksCount} tarefa${tasksCount > 1 ? 's' : ''}`);
         }
         
-        if (postsCount && postsCount > 0) {
+        if (postsCount > 0) {
           parts.push(`${postsCount} post${postsCount > 1 ? 's' : ''}`);
         }
         
@@ -1115,11 +1155,11 @@ async function processDailySummary() {
           priority: 'medium',
           title: '🌅 Bom dia! Seu resumo diário',
           message,
-          action_url: tasksCount && tasksCount > 0 ? '/tasks' : '/social-media',
+          action_url: tasksCount > 0 ? '/tasks' : '/social-media',
           action_label: 'Ver detalhes',
           metadata: { 
-            tasks_count: tasksCount || 0,
-            posts_count: postsCount || 0,
+            tasks_count: tasksCount,
+            posts_count: postsCount,
             date: todayBrasilia.toISOString(),
             play_sound: false
           },
@@ -1127,10 +1167,12 @@ async function processDailySummary() {
 
         trackingToCreate.push({
           notification_type: 'daily_summary',
-          entity_id: agency.id,
+          entity_id: `${agency.id}_${user.user_id}`, // Unique per user
           user_id: user.user_id,
           agency_id: agency.id
         });
+      } else {
+        console.log(`⏭️ User ${user.user_id} has no items assigned for today - skipping notification`);
       }
     }
   }
@@ -1138,7 +1180,7 @@ async function processDailySummary() {
   await batchCreateNotifications(notificationsToCreate);
   await batchTrackNotifications(trackingToCreate);
 
-  console.log(`✅ Created ${notificationsToCreate.length} daily summary notifications`);
+  console.log(`✅ Created ${notificationsToCreate.length} personalized daily summary notifications`);
 }
 
 // ============================================
