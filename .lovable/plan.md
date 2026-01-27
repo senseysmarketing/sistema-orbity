@@ -1,131 +1,213 @@
 
-
-# Correção: Remoção de Usuário Não Funciona
+# Correção: Erro "record 'new' has no field 'updated_by'" ao Mover Posts
 
 ## Problema Identificado
 
-Após análise detalhada, identifiquei **2 problemas** que estão causando a falha na remoção de usuários:
+A função de trigger `notify_post_update_events` foi criada com referências a colunas que **não existem** na tabela `social_media_posts`:
 
-### Problema 1: Verificação de Permissão Incorreta no Frontend
+| Campo no Trigger | Existe na Tabela? | Problema |
+|------------------|-------------------|----------|
+| `NEW.updated_by` | Nao | Causa o erro |
+| `NEW.client_ids` (array) | Nao | Deveria usar `NEW.client_id` (singular) |
+| `NEW.scheduled_for` | Nao | Deveria usar `NEW.scheduled_date` |
 
-A função `isAgencyAdmin` do hook `useAgency()` **é uma função** que precisa ser chamada com parênteses:
+Quando um post e movido entre colunas no Kanban, o trigger e disparado e tenta acessar `NEW.updated_by`, causando o erro:
 
-```typescript
-// No hook useAgency.tsx (linha 205-207):
-const isAgencyAdmin = () => {
-  return agencyRole === 'admin' || agencyRole === 'owner';
-};
+```text
+record "new" has no field "updated_by"
 ```
-
-**Porém**, no componente `UsersManagement.tsx`, ela está sendo usada **sem os parênteses**:
-
-```typescript
-// PROBLEMA - Linhas 49, 52 e 290:
-if (currentAgency && isAgencyAdmin) { ... }  // ❌ Verifica se FUNÇÃO existe (sempre true)
-if (!isAgencyAdmin) { ... }                   // ❌ Sempre false pois função existe
-
-// CORRETO:
-if (currentAgency && isAgencyAdmin()) { ... } // ✅ Chama a função
-if (!isAgencyAdmin()) { ... }                  // ✅ Chama a função
-```
-
-### Problema 2: DELETE Não Verifica Rows Afetadas
-
-O código atual faz DELETE e assume sucesso se não houver erro:
-
-```typescript
-const { error } = await supabase
-  .from('agency_users')
-  .delete()
-  .eq('agency_id', currentAgency?.id)
-  .eq('user_id', userId);
-
-if (error) throw error;
-// Assume sucesso mesmo se 0 rows foram deletadas!
-```
-
-Quando as políticas RLS bloqueiam a operação, o Supabase **não retorna erro** - apenas retorna 0 rows afetadas. O código precisa usar `.select()` para verificar se algo foi realmente deletado.
 
 ---
 
-## Solução Técnica
+## Solucao
 
-### 1. Corrigir Chamadas de `isAgencyAdmin`
+Atualizar a funcao `notify_post_update_events` para usar os campos corretos da tabela `social_media_posts`:
 
-Modificar `src/components/admin/UsersManagement.tsx` para chamar a função corretamente:
+### Mudancas Necessarias
 
-| Linha | Antes | Depois |
-|-------|-------|--------|
-| 49 | `if (currentAgency && isAgencyAdmin)` | `if (currentAgency && isAgencyAdmin())` |
-| 52 | `[currentAgency, isAgencyAdmin]` | `[currentAgency]` (isAgencyAdmin é função estável) |
-| 290 | `if (!isAgencyAdmin)` | `if (!isAgencyAdmin())` |
+1. **Remover referencias a `NEW.updated_by`**
+   - A tabela nao rastreia quem fez a ultima atualizacao
+   - Usar `created_by` como fallback ou deixar `v_updater_name` como "Alguem"
 
-### 2. Verificar Resultado do DELETE
+2. **Corrigir `NEW.client_ids` para `NEW.client_id`**
+   - A tabela usa campo singular `client_id`, nao array
+   - Ajustar logica para buscar cliente unico
 
-Modificar a função `removeUser` para verificar se algo foi deletado:
+3. **Corrigir `NEW.scheduled_for` para `NEW.scheduled_date`**
+   - O nome correto do campo na tabela
 
-```typescript
-const removeUser = async (userId: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('agency_users')
-      .delete()
-      .eq('agency_id', currentAgency?.id)
-      .eq('user_id', userId)
-      .select();  // Adicionar .select() para ver o que foi deletado
+---
 
-    if (error) throw error;
+## Detalhes Tecnicos
 
-    // Verificar se algo foi realmente deletado
-    if (!data || data.length === 0) {
-      throw new Error('Você não tem permissão para remover este usuário ou ele não existe.');
-    }
+### Estrutura Atual da Tabela social_media_posts
 
-    toast({
-      title: "Usuário removido!",
-      description: "O usuário foi removido da agência.",
-    });
+```sql
+-- Campos relevantes que EXISTEM:
+client_id       uuid      -- Singular, nao array
+scheduled_date  timestamptz
+created_by      uuid
+-- NAO existem: updated_by, client_ids, scheduled_for
+```
 
-    fetchUsers();
-  } catch (error: any) {
-    toast({
-      title: "Erro ao remover usuário",
-      description: error.message,
-      variant: "destructive",
-    });
-  }
-};
+### Funcao Corrigida
+
+```sql
+CREATE OR REPLACE FUNCTION public.notify_post_update_events()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_event_key TEXT;
+  v_recipients UUID[];
+  v_post_title TEXT;
+  v_old_status TEXT;
+  v_new_status TEXT;
+  v_client_name TEXT;
+BEGIN
+  -- Get post title
+  v_post_title := COALESCE(NEW.title, 'Post sem titulo');
+  
+  -- Get client name (singular client_id)
+  IF NEW.client_id IS NOT NULL THEN
+    SELECT name INTO v_client_name
+    FROM clients
+    WHERE id = NEW.client_id;
+  END IF;
+  
+  v_old_status := CASE WHEN TG_OP = 'UPDATE' THEN OLD.status ELSE NULL END;
+  v_new_status := NEW.status;
+
+  -- STATUS CHANGE EVENT
+  IF TG_OP = 'UPDATE' AND NEW.status IS DISTINCT FROM OLD.status THEN
+    v_event_key := 'post.status_changed';
+    
+    SELECT ARRAY_AGG(user_id) INTO v_recipients
+    FROM post_assignments
+    WHERE post_id = NEW.id;
+    
+    -- Include creator if not in recipients
+    IF NEW.created_by IS NOT NULL THEN
+      IF v_recipients IS NULL THEN
+        v_recipients := ARRAY[NEW.created_by];
+      ELSIF NOT (NEW.created_by = ANY(v_recipients)) THEN
+        v_recipients := array_append(v_recipients, NEW.created_by);
+      END IF;
+    END IF;
+    
+    -- Notify recipients (excluding creator to avoid self-notification on own actions)
+    IF v_recipients IS NOT NULL THEN
+      DECLARE
+        v_recipient_id UUID;
+      BEGIN
+        FOREACH v_recipient_id IN ARRAY v_recipients LOOP
+          IF public.should_notify_user_for_event(v_recipient_id, NEW.agency_id, 'posts', v_event_key) THEN
+            INSERT INTO public.notifications (
+              user_id, agency_id, type, priority, title, message, action_url, action_label, metadata
+            ) VALUES (
+              v_recipient_id,
+              NEW.agency_id,
+              'post',
+              'medium',
+              '🔄 Status de post atualizado',
+              v_post_title,
+              '/dashboard/social-media',
+              'Ver post',
+              jsonb_build_object(
+                'event', v_event_key, 
+                'post_id', NEW.id, 
+                'from', v_old_status, 
+                'to', v_new_status,
+                'client_name', v_client_name
+              )
+            );
+          END IF;
+        END LOOP;
+      END;
+    END IF;
+    
+    -- Apply agency rules for published posts
+    IF v_new_status = 'published' THEN
+      PERFORM public.apply_post_event_rules(
+        NEW.agency_id, 
+        'post.published', 
+        jsonb_build_object('post_id', NEW.id)
+      );
+    END IF;
+  END IF;
+
+  -- IMPORTANT FIELDS UPDATED
+  IF TG_OP = 'UPDATE' AND NEW.status IS NOT DISTINCT FROM OLD.status THEN
+    IF NEW.title IS DISTINCT FROM OLD.title OR
+       NEW.scheduled_date IS DISTINCT FROM OLD.scheduled_date OR
+       NEW.priority IS DISTINCT FROM OLD.priority THEN
+      
+      v_event_key := 'post.updated_important';
+      
+      SELECT ARRAY_AGG(user_id) INTO v_recipients
+      FROM post_assignments
+      WHERE post_id = NEW.id;
+      
+      IF v_recipients IS NOT NULL THEN
+        DECLARE
+          v_recipient_id UUID;
+        BEGIN
+          FOREACH v_recipient_id IN ARRAY v_recipients LOOP
+            IF public.should_notify_user_for_event(v_recipient_id, NEW.agency_id, 'posts', v_event_key) THEN
+              INSERT INTO public.notifications (
+                user_id, agency_id, type, priority, title, message, action_url, action_label, metadata
+              ) VALUES (
+                v_recipient_id,
+                NEW.agency_id,
+                'post',
+                'low',
+                '✏️ Post atualizado',
+                v_post_title,
+                '/dashboard/social-media',
+                'Ver post',
+                jsonb_build_object('event', v_event_key, 'post_id', NEW.id)
+              );
+            END IF;
+          END LOOP;
+        END;
+      END IF;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
 ```
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Mudanças |
-|---------|----------|
-| `src/components/admin/UsersManagement.tsx` | Corrigir chamadas de `isAgencyAdmin()` e adicionar verificação no DELETE |
+| Arquivo/Local | Mudanca |
+|---------------|---------|
+| Migracao SQL | Criar nova migracao para atualizar a funcao `notify_post_update_events` |
 
 ---
 
 ## Resultado Esperado
 
-| Cenário | Antes | Depois |
+| Cenario | Antes | Depois |
 |---------|-------|--------|
-| Member tenta acessar gerenciamento | Vê a interface (bug) | Vê "Acesso Restrito" |
-| Admin tenta remover usuário | Falha silenciosa | Remove com sucesso |
-| Member tenta remover via hack | Mostra sucesso falso | Mostra erro de permissão |
+| Mover post entre colunas | Erro "no field updated_by" | Funciona normalmente |
+| Notificacoes de status | Nao funcionavam | Funcionam corretamente |
+| Mudancas importantes | Erro | Funcionam corretamente |
 
 ---
 
-## Observações Técnicas
+## Observacoes
 
-1. **Por que RLS não retorna erro?**
-   - Por design, RLS do Postgres filtra rows silenciosamente
-   - DELETE com 0 rows afetadas não é considerado erro
-   - Usar `.select()` força o retorno das rows afetadas
+1. **Por que nao adicionar a coluna `updated_by`?**
+   - Seria uma mudanca maior que afeta toda a aplicacao
+   - Todos os UPDATE precisariam passar `updated_by`
+   - A solucao mais simples e corrigir o trigger
 
-2. **Por que `isAgencyAdmin` sem parênteses "funciona"?**
-   - Em JavaScript, uma função é um objeto "truthy"
-   - `if (isAgencyAdmin)` verifica se a função existe, não seu resultado
-   - Isso significa que QUALQUER usuário passava na verificação
-
+2. **Consistencia com tasks**
+   - O trigger de tasks (`notify_task_update_events`) nao usa `updated_by`
+   - Mantemos o mesmo padrao para posts
