@@ -34,6 +34,52 @@ interface BatchTrackingRecord {
 }
 
 // ============================================
+// PROCESS LOCK - Prevent parallel executions
+// ============================================
+
+const LOCK_DURATION_MS = 30000; // 30 seconds
+const SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
+
+async function acquireProcessLock(lockName: string): Promise<boolean> {
+  const lockKey = `${lockName}_${new Date().toISOString().split('T')[0]}`;
+  
+  const { data: existingLock } = await supabase
+    .from('notification_tracking')
+    .select('last_sent_at')
+    .eq('notification_type', 'process_lock')
+    .eq('entity_id', lockKey)
+    .eq('user_id', SYSTEM_UUID)
+    .single();
+
+  if (existingLock) {
+    const lastRun = new Date(existingLock.last_sent_at);
+    const timeSinceLastRun = Date.now() - lastRun.getTime();
+    
+    if (timeSinceLastRun < LOCK_DURATION_MS) {
+      console.log(`🔒 Lock '${lockName}' still active (${Math.round(timeSinceLastRun / 1000)}s ago) - skipping`);
+      return false;
+    }
+  }
+
+  // Acquire lock
+  const { error } = await supabase.from('notification_tracking').upsert({
+    notification_type: 'process_lock',
+    entity_id: lockKey,
+    user_id: SYSTEM_UUID,
+    agency_id: SYSTEM_UUID,
+    last_sent_at: new Date().toISOString()
+  }, { onConflict: 'notification_type,entity_id,user_id' });
+
+  if (error) {
+    console.error(`Error acquiring lock '${lockName}':`, error);
+    return false;
+  }
+
+  console.log(`🔓 Lock '${lockName}' acquired successfully`);
+  return true;
+}
+
+// ============================================
 // BATCH PROCESSING HELPERS
 // ============================================
 
@@ -320,7 +366,8 @@ async function processTasks() {
 
   console.log(`📊 Found ${tasks?.length || 0} tasks to notify`);
 
-  const notificationsToCreate: NotificationData[] = [];
+  // Build list of potential notifications with user+task deduplication
+  const potentialNotifications: { notification: NotificationData; tracking: BatchTrackingRecord }[] = [];
   const tasksToUpdate: string[] = [];
 
   for (const task of tasks || []) {
@@ -339,19 +386,27 @@ async function processTasks() {
         const canSend = await checkUserPreferences(assignment.user_id, task.agency_id, 'tasks');
         if (!canSend) continue;
 
-        notificationsToCreate.push({
-          user_id: assignment.user_id,
-          agency_id: task.agency_id,
-          type: 'task',
-          priority: 'medium',
-          title: '📋 Tarefa próxima do prazo',
-          message: task.title,
-          action_url: '/tasks',
-          action_label: 'Ver tarefa',
-          metadata: { 
-            task_id: task.id,
-            play_sound: true
+        potentialNotifications.push({
+          notification: {
+            user_id: assignment.user_id,
+            agency_id: task.agency_id,
+            type: 'task',
+            priority: 'medium',
+            title: '📋 Tarefa próxima do prazo',
+            message: task.title,
+            action_url: '/tasks',
+            action_label: 'Ver tarefa',
+            metadata: { 
+              task_id: task.id,
+              play_sound: true
+            },
           },
+          tracking: {
+            notification_type: 'task_upcoming',
+            entity_id: task.id,
+            user_id: assignment.user_id,
+            agency_id: task.agency_id,
+          }
         });
       }
     }
@@ -361,7 +416,26 @@ async function processTasks() {
     }
   }
 
+  // Batch check which notifications were already sent (dedupe by user+task)
+  const trackingRecords = potentialNotifications.map(p => p.tracking);
+  const recentlySent = await batchCheckNotifications(trackingRecords, 24);
+
+  // Filter out already sent notifications
+  const filteredNotifications = potentialNotifications.filter(p => {
+    const key = `${p.tracking.entity_id}_${p.tracking.user_id}`;
+    const alreadySent = recentlySent.has(key);
+    if (alreadySent) {
+      console.log(`⏭️ Skipping task ${p.tracking.entity_id} for user ${p.tracking.user_id} - already notified`);
+    }
+    return !alreadySent;
+  });
+
+  // Create notifications and track them
+  const notificationsToCreate = filteredNotifications.map(p => p.notification);
+  const toTrack = filteredNotifications.map(p => p.tracking);
+
   await batchCreateNotifications(notificationsToCreate);
+  await batchTrackNotifications(toTrack);
 
   if (tasksToUpdate.length > 0) {
     await supabase
@@ -370,7 +444,7 @@ async function processTasks() {
       .in('id', tasksToUpdate);
   }
 
-  console.log(`✅ Created ${notificationsToCreate.length} task notifications`);
+  console.log(`✅ Created ${notificationsToCreate.length} task notifications (filtered from ${potentialNotifications.length})`);
 }
 
 async function processPosts() {
@@ -403,7 +477,8 @@ async function processPosts() {
 
   console.log(`📊 Found ${posts?.length || 0} posts to notify`);
 
-  const notificationsToCreate: NotificationData[] = [];
+  // Build list of potential notifications with user+post deduplication
+  const potentialNotifications: { notification: NotificationData; tracking: BatchTrackingRecord }[] = [];
   const postsToUpdate: string[] = [];
 
   for (const post of posts || []) {
@@ -424,19 +499,27 @@ async function processPosts() {
         const canSend = await checkUserPreferences(user.user_id, post.agency_id, 'posts');
         if (!canSend) continue;
 
-        notificationsToCreate.push({
-          user_id: user.user_id,
-          agency_id: post.agency_id,
-          type: 'post',
-          priority: 'medium',
-          title: '📱 Post próximo de publicar',
-          message: post.title || 'Post sem título',
-          action_url: '/social-media',
-          action_label: 'Ver post',
-          metadata: { 
-            post_id: post.id,
-            play_sound: true
+        potentialNotifications.push({
+          notification: {
+            user_id: user.user_id,
+            agency_id: post.agency_id,
+            type: 'post',
+            priority: 'medium',
+            title: '📱 Post próximo de publicar',
+            message: post.title || 'Post sem título',
+            action_url: '/social-media',
+            action_label: 'Ver post',
+            metadata: { 
+              post_id: post.id,
+              play_sound: true
+            },
           },
+          tracking: {
+            notification_type: 'post_upcoming',
+            entity_id: post.id,
+            user_id: user.user_id,
+            agency_id: post.agency_id,
+          }
         });
       }
     }
@@ -446,7 +529,26 @@ async function processPosts() {
     }
   }
 
+  // Batch check which notifications were already sent (dedupe by user+post)
+  const trackingRecords = potentialNotifications.map(p => p.tracking);
+  const recentlySent = await batchCheckNotifications(trackingRecords, 24);
+
+  // Filter out already sent notifications
+  const filteredNotifications = potentialNotifications.filter(p => {
+    const key = `${p.tracking.entity_id}_${p.tracking.user_id}`;
+    const alreadySent = recentlySent.has(key);
+    if (alreadySent) {
+      console.log(`⏭️ Skipping post ${p.tracking.entity_id} for user ${p.tracking.user_id} - already notified`);
+    }
+    return !alreadySent;
+  });
+
+  // Create notifications and track them
+  const notificationsToCreate = filteredNotifications.map(p => p.notification);
+  const toTrack = filteredNotifications.map(p => p.tracking);
+
   await batchCreateNotifications(notificationsToCreate);
+  await batchTrackNotifications(toTrack);
 
   if (postsToUpdate.length > 0) {
     await supabase
@@ -455,7 +557,7 @@ async function processPosts() {
       .in('id', postsToUpdate);
   }
 
-  console.log(`✅ Created ${notificationsToCreate.length} post notifications`);
+  console.log(`✅ Created ${notificationsToCreate.length} post notifications (filtered from ${potentialNotifications.length})`);
 }
 
 async function processLeads() {
@@ -1053,6 +1155,21 @@ Deno.serve(async (req) => {
     
     console.log('🚀 Starting notification processing...');
     const startTime = Date.now();
+
+    // Acquire global process lock to prevent parallel executions
+    const hasLock = await acquireProcessLock('process_notifications');
+    if (!hasLock) {
+      console.log('⏭️ Another process is running - exiting early');
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'Skipped - another process is running',
+          skipped: true,
+          duration_ms: Date.now() - startTime
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     // If action is 'daily_summary', only run that
     if (action === 'daily_summary') {
