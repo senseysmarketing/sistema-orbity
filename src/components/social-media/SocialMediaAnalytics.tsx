@@ -250,25 +250,25 @@ export function SocialMediaAnalytics() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header com seletor de mês */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 md:space-y-6">
+      {/* Header com seletor de mês - stack vertical no mobile */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">Análises e Insights</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl md:text-2xl font-bold">Análises e Insights</h2>
+          <p className="text-sm text-muted-foreground">
             Visão geral do desempenho e status das postagens
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handlePreviousMonth}>
+          <Button variant="outline" size="icon" onClick={handlePreviousMonth} className="h-9 w-9">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="min-w-[150px] text-center">
-            <span className="text-lg font-semibold capitalize">
-              {format(selectedMonth, "MMMM yyyy", { locale: ptBR })}
+          <div className="min-w-[120px] sm:min-w-[150px] text-center">
+            <span className="text-sm sm:text-lg font-semibold capitalize">
+              {format(selectedMonth, "MMM yyyy", { locale: ptBR })}
             </span>
           </div>
-          <Button variant="outline" size="icon" onClick={handleNextMonth}>
+          <Button variant="outline" size="icon" onClick={handleNextMonth} className="h-9 w-9">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -276,17 +276,17 @@ export function SocialMediaAnalytics() {
 
       {/* Indicador de mês histórico */}
       {!isCurrentMonth && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border">
-          <Archive className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 p-2 sm:p-3 rounded-lg bg-muted/50 border">
+          <Archive className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <span className="text-xs sm:text-sm text-muted-foreground">
             Visualizando dados de {format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })} 
             {analytics.archivedCount > 0 && ` (${analytics.archivedCount} arquivado${analytics.archivedCount > 1 ? 's' : ''})`}
           </span>
         </div>
       )}
 
-      {/* Cards principais de métricas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Cards principais de métricas - 2 colunas no mobile */}
+      <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Postagens</CardTitle>
@@ -342,7 +342,7 @@ export function SocialMediaAnalytics() {
 
       {/* Vencimentos próximos - apenas no mês atual */}
       {isCurrentMonth && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 md:gap-4 grid-cols-1 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -459,8 +459,8 @@ export function SocialMediaAnalytics() {
         </div>
       )}
 
-      {/* Estatísticas detalhadas */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Estatísticas detalhadas - 1 coluna mobile, 3 desktop */}
+      <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
