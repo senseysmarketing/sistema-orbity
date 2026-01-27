@@ -1126,15 +1126,39 @@ async function processDailySummary() {
         console.error(`Error counting posts for user ${user.user_id}:`, postsError);
       }
 
+      // Count meetings where THIS USER is organizer OR participant
+      const { count: userMeetingsCount, error: meetingsError } = await supabase
+        .from('meetings')
+        .select('id', { count: 'exact', head: true })
+        .eq('agency_id', agency.id)
+        .eq('status', 'scheduled')
+        .gte('start_time', todayBrasilia.toISOString())
+        .lte('start_time', endOfDayBrasilia.toISOString())
+        .or(`organizer_id.eq.${user.user_id},participants.cs.["${user.user_id}"]`);
+
+      if (meetingsError) {
+        console.error(`Error counting meetings for user ${user.user_id}:`, meetingsError);
+      }
+
       const tasksCount = userTasksCount || 0;
       const postsCount = userPostsCount || 0;
-      const totalItems = tasksCount + postsCount;
+      const meetingsCount = userMeetingsCount || 0;
+      const totalItems = tasksCount + postsCount + meetingsCount;
 
-      console.log(`📊 User ${user.user_id}: ${tasksCount} tasks, ${postsCount} posts assigned for today`);
+      console.log(`📊 User ${user.user_id}: ${tasksCount} tasks, ${postsCount} posts, ${meetingsCount} meetings assigned for today`);
 
-      // Only send notification if this user has items assigned to them
+      // Determine action URL priority: meetings > tasks > posts > dashboard
+      let actionUrl = '/dashboard';
+      if (meetingsCount > 0) {
+        actionUrl = '/agenda';
+      } else if (tasksCount > 0) {
+        actionUrl = '/tasks';
+      } else if (postsCount > 0) {
+        actionUrl = '/social-media';
+      }
+
       if (totalItems > 0) {
-        // Build personalized message
+        // Build personalized message with all counts
         let message = '📋 Resumo do dia: ';
         const parts = [];
         
@@ -1145,8 +1169,13 @@ async function processDailySummary() {
         if (postsCount > 0) {
           parts.push(`${postsCount} post${postsCount > 1 ? 's' : ''}`);
         }
+
+        if (meetingsCount > 0) {
+          parts.push(`${meetingsCount} reunião${meetingsCount > 1 ? 'ões' : ''}`);
+        }
         
-        message += parts.join(' e ') + ' para hoje';
+        // Join with commas and replace last comma with "e"
+        message += parts.join(', ').replace(/, ([^,]+)$/, ' e $1') + ' para hoje';
 
         notificationsToCreate.push({
           user_id: user.user_id,
@@ -1155,25 +1184,44 @@ async function processDailySummary() {
           priority: 'medium',
           title: '🌅 Bom dia! Seu resumo diário',
           message,
-          action_url: tasksCount > 0 ? '/tasks' : '/social-media',
+          action_url: actionUrl,
           action_label: 'Ver detalhes',
           metadata: { 
             tasks_count: tasksCount,
             posts_count: postsCount,
+            meetings_count: meetingsCount,
             date: todayBrasilia.toISOString(),
             play_sound: false
           },
         });
-
-        trackingToCreate.push({
-          notification_type: 'daily_summary',
-          entity_id: `${agency.id}_${user.user_id}`, // Unique per user
-          user_id: user.user_id,
-          agency_id: agency.id
-        });
       } else {
-        console.log(`⏭️ User ${user.user_id} has no items assigned for today - skipping notification`);
+        // Send "Bom dia" message for users with no assignments
+        notificationsToCreate.push({
+          user_id: user.user_id,
+          agency_id: agency.id,
+          type: 'system',
+          priority: 'low',
+          title: '🌅 Bom dia!',
+          message: 'Sua agenda está livre hoje. Aproveite para planejar ou adiantar demandas!',
+          action_url: '/dashboard',
+          action_label: 'Ir para o Dashboard',
+          metadata: { 
+            tasks_count: 0,
+            posts_count: 0,
+            meetings_count: 0,
+            date: todayBrasilia.toISOString(),
+            play_sound: false
+          },
+        });
       }
+
+      // Track for ALL users (both with and without items)
+      trackingToCreate.push({
+        notification_type: 'daily_summary',
+        entity_id: `${agency.id}_${user.user_id}`, // Unique per user
+        user_id: user.user_id,
+        agency_id: agency.id
+      });
     }
   }
 
