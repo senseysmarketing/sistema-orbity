@@ -38,6 +38,7 @@ interface AgencyContextType {
   userAgencies: Agency[];
   agencyRole: string | null;
   loading: boolean;
+  hasNoAgency: boolean;
   switchAgency: (agencyId: string) => Promise<void>;
   createAgency: (agencyData: Partial<Agency>) => Promise<Agency | null>;
   updateAgency: (agencyId: string, updates: Partial<Agency>) => Promise<void>;
@@ -56,11 +57,13 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const [userAgencies, setUserAgencies] = useState<Agency[]>([]);
   const [agencyRole, setAgencyRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasNoAgency, setHasNoAgency] = useState(false);
 
   const fetchUserAgencies = async () => {
     if (!user) return;
 
     try {
+      setLoading(true);
       const { data: agencyUsers, error: agencyUsersError } = await supabase
         .from('agency_users')
         .select(`
@@ -73,9 +76,20 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
 
       const agencies = agencyUsers?.map(au => au.agencies).filter(Boolean) || [];
       setUserAgencies(agencies);
+      
+      // Check if user has no agency
+      if (agencies.length === 0) {
+        setHasNoAgency(true);
+        setCurrentAgency(null);
+        setAgencyRole(null);
+        localStorage.removeItem('currentAgencyId');
+        return;
+      }
+      
+      setHasNoAgency(false);
 
       // Set current agency (first one if not set)
-      if (agencies.length > 0 && !currentAgency) {
+      if (!currentAgency) {
         const firstAgency = agencies[0];
         const userRole = agencyUsers?.find(au => au.agency_id === firstAgency.id)?.role;
         setCurrentAgency(firstAgency);
@@ -217,6 +231,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       setCurrentAgency(null);
       setUserAgencies([]);
       setAgencyRole(null);
+      setHasNoAgency(false);
       setLoading(false);
     }
   }, [user]);
@@ -239,6 +254,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         userAgencies,
         agencyRole,
         loading,
+        hasNoAgency,
         switchAgency,
         createAgency,
         updateAgency,
