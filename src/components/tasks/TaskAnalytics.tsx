@@ -231,25 +231,25 @@ export function TaskAnalytics({ tasks: currentTasks, profiles, clients, getAssig
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">Análises e Insights</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl md:text-2xl font-bold">Análises e Insights</h2>
+          <p className="text-sm text-muted-foreground">
             Visão geral do desempenho e status das tarefas
           </p>
         </div>
         
         {/* Seletor de Mês */}
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handlePreviousMonth}>
+          <Button variant="outline" size="icon" onClick={handlePreviousMonth} className="h-9 w-9">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="min-w-[150px] text-center">
-            <span className="text-lg font-semibold capitalize">
+          <div className="min-w-[130px] sm:min-w-[150px] text-center">
+            <span className="text-sm sm:text-lg font-semibold capitalize">
               {format(selectedMonth, "MMMM yyyy", { locale: ptBR })}
             </span>
           </div>
-          <Button variant="outline" size="icon" onClick={handleNextMonth} disabled={isSameMonth(selectedMonth, new Date())}>
+          <Button variant="outline" size="icon" onClick={handleNextMonth} disabled={isSameMonth(selectedMonth, new Date())} className="h-9 w-9">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -272,7 +272,7 @@ export function TaskAnalytics({ tasks: currentTasks, profiles, clients, getAssig
       )}
 
       {/* Cards principais de métricas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Tarefas</CardTitle>
@@ -327,7 +327,7 @@ export function TaskAnalytics({ tasks: currentTasks, profiles, clients, getAssig
       </div>
 
       {/* Vencimentos próximos / Resumo do Mês */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 md:gap-4 grid-cols-1 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -447,7 +447,7 @@ export function TaskAnalytics({ tasks: currentTasks, profiles, clients, getAssig
       </div>
 
       {/* Estatísticas detalhadas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

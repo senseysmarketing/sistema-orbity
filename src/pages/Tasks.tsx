@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag } from "lucide-react";
+import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X } from "lucide-react";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 import { FileAttachments, Attachment } from "@/components/ui/file-attachments";
 import {
@@ -809,10 +809,10 @@ export default function Tasks() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gestão de Tarefas</h1>
-          <p className="text-muted-foreground">Painel completo para gerenciamento e acompanhamento de tarefas</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Gestão de Tarefas</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Painel completo para gerenciamento e acompanhamento de tarefas</p>
         </div>
         <div className="flex items-center gap-2">
           {templates.length > 0 && (
@@ -827,9 +827,9 @@ export default function Tasks() {
           )}
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2">
+              <Button className="flex items-center gap-2 h-9">
                 <Plus className="h-4 w-4" />
-                Nova Tarefa
+                <span className="hidden sm:inline">Nova Tarefa</span>
               </Button>
             </DialogTrigger>
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
@@ -998,10 +998,11 @@ export default function Tasks() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="tasks" className="space-y-6">
-          {/* Filtros simplificados */}
-          <div className="flex flex-wrap gap-4">
-            <div className="relative flex-1 min-w-[200px]">
+        <TabsContent value="tasks" className="space-y-4">
+          {/* Filtros responsivos */}
+          <div className="space-y-3">
+            {/* Linha 1: Busca */}
+            <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar tarefas..."
@@ -1011,83 +1012,90 @@ export default function Tasks() {
               />
             </div>
 
-            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Prioridade" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas Prioridades</SelectItem>
-                <SelectItem value="high">Alta</SelectItem>
-                <SelectItem value="medium">Média</SelectItem>
-                <SelectItem value="low">Baixa</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Linha 2: Filtros com scroll horizontal */}
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+              <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
 
-            <Select value={assignedFilter} onValueChange={setAssignedFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Responsável" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Usuários</SelectItem>
-                <SelectItem value="unassigned">Não atribuído</SelectItem>
-                {profiles.map((profile) => (
-                  <SelectItem key={profile.id} value={profile.user_id}>
-                    {profile.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                <SelectTrigger className="w-[130px] sm:w-[150px] h-9 text-xs sm:text-sm flex-shrink-0">
+                  <SelectValue placeholder="Prioridade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas Prioridades</SelectItem>
+                  <SelectItem value="high">Alta</SelectItem>
+                  <SelectItem value="medium">Média</SelectItem>
+                  <SelectItem value="low">Baixa</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={clientFilter} onValueChange={setClientFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Clientes</SelectItem>
-                <SelectItem value="no-client">Sem Cliente</SelectItem>
-                {clients.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={assignedFilter} onValueChange={setAssignedFilter}>
+                <SelectTrigger className="w-[120px] sm:w-[150px] h-9 text-xs sm:text-sm flex-shrink-0">
+                  <SelectValue placeholder="Usuário" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Usuários</SelectItem>
+                  <SelectItem value="unassigned">Não atribuído</SelectItem>
+                  {profiles.map((profile) => (
+                    <SelectItem key={profile.id} value={profile.user_id}>
+                      {profile.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Tipos</SelectItem>
-                {types.map((type) => (
-                  <SelectItem key={type.slug} value={type.slug}>
-                    {type.icon} {type.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={clientFilter} onValueChange={setClientFilter}>
+                <SelectTrigger className="w-[120px] sm:w-[150px] h-9 text-xs sm:text-sm flex-shrink-0">
+                  <SelectValue placeholder="Cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Clientes</SelectItem>
+                  <SelectItem value="no-client">Sem Cliente</SelectItem>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <DateRangeFilterDialog
-              value={dueDateRange}
-              onChange={setDueDateRange}
-              includeNoDate={includeNoDueDate}
-              onIncludeNoDateChange={setIncludeNoDueDate}
-              defaultIncludeNoDate={false}
-              label="Período"
-              active={!!dueDateRange?.from || includeNoDueDate}
-            />
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-[110px] sm:w-[140px] h-9 text-xs sm:text-sm flex-shrink-0">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Tipos</SelectItem>
+                  {types.map((type) => (
+                    <SelectItem key={type.slug} value={type.slug}>
+                      {type.icon} {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            {(searchTerm ||
-              priorityFilter !== "all" ||
-              assignedFilter !== "all" ||
-              clientFilter !== "all" ||
-              typeFilter !== "all" ||
-              !!dueDateRange?.from ||
-              includeNoDueDate !== false) && (
-              <Button variant="outline" onClick={clearFilters}>
-                Limpar
-              </Button>
-            )}
+              <div className="flex-shrink-0">
+                <DateRangeFilterDialog
+                  value={dueDateRange}
+                  onChange={setDueDateRange}
+                  includeNoDate={includeNoDueDate}
+                  onIncludeNoDateChange={setIncludeNoDueDate}
+                  defaultIncludeNoDate={false}
+                  label="Período"
+                  active={!!dueDateRange?.from || includeNoDueDate}
+                />
+              </div>
+
+              {(searchTerm ||
+                priorityFilter !== "all" ||
+                assignedFilter !== "all" ||
+                clientFilter !== "all" ||
+                typeFilter !== "all" ||
+                !!dueDateRange?.from ||
+                includeNoDueDate !== false) && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 px-2 flex-shrink-0">
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Kanban View */}
@@ -1157,18 +1165,18 @@ export default function Tasks() {
 
         <TabsContent value="settings" className="space-y-6">
           <Tabs defaultValue="templates" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="templates" className="flex items-center gap-2">
+            <TabsList className="flex w-full overflow-x-auto scrollbar-hide">
+              <TabsTrigger value="templates" className="flex-shrink-0 gap-1 md:gap-2">
                 <FileText className="h-4 w-4" />
-                Templates
+                <span className="hidden sm:inline">Templates</span>
               </TabsTrigger>
-              <TabsTrigger value="types" className="flex items-center gap-2">
+              <TabsTrigger value="types" className="flex-shrink-0 gap-1 md:gap-2">
                 <Tag className="h-4 w-4" />
-                Tipos
+                <span className="hidden sm:inline">Tipos</span>
               </TabsTrigger>
-              <TabsTrigger value="statuses" className="flex items-center gap-2">
+              <TabsTrigger value="statuses" className="flex-shrink-0 gap-1 md:gap-2">
                 <Settings className="h-4 w-4" />
-                Status
+                <span className="hidden sm:inline">Status</span>
               </TabsTrigger>
             </TabsList>
             <TabsContent value="templates">
