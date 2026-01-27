@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, Users, DollarSign, Target, Calendar, Grid, List, AlertTriangle, TrendingUp, Settings, Download } from "lucide-react";
+import { Plus, Search, Users, DollarSign, Target, Calendar, Grid, List, AlertTriangle, TrendingUp, Settings, Download, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -403,8 +403,9 @@ export default function CRM() {
             <CardContent>
               <div className="space-y-4">
                 {/* Search and Filters */}
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="relative flex-1">
+                <div className="space-y-3">
+                  {/* Search Row */}
+                  <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                     <Input
                       placeholder="Buscar leads..."
@@ -414,45 +415,50 @@ export default function CRM() {
                     />
                   </div>
                   
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full md:w-[180px]">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os Status</SelectItem>
-                      {Object.entries(getStatusConfig()).map(([key, config]) => (
-                        <SelectItem key={key} value={key}>
-                          {config.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  
-                  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="w-full md:w-[150px]">
-                      <SelectValue placeholder="Temperatura" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="hot">🔥 Quente</SelectItem>
-                      <SelectItem value="warm">🌡️ Morno</SelectItem>
-                      <SelectItem value="cold">❄️ Frio</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                    <SelectTrigger className="w-full md:w-[150px]">
-                      <SelectValue placeholder="Origem" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      {uniqueSources.map(source => (
-                        <SelectItem key={source} value={source}>
-                          {source === 'facebook_leads' ? 'Meta Ads' : source}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {/* Filters Row with Horizontal Scroll */}
+                  <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+                    <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-[130px] sm:w-[160px] h-9 text-xs sm:text-sm flex-shrink-0">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os Status</SelectItem>
+                        {Object.entries(getStatusConfig()).map(([key, config]) => (
+                          <SelectItem key={key} value={key}>
+                            {config.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                      <SelectTrigger className="w-[110px] sm:w-[140px] h-9 text-xs sm:text-sm flex-shrink-0">
+                        <SelectValue placeholder="Temp." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        <SelectItem value="hot">🔥 Quente</SelectItem>
+                        <SelectItem value="warm">🌡️ Morno</SelectItem>
+                        <SelectItem value="cold">❄️ Frio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                      <SelectTrigger className="w-[110px] sm:w-[140px] h-9 text-xs sm:text-sm flex-shrink-0">
+                        <SelectValue placeholder="Origem" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {uniqueSources.map(source => (
+                          <SelectItem key={source} value={source}>
+                            {source === 'facebook_leads' ? 'Meta Ads' : source}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {/* Actions Row */}

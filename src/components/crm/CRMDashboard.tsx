@@ -176,23 +176,29 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
       )}
 
       {/* Period Selector */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-muted-foreground">Período:</span>
+      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+        <span className="text-sm text-muted-foreground whitespace-nowrap flex-shrink-0">Período:</span>
         {quickPeriods.map((period) => (
           <Button
             key={period.label}
             variant={dateRange.from.getTime() === period.from.getTime() ? "default" : "outline"}
             size="sm"
             onClick={() => setDateRange({ from: period.from, to: period.to })}
+            className="flex-shrink-0 whitespace-nowrap"
           >
             {period.label}
           </Button>
         ))}
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="ml-2">
+            <Button variant="outline" size="sm" className="flex-shrink-0 whitespace-nowrap">
               <CalendarIcon className="h-4 w-4 mr-2" />
-              {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} - {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
+              <span className="hidden sm:inline">
+                {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} - {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
+              </span>
+              <span className="sm:hidden">
+                {format(dateRange.from, "dd/MM", { locale: ptBR })} - {format(dateRange.to, "dd/MM", { locale: ptBR })}
+              </span>
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
@@ -212,7 +218,7 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
       </div>
 
       {/* Quick Metrics */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
