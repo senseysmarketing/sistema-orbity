@@ -124,9 +124,9 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
   return (
     <Card className="col-span-full">
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">Funil de Vendas</CardTitle>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <CardTitle className="text-base sm:text-lg font-semibold">Funil de Vendas</CardTitle>
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
             <span>Taxa de Conversão Geral:</span>
             <span className="font-semibold text-primary">{generalConversionRate}%</span>
           </div>
@@ -185,18 +185,30 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
         </div>
 
         {/* Conversion rates between stages */}
-        <div className="grid grid-cols-6 gap-2 mt-6 pt-4 border-t">
+        <div className="flex gap-2 mt-4 sm:mt-6 pt-3 sm:pt-4 border-t overflow-x-auto scrollbar-hide pb-1">
           {funnelData.slice(1).map((stage, index) => {
             const previousStage = funnelData[index];
             const rate = previousStage.value > 0 
               ? ((stage.value / previousStage.value) * 100).toFixed(1) 
               : "0";
+            const getShortName = (name: string) => {
+              const abbr: Record<string, string> = {
+                "Em contato": "Cont.",
+                "Qualificados": "Qual.",
+                "Agendamentos": "Agen.",
+                "Reuniões": "Reun.",
+                "Propostas": "Prop.",
+                "Vendas": "Vend.",
+              };
+              return abbr[name] || name;
+            };
             return (
-              <div key={stage.name} className="text-center">
-                <div className="text-xs text-muted-foreground mb-1 truncate">
-                  {previousStage.name} → {stage.name}
+              <div key={stage.name} className="text-center flex-shrink-0 min-w-[60px] sm:min-w-[80px]">
+                <div className="text-[10px] sm:text-xs text-muted-foreground mb-1">
+                  <span className="hidden sm:inline">{previousStage.name} → {stage.name}</span>
+                  <span className="sm:hidden">{getShortName(previousStage.name)} → {getShortName(stage.name)}</span>
                 </div>
-                <div className="text-base font-bold" style={{ color: stage.fill }}>
+                <div className="text-sm sm:text-base font-bold" style={{ color: stage.fill }}>
                   {rate}%
                 </div>
               </div>
