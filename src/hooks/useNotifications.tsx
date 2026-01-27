@@ -185,7 +185,8 @@ export function useNotifications() {
 
     fetchNotifications();
 
-    // Subscribe to realtime updates
+    // Subscribe to realtime updates - apenas para atualizar a UI
+    // Push notifications são enviadas pelo trigger do banco via FCM
     const channel = supabase
       .channel('notifications-changes')
       .on(
@@ -198,19 +199,8 @@ export function useNotifications() {
         },
         (payload) => {
           console.log('Notification change:', payload);
-          
-          // Show browser notification for new notifications
-          if (payload.eventType === 'INSERT') {
-            const newNotification = payload.new as Notification;
-            
-            // Show browser notification
-            showNotification(newNotification.title, {
-              body: newNotification.message,
-              tag: newNotification.id,
-              icon: '/favicon.ico',
-            });
-          }
-          
+          // Push notification já foi enviada pelo trigger do banco via FCM
+          // Aqui apenas atualizamos a lista de notificações na UI
           fetchNotifications();
         }
       )
