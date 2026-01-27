@@ -1,216 +1,275 @@
 
 
-# Otimizacao Mobile: Tela de Tarefas (Tasks)
+# Otimizacao Mobile: Tela de CRM
 
 ## Problemas Identificados (Screenshot)
 
-| Problema | Local | Causa |
-|----------|-------|-------|
-| Header quebrado | `Tasks.tsx` linhas 811-816 | Titulo e botoes em `flex justify-between` sem responsividade |
-| Filtros empilhados verticalmente | `Tasks.tsx` linhas 1003-1091 | `flex-wrap` com selects `w-[180px]` fixos |
-| Search input muito largo | `Tasks.tsx` linha 1004 | `min-w-[200px]` ocupa linha inteira |
-| Tabs de configuracoes sem scroll | `Tasks.tsx` linhas 1159-1173 | `TabsList` basico sem `overflow-x-auto` |
-| Analytics header quebrado | `TaskAnalytics.tsx` linhas 232-256 | `flex justify-between` que quebra no mobile |
+| Problema | Componente | Causa |
+|----------|------------|-------|
+| Botoes de periodo quebrados | `CRMDashboard.tsx` linha 179-211 | Botoes "Este Mes", "Mes Passado" etc em `flex-wrap` que empilha mal |
+| Cards de metricas muito largos | `CRMDashboard.tsx` linha 215 | Grid `md:grid-cols-4` nao tem coluna mobile definida |
+| Funil labels cortados na base | `CRMFunnelChart.tsx` linha 188 | Grid `grid-cols-6` sem responsividade, textos truncados |
+| Header do funil em linha unica | `CRMFunnelChart.tsx` linha 127-132 | `flex justify-between` que quebra no mobile |
+| Tabs de config sem scroll | `CRMSettings.tsx` linha 18 | `TabsList grid-cols-4` empilha textos |
+| Filtros do Pipeline muito largos | `CRM.tsx` linhas 406-456 | Selects `w-full md:w-[180px]` ocupam toda largura |
 
 ---
 
 ## Solucao
 
-### 1. Tasks.tsx - Header Responsivo
+### 1. CRMDashboard.tsx - Periodo Selector Responsivo
 
-**Problema atual (linha 811-816):**
+**Problema atual (linhas 179-211):**
 ```tsx
-<div className="flex justify-between items-center">
-  <div>
-    <h1 className="text-3xl font-bold tracking-tight">Gestao de Tarefas</h1>
-    <p className="text-muted-foreground">Painel completo...</p>
-  </div>
-  <div className="flex items-center gap-2">
-    {/* Templates + Nova Tarefa */}
+<div className="flex flex-wrap items-center gap-2">
+  <span className="text-sm text-muted-foreground">Periodo:</span>
+  {quickPeriods.map((period) => (
+    <Button ...>{period.label}</Button>
+  ))}
+  <Popover>...</Popover>
+</div>
+```
+
+**Solucao:** Scroll horizontal no mobile:
+
+```tsx
+<div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+  <span className="text-sm text-muted-foreground whitespace-nowrap flex-shrink-0">Periodo:</span>
+  {quickPeriods.map((period) => (
+    <Button
+      key={period.label}
+      variant={dateRange.from.getTime() === period.from.getTime() ? "default" : "outline"}
+      size="sm"
+      onClick={() => setDateRange({ from: period.from, to: period.to })}
+      className="flex-shrink-0 whitespace-nowrap"
+    >
+      {period.label}
+    </Button>
+  ))}
+  <Popover>
+    <PopoverTrigger asChild>
+      <Button variant="outline" size="sm" className="flex-shrink-0 whitespace-nowrap">
+        <CalendarIcon className="h-4 w-4 mr-2" />
+        <span className="hidden sm:inline">
+          {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} - {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
+        </span>
+        <span className="sm:hidden">
+          {format(dateRange.from, "dd/MM", { locale: ptBR })} - {format(dateRange.to, "dd/MM", { locale: ptBR })}
+        </span>
+      </Button>
+    </PopoverTrigger>
+    ...
+  </Popover>
+</div>
+```
+
+---
+
+### 2. CRMDashboard.tsx - Cards de Metricas Responsivos
+
+**Problema atual (linha 215):**
+```tsx
+<div className="grid gap-4 md:grid-cols-4">
+```
+
+**Solucao:** 2 colunas no mobile:
+```tsx
+<div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
+```
+
+---
+
+### 3. CRMFunnelChart.tsx - Header Responsivo
+
+**Problema atual (linhas 127-132):**
+```tsx
+<div className="flex items-center justify-between">
+  <CardTitle className="text-lg font-semibold">Funil de Vendas</CardTitle>
+  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <span>Taxa de Conversao Geral:</span>
+    <span className="font-semibold text-primary">{generalConversionRate}%</span>
   </div>
 </div>
 ```
 
 **Solucao:** Stack vertical no mobile:
-
 ```tsx
-<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-  <div>
-    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Gestao de Tarefas</h1>
-    <p className="text-sm md:text-base text-muted-foreground">Painel completo...</p>
-  </div>
-  <div className="flex items-center gap-2">
-    {templates.length > 0 && (
-      <QuickTemplatesDropdown ... />
-    )}
-    <Button className="flex items-center gap-2 h-9">
-      <Plus className="h-4 w-4" />
-      <span className="hidden sm:inline">Nova Tarefa</span>
-    </Button>
+<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+  <CardTitle className="text-base sm:text-lg font-semibold">Funil de Vendas</CardTitle>
+  <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+    <span>Taxa de Conversao Geral:</span>
+    <span className="font-semibold text-primary">{generalConversionRate}%</span>
   </div>
 </div>
 ```
 
 ---
 
-### 2. Tasks.tsx - Filtros com Scroll Horizontal
+### 4. CRMFunnelChart.tsx - Grid de Conversoes Responsivo
 
-**Problema atual (linhas 1003-1091):**
+**Problema atual (linhas 188-205):**
 ```tsx
-<div className="flex flex-wrap gap-4">
-  <div className="relative flex-1 min-w-[200px]">
+<div className="grid grid-cols-6 gap-2 mt-6 pt-4 border-t">
+  {funnelData.slice(1).map((stage, index) => (
+    <div key={stage.name} className="text-center">
+      <div className="text-xs text-muted-foreground mb-1 truncate">
+        {previousStage.name} → {stage.name}
+      </div>
+      <div className="text-base font-bold" style={{ color: stage.fill }}>
+        {rate}%
+      </div>
+    </div>
+  ))}
+</div>
+```
+
+**Solucao:** Scroll horizontal no mobile com labels abreviados:
+```tsx
+<div className="flex gap-2 mt-4 sm:mt-6 pt-3 sm:pt-4 border-t overflow-x-auto scrollbar-hide pb-1">
+  {funnelData.slice(1).map((stage, index) => {
+    const previousStage = funnelData[index];
+    const rate = previousStage.value > 0 
+      ? ((stage.value / previousStage.value) * 100).toFixed(1) 
+      : "0";
+    // Abreviar nomes longos no mobile
+    const getShortName = (name: string) => {
+      const abbr: Record<string, string> = {
+        "Em contato": "Cont.",
+        "Qualificados": "Qual.",
+        "Agendamentos": "Agen.",
+        "Reunioes": "Reun.",
+        "Propostas": "Prop.",
+        "Vendas": "Vend.",
+      };
+      return abbr[name] || name;
+    };
+    return (
+      <div key={stage.name} className="text-center flex-shrink-0 min-w-[60px] sm:min-w-[80px]">
+        <div className="text-[10px] sm:text-xs text-muted-foreground mb-1">
+          <span className="hidden sm:inline">{previousStage.name} → {stage.name}</span>
+          <span className="sm:hidden">{getShortName(previousStage.name)} → {getShortName(stage.name)}</span>
+        </div>
+        <div className="text-sm sm:text-base font-bold" style={{ color: stage.fill }}>
+          {rate}%
+        </div>
+      </div>
+    );
+  })}
+</div>
+```
+
+---
+
+### 5. CRMSettings.tsx - Tabs com Scroll Horizontal
+
+**Problema atual (linhas 17-23):**
+```tsx
+<Tabs defaultValue="integration" className="space-y-4">
+  <TabsList className="grid w-full grid-cols-4">
+    <TabsTrigger value="integration">Integracao</TabsTrigger>
+    <TabsTrigger value="investments">Investimentos</TabsTrigger>
+    <TabsTrigger value="status">Status</TabsTrigger>
+    <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+  </TabsList>
+```
+
+**Solucao:** Scroll horizontal com icones:
+```tsx
+import { Link2, DollarSign, Layers, Webhook } from "lucide-react";
+
+<div>
+  <h2 className="text-xl md:text-2xl font-bold">Configuracoes do CRM</h2>
+  <p className="text-sm text-muted-foreground">
+    Personalize seu pipeline de vendas e integracoes
+  </p>
+</div>
+
+<Tabs defaultValue="integration" className="space-y-4">
+  <TabsList className="flex w-full overflow-x-auto scrollbar-hide">
+    <TabsTrigger value="integration" className="flex-shrink-0 gap-1 md:gap-2">
+      <Link2 className="h-4 w-4" />
+      <span className="hidden sm:inline">Integracao</span>
+    </TabsTrigger>
+    <TabsTrigger value="investments" className="flex-shrink-0 gap-1 md:gap-2">
+      <DollarSign className="h-4 w-4" />
+      <span className="hidden sm:inline">Investimentos</span>
+    </TabsTrigger>
+    <TabsTrigger value="status" className="flex-shrink-0 gap-1 md:gap-2">
+      <Layers className="h-4 w-4" />
+      <span className="hidden sm:inline">Status</span>
+    </TabsTrigger>
+    <TabsTrigger value="webhooks" className="flex-shrink-0 gap-1 md:gap-2">
+      <Webhook className="h-4 w-4" />
+      <span className="hidden sm:inline">Webhooks</span>
+    </TabsTrigger>
+  </TabsList>
+</Tabs>
+```
+
+---
+
+### 6. CRM.tsx - Filtros do Pipeline Responsivos
+
+**Problema atual (linhas 406-456):**
+```tsx
+<div className="flex flex-col md:flex-row gap-4">
+  <div className="relative flex-1">
     <Input ... />
   </div>
-  <Select ...><SelectTrigger className="w-[180px]">...</SelectTrigger></Select>
-  <!-- Varios selects com w-[180px] -->
+  <Select ...><SelectTrigger className="w-full md:w-[180px]">...</SelectTrigger></Select>
+  ...
 </div>
 ```
 
-**Solucao:** Reorganizar em 2 linhas com scroll horizontal:
-
+**Solucao:** Busca isolada + filtros em scroll horizontal:
 ```tsx
-{/* Linha 1: Busca isolada */}
-<div className="relative">
-  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-  <Input
-    placeholder="Buscar tarefas..."
-    value={searchTerm}
-    onChange={(e) => setSearchTerm(e.target.value)}
-    className="pl-8"
-  />
-</div>
+import { Filter } from "lucide-react";
 
-{/* Linha 2: Filtros com scroll horizontal */}
-<div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-  <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-  
-  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-    <SelectTrigger className="w-[130px] sm:w-[150px] h-9 text-xs sm:text-sm flex-shrink-0">
-      <SelectValue placeholder="Prioridade" />
-    </SelectTrigger>
-    ...
-  </Select>
-  
-  <Select value={assignedFilter} onValueChange={setAssignedFilter}>
-    <SelectTrigger className="w-[120px] sm:w-[150px] h-9 text-xs sm:text-sm flex-shrink-0">
-      <SelectValue placeholder="Usuario" />
-    </SelectTrigger>
-    ...
-  </Select>
-  
-  <Select value={clientFilter} onValueChange={setClientFilter}>
-    <SelectTrigger className="w-[120px] sm:w-[150px] h-9 text-xs sm:text-sm flex-shrink-0">
-      <SelectValue placeholder="Cliente" />
-    </SelectTrigger>
-    ...
-  </Select>
-  
-  <Select value={typeFilter} onValueChange={setTypeFilter}>
-    <SelectTrigger className="w-[110px] sm:w-[140px] h-9 text-xs sm:text-sm flex-shrink-0">
-      <SelectValue placeholder="Tipo" />
-    </SelectTrigger>
-    ...
-  </Select>
-  
-  <div className="flex-shrink-0">
-    <DateRangeFilterDialog ... />
+<div className="space-y-3">
+  {/* Linha 1: Busca */}
+  <div className="relative">
+    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+    <Input
+      placeholder="Buscar leads..."
+      value={searchQuery}
+      onChange={(e) => setSearchQuery(e.target.value)}
+      className="pl-9"
+    />
   </div>
   
-  {hasActiveFilters && (
-    <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 px-2 flex-shrink-0">
-      <X className="h-4 w-4" />
-    </Button>
-  )}
+  {/* Linha 2: Filtros com scroll horizontal */}
+  <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+    <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+    
+    <Select value={statusFilter} onValueChange={setStatusFilter}>
+      <SelectTrigger className="w-[130px] sm:w-[160px] h-9 text-xs sm:text-sm flex-shrink-0">
+        <SelectValue placeholder="Status" />
+      </SelectTrigger>
+      ...
+    </Select>
+    
+    <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+      <SelectTrigger className="w-[110px] sm:w-[140px] h-9 text-xs sm:text-sm flex-shrink-0">
+        <SelectValue placeholder="Temp." />
+      </SelectTrigger>
+      ...
+    </Select>
+    
+    <Select value={sourceFilter} onValueChange={setSourceFilter}>
+      <SelectTrigger className="w-[110px] sm:w-[140px] h-9 text-xs sm:text-sm flex-shrink-0">
+        <SelectValue placeholder="Origem" />
+      </SelectTrigger>
+      ...
+    </Select>
+  </div>
 </div>
 ```
 
 ---
 
-### 3. Tasks.tsx - Tabs de Configuracoes com Scroll Horizontal
+### 7. CRMInvestmentMetrics.tsx - Grid Responsivo (ja OK, confirmar)
 
-**Problema atual (linhas 1159-1173):**
-```tsx
-<TabsList>
-  <TabsTrigger value="templates">Templates</TabsTrigger>
-  <TabsTrigger value="types">Tipos</TabsTrigger>
-  <TabsTrigger value="statuses">Status</TabsTrigger>
-</TabsList>
-```
-
-**Solucao:** Adicionar scroll horizontal e ocultar labels no mobile:
-
-```tsx
-<TabsList className="flex w-full overflow-x-auto scrollbar-hide">
-  <TabsTrigger value="templates" className="flex-shrink-0 gap-1 md:gap-2">
-    <FileText className="h-4 w-4" />
-    <span className="hidden sm:inline">Templates</span>
-  </TabsTrigger>
-  <TabsTrigger value="types" className="flex-shrink-0 gap-1 md:gap-2">
-    <Tag className="h-4 w-4" />
-    <span className="hidden sm:inline">Tipos</span>
-  </TabsTrigger>
-  <TabsTrigger value="statuses" className="flex-shrink-0 gap-1 md:gap-2">
-    <Settings className="h-4 w-4" />
-    <span className="hidden sm:inline">Status</span>
-  </TabsTrigger>
-</TabsList>
-```
-
----
-
-### 4. TaskAnalytics.tsx - Header Responsivo
-
-**Problema atual (linhas 232-256):**
-```tsx
-<div className="flex items-center justify-between">
-  <div>
-    <h2 className="text-2xl font-bold">Analises e Insights</h2>
-    <p className="text-muted-foreground">Visao geral...</p>
-  </div>
-  <div className="flex items-center gap-2">
-    <!-- Navegacao de mes -->
-  </div>
-</div>
-```
-
-**Solucao:** Stack vertical no mobile + ajustar grids:
-
-```tsx
-<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-  <div>
-    <h2 className="text-xl md:text-2xl font-bold">Analises e Insights</h2>
-    <p className="text-sm text-muted-foreground">Visao geral do desempenho e status das tarefas</p>
-  </div>
-  <div className="flex items-center gap-2">
-    <Button variant="outline" size="icon" onClick={handlePreviousMonth} className="h-9 w-9">
-      <ChevronLeft className="h-4 w-4" />
-    </Button>
-    <div className="min-w-[130px] sm:min-w-[150px] text-center">
-      <span className="text-sm sm:text-lg font-semibold capitalize">
-        {format(selectedMonth, "MMM yyyy", { locale: ptBR })}
-      </span>
-    </div>
-    <Button variant="outline" size="icon" onClick={handleNextMonth} className="h-9 w-9">
-      <ChevronRight className="h-4 w-4" />
-    </Button>
-  </div>
-</div>
-
-{/* Cards principais - 2 colunas no mobile, 4 no desktop */}
-<div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
-  ...
-</div>
-
-{/* Cards de detalhes - 1 coluna no mobile, 2 no desktop */}
-<div className="grid gap-3 md:gap-4 grid-cols-1 md:grid-cols-2">
-  ...
-</div>
-
-{/* Cards estatisticos - 2 colunas no mobile, 4 no desktop */}
-<div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
-  ...
-</div>
-```
+O grid `md:grid-cols-2` ja funciona bem no mobile (1 coluna), apenas confirmar espacamentos.
 
 ---
 
@@ -218,43 +277,61 @@
 
 | Arquivo | Mudancas |
 |---------|----------|
-| `src/pages/Tasks.tsx` | Header responsivo, filtros em scroll horizontal, tabs de config com scroll |
-| `src/components/tasks/TaskAnalytics.tsx` | Header responsivo, grids otimizados |
+| `src/components/crm/CRMDashboard.tsx` | Periodo selector com scroll, cards 2 colunas mobile |
+| `src/components/crm/CRMFunnelChart.tsx` | Header responsivo, grid de conversoes com scroll |
+| `src/components/crm/CRMSettings.tsx` | Tabs com scroll horizontal e icones |
+| `src/pages/CRM.tsx` | Filtros do pipeline em scroll horizontal |
 
 ---
 
 ## Resultado Visual (Mobile)
 
-### Header (Antes vs Depois)
+### Periodo Selector (Antes vs Depois)
 ```
 ANTES:                          DEPOIS:
 ┌───────────────────┐           ┌───────────────────┐
-│ Gestao  [Templ▼]  │           │ Gestao de Tarefas │
-│ de      [+Nova]   │           │ Painel completo...│
-│ Tarefas           │           │ [Templ▼] [+]      │
-│ Painel...         │           └───────────────────┘
+│ Periodo:          │           │ Per:[Este][Ult]→  │
+│ [Este Mes]        │           │  (scroll horiz)   │
+│ [Mes Passado]     │           └───────────────────┘
+│ [Ultimos 3 Meses] │           
+│ [📅 01/01 - 31/01]│           
 └───────────────────┘           
 ```
 
-### Filtros (Antes vs Depois)
+### Cards Metricas (Antes vs Depois)
 ```
 ANTES:                          DEPOIS:
-┌───────────────────┐           ┌───────────────────┐
-│ 🔍 Buscar...      │           │ 🔍 Buscar tarefas │
-│ [Todas Priorid▼]  │           │ 🔍[Pri▼][Usr▼]→   │
-│ [Todos Usuarios▼] │           │  (scroll horiz)   │
-│ [Todos Clientes▼] │           └───────────────────┘
-│ [Todos Tipos  ▼]  │           
-│ [Periodo      ▼]  │           
+┌───────────────────┐           ┌─────────┬─────────┐
+│ Total de Leads    │           │ Leads   │ Conv.   │
+│ 101               │           │ 101     │ 5.0%    │
+├───────────────────┤           ├─────────┼─────────┤
+│ Taxa Conversao    │           │ Receita │ Atencao │
+│ 5.0%              │           │ R$8.560 │ 5       │
+├───────────────────┤           └─────────┴─────────┘
+│ Receita Confirm.  │           
+│ R$ 8.560          │           
+├───────────────────┤           
+│ Atencao Necess.   │           
+│ 5                 │           
 └───────────────────┘           
 ```
 
-### Tabs de Config (Antes vs Depois)
+### Funil Conversoes (Antes vs Depois)
 ```
 ANTES:                          DEPOIS:
 ┌───────────────────┐           ┌───────────────────┐
-│ [Templates][Tipos]│           │ [📄][🏷️][⚙️]    │
-│ [Status]          │           │  (icones apenas)  │
+│ Lead... Em c... Qu│           │ [Lead→Cont][Cont→Q│
+│ 20.8%  61.9% 92.3%│           │  20.8%    61.9% → │
+│      (cortado)    │           │  (scroll horiz)   │
+└───────────────────┘           └───────────────────┘
+```
+
+### Tabs Config (Antes vs Depois)
+```
+ANTES:                          DEPOIS:
+┌───────────────────┐           ┌───────────────────┐
+│ Integr│Invest│Sta.│           │ [🔗][💲][≡][🔌]  │
+│ Webho │      │    │           │  (icones apenas)  │
 └───────────────────┘           └───────────────────┘
 ```
 
@@ -264,11 +341,10 @@ ANTES:                          DEPOIS:
 
 | Componente | Antes | Depois |
 |------------|-------|--------|
-| Header | 1 linha que quebra | Stack vertical no mobile |
-| Botao Nova Tarefa | "Nova Tarefa" | Só icone + no mobile |
-| Busca | min-w-[200px] flex-1 | Input simples em linha propria |
-| Filtros | flex-wrap, w-[180px] | scroll horizontal, w-[110-150px] |
-| Tabs config | Sem scroll | scroll horizontal + icones |
-| Analytics header | 1 linha | Stack vertical no mobile |
-| Analytics grids | Fixos | Responsivos (2-4 cols) |
+| Periodo selector | flex-wrap vertical | scroll horizontal |
+| Cards metricas | 1 coluna mobile | 2 colunas mobile |
+| Funil header | 1 linha que quebra | stack vertical mobile |
+| Funil conversoes | grid-cols-6 truncado | scroll horizontal + abbr |
+| Settings tabs | grid-cols-4 empilhado | scroll horizontal + icones |
+| Pipeline filtros | flex-col vertical | busca + scroll horizontal |
 
