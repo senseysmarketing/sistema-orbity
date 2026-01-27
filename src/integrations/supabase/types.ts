@@ -3901,6 +3901,7 @@ export type Database = {
           subtasks: Json | null
           title: string
           updated_at: string | null
+          updated_by: string | null
         }
         Insert: {
           agency_id: string
@@ -3928,6 +3929,7 @@ export type Database = {
           subtasks?: Json | null
           title: string
           updated_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           agency_id?: string
@@ -3955,6 +3957,7 @@ export type Database = {
           subtasks?: Json | null
           title?: string
           updated_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -4498,6 +4501,7 @@ export type Database = {
           task_type: string | null
           title: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           agency_id?: string | null
@@ -4518,6 +4522,7 @@ export type Database = {
           task_type?: string | null
           title: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           agency_id?: string | null
@@ -4538,6 +4543,7 @@ export type Database = {
           task_type?: string | null
           title?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {

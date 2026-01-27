@@ -242,8 +242,15 @@ export function useSocialMediaPosts() {
 
   const updatePost = async (id: string, updates: Partial<SocialMediaPost>) => {
     try {
+      // Obter usuário atual para rastrear quem fez a ação
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+
       // Se scheduled_date mudou, resetar notification_sent_at
-      const finalUpdates: any = { ...updates };
+      const finalUpdates: any = { 
+        ...updates,
+        updated_by: userId  // Passa quem fez a ação para o trigger excluir das notificações
+      };
       if (updates.scheduled_date) {
         const originalPost = posts.find(p => p.id === id);
         if (originalPost && originalPost.scheduled_date !== updates.scheduled_date) {

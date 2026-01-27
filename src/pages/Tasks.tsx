@@ -631,6 +631,7 @@ export default function Tasks() {
         subtasks: newTask.subtasks as any,
         attachments: newTask.attachments as any,
         task_type: newTask.task_type || null,
+        updated_by: profile?.user_id,  // Passa quem fez a ação para excluir das notificações
       };
 
       // Reset notification_sent_at if due_date changed
@@ -747,9 +748,13 @@ export default function Tasks() {
     );
 
     try {
+      // Passa updated_by para o trigger excluir quem fez a ação das notificações
       const { error } = await supabase
         .from("tasks")
-        .update({ status: newStatus as any })
+        .update({ 
+          status: newStatus as any,
+          updated_by: profile?.user_id 
+        })
         .eq("id", taskId);
 
       if (error) throw error;
