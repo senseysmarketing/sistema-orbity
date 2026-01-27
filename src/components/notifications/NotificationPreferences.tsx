@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -8,12 +16,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 import { Bell, Mail, Volume2, Chrome, Clock, Smartphone, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { PushDiagnostics } from "./PushDiagnostics";
+
 interface NotificationPreferencesProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -62,7 +72,7 @@ function PushNotificationSection() {
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between opacity-60">
-          <Label className="flex items-center gap-2">
+          <Label className="flex items-center gap-2 text-sm">
             <Smartphone className="h-4 w-4" />
             <span>Push no Celular</span>
           </Label>
@@ -79,7 +89,7 @@ function PushNotificationSection() {
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between opacity-60">
-          <Label className="flex items-center gap-2">
+          <Label className="flex items-center gap-2 text-sm">
             <Smartphone className="h-4 w-4" />
             <span>Push no Celular</span>
           </Label>
@@ -98,7 +108,7 @@ function PushNotificationSection() {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label className="flex items-center gap-2 cursor-pointer">
+        <Label className="flex items-center gap-2 cursor-pointer text-sm">
           <Smartphone className="h-4 w-4" />
           <span>Push no Celular</span>
         </Label>
@@ -174,6 +184,7 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
   const { user } = useAuth();
   const { currentAgency, isAgencyAdmin } = useAgency();
   const [loading, setLoading] = useState(false);
+  const isMobile = useIsMobile();
 
   const TASK_EVENT_KEYS = {
     assigned: 'task.assigned',
@@ -515,13 +526,517 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
   const notificationTypesList = [
     { key: "reminders_enabled", label: "Lembretes", icon: "📝" },
     { key: "tasks_enabled", label: "Tarefas", icon: "✅" },
-    { key: "posts_enabled", label: "Posts de Social Media", icon: "📱" },
-    { key: "payments_enabled", label: "Pagamentos de Clientes", icon: "💰" },
+    { key: "posts_enabled", label: "Posts de Social Media", labelMobile: "Posts", icon: "📱" },
+    { key: "payments_enabled", label: "Pagamentos de Clientes", labelMobile: "Pagamentos", icon: "💰" },
     { key: "expenses_enabled", label: "Despesas", icon: "💸" },
     { key: "leads_enabled", label: "Leads", icon: "👤" },
     { key: "meetings_enabled", label: "Reuniões", icon: "📅" },
-    { key: "system_enabled", label: "Notificações do Sistema", icon: "🔔" },
+    { key: "system_enabled", label: "Notificações do Sistema", labelMobile: "Sistema", icon: "🔔" },
   ];
+
+  const content = (
+    <div className="space-y-4 md:space-y-6">
+      {/* Seção 1: O que notificar */}
+      <Card>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+            <Bell className="h-4 w-4 md:h-5 md:w-5" />
+            O que notificar
+          </CardTitle>
+          <CardDescription className="text-xs md:text-sm">
+            Escolha os tipos de notificações
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-0 space-y-3 md:space-y-4">
+          {notificationTypesList.map(({ key, label, labelMobile, icon }) => (
+            <div key={key} className="flex items-center justify-between">
+              <Label htmlFor={key} className="flex items-center gap-2 cursor-pointer text-sm">
+                <span className="text-lg md:text-xl">{icon}</span>
+                <span className="hidden md:inline">{label}</span>
+                <span className="md:hidden">{labelMobile || label}</span>
+              </Label>
+              <Switch
+                id={key}
+                checked={types[key as keyof NotificationTypes]}
+                onCheckedChange={(checked) =>
+                  setTypes(prev => ({ ...prev, [key]: checked }))
+                }
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Seção 1.5: Tarefas por evento */}
+      <Card>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+            <span className="text-lg">✅</span>
+            <span className="hidden md:inline">Tarefas (por evento)</span>
+            <span className="md:hidden">Tarefas</span>
+          </CardTitle>
+          <CardDescription className="text-xs md:text-sm">
+            <span className="hidden sm:inline">Personalize quais eventos de tarefas disparam notificações.</span>
+            <span className="sm:hidden">Eventos de tarefas</span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-0 space-y-3 md:space-y-4">
+          <div className="flex items-center justify-between">
+            <Label className="cursor-pointer text-sm">
+              <span className="hidden md:inline">Quando uma tarefa for atribuída a mim</span>
+              <span className="md:hidden">Tarefa atribuída</span>
+            </Label>
+            <Switch
+              checked={taskEvents[TASK_EVENT_KEYS.assigned]}
+              disabled={!types.tasks_enabled}
+              onCheckedChange={(checked) =>
+                setTaskEvents(prev => ({ ...prev, [TASK_EVENT_KEYS.assigned]: checked }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label className="cursor-pointer text-sm">
+              <span className="hidden md:inline">Quando o status da tarefa mudar</span>
+              <span className="md:hidden">Status alterado</span>
+            </Label>
+            <Switch
+              checked={taskEvents[TASK_EVENT_KEYS.statusChanged]}
+              disabled={!types.tasks_enabled}
+              onCheckedChange={(checked) =>
+                setTaskEvents(prev => ({ ...prev, [TASK_EVENT_KEYS.statusChanged]: checked }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label className="cursor-pointer text-sm">
+              <span className="hidden md:inline">Quando houver mudanças importantes (prazo/prioridade/título)</span>
+              <span className="md:hidden">Mudanças importantes</span>
+            </Label>
+            <Switch
+              checked={taskEvents[TASK_EVENT_KEYS.importantUpdated]}
+              disabled={!types.tasks_enabled}
+              onCheckedChange={(checked) =>
+                setTaskEvents(prev => ({ ...prev, [TASK_EVENT_KEYS.importantUpdated]: checked }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between opacity-70">
+            <div className="flex-1 min-w-0 mr-3">
+              <Label className="cursor-pointer text-sm">
+                <span className="hidden md:inline">Quando alguém comentar/adicionar nota</span>
+                <span className="md:hidden">Comentário/nota</span>
+              </Label>
+              <p className="text-xs text-muted-foreground hidden sm:block">Em breve</p>
+            </div>
+            <Switch checked={taskEvents[TASK_EVENT_KEYS.commentAdded]} disabled className="flex-shrink-0" />
+          </div>
+
+          {!types.tasks_enabled && (
+            <p className="text-xs text-muted-foreground">
+              Ative <strong>Tarefas</strong> acima para habilitar.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Seção 1.55: Posts por evento */}
+      <Card>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+            <span className="text-lg">📱</span>
+            <span className="hidden md:inline">Posts (por evento)</span>
+            <span className="md:hidden">Posts</span>
+          </CardTitle>
+          <CardDescription className="text-xs md:text-sm">
+            <span className="hidden sm:inline">Personalize quais eventos de posts disparam notificações.</span>
+            <span className="sm:hidden">Eventos de posts</span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-0 space-y-3 md:space-y-4">
+          <div className="flex items-center justify-between">
+            <Label className="cursor-pointer text-sm">
+              <span className="hidden md:inline">Quando um post for atribuído a mim</span>
+              <span className="md:hidden">Post atribuído</span>
+            </Label>
+            <Switch
+              checked={postEvents[POST_EVENT_KEYS.assigned]}
+              disabled={!types.posts_enabled}
+              onCheckedChange={(checked) =>
+                setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.assigned]: checked }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label className="cursor-pointer text-sm">
+              <span className="hidden md:inline">Quando o status do post mudar</span>
+              <span className="md:hidden">Status alterado</span>
+            </Label>
+            <Switch
+              checked={postEvents[POST_EVENT_KEYS.statusChanged]}
+              disabled={!types.posts_enabled}
+              onCheckedChange={(checked) =>
+                setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.statusChanged]: checked }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label className="cursor-pointer text-sm">
+              <span className="hidden md:inline">Quando houver mudanças importantes (data/prioridade/título/notas)</span>
+              <span className="md:hidden">Mudanças importantes</span>
+            </Label>
+            <Switch
+              checked={postEvents[POST_EVENT_KEYS.importantUpdated]}
+              disabled={!types.posts_enabled}
+              onCheckedChange={(checked) =>
+                setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.importantUpdated]: checked }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label className="cursor-pointer text-sm">
+              <span className="hidden md:inline">Quando um post entrar em "Aguardando Aprovação"</span>
+              <span className="md:hidden">Aguardando aprovação</span>
+            </Label>
+            <Switch
+              checked={postEvents[POST_EVENT_KEYS.pendingApproval]}
+              disabled={!types.posts_enabled}
+              onCheckedChange={(checked) =>
+                setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.pendingApproval]: checked }))
+              }
+            />
+          </div>
+
+          {!types.posts_enabled && (
+            <p className="text-xs text-muted-foreground">
+              Ative <strong>Posts</strong> acima para habilitar.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Seção 1.6: Regras do time (Admins) */}
+      {isAgencyAdmin() && (
+        <Card>
+          <CardHeader className="p-4 md:p-6">
+            <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+              🏢 <span className="hidden md:inline">Regras do time (Admins)</span>
+              <span className="md:hidden">Regras do time</span>
+            </CardTitle>
+            <CardDescription className="text-xs md:text-sm">
+              Regras automáticas para a agência
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0 space-y-3 md:space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0 mr-3">
+                <Label className="cursor-pointer text-sm">
+                  <span className="hidden md:inline">Notificar admins quando tarefa virar Concluída</span>
+                  <span className="md:hidden">Admins: tarefa concluída</span>
+                </Label>
+                <p className="text-xs text-muted-foreground hidden sm:block">Evento: status → done</p>
+              </div>
+              <Switch
+                checked={agencyTaskRules.notifyAdminsOnDone}
+                onCheckedChange={(checked) =>
+                  setAgencyTaskRules(prev => ({ ...prev, notifyAdminsOnDone: checked }))
+                }
+                className="flex-shrink-0"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0 mr-3">
+                <Label className="cursor-pointer text-sm">
+                  <span className="hidden md:inline">Notificar criador quando a tarefa for atribuída</span>
+                  <span className="md:hidden">Criador: tarefa atribuída</span>
+                </Label>
+                <p className="text-xs text-muted-foreground hidden sm:block">Útil para delegações</p>
+              </div>
+              <Switch
+                checked={agencyTaskRules.notifyCreatorOnAssigned}
+                onCheckedChange={(checked) =>
+                  setAgencyTaskRules(prev => ({ ...prev, notifyCreatorOnAssigned: checked }))
+                }
+                className="flex-shrink-0"
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0 mr-3">
+                <Label className="cursor-pointer text-sm">
+                  <span className="hidden md:inline">Notificar admins quando um post for publicado</span>
+                  <span className="md:hidden">Admins: post publicado</span>
+                </Label>
+                <p className="text-xs text-muted-foreground hidden sm:block">Evento: status → published</p>
+              </div>
+              <Switch
+                checked={agencyPostRules.notifyAdminsOnPublished}
+                onCheckedChange={(checked) =>
+                  setAgencyPostRules({ notifyAdminsOnPublished: checked })
+                }
+                className="flex-shrink-0"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Seção 2: Onde receber */}
+      <Card>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+            <Mail className="h-4 w-4 md:h-5 md:w-5" />
+            Onde receber
+          </CardTitle>
+          <CardDescription className="text-xs md:text-sm">
+            Canais de entrega das notificações
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-0 space-y-4 md:space-y-6">
+          {/* Sistema */}
+          <div className="flex items-center justify-between opacity-60">
+            <Label className="flex items-center gap-2 text-sm">
+              <Bell className="h-4 w-4" />
+              <span className="hidden md:inline">Notificações no Sistema</span>
+              <span className="md:hidden">Sistema</span>
+            </Label>
+            <span className="text-xs text-muted-foreground">Sempre ativo</span>
+          </div>
+
+          <Separator />
+
+          {/* Som */}
+          <div className="flex items-center justify-between">
+            <Label htmlFor="sound" className="flex items-center gap-2 cursor-pointer text-sm">
+              <Volume2 className="h-4 w-4" />
+              <span className="hidden md:inline">Som de Notificação</span>
+              <span className="md:hidden">Som</span>
+            </Label>
+            <Switch
+              id="sound"
+              checked={channels.sound_enabled}
+              onCheckedChange={(checked) =>
+                setChannels(prev => ({ ...prev, sound_enabled: checked }))
+              }
+            />
+          </div>
+
+          <Separator />
+
+          {/* Navegador */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="browser" className="flex items-center gap-2 cursor-pointer text-sm">
+                <Chrome className="h-4 w-4" />
+                <span className="hidden md:inline">Notificações do Navegador</span>
+                <span className="md:hidden">Navegador</span>
+              </Label>
+              <Switch
+                id="browser"
+                checked={channels.browser_notifications}
+                onCheckedChange={(checked) => {
+                  if (checked && Notification.permission !== "granted") {
+                    requestBrowserPermission();
+                  } else {
+                    setChannels(prev => ({ ...prev, browser_notifications: checked }));
+                  }
+                }}
+              />
+            </div>
+            {channels.browser_notifications && Notification.permission !== "granted" && (
+              <p className="text-xs text-muted-foreground ml-6">
+                Clique no switch para solicitar permissão
+              </p>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Push Notifications (Celular) */}
+          <PushNotificationSection />
+
+          <Separator />
+
+          {/* Email */}
+          <div className="space-y-3 md:space-y-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="email" className="flex items-center gap-2 cursor-pointer text-sm">
+                <Mail className="h-4 w-4" />
+                <span>Email</span>
+              </Label>
+              <Switch
+                id="email"
+                checked={channels.email_enabled}
+                onCheckedChange={(checked) =>
+                  setChannels(prev => ({ ...prev, email_enabled: checked }))
+                }
+              />
+            </div>
+
+            {channels.email_enabled && (
+              <div className="ml-4 md:ml-6 space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="email-address" className="text-xs md:text-sm">
+                    Endereço de Email
+                  </Label>
+                  <Input
+                    id="email-address"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={channels.email_address}
+                    onChange={(e) =>
+                      setChannels(prev => ({ ...prev, email_address: e.target.value }))
+                    }
+                    className="h-9"
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="digest"
+                    checked={channels.email_digest}
+                    onCheckedChange={(checked) =>
+                      setChannels(prev => ({ ...prev, email_digest: checked as boolean }))
+                    }
+                  />
+                  <Label htmlFor="digest" className="text-xs md:text-sm cursor-pointer">
+                    <span className="hidden md:inline">Receber resumo diário (uma vez por dia)</span>
+                    <span className="md:hidden">Resumo diário</span>
+                  </Label>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Seção 3: Não Perturbe */}
+      <Card>
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+            <Clock className="h-4 w-4 md:h-5 md:w-5" />
+            Não Perturbe
+          </CardTitle>
+          <CardDescription className="text-xs md:text-sm">
+            <span className="hidden sm:inline">Configure quando você não deseja receber notificações</span>
+            <span className="sm:hidden">Horários de silêncio</span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6 pt-0 space-y-3 md:space-y-4">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="dnd-enabled" className="cursor-pointer text-sm">
+              Ativar Não Perturbe
+            </Label>
+            <Switch
+              id="dnd-enabled"
+              checked={dndEnabled}
+              onCheckedChange={setDndEnabled}
+            />
+          </div>
+
+          {dndEnabled && (
+            <div className="ml-4 md:ml-6 space-y-3 md:space-y-4 pt-2">
+              <div className="grid grid-cols-2 gap-3 md:gap-4">
+                <div className="space-y-1.5 md:space-y-2">
+                  <Label htmlFor="dnd-start" className="text-xs md:text-sm">
+                    De
+                  </Label>
+                  <Input
+                    id="dnd-start"
+                    type="time"
+                    value={dnd.dnd_start_time}
+                    onChange={(e) =>
+                      setDnd(prev => ({ ...prev, dnd_start_time: e.target.value }))
+                    }
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5 md:space-y-2">
+                  <Label htmlFor="dnd-end" className="text-xs md:text-sm">
+                    Até
+                  </Label>
+                  <Input
+                    id="dnd-end"
+                    type="time"
+                    value={dnd.dnd_end_time}
+                    onChange={(e) =>
+                      setDnd(prev => ({ ...prev, dnd_end_time: e.target.value }))
+                    }
+                    className="h-9"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="dnd-weekends"
+                  checked={dnd.dnd_weekends}
+                  onCheckedChange={(checked) =>
+                    setDnd(prev => ({ ...prev, dnd_weekends: checked as boolean }))
+                  }
+                />
+                <Label htmlFor="dnd-weekends" className="text-xs md:text-sm cursor-pointer">
+                  <span className="hidden md:inline">Silenciar também nos fins de semana</span>
+                  <span className="md:hidden">Fins de semana</span>
+                </Label>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  const footer = (
+    <div className="flex justify-end gap-2 md:gap-3">
+      <Button 
+        variant="outline" 
+        onClick={() => onOpenChange(false)} 
+        disabled={loading}
+        size="sm"
+        className="md:h-10 md:px-4 md:py-2"
+      >
+        Cancelar
+      </Button>
+      <Button 
+        onClick={handleSave} 
+        disabled={loading}
+        size="sm"
+        className="md:h-10 md:px-4 md:py-2"
+      >
+        {loading ? "Salvando..." : "Salvar"}
+      </Button>
+    </div>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={open} onOpenChange={onOpenChange}>
+        <DrawerContent className="max-h-[90vh]">
+          <DrawerHeader className="text-left">
+            <DrawerTitle>Preferências de Notificação</DrawerTitle>
+            <DrawerDescription>
+              Configure como e quando receber notificações
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="overflow-y-auto flex-1 px-4 pb-4">
+            {content}
+          </div>
+          <DrawerFooter className="border-t pt-4">
+            {footer}
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -532,420 +1047,11 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
             Configure como e quando você deseja receber notificações
           </DialogDescription>
         </DialogHeader>
-
-        <div className="space-y-6 py-4">
-          {/* Seção 1: O que notificar */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Bell className="h-5 w-5" />
-                O que notificar
-              </CardTitle>
-              <CardDescription>
-                Escolha os tipos de notificações que deseja receber
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {notificationTypesList.map(({ key, label, icon }) => (
-                <div key={key} className="flex items-center justify-between">
-                  <Label htmlFor={key} className="flex items-center gap-2 cursor-pointer">
-                    <span className="text-xl">{icon}</span>
-                    <span>{label}</span>
-                  </Label>
-                  <Switch
-                    id={key}
-                    checked={types[key as keyof NotificationTypes]}
-                    onCheckedChange={(checked) =>
-                      setTypes(prev => ({ ...prev, [key]: checked }))
-                    }
-                  />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Seção 1.5: Tarefas por evento */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <span className="text-lg">✅</span>
-                Tarefas (por evento)
-              </CardTitle>
-              <CardDescription>
-                Personalize quais eventos de tarefas disparam notificações para você.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="cursor-pointer">Quando uma tarefa for atribuída a mim</Label>
-                <Switch
-                  checked={taskEvents[TASK_EVENT_KEYS.assigned]}
-                  disabled={!types.tasks_enabled}
-                  onCheckedChange={(checked) =>
-                    setTaskEvents(prev => ({ ...prev, [TASK_EVENT_KEYS.assigned]: checked }))
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label className="cursor-pointer">Quando o status da tarefa mudar</Label>
-                <Switch
-                  checked={taskEvents[TASK_EVENT_KEYS.statusChanged]}
-                  disabled={!types.tasks_enabled}
-                  onCheckedChange={(checked) =>
-                    setTaskEvents(prev => ({ ...prev, [TASK_EVENT_KEYS.statusChanged]: checked }))
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label className="cursor-pointer">Quando houver mudanças importantes (prazo/prioridade/título)</Label>
-                <Switch
-                  checked={taskEvents[TASK_EVENT_KEYS.importantUpdated]}
-                  disabled={!types.tasks_enabled}
-                  onCheckedChange={(checked) =>
-                    setTaskEvents(prev => ({ ...prev, [TASK_EVENT_KEYS.importantUpdated]: checked }))
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between opacity-70">
-                <div>
-                  <Label className="cursor-pointer">Quando alguém comentar/adicionar nota</Label>
-                  <p className="text-xs text-muted-foreground">Em breve (precisamos do módulo de comentários/notas estruturado)</p>
-                </div>
-                <Switch checked={taskEvents[TASK_EVENT_KEYS.commentAdded]} disabled />
-              </div>
-
-              {!types.tasks_enabled && (
-                <p className="text-xs text-muted-foreground">
-                  Ative <strong>Tarefas</strong> em “O que notificar” para habilitar essas opções.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Seção 1.55: Posts por evento */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <span className="text-lg">📱</span>
-                Posts (por evento)
-              </CardTitle>
-              <CardDescription>
-                Personalize quais eventos de posts disparam notificações para você.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label className="cursor-pointer">Quando um post for atribuído a mim</Label>
-                <Switch
-                  checked={postEvents[POST_EVENT_KEYS.assigned]}
-                  disabled={!types.posts_enabled}
-                  onCheckedChange={(checked) =>
-                    setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.assigned]: checked }))
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label className="cursor-pointer">Quando o status do post mudar</Label>
-                <Switch
-                  checked={postEvents[POST_EVENT_KEYS.statusChanged]}
-                  disabled={!types.posts_enabled}
-                  onCheckedChange={(checked) =>
-                    setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.statusChanged]: checked }))
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label className="cursor-pointer">Quando houver mudanças importantes (data/prioridade/título/notas)</Label>
-                <Switch
-                  checked={postEvents[POST_EVENT_KEYS.importantUpdated]}
-                  disabled={!types.posts_enabled}
-                  onCheckedChange={(checked) =>
-                    setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.importantUpdated]: checked }))
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <Label className="cursor-pointer">Quando um post entrar em “Aguardando Aprovação”</Label>
-                <Switch
-                  checked={postEvents[POST_EVENT_KEYS.pendingApproval]}
-                  disabled={!types.posts_enabled}
-                  onCheckedChange={(checked) =>
-                    setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.pendingApproval]: checked }))
-                  }
-                />
-              </div>
-
-              {!types.posts_enabled && (
-                <p className="text-xs text-muted-foreground">
-                  Ative <strong>Posts de Social Media</strong> em “O que notificar” para habilitar essas opções.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Seção 1.6: Regras do time (Admins) */}
-          {isAgencyAdmin() && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">🏢 Regras do time (Admins)</CardTitle>
-                <CardDescription>
-                  Essas regras afetam toda a agência (automático por regra).
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="cursor-pointer">Notificar admins quando tarefa virar Concluída</Label>
-                    <p className="text-xs text-muted-foreground">Evento: mudança de status → done</p>
-                  </div>
-                  <Switch
-                    checked={agencyTaskRules.notifyAdminsOnDone}
-                    onCheckedChange={(checked) =>
-                      setAgencyTaskRules(prev => ({ ...prev, notifyAdminsOnDone: checked }))
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="cursor-pointer">Notificar criador quando a tarefa for atribuída</Label>
-                    <p className="text-xs text-muted-foreground">Útil para acompanhar delegações</p>
-                  </div>
-                  <Switch
-                    checked={agencyTaskRules.notifyCreatorOnAssigned}
-                    onCheckedChange={(checked) =>
-                      setAgencyTaskRules(prev => ({ ...prev, notifyCreatorOnAssigned: checked }))
-                    }
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="cursor-pointer">Notificar admins quando um post for publicado</Label>
-                    <p className="text-xs text-muted-foreground">Evento: status → published</p>
-                  </div>
-                  <Switch
-                    checked={agencyPostRules.notifyAdminsOnPublished}
-                    onCheckedChange={(checked) =>
-                      setAgencyPostRules({ notifyAdminsOnPublished: checked })
-                    }
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Seção 2: Onde receber */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Mail className="h-5 w-5" />
-                Onde receber
-              </CardTitle>
-              <CardDescription>
-                Configure os canais de entrega das notificações
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Sistema */}
-              <div className="flex items-center justify-between opacity-60">
-                <Label className="flex items-center gap-2">
-                  <Bell className="h-4 w-4" />
-                  <span>Notificações no Sistema</span>
-                </Label>
-                <span className="text-sm text-muted-foreground">Sempre ativo</span>
-              </div>
-
-              <Separator />
-
-              {/* Som */}
-              <div className="flex items-center justify-between">
-                <Label htmlFor="sound" className="flex items-center gap-2 cursor-pointer">
-                  <Volume2 className="h-4 w-4" />
-                  <span>Som de Notificação</span>
-                </Label>
-                <Switch
-                  id="sound"
-                  checked={channels.sound_enabled}
-                  onCheckedChange={(checked) =>
-                    setChannels(prev => ({ ...prev, sound_enabled: checked }))
-                  }
-                />
-              </div>
-
-              <Separator />
-
-              {/* Navegador */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="browser" className="flex items-center gap-2 cursor-pointer">
-                    <Chrome className="h-4 w-4" />
-                    <span>Notificações do Navegador</span>
-                  </Label>
-                  <Switch
-                    id="browser"
-                    checked={channels.browser_notifications}
-                    onCheckedChange={(checked) => {
-                      if (checked && Notification.permission !== "granted") {
-                        requestBrowserPermission();
-                      } else {
-                        setChannels(prev => ({ ...prev, browser_notifications: checked }));
-                      }
-                    }}
-                  />
-                </div>
-                {channels.browser_notifications && Notification.permission !== "granted" && (
-                  <p className="text-xs text-muted-foreground ml-6">
-                    Clique no switch para solicitar permissão do navegador
-                  </p>
-                )}
-              </div>
-
-              <Separator />
-
-              {/* Push Notifications (Celular) */}
-              <PushNotificationSection />
-
-              <Separator />
-
-              {/* Email */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="email" className="flex items-center gap-2 cursor-pointer">
-                    <Mail className="h-4 w-4" />
-                    <span>Email</span>
-                  </Label>
-                  <Switch
-                    id="email"
-                    checked={channels.email_enabled}
-                    onCheckedChange={(checked) =>
-                      setChannels(prev => ({ ...prev, email_enabled: checked }))
-                    }
-                  />
-                </div>
-
-                {channels.email_enabled && (
-                  <div className="ml-6 space-y-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="email-address" className="text-sm">
-                        Endereço de Email
-                      </Label>
-                      <Input
-                        id="email-address"
-                        type="email"
-                        placeholder="seu@email.com"
-                        value={channels.email_address}
-                        onChange={(e) =>
-                          setChannels(prev => ({ ...prev, email_address: e.target.value }))
-                        }
-                      />
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="digest"
-                        checked={channels.email_digest}
-                        onCheckedChange={(checked) =>
-                          setChannels(prev => ({ ...prev, email_digest: checked as boolean }))
-                        }
-                      />
-                      <Label htmlFor="digest" className="text-sm cursor-pointer">
-                        Receber resumo diário (uma vez por dia)
-                      </Label>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Seção 3: Não Perturbe */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Clock className="h-5 w-5" />
-                Não Perturbe
-              </CardTitle>
-              <CardDescription>
-                Configure quando você não deseja receber notificações
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="dnd-enabled" className="cursor-pointer">
-                  Ativar Não Perturbe
-                </Label>
-                <Switch
-                  id="dnd-enabled"
-                  checked={dndEnabled}
-                  onCheckedChange={setDndEnabled}
-                />
-              </div>
-
-              {dndEnabled && (
-                <div className="ml-6 space-y-4 pt-2">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="dnd-start" className="text-sm">
-                        De
-                      </Label>
-                      <Input
-                        id="dnd-start"
-                        type="time"
-                        value={dnd.dnd_start_time}
-                        onChange={(e) =>
-                          setDnd(prev => ({ ...prev, dnd_start_time: e.target.value }))
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="dnd-end" className="text-sm">
-                        Até
-                      </Label>
-                      <Input
-                        id="dnd-end"
-                        type="time"
-                        value={dnd.dnd_end_time}
-                        onChange={(e) =>
-                          setDnd(prev => ({ ...prev, dnd_end_time: e.target.value }))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="weekends"
-                      checked={dnd.dnd_weekends}
-                      onCheckedChange={(checked) =>
-                        setDnd(prev => ({ ...prev, dnd_weekends: checked as boolean }))
-                      }
-                    />
-                    <Label htmlFor="weekends" className="text-sm cursor-pointer">
-                      Aplicar nos finais de semana
-                    </Label>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className="py-4">
+          {content}
         </div>
-
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={loading}>
-            {loading ? "Salvando..." : "Salvar Preferências"}
-          </Button>
+        <div className="pt-4 border-t">
+          {footer}
         </div>
       </DialogContent>
     </Dialog>
