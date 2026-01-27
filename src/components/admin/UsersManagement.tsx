@@ -46,10 +46,10 @@ export function UsersManagement() {
   const { planLimits } = usePaymentMiddleware();
 
   useEffect(() => {
-    if (currentAgency && isAgencyAdmin) {
+    if (currentAgency && isAgencyAdmin()) {
       fetchUsers();
     }
-  }, [currentAgency, isAgencyAdmin]);
+  }, [currentAgency]);
 
   const fetchUsers = async () => {
     try {
@@ -264,13 +264,19 @@ export function UsersManagement() {
 
   const removeUser = async (userId: string) => {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('agency_users')
         .delete()
         .eq('agency_id', currentAgency?.id)
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .select();
 
       if (error) throw error;
+
+      // Verificar se algo foi realmente deletado
+      if (!data || data.length === 0) {
+        throw new Error('Você não tem permissão para remover este usuário ou ele não existe.');
+      }
 
       toast({
         title: "Usuário removido!",
@@ -287,7 +293,7 @@ export function UsersManagement() {
     }
   };
 
-  if (!isAgencyAdmin) {
+  if (!isAgencyAdmin()) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-8">
