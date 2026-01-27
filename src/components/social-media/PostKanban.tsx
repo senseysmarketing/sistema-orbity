@@ -5,7 +5,7 @@ import { PostKanbanColumn } from "./PostKanbanColumn";
 import { PostCard } from "./PostCard";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Filter, ArrowUpDown } from "lucide-react";
+import { Plus, Filter, ArrowUpDown, X } from "lucide-react";
 import { PostFormDialog } from "./PostFormDialog";
 import { PostDetailsDialog } from "./PostDetailsDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -277,91 +277,93 @@ export function PostKanban() {
   };
 
   return (
-    <div className="space-y-4 h-full flex flex-col">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0">
-        <h2 className="text-2xl font-bold">Kanban de Produção</h2>
+    <div className="space-y-3 md:space-y-4 h-full flex flex-col">
+      {/* Linha 1: Título + Botão Nova Postagem */}
+      <div className="flex items-center justify-between flex-shrink-0">
+        <h2 className="text-xl md:text-2xl font-bold">Kanban de Produção</h2>
+        <Button onClick={() => setIsCreateDialogOpen(true)} className="h-9">
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline ml-2">Nova Postagem</span>
+        </Button>
+      </div>
+      
+      {/* Linha 2: Filtros com scroll horizontal */}
+      <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 flex-shrink-0">
+        <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         
-        <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <Select value={filterClient} onValueChange={setFilterClient}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Todos os clientes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os clientes</SelectItem>
-                {uniqueClients.map(client => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <Select value={filterClient} onValueChange={setFilterClient}>
+          <SelectTrigger className="w-[130px] sm:w-[160px] h-9 text-xs sm:text-sm flex-shrink-0">
+            <SelectValue placeholder="Cliente" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os clientes</SelectItem>
+            {uniqueClients.map(client => (
+              <SelectItem key={client.id} value={client.id}>
+                {client.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-            <Select value={filterContentType} onValueChange={setFilterContentType}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Todos os tipos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os tipos</SelectItem>
-                {allContentTypes.map(type => (
-                  <SelectItem key={type.id} value={type.id}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <Select value={filterContentType} onValueChange={setFilterContentType}>
+          <SelectTrigger className="w-[100px] sm:w-[140px] h-9 text-xs sm:text-sm flex-shrink-0">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os tipos</SelectItem>
+            {allContentTypes.map(type => (
+              <SelectItem key={type.id} value={type.id}>
+                {type.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-            <Select value={filterUser} onValueChange={setFilterUser}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Todos os usuários" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os usuários</SelectItem>
-                {uniqueUsers.map(user => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <Select value={filterUser} onValueChange={setFilterUser}>
+          <SelectTrigger className="w-[110px] sm:w-[150px] h-9 text-xs sm:text-sm flex-shrink-0">
+            <SelectValue placeholder="Usuário" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os usuários</SelectItem>
+            {uniqueUsers.map(user => (
+              <SelectItem key={user.id} value={user.id}>
+                {user.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-            <DateRangeFilterDialog
-              value={dateRange}
-              onChange={setDateRange}
-              includeNoDate={includeNoDate}
-              onIncludeNoDateChange={setIncludeNoDate}
-              defaultIncludeNoDate={false}
-              label="Período"
-              active={!!dateRange?.from || includeNoDate}
-            />
-
-            {/* Seletor de ordenação */}
-            <Select value={sortBy} onValueChange={(value) => setSortBy(value as "post_date" | "due_date")}>
-              <SelectTrigger className="w-[200px]">
-                <div className="flex items-center gap-2 whitespace-nowrap">
-                  <ArrowUpDown className="h-4 w-4 flex-shrink-0" />
-                  <SelectValue placeholder="Ordenar por" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="post_date">Data de Postagem</SelectItem>
-                <SelectItem value="due_date">Data de Entrega</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {hasActiveFilters && (
-              <Button variant="outline" onClick={clearFilters}>
-                Limpar
-              </Button>
-            )}
-          </div>
-
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Postagem
-          </Button>
+        <div className="flex-shrink-0">
+          <DateRangeFilterDialog
+            value={dateRange}
+            onChange={setDateRange}
+            includeNoDate={includeNoDate}
+            onIncludeNoDateChange={setIncludeNoDate}
+            defaultIncludeNoDate={false}
+            label="Período"
+            active={!!dateRange?.from || includeNoDate}
+          />
         </div>
+
+        {/* Seletor de ordenação */}
+        <Select value={sortBy} onValueChange={(value) => setSortBy(value as "post_date" | "due_date")}>
+          <SelectTrigger className="w-[120px] sm:w-[160px] h-9 text-xs sm:text-sm flex-shrink-0">
+            <div className="flex items-center gap-1 whitespace-nowrap">
+              <ArrowUpDown className="h-3.5 w-3.5 flex-shrink-0" />
+              <SelectValue placeholder="Ordenar" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="post_date">Data Postagem</SelectItem>
+            <SelectItem value="due_date">Data Entrega</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 px-2 flex-shrink-0">
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       <div className="flex-1 overflow-hidden">
