@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, ChevronLeft, ChevronRight, Filter, X } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Filter, X, Grid3x3, CalendarDays, List } from "lucide-react";
 import { useSocialMediaPosts, SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 import { PostFormDialog } from "./PostFormDialog";
 import { PostCard } from "./PostCard";
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 const STATUSES = [
   { value: "draft", label: "Briefing" },
@@ -24,6 +25,31 @@ const STATUSES = [
   { value: "scheduled", label: "Agendado" },
   { value: "published", label: "Publicado" },
 ];
+
+// Gera uma cor consistente baseada no client_id
+const getClientColor = (clientId?: string | null): string => {
+  if (!clientId) return "hsl(var(--muted))";
+  
+  const colors = [
+    "hsl(220, 70%, 50%)",
+    "hsl(340, 75%, 50%)",
+    "hsl(160, 60%, 45%)",
+    "hsl(280, 65%, 55%)",
+    "hsl(30, 80%, 55%)",
+    "hsl(190, 70%, 50%)",
+    "hsl(45, 90%, 55%)",
+    "hsl(300, 65%, 50%)",
+    "hsl(120, 60%, 45%)",
+    "hsl(10, 75%, 55%)",
+  ];
+  
+  let hash = 0;
+  for (let i = 0; i < clientId.length; i++) {
+    hash = clientId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  return colors[Math.abs(hash) % colors.length];
+};
 
 export function SocialMediaCalendar() {
   const { currentAgency } = useAgency();
@@ -84,19 +110,15 @@ export function SocialMediaCalendar() {
   };
 
   // Filtrar posts por data e filtros ativos
-  // IMPORTANTE: Usar post_date para o calendário (ou scheduled_date como fallback)
   const getFilteredPostsForDate = (date: Date) => {
     return allPosts.filter(post => {
-      // Filtro por data - usar post_date prioritariamente
       const effectiveDate = post.post_date || post.scheduled_date;
       const matchesDate = isSameDay(new Date(effectiveDate), date);
       if (!matchesDate) return false;
       
-      // Filtro por cliente
       const matchesClient = clientFilter.length === 0 || 
         clientFilter.includes(post.client_id || '');
       
-      // Filtro por status
       const matchesStatus = statusFilter === "all" || 
         post.status === statusFilter;
       
@@ -150,33 +172,75 @@ export function SocialMediaCalendar() {
     setEditingPost(null);
   };
 
+  const weekDaysMobile = ["D", "S", "T", "Q", "Q", "S", "S"];
+  const weekDaysDesktop = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        {/* Navegação de mês */}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handlePreviousMonth}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <h2 className="text-xl font-semibold capitalize">
-            {format(selectedDate, "MMMM yyyy", { locale: ptBR })}
-          </h2>
-          <Button variant="outline" size="icon" onClick={handleNextMonth}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+    <div className="space-y-3 sm:space-y-4">
+      {/* Header responsivo */}
+      <div className="space-y-3">
+        {/* Linha 1: Navegação + View Mode + Nova Postagem */}
+        <div className="flex items-center justify-between gap-2">
+          {/* Navegação de mês */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button variant="outline" size="icon" onClick={handlePreviousMonth} className="h-9 w-9">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <h2 className="text-base sm:text-xl font-semibold capitalize whitespace-nowrap">
+              {format(selectedDate, "MMM yyyy", { locale: ptBR })}
+            </h2>
+            <Button variant="outline" size="icon" onClick={handleNextMonth} className="h-9 w-9">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* View mode + Nova Postagem */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button
+              variant={viewMode === "month" ? "default" : "outline"}
+              size="icon"
+              onClick={() => setViewMode("month")}
+              className="h-9 w-9"
+              title="Mês"
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "week" ? "default" : "outline"}
+              size="icon"
+              onClick={() => setViewMode("week")}
+              className="h-9 w-9"
+              title="Semana"
+            >
+              <CalendarDays className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "day" ? "default" : "outline"}
+              size="icon"
+              onClick={() => setViewMode("day")}
+              className="h-9 w-9"
+              title="Dia"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            
+            <Button onClick={() => setIsCreateDialogOpen(true)} className="h-9">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline ml-2">Nova Postagem</span>
+            </Button>
+          </div>
         </div>
         
-        {/* Filtros + Botões de visualização + Nova Postagem */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Filtros */}
-          <Filter className="h-4 w-4 text-muted-foreground" />
+        {/* Linha 2: Filtros compactos */}
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+          <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           
-          {/* Filtro de Cliente - Multi-select com Popover */}
+          {/* Filtro de Cliente */}
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" size="sm" className="h-8 text-xs sm:text-sm whitespace-nowrap flex-shrink-0">
                 {clientFilter.length === 0 
-                  ? "Todos os clientes" 
+                  ? "Clientes" 
                   : `${clientFilter.length} cliente(s)`}
               </Button>
             </PopoverTrigger>
@@ -206,11 +270,11 @@ export function SocialMediaCalendar() {
           
           {/* Filtro de Status */}
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[110px] sm:w-[150px] h-8 text-xs sm:text-sm flex-shrink-0">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos status</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               {STATUSES.map(status => (
                 <SelectItem key={status.value} value={status.value}>
                   {status.label}
@@ -223,186 +287,215 @@ export function SocialMediaCalendar() {
           {hasActiveFilters && (
             <Button 
               variant="ghost" 
+              size="sm"
               onClick={clearFilters}
+              className="h-8 px-2 flex-shrink-0"
             >
-              <X className="h-4 w-4 mr-1" />
-              Limpar
+              <X className="h-4 w-4" />
             </Button>
           )}
-          
-          {/* Separador visual */}
-          <div className="h-6 w-px bg-border mx-1 hidden sm:block" />
-          
-          {/* Botões de visualização */}
-          <Button
-            variant={viewMode === "month" ? "default" : "outline"}
-            onClick={() => setViewMode("month")}
-          >
-            Mês
-          </Button>
-          <Button
-            variant={viewMode === "week" ? "default" : "outline"}
-            onClick={() => setViewMode("week")}
-          >
-            Semana
-          </Button>
-          <Button
-            variant={viewMode === "day" ? "default" : "outline"}
-            onClick={() => setViewMode("day")}
-          >
-            Dia
-          </Button>
-          
-          {/* Botão Nova Postagem */}
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Postagem
-          </Button>
         </div>
       </div>
 
       {viewMode === "month" && (
-        <div className="grid grid-cols-7 gap-2">
-          {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(day => (
-            <div key={day} className="text-center font-semibold text-sm p-2">
-              {day}
-            </div>
-          ))}
+        <div>
+          {/* Header dos dias - responsivo */}
+          <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-1">
+            {weekDaysMobile.map((day, i) => (
+              <div key={i} className="text-center font-semibold text-xs sm:text-sm p-1 sm:p-2">
+                <span className="sm:hidden">{day}</span>
+                <span className="hidden sm:inline">{weekDaysDesktop[i]}</span>
+              </div>
+            ))}
+          </div>
           
-          {calendarDays.map(day => {
-            const dayPosts = getFilteredPostsForDate(day);
-            const isToday = isSameDay(day, new Date());
-            const isCurrentMonth = isSameMonth(day, selectedDate);
-            
-            return (
-              <Card 
-                key={day.toISOString()} 
-                className={`min-h-[120px] ${isToday ? 'border-primary' : ''} ${!isCurrentMonth ? 'opacity-50' : ''}`}
-              >
-                <CardHeader className="p-2">
-                  <CardTitle className="text-sm">{format(day, "d")}</CardTitle>
-                </CardHeader>
-                <CardContent className="p-2 space-y-1">
-                  {dayPosts.slice(0, 3).map(post => (
-                    <PostCard 
-                      key={post.id} 
-                      post={post} 
-                      compact 
-                      showArchived
-                      onClick={() => handlePostClick(post)}
-                    />
-                  ))}
-                  {dayPosts.length > 3 && (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button 
-                          variant="link" 
-                          size="sm" 
-                          className="text-xs text-muted-foreground p-0 h-auto hover:text-primary w-full justify-start"
-                        >
-                          +{dayPosts.length - 3} mais
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-80 p-0" align="start">
-                        <div className="p-3 border-b">
-                          <p className="text-sm font-medium">
-                            Postagens em {format(day, "d 'de' MMMM", { locale: ptBR })} ({dayPosts.length})
-                          </p>
+          {/* Grid de dias */}
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
+            {calendarDays.map(day => {
+              const dayPosts = getFilteredPostsForDate(day);
+              const isToday = isSameDay(day, new Date());
+              const isCurrentMonth = isSameMonth(day, selectedDate);
+              
+              return (
+                <Popover key={day.toISOString()}>
+                  <PopoverTrigger asChild>
+                    <div 
+                      className={cn(
+                        "min-h-[50px] sm:min-h-[100px] p-1 sm:p-2 rounded border cursor-pointer hover:bg-muted/50 transition-colors bg-card",
+                        isToday && "border-primary border-2",
+                        !isCurrentMonth && "opacity-50 bg-muted/30"
+                      )}
+                    >
+                      {/* Número do dia */}
+                      <div className="text-xs sm:text-sm font-medium mb-1">
+                        {format(day, "d")}
+                      </div>
+                      
+                      {/* Mobile: indicadores de cor */}
+                      <div className="flex flex-wrap gap-0.5 sm:hidden">
+                        {dayPosts.slice(0, 4).map(post => (
+                          <div 
+                            key={post.id}
+                            className="w-2.5 h-2.5 rounded-full"
+                            style={{ backgroundColor: getClientColor(post.client_id) }}
+                            title={post.title}
+                          />
+                        ))}
+                        {dayPosts.length > 4 && (
+                          <span className="text-[9px] text-muted-foreground font-medium">+{dayPosts.length - 4}</span>
+                        )}
+                      </div>
+                      
+                      {/* Desktop: cards de post */}
+                      <div className="hidden sm:block space-y-1">
+                        {dayPosts.slice(0, 2).map(post => (
+                          <PostCard 
+                            key={post.id} 
+                            post={post} 
+                            compact 
+                            showArchived
+                            onClick={(e) => {
+                              e?.stopPropagation();
+                              handlePostClick(post);
+                            }}
+                          />
+                        ))}
+                        {dayPosts.length > 2 && (
+                          <span className="text-xs text-muted-foreground">
+                            +{dayPosts.length - 2} mais
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </PopoverTrigger>
+                  
+                  {/* Popover com lista de posts ao clicar */}
+                  {dayPosts.length > 0 && (
+                    <PopoverContent className="w-72 p-0" align="start">
+                      <div className="p-3 border-b bg-popover">
+                        <p className="text-sm font-medium">
+                          {format(day, "d 'de' MMMM", { locale: ptBR })} ({dayPosts.length})
+                        </p>
+                      </div>
+                      <ScrollArea className="max-h-60">
+                        <div className="p-2 space-y-2 bg-popover">
+                          {dayPosts.map(post => (
+                            <PostCard 
+                              key={post.id} 
+                              post={post} 
+                              compact 
+                              showArchived
+                              onClick={() => handlePostClick(post)}
+                            />
+                          ))}
                         </div>
-                        <ScrollArea className="max-h-80">
-                          <div className="p-2 space-y-2">
-                            {dayPosts.map(post => (
-                              <PostCard 
-                                key={post.id} 
-                                post={post} 
-                                compact 
-                                showArchived
-                                onClick={() => handlePostClick(post)}
-                              />
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      </PopoverContent>
-                    </Popover>
+                      </ScrollArea>
+                    </PopoverContent>
                   )}
-                </CardContent>
-              </Card>
-            );
-          })}
+                </Popover>
+              );
+            })}
+          </div>
         </div>
       )}
 
       {viewMode === "week" && (
         <div className="space-y-4">
-          <div className="grid grid-cols-7 gap-2">
-            {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(day => (
-              <div key={day} className="text-center font-semibold text-sm p-2">
-                {day}
+          {/* Header dos dias - responsivo */}
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
+            {weekDaysMobile.map((day, i) => (
+              <div key={i} className="text-center font-semibold text-xs sm:text-sm p-1 sm:p-2">
+                <span className="sm:hidden">{day}</span>
+                <span className="hidden sm:inline">{weekDaysDesktop[i]}</span>
               </div>
             ))}
-            
+          </div>
+          
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {weekDays.map(day => {
               const dayPosts = getFilteredPostsForDate(day);
               const isToday = isSameDay(day, new Date());
               
               return (
-                <Card 
-                  key={day.toISOString()} 
-                  className={`min-h-[200px] ${isToday ? 'border-primary border-2' : ''}`}
-                >
-                  <CardHeader className="p-3">
-                    <CardTitle className="text-lg">{format(day, "d")}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-3 space-y-2">
-                    {dayPosts.slice(0, 5).map(post => (
-                      <PostCard 
-                        key={post.id} 
-                        post={post} 
-                        compact 
-                        showArchived
-                        onClick={() => handlePostClick(post)}
-                      />
-                    ))}
-                    {dayPosts.length > 5 && (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button 
-                            variant="link" 
-                            size="sm" 
-                            className="text-xs text-muted-foreground p-0 h-auto hover:text-primary w-full justify-start"
-                          >
-                            +{dayPosts.length - 5} mais
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80 p-0" align="start">
-                          <div className="p-3 border-b">
-                            <p className="text-sm font-medium">
-                              Postagens em {format(day, "d 'de' MMMM", { locale: ptBR })} ({dayPosts.length})
-                            </p>
-                          </div>
-                          <ScrollArea className="max-h-80">
-                            <div className="p-2 space-y-2">
-                              {dayPosts.map(post => (
-                                <PostCard 
-                                  key={post.id} 
-                                  post={post} 
-                                  compact 
-                                  showArchived
-                                  onClick={() => handlePostClick(post)}
-                                />
-                              ))}
-                            </div>
-                          </ScrollArea>
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                    {dayPosts.length === 0 && (
-                      <p className="text-xs text-muted-foreground text-center py-4">
-                        Nenhuma postagem
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
+                <Popover key={day.toISOString()}>
+                  <PopoverTrigger asChild>
+                    <div 
+                      className={cn(
+                        "min-h-[80px] sm:min-h-[200px] p-1 sm:p-3 rounded border cursor-pointer hover:bg-muted/50 transition-colors bg-card",
+                        isToday && "border-primary border-2"
+                      )}
+                    >
+                      <div className="text-sm sm:text-lg font-medium mb-1 sm:mb-2">
+                        {format(day, "d")}
+                      </div>
+                      
+                      {/* Mobile: indicadores de cor */}
+                      <div className="flex flex-wrap gap-0.5 sm:hidden">
+                        {dayPosts.slice(0, 6).map(post => (
+                          <div 
+                            key={post.id}
+                            className="w-2.5 h-2.5 rounded-full"
+                            style={{ backgroundColor: getClientColor(post.client_id) }}
+                            title={post.title}
+                          />
+                        ))}
+                        {dayPosts.length > 6 && (
+                          <span className="text-[9px] text-muted-foreground font-medium">+{dayPosts.length - 6}</span>
+                        )}
+                      </div>
+                      
+                      {/* Desktop: cards de post */}
+                      <div className="hidden sm:block space-y-2">
+                        {dayPosts.slice(0, 4).map(post => (
+                          <PostCard 
+                            key={post.id} 
+                            post={post} 
+                            compact 
+                            showArchived
+                            onClick={(e) => {
+                              e?.stopPropagation();
+                              handlePostClick(post);
+                            }}
+                          />
+                        ))}
+                        {dayPosts.length > 4 && (
+                          <span className="text-xs text-muted-foreground">
+                            +{dayPosts.length - 4} mais
+                          </span>
+                        )}
+                        {dayPosts.length === 0 && (
+                          <p className="text-xs text-muted-foreground text-center py-4">
+                            Nenhuma postagem
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </PopoverTrigger>
+                  
+                  {/* Popover com lista de posts ao clicar */}
+                  {dayPosts.length > 0 && (
+                    <PopoverContent className="w-72 p-0" align="start">
+                      <div className="p-3 border-b bg-popover">
+                        <p className="text-sm font-medium">
+                          {format(day, "d 'de' MMMM", { locale: ptBR })} ({dayPosts.length})
+                        </p>
+                      </div>
+                      <ScrollArea className="max-h-60">
+                        <div className="p-2 space-y-2 bg-popover">
+                          {dayPosts.map(post => (
+                            <PostCard 
+                              key={post.id} 
+                              post={post} 
+                              compact 
+                              showArchived
+                              onClick={() => handlePostClick(post)}
+                            />
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </PopoverContent>
+                  )}
+                </Popover>
               );
             })}
           </div>
@@ -412,14 +505,14 @@ export function SocialMediaCalendar() {
       {viewMode === "day" && (
         <div className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl capitalize">
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-lg sm:text-2xl capitalize">
                 {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6">
               {getFilteredPostsForDate(selectedDate).length > 0 ? (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   {getFilteredPostsForDate(selectedDate).map(post => (
                     <PostCard 
                       key={post.id} 
@@ -430,8 +523,8 @@ export function SocialMediaCalendar() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground text-lg">
+                <div className="text-center py-8 sm:py-12">
+                  <p className="text-muted-foreground text-base sm:text-lg">
                     {hasActiveFilters 
                       ? "Nenhuma postagem encontrada com os filtros aplicados"
                       : "Nenhuma postagem agendada para este dia"}
@@ -449,6 +542,7 @@ export function SocialMediaCalendar() {
           </Card>
         </div>
       )}
+
       <PostFormDialog 
         open={isCreateDialogOpen}
         onOpenChange={handleDialogClose}
@@ -463,7 +557,6 @@ export function SocialMediaCalendar() {
         onEdit={handleEdit}
         onDelete={handleDelete}
         onDuplicate={handleDuplicate}
-        onPostUpdate={fetchPosts}
       />
     </div>
   );
