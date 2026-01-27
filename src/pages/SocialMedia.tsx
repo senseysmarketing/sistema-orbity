@@ -1,21 +1,31 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, LayoutGrid, Settings, TrendingUp } from "lucide-react";
+import { Calendar, LayoutGrid, Settings, TrendingUp, Plus } from "lucide-react";
 import { SocialMediaCalendar } from "@/components/social-media/SocialMediaCalendar";
 import { PostKanban } from "@/components/social-media/PostKanban";
 import { SocialMediaSettings } from "@/components/social-media/SocialMediaSettings";
 import { SocialMediaAnalytics } from "@/components/social-media/SocialMediaAnalytics";
+import { Button } from "@/components/ui/button";
 
 export default function SocialMedia() {
   const [activeTab, setActiveTab] = useState("calendar");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Social Media Planner</h1>
-        <p className="text-sm md:text-base text-muted-foreground">
-          Gerencie todo o workflow de criação de conteúdo para redes sociais
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Social Media Planner</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Gerencie todo o workflow de criação de conteúdo para redes sociais
+          </p>
+        </div>
+        {activeTab === "kanban" && (
+          <Button onClick={() => setIsCreateDialogOpen(true)} className="h-9">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline ml-2">Novo Post</span>
+          </Button>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -43,7 +53,10 @@ export default function SocialMedia() {
         </TabsContent>
 
         <TabsContent value="kanban" className="space-y-4">
-          <PostKanban />
+          <PostKanban 
+            isCreateDialogOpen={isCreateDialogOpen}
+            onCreateDialogOpenChange={setIsCreateDialogOpen}
+          />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
