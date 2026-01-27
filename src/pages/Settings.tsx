@@ -135,14 +135,37 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="profile">Perfil</TabsTrigger>
-          <TabsTrigger value="subscription">Assinatura</TabsTrigger>
-          {isAgencyAdmin && <TabsTrigger value="users">Usuários</TabsTrigger>}
-          <TabsTrigger value="integrations">Integrações</TabsTrigger>
-          <TabsTrigger value="account">Conta</TabsTrigger>
-          <TabsTrigger value="notifications">Notificações</TabsTrigger>
-          <TabsTrigger value="appearance">Aparência</TabsTrigger>
+        <TabsList className="flex w-full overflow-x-auto scrollbar-hide">
+          <TabsTrigger value="profile" className="flex-shrink-0 gap-1 md:gap-2">
+            <User className="h-4 w-4" />
+            <span className="hidden sm:inline">Perfil</span>
+          </TabsTrigger>
+          <TabsTrigger value="subscription" className="flex-shrink-0 gap-1 md:gap-2">
+            <CreditCard className="h-4 w-4" />
+            <span className="hidden sm:inline">Assinatura</span>
+          </TabsTrigger>
+          {isAgencyAdmin && (
+            <TabsTrigger value="users" className="flex-shrink-0 gap-1 md:gap-2">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Usuários</span>
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="integrations" className="flex-shrink-0 gap-1 md:gap-2">
+            <Puzzle className="h-4 w-4" />
+            <span className="hidden sm:inline">Integrações</span>
+          </TabsTrigger>
+          <TabsTrigger value="account" className="flex-shrink-0 gap-1 md:gap-2">
+            <Shield className="h-4 w-4" />
+            <span className="hidden sm:inline">Conta</span>
+          </TabsTrigger>
+          <TabsTrigger value="notifications" className="flex-shrink-0 gap-1 md:gap-2">
+            <Bell className="h-4 w-4" />
+            <span className="hidden sm:inline">Notificações</span>
+          </TabsTrigger>
+          <TabsTrigger value="appearance" className="flex-shrink-0 gap-1 md:gap-2">
+            <Palette className="h-4 w-4" />
+            <span className="hidden sm:inline">Aparência</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
