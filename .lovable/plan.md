@@ -1,210 +1,188 @@
 
 
-# Correção: Notificações Push Não Chegando no iOS
+# Refatoração Definitiva: Sistema de Push Notifications
 
-## Diagnóstico
+## Diagnóstico Completo das Duplicações
 
-### Backend: Funcionando ✅
+### Fontes de Duplicação Identificadas
+
+| # | Fonte | Local | O que faz | Resultado |
+|---|-------|-------|-----------|-----------|
+| **1** | Trigger do Banco | `trg_push_on_new_notification` | INSERT em `notifications` → chama `send-push-notification` | 1x push |
+| **2** | Realtime + Browser API | `useNotifications.tsx` linhas 203-211 | Escuta INSERT via realtime → chama `showNotification()` (Browser Notification API) | 1x notificação browser |
+| **3** | Service Worker | `firebase-messaging-sw.js` | Recebe push do FCM → chama `showNotification()` | 1x push |
+
+### Fluxo Atual (Problemático)
+
+```text
+Tarefa atribuída
+       ↓
+Trigger notify_task_assignment
+       ↓
+INSERT INTO notifications
+       ↓
+┌─────────────────────────────────┐    ┌─────────────────────────────────┐
+│ trg_push_on_new_notification    │    │ Supabase Realtime               │
+│      ↓                          │    │      ↓                          │
+│ send-push-notification          │    │ useNotifications.tsx            │
+│      ↓                          │    │      ↓                          │
+│ FCM envia push                  │    │ showNotification() [Browser]    │
+│      ↓                          │    │      ↓                          │
+│ Service Worker → showNotification│    │ NOTIFICAÇÃO DUPLICADA #2       │
+│      ↓                          │    └─────────────────────────────────┘
+│ NOTIFICAÇÃO #1                  │
+└─────────────────────────────────┘
 ```
-[FCM] Push notifications sent: 1/1
-[FCM] Message sent successfully: projects/orbityapp-f710e/messages/bd0a5e64-...
-```
 
-### O Problema: Service Worker
-
-Há dois problemas no `firebase-messaging-sw.js`:
-
-| Problema | Descrição |
-|----------|-----------|
-| **1. Tag fixa** | `tag: 'orbity-notification'` faz com que notificações substituam as anteriores silenciosamente |
-| **2. Firebase SDK conflito** | Ao remover `onBackgroundMessage`, o SDK pode estar "interceptando" o evento push antes do handler universal |
+**Resultado**: 2 notificações aparecem para cada evento!
 
 ---
 
-## Solução
+## Solução: Simplificar para Fluxo Único de Push
 
-### Arquivo: `public/firebase-messaging-sw.js`
+### Estratégia
 
-**Mudança 1**: Remover a tag fixa ou usar tag dinâmica baseada no ID da notificação
+**Priorizar Push Notifications (FCM)** e **remover a notificação via Browser API** no hook `useNotifications`.
 
-```javascript
-// ANTES
-await self.registration.showNotification(title, {
-  body,
-  icon: '...',
-  badge: '...',
-  data,
-  tag: 'orbity-notification'  // ❌ Tag fixa substitui notificações
-});
+O fluxo será:
 
-// DEPOIS
-await self.registration.showNotification(title, {
-  body,
-  icon: '...',
-  badge: '...',
-  data,
-  tag: data?.notification_id || `orbity-${Date.now()}`,  // ✅ Tag única por notificação
-  renotify: true  // Força som/vibração mesmo se tag existir
-});
+```text
+INSERT INTO notifications
+       ↓
+Trigger trg_push_on_new_notification
+       ↓
+send-push-notification (Edge Function)
+       ↓
+FCM envia para dispositivo
+       ↓
+Service Worker recebe push
+       ↓
+showNotification() [único]
+       ↓
+1 notificação apenas ✓
 ```
 
-**Mudança 2**: Restaurar `onBackgroundMessage` mas SEM exibir notificação (apenas log), para evitar que o Firebase SDK "engula" o evento
+### Mudanças Necessárias
 
-```javascript
-// Manter o Firebase SDK satisfeito mas sem duplicação
-messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] onBackgroundMessage (handled by push event):', payload);
-  // NÃO mostrar notificação aqui - o push event universal cuida disso
-  return;
-});
-```
+| Arquivo | Mudança |
+|---------|---------|
+| `src/hooks/useNotifications.tsx` | **Remover** a chamada `showNotification()` no handler de realtime (linhas 203-211) |
+| `public/firebase-messaging-sw.js` | Nenhuma mudança necessária - já está correto |
 
 ---
 
-## Código Final do Service Worker
+## Detalhes Técnicos
 
-```javascript
-// Firebase Cloud Messaging Service Worker (versão robusta para iOS/Safari)
+### `src/hooks/useNotifications.tsx`
 
-// Forçar ativação imediata do Service Worker
-self.addEventListener('install', (event) => {
-  console.log('[SW] Installing...');
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating...');
-  event.waitUntil(clients.claim());
-});
-
-// Handler para mensagens do client
-self.addEventListener('message', (event) => {
-  console.log('[SW] Message received:', event.data);
-  if (event.data?.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-  if (event.data?.type === 'FIREBASE_CONFIG') {
-    console.log('[SW] Firebase config received');
-  }
-});
-
-importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBIDL3R7nd0pE0wzmXdNePWTSyxOvyZ0cY",
-  authDomain: "orbityapp-f710e.firebaseapp.com",
-  projectId: "orbityapp-f710e",
-  storageBucket: "orbityapp-f710e.appspot.com",
-  messagingSenderId: "929526059094",
-  appId: "1:929526059094:web:61fb87a4f693ddd61b2bf7"
-};
-
-try {
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-  }
-} catch (e) {
-  console.error('[SW] Firebase init error:', e);
-}
-
-const messaging = firebase.messaging();
-
-// Manter Firebase SDK satisfeito - não exibe notificação, apenas log
-messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] onBackgroundMessage recebido (handled by push event)');
-  // Retorna sem fazer nada - o push event universal cuida da exibição
-});
-
-// Handler universal de push - funciona em todos os browsers incluindo Safari/iOS
-self.addEventListener('push', (event) => {
-  console.log('[SW] Push event recebido');
-
-  if (!event.data) {
-    console.log('[SW] Push event sem dados');
-    return;
-  }
-
-  event.waitUntil((async () => {
-    let msg = {};
-    try {
-      msg = event.data.json();
-    } catch {
-      msg = { data: { body: event.data.text() } };
-    }
-
-    console.log('[SW] Push payload:', JSON.stringify(msg));
-
-    const title = msg?.notification?.title || msg?.data?.title || 'Nova notificação';
-    const body = msg?.notification?.body || msg?.data?.body || '';
-    const data = msg?.data || {};
-
-    // Tag única baseada no ID da notificação ou timestamp
-    const notificationTag = data?.notification_id || `orbity-${Date.now()}`;
-
-    console.log('[SW] Exibindo notificação:', title, 'tag:', notificationTag);
-
-    await self.registration.showNotification(title, {
-      body,
-      icon: 'https://sistema-orbity.lovable.app/favicon.ico',
-      badge: 'https://sistema-orbity.lovable.app/favicon.ico',
-      data,
-      tag: notificationTag,
-      renotify: true  // Força som/vibração mesmo com tag existente
-    });
-
-    console.log('[SW] Notificação exibida com sucesso');
-  })());
-});
-
-// Click handler
-self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification click:', event);
-  
-  event.notification.close();
-
-  const actionUrl = event.notification.data?.action_url || '/dashboard';
-  const urlToOpen = new URL(actionUrl, self.location.origin).href;
-
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
-          client.navigate(urlToOpen);
-          return client.focus();
-        }
+**Antes (Problemático):**
+```typescript
+// Subscribe to realtime updates
+const channel = supabase
+  .channel('notifications-changes')
+  .on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'notifications',
+      filter: `agency_id=eq.${currentAgency?.id}`,
+    },
+    (payload) => {
+      console.log('Notification change:', payload);
+      
+      // ❌ ISSO CAUSA DUPLICAÇÃO - push já foi enviado pelo trigger
+      if (payload.eventType === 'INSERT') {
+        const newNotification = payload.new as Notification;
+        
+        showNotification(newNotification.title, {
+          body: newNotification.message,
+          tag: newNotification.id,
+          icon: '/favicon.ico',
+        });
       }
-      return clients.openWindow?.(urlToOpen);
-    })
-  );
-});
+      
+      fetchNotifications();
+    }
+  )
+  .subscribe();
+```
+
+**Depois (Correto):**
+```typescript
+// Subscribe to realtime updates
+const channel = supabase
+  .channel('notifications-changes')
+  .on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'notifications',
+      filter: `agency_id=eq.${currentAgency?.id}`,
+    },
+    (payload) => {
+      console.log('Notification change:', payload);
+      // Push notification já foi enviada pelo trigger do banco via FCM
+      // Aqui apenas atualizamos a lista de notificações na UI
+      fetchNotifications();
+    }
+  )
+  .subscribe();
 ```
 
 ---
 
-## Resumo das Mudanças
+## Por que esta é a solução correta?
 
-| Item | Antes | Depois |
-|------|-------|--------|
-| `tag` | Fixo `'orbity-notification'` | Dinâmico baseado em `notification_id` |
-| `renotify` | Não existia | `true` - força som mesmo com tag |
-| `onBackgroundMessage` | Removido | Restaurado (apenas log, sem exibição) |
-| Logs | Básicos | Detalhados para debug |
+| Aspecto | Browser Notification API | FCM Push (Service Worker) |
+|---------|--------------------------|---------------------------|
+| Funciona em background | ❌ Apenas com app aberto | ✅ Sim |
+| Funciona no iOS PWA | ❌ Limitado | ✅ Sim (com PWA instalado) |
+| Persistência | ❌ Nenhuma | ✅ Entregue mesmo offline |
+| Ícone/Badge consistente | ❌ Varia | ✅ Configurável |
+
+**FCM é superior** para todos os casos de uso, então o realtime deve apenas atualizar a UI (lista de notificações), não disparar notificações duplicadas.
 
 ---
 
-## Passos Após Deploy
+## Arquivos a Modificar
 
-1. **Forçar atualização do SW no iPhone**:
-   - Vá em Configurações → Notificações
-   - Clique em "Atualizar Service Worker"
-   - Aguarde o status mudar para "active"
+| Arquivo | Ação |
+|---------|------|
+| `src/hooks/useNotifications.tsx` | Remover `showNotification()` do handler de INSERT (linhas 203-211) |
 
-2. **Testar Push**:
-   - Clique em "Testar Push"
-   - A notificação deve aparecer
+---
 
-3. **Se ainda não funcionar**:
-   - Reinstale a PWA (remover da tela inicial → adicionar novamente)
-   - Ative as notificações novamente
+## Resultado Esperado
+
+| Antes | Depois |
+|-------|--------|
+| 2 notificações por evento | 1 notificação por evento |
+| Realtime + FCM duplicando | Apenas FCM (via trigger) |
+| Confusão de fontes | Fluxo único e previsível |
+
+---
+
+## Fluxo Final Simplificado
+
+```text
+Ação do usuário (ex: atribuir tarefa)
+            ↓
+Trigger no banco (notify_task_assignment)
+            ↓
+INSERT INTO notifications
+            ↓
+Trigger trg_push_on_new_notification
+            ↓
+Edge Function send-push-notification
+            ↓
+FCM envia para dispositivo(s)
+            ↓
+Service Worker recebe push event
+            ↓
+showNotification() → 1 notificação ✓
+            ↓
+Realtime atualiza lista na UI (sem notificação)
+```
 
