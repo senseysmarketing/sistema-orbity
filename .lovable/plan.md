@@ -1,60 +1,196 @@
 
-# Padronizar Header e Filtros do Social Media Kanban
 
-## Objetivo
+# Correção Crítica: Bloquear Acesso de Usuários Sem Agência
 
-Ajustar o layout da aba Kanban do Social Media para seguir o mesmo padrão visual da página de Gestão de Tarefas, incluindo:
+## Problema Identificado
 
-1. Header com título e descrição à esquerda, botões à direita
-2. Campo de busca de posts em linha própria
-3. Linha de filtros abaixo do campo de busca
+Quando um administrador remove um usuário da agência, o sistema:
 
----
+1. **Remove apenas** o registro em `agency_users` (vínculo usuário-agência)
+2. **NÃO remove** o usuário de:
+   - `auth.users` (pode continuar fazendo login)
+   - `profiles` (mantém perfil ativo)
 
-## Layout Atual vs Desejado
-
-| Elemento | Atual (PostKanban) | Desejado (igual Tasks) |
-|----------|-------------------|------------------------|
-| Header | Apenas título "Kanban de Produção" | Removido do componente (será no pai) |
-| Botão Novo | Na linha do título | No header da página |
-| Campo de Busca | Não existe | Linha própria com ícone de busca |
-| Filtros | Primeira linha | Segunda linha, abaixo da busca |
+**Consequência**: O usuário excluído consegue fazer login e acessar o interior do sistema, mesmo sem estar vinculado a nenhuma agência.
 
 ---
 
-## Mudanças Propostas
-
-### 1. Página SocialMedia.tsx
-
-Atualizar o header da página para incluir:
-- Título "Social Media Planner" com descrição (já existe)
-- Botão "Novo Post" ao lado direito do header (mover de dentro do PostKanban)
-- Possível dropdown de Templates de Posts (se existir)
+## Análise do Fluxo Atual
 
 ```text
-+------------------------------------------------------------------+
-|  Social Media Planner                    [Templates ▼] [+ Novo Post]
-|  Gerencie todo o workflow...                                      |
-+------------------------------------------------------------------+
-|  [Calendário] [Kanban] [Análises] [Configurações]                |
-+------------------------------------------------------------------+
+┌────────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
+│     Auth.tsx       │────▶│    AppLayout     │────▶│   PaymentWrapper    │
+│  (verifica login)  │     │ (verifica user)  │     │ (verifica plano)    │
+└────────────────────┘     └──────────────────┘     └─────────────────────┘
+         │                         │                         │
+         ▼                         ▼                         ▼
+    user existe?             user existe?              tem subscription?
+         │                         │                         │
+         │ SIM                     │ SIM                     │ ??? 
+         ▼                         ▼                         ▼
+    redirect to              render layout            NENHUMA verificação
+     /dashboard                                       se tem agência!
 ```
 
-### 2. Componente PostKanban.tsx
+**O problema**: Ninguém verifica se o usuário pertence a alguma agência.
 
-Ajustar a estrutura interna para:
-- Remover o header com título (será tratado na página pai)
-- Adicionar campo de busca em linha própria
-- Manter filtros na segunda linha
+---
+
+## Solução Proposta
+
+### Abordagem 1: Verificação no Frontend (Rápida, mas superficial)
+
+Adicionar verificação no `useAgency` e `AppLayout` para bloquear usuários sem agência.
+
+### Abordagem 2: Tela de "Sem Acesso" dedicada (Recomendada)
+
+Criar uma tela específica para usuários sem agência, explicando a situação e oferecendo opções.
+
+---
+
+## Implementação Detalhada
+
+### 1. Modificar `useAgency.tsx`
+
+Adicionar um flag para indicar que o usuário não pertence a nenhuma agência:
+
+```typescript
+interface AgencyContextType {
+  // ... existentes
+  hasNoAgency: boolean;  // Novo: indica se usuário não tem agência
+}
+
+// Na função fetchUserAgencies:
+const fetchUserAgencies = async () => {
+  if (!user) return;
+
+  try {
+    setLoading(true);
+    const { data: agencyUsers, error } = await supabase
+      .from('agency_users')
+      .select('*, agencies (*)')
+      .eq('user_id', user.id);
+
+    if (agencyUsersError) throw agencyUsersError;
+
+    const agencies = agencyUsers?.map(au => au.agencies).filter(Boolean) || [];
+    setUserAgencies(agencies);
+    setHasNoAgency(agencies.length === 0);  // Novo
+
+    // ... resto do código
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+### 2. Criar componente `NoAgencyScreen.tsx`
+
+```typescript
+// src/components/agency/NoAgencyScreen.tsx
+export function NoAgencyScreen() {
+  const { signOut } = useAuth();
+  
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-red-50">
+      <Card className="max-w-md">
+        <CardHeader className="text-center">
+          <div className="mx-auto w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+            <Building2 className="h-8 w-8 text-orange-600" />
+          </div>
+          <CardTitle className="text-2xl text-orange-800">
+            Acesso Não Disponível
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-center">
+          <p className="text-muted-foreground">
+            Sua conta não está vinculada a nenhuma agência. 
+            Isso pode acontecer se você foi removido de uma agência 
+            ou se sua conta foi desativada.
+          </p>
+          
+          <div className="space-y-2">
+            <Button onClick={signOut} variant="destructive" className="w-full">
+              <LogOut className="mr-2 h-4 w-4" />
+              Sair
+            </Button>
+          </div>
+          
+          <p className="text-xs text-muted-foreground">
+            Se você acredita que isso é um erro, entre em contato com o 
+            administrador da sua agência ou com o suporte.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+```
+
+### 3. Modificar `AppLayout.tsx`
+
+Adicionar verificação de agência após loading:
+
+```typescript
+export function AppLayout() {
+  const { user, loading: authLoading } = useAuth();
+  const { loading: agencyLoading, hasNoAgency, userAgencies } = useAgency();
+  
+  // Loading states
+  if (authLoading || agencyLoading) {
+    return <LoadingSpinner />;
+  }
+
+  // Não autenticado -> redireciona para login
+  if (!user) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Autenticado mas sem agência -> mostra tela de bloqueio
+  if (hasNoAgency || userAgencies.length === 0) {
+    return <NoAgencyScreen />;
+  }
+
+  // Normal flow...
+  return (
+    <SidebarProvider>
+      {/* ... */}
+    </SidebarProvider>
+  );
+}
+```
+
+### 4. Limpar localStorage na remoção
+
+No `useAgency.tsx`, ao detectar que não há agências, limpar o ID salvo:
+
+```typescript
+if (agencies.length === 0) {
+  localStorage.removeItem('currentAgencyId');
+}
+```
+
+---
+
+## Fluxo Corrigido
 
 ```text
-+------------------------------------------------------------------+
-| [🔍 Buscar posts...]                                              |  <- Nova linha
-+------------------------------------------------------------------+
-| [⚙] [Clientes ▼] [Usuários ▼] [Tipo ▼] [Período ▼] [Ordenar ▼] [X] <- Filtros
-+------------------------------------------------------------------+
-| [Briefing] [Em Criação] [Aguardando Aprovação] [Aprovado] ...     |
-+------------------------------------------------------------------+
+┌────────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
+│     Auth.tsx       │────▶│    AppLayout     │────▶│   PaymentWrapper    │
+│  (verifica login)  │     │ (verifica user)  │     │ (verifica plano)    │
+└────────────────────┘     │ (verifica agência)│    └─────────────────────┘
+         │                 └──────────────────┘              
+         ▼                         │                         
+    user existe?             user existe?                    
+         │                         │                         
+         │ SIM                     │ SIM                     
+         ▼                         ▼                         
+    redirect to              tem agência?                    
+     /dashboard                    │                         
+                                   │ NÃO                     
+                                   ▼                         
+                           NoAgencyScreen                    
+                         "Acesso Não Disponível"             
 ```
 
 ---
@@ -63,121 +199,27 @@ Ajustar a estrutura interna para:
 
 | Arquivo | Mudanças |
 |---------|----------|
-| `src/pages/SocialMedia.tsx` | Adicionar botão "Novo Post" no header principal, gerenciar estado do dialog de criação |
-| `src/components/social-media/PostKanban.tsx` | Remover título interno, adicionar campo de busca, ajustar layout dos filtros |
+| `src/hooks/useAgency.tsx` | Adicionar `hasNoAgency` flag, limpar localStorage |
+| `src/components/agency/NoAgencyScreen.tsx` | Novo componente para exibir bloqueio |
+| `src/components/layout/AppLayout.tsx` | Verificar se usuário tem agência antes de renderizar |
 
 ---
 
-## Detalhes Técnicos
+## Comportamento Esperado
 
-### SocialMedia.tsx
-
-```tsx
-// Estado para controlar o dialog de criação
-const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-
-// Header atualizado
-<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-  <div>
-    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Social Media Planner</h1>
-    <p className="text-sm md:text-base text-muted-foreground">
-      Gerencie todo o workflow de criação de conteúdo para redes sociais
-    </p>
-  </div>
-  <div className="flex items-center gap-2">
-    <Button onClick={() => setIsCreateDialogOpen(true)} className="flex items-center gap-2 h-9">
-      <Plus className="h-4 w-4" />
-      <span className="hidden sm:inline">Novo Post</span>
-    </Button>
-  </div>
-</div>
-```
-
-### PostKanban.tsx
-
-```tsx
-// Adicionar estado de busca
-const [searchTerm, setSearchTerm] = useState("");
-
-// Filtrar por termo de busca
-const filteredPosts = useMemo(() => {
-  let filtered = posts;
-  
-  // Filtro de busca por título ou descrição
-  if (searchTerm) {
-    const term = searchTerm.toLowerCase();
-    filtered = filtered.filter(post => 
-      post.title?.toLowerCase().includes(term) ||
-      post.description?.toLowerCase().includes(term) ||
-      post.clients?.name?.toLowerCase().includes(term)
-    );
-  }
-  
-  // ... demais filtros existentes
-}, [posts, searchTerm, filterClient, ...]);
-
-// Layout atualizado (sem o header interno)
-<div className="space-y-3 md:space-y-4 h-full flex flex-col">
-  {/* Linha 1: Campo de Busca */}
-  <div className="relative flex-shrink-0">
-    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-    <Input
-      placeholder="Buscar posts..."
-      value={searchTerm}
-      onChange={(e) => setSearchTerm(e.target.value)}
-      className="pl-8"
-    />
-  </div>
-
-  {/* Linha 2: Filtros */}
-  <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 flex-shrink-0">
-    <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-    {/* ... filtros existentes ... */}
-  </div>
-
-  {/* Kanban columns */}
-  <div className="flex-1 overflow-hidden">
-    ...
-  </div>
-</div>
-```
+| Cenário | Antes | Depois |
+|---------|-------|--------|
+| Usuário removido tenta login | Entra no sistema (vazio/quebrado) | Vê "Acesso Não Disponível" |
+| Usuário removido na sessão | Continua usando | Ao recarregar, vê bloqueio |
+| Usuário nunca teve agência | Entra no sistema | Vê "Acesso Não Disponível" |
 
 ---
 
-## Interface Resultante
+## Considerações de Segurança
 
-```text
-┌──────────────────────────────────────────────────────────────────┐
-│  Social Media Planner                              [+ Novo Post] │
-│  Gerencie todo o workflow de criação de conteúdo...              │
-├──────────────────────────────────────────────────────────────────┤
-│  [📅 Calendário] [⊞ Kanban] [📈 Análises] [⚙ Configurações]     │
-├──────────────────────────────────────────────────────────────────┤
-│  🔍 Buscar posts...                                              │
-├──────────────────────────────────────────────────────────────────┤
-│  ⚙ [Clientes ▼] [Tipo ▼] [Usuários ▼] [Período ▼] [Ordenar ▼]   │
-├──────────────────────────────────────────────────────────────────┤
-│  Briefing    │ Em Criação │ Aguard. Aprovação │ Aprovado │ ...  │
-│  ┌─────────┐ │ ┌─────────┐│ ┌─────────────┐   │ ...      │      │
-│  │ Post 1  │ │ │ Post 2  ││ │ Post 3      │   │          │      │
-│  └─────────┘ │ └─────────┘│ └─────────────┘   │          │      │
-└──────────────────────────────────────────────────────────────────┘
-```
+1. **RLS continua protegendo dados**: Mesmo se alguém burlar o frontend, as políticas RLS impedem acesso a dados de agências.
 
----
+2. **Esta é uma correção de UX/Frontend**: O objetivo é dar feedback claro ao usuário, não é a única linha de defesa.
 
-## Comunicacao entre Componentes
+3. **Opção futura**: Desativar completamente o usuário no `auth.users` ao removê-lo da última agência (requer edge function com service role).
 
-O botao "Novo Post" sera movido para o header da pagina `SocialMedia.tsx`. Existem duas abordagens para comunicar com o `PostKanban`:
-
-**Opcao A - Props (recomendada)**: Passar props para controlar o dialog
-```tsx
-<PostKanban 
-  isCreateDialogOpen={isCreateDialogOpen} 
-  onCreateDialogOpenChange={setIsCreateDialogOpen} 
-/>
-```
-
-**Opcao B - Manter no Kanban**: Manter o dialog dentro do PostKanban e expor uma ref/callback
-
-Vou usar a Opcao A por ser mais clara e seguir o padrao da pagina Tasks.
