@@ -46,12 +46,12 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
 
   return (
     <>
-      <div className="flex items-center justify-between p-4 border-b">
-        <h3 className="font-semibold text-lg">Notificações</h3>
-        <div className="flex gap-2">
+      <div className="flex items-center justify-between p-3 md:p-4 border-b">
+        <h3 className="font-semibold text-base md:text-lg">Notificações</h3>
+        <div className="flex gap-1 md:gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9">
                 <Moon className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -76,6 +76,7 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
           <Button
             variant="ghost"
             size="icon"
+            className="h-8 w-8 md:h-9 md:w-9"
             onClick={markAllAsRead}
             disabled={notifications.every(n => n.is_read)}
           >
@@ -84,6 +85,7 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
           <Button
             variant="ghost"
             size="icon"
+            className="h-8 w-8 md:h-9 md:w-9"
             onClick={() => setPreferencesOpen(true)}
           >
             <Settings className="h-4 w-4" />
@@ -92,10 +94,13 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
       </div>
 
       <Tabs defaultValue="unread" className="w-full" onValueChange={(v) => setFilter(v as any)}>
-        <TabsList className="w-full rounded-none border-b">
-          <TabsTrigger value="all" className="flex-1">Todas</TabsTrigger>
-          <TabsTrigger value="unread" className="flex-1">Não lidas</TabsTrigger>
-          <TabsTrigger value="today" className="flex-1">Hoje</TabsTrigger>
+        <TabsList className="w-full rounded-none border-b h-10">
+          <TabsTrigger value="all" className="flex-1 text-xs sm:text-sm">Todas</TabsTrigger>
+          <TabsTrigger value="unread" className="flex-1 text-xs sm:text-sm">
+            <span className="hidden sm:inline">Não lidas</span>
+            <span className="sm:hidden">Novas</span>
+          </TabsTrigger>
+          <TabsTrigger value="today" className="flex-1 text-xs sm:text-sm">Hoje</TabsTrigger>
         </TabsList>
 
         <TabsContent value={filter} className="m-0">
@@ -113,7 +118,7 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
                 {/* Urgent notifications */}
                 {groupedNotifications.urgent.length > 0 && (
                   <div>
-                    <div className="px-4 py-2 bg-destructive/10">
+                    <div className="px-3 md:px-4 py-2 bg-destructive/10">
                       <p className="text-xs font-medium text-destructive">Urgente</p>
                     </div>
                     {groupedNotifications.urgent.map(notification => (
@@ -129,7 +134,7 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
                 {/* High priority notifications */}
                 {groupedNotifications.high.length > 0 && (
                   <div>
-                    <div className="px-4 py-2 bg-orange-500/10">
+                    <div className="px-3 md:px-4 py-2 bg-orange-500/10">
                       <p className="text-xs font-medium text-orange-600 dark:text-orange-400">Alta prioridade</p>
                     </div>
                     {groupedNotifications.high.map(notification => (

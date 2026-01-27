@@ -69,23 +69,25 @@ export function NotificationItem({ notification, onClose }: NotificationItemProp
   return (
     <div
       className={cn(
-        "p-4 hover:bg-muted/50 transition-colors cursor-pointer relative group",
+        "p-3 md:p-4 hover:bg-muted/50 transition-colors cursor-pointer relative group",
         !notification.is_read && "bg-primary/5"
       )}
       onClick={handleClick}
     >
-      <div className="flex gap-3">
-        <div className={cn("mt-1", colorMap[notification.type])}>
-          <Icon className="h-5 w-5" />
+      <div className="flex gap-2 md:gap-3">
+        <div className={cn("mt-0.5 md:mt-1", colorMap[notification.type])}>
+          <Icon className="h-4 w-4 md:h-5 md:w-5" />
         </div>
         
-        <div className="flex-1 space-y-1 min-w-0">
+        <div className="flex-1 space-y-0.5 md:space-y-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <p className="font-medium text-sm leading-tight">{notification.title}</p>
+            <p className="font-medium text-xs md:text-sm leading-tight line-clamp-1">
+              {notification.title}
+            </p>
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+              className="h-5 w-5 md:h-6 md:w-6 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
               onClick={handleArchive}
               type="button"
             >
@@ -94,11 +96,11 @@ export function NotificationItem({ notification, onClose }: NotificationItemProp
             </Button>
           </div>
           
-          <p className="text-sm text-muted-foreground line-clamp-2">
+          <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">
             {notification.message}
           </p>
           
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 md:gap-3 text-[10px] md:text-xs text-muted-foreground">
             <span>
               {formatDistanceToNow(new Date(notification.created_at), {
                 addSuffix: true,
@@ -110,7 +112,8 @@ export function NotificationItem({ notification, onClose }: NotificationItemProp
               <>
                 <span>•</span>
                 <span className="flex items-center gap-1 text-primary">
-                  {notification.action_label}
+                  <span className="hidden sm:inline">{notification.action_label}</span>
+                  <span className="sm:hidden">Ver</span>
                   <ExternalLink className="h-3 w-3" />
                 </span>
               </>
@@ -119,8 +122,8 @@ export function NotificationItem({ notification, onClose }: NotificationItemProp
         </div>
         
         {!notification.is_read && (
-          <div className="mt-2">
-            <div className="h-2 w-2 rounded-full bg-primary" />
+          <div className="mt-1 md:mt-2">
+            <div className="h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-primary" />
           </div>
         )}
       </div>
