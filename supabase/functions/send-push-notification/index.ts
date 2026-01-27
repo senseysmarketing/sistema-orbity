@@ -176,25 +176,23 @@ async function sendToFCM(
     ? actionUrl 
     : `https://sistema-orbity.lovable.app${actionUrl}`;
 
+  // Data-only payload: FCM não exibe automaticamente, apenas o Service Worker exibe
   const message = {
     message: {
       token: fcmToken,
-      notification: {
-        title: payload.title,
-        body: payload.body,
-      },
+      // SEM notification - deixa o Service Worker exibir (evita duplicação)
       webpush: {
-        notification: {
-          icon: payload.icon || 'https://sistema-orbity.lovable.app/favicon.ico',
-          badge: 'https://sistema-orbity.lovable.app/favicon.ico',
-        },
         fcm_options: {
           link: absoluteActionUrl,
         },
       },
       data: {
+        title: payload.title,
+        body: payload.body,
+        icon: payload.icon || 'https://sistema-orbity.lovable.app/favicon.ico',
+        notification_id: payload.data?.notification_id || `${Date.now()}`,
+        action_url: absoluteActionUrl,
         ...payload.data,
-        click_action: absoluteActionUrl,
       },
     },
   };
