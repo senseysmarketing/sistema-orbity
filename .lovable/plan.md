@@ -1,204 +1,131 @@
 
-# Correção Definitiva: Duplicação de Push Notifications
+
+# Correção: Remoção de Usuário Não Funciona
 
 ## Problema Identificado
 
-O sistema está enviando **DUAS notificações push** para cada evento porque:
+Após análise detalhada, identifiquei **2 problemas** que estão causando a falha na remoção de usuários:
 
-1. O payload FCM contém tanto `notification` (exibição automática pelo FCM) quanto `data` (processado pelo Service Worker)
-2. O FCM SDK exibe automaticamente a notificação via `notification`
-3. O Service Worker TAMBÉM exibe via `showNotification()` no evento `push`
+### Problema 1: Verificação de Permissão Incorreta no Frontend
 
-Resultado: 2 pushes idênticas com ~2 segundos de diferença
+A função `isAgencyAdmin` do hook `useAgency()` **é uma função** que precisa ser chamada com parênteses:
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                    FLUXO ATUAL (DUPLICADO)                      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Edge Function envia para FCM:                                  │
-│  {                                                              │
-│    notification: { title, body },  ←──── FCM exibe AQUI         │
-│    data: { ... }                   ←──── SW exibe AQUI          │
-│  }                                                              │
-│                                                                 │
-│  FCM recebe e:                                                  │
-│    1. Exibe automaticamente via "notification" (push #1)        │
-│    2. Envia "push" event para Service Worker                    │
-│       └─ SW exibe via showNotification() (push #2)              │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Solucao: Data-Only Payload
-
-Enviar apenas `data` (sem `notification`) para que SOMENTE o Service Worker exiba a notificacao:
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                    FLUXO CORRIGIDO (UNICO)                      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Edge Function envia para FCM:                                  │
-│  {                                                              │
-│    data: { title, body, ... }   ←──── APENAS dados              │
-│  }                                                              │
-│                                                                 │
-│  FCM recebe e:                                                  │
-│    1. NAO exibe nada (sem "notification")                       │
-│    2. Envia "push" event para Service Worker                    │
-│       └─ SW exibe via showNotification() (push unico)           │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Mudancas Tecnicas
-
-### 1. Edge Function: send-push-notification/index.ts
-
-Remover o campo `notification` do payload FCM e mover tudo para `data`:
-
-**Antes (duplica):**
 ```typescript
-const message = {
-  message: {
-    token: fcmToken,
-    notification: {              // ← FCM exibe automaticamente
-      title: payload.title,
-      body: payload.body,
-    },
-    webpush: {
-      notification: {
-        icon: '...',
-        badge: '...',
-      },
-      fcm_options: { link: absoluteActionUrl },
-    },
-    data: {
-      ...payload.data,
-      click_action: absoluteActionUrl,
-    },
-  },
+// No hook useAgency.tsx (linha 205-207):
+const isAgencyAdmin = () => {
+  return agencyRole === 'admin' || agencyRole === 'owner';
 };
 ```
 
-**Depois (unico):**
+**Porém**, no componente `UsersManagement.tsx`, ela está sendo usada **sem os parênteses**:
+
 ```typescript
-const message = {
-  message: {
-    token: fcmToken,
-    // SEM notification - deixa o Service Worker exibir
-    webpush: {
-      fcm_options: {
-        link: absoluteActionUrl,
-      },
-    },
-    data: {
-      title: payload.title,         // ← Movido para data
-      body: payload.body,           // ← Movido para data
-      icon: payload.icon || 'https://sistema-orbity.lovable.app/favicon.ico',
-      notification_id: payload.data?.notification_id || '',
-      action_url: absoluteActionUrl,
-      ...payload.data,
-    },
-  },
-};
+// PROBLEMA - Linhas 49, 52 e 290:
+if (currentAgency && isAgencyAdmin) { ... }  // ❌ Verifica se FUNÇÃO existe (sempre true)
+if (!isAgencyAdmin) { ... }                   // ❌ Sempre false pois função existe
+
+// CORRETO:
+if (currentAgency && isAgencyAdmin()) { ... } // ✅ Chama a função
+if (!isAgencyAdmin()) { ... }                  // ✅ Chama a função
 ```
+
+### Problema 2: DELETE Não Verifica Rows Afetadas
+
+O código atual faz DELETE e assume sucesso se não houver erro:
+
+```typescript
+const { error } = await supabase
+  .from('agency_users')
+  .delete()
+  .eq('agency_id', currentAgency?.id)
+  .eq('user_id', userId);
+
+if (error) throw error;
+// Assume sucesso mesmo se 0 rows foram deletadas!
+```
+
+Quando as políticas RLS bloqueiam a operação, o Supabase **não retorna erro** - apenas retorna 0 rows afetadas. O código precisa usar `.select()` para verificar se algo foi realmente deletado.
 
 ---
 
-### 2. Service Worker: firebase-messaging-sw.js
+## Solução Técnica
 
-Atualizar para extrair dados corretamente do payload `data`:
+### 1. Corrigir Chamadas de `isAgencyAdmin`
 
-```javascript
-self.addEventListener('push', (event) => {
-  console.log('[SW] Push event recebido');
+Modificar `src/components/admin/UsersManagement.tsx` para chamar a função corretamente:
 
-  if (!event.data) {
-    console.log('[SW] Push event sem dados');
-    return;
-  }
+| Linha | Antes | Depois |
+|-------|-------|--------|
+| 49 | `if (currentAgency && isAgencyAdmin)` | `if (currentAgency && isAgencyAdmin())` |
+| 52 | `[currentAgency, isAgencyAdmin]` | `[currentAgency]` (isAgencyAdmin é função estável) |
+| 290 | `if (!isAgencyAdmin)` | `if (!isAgencyAdmin())` |
 
-  event.waitUntil((async () => {
-    let msg = {};
-    try {
-      msg = event.data.json();
-    } catch {
-      msg = { data: { body: event.data.text() } };
+### 2. Verificar Resultado do DELETE
+
+Modificar a função `removeUser` para verificar se algo foi deletado:
+
+```typescript
+const removeUser = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('agency_users')
+      .delete()
+      .eq('agency_id', currentAgency?.id)
+      .eq('user_id', userId)
+      .select();  // Adicionar .select() para ver o que foi deletado
+
+    if (error) throw error;
+
+    // Verificar se algo foi realmente deletado
+    if (!data || data.length === 0) {
+      throw new Error('Você não tem permissão para remover este usuário ou ele não existe.');
     }
 
-    console.log('[SW] Push payload:', JSON.stringify(msg));
-
-    // Priorizar dados do campo 'data' (data-only payload)
-    const data = msg?.data || {};
-    const title = data?.title || msg?.notification?.title || 'Nova notificacao';
-    const body = data?.body || msg?.notification?.body || '';
-    const icon = data?.icon || 'https://sistema-orbity.lovable.app/favicon.ico';
-
-    // Tag unica baseada no ID da notificacao
-    const notificationTag = data?.notification_id || `orbity-${Date.now()}`;
-
-    console.log('[SW] Exibindo notificacao:', title, 'tag:', notificationTag);
-
-    await self.registration.showNotification(title, {
-      body,
-      icon,
-      badge: 'https://sistema-orbity.lovable.app/favicon.ico',
-      data,
-      tag: notificationTag,
-      renotify: false  // NAO renotificar se tag igual (previne duplicatas)
+    toast({
+      title: "Usuário removido!",
+      description: "O usuário foi removido da agência.",
     });
 
-    console.log('[SW] Notificacao exibida com sucesso');
-  })());
-});
-```
-
----
-
-### 3. Remover onBackgroundMessage redundante
-
-O handler `onBackgroundMessage` do Firebase SDK nao e mais necessario com data-only payload:
-
-```javascript
-// REMOVER ou comentar este bloco:
-// messaging.onBackgroundMessage((payload) => {
-//   console.log('[SW] onBackgroundMessage recebido:', payload);
-//   return;
-// });
+    fetchUsers();
+  } catch (error: any) {
+    toast({
+      title: "Erro ao remover usuário",
+      description: error.message,
+      variant: "destructive",
+    });
+  }
+};
 ```
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Mudanca |
-|---------|---------|
-| `supabase/functions/send-push-notification/index.ts` | Remover `notification`, mover dados para `data` |
-| `public/firebase-messaging-sw.js` | Priorizar `data`, remover `onBackgroundMessage`, usar `renotify: false` |
-
----
-
-## Por que Data-Only Payload?
-
-| Aspecto | Com `notification` | Data-Only |
-|---------|-------------------|-----------|
-| Quem exibe? | FCM automatico + SW | Apenas SW |
-| Controle | Limitado | Total |
-| Duplicacao | Possivel | Impossivel |
-| Tags dinamicas | Nao | Sim |
-| Funciona em iOS/Safari | Sim | Sim |
+| Arquivo | Mudanças |
+|---------|----------|
+| `src/components/admin/UsersManagement.tsx` | Corrigir chamadas de `isAgencyAdmin()` e adicionar verificação no DELETE |
 
 ---
 
 ## Resultado Esperado
 
-- **Antes**: 2 push notifications por evento (1 do FCM + 1 do SW)
-- **Depois**: 1 push notification por evento (apenas do SW)
+| Cenário | Antes | Depois |
+|---------|-------|--------|
+| Member tenta acessar gerenciamento | Vê a interface (bug) | Vê "Acesso Restrito" |
+| Admin tenta remover usuário | Falha silenciosa | Remove com sucesso |
+| Member tenta remover via hack | Mostra sucesso falso | Mostra erro de permissão |
 
-A notificacao sera exibida com tag unica baseada no `notification_id`, impedindo qualquer duplicacao mesmo em cenarios de retry.
+---
+
+## Observações Técnicas
+
+1. **Por que RLS não retorna erro?**
+   - Por design, RLS do Postgres filtra rows silenciosamente
+   - DELETE com 0 rows afetadas não é considerado erro
+   - Usar `.select()` força o retorno das rows afetadas
+
+2. **Por que `isAgencyAdmin` sem parênteses "funciona"?**
+   - Em JavaScript, uma função é um objeto "truthy"
+   - `if (isAgencyAdmin)` verifica se a função existe, não seu resultado
+   - Isso significa que QUALQUER usuário passava na verificação
+
