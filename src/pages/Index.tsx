@@ -339,21 +339,21 @@ const Index = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col gap-2 md:flex-row md:justify-between md:items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <LayoutDashboard className="h-8 w-8 text-primary" />
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
+            <LayoutDashboard className="h-6 w-6 md:h-8 md:w-8 text-primary" />
             {getRoleGreeting()}
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
             {getRoleSubtitle()}
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-muted-foreground">Agência</p>
-          <p className="font-semibold">{currentAgency?.name || 'Carregando...'}</p>
+        <div className="text-left md:text-right">
+          <p className="text-xs md:text-sm text-muted-foreground">Agência</p>
+          <p className="font-semibold text-sm md:text-base">{currentAgency?.name || 'Carregando...'}</p>
         </div>
       </div>
 
@@ -367,26 +367,26 @@ const Index = () => {
 
       {/* Conteúdo por Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">
-            <LayoutDashboard className="h-4 w-4 mr-2" />
-            Visão Geral
+        <TabsList className="flex w-full overflow-x-auto scrollbar-hide">
+          <TabsTrigger value="overview" className="flex-shrink-0 gap-1 md:gap-2">
+            <LayoutDashboard className="h-4 w-4" />
+            <span className="hidden sm:inline">Visão Geral</span>
           </TabsTrigger>
-          <TabsTrigger value="tasks">
-            <CheckSquare className="h-4 w-4 mr-2" />
-            Tarefas
+          <TabsTrigger value="tasks" className="flex-shrink-0 gap-1 md:gap-2">
+            <CheckSquare className="h-4 w-4" />
+            <span className="hidden sm:inline">Tarefas</span>
           </TabsTrigger>
-          <TabsTrigger value="crm">
-            <Target className="h-4 w-4 mr-2" />
-            CRM
+          <TabsTrigger value="crm" className="flex-shrink-0 gap-1 md:gap-2">
+            <Target className="h-4 w-4" />
+            <span className="hidden sm:inline">CRM</span>
           </TabsTrigger>
-          <TabsTrigger value="social">
-            <Share2 className="h-4 w-4 mr-2" />
-            Social
+          <TabsTrigger value="social" className="flex-shrink-0 gap-1 md:gap-2">
+            <Share2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Social</span>
           </TabsTrigger>
-          <TabsTrigger value="performance">
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Performance
+          <TabsTrigger value="performance" className="flex-shrink-0 gap-1 md:gap-2">
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Performance</span>
           </TabsTrigger>
         </TabsList>
 

@@ -99,7 +99,7 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
         </TabsList>
 
         <TabsContent value={filter} className="m-0">
-          <ScrollArea className="h-[500px]">
+          <ScrollArea className="h-[60vh] md:h-[500px]">
             {loading ? (
               <div className="p-8 text-center text-muted-foreground">
                 Carregando...

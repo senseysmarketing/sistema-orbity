@@ -98,7 +98,7 @@ export function TaskCard({
 
   return (
     <div 
-      className="p-4 rounded-lg border cursor-pointer hover:shadow-md hover:brightness-95 transition-all"
+      className="p-3 md:p-4 rounded-lg border cursor-pointer hover:shadow-md hover:brightness-95 transition-all"
       onClick={(e) => onClick?.(e)}
       style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
     >
@@ -124,7 +124,7 @@ export function TaskCard({
       </div>
 
       {/* Linha 2: Título */}
-      <h3 className="font-semibold line-clamp-2 break-words mb-3">{task.title}</h3>
+      <h3 className="font-semibold text-sm md:text-base line-clamp-2 break-words mb-2 md:mb-3">{task.title}</h3>
       
       {task.description && (
         <p className="text-sm text-muted-foreground mb-2 line-clamp-2">

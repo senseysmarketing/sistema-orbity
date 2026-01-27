@@ -312,12 +312,12 @@ export default function CRM() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">CRM & Leads</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">CRM & Leads</h2>
+          <p className="text-sm md:text-base text-muted-foreground">
             Gestão comercial com funil de vendas e métricas de investimento
           </p>
         </div>
@@ -351,16 +351,16 @@ export default function CRM() {
 
       {/* Main Tabs - 3 tabs: Dashboard, Pipeline, Settings */}
       <Tabs defaultValue="dashboard" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="dashboard" className="flex items-center gap-2">
+        <TabsList className="flex w-full overflow-x-auto scrollbar-hide lg:w-auto">
+          <TabsTrigger value="dashboard" className="flex-shrink-0 gap-1 md:gap-2">
             <TrendingUp className="h-4 w-4" />
             <span className="hidden sm:inline">Dashboard</span>
           </TabsTrigger>
-          <TabsTrigger value="pipeline" className="flex items-center gap-2">
+          <TabsTrigger value="pipeline" className="flex-shrink-0 gap-1 md:gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Pipeline</span>
           </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
+          <TabsTrigger value="settings" className="flex-shrink-0 gap-1 md:gap-2">
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">Configurações</span>
           </TabsTrigger>

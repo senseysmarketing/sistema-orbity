@@ -1,6 +1,7 @@
 import { Outlet, Navigate } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
+import { MobileBottomNav } from './MobileBottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from "@/components/ui/button";
 import { Loader2, Moon, Sun } from 'lucide-react';
@@ -56,9 +57,12 @@ export function AppLayout() {
           </header>
           
           {/* Main content */}
-          <main className="flex-1 p-6 overflow-hidden">
+          <main className="flex-1 p-4 md:p-6 overflow-auto pb-20 md:pb-6">
             <Outlet />
           </main>
+          
+          {/* Mobile Bottom Navigation */}
+          <MobileBottomNav />
         </div>
       </div>
       

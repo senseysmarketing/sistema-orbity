@@ -47,12 +47,12 @@ export default function Clients() {
   const inactiveCount = clients?.filter(c => !c.active).length || 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Clientes</h1>
+          <p className="text-sm md:text-base text-muted-foreground">
             Gerencie informações, tarefas e acessos dos seus clientes
           </p>
         </div>
