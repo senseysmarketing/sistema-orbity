@@ -3,22 +3,26 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { useAuth } from '@/hooks/useAuth';
+import { useAgency } from '@/hooks/useAgency';
 import { Button } from "@/components/ui/button";
 import { Loader2, Moon, Sun } from 'lucide-react';
 import { useTheme } from "@/components/ui/theme-provider";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { HelpButton } from "@/components/help/HelpButton";
 import { TourTooltip } from "@/components/tour/TourTooltip";
+import { NoAgencyScreen } from "@/components/agency/NoAgencyScreen";
 
 export function AppLayout() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { loading: agencyLoading, hasNoAgency, userAgencies } = useAgency();
   const { theme, setTheme } = useTheme();
 
   const toggleTheme = () => {
     setTheme(theme === "light" ? "dark" : "light");
   };
 
-  if (loading) {
+  // Show loading while checking auth or agency
+  if (authLoading || agencyLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -26,8 +30,14 @@ export function AppLayout() {
     );
   }
 
+  // Not authenticated -> redirect to login
   if (!user) {
     return <Navigate to="/" replace />;
+  }
+
+  // Authenticated but has no agency -> show blocked screen
+  if (hasNoAgency || userAgencies.length === 0) {
+    return <NoAgencyScreen />;
   }
 
   return (
