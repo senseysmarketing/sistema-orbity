@@ -1,213 +1,183 @@
 
-# Correção: Erro "record 'new' has no field 'updated_by'" ao Mover Posts
+# Padronizar Header e Filtros do Social Media Kanban
 
-## Problema Identificado
+## Objetivo
 
-A função de trigger `notify_post_update_events` foi criada com referências a colunas que **não existem** na tabela `social_media_posts`:
+Ajustar o layout da aba Kanban do Social Media para seguir o mesmo padrão visual da página de Gestão de Tarefas, incluindo:
 
-| Campo no Trigger | Existe na Tabela? | Problema |
-|------------------|-------------------|----------|
-| `NEW.updated_by` | Nao | Causa o erro |
-| `NEW.client_ids` (array) | Nao | Deveria usar `NEW.client_id` (singular) |
-| `NEW.scheduled_for` | Nao | Deveria usar `NEW.scheduled_date` |
+1. Header com título e descrição à esquerda, botões à direita
+2. Campo de busca de posts em linha própria
+3. Linha de filtros abaixo do campo de busca
 
-Quando um post e movido entre colunas no Kanban, o trigger e disparado e tenta acessar `NEW.updated_by`, causando o erro:
+---
+
+## Layout Atual vs Desejado
+
+| Elemento | Atual (PostKanban) | Desejado (igual Tasks) |
+|----------|-------------------|------------------------|
+| Header | Apenas título "Kanban de Produção" | Removido do componente (será no pai) |
+| Botão Novo | Na linha do título | No header da página |
+| Campo de Busca | Não existe | Linha própria com ícone de busca |
+| Filtros | Primeira linha | Segunda linha, abaixo da busca |
+
+---
+
+## Mudanças Propostas
+
+### 1. Página SocialMedia.tsx
+
+Atualizar o header da página para incluir:
+- Título "Social Media Planner" com descrição (já existe)
+- Botão "Novo Post" ao lado direito do header (mover de dentro do PostKanban)
+- Possível dropdown de Templates de Posts (se existir)
 
 ```text
-record "new" has no field "updated_by"
++------------------------------------------------------------------+
+|  Social Media Planner                    [Templates ▼] [+ Novo Post]
+|  Gerencie todo o workflow...                                      |
++------------------------------------------------------------------+
+|  [Calendário] [Kanban] [Análises] [Configurações]                |
++------------------------------------------------------------------+
 ```
 
----
+### 2. Componente PostKanban.tsx
 
-## Solucao
+Ajustar a estrutura interna para:
+- Remover o header com título (será tratado na página pai)
+- Adicionar campo de busca em linha própria
+- Manter filtros na segunda linha
 
-Atualizar a funcao `notify_post_update_events` para usar os campos corretos da tabela `social_media_posts`:
-
-### Mudancas Necessarias
-
-1. **Remover referencias a `NEW.updated_by`**
-   - A tabela nao rastreia quem fez a ultima atualizacao
-   - Usar `created_by` como fallback ou deixar `v_updater_name` como "Alguem"
-
-2. **Corrigir `NEW.client_ids` para `NEW.client_id`**
-   - A tabela usa campo singular `client_id`, nao array
-   - Ajustar logica para buscar cliente unico
-
-3. **Corrigir `NEW.scheduled_for` para `NEW.scheduled_date`**
-   - O nome correto do campo na tabela
-
----
-
-## Detalhes Tecnicos
-
-### Estrutura Atual da Tabela social_media_posts
-
-```sql
--- Campos relevantes que EXISTEM:
-client_id       uuid      -- Singular, nao array
-scheduled_date  timestamptz
-created_by      uuid
--- NAO existem: updated_by, client_ids, scheduled_for
-```
-
-### Funcao Corrigida
-
-```sql
-CREATE OR REPLACE FUNCTION public.notify_post_update_events()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_event_key TEXT;
-  v_recipients UUID[];
-  v_post_title TEXT;
-  v_old_status TEXT;
-  v_new_status TEXT;
-  v_client_name TEXT;
-BEGIN
-  -- Get post title
-  v_post_title := COALESCE(NEW.title, 'Post sem titulo');
-  
-  -- Get client name (singular client_id)
-  IF NEW.client_id IS NOT NULL THEN
-    SELECT name INTO v_client_name
-    FROM clients
-    WHERE id = NEW.client_id;
-  END IF;
-  
-  v_old_status := CASE WHEN TG_OP = 'UPDATE' THEN OLD.status ELSE NULL END;
-  v_new_status := NEW.status;
-
-  -- STATUS CHANGE EVENT
-  IF TG_OP = 'UPDATE' AND NEW.status IS DISTINCT FROM OLD.status THEN
-    v_event_key := 'post.status_changed';
-    
-    SELECT ARRAY_AGG(user_id) INTO v_recipients
-    FROM post_assignments
-    WHERE post_id = NEW.id;
-    
-    -- Include creator if not in recipients
-    IF NEW.created_by IS NOT NULL THEN
-      IF v_recipients IS NULL THEN
-        v_recipients := ARRAY[NEW.created_by];
-      ELSIF NOT (NEW.created_by = ANY(v_recipients)) THEN
-        v_recipients := array_append(v_recipients, NEW.created_by);
-      END IF;
-    END IF;
-    
-    -- Notify recipients (excluding creator to avoid self-notification on own actions)
-    IF v_recipients IS NOT NULL THEN
-      DECLARE
-        v_recipient_id UUID;
-      BEGIN
-        FOREACH v_recipient_id IN ARRAY v_recipients LOOP
-          IF public.should_notify_user_for_event(v_recipient_id, NEW.agency_id, 'posts', v_event_key) THEN
-            INSERT INTO public.notifications (
-              user_id, agency_id, type, priority, title, message, action_url, action_label, metadata
-            ) VALUES (
-              v_recipient_id,
-              NEW.agency_id,
-              'post',
-              'medium',
-              '🔄 Status de post atualizado',
-              v_post_title,
-              '/dashboard/social-media',
-              'Ver post',
-              jsonb_build_object(
-                'event', v_event_key, 
-                'post_id', NEW.id, 
-                'from', v_old_status, 
-                'to', v_new_status,
-                'client_name', v_client_name
-              )
-            );
-          END IF;
-        END LOOP;
-      END;
-    END IF;
-    
-    -- Apply agency rules for published posts
-    IF v_new_status = 'published' THEN
-      PERFORM public.apply_post_event_rules(
-        NEW.agency_id, 
-        'post.published', 
-        jsonb_build_object('post_id', NEW.id)
-      );
-    END IF;
-  END IF;
-
-  -- IMPORTANT FIELDS UPDATED
-  IF TG_OP = 'UPDATE' AND NEW.status IS NOT DISTINCT FROM OLD.status THEN
-    IF NEW.title IS DISTINCT FROM OLD.title OR
-       NEW.scheduled_date IS DISTINCT FROM OLD.scheduled_date OR
-       NEW.priority IS DISTINCT FROM OLD.priority THEN
-      
-      v_event_key := 'post.updated_important';
-      
-      SELECT ARRAY_AGG(user_id) INTO v_recipients
-      FROM post_assignments
-      WHERE post_id = NEW.id;
-      
-      IF v_recipients IS NOT NULL THEN
-        DECLARE
-          v_recipient_id UUID;
-        BEGIN
-          FOREACH v_recipient_id IN ARRAY v_recipients LOOP
-            IF public.should_notify_user_for_event(v_recipient_id, NEW.agency_id, 'posts', v_event_key) THEN
-              INSERT INTO public.notifications (
-                user_id, agency_id, type, priority, title, message, action_url, action_label, metadata
-              ) VALUES (
-                v_recipient_id,
-                NEW.agency_id,
-                'post',
-                'low',
-                '✏️ Post atualizado',
-                v_post_title,
-                '/dashboard/social-media',
-                'Ver post',
-                jsonb_build_object('event', v_event_key, 'post_id', NEW.id)
-              );
-            END IF;
-          END LOOP;
-        END;
-      END IF;
-    END IF;
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
+```text
++------------------------------------------------------------------+
+| [🔍 Buscar posts...]                                              |  <- Nova linha
++------------------------------------------------------------------+
+| [⚙] [Clientes ▼] [Usuários ▼] [Tipo ▼] [Período ▼] [Ordenar ▼] [X] <- Filtros
++------------------------------------------------------------------+
+| [Briefing] [Em Criação] [Aguardando Aprovação] [Aprovado] ...     |
++------------------------------------------------------------------+
 ```
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo/Local | Mudanca |
-|---------------|---------|
-| Migracao SQL | Criar nova migracao para atualizar a funcao `notify_post_update_events` |
+| Arquivo | Mudanças |
+|---------|----------|
+| `src/pages/SocialMedia.tsx` | Adicionar botão "Novo Post" no header principal, gerenciar estado do dialog de criação |
+| `src/components/social-media/PostKanban.tsx` | Remover título interno, adicionar campo de busca, ajustar layout dos filtros |
 
 ---
 
-## Resultado Esperado
+## Detalhes Técnicos
 
-| Cenario | Antes | Depois |
-|---------|-------|--------|
-| Mover post entre colunas | Erro "no field updated_by" | Funciona normalmente |
-| Notificacoes de status | Nao funcionavam | Funcionam corretamente |
-| Mudancas importantes | Erro | Funcionam corretamente |
+### SocialMedia.tsx
+
+```tsx
+// Estado para controlar o dialog de criação
+const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+// Header atualizado
+<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  <div>
+    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Social Media Planner</h1>
+    <p className="text-sm md:text-base text-muted-foreground">
+      Gerencie todo o workflow de criação de conteúdo para redes sociais
+    </p>
+  </div>
+  <div className="flex items-center gap-2">
+    <Button onClick={() => setIsCreateDialogOpen(true)} className="flex items-center gap-2 h-9">
+      <Plus className="h-4 w-4" />
+      <span className="hidden sm:inline">Novo Post</span>
+    </Button>
+  </div>
+</div>
+```
+
+### PostKanban.tsx
+
+```tsx
+// Adicionar estado de busca
+const [searchTerm, setSearchTerm] = useState("");
+
+// Filtrar por termo de busca
+const filteredPosts = useMemo(() => {
+  let filtered = posts;
+  
+  // Filtro de busca por título ou descrição
+  if (searchTerm) {
+    const term = searchTerm.toLowerCase();
+    filtered = filtered.filter(post => 
+      post.title?.toLowerCase().includes(term) ||
+      post.description?.toLowerCase().includes(term) ||
+      post.clients?.name?.toLowerCase().includes(term)
+    );
+  }
+  
+  // ... demais filtros existentes
+}, [posts, searchTerm, filterClient, ...]);
+
+// Layout atualizado (sem o header interno)
+<div className="space-y-3 md:space-y-4 h-full flex flex-col">
+  {/* Linha 1: Campo de Busca */}
+  <div className="relative flex-shrink-0">
+    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+    <Input
+      placeholder="Buscar posts..."
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+      className="pl-8"
+    />
+  </div>
+
+  {/* Linha 2: Filtros */}
+  <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1 flex-shrink-0">
+    <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+    {/* ... filtros existentes ... */}
+  </div>
+
+  {/* Kanban columns */}
+  <div className="flex-1 overflow-hidden">
+    ...
+  </div>
+</div>
+```
 
 ---
 
-## Observacoes
+## Interface Resultante
 
-1. **Por que nao adicionar a coluna `updated_by`?**
-   - Seria uma mudanca maior que afeta toda a aplicacao
-   - Todos os UPDATE precisariam passar `updated_by`
-   - A solucao mais simples e corrigir o trigger
+```text
+┌──────────────────────────────────────────────────────────────────┐
+│  Social Media Planner                              [+ Novo Post] │
+│  Gerencie todo o workflow de criação de conteúdo...              │
+├──────────────────────────────────────────────────────────────────┤
+│  [📅 Calendário] [⊞ Kanban] [📈 Análises] [⚙ Configurações]     │
+├──────────────────────────────────────────────────────────────────┤
+│  🔍 Buscar posts...                                              │
+├──────────────────────────────────────────────────────────────────┤
+│  ⚙ [Clientes ▼] [Tipo ▼] [Usuários ▼] [Período ▼] [Ordenar ▼]   │
+├──────────────────────────────────────────────────────────────────┤
+│  Briefing    │ Em Criação │ Aguard. Aprovação │ Aprovado │ ...  │
+│  ┌─────────┐ │ ┌─────────┐│ ┌─────────────┐   │ ...      │      │
+│  │ Post 1  │ │ │ Post 2  ││ │ Post 3      │   │          │      │
+│  └─────────┘ │ └─────────┘│ └─────────────┘   │          │      │
+└──────────────────────────────────────────────────────────────────┘
+```
 
-2. **Consistencia com tasks**
-   - O trigger de tasks (`notify_task_update_events`) nao usa `updated_by`
-   - Mantemos o mesmo padrao para posts
+---
+
+## Comunicacao entre Componentes
+
+O botao "Novo Post" sera movido para o header da pagina `SocialMedia.tsx`. Existem duas abordagens para comunicar com o `PostKanban`:
+
+**Opcao A - Props (recomendada)**: Passar props para controlar o dialog
+```tsx
+<PostKanban 
+  isCreateDialogOpen={isCreateDialogOpen} 
+  onCreateDialogOpenChange={setIsCreateDialogOpen} 
+/>
+```
+
+**Opcao B - Manter no Kanban**: Manter o dialog dentro do PostKanban e expor uma ref/callback
+
+Vou usar a Opcao A por ser mais clara e seguir o padrao da pagina Tasks.
