@@ -1,187 +1,168 @@
 
 
-# Otimização Mobile: Central de Notificações
+# Otimização Mobile: Modal de Preferências de Notificação
 
-## Problemas Identificados (Screenshot)
+## Problemas Identificados
 
-| Problema | Componente | Causa |
-|----------|------------|-------|
-| Popover muito largo | `NotificationBell.tsx` linha 28 | Largura fixa `w-[400px]` que corta no mobile |
-| Header com pouco espaço | `NotificationCenter.tsx` linha 49-92 | Título e botões em linha sem responsividade |
-| Tabs com labels longos | `NotificationCenter.tsx` linha 95-99 | "Não lidas" ocupa muito espaço |
-| Items de notificação grandes | `NotificationItem.tsx` linha 70-127 | Padding e fontes não otimizados para mobile |
+| Problema | Local | Causa |
+|----------|-------|-------|
+| Dialog muito largo no mobile | Linha 528 | `max-w-2xl` sem adaptação mobile |
+| Cards com padding excessivo | Linhas 538-939 | `CardHeader` e `CardContent` padrão |
+| Labels longos cortando | Várias linhas | Textos sem quebra responsiva |
+| Footer não fixo | Linhas 942-949 | Botões podem ficar fora da view |
+| Tipografia grande demais | Todo o componente | `text-lg` fixo nos títulos |
 
 ---
 
 ## Solução
 
-### 1. NotificationBell.tsx - Drawer no Mobile em vez de Popover
+### 1. Wrapper Responsivo: Drawer no Mobile, Dialog no Desktop
 
-Usar Drawer (bottom sheet) no mobile para melhor UX, e manter Popover no desktop:
+Criar lógica condicional que renderiza `Drawer` (bottom sheet) no mobile e mantém `Dialog` no desktop, similar ao que fizemos no `NotificationBell`.
 
 ```tsx
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from "@/components/ui/drawer";
 
-export function NotificationBell() {
-  const { unreadCount } = useNotifications();
-  const [open, setOpen] = useState(false);
+export function NotificationPreferences({ open, onOpenChange }: NotificationPreferencesProps) {
   const isMobile = useIsMobile();
+  // ... existing state and logic ...
 
-  const triggerButton = (
-    <Button variant="ghost" size="icon" className="relative">
-      <Bell className="h-5 w-5" />
-      {unreadCount > 0 && (
-        <Badge ...>{unreadCount > 9 ? '9+' : unreadCount}</Badge>
-      )}
-    </Button>
+  const content = (
+    // Content component extracted
+  );
+
+  const footer = (
+    <div className="flex justify-end gap-3 pt-4 border-t">
+      <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+        Cancelar
+      </Button>
+      <Button onClick={handleSave} disabled={loading}>
+        {loading ? "Salvando..." : "Salvar"}
+      </Button>
+    </div>
   );
 
   if (isMobile) {
     return (
-      <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
-        <DrawerContent className="max-h-[85vh]">
-          <NotificationCenter onClose={() => setOpen(false)} />
+      <Drawer open={open} onOpenChange={onOpenChange}>
+        <DrawerContent className="max-h-[90vh]">
+          <DrawerHeader className="text-left">
+            <DrawerTitle>Preferências de Notificação</DrawerTitle>
+            <DrawerDescription>
+              Configure como e quando você deseja receber notificações
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="overflow-y-auto flex-1 px-4">
+            {content}
+          </div>
+          <DrawerFooter className="border-t pt-4">
+            {footer}
+          </DrawerFooter>
         </DrawerContent>
       </Drawer>
     );
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>{triggerButton}</PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0" align="end">
-        <NotificationCenter onClose={() => setOpen(false)} />
-      </PopoverContent>
-    </Popover>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Preferências de Notificação</DialogTitle>
+          <DialogDescription>...</DialogDescription>
+        </DialogHeader>
+        {content}
+        {footer}
+      </DialogContent>
+    </Dialog>
   );
 }
 ```
 
 ---
 
-### 2. NotificationCenter.tsx - Header e Tabs Responsivos
+### 2. Cards Responsivos
 
-**Header compacto no mobile:**
-```tsx
-<div className="flex items-center justify-between p-3 md:p-4 border-b">
-  <h3 className="font-semibold text-base md:text-lg">Notificações</h3>
-  <div className="flex gap-1 md:gap-2">
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9">
-          <Moon className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      ...
-    </DropdownMenu>
-    <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9" ...>
-      <CheckCheck className="h-4 w-4" />
-    </Button>
-    <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9" ...>
-      <Settings className="h-4 w-4" />
-    </Button>
-  </div>
-</div>
-```
+Ajustar os Cards para terem padding menor no mobile:
 
-**Tabs com labels abreviados no mobile:**
 ```tsx
-<TabsList className="w-full rounded-none border-b h-10">
-  <TabsTrigger value="all" className="flex-1 text-xs sm:text-sm">Todas</TabsTrigger>
-  <TabsTrigger value="unread" className="flex-1 text-xs sm:text-sm">
-    <span className="hidden sm:inline">Não lidas</span>
-    <span className="sm:hidden">Novas</span>
-  </TabsTrigger>
-  <TabsTrigger value="today" className="flex-1 text-xs sm:text-sm">Hoje</TabsTrigger>
-</TabsList>
+<Card>
+  <CardHeader className="p-4 md:p-6">
+    <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+      <Bell className="h-4 w-4 md:h-5 md:w-5" />
+      O que notificar
+    </CardTitle>
+    <CardDescription className="text-xs md:text-sm">
+      Escolha os tipos de notificações que deseja receber
+    </CardDescription>
+  </CardHeader>
+  <CardContent className="p-4 md:p-6 pt-0 md:pt-0 space-y-3 md:space-y-4">
+    ...
+  </CardContent>
+</Card>
 ```
-
-**ScrollArea com altura adaptativa:**
-```tsx
-<ScrollArea className="h-[60vh] md:h-[500px]">
-```
-(Já está ok, apenas garantir que funcione bem com o Drawer)
 
 ---
 
-### 3. NotificationItem.tsx - Layout Compacto no Mobile
+### 3. Labels Responsivos
 
-**Padding e tipografia responsivos:**
+Para labels longos como "Quando houver mudanças importantes (prazo/prioridade/título)", usar texto mais curto no mobile:
+
 ```tsx
-<div
-  className={cn(
-    "p-3 md:p-4 hover:bg-muted/50 transition-colors cursor-pointer relative group",
-    !notification.is_read && "bg-primary/5"
-  )}
-  onClick={handleClick}
->
-  <div className="flex gap-2 md:gap-3">
-    <div className={cn("mt-0.5 md:mt-1", colorMap[notification.type])}>
-      <Icon className="h-4 w-4 md:h-5 md:w-5" />
-    </div>
-    
-    <div className="flex-1 space-y-0.5 md:space-y-1 min-w-0">
-      <div className="flex items-start justify-between gap-2">
-        <p className="font-medium text-xs md:text-sm leading-tight line-clamp-1">
-          {notification.title}
-        </p>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5 md:h-6 md:w-6 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-          onClick={handleArchive}
-          type="button"
-        >
-          <X className="h-3 w-3" />
-          <span className="sr-only">Arquivar</span>
-        </Button>
-      </div>
-      
-      <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">
-        {notification.message}
-      </p>
-      
-      <div className="flex items-center gap-2 md:gap-3 text-[10px] md:text-xs text-muted-foreground">
-        <span>
-          {formatDistanceToNow(new Date(notification.created_at), {
-            addSuffix: true,
-            locale: ptBR,
-          })}
-        </span>
-        
-        {notification.action_label && (
-          <>
-            <span>•</span>
-            <span className="flex items-center gap-1 text-primary">
-              <span className="hidden sm:inline">{notification.action_label}</span>
-              <span className="sm:hidden">Ver</span>
-              <ExternalLink className="h-3 w-3" />
-            </span>
-          </>
-        )}
-      </div>
-    </div>
-    
-    {!notification.is_read && (
-      <div className="mt-1 md:mt-2">
-        <div className="h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-primary" />
-      </div>
+<div className="flex items-center justify-between">
+  <Label className="cursor-pointer text-sm md:text-base">
+    <span className="hidden md:inline">Quando houver mudanças importantes (prazo/prioridade/título)</span>
+    <span className="md:hidden">Mudanças importantes</span>
+  </Label>
+  <Switch ... />
+</div>
+```
+
+---
+
+### 4. Switches com Descrições Compactas
+
+Para itens com descrição adicional, manter apenas o label principal no mobile:
+
+```tsx
+<div className="flex items-center justify-between">
+  <div className="flex-1 min-w-0 mr-3">
+    <Label className="cursor-pointer text-sm">Notificar admins quando tarefa virar Concluída</Label>
+    <p className="text-xs text-muted-foreground hidden sm:block">Evento: mudança de status → done</p>
+  </div>
+  <Switch ... className="flex-shrink-0" />
+</div>
+```
+
+---
+
+### 5. Footer com Botão Responsivo
+
+Texto do botão mais curto no mobile:
+
+```tsx
+<div className="flex justify-end gap-2 md:gap-3">
+  <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading} size="sm" className="md:size-default">
+    Cancelar
+  </Button>
+  <Button onClick={handleSave} disabled={loading} size="sm" className="md:size-default">
+    {loading ? "Salvando..." : (
+      <>
+        <span className="hidden md:inline">Salvar Preferências</span>
+        <span className="md:hidden">Salvar</span>
+      </>
     )}
-  </div>
+  </Button>
 </div>
 ```
 
 ---
 
-## Arquivos a Modificar
+## Arquivo a Modificar
 
 | Arquivo | Mudanças |
 |---------|----------|
-| `src/components/notifications/NotificationBell.tsx` | Drawer no mobile, Popover no desktop |
-| `src/components/notifications/NotificationCenter.tsx` | Header compacto, tabs responsivas |
-| `src/components/notifications/NotificationItem.tsx` | Padding, tipografia e ícones menores no mobile |
+| `src/components/notifications/NotificationPreferences.tsx` | Drawer no mobile, Dialog no desktop, cards/labels/footer responsivos |
 
 ---
 
@@ -189,19 +170,20 @@ export function NotificationBell() {
 
 ### Antes vs Depois
 ```
-ANTES (Popover cortado):        DEPOIS (Drawer full-width):
+ANTES (Dialog cortado):         DEPOIS (Drawer full-width):
 ┌───────────────────┐           ┌───────────────────┐
-│     [cortado]     │           │  ━━━━━━━━━━━━━━   │ <- handle do drawer
-│  Notificações  ⚙️ │           │ Notificações  ⚙️✓ │
-│ Todas│Não li│Hoje │           │ [Todas][Novas][Hoj│
-├───────────────────┤           ├───────────────────┤
-│ ✓ Post próximo... │           │ ✓ Post próximo... │
-│   Caixinha de...  │           │   Caixinha...     │
-│   há 1 hora · Ver │           │   1h · Ver        │
-├───────────────────┤           ├───────────────────┤
-│ ✓ Status atualiza │           │ ✓ Status atualiz. │
-│   Arte - Valter.. │           │   Arte - Valter   │
-│   há 2 horas · Ve │           │   2h · Ver tarefa │
+│    [cortado]      │           │  ━━━━━━━━━━━━━━   │ <- handle
+│ Preferências de   │           │ Preferências de   │
+│ Notificação       │           │ Notificação       │
+│                   │           │ Configure como... │
+│ ┌───────────────┐ │           ├───────────────────┤
+│ │ O que notif.  │ │           │ O que notificar   │
+│ │ 📝 Lembretes  │ │           │ 📝 Lembretes    ⚪│
+│ │ ✅ Tarefas    │ │           │ ✅ Tarefas      ⚪│
+│ │ 📱 Posts...   │ │           │ 📱 Posts        ⚪│
+│ └───────────────┘ │           │ (scroll interno)  │
+│                   │           ├───────────────────┤
+│ [Cancelar][Salvar]│           │ [Cancelar][Salvar]│
 └───────────────────┘           └───────────────────┘
 ```
 
@@ -211,13 +193,12 @@ ANTES (Popover cortado):        DEPOIS (Drawer full-width):
 
 | Componente | Antes | Depois |
 |------------|-------|--------|
-| Container | Popover 400px fixo | Drawer no mobile, Popover no desktop |
-| Header padding | p-4 fixo | p-3 mobile, p-4 desktop |
-| Botões de ação | h-9 w-9 | h-8 w-8 mobile, h-9 w-9 desktop |
-| Tab "Não lidas" | Label completo | "Novas" no mobile |
-| Item padding | p-4 fixo | p-3 mobile, p-4 desktop |
-| Ícones item | h-5 w-5 | h-4 w-4 mobile, h-5 w-5 desktop |
-| Botão arquivar | opacity-0 hover | Sempre visível no mobile (touch) |
-| Título item | text-sm | text-xs mobile, text-sm desktop |
-| Indicador não lida | h-2 w-2 | h-1.5 w-1.5 mobile |
+| Container | Dialog max-w-2xl | Drawer no mobile, Dialog no desktop |
+| Card padding | p-6 fixo | p-4 mobile, p-6 desktop |
+| Card titles | text-lg | text-base mobile, text-lg desktop |
+| Icons | h-5 w-5 | h-4 w-4 mobile, h-5 w-5 desktop |
+| Labels longos | Texto completo | Versão curta no mobile |
+| Descrições extras | Sempre visíveis | Ocultas no mobile (sm:block) |
+| Botão salvar | "Salvar Preferências" | "Salvar" no mobile |
+| Footer | Inline no scroll | Fixo no bottom do Drawer |
 
