@@ -1,4 +1,4 @@
-// Firebase Cloud Messaging Service Worker (versão robusta para iOS/Safari)
+// Firebase Cloud Messaging Service Worker (Data-Only Payload - sem duplicação)
 
 // Forçar ativação imediata do Service Worker
 self.addEventListener('install', (event) => {
@@ -17,41 +17,10 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-  if (event.data?.type === 'FIREBASE_CONFIG') {
-    console.log('[SW] Firebase config received');
-  }
 });
 
-importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBIDL3R7nd0pE0wzmXdNePWTSyxOvyZ0cY",
-  authDomain: "orbityapp-f710e.firebaseapp.com",
-  projectId: "orbityapp-f710e",
-  storageBucket: "orbityapp-f710e.appspot.com",
-  messagingSenderId: "929526059094",
-  appId: "1:929526059094:web:61fb87a4f693ddd61b2bf7"
-};
-
-// Inicialização única e segura
-try {
-  if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-  }
-} catch (e) {
-  console.error('[SW] Firebase init error:', e);
-}
-
-const messaging = firebase.messaging();
-
-// Manter Firebase SDK satisfeito - não exibe notificação, apenas log
-// Isso evita que o SDK "engula" o evento push antes do handler universal
-messaging.onBackgroundMessage((payload) => {
-  console.log('[SW] onBackgroundMessage recebido (handled by push event):', payload);
-  // Retorna sem fazer nada - o push event universal cuida da exibição
-  return;
-});
+// NOTA: Firebase SDK não é mais necessário para data-only payloads
+// O evento 'push' universal abaixo cuida de tudo
 
 // Handler universal de push - funciona em todos os browsers incluindo Safari/iOS
 self.addEventListener('push', (event) => {
@@ -72,22 +41,24 @@ self.addEventListener('push', (event) => {
 
     console.log('[SW] Push payload:', JSON.stringify(msg));
 
-    const title = msg?.notification?.title || msg?.data?.title || 'Nova notificação';
-    const body = msg?.notification?.body || msg?.data?.body || '';
+    // Data-only payload: todos os dados vêm do campo 'data'
     const data = msg?.data || {};
+    const title = data?.title || 'Nova notificação';
+    const body = data?.body || '';
+    const icon = data?.icon || 'https://sistema-orbity.lovable.app/favicon.ico';
 
-    // Tag única baseada no ID da notificação ou timestamp
+    // Tag única baseada no ID da notificação (evita duplicação)
     const notificationTag = data?.notification_id || `orbity-${Date.now()}`;
 
     console.log('[SW] Exibindo notificação:', title, 'tag:', notificationTag);
 
     await self.registration.showNotification(title, {
       body,
-      icon: 'https://sistema-orbity.lovable.app/favicon.ico',
+      icon,
       badge: 'https://sistema-orbity.lovable.app/favicon.ico',
       data,
       tag: notificationTag,
-      renotify: true  // Força som/vibração mesmo com tag existente
+      renotify: false  // NÃO renotificar se tag igual (previne duplicatas)
     });
 
     console.log('[SW] Notificação exibida com sucesso');
