@@ -1,199 +1,204 @@
 
-# Correção de Duplicidade de Notificações
+# Correção Definitiva: Duplicação de Push Notifications
 
-## Resumo dos Problemas Identificados
+## Problema Identificado
 
-Após análise detalhada do código e dos dados no banco, identifiquei **3 causas principais** de duplicação:
+O sistema está enviando **DUAS notificações push** para cada evento porque:
 
-| # | Problema | Local | Impacto |
-|---|----------|-------|---------|
-| 1 | Criador que também é assignee recebe 2 notificações | Triggers SQL (posts/tasks) | Alta: duplicação em eventos de status |
-| 2 | Edge function executando em paralelo | `process-notifications` | Alta: duplicações em "Post/Tarefa próximo do prazo" |
-| 3 | Falta de deduplicação por user+entity | `processPosts()` e `processTasks()` | Média: sem controle granular por usuário |
+1. O payload FCM contém tanto `notification` (exibição automática pelo FCM) quanto `data` (processado pelo Service Worker)
+2. O FCM SDK exibe automaticamente a notificação via `notification`
+3. O Service Worker TAMBÉM exibe via `showNotification()` no evento `push`
 
----
-
-## Solução Técnica
-
-### 1. Corrigir Triggers SQL - Evitar notificar criador se já for assignee
-
-**Arquivos**: Nova migration SQL para atualizar `notify_post_update_events()` e `notify_task_update_events()`
-
-**Antes** (lógica atual - DUPLICA):
-```sql
--- Notifica todos os assignees
-FOR assignee IN SELECT user_id FROM post_assignments WHERE post_id = NEW.id
-LOOP
-  INSERT INTO notifications...
-END LOOP;
-
--- Depois notifica o criador separadamente (DUPLICA se criador = assignee)
-IF NEW.created_by IS NOT NULL THEN
-  INSERT INTO notifications...
-END IF;
-```
-
-**Depois** (lógica corrigida):
-```sql
--- Notifica todos os assignees
-FOR assignee IN SELECT user_id FROM post_assignments WHERE post_id = NEW.id
-LOOP
-  INSERT INTO notifications...
-END LOOP;
-
--- Notifica o criador APENAS se NÃO for assignee
-IF NEW.created_by IS NOT NULL THEN
-  -- Verifica se o criador NÃO está na lista de assignees
-  IF NOT EXISTS (
-    SELECT 1 FROM post_assignments 
-    WHERE post_id = NEW.id AND user_id = NEW.created_by
-  ) THEN
-    INSERT INTO notifications...
-  END IF;
-END IF;
-```
-
----
-
-### 2. Adicionar Lock de Processamento na Edge Function
-
-**Arquivo**: `supabase/functions/process-notifications/index.ts`
-
-Adicionar um sistema de "lock" usando a tabela `notification_tracking` para evitar execuções paralelas:
-
-```typescript
-// No início da função processPosts()
-const lockKey = `process_posts_${new Date().toISOString().split('T')[0]}`;
-const { data: existingLock } = await supabase
-  .from('notification_tracking')
-  .select('last_sent_at')
-  .eq('notification_type', 'process_lock')
-  .eq('entity_id', lockKey)
-  .single();
-
-// Se executou nos últimos 30 segundos, pular
-if (existingLock) {
-  const lastRun = new Date(existingLock.last_sent_at);
-  if ((Date.now() - lastRun.getTime()) < 30000) {
-    console.log('[Posts] Skipping - another process ran recently');
-    return;
-  }
-}
-
-// Adquirir lock
-await supabase.from('notification_tracking').upsert({
-  notification_type: 'process_lock',
-  entity_id: lockKey,
-  user_id: '00000000-0000-0000-0000-000000000000',
-  agency_id: '00000000-0000-0000-0000-000000000000',
-  last_sent_at: new Date().toISOString()
-}, { onConflict: 'notification_type,entity_id,user_id' });
-```
-
----
-
-### 3. Usar Deduplicação por User+Post/Task
-
-**Arquivo**: `supabase/functions/process-notifications/index.ts`
-
-Modificar `processPosts()` e `processTasks()` para usar o sistema de batch tracking que já existe:
-
-```typescript
-// Antes de criar notificações, verificar quais já foram enviadas
-const trackingRecords: BatchTrackingRecord[] = notificationsToCreate.map(n => ({
-  notification_type: 'post_upcoming', // ou 'task_upcoming'
-  entity_id: n.metadata.post_id,
-  user_id: n.user_id,
-  agency_id: n.agency_id,
-}));
-
-const recentlySent = await batchCheckNotifications(trackingRecords, 24);
-
-// Filtrar notificações que já foram enviadas
-const filteredNotifications = notificationsToCreate.filter(n => {
-  const key = `${n.metadata.post_id}_${n.user_id}`;
-  return !recentlySent.has(key);
-});
-
-await batchCreateNotifications(filteredNotifications);
-await batchTrackNotifications(trackingRecords.filter(r => 
-  !recentlySent.has(`${r.entity_id}_${r.user_id}`)
-));
-```
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Mudança |
-|---------|---------|
-| Nova migration SQL | Atualizar `notify_post_update_events()` e `notify_task_update_events()` para não duplicar quando criador = assignee |
-| `supabase/functions/process-notifications/index.ts` | Adicionar lock de processamento + usar batch tracking para posts/tasks |
-
----
-
-## Resultado Esperado
-
-| Cenário | Antes | Depois |
-|---------|-------|--------|
-| Criador que é assignee (status changed) | 2 notificações | 1 notificação |
-| Edge function chamada 2x em paralelo | Duplica tudo | Segunda execução ignorada |
-| "Post próximo de publicar" | Pode duplicar | Deduplicado por user+post |
-| "Tarefa próxima do prazo" | Pode duplicar | Deduplicado por user+task |
-
----
-
-## Diagrama do Fluxo Corrigido
+Resultado: 2 pushes idênticas com ~2 segundos de diferença
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                    FLUXO DE NOTIFICAÇÕES                        │
+│                    FLUXO ATUAL (DUPLICADO)                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  TRIGGERS (tempo real - eventos)                                │
-│  ───────────────────────────────                                │
-│  task_assignments INSERT → notify_task_assignment()             │
-│       └─ Notifica assignee                                      │
+│  Edge Function envia para FCM:                                  │
+│  {                                                              │
+│    notification: { title, body },  ←──── FCM exibe AQUI         │
+│    data: { ... }                   ←──── SW exibe AQUI          │
+│  }                                                              │
 │                                                                 │
-│  tasks UPDATE → notify_task_update_events()                     │
-│       ├─ Notifica assignees                                     │
-│       └─ Notifica criador SE NÃO for assignee ← CORREÇÃO        │
-│                                                                 │
-│  (mesmo para posts)                                             │
-│                                                                 │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  EDGE FUNCTION (cron - lembretes)                               │
-│  ─────────────────────────────────                              │
-│  process-notifications (a cada hora)                            │
-│       ├─ Verificar lock (30s) ← NOVA PROTEÇÃO                   │
-│       ├─ processReminders()                                     │
-│       ├─ processTasks() + batch tracking ← CORREÇÃO             │
-│       ├─ processPosts() + batch tracking ← CORREÇÃO             │
-│       └─ ...                                                    │
-│                                                                 │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  PUSH NOTIFICATIONS                                             │
-│  ──────────────────                                             │
-│  notifications INSERT → trg_push_on_new_notification            │
-│       └─ Chama send-push-notification (1 push por registro)     │
+│  FCM recebe e:                                                  │
+│    1. Exibe automaticamente via "notification" (push #1)        │
+│    2. Envia "push" event para Service Worker                    │
+│       └─ SW exibe via showNotification() (push #2)              │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Observações Técnicas
+## Solucao: Data-Only Payload
 
-1. **Por que usar lock de 30 segundos?**
-   - O cron pode disparar múltiplas instâncias quase simultaneamente
-   - 30s é suficiente para uma execução completa, mas curto o bastante para não bloquear execuções legítimas
+Enviar apenas `data` (sem `notification`) para que SOMENTE o Service Worker exiba a notificacao:
 
-2. **Por que não usar UNIQUE constraint?**
-   - Seria mais drástico e poderia causar erros silenciosos
-   - O batch tracking permite controle mais granular (ex: reenviar após 24h)
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    FLUXO CORRIGIDO (UNICO)                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Edge Function envia para FCM:                                  │
+│  {                                                              │
+│    data: { title, body, ... }   ←──── APENAS dados              │
+│  }                                                              │
+│                                                                 │
+│  FCM recebe e:                                                  │
+│    1. NAO exibe nada (sem "notification")                       │
+│    2. Envia "push" event para Service Worker                    │
+│       └─ SW exibe via showNotification() (push unico)           │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-3. **Push notifications não duplicam?**
-   - Correto! O trigger `trg_push_on_new_notification` só dispara 1x por INSERT
-   - Se houver 2 notificações duplicadas no banco, haverá 2 pushes (corrigimos na origem)
+---
+
+## Mudancas Tecnicas
+
+### 1. Edge Function: send-push-notification/index.ts
+
+Remover o campo `notification` do payload FCM e mover tudo para `data`:
+
+**Antes (duplica):**
+```typescript
+const message = {
+  message: {
+    token: fcmToken,
+    notification: {              // ← FCM exibe automaticamente
+      title: payload.title,
+      body: payload.body,
+    },
+    webpush: {
+      notification: {
+        icon: '...',
+        badge: '...',
+      },
+      fcm_options: { link: absoluteActionUrl },
+    },
+    data: {
+      ...payload.data,
+      click_action: absoluteActionUrl,
+    },
+  },
+};
+```
+
+**Depois (unico):**
+```typescript
+const message = {
+  message: {
+    token: fcmToken,
+    // SEM notification - deixa o Service Worker exibir
+    webpush: {
+      fcm_options: {
+        link: absoluteActionUrl,
+      },
+    },
+    data: {
+      title: payload.title,         // ← Movido para data
+      body: payload.body,           // ← Movido para data
+      icon: payload.icon || 'https://sistema-orbity.lovable.app/favicon.ico',
+      notification_id: payload.data?.notification_id || '',
+      action_url: absoluteActionUrl,
+      ...payload.data,
+    },
+  },
+};
+```
+
+---
+
+### 2. Service Worker: firebase-messaging-sw.js
+
+Atualizar para extrair dados corretamente do payload `data`:
+
+```javascript
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push event recebido');
+
+  if (!event.data) {
+    console.log('[SW] Push event sem dados');
+    return;
+  }
+
+  event.waitUntil((async () => {
+    let msg = {};
+    try {
+      msg = event.data.json();
+    } catch {
+      msg = { data: { body: event.data.text() } };
+    }
+
+    console.log('[SW] Push payload:', JSON.stringify(msg));
+
+    // Priorizar dados do campo 'data' (data-only payload)
+    const data = msg?.data || {};
+    const title = data?.title || msg?.notification?.title || 'Nova notificacao';
+    const body = data?.body || msg?.notification?.body || '';
+    const icon = data?.icon || 'https://sistema-orbity.lovable.app/favicon.ico';
+
+    // Tag unica baseada no ID da notificacao
+    const notificationTag = data?.notification_id || `orbity-${Date.now()}`;
+
+    console.log('[SW] Exibindo notificacao:', title, 'tag:', notificationTag);
+
+    await self.registration.showNotification(title, {
+      body,
+      icon,
+      badge: 'https://sistema-orbity.lovable.app/favicon.ico',
+      data,
+      tag: notificationTag,
+      renotify: false  // NAO renotificar se tag igual (previne duplicatas)
+    });
+
+    console.log('[SW] Notificacao exibida com sucesso');
+  })());
+});
+```
+
+---
+
+### 3. Remover onBackgroundMessage redundante
+
+O handler `onBackgroundMessage` do Firebase SDK nao e mais necessario com data-only payload:
+
+```javascript
+// REMOVER ou comentar este bloco:
+// messaging.onBackgroundMessage((payload) => {
+//   console.log('[SW] onBackgroundMessage recebido:', payload);
+//   return;
+// });
+```
+
+---
+
+## Arquivos a Modificar
+
+| Arquivo | Mudanca |
+|---------|---------|
+| `supabase/functions/send-push-notification/index.ts` | Remover `notification`, mover dados para `data` |
+| `public/firebase-messaging-sw.js` | Priorizar `data`, remover `onBackgroundMessage`, usar `renotify: false` |
+
+---
+
+## Por que Data-Only Payload?
+
+| Aspecto | Com `notification` | Data-Only |
+|---------|-------------------|-----------|
+| Quem exibe? | FCM automatico + SW | Apenas SW |
+| Controle | Limitado | Total |
+| Duplicacao | Possivel | Impossivel |
+| Tags dinamicas | Nao | Sim |
+| Funciona em iOS/Safari | Sim | Sim |
+
+---
+
+## Resultado Esperado
+
+- **Antes**: 2 push notifications por evento (1 do FCM + 1 do SW)
+- **Depois**: 1 push notification por evento (apenas do SW)
+
+A notificacao sera exibida com tag unica baseada no `notification_id`, impedindo qualquer duplicacao mesmo em cenarios de retry.
