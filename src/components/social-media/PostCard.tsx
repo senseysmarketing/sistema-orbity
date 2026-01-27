@@ -1,8 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
-import { Instagram, Facebook, Linkedin, Twitter, Youtube, Image, Film, LayoutGrid, Zap, Clock, AlertCircle, Users, Archive, Calendar } from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { Instagram, Facebook, Linkedin, Twitter, Youtube, Image, Film, LayoutGrid, Zap, Clock, Users, Archive, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PostDueDateBadge, getDueDateStatus, formatDueDate, formatPostDate } from "./PostDueDateBadge";
 
@@ -88,7 +86,6 @@ const getEffectiveDueDate = (post: SocialMediaPost): string | null | undefined =
 };
 
 export function PostCard({ post, compact = false, onClick, showArchived = false }: PostCardProps) {
-  const PlatformIcon = platformIcons[post.platform as keyof typeof platformIcons] || Instagram;
   const ContentTypeIcon = contentTypeIcons[post.post_type as keyof typeof contentTypeIcons] || Image;
   const clientColor = getClientColor(post.client_id);
   const statusInfo = statusConfig[post.status as keyof typeof statusConfig] || statusConfig.draft;
@@ -102,25 +99,27 @@ export function PostCard({ post, compact = false, onClick, showArchived = false 
     return (
       <div 
         className={cn(
-          "text-xs p-1.5 rounded border cursor-pointer hover:brightness-95 transition-all",
+          "text-xs p-1 sm:p-1.5 rounded border cursor-pointer hover:brightness-95 transition-all",
           isArchived && "opacity-60 border-dashed"
         )}
         onClick={(e) => onClick?.(e)}
         style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
       >
         <div className="flex items-center gap-1">
-          {isArchived && <Archive className="h-3 w-3 text-muted-foreground" />}
-          <ContentTypeIcon className="h-3 w-3" />
-          <span className="truncate flex-1">{post.title}</span>
-          <div className={`h-2 w-2 rounded-full ${statusInfo.color}`} />
+          {isArchived && <Archive className="h-2.5 sm:h-3 w-2.5 sm:w-3 text-muted-foreground flex-shrink-0" />}
+          <ContentTypeIcon className="h-2.5 sm:h-3 w-2.5 sm:w-3 flex-shrink-0" />
+          <span className="truncate flex-1 text-[10px] sm:text-xs">{post.title}</span>
+          {/* Indicador de due date com ícone colorido */}
+          {effectiveDueDate && dueDateStatus && dueDateStatus.type !== 'completed' && dueDateStatus.type !== 'on_time' && (
+            <Clock className={cn(
+              "h-2.5 w-2.5 flex-shrink-0",
+              dueDateStatus.type === 'overdue' && "text-red-500",
+              dueDateStatus.type === 'today' && "text-orange-500",
+              dueDateStatus.type === 'tomorrow' && "text-yellow-500",
+            )} />
+          )}
+          <div className={`h-1.5 sm:h-2 w-1.5 sm:w-2 rounded-full flex-shrink-0 ${statusInfo.color}`} />
         </div>
-        {/* Mostrar due_date no card compacto se existir e não estiver completo */}
-        {effectiveDueDate && dueDateStatus && dueDateStatus.type !== 'completed' && dueDateStatus.type !== 'on_time' && (
-          <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground">
-            <Clock className="h-2.5 w-2.5" />
-            <span>Arte: {formatDueDate(effectiveDueDate)}</span>
-          </div>
-        )}
       </div>
     );
   }
