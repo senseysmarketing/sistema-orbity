@@ -196,9 +196,9 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] md:max-h-[90vh] overflow-y-auto p-4 md:p-6">
           <DialogHeader>
-            <DialogTitle className="text-2xl">{task.title}</DialogTitle>
+            <DialogTitle className="text-xl md:text-2xl">{task.title}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -336,7 +336,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
             ) : null}
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             {onDuplicate && (
               <Button
                 variant="outline"
@@ -344,19 +344,21 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                   onDuplicate(task);
                   onOpenChange(false);
                 }}
+                className="w-full sm:w-auto"
               >
                 <Copy className="h-4 w-4 mr-2" />
-                Duplicar
+                <span className="hidden sm:inline">Duplicar</span>
               </Button>
             )}
             <Button
               variant="destructive"
               onClick={() => canDelete ? setShowDeleteAlert(true) : setShowNoPermissionAlert(true)}
+              className="w-full sm:w-auto"
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Excluir
+              <span className="hidden sm:inline">Excluir</span>
             </Button>
-            <Button onClick={handleEdit}>
+            <Button onClick={handleEdit} className="w-full sm:w-auto">
               <Pencil className="h-4 w-4 mr-2" />
               Editar
             </Button>

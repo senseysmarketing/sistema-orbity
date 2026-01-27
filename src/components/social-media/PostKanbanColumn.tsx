@@ -17,15 +17,15 @@ export function PostKanbanColumn({ id, title, color, posts, onPostClick }: PostK
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
-    <div className="space-y-4 min-w-[330px] w-[330px] flex-shrink-0">
-      <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
-        <div className={`w-3 h-3 ${color} rounded-full`}></div>
-        <h3 className="font-semibold">{title}</h3>
-        <Badge variant="secondary">{posts.length}</Badge>
+    <div className="space-y-3 md:space-y-4 min-w-[280px] md:min-w-[330px] w-[280px] md:w-[330px] flex-shrink-0">
+      <div className="flex items-center gap-2 px-2 md:px-3 py-2 bg-muted rounded-lg">
+        <div className={`w-2.5 md:w-3 h-2.5 md:h-3 ${color} rounded-full`}></div>
+        <h3 className="font-semibold text-sm md:text-base">{title}</h3>
+        <Badge variant="secondary" className="text-xs">{posts.length}</Badge>
       </div>
       <div
         ref={setNodeRef}
-        className={`space-y-3 min-h-[400px] max-h-[70vh] overflow-y-auto p-4 rounded-xl border-2 border-dashed transition-all duration-200 ${
+        className={`space-y-2 md:space-y-3 min-h-[300px] md:min-h-[400px] max-h-[60vh] md:max-h-[70vh] overflow-y-auto p-3 md:p-4 rounded-xl border-2 border-dashed transition-all duration-200 ${
           isOver 
             ? 'bg-primary/10 border-primary/50 shadow-lg scale-[1.02]' 
             : 'bg-muted/20 border-transparent hover:border-muted-foreground/20 hover:bg-muted/30'

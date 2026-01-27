@@ -124,3 +124,30 @@ All colors MUST be HSL.
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* PWA safe areas for mobile */
+.pwa-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.pwa-safe-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+/* Mobile bottom nav spacing - adds padding when bottom nav is present */
+.has-mobile-nav {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0));
+}
+
+/* Touch device improvements */
+@media (pointer: coarse) {
+  button:not(.no-touch-size),
+  [role="button"]:not(.no-touch-size) {
+    min-height: 44px;
+  }
+  
+  /* Ensure select triggers and inputs have adequate touch targets */
+  .touch-target {
+    min-height: 44px;
+  }
+}

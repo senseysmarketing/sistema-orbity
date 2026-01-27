@@ -96,10 +96,10 @@ export default function Agenda() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Agenda</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl md:text-3xl font-bold">Agenda</h1>
+        <p className="text-sm md:text-base text-muted-foreground">
           Gerencie reuniões comerciais e com clientes
         </p>
       </div>
@@ -117,9 +117,9 @@ export default function Agenda() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="grid lg:grid-cols-[280px_1fr] gap-6">
-          {/* Sidebar */}
-          <div className="space-y-4">
+        <div className="grid lg:grid-cols-[280px_1fr] gap-4 lg:gap-6">
+          {/* Sidebar - hidden on mobile */}
+          <div className="hidden lg:block space-y-4">
             <MiniCalendar
               selectedDate={currentDate}
               onDateSelect={handleMiniCalendarSelect}
