@@ -22,7 +22,19 @@ export function UpdatePrompt() {
     },
   });
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
+    try {
+      // Limpar todos os caches antes de atualizar para evitar conflitos
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        console.log('[PWA] Limpando caches antes de atualizar:', cacheNames);
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+    } catch (error) {
+      console.error('[PWA] Erro ao limpar caches:', error);
+    }
+    
+    // Agora atualizar o Service Worker
     updateServiceWorker(true);
   };
 
