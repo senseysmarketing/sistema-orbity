@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, Lock, Bell, Palette, Save, Shield, Mail, Phone, BarChart3, CreditCard, Users, Puzzle } from "lucide-react";
+import { User, Lock, Bell, Palette, Save, Shield, CreditCard, Users, Puzzle, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -120,6 +120,58 @@ export default function Settings() {
       toast({
         title: "Erro ao alterar senha",
         description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCacheReset = async () => {
+    try {
+      // 1. Desregistrar todos os Service Workers
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        console.log('[Settings] Desregistrando', registrations.length, 'Service Workers');
+        await Promise.all(registrations.map(r => r.unregister()));
+      }
+      
+      // 2. Limpar todos os caches do navegador
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        console.log('[Settings] Limpando caches:', cacheNames);
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+      
+      // 3. Preservar apenas autenticação no localStorage
+      const authKey = 'sb-ovookkywclrqfmtumelw-auth-token';
+      const authData = localStorage.getItem(authKey);
+      
+      // Limpar localStorage exceto auth
+      const keysToPreserve = [authKey];
+      Object.keys(localStorage).forEach(key => {
+        if (!keysToPreserve.includes(key)) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Restaurar auth se existia
+      if (authData) {
+        localStorage.setItem(authKey, authData);
+      }
+      
+      toast({
+        title: "Cache limpo!",
+        description: "A página será recarregada em instantes...",
+      });
+      
+      // Recarregar após pequeno delay para mostrar o toast
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error('[Settings] Erro ao limpar cache:', error);
+      toast({
+        title: "Erro ao limpar cache",
+        description: "Tente novamente.",
         variant: "destructive",
       });
     }
@@ -328,6 +380,19 @@ export default function Settings() {
                     </p>
                   </div>
                   <Switch disabled />
+                </div>
+
+                <div className="flex items-center justify-between p-4 border rounded-lg border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-orange-800 dark:text-orange-200">Limpar Cache do Aplicativo</h4>
+                    <p className="text-sm text-orange-700 dark:text-orange-300">
+                      Resolve problemas de refresh automático e dados desatualizados
+                    </p>
+                  </div>
+                  <Button variant="outline" onClick={handleCacheReset} className="border-orange-300 text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900/50">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Limpar Cache
+                  </Button>
                 </div>
 
                 <div className="flex items-center justify-between p-4 border rounded-lg border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
