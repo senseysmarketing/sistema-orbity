@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useAgency } from './useAgency';
@@ -67,6 +67,10 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [refreshing, setRefreshing] = useState(false);
   const [showRefreshAlert, setShowRefreshAlert] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState(0);
+  
+  // Refs para controlar visibilidade sem causar re-renders
+  const wasVisibleRef = useRef(true);
+  const lastVisibilityCheckRef = useRef(Date.now());
 
   const fetchPlans = async (forceRefresh = false) => {
     if (!forceRefresh) {
@@ -279,16 +283,27 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   };
 
   // Check if user has been away for too long when page becomes visible
+  // Using refs to avoid re-renders on every visibility change
   useEffect(() => {
-    if (isVisible && user) {
-      const timeAway = getTimeAway();
-      const AWAY_THRESHOLD = 10 * 60 * 1000; // 10 minutes
+    const now = Date.now();
+    const AWAY_THRESHOLD = 10 * 60 * 1000; // 10 minutes
+    
+    // Only process if transitioning TO visible AND was invisible before
+    if (isVisible && !wasVisibleRef.current) {
+      const timeAway = now - lastVisibilityCheckRef.current;
       
-      if (timeAway > AWAY_THRESHOLD) {
+      // Only show alert if away for too long
+      if (user && timeAway > AWAY_THRESHOLD) {
         setShowRefreshAlert(true);
       }
     }
-  }, [isVisible, user, getTimeAway]);
+    
+    // Update refs without causing re-render
+    wasVisibleRef.current = isVisible;
+    if (!isVisible) {
+      lastVisibilityCheckRef.current = now;
+    }
+  }, [isVisible]); // Removed user and getTimeAway from deps to prevent re-renders
 
   useEffect(() => {
     if (user) {
