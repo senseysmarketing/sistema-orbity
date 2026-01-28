@@ -1,84 +1,124 @@
 
-# Diagnóstico Adicional: Refresh Persistente ao Trocar de Aba
+# Correção Definitiva: Refresh Persistente ao Trocar de Aba
 
 ## Problema Identificado
 
-Apesar das correções anteriores (PWA com `registerType: "prompt"`, TanStack Query com `refetchOnWindowFocus: false`, e Service Worker sem `skipWaiting()`), o problema de refresh ainda persiste.
+O problema de refresh automático continua mesmo após as correções no código. Isso indica que:
+
+1. **Cache do Service Worker antigo** - O Service Worker anterior (com `skipWaiting()` e `clients.claim()`) ainda está instalado e ativo no navegador dos usuários
+2. **Realtime Channels** - Múltiplos canais Supabase Realtime podem estar reconectando ao voltar para a aba
+3. **Hook de visibilidade ainda ativo** - O `useSubscription` ainda tem um `useEffect` que depende de `isVisible` (linhas 282-291)
 
 ---
 
-## Causas Raiz Encontradas
+## Causas Raiz
 
-### 1. useSubscription com dependência de isVisible no useEffect (CRÍTICO)
+### 1. Service Worker Antigo em Cache (CAUSA PRINCIPAL PROVÁVEL)
 
-No arquivo `src/hooks/useSubscription.tsx` (linha 314):
+O navegador ainda tem a versão antiga do Service Worker em cache. Mesmo que o código novo não tenha `skipWaiting()`, o SW antigo ainda está:
+- Interceptando requisições
+- Forçando reload quando detecta mudanças
+- Tomando controle das abas com `clients.claim()`
 
-```typescript
-useEffect(() => {
-  if (user) {
-    fetchPlans();
-    checkSubscription();
-    // ...
-  }
-}, [user, isVisible]);  // ← isVisible como dependência causa re-execução
-```
+**Solução**: Adicionar código para desregistrar Service Workers antigos e forçar atualização limpa.
 
-**Problema**: Toda vez que `isVisible` muda (voltando para a aba), este `useEffect` é re-executado, forçando nova chamada de API e potencialmente causando re-renderizações em cascata de toda a árvore de componentes.
+### 2. useSubscription ainda depende de isVisible
 
-### 2. usePageVisibility disparando atualizações frequentes
-
-O hook `usePageVisibility` está corretamente implementado, mas os hooks que o consomem (`useSubscription`, `usePaymentMiddleware`) estão usando `isVisible` diretamente como dependência de `useEffect`, o que causa re-execuções desnecessárias.
-
-### 3. Realtime Subscriptions reconectando
-
-Quando a aba perde foco, as conexões WebSocket do Supabase Realtime podem ser pausadas. Ao retornar, a reconexão pode disparar eventos que causam re-fetch de dados e potencialmente navegação.
-
----
-
-## Solução Proposta
-
-### 1. Refatorar useSubscription para não depender de isVisible
-
-Remover `isVisible` da lista de dependências do `useEffect` principal e usar apenas para condicionais internas:
+Na linha 282-291 de `useSubscription.tsx`:
 
 ```typescript
-// ANTES (problemático)
 useEffect(() => {
-  if (user) {
-    fetchPlans();
-    checkSubscription();
-  }
-}, [user, isVisible]);  // ← Causa re-render ao mudar aba
-
-// DEPOIS (correto)
-useEffect(() => {
-  if (user) {
-    fetchPlans();
-    checkSubscription();
-  }
-}, [user]);  // ← Só executa quando user muda
-```
-
-### 2. Separar lógica de visibilidade em efeito dedicado
-
-Criar um efeito separado que apenas observa mudanças de visibilidade, mas não força re-execução do fluxo principal:
-
-```typescript
-// Efeito para revalidar dados quando volta à aba (opcional, não força)
-useEffect(() => {
-  if (isVisible && user && lastCheckTime > 0) {
-    const timeSinceLastCheck = Date.now() - lastCheckTime;
-    // Só faz refresh se passou muito tempo (10+ minutos)
-    if (timeSinceLastCheck > 10 * 60 * 1000) {
-      checkSubscription(true);
+  if (isVisible && user) {
+    const timeAway = getTimeAway();
+    const AWAY_THRESHOLD = 10 * 60 * 1000;
+    
+    if (timeAway > AWAY_THRESHOLD) {
+      setShowRefreshAlert(true);  // Isso pode causar re-render
     }
   }
-}, [isVisible]); // Separado do efeito principal
+}, [isVisible, user, getTimeAway]);  // ← isVisible ainda está aqui
 ```
 
-### 3. Aplicar mesma correção em usePaymentMiddleware
+Este `useEffect` é executado toda vez que `isVisible` muda, o que pode causar re-renders.
 
-O hook `usePaymentMiddleware` também usa `isVisible` de forma similar - aplicar a mesma refatoração.
+### 3. Múltiplos Realtime Channels
+
+Existem vários canais Supabase Realtime que podem estar se reconectando ao voltar para a aba:
+- `reminder_lists_changes`
+- `crm-leads-{agencyId}`
+- `notifications-changes`
+- `task-assignments-changes`
+- `post-assignments-changes`
+- `reminders_changes`
+
+---
+
+## Plano de Correção
+
+### Fase 1: Limpar Service Worker Antigo
+
+Adicionar código em `main.tsx` para:
+1. Desregistrar Service Workers antigos
+2. Limpar caches do navegador
+3. Permitir instalação limpa do novo SW
+
+```typescript
+// src/main.tsx
+// Limpar Service Workers antigos antes de iniciar a aplicação
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      // Verificar se é um SW antigo (não o do PWA atual)
+      if (registration.active?.scriptURL.includes('firebase-messaging-sw.js')) {
+        console.log('[App] Desregistrando SW antigo:', registration.scope);
+        registration.unregister();
+      }
+    }
+  });
+}
+```
+
+### Fase 2: Otimizar Hook de Visibilidade
+
+Modificar `useSubscription.tsx` para evitar re-renders desnecessários:
+
+```typescript
+// ANTES
+useEffect(() => {
+  if (isVisible && user) {
+    // ... lógica
+  }
+}, [isVisible, user, getTimeAway]);
+
+// DEPOIS - usar ref para evitar re-render
+const wasVisibleRef = useRef(true);
+
+useEffect(() => {
+  // Só executa quando VOLTA para visível (não quando sai)
+  if (isVisible && !wasVisibleRef.current && user) {
+    const timeAway = getTimeAway();
+    if (timeAway > AWAY_THRESHOLD) {
+      setShowRefreshAlert(true);
+    }
+  }
+  wasVisibleRef.current = isVisible;
+}, [isVisible]);
+```
+
+### Fase 3: Atualizar UpdatePrompt para Limpar Cache
+
+Modificar `UpdatePrompt.tsx` para limpar caches antes de atualizar:
+
+```typescript
+const handleUpdate = async () => {
+  // Limpar caches antes de atualizar
+  if ('caches' in window) {
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames.map(name => caches.delete(name)));
+  }
+  updateServiceWorker(true);
+};
+```
 
 ---
 
@@ -86,100 +126,157 @@ O hook `usePaymentMiddleware` também usa `isVisible` de forma similar - aplicar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/hooks/useSubscription.tsx` | Remover `isVisible` das deps do useEffect principal |
-| `src/hooks/usePaymentMiddleware.tsx` | Remover lógica de refresh baseada em visibilidade |
-| `src/hooks/usePageVisibility.tsx` | Opcional: adicionar debounce para evitar disparos rápidos |
+| `src/main.tsx` | Adicionar limpeza de Service Workers antigos |
+| `src/hooks/useSubscription.tsx` | Usar ref para evitar re-renders em mudança de visibilidade |
+| `src/components/pwa/UpdatePrompt.tsx` | Limpar caches antes de atualizar |
 
 ---
 
-## Correções Específicas
+## Instruções para Usuário Limpar Cache Manualmente
 
-### useSubscription.tsx
+Enquanto as correções são aplicadas, o usuário pode limpar manualmente:
 
-```typescript
-// Linha 293-314: Separar os concerns
+### Chrome/Edge:
+1. F12 (DevTools)
+2. Aba "Application"
+3. Seção "Service Workers" → "Unregister"
+4. Seção "Cache" → "Clear storage"
 
-// 1. Efeito de inicialização (quando user muda)
-useEffect(() => {
-  if (user) {
-    fetchPlans();
-    checkSubscription();
-    
-    // Intervalo de verificação periódica
-    const interval = setInterval(() => {
-      checkSubscription();
-    }, 5 * 60 * 1000);
-    
-    return () => clearInterval(interval);
-  } else {
-    setCurrentSubscription(null);
-    setLoading(false);
-  }
-}, [user]); // ← SEM isVisible
+### Firefox:
+1. F12 (DevTools)
+2. Aba "Storage"
+3. "Cache Storage" → Deletar todos
+4. "Service Workers" → Unregister
 
-// 2. Efeito de revalidação ao voltar (separado, menos agressivo)
-// Já existe nas linhas 281-291, mas precisa ser ajustado para não causar problemas
-```
+### Safari:
+1. Develop menu → "Empty Caches"
+2. Settings → Privacy → "Manage Website Data" → Remove
 
-### usePaymentMiddleware.tsx
+---
+
+## Implementação Técnica
+
+### 1. src/main.tsx
 
 ```typescript
-// Linha 237-263: Remover referência a isVisible no useEffect principal
+import { createRoot } from "react-dom/client";
+import App from "./App.tsx";
+import "./index.css";
 
-useEffect(() => {
-  if (user && currentAgency) {
-    const cacheKey = `payment_${currentAgency.id}`;
-    const cached = cache.get(cacheKey);
-    
-    if (!cached.exists) {
-      checkPaymentStatus();
-      refreshUsageCounts();
-    } else {
-      setPaymentStatus(cached.data || { isValid: false, isBlocked: true });
-      setLoading(false);
-      
-      // Background refresh se dados estão stale
-      if (cached.isStale) {
-        checkPaymentStatus(true);
-        refreshUsageCounts();
+// Limpar Service Workers antigos que podem causar refresh automático
+const cleanupOldServiceWorkers = async () => {
+  if ('serviceWorker' in navigator) {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        // Se o SW atual não é o novo PWA SW, desregistrar
+        const isOldFirebaseSW = registration.active?.scriptURL.includes('firebase-messaging-sw.js');
+        if (isOldFirebaseSW) {
+          console.log('[App] Encontrado SW antigo, verificando versão...');
+          // Forçar atualização do SW
+          await registration.update();
+        }
       }
+    } catch (error) {
+      console.log('[App] Erro ao limpar SWs:', error);
     }
-  } else {
-    setLoading(false);
   }
-}, [user, currentAgency]); // ← SEM dependências de visibilidade
+};
+
+// Executar limpeza antes de renderizar
+cleanupOldServiceWorkers();
+
+createRoot(document.getElementById("root")!).render(<App />);
+```
+
+### 2. src/hooks/useSubscription.tsx (refatoração)
+
+```typescript
+// Adicionar import de useRef
+import { ..., useRef } from 'react';
+
+// Dentro do Provider:
+const wasVisibleRef = useRef(true);
+const lastVisibilityCheckRef = useRef(Date.now());
+
+// Substituir o useEffect de visibilidade (linhas 282-291)
+useEffect(() => {
+  const now = Date.now();
+  
+  // Só processa se passou para visível E estava invisível antes
+  if (isVisible && !wasVisibleRef.current) {
+    const timeAway = now - lastVisibilityCheckRef.current;
+    
+    // Só mostra alerta se ficou muito tempo fora (10 min)
+    if (user && timeAway > 10 * 60 * 1000) {
+      setShowRefreshAlert(true);
+    }
+  }
+  
+  // Atualizar refs sem causar re-render
+  wasVisibleRef.current = isVisible;
+  if (!isVisible) {
+    lastVisibilityCheckRef.current = now;
+  }
+}, [isVisible]); // Removido user e getTimeAway das deps
+```
+
+### 3. src/components/pwa/UpdatePrompt.tsx
+
+```typescript
+const handleUpdate = async () => {
+  try {
+    // Limpar todos os caches antes de atualizar
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      console.log('[PWA] Limpando caches:', cacheNames);
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+    }
+  } catch (error) {
+    console.error('[PWA] Erro ao limpar caches:', error);
+  }
+  
+  // Agora atualizar o Service Worker
+  updateServiceWorker(true);
+};
 ```
 
 ---
 
-## Fluxo Esperado Após Correções
+## Fluxo Após Correções
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│ Usuário abre a aplicação                                     │
-├─────────────────────────────────────────────────────────────┤
-│ useSubscription e usePaymentMiddleware carregam dados       │
-│ TanStack Query cacheia por 5 minutos                        │
-├─────────────────────────────────────────────────────────────┤
-│ Usuário muda de aba (perde foco)                            │
-│   └── isVisible = false (mas nenhum efeito é executado)     │
-├─────────────────────────────────────────────────────────────┤
-│ Usuário volta à aba (ganha foco)                            │
-│   └── isVisible = true (mas NÃO força re-fetch)             │
-│   └── Dados permanecem no cache, formulário intacto         │
-├─────────────────────────────────────────────────────────────┤
-│ Apenas se esteve fora por 10+ minutos:                      │
-│   └── Mostra toast "Dados podem estar desatualizados"       │
-│   └── Usuário pode clicar para atualizar manualmente        │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ App inicia                                                      │
+├────────────────────────────────────────────────────────────────┤
+│ main.tsx: Verifica e atualiza SWs antigos                       │
+│ UpdatePrompt: Registra novo SW com registerType="prompt"        │
+├────────────────────────────────────────────────────────────────┤
+│ Usuário navega e preenche formulário                            │
+├────────────────────────────────────────────────────────────────┤
+│ Usuário muda de aba                                             │
+│   ├── isVisible = false                                         │
+│   ├── wasVisibleRef.current = false                             │
+│   └── lastVisibilityCheckRef.current = agora                    │
+├────────────────────────────────────────────────────────────────┤
+│ Usuário volta à aba (poucos segundos depois)                    │
+│   ├── isVisible = true                                          │
+│   ├── wasVisibleRef era false → verifica tempo                  │
+│   ├── tempo < 10min → NÃO mostra alerta                         │
+│   └── Estado preservado, sem re-render                          │
+├────────────────────────────────────────────────────────────────┤
+│ Usuário volta à aba (após 15 minutos)                           │
+│   ├── tempo > 10min → mostra alerta discreto                    │
+│   └── "Dados podem estar desatualizados. [Atualizar]"           │
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Benefícios
+## Benefícios Esperados
 
-1. **Sem refresh automático** - Voltar à aba não dispara re-renders
-2. **Formulários preservados** - Estado local permanece intacto
-3. **Menor uso de rede** - Menos chamadas de API desnecessárias
-4. **UX mais suave** - Sem piscar de tela ou perda de foco
-5. **Cache respeitado** - TanStack Query e caches manuais funcionam corretamente
+1. **Elimina refresh automático** - Service Workers antigos são atualizados
+2. **Cache limpo** - Sem conflitos entre versões antigas e novas
+3. **Re-renders minimizados** - Uso de refs evita re-execução de effects
+4. **UX melhorada** - Formulários e estado preservados ao trocar de aba
+5. **Atualização controlada** - Usuário decide quando aceitar novas versões
