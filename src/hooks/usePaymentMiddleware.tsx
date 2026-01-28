@@ -247,20 +247,18 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
         setPaymentStatus(cached.data || { isValid: false, isBlocked: true });
         setLoading(false);
         
-        // Schedule a background refresh if data is getting stale
+        // Background refresh if data is stale (no visibility check to avoid re-renders)
         if (cached.isStale) {
           setTimeout(() => {
-            if (isVisible) {
-              checkPaymentStatus(true);
-              refreshUsageCounts();
-            }
+            checkPaymentStatus(true);
+            refreshUsageCounts();
           }, 1000);
         }
       }
     } else {
       setLoading(false);
     }
-  }, [user, currentAgency]);
+  }, [user, currentAgency]); // Removed visibility dependency to prevent tab-switch re-renders
 
   // Remove automatic blocking - just show warning toasts instead
   useEffect(() => {
