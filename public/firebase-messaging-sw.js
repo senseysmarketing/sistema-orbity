@@ -1,20 +1,21 @@
 // Firebase Cloud Messaging Service Worker (Data-Only Payload - sem duplicação)
 
-// Forçar ativação imediata do Service Worker
-self.addEventListener('install', (event) => {
+// Instalação do Service Worker (sem skipWaiting para evitar reload automático)
+self.addEventListener('install', () => {
   console.log('[SW] Installing...');
-  self.skipWaiting();
+  // NÃO usar skipWaiting() aqui - deixar o PWA controlar a atualização
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', () => {
   console.log('[SW] Activating...');
-  event.waitUntil(clients.claim());
+  // NÃO usar clients.claim() aqui - evita assumir controle e forçar reload
 });
 
-// Handler para mensagens do client (forçar skipWaiting)
+// Handler para mensagens do client (skipWaiting controlado pelo PWA)
 self.addEventListener('message', (event) => {
   console.log('[SW] Message received:', event.data);
   if (event.data?.type === 'SKIP_WAITING') {
+    // Só faz skipWaiting quando explicitamente solicitado pelo PWA
     self.skipWaiting();
   }
 });

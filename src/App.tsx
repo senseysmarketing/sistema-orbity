@@ -39,8 +39,16 @@ import ClientDetail from "./pages/ClientDetail";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Install from "./pages/Install";
 import { InstallPrompt } from "./components/pwa/InstallPrompt";
+import { UpdatePrompt } from "./components/pwa/UpdatePrompt";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutos
+    },
+  },
+});
 
 // Componente para rastrear PageViews em navegação SPA
 function PageViewTracker() {
@@ -112,6 +120,7 @@ const App = () => (
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                       <InstallPrompt />
+                      <UpdatePrompt />
                     </PaymentMiddlewareProvider>
                   </BrowserRouter>
                 </TooltipProvider>
