@@ -295,14 +295,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       fetchPlans();
       checkSubscription();
 
-      // Reduced frequency: check every 5 minutes instead of 30 seconds
+      // Reduced frequency: check every 5 minutes
       const interval = setInterval(() => {
-        // Only check if page is visible and user is active
-        if (isVisible) {
-          const timeSinceLastCheck = Date.now() - lastCheckTime;
-          if (timeSinceLastCheck > 5 * 60 * 1000) { // 5 minutes
-            checkSubscription();
-          }
+        const timeSinceLastCheck = Date.now() - lastCheckTime;
+        if (timeSinceLastCheck > 5 * 60 * 1000) {
+          checkSubscription();
         }
       }, 5 * 60 * 1000);
       
@@ -311,7 +308,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       setCurrentSubscription(null);
       setLoading(false);
     }
-  }, [user, isVisible]);
+  }, [user]); // Removed isVisible to prevent re-renders on tab switch
 
   // Check subscription when user changes agency
   useEffect(() => {
