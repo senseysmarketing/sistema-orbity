@@ -24,17 +24,30 @@ export function UpdatePrompt() {
 
   const handleUpdate = async () => {
     try {
-      // Limpar todos os caches antes de atualizar para evitar conflitos
+      // 1. Limpar TODOS os caches antes de atualizar
       if ('caches' in window) {
         const cacheNames = await caches.keys();
-        console.log('[PWA] Limpando caches antes de atualizar:', cacheNames);
+        console.log('[PWA] Limpando todos os caches:', cacheNames);
         await Promise.all(cacheNames.map(name => caches.delete(name)));
       }
+      
+      // 2. Desregistrar SWs antigos que não são o principal
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          // Manter apenas o SW principal (escopo raiz '/')
+          const isRootScope = reg.scope.endsWith('/') && reg.scope.split('/').length <= 4;
+          if (!isRootScope) {
+            console.log('[PWA] Removendo SW secundário:', reg.scope);
+            await reg.unregister();
+          }
+        }
+      }
     } catch (error) {
-      console.error('[PWA] Erro ao limpar caches:', error);
+      console.error('[PWA] Erro ao limpar antes de atualizar:', error);
     }
     
-    // Agora atualizar o Service Worker
+    // 3. Atualizar o Service Worker principal
     updateServiceWorker(true);
   };
 
@@ -47,7 +60,7 @@ export function UpdatePrompt() {
   return (
     <Alert className="fixed top-4 right-4 w-auto max-w-sm z-50 border-primary/20 bg-background shadow-lg animate-in slide-in-from-top-2">
       <RefreshCw className="h-4 w-4 text-primary" />
-      <AlertTitle className="text-sm font-semibold">Dados Desatualizados</AlertTitle>
+      <AlertTitle className="text-sm font-semibold">Atualização Disponível</AlertTitle>
       <AlertDescription className="text-xs text-muted-foreground mt-1">
         Uma nova versão está disponível.
       </AlertDescription>
