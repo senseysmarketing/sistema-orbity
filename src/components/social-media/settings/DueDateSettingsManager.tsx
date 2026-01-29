@@ -4,10 +4,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useSocialMediaSettings } from "@/hooks/useSocialMediaSettings";
+import { useAgency } from "@/hooks/useAgency";
 import { Loader2, Info } from "lucide-react";
 
 export function DueDateSettingsManager() {
-  const { settings, loading, updateSettings, getDefaultDueDateDaysBefore } = useSocialMediaSettings();
+  const { currentAgency } = useAgency();
+  const { settings, loading, updateSettings, getDefaultDueDateDaysBefore } = useSocialMediaSettings(currentAgency?.id);
   const [daysBefore, setDaysBefore] = useState<number>(3);
   const [saving, setSaving] = useState(false);
 
