@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { 
-  Mail, Phone, Building, Calendar, DollarSign, Target, Clock, 
-  Edit, Tag, User, Globe, MessageSquare, TrendingUp, History
+  Mail, Phone, Building, Calendar, DollarSign, Clock, 
+  Edit, Tag, Target, MessageSquare, History, ClipboardList
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -51,6 +51,38 @@ interface LeadDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   onEdit: (lead: Lead) => void;
 }
+
+// Campos padrão do Facebook que não são perguntas do formulário
+const STANDARD_FIELDS = ['full_name', 'email', 'phone_number', 'company_name', 'form_name', 'page_name', 'ad_id', 'adset_id', 'campaign_id', 'form_id', 'page_id', 'platform', 'leadgen_id'];
+
+// Formatar pergunta: "qual_o_seu_vgv_mensal?" → "Qual o seu VGV mensal?"
+const formatQuestion = (key: string) => {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/\?$/, '')
+    .replace(/^\w/, c => c.toUpperCase()) + '?';
+};
+
+// Formatar resposta: "menos_de_r$500.000" → "Menos de R$ 500.000"
+const formatAnswer = (value: string | null | undefined) => {
+  if (!value) return '-';
+  return String(value)
+    .replace(/_/g, ' ')
+    .replace(/r\$/gi, 'R$ ')
+    .replace(/^\w/, c => c.toUpperCase());
+};
+
+// Extrair apenas as perguntas personalizadas
+const getFormQuestions = (customFields: any) => {
+  if (!customFields || typeof customFields !== 'object') return [];
+  
+  return Object.entries(customFields)
+    .filter(([key]) => !STANDARD_FIELDS.includes(key.toLowerCase()))
+    .map(([question, answer]) => ({
+      question: formatQuestion(question),
+      answer: formatAnswer(answer as string)
+    }));
+};
 
 export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDetailsDialogProps) {
   const [history, setHistory] = useState<LeadHistoryItem[]>([]);
@@ -98,6 +130,7 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
       setLoadingHistory(false);
     }
   };
+
   if (!lead) return null;
 
   const formatCurrency = (value: number) => {
@@ -106,6 +139,10 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
 
   const formatDate = (date: string) => {
     return format(new Date(date), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR });
+  };
+
+  const formatShortDate = (date: string) => {
+    return format(new Date(date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
   };
 
   const getStatusColor = (status: string) => {
@@ -147,15 +184,17 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
   };
 
   const isMetaAdsLead = lead.source === 'facebook_leads';
+  const formQuestions = getFormQuestions(lead.custom_fields);
+  const daysInFunnel = Math.floor((new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <DialogTitle className="text-2xl">{lead.name}</DialogTitle>
-              <DialogDescription className="flex items-center gap-2 flex-wrap">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1 min-w-0 flex-1">
+              <DialogTitle className="text-xl truncate">{lead.name}</DialogTitle>
+              <DialogDescription className="flex items-center gap-2 flex-wrap text-xs">
                 {lead.company && (
                   <span className="flex items-center gap-1">
                     <Building className="h-3 w-3" />
@@ -169,7 +208,7 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
                 </span>
               </DialogDescription>
             </div>
-            <div className="flex gap-2 flex-wrap justify-end">
+            <div className="flex gap-2 flex-wrap justify-end flex-shrink-0">
               <Badge className={getStatusColor(lead.status)}>
                 {getStatusLabel(lead.status)}
               </Badge>
@@ -180,260 +219,241 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="mt-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="details">Detalhes</TabsTrigger>
-            <TabsTrigger value="notes">Notas</TabsTrigger>
-            <TabsTrigger value="history">Histórico</TabsTrigger>
-          </TabsList>
+        <div className="flex-1 overflow-y-auto space-y-4 py-4 min-h-0">
+          {/* Metrics Cards */}
+          <div className="grid gap-4 grid-cols-2">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2 font-medium">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  Valor do Lead
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-green-600">
+                  {formatCurrency(lead.value)}
+                </div>
+              </CardContent>
+            </Card>
 
-          <div className="mt-4 overflow-y-auto max-h-[calc(90vh-280px)]">
-            <TabsContent value="overview" className="space-y-4">
-              {/* Contact Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Informações de Contato
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-3">
-                  {lead.email && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                        <Mail className="h-4 w-4 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-xs text-muted-foreground">Email</p>
-                        <p className="text-sm font-medium">{lead.email}</p>
-                      </div>
-                    </div>
-                  )}
-                  {lead.phone && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                        <Phone className="h-4 w-4 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-xs text-muted-foreground">Telefone</p>
-                        <p className="text-sm font-medium">{lead.phone}</p>
-                      </div>
-                    </div>
-                  )}
-                  {lead.company && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
-                        <Building className="h-4 w-4 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-xs text-muted-foreground">Empresa</p>
-                        <p className="text-sm font-medium">{lead.company}</p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Lead Value & Timeline */}
-              <div className="grid gap-4 md:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <DollarSign className="h-4 w-4" />
-                      Valor do Lead
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatCurrency(lead.value)}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Valor estimado da oportunidade
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Tempo no Funil
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {Math.floor((new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))} dias
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Desde {format(new Date(lead.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Important Dates */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Datas e Follow-ups
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Criado em</span>
-                    <span className="text-sm font-medium">{formatDate(lead.created_at)}</span>
-                  </div>
-                  {lead.last_contact && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Último contato</span>
-                      <span className="text-sm font-medium">{formatDate(lead.last_contact)}</span>
-                    </div>
-                  )}
-                  {lead.next_contact && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Próximo contato</span>
-                      <Badge variant={new Date(lead.next_contact) < new Date() ? "destructive" : "secondary"}>
-                        {formatDate(lead.next_contact)}
-                      </Badge>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Meta Ads Data */}
-              {isMetaAdsLead && (
-                <Card className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Target className="h-5 w-5 text-blue-600" />
-                      Dados do Meta Ads
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-blue-600 text-white">📱 Lead de Anúncio</Badge>
-                    </div>
-                    {lead.custom_fields?.form_name && (
-                      <p className="text-sm">
-                        <span className="text-muted-foreground">Formulário:</span>{' '}
-                        <span className="font-medium">{lead.custom_fields.form_name}</span>
-                      </p>
-                    )}
-                    {lead.custom_fields?.page_name && (
-                      <p className="text-sm">
-                        <span className="text-muted-foreground">Página:</span>{' '}
-                        <span className="font-medium">{lead.custom_fields.page_name}</span>
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-
-            <TabsContent value="details" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Informações Adicionais</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Status</p>
-                      <Badge className={getStatusColor(lead.status)}>
-                        {getStatusLabel(lead.status)}
-                      </Badge>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Temperatura</p>
-                      <Badge className={getTemperatureColor(lead.temperature)}>
-                        {getTemperatureLabel(lead.temperature)}
-                      </Badge>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Origem</p>
-                      <Badge variant="secondary">{lead.source}</Badge>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Última atualização</p>
-                      <p className="text-sm">{format(new Date(lead.updated_at), 'dd/MM/yyyy', { locale: ptBR })}</p>
-                    </div>
-                  </div>
-
-                  {lead.tags && lead.tags.length > 0 && (
-                    <>
-                      <Separator />
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-2">Tags</p>
-                        <div className="flex flex-wrap gap-1">
-                          {lead.tags.map((tag, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              <Tag className="h-3 w-3 mr-1" />
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="notes" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    Notas do Lead
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {lead.notes ? (
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{lead.notes}</p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">Nenhuma nota adicionada</p>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="history" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <History className="h-4 w-4" />
-                    Histórico de Movimentações
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {loadingHistory ? (
-                    <p className="text-sm text-muted-foreground">Carregando histórico...</p>
-                  ) : history.length === 0 ? (
-                    <p className="text-sm text-muted-foreground italic">Nenhuma movimentação registrada</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {history.map((item) => (
-                        <div key={item.id} className="flex gap-3 pb-4 border-b last:border-0 last:pb-0">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{item.description}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {format(new Date(item.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })} 
-                              {item.profiles && ` • por ${item.profiles.name}`}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2 font-medium">
+                  <Clock className="h-4 w-4 text-blue-600" />
+                  Tempo no Funil
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-blue-600">
+                  {daysInFunnel} {daysInFunnel === 1 ? 'dia' : 'dias'}
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </Tabs>
 
-        <DialogFooter className="mt-4">
+          {/* Contact Information */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2 font-medium">
+                <Mail className="h-4 w-4" />
+                Informações de Contato
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-2">
+              {lead.email && (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10">
+                    <Mail className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">Email</p>
+                    <p className="text-sm font-medium truncate">{lead.email}</p>
+                  </div>
+                </div>
+              )}
+              {lead.phone && (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10">
+                    <Phone className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">Telefone</p>
+                    <p className="text-sm font-medium">{lead.phone}</p>
+                  </div>
+                </div>
+              )}
+              {lead.company && (
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10">
+                    <Building className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">Empresa</p>
+                    <p className="text-sm font-medium">{lead.company}</p>
+                  </div>
+                </div>
+              )}
+              {!lead.email && !lead.phone && !lead.company && (
+                <p className="text-sm text-muted-foreground italic">Nenhuma informação de contato</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Meta Ads Form Questions */}
+          {isMetaAdsLead && formQuestions.length > 0 && (
+            <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2 font-medium">
+                  <ClipboardList className="h-4 w-4 text-blue-600" />
+                  Respostas do Formulário
+                  <Badge variant="secondary" className="ml-auto text-xs">Meta Ads</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {formQuestions.map((item, index) => (
+                  <div key={index} className="border-b border-blue-200 dark:border-blue-800 last:border-0 pb-3 last:pb-0">
+                    <p className="text-xs text-muted-foreground">{item.question}</p>
+                    <p className="text-sm font-medium mt-0.5">{item.answer}</p>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Meta Ads Source Info (when no form questions) */}
+          {isMetaAdsLead && formQuestions.length === 0 && (
+            <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2 font-medium">
+                  <Target className="h-4 w-4 text-blue-600" />
+                  Dados do Meta Ads
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Badge className="bg-blue-600 text-white">📱 Lead de Anúncio</Badge>
+                {lead.custom_fields?.form_name && (
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Formulário:</span>{' '}
+                    <span className="font-medium">{lead.custom_fields.form_name}</span>
+                  </p>
+                )}
+                {lead.custom_fields?.page_name && (
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Página:</span>{' '}
+                    <span className="font-medium">{lead.custom_fields.page_name}</span>
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Dates and Follow-ups */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2 font-medium">
+                <Calendar className="h-4 w-4" />
+                Datas e Follow-ups
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">Criado em</span>
+                <span className="text-sm font-medium">{formatShortDate(lead.created_at)}</span>
+              </div>
+              {lead.last_contact && (
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">Último contato</span>
+                  <span className="text-sm font-medium">{formatShortDate(lead.last_contact)}</span>
+                </div>
+              )}
+              {lead.next_contact && (
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">Próximo contato</span>
+                  <Badge variant={new Date(lead.next_contact) < new Date() ? "destructive" : "secondary"} className="text-xs">
+                    {formatShortDate(lead.next_contact)}
+                  </Badge>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Tags */}
+          {lead.tags && lead.tags.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2 font-medium">
+                  <Tag className="h-4 w-4" />
+                  Tags
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-1">
+                  {lead.tags.map((tag, index) => (
+                    <Badge key={index} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Accordions for Notes and History */}
+          <Accordion type="multiple" className="space-y-2">
+            {/* Notes */}
+            <AccordionItem value="notes" className="border rounded-lg">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <MessageSquare className="h-4 w-4" />
+                  Notas do Lead
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                {lead.notes ? (
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{lead.notes}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">Nenhuma nota adicionada</p>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* History */}
+            <AccordionItem value="history" className="border rounded-lg">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <History className="h-4 w-4" />
+                  Histórico de Movimentações
+                  {history.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 text-xs">{history.length}</Badge>
+                  )}
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                {loadingHistory ? (
+                  <p className="text-sm text-muted-foreground">Carregando histórico...</p>
+                ) : history.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">Nenhuma movimentação registrada</p>
+                ) : (
+                  <div className="space-y-3">
+                    {history.map((item) => (
+                      <div key={item.id} className="flex gap-3 pb-3 border-b last:border-0 last:pb-0">
+                        <div className="flex-1">
+                          <p className="text-sm">{item.description}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(item.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })} 
+                            {item.profiles && ` • por ${item.profiles.name}`}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+
+        <DialogFooter className="flex-shrink-0 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Fechar
           </Button>
