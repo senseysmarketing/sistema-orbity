@@ -40,6 +40,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Install from "./pages/Install";
 import { InstallPrompt } from "./components/pwa/InstallPrompt";
 import { UpdatePrompt } from "./components/pwa/UpdatePrompt";
+import { PushActivationBanner } from "./components/notifications/PushActivationBanner";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -121,6 +122,7 @@ const App = () => (
                       </Routes>
                       <InstallPrompt />
                       <UpdatePrompt />
+                      <PushActivationBanner />
                     </PaymentMiddlewareProvider>
                   </BrowserRouter>
                 </TooltipProvider>

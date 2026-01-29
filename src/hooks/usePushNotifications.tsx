@@ -33,6 +33,11 @@ const isIOS = (): boolean => {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 };
 
+// Helper to detect Android
+const isAndroid = (): boolean => {
+  return /android/i.test(navigator.userAgent);
+};
+
 export function usePushNotifications() {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [token, setToken] = useState<string | null>(null);
@@ -184,6 +189,7 @@ export function usePushNotifications() {
           standalone: standalone,
           displayMode: standalone ? 'standalone' : 'browser',
           isIOS: ios,
+          isAndroid: isAndroid(),
           generatedAt: new Date().toISOString(),
         },
         platform: 'web',
@@ -376,6 +382,7 @@ export function usePushNotifications() {
     hasFirebaseConfig,
     isStandaloneMode,
     isIOS: isIOS(),
+    isAndroid: isAndroid(),
     requestPermission,
     disablePushNotifications,
   };

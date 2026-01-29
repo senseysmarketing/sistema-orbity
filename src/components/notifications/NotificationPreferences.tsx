@@ -66,6 +66,7 @@ function PushNotificationSection() {
     token,
     isStandaloneMode,
     isIOS,
+    isAndroid,
   } = usePushNotifications();
 
   if (!hasFirebaseConfig) {
@@ -155,6 +156,18 @@ function PushNotificationSection() {
         </div>
       )}
       
+      {/* Android instructions */}
+      {isAndroid && !isStandaloneMode && !isEnabled && (
+        <div className="ml-6 p-2 rounded-md bg-blue-500/10 border border-blue-500/30">
+          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+            💡 Dica para Android:
+          </p>
+          <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
+            Para melhor experiência, instale o app clicando no menu ⋮ e "Instalar aplicativo" ou "Adicionar à tela inicial".
+          </p>
+        </div>
+      )}
+      
       <p className="text-xs text-muted-foreground ml-6">
         {isEnabled 
           ? `✓ Notificações push ativadas${isStandaloneMode ? ' (PWA)' : ''}. Você receberá alertas mesmo com o app em segundo plano.`
@@ -173,6 +186,7 @@ function PushNotificationSection() {
           permission={permission}
           isStandaloneMode={isStandaloneMode}
           isIOS={isIOS}
+          isAndroid={isAndroid}
           isSupported={isSupported}
         />
       )}
