@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { User, Lock, Bell, Palette, Save, Shield, CreditCard, Users, Puzzle, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,10 @@ export default function Settings() {
     avatar_url: '',
   });
   const [loading, setLoading] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [updatingPassword, setUpdatingPassword] = useState(false);
   
   const { theme, setTheme } = useTheme();
   const { profile: userProfile, signOut } = useAuth();
@@ -109,19 +114,66 @@ export default function Settings() {
     }
   };
 
+  const { currentAgency } = useAgency();
+
   const updatePassword = async () => {
-    try {
-      // Implementar mudança de senha via Supabase
+    if (!newPassword || !confirmPassword) {
       toast({
-        title: "Funcionalidade em desenvolvimento",
-        description: "A alteração de senha será implementada em breve.",
+        title: "Campos obrigatórios",
+        description: "Preencha a nova senha e a confirmação.",
+        variant: "destructive",
       });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Senhas não coincidem",
+        description: "A nova senha e a confirmação devem ser iguais.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "Senha muito curta",
+        description: "A senha deve ter pelo menos 6 caracteres.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setUpdatingPassword(true);
+      
+      const { data, error } = await supabase.functions.invoke('update-user-password', {
+        body: {
+          target_user_id: userProfile?.user_id,
+          new_password: newPassword,
+          agency_id: currentAgency?.id,
+        }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: "Senha alterada!",
+        description: "Sua senha foi atualizada com sucesso.",
+      });
+
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowPasswordDialog(false);
     } catch (error: any) {
       toast({
         title: "Erro ao alterar senha",
-        description: error.message,
+        description: error.message || "Tente novamente.",
         variant: "destructive",
       });
+    } finally {
+      setUpdatingPassword(false);
     }
   };
 
@@ -366,11 +418,53 @@ export default function Settings() {
                       Atualize sua senha para manter sua conta segura
                     </p>
                   </div>
-                  <Button variant="outline" onClick={updatePassword}>
+                  <Button variant="outline" onClick={() => setShowPasswordDialog(true)}>
                     <Lock className="mr-2 h-4 w-4" />
                     Alterar Senha
                   </Button>
                 </div>
+
+                {/* Dialog de Alteração de Senha */}
+                <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Alterar Senha</DialogTitle>
+                      <DialogDescription>
+                        Digite sua nova senha. Ela deve ter pelo menos 6 caracteres.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="new-password">Nova Senha</Label>
+                        <Input
+                          id="new-password"
+                          type="password"
+                          placeholder="Digite a nova senha"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="confirm-password">Confirmar Senha</Label>
+                        <Input
+                          id="confirm-password"
+                          type="password"
+                          placeholder="Confirme a nova senha"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+                        Cancelar
+                      </Button>
+                      <Button onClick={updatePassword} disabled={updatingPassword}>
+                        {updatingPassword ? 'Salvando...' : 'Alterar Senha'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="space-y-1">
