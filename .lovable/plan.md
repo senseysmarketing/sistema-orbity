@@ -1,169 +1,240 @@
 
 
-# Correção: Push Multi-Dispositivo com Token Único por Device
+# Correção: Aviso de Atualização Aparecendo Com Frequência Demais
 
 ## Problema Atual
 
-A lógica atual desativa **todos** os tokens do usuário quando um novo é registrado, impedindo notificações em múltiplos dispositivos.
+O componente `UpdatePrompt` mostra o aviso de atualização sempre que o Service Worker detecta uma nova versão, mas:
+
+1. **Não há cooldown** - após clicar em "Mais tarde", o aviso pode reaparecer na próxima verificação
+2. **Não persiste a recusa** - a recusa não é salva no localStorage
+3. **Verifica a cada 1 hora** - muito frequente para mostrar o prompt
 
 ## Solução Proposta
 
-Criar um **identificador único por tipo de dispositivo** e desativar apenas tokens antigos do **mesmo tipo de dispositivo**, mantendo tokens de outros dispositivos ativos.
+Implementar um sistema de **cooldown inteligente** com as seguintes regras:
+
+| Ação do Usuário | Comportamento |
+|-----------------|---------------|
+| Clica em "Mais tarde" | Esconde por **24 horas** |
+| Clica em "X" | Esconde por **4 horas** |
+| Ignora (não interage) | Continua visível |
+| Atualização aplicada | Reset do cooldown |
 
 ---
 
-## Estratégia de Identificação
-
-Vamos criar um `deviceType` baseado em características únicas:
-
-| Dispositivo | isIOS | isAndroid | standalone | deviceType |
-|-------------|-------|-----------|------------|------------|
-| iPhone PWA | true | false | true | `ios-pwa` |
-| iPhone Safari | true | false | false | `ios-browser` |
-| Android PWA | false | true | true | `android-pwa` |
-| Android Chrome | false | true | false | `android-browser` |
-| Mac/PC Chrome | false | false | false | `desktop-browser` |
-| Mac/PC PWA | false | false | true | `desktop-pwa` |
-
----
-
-## Arquivos a Modificar
+## Arquivo a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/hooks/usePushNotifications.tsx` | Criar deviceType, salvar no device_info, e desativar apenas tokens do mesmo deviceType |
-| `supabase/functions/send-push-notification/index.ts` | Adicionar headers TTL e Urgency |
+| `src/components/pwa/UpdatePrompt.tsx` | Adicionar lógica de cooldown com localStorage |
 
 ---
 
-## Implementação Frontend
+## Implementação
 
-### 1. Função para gerar deviceType
+### 1. Constantes de Cooldown
 
 ```typescript
-// Helper para gerar identificador único do tipo de dispositivo
-const getDeviceType = (): string => {
-  const ios = isIOS();
-  const android = isAndroid();
-  const standalone = isStandalone();
+const DISMISS_KEY = 'pwa_update_dismissed_at';
+const DISMISS_COOLDOWN_HOURS = 24; // "Mais tarde" = 24h
+const QUICK_DISMISS_COOLDOWN_HOURS = 4; // "X" = 4h
+```
+
+### 2. Função para verificar se deve mostrar
+
+```typescript
+const shouldShowPrompt = (): boolean => {
+  const dismissedAt = localStorage.getItem(DISMISS_KEY);
+  if (!dismissedAt) return true;
   
-  if (ios) return standalone ? 'ios-pwa' : 'ios-browser';
-  if (android) return standalone ? 'android-pwa' : 'android-browser';
-  return standalone ? 'desktop-pwa' : 'desktop-browser';
+  const dismissedTime = parseInt(dismissedAt, 10);
+  const hoursSinceDismiss = (Date.now() - dismissedTime) / (1000 * 60 * 60);
+  
+  // Verificar se passou o cooldown
+  const cooldownHours = localStorage.getItem('pwa_dismiss_type') === 'quick' 
+    ? QUICK_DISMISS_COOLDOWN_HOURS 
+    : DISMISS_COOLDOWN_HOURS;
+    
+  return hoursSinceDismiss >= cooldownHours;
 };
 ```
 
-### 2. Lógica de saveToken atualizada
+### 3. Handlers atualizados
 
 ```typescript
-const saveToken = useCallback(async (fcmToken: string) => {
-  if (!user || !currentAgency) {
-    console.log('[Push] Cannot save token - no user or agency');
-    return;
-  }
+// "Mais tarde" - cooldown de 24h
+const handleDismiss = () => {
+  localStorage.setItem(DISMISS_KEY, Date.now().toString());
+  localStorage.setItem('pwa_dismiss_type', 'full');
+  setNeedRefresh(false);
+};
 
-  const standalone = isStandalone();
-  const ios = isIOS();
-  const android = isAndroid();
-  const deviceType = getDeviceType();
+// "X" - cooldown de 4h
+const handleQuickDismiss = () => {
+  localStorage.setItem(DISMISS_KEY, Date.now().toString());
+  localStorage.setItem('pwa_dismiss_type', 'quick');
+  setNeedRefresh(false);
+};
 
-  try {
-    // Buscar tokens existentes do usuário
-    const { data: existingTokens } = await supabase
-      .from('push_subscriptions')
-      .select('id, fcm_token, device_info')
-      .eq('user_id', user.id)
-      .eq('is_active', true);
+// Atualizar - limpa o cooldown
+const handleUpdate = async () => {
+  localStorage.removeItem(DISMISS_KEY);
+  localStorage.removeItem('pwa_dismiss_type');
+  // ... resto da lógica existente
+};
+```
 
-    // Desativar apenas tokens do MESMO tipo de dispositivo (exceto o atual)
-    if (existingTokens && existingTokens.length > 0) {
-      const tokensToDeactivate = existingTokens.filter(sub => {
-        // Se é o mesmo token, não desativa
-        if (sub.fcm_token === fcmToken) return false;
-        
-        // Verifica se é do mesmo tipo de dispositivo
-        const existingDeviceType = sub.device_info?.deviceType;
-        return existingDeviceType === deviceType;
-      });
+### 4. Renderização condicional
 
-      if (tokensToDeactivate.length > 0) {
-        const idsToDeactivate = tokensToDeactivate.map(t => t.id);
-        await supabase
-          .from('push_subscriptions')
-          .update({ is_active: false })
-          .in('id', idsToDeactivate);
-        
-        console.log(`[Push] Deactivated ${tokensToDeactivate.length} old ${deviceType} tokens`);
+```typescript
+// Só mostra se needRefresh E passou o cooldown
+if (!needRefresh || !shouldShowPrompt()) return null;
+```
+
+---
+
+## Código Final
+
+```typescript
+import { useRegisterSW } from 'virtual:pwa-register/react';
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RefreshCw, X } from "lucide-react";
+
+const DISMISS_KEY = 'pwa_update_dismissed_at';
+const DISMISS_TYPE_KEY = 'pwa_dismiss_type';
+const DISMISS_COOLDOWN_HOURS = 24;      // "Mais tarde" = 24h
+const QUICK_DISMISS_COOLDOWN_HOURS = 4; // "X" = 4h
+
+export function UpdatePrompt() {
+  const {
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegisteredSW(swUrl, r) {
+      console.log('[PWA] Service Worker registrado:', swUrl);
+      // Verificar atualizações a cada 1 hora
+      if (r) {
+        setInterval(() => {
+          r.update();
+        }, 60 * 60 * 1000);
       }
-    }
+    },
+    onRegisterError(error) {
+      console.error('[PWA] Erro ao registrar SW:', error);
+    },
+  });
 
-    // Upsert o novo token com deviceType no device_info
-    const { error } = await supabase.from('push_subscriptions').upsert({
-      user_id: user.id,
-      agency_id: currentAgency.id,
-      fcm_token: fcmToken,
-      device_info: {
-        userAgent: navigator.userAgent,
-        platform: navigator.platform,
-        language: navigator.language,
-        standalone: standalone,
-        displayMode: standalone ? 'standalone' : 'browser',
-        isIOS: ios,
-        isAndroid: android,
-        deviceType: deviceType,  // NOVO: identificador do tipo de dispositivo
-        generatedAt: new Date().toISOString(),
-      },
-      platform: 'web',
-      is_active: true,
-      updated_at: new Date().toISOString(),
-    }, { 
-      onConflict: 'user_id,fcm_token' 
-    });
-
-    if (error) throw error;
+  // Verificar se passou o cooldown desde a última recusa
+  const shouldShowPrompt = (): boolean => {
+    const dismissedAt = localStorage.getItem(DISMISS_KEY);
+    if (!dismissedAt) return true;
     
-    console.log(`[Push] Token saved for ${deviceType} (standalone: ${standalone})`);
-  } catch (error) {
-    console.error('[Push] Failed to save token:', error);
-  }
-}, [user, currentAgency]);
+    const dismissedTime = parseInt(dismissedAt, 10);
+    const hoursSinceDismiss = (Date.now() - dismissedTime) / (1000 * 60 * 60);
+    
+    const dismissType = localStorage.getItem(DISMISS_TYPE_KEY);
+    const cooldownHours = dismissType === 'quick' 
+      ? QUICK_DISMISS_COOLDOWN_HOURS 
+      : DISMISS_COOLDOWN_HOURS;
+      
+    return hoursSinceDismiss >= cooldownHours;
+  };
+
+  const handleUpdate = async () => {
+    // Limpar cooldown ao atualizar
+    localStorage.removeItem(DISMISS_KEY);
+    localStorage.removeItem(DISMISS_TYPE_KEY);
+    
+    try {
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        console.log('[PWA] Limpando todos os caches:', cacheNames);
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+      
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          const isRootScope = reg.scope.endsWith('/') && reg.scope.split('/').length <= 4;
+          if (!isRootScope) {
+            console.log('[PWA] Removendo SW secundário:', reg.scope);
+            await reg.unregister();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[PWA] Erro ao limpar antes de atualizar:', error);
+    }
+    
+    updateServiceWorker(true);
+  };
+
+  // "Mais tarde" - cooldown maior (24h)
+  const handleDismiss = () => {
+    localStorage.setItem(DISMISS_KEY, Date.now().toString());
+    localStorage.setItem(DISMISS_TYPE_KEY, 'full');
+    setNeedRefresh(false);
+  };
+
+  // Botão X - cooldown menor (4h)
+  const handleQuickDismiss = () => {
+    localStorage.setItem(DISMISS_KEY, Date.now().toString());
+    localStorage.setItem(DISMISS_TYPE_KEY, 'quick');
+    setNeedRefresh(false);
+  };
+
+  // Só mostra se há atualização E passou o cooldown
+  if (!needRefresh || !shouldShowPrompt()) return null;
+
+  return (
+    <Alert className="fixed top-4 right-4 w-auto max-w-sm z-50 border-primary/20 bg-background shadow-lg animate-in slide-in-from-top-2">
+      <RefreshCw className="h-4 w-4 text-primary" />
+      <AlertTitle className="text-sm font-semibold">Atualização Disponível</AlertTitle>
+      <AlertDescription className="text-xs text-muted-foreground mt-1">
+        Uma nova versão está disponível.
+      </AlertDescription>
+      <div className="flex gap-2 mt-3">
+        <Button 
+          size="sm" 
+          variant="ghost" 
+          onClick={handleDismiss}
+          className="h-7 text-xs"
+        >
+          Mais tarde
+        </Button>
+        <Button 
+          size="sm" 
+          onClick={handleUpdate}
+          className="h-7 text-xs"
+        >
+          Atualizar
+        </Button>
+      </div>
+      <Button
+        size="icon"
+        variant="ghost"
+        onClick={handleQuickDismiss}
+        className="absolute top-2 right-2 h-6 w-6"
+      >
+        <X className="h-3 w-3" />
+      </Button>
+    </Alert>
+  );
+}
 ```
 
 ---
 
-## Implementação Backend
+## Comportamento Final
 
-### Adicionar headers no send-push-notification
+| Situação | Resultado |
+|----------|-----------|
+| Usuário clica "Mais tarde" | Aviso some por 24 horas |
+| Usuário clica "X" | Aviso some por 4 horas |
+| Passa o cooldown + nova atualização | Aviso aparece novamente |
+| Usuário atualiza | Cooldown é limpo |
 
-```typescript
-webpush: {
-  headers: {
-    TTL: '86400',      // 24h de persistência
-    Urgency: 'high',   // Entrega imediata para iOS/Android
-  },
-  fcm_options: {
-    link: absoluteActionUrl,
-  },
-},
-```
-
----
-
-## Resultado Final
-
-| Cenário | Comportamento |
-|---------|---------------|
-| Usuário ativa no iPhone PWA | Token `ios-pwa` ativo |
-| Mesmo usuário ativa no Mac Chrome | Token `desktop-browser` ativo, iPhone continua ativo |
-| Usuário reinstala PWA no iPhone | Token antigo `ios-pwa` desativado, novo `ios-pwa` ativo |
-| Push enviado | Vai para iPhone E Mac simultaneamente |
-
----
-
-## Benefícios
-
-1. **Multi-dispositivo real**: Mac + iPhone + Android recebem notificações
-2. **Sem duplicação**: Apenas 1 token por tipo de dispositivo
-3. **Auto-limpeza**: Reinstalar o PWA limpa token antigo do mesmo device
-4. **Logs claros**: Console mostra qual deviceType foi registrado
+Isso garante que o aviso não seja intrusivo, mas ainda notifique o usuário sobre atualizações importantes após um período razoável.
 
