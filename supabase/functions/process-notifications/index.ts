@@ -40,43 +40,82 @@ interface BatchTrackingRecord {
 const LOCK_DURATION_MS = 30000; // 30 seconds
 const SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
 
-async function acquireProcessLock(lockName: string): Promise<boolean> {
-  const lockKey = `${lockName}_${new Date().toISOString().split('T')[0]}`;
+// Generate a deterministic UUID from a string (UUID v5-like)
+function stringToUUID(str: string): string {
+  let hash1 = 0;
+  let hash2 = 0;
+  let hash3 = 0;
   
-  const { data: existingLock } = await supabase
-    .from('notification_tracking')
-    .select('last_sent_at')
-    .eq('notification_type', 'process_lock')
-    .eq('entity_id', lockKey)
-    .eq('user_id', SYSTEM_UUID)
-    .single();
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash1 = ((hash1 << 5) - hash1 + char) | 0;
+    hash2 = ((hash2 << 7) - hash2 + char) | 0;
+    hash3 = ((hash3 << 11) - hash3 + char) | 0;
+  }
+  
+  const hex1 = Math.abs(hash1).toString(16).padStart(8, '0').slice(-8);
+  const hex2 = Math.abs(hash2).toString(16).padStart(8, '0').slice(-8);
+  const hex3 = Math.abs(hash3).toString(16).padStart(8, '0').slice(-8);
+  
+  // Format as UUID v4 (but deterministic): xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx
+  return `${hex1}-${hex2.slice(0, 4)}-4${hex2.slice(5, 8)}-8${hex3.slice(1, 4)}-${hex3.slice(4)}${hex1.slice(0, 4)}${hex2.slice(0, 4)}`;
+}
 
-  if (existingLock) {
-    const lastRun = new Date(existingLock.last_sent_at);
-    const timeSinceLastRun = Date.now() - lastRun.getTime();
-    
-    if (timeSinceLastRun < LOCK_DURATION_MS) {
-      console.log(`🔒 Lock '${lockName}' still active (${Math.round(timeSinceLastRun / 1000)}s ago) - skipping`);
-      return false;
+async function acquireProcessLock(lockName: string): Promise<boolean> {
+  const today = new Date().toISOString().split('T')[0];
+  const lockKeyString = `${lockName}_${today}`;
+  const lockKey = stringToUUID(lockKeyString);
+  
+  console.log(`🔐 Lock attempt: '${lockKeyString}' → UUID: ${lockKey}`);
+  
+  try {
+    const { data: existingLock, error: selectError } = await supabase
+      .from('notification_tracking')
+      .select('last_sent_at')
+      .eq('notification_type', 'process_lock')
+      .eq('entity_id', lockKey)
+      .eq('user_id', SYSTEM_UUID)
+      .single();
+
+    if (selectError && selectError.code !== 'PGRST116') {
+      // PGRST116 = no rows found (expected for first run)
+      console.warn(`⚠️ Lock select error for '${lockName}':`, selectError.message);
+      // On error, proceed with execution to avoid blocking
+      return true;
     }
+
+    if (existingLock) {
+      const lastRun = new Date(existingLock.last_sent_at);
+      const timeSinceLastRun = Date.now() - lastRun.getTime();
+      
+      if (timeSinceLastRun < LOCK_DURATION_MS) {
+        console.log(`🔒 Lock '${lockName}' still active (${Math.round(timeSinceLastRun / 1000)}s ago) - skipping`);
+        return false;
+      }
+    }
+
+    // Acquire lock
+    const { error: upsertError } = await supabase.from('notification_tracking').upsert({
+      notification_type: 'process_lock',
+      entity_id: lockKey,
+      user_id: SYSTEM_UUID,
+      agency_id: SYSTEM_UUID,
+      last_sent_at: new Date().toISOString()
+    }, { onConflict: 'notification_type,entity_id,user_id' });
+
+    if (upsertError) {
+      console.warn(`⚠️ Lock upsert error for '${lockName}':`, upsertError.message);
+      // On error, proceed with execution to avoid blocking all notifications
+      return true;
+    }
+
+    console.log(`🔓 Lock '${lockName}' acquired successfully`);
+    return true;
+  } catch (err) {
+    console.error(`❌ Lock exception for '${lockName}':`, err);
+    // On any exception, proceed to avoid blocking
+    return true;
   }
-
-  // Acquire lock
-  const { error } = await supabase.from('notification_tracking').upsert({
-    notification_type: 'process_lock',
-    entity_id: lockKey,
-    user_id: SYSTEM_UUID,
-    agency_id: SYSTEM_UUID,
-    last_sent_at: new Date().toISOString()
-  }, { onConflict: 'notification_type,entity_id,user_id' });
-
-  if (error) {
-    console.error(`Error acquiring lock '${lockName}':`, error);
-    return false;
-  }
-
-  console.log(`🔓 Lock '${lockName}' acquired successfully`);
-  return true;
 }
 
 // ============================================
