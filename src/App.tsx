@@ -38,9 +38,7 @@ import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Install from "./pages/Install";
-import { InstallPrompt } from "./components/pwa/InstallPrompt";
 import { UpdatePrompt } from "./components/pwa/UpdatePrompt";
-import { PushActivationBanner } from "./components/notifications/PushActivationBanner";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -120,9 +118,7 @@ const App = () => (
                         
                         <Route path="*" element={<NotFound />} />
                       </Routes>
-                      <InstallPrompt />
                       <UpdatePrompt />
-                      <PushActivationBanner />
                     </PaymentMiddlewareProvider>
                   </BrowserRouter>
                 </TooltipProvider>

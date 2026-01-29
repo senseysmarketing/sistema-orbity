@@ -11,6 +11,8 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { HelpButton } from "@/components/help/HelpButton";
 import { TourTooltip } from "@/components/tour/TourTooltip";
 import { NoAgencyScreen } from "@/components/agency/NoAgencyScreen";
+import { InstallPrompt } from "@/components/pwa/InstallPrompt";
+import { PushActivationBanner } from "@/components/notifications/PushActivationBanner";
 
 export function AppLayout() {
   const { user, loading: authLoading } = useAuth();
@@ -79,6 +81,10 @@ export function AppLayout() {
       {/* Global components */}
       <HelpButton />
       <TourTooltip />
+      
+      {/* PWA & Notification banners - only shown when authenticated */}
+      <InstallPrompt />
+      <PushActivationBanner />
     </SidebarProvider>
   );
 }
