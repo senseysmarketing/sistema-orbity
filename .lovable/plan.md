@@ -1,140 +1,122 @@
 
-
-# Correção: Resumo Diário Não Sendo Enviado
+# Correção: Orçamento Diário Calculando Campanhas/Conjuntos Inativos
 
 ## Problema Identificado
 
-Após análise completa dos logs e banco de dados, identifiquei que o **Resumo Diário não está sendo enviado desde 27 de Janeiro** por causa de um erro no sistema de lock.
+Na tela de Controle de Tráfego → Painel de Clientes, o **orçamento diário** da conta "Aliança Casas de Madeira" está mostrando R$41 quando deveria ser R$26.
 
 ### Causa Raiz
 
-O campo `entity_id` na tabela `notification_tracking` é do tipo **UUID**, mas o código do lock tenta inserir uma **string**:
+O cálculo atual na edge function `facebook-account-summary` tem dois problemas:
+
+1. **Campanhas com CBO (Campaign Budget Optimization)**: Quando a campanha usa orçamento a nível de campanha, o código soma o `daily_budget` da campanha se ela estiver ATIVA, mas não verifica se a campanha inteira deveria contribuir
+
+2. **Ad Sets com orçamento individual**: Quando o orçamento é a nível de conjunto (ABO), o código soma todos os ad sets ATIVOS, mas **não verifica se a campanha pai também está ATIVA**
+
+### Lógica Atual Problemática
 
 ```typescript
-// Código problemático
-const lockKey = `${lockName}_${new Date().toISOString().split('T')[0]}`;
-// Resulta em: "process_notifications_2026-01-29" (não é um UUID!)
+// Campanhas - soma daily_budget de campanhas ativas
+for (const campaign of campaignsData.data) {
+  if (campaign.status === 'ACTIVE' || campaign.effective_status === 'ACTIVE') {
+    if (campaign.daily_budget) {
+      campaignDailyBudget += parseFloat(campaign.daily_budget) / 100
+    }
+  }
+}
 
-await supabase.from('notification_tracking').upsert({
-  entity_id: lockKey,  // ❌ String inválida para campo UUID
-  // ...
-});
+// Ad Sets - soma daily_budget de ad sets ativos
+for (const adset of adsetsData.data) {
+  if (adset.status === 'ACTIVE' || adset.effective_status === 'ACTIVE') {
+    if (adset.daily_budget) {
+      adsetDailyBudget += parseFloat(adset.daily_budget) / 100
+    }
+  }
+}
+
+// Problema: Se campanha = 0 e adset > 0, usa adset
+// MAS não verifica se a campanha pai do adset está ativa!
 ```
 
-### Erro nos Logs
+### Problema Adicional
 
-```
-ERROR: invalid input syntax for type uuid: "process_notifications_2026-01-29"
-```
-
-Quando o upsert falha, a função `acquireProcessLock` retorna `false`, e a lógica interpreta isso como "outro processo está rodando" - **bloqueando todos os envios subsequentes**.
+O campo `effective_status` de um ad set pode ser `ACTIVE` mesmo que sua campanha pai esteja `PAUSED`. Isso porque `effective_status` representa o status do próprio objeto, não considera a hierarquia completa.
 
 ---
 
 ## Solução
 
-### Parte 1: Corrigir o Sistema de Lock
+Modificar a edge function `facebook-account-summary` para:
 
-O lock precisa usar UUIDs válidos ou uma abordagem diferente:
+1. **Primeiro**, buscar as campanhas e criar um mapa de campanhas ATIVAS
+2. **Depois**, ao iterar os ad sets, verificar se a campanha pai está no mapa de campanhas ativas
+3. Só somar o orçamento de ad sets cujas campanhas pai estão ATIVAS
 
-**Opção A - Usar UUID v5 determinístico (recomendada):**
-```typescript
-import { v5 as uuidv5 } from 'uuid';
-
-const NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8'; // DNS namespace
-
-async function acquireProcessLock(lockName: string): Promise<boolean> {
-  const today = new Date().toISOString().split('T')[0];
-  const lockKey = uuidv5(`${lockName}_${today}`, NAMESPACE);
-  // Agora lockKey é um UUID válido
-  // ...
-}
-```
-
-**Opção B - Usar tabela separada para locks:**
-Criar uma tabela específica com campo `lock_name TEXT` ao invés de usar `notification_tracking`.
-
-### Parte 2: Melhorar Tratamento de Erros
-
-Quando o lock falha por erro de banco, NÃO considerar como "outro processo rodando", e sim permitir a execução:
+### Código Corrigido
 
 ```typescript
-async function acquireProcessLock(lockName: string): Promise<boolean> {
-  // ... código do lock ...
-  
-  const { error } = await supabase.from('notification_tracking').upsert({...});
+// 1. Buscar campanhas e criar mapa de IDs ativos
+const activeCampaignIds = new Set<string>()
+let campaignDailyBudget = 0
 
-  if (error) {
-    // Se for erro de formato, não bloquear - permitir execução
-    if (error.code === '22P02') {
-      console.warn(`Lock format error for '${lockName}', proceeding anyway`);
-      return true; // Permite a execução
+if (campaignsData.data) {
+  for (const campaign of campaignsData.data) {
+    // Só considerar ACTIVE (não PAUSED, DELETED, etc)
+    if (campaign.effective_status === 'ACTIVE') {
+      activeCampaignIds.add(campaign.id)
+      activeCampaignsCount++
+      
+      // Somar orçamento da campanha (CBO)
+      if (campaign.daily_budget) {
+        campaignDailyBudget += parseFloat(campaign.daily_budget) / 100
+      }
     }
-    console.error(`Error acquiring lock '${lockName}':`, error);
-    return true; // Em caso de erro, melhor tentar do que bloquear
   }
-  // ...
+}
+
+// 2. Buscar ad sets com campo campaign_id para verificar hierarquia
+const adsetsUrl = `...&fields=id,status,effective_status,daily_budget,updated_time,campaign_id&...`
+
+// 3. Iterar ad sets verificando se campanha pai está ativa
+let adsetDailyBudget = 0
+
+if (adsetsData.data) {
+  for (const adset of adsetsData.data) {
+    // Só somar se o ad set está ATIVO E a campanha pai está ATIVA
+    if (adset.effective_status === 'ACTIVE' && activeCampaignIds.has(adset.campaign_id)) {
+      if (adset.daily_budget) {
+        adsetDailyBudget += parseFloat(adset.daily_budget) / 100
+      }
+    }
+  }
 }
 ```
 
 ---
 
-## Arquivos a Modificar
+## Mudanças Detalhadas
 
-| Arquivo | Mudança |
-|---------|---------|
-| `supabase/functions/process-notifications/index.ts` | Corrigir sistema de lock para usar UUID válido e melhorar tratamento de erros |
+### Arquivo: `supabase/functions/facebook-account-summary/index.ts`
 
----
-
-## Implementação
-
-Vou modificar a função `acquireProcessLock` para:
-
-1. Gerar um UUID determinístico baseado no nome do lock + data usando SHA-1 hash convertido para formato UUID
-2. Quando há erro no banco, permitir a execução ao invés de bloquear
-3. Adicionar logs mais detalhados para debugging
-
-```typescript
-// Gerar UUID v5 determinístico a partir de uma string
-function stringToUUID(str: string): string {
-  // Simple hash-based UUID generation (UUID v5-like)
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  
-  const hex = Math.abs(hash).toString(16).padStart(12, '0');
-  // Format as UUID (version 4 format but deterministic)
-  return `00000000-0000-4000-8000-${hex.slice(-12)}`;
-}
-
-async function acquireProcessLock(lockName: string): Promise<boolean> {
-  const today = new Date().toISOString().split('T')[0];
-  const lockKey = stringToUUID(`${lockName}_${today}`);
-  
-  console.log(`🔐 Attempting to acquire lock '${lockName}' with key ${lockKey}`);
-  
-  // ... rest of the lock logic with improved error handling
-}
-```
+| Seção | Mudança |
+|-------|---------|
+| Linha ~114 | Mudar query de campanhas para usar `effective_status === 'ACTIVE'` (mais restritivo) |
+| Linha ~122 | Criar `Set<string>` com IDs de campanhas ativas |
+| Linha ~143 | Adicionar `campaign_id` na query de ad sets |
+| Linha ~153 | Verificar se `campaign_id` está no set de campanhas ativas antes de somar orçamento |
 
 ---
 
 ## Benefícios
 
-1. **Resumos diários funcionarão novamente** - Lock não bloqueará mais por erro de formato
-2. **Locks válidos no banco** - UUIDs determinísticos por dia
-3. **Resiliência** - Erros de lock não impedem processamento
-4. **Debugging melhorado** - Logs mais claros
+1. **Orçamento preciso** - Só soma campanhas e conjuntos realmente ativos
+2. **Hierarquia respeitada** - Ad sets de campanhas pausadas não são contados
+3. **Contagem de campanhas correta** - `active_campaigns_count` refletirá apenas campanhas com `effective_status = 'ACTIVE'`
 
 ---
 
-## Após Implementação
+## Testes
 
-Depois de fazer o deploy, será necessário:
-1. Aguardar o próximo cron job às 8h (11h UTC)
-2. Ou testar manualmente chamando a edge function
-
+Após implementação:
+- Verificar que "Aliança Casas de Madeira" mostra R$26 de orçamento
+- Validar outras contas para garantir que os valores estão corretos
