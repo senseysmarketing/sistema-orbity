@@ -115,16 +115,20 @@ serve(async (req) => {
         const campaignsResponse = await fetch(campaignsUrl)
         const campaignsData = await campaignsResponse.json()
 
+        // Criar Set de IDs de campanhas REALMENTE ativas para validação hierárquica
+        const activeCampaignIds = new Set<string>()
         let activeCampaignsCount = 0
         let campaignDailyBudget = 0
         let lastCampaignUpdate: string | null = null
 
         if (campaignsData.data) {
           for (const campaign of campaignsData.data) {
-            if (campaign.status === 'ACTIVE' || campaign.effective_status === 'ACTIVE') {
+            // Usar apenas effective_status === 'ACTIVE' (mais restritivo e preciso)
+            if (campaign.effective_status === 'ACTIVE') {
+              activeCampaignIds.add(campaign.id)
               activeCampaignsCount++
               
-              // Somar orçamento diário (converter de centavos para reais)
+              // Somar orçamento diário da campanha (CBO - Campaign Budget Optimization)
               if (campaign.daily_budget) {
                 campaignDailyBudget += parseFloat(campaign.daily_budget) / 100
               }
@@ -138,22 +142,31 @@ serve(async (req) => {
             }
           }
         }
+        
+        console.log(`Account ${accountId}: Found ${activeCampaignIds.size} active campaigns (IDs: ${Array.from(activeCampaignIds).join(', ')})`)
 
-        // 2.1 Buscar ad sets para orçamento e última atualização
-        const adsetsUrl = `https://graph.facebook.com/v18.0/${accountId}/adsets?fields=id,status,effective_status,daily_budget,updated_time&limit=500&access_token=${connection.access_token}`
+        // 2.1 Buscar ad sets para orçamento e última atualização (incluindo campaign_id para validação hierárquica)
+        const adsetsUrl = `https://graph.facebook.com/v18.0/${accountId}/adsets?fields=id,campaign_id,status,effective_status,daily_budget,updated_time&limit=500&access_token=${connection.access_token}`
         const adsetsResponse = await fetch(adsetsUrl)
         const adsetsData = await adsetsResponse.json()
 
         let adsetDailyBudget = 0
         let lastAdsetUpdate: string | null = null
+        let skippedAdsets = 0
 
         if (adsetsData.data) {
           for (const adset of adsetsData.data) {
-            // Somar orçamento diário dos ad sets ativos
-            if (adset.status === 'ACTIVE' || adset.effective_status === 'ACTIVE') {
+            // CORREÇÃO: Só somar orçamento se o ad set está ATIVO E a campanha pai está ATIVA
+            const adsetIsActive = adset.effective_status === 'ACTIVE'
+            const parentCampaignIsActive = activeCampaignIds.has(adset.campaign_id)
+            
+            if (adsetIsActive && parentCampaignIsActive) {
               if (adset.daily_budget) {
                 adsetDailyBudget += parseFloat(adset.daily_budget) / 100
               }
+            } else if (adsetIsActive && !parentCampaignIsActive) {
+              // Log ad sets que seriam contados erroneamente antes da correção
+              skippedAdsets++
             }
             
             // Encontrar data mais recente de atualização
@@ -163,6 +176,10 @@ serve(async (req) => {
               }
             }
           }
+        }
+        
+        if (skippedAdsets > 0) {
+          console.log(`Account ${accountId}: Skipped ${skippedAdsets} ad sets with inactive parent campaigns`)
         }
 
         // 2.2 Buscar ads para pegar updated_time mais recente
