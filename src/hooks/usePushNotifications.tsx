@@ -38,6 +38,17 @@ const isAndroid = (): boolean => {
   return /android/i.test(navigator.userAgent);
 };
 
+// Helper para gerar identificador único do tipo de dispositivo
+const getDeviceType = (): string => {
+  const ios = isIOS();
+  const android = isAndroid();
+  const standalone = isStandalone();
+  
+  if (ios) return standalone ? 'ios-pwa' : 'ios-browser';
+  if (android) return standalone ? 'android-pwa' : 'android-browser';
+  return standalone ? 'desktop-pwa' : 'desktop-browser';
+};
+
 export function usePushNotifications() {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [token, setToken] = useState<string | null>(null);
@@ -161,23 +172,44 @@ export function usePushNotifications() {
 
     const standalone = isStandalone();
     const ios = isIOS();
+    const android = isAndroid();
+    const deviceType = getDeviceType();
 
     try {
-      // Step 1: Deactivate ALL previous tokens for this user (ensures only latest token is active)
-      const { error: deactivateError } = await supabase
+      // Step 1: Buscar tokens existentes do usuário
+      const { data: existingTokens } = await supabase
         .from('push_subscriptions')
-        .update({ is_active: false })
+        .select('id, fcm_token, device_info')
         .eq('user_id', user.id)
-        .neq('fcm_token', fcmToken);
+        .eq('is_active', true);
 
-      if (deactivateError) {
-        console.warn('[Push] Error deactivating old tokens:', deactivateError);
-        // Continue anyway - not critical
-      } else {
-        console.log('[Push] Deactivated previous tokens');
+      // Step 2: Desativar apenas tokens do MESMO tipo de dispositivo (exceto o atual)
+      if (existingTokens && existingTokens.length > 0) {
+        const tokensToDeactivate = existingTokens.filter(sub => {
+          // Se é o mesmo token, não desativa
+          if (sub.fcm_token === fcmToken) return false;
+          
+          // Verifica se é do mesmo tipo de dispositivo
+          const existingDeviceType = (sub.device_info as any)?.deviceType;
+          return existingDeviceType === deviceType;
+        });
+
+        if (tokensToDeactivate.length > 0) {
+          const idsToDeactivate = tokensToDeactivate.map(t => t.id);
+          const { error: deactivateError } = await supabase
+            .from('push_subscriptions')
+            .update({ is_active: false })
+            .in('id', idsToDeactivate);
+          
+          if (deactivateError) {
+            console.warn('[Push] Error deactivating old tokens:', deactivateError);
+          } else {
+            console.log(`[Push] Deactivated ${tokensToDeactivate.length} old ${deviceType} tokens`);
+          }
+        }
       }
 
-      // Step 2: Upsert the new token with enhanced device_info
+      // Step 3: Upsert the new token with deviceType no device_info
       const { error } = await supabase.from('push_subscriptions').upsert({
         user_id: user.id,
         agency_id: currentAgency.id,
@@ -189,7 +221,8 @@ export function usePushNotifications() {
           standalone: standalone,
           displayMode: standalone ? 'standalone' : 'browser',
           isIOS: ios,
-          isAndroid: isAndroid(),
+          isAndroid: android,
+          deviceType: deviceType,
           generatedAt: new Date().toISOString(),
         },
         platform: 'web',
@@ -204,7 +237,7 @@ export function usePushNotifications() {
         throw error;
       }
       
-      console.log('[Push] Token saved successfully (standalone:', standalone, ', iOS:', ios, ')');
+      console.log(`[Push] Token saved for ${deviceType} (standalone: ${standalone})`);
     } catch (error) {
       console.error('[Push] Failed to save token:', error);
     }

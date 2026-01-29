@@ -182,6 +182,10 @@ async function sendToFCM(
       token: fcmToken,
       // SEM notification - deixa o Service Worker exibir (evita duplicação)
       webpush: {
+        headers: {
+          TTL: '86400',      // 24h - mensagem persiste se offline
+          Urgency: 'high',   // Entrega imediata para iOS/Android
+        },
         fcm_options: {
           link: absoluteActionUrl,
         },
