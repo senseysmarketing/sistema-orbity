@@ -351,7 +351,7 @@ export default function CRM() {
 
       {/* Main Tabs - 3 tabs: Dashboard, Pipeline, Settings */}
       <Tabs defaultValue="dashboard" className="space-y-4">
-        <TabsList className="flex w-full overflow-x-auto scrollbar-hide lg:w-auto">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="dashboard" className="flex-shrink-0 gap-1 md:gap-2">
             <TrendingUp className="h-4 w-4" />
             <span className="hidden sm:inline">Dashboard</span>

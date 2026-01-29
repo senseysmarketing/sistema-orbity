@@ -187,7 +187,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="flex w-full overflow-x-auto scrollbar-hide">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-7">
           <TabsTrigger value="profile" className="flex-shrink-0 gap-1 md:gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Perfil</span>
