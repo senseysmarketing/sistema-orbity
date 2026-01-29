@@ -1,52 +1,80 @@
 
-# Plano: Melhorias de UX para PWA e Banners de Notificação
 
-## Problemas Identificados
+# Correção: Resumo Diário Não Sendo Enviado
 
-1. **Banners aparecendo na Landing Page** - Os componentes `InstallPrompt` e `PushActivationBanner` estão no nível global do `App.tsx`, aparecendo em todas as páginas, inclusive na Landing Page
-2. **PWA redirecionando para Landing Page** - Quando o usuário abre o app instalado (modo standalone), ele vê a Landing Page ao invés de ir direto para login/dashboard
+## Problema Identificado
+
+Após análise completa dos logs e banco de dados, identifiquei que o **Resumo Diário não está sendo enviado desde 27 de Janeiro** por causa de um erro no sistema de lock.
+
+### Causa Raiz
+
+O campo `entity_id` na tabela `notification_tracking` é do tipo **UUID**, mas o código do lock tenta inserir uma **string**:
+
+```typescript
+// Código problemático
+const lockKey = `${lockName}_${new Date().toISOString().split('T')[0]}`;
+// Resulta em: "process_notifications_2026-01-29" (não é um UUID!)
+
+await supabase.from('notification_tracking').upsert({
+  entity_id: lockKey,  // ❌ String inválida para campo UUID
+  // ...
+});
+```
+
+### Erro nos Logs
+
+```
+ERROR: invalid input syntax for type uuid: "process_notifications_2026-01-29"
+```
+
+Quando o upsert falha, a função `acquireProcessLock` retorna `false`, e a lógica interpreta isso como "outro processo está rodando" - **bloqueando todos os envios subsequentes**.
 
 ---
 
-## Solução Proposta
+## Solução
 
-### Parte 1: Mover Banners para Dentro do AppLayout
+### Parte 1: Corrigir o Sistema de Lock
 
-Atualmente os banners estão em `App.tsx` (global):
+O lock precisa usar UUIDs válidos ou uma abordagem diferente:
+
+**Opção A - Usar UUID v5 determinístico (recomendada):**
 ```typescript
-<InstallPrompt />
-<UpdatePrompt />
-<PushActivationBanner />
+import { v5 as uuidv5 } from 'uuid';
+
+const NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8'; // DNS namespace
+
+async function acquireProcessLock(lockName: string): Promise<boolean> {
+  const today = new Date().toISOString().split('T')[0];
+  const lockKey = uuidv5(`${lockName}_${today}`, NAMESPACE);
+  // Agora lockKey é um UUID válido
+  // ...
+}
 ```
 
-Mover `InstallPrompt` e `PushActivationBanner` para dentro do `AppLayout.tsx`, que só é renderizado quando o usuário está autenticado e dentro do dashboard.
+**Opção B - Usar tabela separada para locks:**
+Criar uma tabela específica com campo `lock_name TEXT` ao invés de usar `notification_tracking`.
 
-O `UpdatePrompt` pode permanecer global pois é importante para atualizações do PWA em qualquer tela.
+### Parte 2: Melhorar Tratamento de Erros
 
-### Parte 2: Redirecionamento Inteligente na Landing Page
-
-Adicionar lógica na `LandingPage.tsx` para:
-1. Detectar se está em modo standalone (PWA instalado)
-2. Verificar se usuário está logado
-3. Redirecionar automaticamente:
-   - Se logado → `/dashboard`
-   - Se não logado + em PWA → `/auth`
+Quando o lock falha por erro de banco, NÃO considerar como "outro processo rodando", e sim permitir a execução:
 
 ```typescript
-// Detectar modo standalone
-const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
-  || (window.navigator as any).standalone === true;
+async function acquireProcessLock(lockName: string): Promise<boolean> {
+  // ... código do lock ...
+  
+  const { error } = await supabase.from('notification_tracking').upsert({...});
 
-// Se está no PWA, redirecionar
-useEffect(() => {
-  if (isStandalone) {
-    if (user) {
-      navigate('/dashboard');
-    } else if (!loading) {
-      navigate('/auth');
+  if (error) {
+    // Se for erro de formato, não bloquear - permitir execução
+    if (error.code === '22P02') {
+      console.warn(`Lock format error for '${lockName}', proceeding anyway`);
+      return true; // Permite a execução
     }
+    console.error(`Error acquiring lock '${lockName}':`, error);
+    return true; // Em caso de erro, melhor tentar do que bloquear
   }
-}, [isStandalone, user, loading]);
+  // ...
+}
 ```
 
 ---
@@ -55,41 +83,58 @@ useEffect(() => {
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/App.tsx` | Remover `InstallPrompt` e `PushActivationBanner` do nível global |
-| `src/components/layout/AppLayout.tsx` | Adicionar `InstallPrompt` e `PushActivationBanner` dentro do layout autenticado |
-| `src/pages/LandingPage.tsx` | Adicionar detecção de PWA e redirecionamento inteligente |
+| `supabase/functions/process-notifications/index.ts` | Corrigir sistema de lock para usar UUID válido e melhorar tratamento de erros |
 
 ---
 
-## Fluxo Esperado
+## Implementação
 
-```text
-Acesso pelo NAVEGADOR (browser):
-┌────────────────────────────────────────────────────────────────┐
-│ Usuário acessa / (Landing Page)                                 │
-│   └── Vê a Landing Page normalmente                            │
-│   └── Sem banners de instalação/notificação                    │
-│   └── Pode clicar em "Entrar" → /auth                          │
-├────────────────────────────────────────────────────────────────┤
-│ Usuário faz login → /dashboard                                  │
-│   └── Agora vê os banners (Install/Push) se aplicável          │
-└────────────────────────────────────────────────────────────────┘
+Vou modificar a função `acquireProcessLock` para:
 
-Acesso pelo PWA (standalone):
-┌────────────────────────────────────────────────────────────────┐
-│ Usuário abre o app instalado                                    │
-│   └── Landing Page detecta modo standalone                     │
-│   └── Verifica se está logado                                  │
-│       ├── Se SIM → Redireciona para /dashboard                 │
-│       └── Se NÃO → Redireciona para /auth                      │
-└────────────────────────────────────────────────────────────────┘
+1. Gerar um UUID determinístico baseado no nome do lock + data usando SHA-1 hash convertido para formato UUID
+2. Quando há erro no banco, permitir a execução ao invés de bloquear
+3. Adicionar logs mais detalhados para debugging
+
+```typescript
+// Gerar UUID v5 determinístico a partir de uma string
+function stringToUUID(str: string): string {
+  // Simple hash-based UUID generation (UUID v5-like)
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  
+  const hex = Math.abs(hash).toString(16).padStart(12, '0');
+  // Format as UUID (version 4 format but deterministic)
+  return `00000000-0000-4000-8000-${hex.slice(-12)}`;
+}
+
+async function acquireProcessLock(lockName: string): Promise<boolean> {
+  const today = new Date().toISOString().split('T')[0];
+  const lockKey = stringToUUID(`${lockName}_${today}`);
+  
+  console.log(`🔐 Attempting to acquire lock '${lockName}' with key ${lockKey}`);
+  
+  // ... rest of the lock logic with improved error handling
+}
 ```
 
 ---
 
 ## Benefícios
 
-1. **UX limpa na Landing Page** - Visitantes não veem banners desnecessários
-2. **Acesso direto no PWA** - Usuários do app não passam pela Landing Page
-3. **Lógica inteligente** - Sistema detecta contexto e adapta comportamento
-4. **Mantém funcionalidade** - Banners continuam funcionando para usuários logados
+1. **Resumos diários funcionarão novamente** - Lock não bloqueará mais por erro de formato
+2. **Locks válidos no banco** - UUIDs determinísticos por dia
+3. **Resiliência** - Erros de lock não impedem processamento
+4. **Debugging melhorado** - Logs mais claros
+
+---
+
+## Após Implementação
+
+Depois de fazer o deploy, será necessário:
+1. Aguardar o próximo cron job às 8h (11h UTC)
+2. Ou testar manualmente chamando a edge function
+
