@@ -1,240 +1,144 @@
 
+# Correção: Loop de Re-renderização nas Preferências de Notificação (Android)
 
-# Correção: Aviso de Atualização Aparecendo Com Frequência Demais
+## Problema Identificado
 
-## Problema Atual
+O usuário "João Paulo" no Android não consegue usar as Preferências de Notificação porque a tela fica "atualizando toda hora". A investigação revelou um **loop de re-renderização** causado por dependências instáveis no hook `usePushNotifications`.
 
-O componente `UpdatePrompt` mostra o aviso de atualização sempre que o Service Worker detecta uma nova versão, mas:
+## Causa Raiz
 
-1. **Não há cooldown** - após clicar em "Mais tarde", o aviso pode reaparecer na próxima verificação
-2. **Não persiste a recusa** - a recusa não é salva no localStorage
-3. **Verifica a cada 1 hora** - muito frequente para mostrar o prompt
+O hook `usePushNotifications` possui um `useEffect` para carregar o token existente que inclui `saveToken` nas suas dependências:
 
-## Solução Proposta
+```typescript
+useEffect(() => {
+  const loadExistingToken = async () => {
+    // ... obtém token ...
+    await saveToken(existingToken);  // Re-save para manter atualizado
+  };
+  loadExistingToken();
+}, [user, isSupported, permission, hasFirebaseConfig, getFirebaseMessaging, saveToken]); 
+//                                                                           ↑
+//                                                           DEPENDÊNCIA INSTÁVEL
+```
 
-Implementar um sistema de **cooldown inteligente** com as seguintes regras:
+### Por que causa loop:
 
-| Ação do Usuário | Comportamento |
-|-----------------|---------------|
-| Clica em "Mais tarde" | Esconde por **24 horas** |
-| Clica em "X" | Esconde por **4 horas** |
-| Ignora (não interage) | Continua visível |
-| Atualização aplicada | Reset do cooldown |
+1. Componente monta → `useEffect` executa
+2. `saveToken` é chamado → faz query no banco
+3. Enquanto isso, `currentAgency` é carregada pelo `useAgency`
+4. `currentAgency` muda → `saveToken` é recriado (novo `useCallback`)
+5. Nova referência de `saveToken` → `useEffect` dispara de novo
+6. Volta ao passo 2 → **LOOP!**
+
+No Android, isso é mais perceptível porque:
+- Service Worker pode demorar mais para ativar
+- Firebase pode enviar eventos de atualização de token mais frequentemente
+- O estado `permission` pode oscilar durante a inicialização
 
 ---
 
-## Arquivo a Modificar
+## Solução
+
+### Mudanças no `usePushNotifications.tsx`
+
+1. **Usar `useRef` para armazenar função estável** - evitar que `saveToken` seja dependência direta
+2. **Adicionar flag para evitar execuções duplicadas** - controle de "já carregou"
+3. **Remover `saveToken` das dependências do useEffect** - usar ref em vez disso
+
+---
+
+## Arquivos a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/pwa/UpdatePrompt.tsx` | Adicionar lógica de cooldown com localStorage |
+| `src/hooks/usePushNotifications.tsx` | Estabilizar `saveToken` com ref e evitar loop |
 
 ---
 
-## Implementação
+## Implementação Detalhada
 
-### 1. Constantes de Cooldown
+### Adicionar ref para saveToken estável
 
 ```typescript
-const DISMISS_KEY = 'pwa_update_dismissed_at';
-const DISMISS_COOLDOWN_HOURS = 24; // "Mais tarde" = 24h
-const QUICK_DISMISS_COOLDOWN_HOURS = 4; // "X" = 4h
+// Adicionar junto com os outros refs (após linha 63)
+const saveTokenRef = useRef<(token: string) => Promise<void>>();
+
+// Após a definição do saveToken (após linha 244)
+saveTokenRef.current = saveToken;
 ```
 
-### 2. Função para verificar se deve mostrar
+### Modificar o useEffect para usar ref
 
 ```typescript
-const shouldShowPrompt = (): boolean => {
-  const dismissedAt = localStorage.getItem(DISMISS_KEY);
-  if (!dismissedAt) return true;
+// Substituir o useEffect de loadExistingToken (linhas 382-408)
+useEffect(() => {
+  // Flag para evitar execuções duplicadas durante a mesma sessão
+  let didLoad = false;
   
-  const dismissedTime = parseInt(dismissedAt, 10);
-  const hoursSinceDismiss = (Date.now() - dismissedTime) / (1000 * 60 * 60);
-  
-  // Verificar se passou o cooldown
-  const cooldownHours = localStorage.getItem('pwa_dismiss_type') === 'quick' 
-    ? QUICK_DISMISS_COOLDOWN_HOURS 
-    : DISMISS_COOLDOWN_HOURS;
-    
-  return hoursSinceDismiss >= cooldownHours;
-};
-```
+  const loadExistingToken = async () => {
+    if (didLoad) return;
+    if (!user || !isSupported || permission !== 'granted' || !hasFirebaseConfig) return;
 
-### 3. Handlers atualizados
-
-```typescript
-// "Mais tarde" - cooldown de 24h
-const handleDismiss = () => {
-  localStorage.setItem(DISMISS_KEY, Date.now().toString());
-  localStorage.setItem('pwa_dismiss_type', 'full');
-  setNeedRefresh(false);
-};
-
-// "X" - cooldown de 4h
-const handleQuickDismiss = () => {
-  localStorage.setItem(DISMISS_KEY, Date.now().toString());
-  localStorage.setItem('pwa_dismiss_type', 'quick');
-  setNeedRefresh(false);
-};
-
-// Atualizar - limpa o cooldown
-const handleUpdate = async () => {
-  localStorage.removeItem(DISMISS_KEY);
-  localStorage.removeItem('pwa_dismiss_type');
-  // ... resto da lógica existente
-};
-```
-
-### 4. Renderização condicional
-
-```typescript
-// Só mostra se needRefresh E passou o cooldown
-if (!needRefresh || !shouldShowPrompt()) return null;
-```
-
----
-
-## Código Final
-
-```typescript
-import { useRegisterSW } from 'virtual:pwa-register/react';
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { RefreshCw, X } from "lucide-react";
-
-const DISMISS_KEY = 'pwa_update_dismissed_at';
-const DISMISS_TYPE_KEY = 'pwa_dismiss_type';
-const DISMISS_COOLDOWN_HOURS = 24;      // "Mais tarde" = 24h
-const QUICK_DISMISS_COOLDOWN_HOURS = 4; // "X" = 4h
-
-export function UpdatePrompt() {
-  const {
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegisteredSW(swUrl, r) {
-      console.log('[PWA] Service Worker registrado:', swUrl);
-      // Verificar atualizações a cada 1 hora
-      if (r) {
-        setInterval(() => {
-          r.update();
-        }, 60 * 60 * 1000);
-      }
-    },
-    onRegisterError(error) {
-      console.error('[PWA] Erro ao registrar SW:', error);
-    },
-  });
-
-  // Verificar se passou o cooldown desde a última recusa
-  const shouldShowPrompt = (): boolean => {
-    const dismissedAt = localStorage.getItem(DISMISS_KEY);
-    if (!dismissedAt) return true;
-    
-    const dismissedTime = parseInt(dismissedAt, 10);
-    const hoursSinceDismiss = (Date.now() - dismissedTime) / (1000 * 60 * 60);
-    
-    const dismissType = localStorage.getItem(DISMISS_TYPE_KEY);
-    const cooldownHours = dismissType === 'quick' 
-      ? QUICK_DISMISS_COOLDOWN_HOURS 
-      : DISMISS_COOLDOWN_HOURS;
-      
-    return hoursSinceDismiss >= cooldownHours;
-  };
-
-  const handleUpdate = async () => {
-    // Limpar cooldown ao atualizar
-    localStorage.removeItem(DISMISS_KEY);
-    localStorage.removeItem(DISMISS_TYPE_KEY);
+    didLoad = true;
     
     try {
-      if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        console.log('[PWA] Limpando todos os caches:', cacheNames);
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
-      }
+      const messaging = getFirebaseMessaging();
+      const registration = await navigator.serviceWorker.ready;
       
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (const reg of registrations) {
-          const isRootScope = reg.scope.endsWith('/') && reg.scope.split('/').length <= 4;
-          if (!isRootScope) {
-            console.log('[PWA] Removendo SW secundário:', reg.scope);
-            await reg.unregister();
-          }
+      const existingToken = await getToken(messaging, {
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: registration,
+      });
+
+      if (existingToken) {
+        console.log('[Push] Existing token found');
+        setToken(existingToken);
+        
+        // Usar ref para evitar dependência instável
+        if (saveTokenRef.current) {
+          await saveTokenRef.current(existingToken);
         }
       }
     } catch (error) {
-      console.error('[PWA] Erro ao limpar antes de atualizar:', error);
+      console.error('[Push] Error loading existing token:', error);
     }
-    
-    updateServiceWorker(true);
   };
 
-  // "Mais tarde" - cooldown maior (24h)
-  const handleDismiss = () => {
-    localStorage.setItem(DISMISS_KEY, Date.now().toString());
-    localStorage.setItem(DISMISS_TYPE_KEY, 'full');
-    setNeedRefresh(false);
+  loadExistingToken();
+  
+  return () => {
+    didLoad = true; // Cancelar se desmontar
   };
-
-  // Botão X - cooldown menor (4h)
-  const handleQuickDismiss = () => {
-    localStorage.setItem(DISMISS_KEY, Date.now().toString());
-    localStorage.setItem(DISMISS_TYPE_KEY, 'quick');
-    setNeedRefresh(false);
-  };
-
-  // Só mostra se há atualização E passou o cooldown
-  if (!needRefresh || !shouldShowPrompt()) return null;
-
-  return (
-    <Alert className="fixed top-4 right-4 w-auto max-w-sm z-50 border-primary/20 bg-background shadow-lg animate-in slide-in-from-top-2">
-      <RefreshCw className="h-4 w-4 text-primary" />
-      <AlertTitle className="text-sm font-semibold">Atualização Disponível</AlertTitle>
-      <AlertDescription className="text-xs text-muted-foreground mt-1">
-        Uma nova versão está disponível.
-      </AlertDescription>
-      <div className="flex gap-2 mt-3">
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          onClick={handleDismiss}
-          className="h-7 text-xs"
-        >
-          Mais tarde
-        </Button>
-        <Button 
-          size="sm" 
-          onClick={handleUpdate}
-          className="h-7 text-xs"
-        >
-          Atualizar
-        </Button>
-      </div>
-      <Button
-        size="icon"
-        variant="ghost"
-        onClick={handleQuickDismiss}
-        className="absolute top-2 right-2 h-6 w-6"
-      >
-        <X className="h-3 w-3" />
-      </Button>
-    </Alert>
-  );
-}
+}, [user?.id, isSupported, permission, hasFirebaseConfig, getFirebaseMessaging]); 
+// Nota: Removido saveToken, usando user?.id em vez de user
 ```
 
 ---
 
-## Comportamento Final
+## Mudanças Principais
 
-| Situação | Resultado |
-|----------|-----------|
-| Usuário clica "Mais tarde" | Aviso some por 24 horas |
-| Usuário clica "X" | Aviso some por 4 horas |
-| Passa o cooldown + nova atualização | Aviso aparece novamente |
-| Usuário atualiza | Cooldown é limpo |
+1. **`saveTokenRef`**: Armazena referência estável da função
+2. **`didLoad` flag**: Evita execuções duplicadas dentro do mesmo efeito
+3. **Dependência `user?.id`**: Usa ID primitivo em vez do objeto inteiro
+4. **Removido `saveToken` das deps**: Usa ref para chamar a função
 
-Isso garante que o aviso não seja intrusivo, mas ainda notifique o usuário sobre atualizações importantes após um período razoável.
+---
 
+## Resultado Esperado
+
+| Antes | Depois |
+|-------|--------|
+| Loop contínuo de re-render | Carrega token uma única vez |
+| Tela piscando toda hora | Tela estável |
+| Não consegue abrir Preferências | Preferências funcionam normalmente |
+
+---
+
+## Por que isso afeta mais o Android?
+
+1. **Timing diferente**: Android Chrome pode inicializar Service Workers mais lentamente
+2. **Permission flicker**: Estado de permissão pode oscilar brevemente
+3. **FCM behavior**: Firebase no Android pode emitir mais eventos de atualização
+4. **Memory/CPU**: Devices Android variados podem processar efeitos em tempos diferentes
+
+A correção estabiliza o comportamento em **todas** as plataformas (iOS, Android, Desktop).
