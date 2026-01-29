@@ -61,6 +61,7 @@ export function usePushNotifications() {
   
   const firebaseAppRef = useRef<FirebaseApp | null>(null);
   const messagingRef = useRef<Messaging | null>(null);
+  const saveTokenRef = useRef<(token: string) => Promise<void>>();
 
   // Check if Firebase config is available
   const hasFirebaseConfig = Boolean(
@@ -243,6 +244,9 @@ export function usePushNotifications() {
     }
   }, [user, currentAgency]);
 
+  // Manter ref atualizada para evitar dependência instável no useEffect
+  saveTokenRef.current = saveToken;
+
   // Request permission and get token
   const requestPermission = useCallback(async () => {
     if (!isSupported) {
@@ -381,8 +385,14 @@ export function usePushNotifications() {
 
   // Load existing token on mount
   useEffect(() => {
+    // Flag para evitar execuções duplicadas durante a mesma sessão
+    let didLoad = false;
+    
     const loadExistingToken = async () => {
+      if (didLoad) return;
       if (!user || !isSupported || permission !== 'granted' || !hasFirebaseConfig) return;
+
+      didLoad = true;
 
       try {
         const messaging = getFirebaseMessaging();
@@ -396,8 +406,10 @@ export function usePushNotifications() {
         if (existingToken) {
           console.log('[Push] Existing token found');
           setToken(existingToken);
-          // Re-save to ensure it's up to date
-          await saveToken(existingToken);
+          // Usar ref para evitar dependência instável
+          if (saveTokenRef.current) {
+            await saveTokenRef.current(existingToken);
+          }
         }
       } catch (error) {
         console.error('[Push] Error loading existing token:', error);
@@ -405,7 +417,11 @@ export function usePushNotifications() {
     };
 
     loadExistingToken();
-  }, [user, isSupported, permission, hasFirebaseConfig, getFirebaseMessaging, saveToken]);
+    
+    return () => {
+      didLoad = true; // Cancelar se desmontar
+    };
+  }, [user?.id, isSupported, permission, hasFirebaseConfig, getFirebaseMessaging]);
 
   return {
     permission,
