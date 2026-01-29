@@ -1,9 +1,8 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useAgency } from './useAgency';
 import { useCache } from './useCache';
-import { usePageVisibility } from './usePageVisibility';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
@@ -49,7 +48,7 @@ const PaymentMiddlewareContext = createContext<PaymentMiddlewareContextType | un
 export function PaymentMiddlewareProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
   const { currentAgency } = useAgency();
-  const { isVisible } = usePageVisibility();
+  // Removido usePageVisibility para evitar re-renders em troca de aba
   const cache = useCache<PaymentStatus>(3 * 60 * 1000); // 3 minutes cache
   const navigate = useNavigate();
   
