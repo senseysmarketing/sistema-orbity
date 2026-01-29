@@ -30,6 +30,7 @@ interface PushDiagnosticsProps {
   permission: NotificationPermission;
   isStandaloneMode: boolean;
   isIOS: boolean;
+  isAndroid: boolean;
   isSupported: boolean;
 }
 
@@ -38,6 +39,7 @@ export function PushDiagnostics({
   permission,
   isStandaloneMode,
   isIOS,
+  isAndroid,
   isSupported: _isSupported,
 }: PushDiagnosticsProps) {
   const { toast } = useToast();
@@ -328,6 +330,21 @@ export function PushDiagnostics({
                 size="icon" 
                 className="h-5 w-5"
                 onClick={() => copyToClipboard(String(isIOS), 'iOS status')}
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+            <span className="text-muted-foreground">Dispositivo Android</span>
+            <div className="flex items-center gap-1">
+              <span>{isAndroid ? 'Sim' : 'Não'}</span>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-5 w-5"
+                onClick={() => copyToClipboard(String(isAndroid), 'Android status')}
               >
                 <Copy className="h-3 w-3" />
               </Button>
