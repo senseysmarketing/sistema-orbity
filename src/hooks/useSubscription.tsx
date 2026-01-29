@@ -282,28 +282,46 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     return Number.POSITIVE_INFINITY;
   };
 
+  // Ref para debounce de visibilidade
+  const visibilityDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
   // Check if user has been away for too long when page becomes visible
-  // Using refs to avoid re-renders on every visibility change
+  // Using refs and debounce to avoid re-renders on every visibility change
   useEffect(() => {
-    const now = Date.now();
     const AWAY_THRESHOLD = 10 * 60 * 1000; // 10 minutes
     
-    // Only process if transitioning TO visible AND was invisible before
-    if (isVisible && !wasVisibleRef.current) {
-      const timeAway = now - lastVisibilityCheckRef.current;
-      
-      // Only show alert if away for too long
-      if (user && timeAway > AWAY_THRESHOLD) {
-        setShowRefreshAlert(true);
-      }
+    if (!isVisible) {
+      // Usuário saiu da aba - registrar timestamp
+      wasVisibleRef.current = false;
+      lastVisibilityCheckRef.current = Date.now();
+      return;
     }
     
-    // Update refs without causing re-render
-    wasVisibleRef.current = isVisible;
-    if (!isVisible) {
-      lastVisibilityCheckRef.current = now;
+    // Limpar debounce anterior
+    if (visibilityDebounceRef.current) {
+      clearTimeout(visibilityDebounceRef.current);
     }
-  }, [isVisible]); // Removed user and getTimeAway from deps to prevent re-renders
+    
+    // Debounce para evitar checks rápidos demais (ex: alt-tab rápido)
+    visibilityDebounceRef.current = setTimeout(() => {
+      if (!wasVisibleRef.current) {
+        const timeAway = Date.now() - lastVisibilityCheckRef.current;
+        
+        // Só mostrar alerta se ficou muito tempo fora
+        if (user && timeAway > AWAY_THRESHOLD) {
+          console.log('[Subscription] User was away for', Math.round(timeAway / 1000), 'seconds');
+          setShowRefreshAlert(true);
+        }
+      }
+      wasVisibleRef.current = true;
+    }, 500); // 500ms debounce
+    
+    return () => {
+      if (visibilityDebounceRef.current) {
+        clearTimeout(visibilityDebounceRef.current);
+      }
+    };
+  }, [isVisible]); // Removed user from deps to prevent re-renders
 
   useEffect(() => {
     if (user) {

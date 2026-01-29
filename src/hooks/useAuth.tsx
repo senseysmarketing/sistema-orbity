@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -42,6 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [lastActivityTime, setLastActivityTime] = useState(Date.now());
   const { toast } = useToast();
 
+  // Refs para evitar re-renders desnecessários
+  const currentUserIdRef = useRef<string | null>(null);
+  const sessionRef = useRef<Session | null>(null);
+
   // Session timeout: 2 hours
   const SESSION_TIMEOUT = 2 * 60 * 60 * 1000;
 
@@ -53,6 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLastActivityTime(Date.now());
       setSessionExpired(false);
       setShowSessionAlert(false);
+      
+      // Atualizar refs sem causar re-render se user não mudou
+      sessionRef.current = data.session;
       
       toast({
         title: "Sessão atualizada",
@@ -108,29 +115,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      async (event, newSession) => {
+        // Eventos silenciosos que não devem causar re-render da árvore inteira
+        const silentEvents = ['TOKEN_REFRESHED'];
         
-        if (session?.user) {
-          setLastActivityTime(Date.now());
-          setSessionExpired(false);
-          setShowSessionAlert(false);
+        if (silentEvents.includes(event)) {
+          // Token foi renovado silenciosamente - atualizar ref mas não estado
+          console.log('[Auth] Token refreshed silently, skipping state update');
+          sessionRef.current = newSession;
+          return;
+        }
+        
+        // Verificar se user realmente mudou antes de atualizar estado
+        const newUserId = newSession?.user?.id || null;
+        const currentUserId = currentUserIdRef.current;
+        
+        // Só atualizar estado se o user realmente mudou
+        if (newUserId !== currentUserId) {
+          console.log('[Auth] User changed:', currentUserId, '->', newUserId);
+          currentUserIdRef.current = newUserId;
+          sessionRef.current = newSession;
           
-          // Fetch user profile
-          setTimeout(async () => {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('user_id', session.user.id)
-              .single();
+          setSession(newSession);
+          setUser(newSession?.user ?? null);
+          
+          if (newSession?.user) {
+            setLastActivityTime(Date.now());
+            setSessionExpired(false);
+            setShowSessionAlert(false);
             
-            if (profileData) {
-              setProfile(profileData as Profile);
-            }
-          }, 0);
-        } else {
-          setProfile(null);
+            // Fetch user profile
+            setTimeout(async () => {
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('user_id', newSession.user.id)
+                .single();
+              
+              if (profileData) {
+                setProfile(profileData as Profile);
+              }
+            }, 0);
+          } else {
+            setProfile(null);
+          }
+        } else if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+          // Sempre processar eventos de sign in/out explícitos
+          console.log('[Auth] Explicit auth event:', event);
+          sessionRef.current = newSession;
+          setSession(newSession);
+          setUser(newSession?.user ?? null);
+          
+          if (newSession?.user) {
+            setLastActivityTime(Date.now());
+            setSessionExpired(false);
+            setShowSessionAlert(false);
+            
+            setTimeout(async () => {
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('user_id', newSession.user.id)
+                .single();
+              
+              if (profileData) {
+                setProfile(profileData as Profile);
+              }
+            }, 0);
+          } else {
+            setProfile(null);
+          }
         }
         
         setLoading(false);
@@ -138,15 +192,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+      currentUserIdRef.current = existingSession?.user?.id || null;
+      sessionRef.current = existingSession;
       
-      if (session?.user) {
+      setSession(existingSession);
+      setUser(existingSession?.user ?? null);
+      
+      if (existingSession?.user) {
         supabase
           .from('profiles')
           .select('*')
-          .eq('user_id', session.user.id)
+          .eq('user_id', existingSession.user.id)
           .single()
           .then(({ data: profileData }) => {
             if (profileData) {

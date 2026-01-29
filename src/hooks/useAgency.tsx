@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
@@ -59,10 +59,21 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [hasNoAgency, setHasNoAgency] = useState(false);
 
+  // Ref para evitar re-fetch quando user não mudou
+  const previousUserIdRef = useRef<string | null>(null);
+  const isFetchingRef = useRef(false);
+
   const fetchUserAgencies = async () => {
     if (!user) return;
 
+    // Evitar chamadas duplicadas
+    if (isFetchingRef.current) {
+      console.log('[Agency] Already fetching, skipping duplicate call');
+      return;
+    }
+
     try {
+      isFetchingRef.current = true;
       setLoading(true);
       const { data: agencyUsers, error: agencyUsersError } = await supabase
         .from('agency_users')
@@ -100,6 +111,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       console.error('Error fetching agencies:', error);
       toast.error('Erro ao carregar agências');
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
     }
   };
@@ -225,6 +237,17 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    const currentUserId = user?.id || null;
+    
+    // Só executar se user ID realmente mudou
+    if (currentUserId === previousUserIdRef.current) {
+      console.log('[Agency] User ID unchanged, skipping fetch');
+      return;
+    }
+    
+    console.log('[Agency] User ID changed:', previousUserIdRef.current, '->', currentUserId);
+    previousUserIdRef.current = currentUserId;
+    
     if (user) {
       fetchUserAgencies();
     } else {
@@ -234,7 +257,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       setHasNoAgency(false);
       setLoading(false);
     }
-  }, [user]);
+  }, [user?.id]); // Depender apenas do ID, não do objeto inteiro
 
   // Restore current agency from localStorage
   useEffect(() => {
