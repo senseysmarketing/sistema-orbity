@@ -3,6 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RefreshCw, X } from "lucide-react";
 
+const DISMISS_KEY = 'pwa_update_dismissed_at';
+const DISMISS_TYPE_KEY = 'pwa_dismiss_type';
+const DISMISS_COOLDOWN_HOURS = 24;      // "Mais tarde" = 24h
+const QUICK_DISMISS_COOLDOWN_HOURS = 4; // "X" = 4h
+
 export function UpdatePrompt() {
   const {
     needRefresh: [needRefresh, setNeedRefresh],
@@ -10,7 +15,7 @@ export function UpdatePrompt() {
   } = useRegisterSW({
     onRegisteredSW(swUrl, r) {
       console.log('[PWA] Service Worker registrado:', swUrl);
-      // Verificar atualizações a cada 1 hora (não força reload)
+      // Verificar atualizações a cada 1 hora
       if (r) {
         setInterval(() => {
           r.update();
@@ -22,20 +27,37 @@ export function UpdatePrompt() {
     },
   });
 
+  // Verificar se passou o cooldown desde a última recusa
+  const shouldShowPrompt = (): boolean => {
+    const dismissedAt = localStorage.getItem(DISMISS_KEY);
+    if (!dismissedAt) return true;
+    
+    const dismissedTime = parseInt(dismissedAt, 10);
+    const hoursSinceDismiss = (Date.now() - dismissedTime) / (1000 * 60 * 60);
+    
+    const dismissType = localStorage.getItem(DISMISS_TYPE_KEY);
+    const cooldownHours = dismissType === 'quick' 
+      ? QUICK_DISMISS_COOLDOWN_HOURS 
+      : DISMISS_COOLDOWN_HOURS;
+      
+    return hoursSinceDismiss >= cooldownHours;
+  };
+
   const handleUpdate = async () => {
+    // Limpar cooldown ao atualizar
+    localStorage.removeItem(DISMISS_KEY);
+    localStorage.removeItem(DISMISS_TYPE_KEY);
+    
     try {
-      // 1. Limpar TODOS os caches antes de atualizar
       if ('caches' in window) {
         const cacheNames = await caches.keys();
         console.log('[PWA] Limpando todos os caches:', cacheNames);
         await Promise.all(cacheNames.map(name => caches.delete(name)));
       }
       
-      // 2. Desregistrar SWs antigos que não são o principal
       if ('serviceWorker' in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const reg of registrations) {
-          // Manter apenas o SW principal (escopo raiz '/')
           const isRootScope = reg.scope.endsWith('/') && reg.scope.split('/').length <= 4;
           if (!isRootScope) {
             console.log('[PWA] Removendo SW secundário:', reg.scope);
@@ -47,15 +69,25 @@ export function UpdatePrompt() {
       console.error('[PWA] Erro ao limpar antes de atualizar:', error);
     }
     
-    // 3. Atualizar o Service Worker principal
     updateServiceWorker(true);
   };
 
+  // "Mais tarde" - cooldown maior (24h)
   const handleDismiss = () => {
+    localStorage.setItem(DISMISS_KEY, Date.now().toString());
+    localStorage.setItem(DISMISS_TYPE_KEY, 'full');
     setNeedRefresh(false);
   };
 
-  if (!needRefresh) return null;
+  // Botão X - cooldown menor (4h)
+  const handleQuickDismiss = () => {
+    localStorage.setItem(DISMISS_KEY, Date.now().toString());
+    localStorage.setItem(DISMISS_TYPE_KEY, 'quick');
+    setNeedRefresh(false);
+  };
+
+  // Só mostra se há atualização E passou o cooldown
+  if (!needRefresh || !shouldShowPrompt()) return null;
 
   return (
     <Alert className="fixed top-4 right-4 w-auto max-w-sm z-50 border-primary/20 bg-background shadow-lg animate-in slide-in-from-top-2">
@@ -84,7 +116,7 @@ export function UpdatePrompt() {
       <Button
         size="icon"
         variant="ghost"
-        onClick={handleDismiss}
+        onClick={handleQuickDismiss}
         className="absolute top-2 right-2 h-6 w-6"
       >
         <X className="h-3 w-3" />
