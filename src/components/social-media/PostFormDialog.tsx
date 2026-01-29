@@ -32,8 +32,8 @@ interface Client {
 
 export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: PostFormDialogProps) {
   const { createPost, updatePost } = useSocialMediaPosts();
-  const { getDefaultDueDateDaysBefore } = useSocialMediaSettings();
   const { currentAgency } = useAgency();
+  const { getDefaultDueDateDaysBefore } = useSocialMediaSettings(currentAgency?.id);
   const { toast } = useToast();
   const { fetchClientIds, updateClientRelations } = useClientRelations();
   const [clients, setClients] = useState<Client[]>([]);

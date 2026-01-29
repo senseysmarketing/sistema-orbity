@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAgency } from './useAgency';
 import { toast } from 'sonner';
 
 export interface SocialMediaSettings {
@@ -11,13 +10,16 @@ export interface SocialMediaSettings {
   updated_at: string;
 }
 
-export function useSocialMediaSettings() {
-  const { currentAgency } = useAgency();
+/**
+ * Hook for social media settings.
+ * @param agencyId - Optional agency ID. If not provided, the hook will return defaults.
+ */
+export function useSocialMediaSettings(agencyId?: string | null) {
   const [settings, setSettings] = useState<SocialMediaSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchSettings = async () => {
-    if (!currentAgency?.id) {
+  const fetchSettings = useCallback(async () => {
+    if (!agencyId) {
       setLoading(false);
       return;
     }
@@ -26,7 +28,7 @@ export function useSocialMediaSettings() {
       const { data, error } = await supabase
         .from('social_media_settings')
         .select('*')
-        .eq('agency_id', currentAgency.id)
+        .eq('agency_id', agencyId)
         .maybeSingle();
 
       if (error) throw error;
@@ -36,14 +38,14 @@ export function useSocialMediaSettings() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [agencyId]);
 
   useEffect(() => {
     fetchSettings();
-  }, [currentAgency?.id]);
+  }, [fetchSettings]);
 
   const updateSettings = async (updates: Partial<SocialMediaSettings>) => {
-    if (!currentAgency?.id) return;
+    if (!agencyId) return;
 
     try {
       if (settings) {
@@ -60,7 +62,7 @@ export function useSocialMediaSettings() {
         const { data, error } = await supabase
           .from('social_media_settings')
           .insert({
-            agency_id: currentAgency.id,
+            agency_id: agencyId,
             ...updates
           })
           .select()
