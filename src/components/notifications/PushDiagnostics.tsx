@@ -13,7 +13,8 @@ import {
   XCircle, 
   AlertCircle,
   Smartphone,
-  Loader2
+  Loader2,
+  RotateCcw
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,7 +50,9 @@ export function PushDiagnostics({
   const [isTestingPush, setIsTestingPush] = useState(false);
   const [isClearingTokens, setIsClearingTokens] = useState(false);
   const [isUpdatingSW, setIsUpdatingSW] = useState(false);
+  const [isForceReactivating, setIsForceReactivating] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string>(new Date().toLocaleTimeString('pt-BR'));
+  const [showReactivateHint, setShowReactivateHint] = useState(false);
 
   const addLog = useCallback((message: string, type: DiagnosticLog['type'] = 'info') => {
     const time = new Date().toLocaleTimeString('pt-BR');
@@ -151,6 +154,7 @@ export function PushDiagnostics({
     }
 
     setIsTestingPush(true);
+    setShowReactivateHint(false);
     addLog('Enviando notificação de teste...', 'info');
 
     try {
@@ -174,20 +178,59 @@ export function PushDiagnostics({
           description: error.message,
           variant: "destructive" 
         });
-      } else {
-        addLog(`Resposta FCM: ${JSON.stringify(data)}`, 'success');
-        toast({ 
-          title: "Teste enviado!", 
-          description: "Aguarde alguns segundos pela notificação." 
-        });
+        return;
+      }
+      
+      // Tratar todos os cenários de resposta
+      if (data) {
+        addLog(`Resposta: sent=${data.sent}, total=${data.total}`, 'info');
         
-        // Log detailed response
-        if (data?.results) {
+        if (data.sent === 0) {
+          if (data.total === 0) {
+            addLog('Nenhuma subscription ativa encontrada', 'warning');
+            setShowReactivateHint(true);
+            toast({ 
+              title: "Sem tokens ativos", 
+              description: "Clique em 'Reativar Push' para corrigir.",
+              variant: "destructive" 
+            });
+          } else {
+            addLog(`Falha: 0/${data.total} enviados - token pode estar expirado`, 'error');
+            
+            // Analisar erros específicos
+            if (data.errors?.length > 0) {
+              data.errors.forEach((err: string, index: number) => {
+                const shortErr = err.substring(0, 150);
+                addLog(`Erro ${index + 1}: ${shortErr}`, 'error');
+                
+                if (err.includes('UNREGISTERED') || err.includes('404')) {
+                  addLog('⚠️ Token UNREGISTERED - precisa reativar', 'error');
+                  setShowReactivateHint(true);
+                }
+              });
+            }
+            
+            toast({ 
+              title: "Token expirado", 
+              description: "Clique em 'Reativar Push' para gerar novo token.",
+              variant: "destructive" 
+            });
+          }
+        } else {
+          addLog(`Sucesso: ${data.sent}/${data.total} enviados ✓`, 'success');
+          toast({ 
+            title: "Teste enviado!", 
+            description: "Aguarde alguns segundos pela notificação." 
+          });
+        }
+        
+        // Log resultados detalhados se existirem
+        if (data.results) {
           data.results.forEach((result: any, index: number) => {
             if (result.success) {
-              addLog(`Token ${index + 1}: Enviado com sucesso ✓`, 'success');
+              addLog(`Token ${index + 1}: Enviado ✓`, 'success');
             } else {
-              addLog(`Token ${index + 1}: Falhou - ${result.error || 'erro desconhecido'}`, 'error');
+              addLog(`Token ${index + 1}: Falhou - ${result.error || 'erro'}`, 'error');
             }
           });
         }
@@ -201,6 +244,96 @@ export function PushDiagnostics({
       });
     } finally {
       setIsTestingPush(false);
+    }
+  };
+
+  const forceReactivatePush = async () => {
+    if (!user) {
+      addLog('Usuário não autenticado', 'error');
+      return;
+    }
+
+    setIsForceReactivating(true);
+    addLog('🔄 Iniciando reativação forçada...', 'info');
+
+    try {
+      // 1. Deletar todos os tokens do usuário no banco
+      addLog('Removendo tokens antigos do banco...', 'info');
+      const { error: deleteError } = await supabase
+        .from('push_subscriptions')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (deleteError) {
+        addLog(`Erro ao deletar tokens: ${deleteError.message}`, 'error');
+      } else {
+        addLog('Tokens removidos do banco ✓', 'success');
+      }
+
+      // 2. Unregister SW Firebase atual
+      addLog('Removendo Service Worker Firebase...', 'info');
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      let swRemoved = false;
+      
+      for (const reg of registrations) {
+        if (reg.active?.scriptURL?.includes('firebase-messaging-sw')) {
+          await reg.unregister();
+          swRemoved = true;
+          addLog('SW Firebase removido ✓', 'success');
+        }
+      }
+      
+      if (!swRemoved) {
+        addLog('Nenhum SW Firebase encontrado para remover', 'info');
+      }
+
+      // 3. Aguardar um momento
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 4. Registrar novo SW
+      addLog('Registrando novo Service Worker...', 'info');
+      const newReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { 
+        scope: '/' 
+      });
+      addLog(`Novo SW registrado: ${newReg.scope}`, 'success');
+
+      // 5. Aguardar ativação
+      if (newReg.installing) {
+        addLog('Aguardando SW ativar...', 'info');
+        await new Promise<void>((resolve) => {
+          const sw = newReg.installing!;
+          sw.addEventListener('statechange', () => {
+            if (sw.state === 'activated') {
+              resolve();
+            }
+          });
+          setTimeout(resolve, 3000); // Timeout de 3s
+        });
+      }
+
+      await navigator.serviceWorker.ready;
+      addLog('SW pronto e ativo ✓', 'success');
+
+      // 6. Verificar status
+      await checkSwStatus();
+
+      setShowReactivateHint(false);
+      toast({
+        title: "Reativação concluída!",
+        description: "Agora clique em 'Ativar' no card de Push Notifications acima.",
+      });
+      
+      addLog('✅ Reativação concluída - clique em "Ativar" acima', 'success');
+
+    } catch (error: any) {
+      addLog(`Erro na reativação: ${error.message}`, 'error');
+      toast({ 
+        title: "Erro na reativação", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    } finally {
+      setIsForceReactivating(false);
     }
   };
 
@@ -435,6 +568,18 @@ export function PushDiagnostics({
 
         <Separator />
 
+        {/* Reactivate Hint Alert */}
+        {showReactivateHint && (
+          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm">
+            <p className="text-destructive font-medium mb-2">
+              ⚠️ Token expirado ou inválido
+            </p>
+            <p className="text-xs text-muted-foreground mb-2">
+              Clique em "Reativar Push" para limpar tokens antigos e registrar um novo Service Worker.
+            </p>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="space-y-2">
           <div className="flex gap-2">
@@ -468,6 +613,22 @@ export function PushDiagnostics({
               Limpar Tokens
             </Button>
           </div>
+
+          {/* Botão de Reativação Forçada */}
+          <Button
+            variant={showReactivateHint ? "destructive" : "outline"}
+            size="sm"
+            className="w-full h-8 text-xs"
+            onClick={forceReactivatePush}
+            disabled={isForceReactivating}
+          >
+            {isForceReactivating ? (
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            ) : (
+              <RotateCcw className="h-3 w-3 mr-1" />
+            )}
+            Reativar Push (Limpar e Reregistrar)
+          </Button>
 
           <Button
             variant="outline"
