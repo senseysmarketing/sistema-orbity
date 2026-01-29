@@ -1,122 +1,307 @@
 
-# Correção: Orçamento Diário Calculando Campanhas/Conjuntos Inativos
 
-## Problema Identificado
+# Diagnóstico e Solução: Refresh/Perda de Estado ao Trocar de Abas
 
-Na tela de Controle de Tráfego → Painel de Clientes, o **orçamento diário** da conta "Aliança Casas de Madeira" está mostrando R$41 quando deveria ser R$26.
+## Diagnóstico Detalhado
 
-### Causa Raiz
+Após análise profunda do código, identifiquei **múltiplas fontes de problemas** que causam o comportamento de refresh ao trocar de abas:
 
-O cálculo atual na edge function `facebook-account-summary` tem dois problemas:
+---
 
-1. **Campanhas com CBO (Campaign Budget Optimization)**: Quando a campanha usa orçamento a nível de campanha, o código soma o `daily_budget` da campanha se ela estiver ATIVA, mas não verifica se a campanha inteira deveria contribuir
+## Causas Identificadas
 
-2. **Ad Sets com orçamento individual**: Quando o orçamento é a nível de conjunto (ABO), o código soma todos os ad sets ATIVOS, mas **não verifica se a campanha pai também está ATIVA**
+### 1. Supabase `onAuthStateChange` Disparando Re-renders
 
-### Lógica Atual Problemática
+**Arquivo**: `src/hooks/useAuth.tsx`
+**Problema**: O listener `onAuthStateChange` dispara eventos mesmo quando não houve mudança real de sessão. Quando o token é renovado automaticamente (background), isso causa re-render da árvore inteira.
 
 ```typescript
-// Campanhas - soma daily_budget de campanhas ativas
-for (const campaign of campaignsData.data) {
-  if (campaign.status === 'ACTIVE' || campaign.effective_status === 'ACTIVE') {
-    if (campaign.daily_budget) {
-      campaignDailyBudget += parseFloat(campaign.daily_budget) / 100
-    }
-  }
-}
-
-// Ad Sets - soma daily_budget de ad sets ativos
-for (const adset of adsetsData.data) {
-  if (adset.status === 'ACTIVE' || adset.effective_status === 'ACTIVE') {
-    if (adset.daily_budget) {
-      adsetDailyBudget += parseFloat(adset.daily_budget) / 100
-    }
-  }
-}
-
-// Problema: Se campanha = 0 e adset > 0, usa adset
-// MAS não verifica se a campanha pai do adset está ativa!
+// Linha 110-138
+supabase.auth.onAuthStateChange(async (event, session) => {
+  setSession(session);      // ← Atualiza estado = re-render
+  setUser(session?.user);   // ← Atualiza estado = re-render
+  // ... busca perfil (mais re-renders)
+});
 ```
 
-### Problema Adicional
-
-O campo `effective_status` de um ad set pode ser `ACTIVE` mesmo que sua campanha pai esteja `PAUSED`. Isso porque `effective_status` representa o status do próprio objeto, não considera a hierarquia completa.
+**Impacto**: Cada vez que o Supabase renova o token (ex: ao voltar para aba), todos os providers re-renderizam.
 
 ---
 
-## Solução
+### 2. `usePageVisibility` Causando Cascata de Efeitos
 
-Modificar a edge function `facebook-account-summary` para:
+**Arquivo**: `src/hooks/usePageVisibility.tsx`
+**Problema**: Este hook atualiza `isVisible` a cada mudança de visibilidade, e vários outros hooks dependem dele:
 
-1. **Primeiro**, buscar as campanhas e criar um mapa de campanhas ATIVAS
-2. **Depois**, ao iterar os ad sets, verificar se a campanha pai está no mapa de campanhas ativas
-3. Só somar o orçamento de ad sets cujas campanhas pai estão ATIVAS
+- `useSubscription` (linha 287-306)
+- `usePaymentMiddleware` (linha 52)
 
-### Código Corrigido
+Embora já tenham sido feitas melhorias com `useRef`, ainda há dependências que podem causar re-renders.
+
+---
+
+### 3. `useAgency` Fazendo Fetch em Cascata
+
+**Arquivo**: `src/hooks/useAgency.tsx`
+**Problema**: Na linha 62-105, `fetchUserAgencies` é chamado sempre que `user` muda:
 
 ```typescript
-// 1. Buscar campanhas e criar mapa de IDs ativos
-const activeCampaignIds = new Set<string>()
-let campaignDailyBudget = 0
+useEffect(() => {
+  if (user) {
+    fetchUserAgencies();  // ← Faz fetch do banco
+  } else {
+    setCurrentAgency(null);
+    // ...
+  }
+}, [user]); // ← Depende de user
+```
 
-if (campaignsData.data) {
-  for (const campaign of campaignsData.data) {
-    // Só considerar ACTIVE (não PAUSED, DELETED, etc)
-    if (campaign.effective_status === 'ACTIVE') {
-      activeCampaignIds.add(campaign.id)
-      activeCampaignsCount++
-      
-      // Somar orçamento da campanha (CBO)
-      if (campaign.daily_budget) {
-        campaignDailyBudget += parseFloat(campaign.daily_budget) / 100
+Quando `onAuthStateChange` atualiza `user` (mesmo com o mesmo valor), este efeito dispara.
+
+---
+
+### 4. `useCache` Perdendo Dados em Re-mount
+
+**Arquivo**: `src/hooks/useCache.tsx`
+**Problema**: O cache usa `useState` interno:
+
+```typescript
+const [cache, setCache] = useState<Map<string, CacheItem<T>>>(new Map());
+```
+
+Se o provider que usa este hook for desmontado, **todo o cache é perdido**.
+
+---
+
+### 5. Hierarquia de Providers Reinicializando
+
+**Arquivo**: `src/App.tsx`
+**Problema**: A ordem dos providers cria uma cascata de dependências:
+
+```
+AuthProvider
+  └── AgencyProvider (depende de user)
+      └── SubscriptionProvider (depende de agency)
+          └── MasterProvider
+              └── PaymentMiddlewareProvider (depende de tudo)
+```
+
+Qualquer re-render no `AuthProvider` propaga para toda a árvore.
+
+---
+
+## Solução Proposta
+
+### Parte 1: Estabilizar `onAuthStateChange`
+
+Modificar `useAuth.tsx` para **ignorar eventos de refresh de token** que não alteram o usuário:
+
+```typescript
+supabase.auth.onAuthStateChange(async (event, session) => {
+  // NOVO: Ignorar eventos que não mudam o usuário
+  if (event === 'TOKEN_REFRESHED') {
+    // Token foi renovado, mas usuário é o mesmo - não re-renderizar
+    console.log('[Auth] Token refreshed silently');
+    return;
+  }
+  
+  // NOVO: Só atualizar estado se realmente mudou
+  if (session?.user?.id !== user?.id) {
+    setSession(session);
+    setUser(session?.user ?? null);
+    // ... resto do código
+  }
+});
+```
+
+---
+
+### Parte 2: Usar `useRef` para Evitar Re-renders Desnecessários
+
+Em hooks como `useAgency`, usar refs para comparar valores anteriores:
+
+```typescript
+const previousUserIdRef = useRef<string | null>(null);
+
+useEffect(() => {
+  // NOVO: Só executar se user ID realmente mudou
+  if (user?.id === previousUserIdRef.current) {
+    return; // Mesmo usuário, ignorar
+  }
+  
+  previousUserIdRef.current = user?.id || null;
+  
+  if (user) {
+    fetchUserAgencies();
+  } else {
+    // ... cleanup
+  }
+}, [user?.id]); // Só depender do ID, não do objeto inteiro
+```
+
+---
+
+### Parte 3: Persistir Cache em sessionStorage
+
+Modificar `useCache.tsx` para usar `sessionStorage` como fallback:
+
+```typescript
+// Carregar cache inicial do sessionStorage
+const [cache, setCache] = useState<Map<string, CacheItem<T>>>(() => {
+  try {
+    const stored = sessionStorage.getItem(`cache_${namespace}`);
+    return stored ? new Map(JSON.parse(stored)) : new Map();
+  } catch {
+    return new Map();
+  }
+});
+
+// Salvar cache quando mudar
+useEffect(() => {
+  try {
+    sessionStorage.setItem(
+      `cache_${namespace}`, 
+      JSON.stringify(Array.from(cache.entries()))
+    );
+  } catch {}
+}, [cache]);
+```
+
+---
+
+### Parte 4: Adicionar Debounce em Efeitos de Visibilidade
+
+No `useSubscription`, adicionar debounce para evitar múltiplos checks:
+
+```typescript
+const visibilityDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+useEffect(() => {
+  if (!isVisible) {
+    wasVisibleRef.current = false;
+    lastVisibilityCheckRef.current = Date.now();
+    return;
+  }
+  
+  // NOVO: Debounce para evitar checks rápidos demais
+  if (visibilityDebounceRef.current) {
+    clearTimeout(visibilityDebounceRef.current);
+  }
+  
+  visibilityDebounceRef.current = setTimeout(() => {
+    if (!wasVisibleRef.current) {
+      const timeAway = Date.now() - lastVisibilityCheckRef.current;
+      if (user && timeAway > AWAY_THRESHOLD) {
+        setShowRefreshAlert(true);
       }
     }
-  }
-}
-
-// 2. Buscar ad sets com campo campaign_id para verificar hierarquia
-const adsetsUrl = `...&fields=id,status,effective_status,daily_budget,updated_time,campaign_id&...`
-
-// 3. Iterar ad sets verificando se campanha pai está ativa
-let adsetDailyBudget = 0
-
-if (adsetsData.data) {
-  for (const adset of adsetsData.data) {
-    // Só somar se o ad set está ATIVO E a campanha pai está ATIVA
-    if (adset.effective_status === 'ACTIVE' && activeCampaignIds.has(adset.campaign_id)) {
-      if (adset.daily_budget) {
-        adsetDailyBudget += parseFloat(adset.daily_budget) / 100
-      }
+    wasVisibleRef.current = true;
+  }, 500); // 500ms debounce
+  
+  return () => {
+    if (visibilityDebounceRef.current) {
+      clearTimeout(visibilityDebounceRef.current);
     }
-  }
+  };
+}, [isVisible]);
+```
+
+---
+
+### Parte 5: Preservar Estado de Formulários/Tarefas
+
+Adicionar hook para auto-salvar drafts em localStorage:
+
+```typescript
+// Novo arquivo: src/hooks/useFormDraft.tsx
+export function useFormDraft<T>(key: string, initialValue: T) {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      const saved = localStorage.getItem(`draft_${key}`);
+      return saved ? JSON.parse(saved) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+  
+  // Auto-save com debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      localStorage.setItem(`draft_${key}`, JSON.stringify(value));
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [key, value]);
+  
+  const clearDraft = () => {
+    localStorage.removeItem(`draft_${key}`);
+    setValue(initialValue);
+  };
+  
+  return [value, setValue, clearDraft] as const;
 }
 ```
 
 ---
 
-## Mudanças Detalhadas
+## Arquivos a Modificar
 
-### Arquivo: `supabase/functions/facebook-account-summary/index.ts`
-
-| Seção | Mudança |
-|-------|---------|
-| Linha ~114 | Mudar query de campanhas para usar `effective_status === 'ACTIVE'` (mais restritivo) |
-| Linha ~122 | Criar `Set<string>` com IDs de campanhas ativas |
-| Linha ~143 | Adicionar `campaign_id` na query de ad sets |
-| Linha ~153 | Verificar se `campaign_id` está no set de campanhas ativas antes de somar orçamento |
-
----
-
-## Benefícios
-
-1. **Orçamento preciso** - Só soma campanhas e conjuntos realmente ativos
-2. **Hierarquia respeitada** - Ad sets de campanhas pausadas não são contados
-3. **Contagem de campanhas correta** - `active_campaigns_count` refletirá apenas campanhas com `effective_status = 'ACTIVE'`
+| Arquivo | Mudança |
+|---------|---------|
+| `src/hooks/useAuth.tsx` | Filtrar eventos `TOKEN_REFRESHED` e comparar user ID antes de atualizar estado |
+| `src/hooks/useAgency.tsx` | Usar `useRef` para evitar re-fetch quando user não mudou |
+| `src/hooks/useSubscription.tsx` | Adicionar debounce no efeito de visibilidade |
+| `src/hooks/usePaymentMiddleware.tsx` | Remover dependência de `isVisible` do cache check |
+| `src/hooks/useCache.tsx` | Adicionar persistência em sessionStorage (opcional) |
+| `src/hooks/useFormDraft.tsx` | **NOVO** - Hook para auto-salvar drafts de formulários |
 
 ---
 
-## Testes
+## Benefícios Esperados
 
-Após implementação:
-- Verificar que "Aliança Casas de Madeira" mostra R$26 de orçamento
-- Validar outras contas para garantir que os valores estão corretos
+1. **Sem refreshes ao trocar de aba** - Token refresh não causa re-render
+2. **Formulários preservados** - Drafts salvos em localStorage
+3. **Menos chamadas ao banco** - Fetch só quando necessário
+4. **UX fluida** - Usuário não perde trabalho em andamento
+
+---
+
+## Detalhes Técnicos
+
+### Mudança Principal no `useAuth.tsx`
+
+A mudança mais importante é no listener do Supabase. Atualmente:
+
+```typescript
+supabase.auth.onAuthStateChange(async (event, session) => {
+  setSession(session);
+  setUser(session?.user ?? null);
+```
+
+Deve virar:
+
+```typescript
+supabase.auth.onAuthStateChange(async (event, session) => {
+  // Eventos silenciosos que não devem causar re-render
+  const silentEvents = ['TOKEN_REFRESHED', 'USER_UPDATED'];
+  
+  if (silentEvents.includes(event)) {
+    // Atualizar refs internamente sem re-render
+    sessionRef.current = session;
+    return;
+  }
+  
+  // Só atualizar estado se user realmente mudou
+  const newUserId = session?.user?.id || null;
+  const currentUserId = user?.id || null;
+  
+  if (newUserId !== currentUserId) {
+    setSession(session);
+    setUser(session?.user ?? null);
+    // ... resto
+  }
+});
+```
+
+Esta mudança elimina a principal causa de re-renders desnecessários.
+
