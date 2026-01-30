@@ -1,126 +1,134 @@
 
-# Correção: Loop de Re-renderização nas Preferências de Notificação (Android)
+# Correção: Loop de Re-renderização nas Preferências de Notificação (iPhone)
 
 ## Problema Identificado
 
-O usuário "João Paulo" no Android não consegue usar as Preferências de Notificação porque a tela fica "atualizando toda hora". A investigação revelou um **loop de re-renderização** causado por dependências instáveis no hook `usePushNotifications`.
+O loop de re-renderização nas Preferências de Notificação persiste em iPhones mesmo após a correção anterior. A investigação identificou múltiplas causas:
 
-## Causa Raiz
+### Causa 1: Valores calculados inline no retorno do hook
 
-O hook `usePushNotifications` possui um `useEffect` para carregar o token existente que inclui `saveToken` nas suas dependências:
+No `usePushNotifications.tsx`, as funções `isIOS()` e `isAndroid()` são executadas diretamente no return statement:
+
+```typescript
+return {
+  // ...
+  isIOS: isIOS(),      // ← Executada a cada render
+  isAndroid: isAndroid(), // ← Executada a cada render
+};
+```
+
+Embora retornem valores primitivos (boolean), isso força recálculo desnecessário.
+
+### Causa 2: Dependência instável no useEffect de foreground messages
 
 ```typescript
 useEffect(() => {
-  const loadExistingToken = async () => {
-    // ... obtém token ...
-    await saveToken(existingToken);  // Re-save para manter atualizado
-  };
-  loadExistingToken();
-}, [user, isSupported, permission, hasFirebaseConfig, getFirebaseMessaging, saveToken]); 
-//                                                                           ↑
-//                                                           DEPENDÊNCIA INSTÁVEL
+  // ...listener de mensagens foreground...
+}, [isSupported, permission, hasFirebaseConfig, getFirebaseMessaging, toast]);
+//                                                                    ↑
+//                                                     Pode mudar frequentemente
 ```
 
-### Por que causa loop:
+O objeto `toast` do hook `useToast` pode ter referência instável, causando re-execuções do efeito.
 
-1. Componente monta → `useEffect` executa
-2. `saveToken` é chamado → faz query no banco
-3. Enquanto isso, `currentAgency` é carregada pelo `useAgency`
-4. `currentAgency` muda → `saveToken` é recriado (novo `useCallback`)
-5. Nova referência de `saveToken` → `useEffect` dispara de novo
-6. Volta ao passo 2 → **LOOP!**
+### Causa 3: PushDiagnostics executando efeito no mount
 
-No Android, isso é mais perceptível porque:
-- Service Worker pode demorar mais para ativar
-- Firebase pode enviar eventos de atualização de token mais frequentemente
-- O estado `permission` pode oscilar durante a inicialização
+O `PushDiagnostics` executa `refreshDiagnostics()` sem as dependências corretas:
+
+```typescript
+useEffect(() => {
+  refreshDiagnostics();
+}, []); // ← Deveria incluir refreshDiagnostics ou usar ref
+```
 
 ---
 
 ## Solução
 
-### Mudanças no `usePushNotifications.tsx`
+### Arquivo 1: `src/hooks/usePushNotifications.tsx`
 
-1. **Usar `useRef` para armazenar função estável** - evitar que `saveToken` seja dependência direta
-2. **Adicionar flag para evitar execuções duplicadas** - controle de "já carregou"
-3. **Remover `saveToken` das dependências do useEffect** - usar ref em vez disso
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Mudança |
-|---------|---------|
-| `src/hooks/usePushNotifications.tsx` | Estabilizar `saveToken` com ref e evitar loop |
-
----
-
-## Implementação Detalhada
-
-### Adicionar ref para saveToken estável
+1. **Memoizar valores de plataforma usando `useMemo`**
+2. **Remover `toast` das dependências usando ref**
+3. **Estabilizar todos os valores retornados**
 
 ```typescript
-// Adicionar junto com os outros refs (após linha 63)
-const saveTokenRef = useRef<(token: string) => Promise<void>>();
+// Memoizar detecção de plataforma (só calcula uma vez)
+const platformInfo = useMemo(() => ({
+  isIOS: isIOS(),
+  isAndroid: isAndroid(),
+  isStandalone: isStandalone(),
+}), []); // Vazio porque user agent não muda durante sessão
 
-// Após a definição do saveToken (após linha 244)
-saveTokenRef.current = saveToken;
-```
+// Ref para toast (evitar dependência instável)
+const toastRef = useRef(toast);
+toastRef.current = toast;
 
-### Modificar o useEffect para usar ref
-
-```typescript
-// Substituir o useEffect de loadExistingToken (linhas 382-408)
+// Atualizar useEffect de foreground para usar ref
 useEffect(() => {
-  // Flag para evitar execuções duplicadas durante a mesma sessão
-  let didLoad = false;
-  
-  const loadExistingToken = async () => {
-    if (didLoad) return;
-    if (!user || !isSupported || permission !== 'granted' || !hasFirebaseConfig) return;
+  if (!isSupported || permission !== 'granted' || !hasFirebaseConfig) return;
 
-    didLoad = true;
+  try {
+    const messaging = getFirebaseMessaging();
     
-    try {
-      const messaging = getFirebaseMessaging();
-      const registration = await navigator.serviceWorker.ready;
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log('[Push] Foreground message received:', payload);
       
-      const existingToken = await getToken(messaging, {
-        vapidKey: VAPID_KEY,
-        serviceWorkerRegistration: registration,
+      // Usar ref ao invés de toast diretamente
+      toastRef.current({
+        title: payload.notification?.title || 'Nova notificação',
+        description: payload.notification?.body,
       });
+      // ...
+    });
 
-      if (existingToken) {
-        console.log('[Push] Existing token found');
-        setToken(existingToken);
-        
-        // Usar ref para evitar dependência instável
-        if (saveTokenRef.current) {
-          await saveTokenRef.current(existingToken);
-        }
-      }
-    } catch (error) {
-      console.error('[Push] Error loading existing token:', error);
-    }
-  };
+    return () => unsubscribe();
+  } catch (error) {
+    console.error('[Push] Error setting up foreground listener:', error);
+  }
+}, [isSupported, permission, hasFirebaseConfig, getFirebaseMessaging]); // ← Removido toast
 
-  loadExistingToken();
+// Retorno estável
+return {
+  permission,
+  token,
+  isSupported,
+  isLoading,
+  hasFirebaseConfig,
+  isStandaloneMode,
+  isIOS: platformInfo.isIOS,       // ← Valor memoizado
+  isAndroid: platformInfo.isAndroid, // ← Valor memoizado
+  requestPermission,
+  disablePushNotifications,
+};
+```
+
+### Arquivo 2: `src/components/notifications/PushDiagnostics.tsx`
+
+1. **Corrigir dependências do useEffect inicial**
+
+```typescript
+// Usar useRef para evitar re-execução desnecessária
+const initializedRef = useRef(false);
+
+useEffect(() => {
+  if (initializedRef.current) return;
+  initializedRef.current = true;
   
-  return () => {
-    didLoad = true; // Cancelar se desmontar
-  };
-}, [user?.id, isSupported, permission, hasFirebaseConfig, getFirebaseMessaging]); 
-// Nota: Removido saveToken, usando user?.id em vez de user
+  refreshDiagnostics();
+}, [refreshDiagnostics]);
 ```
 
 ---
 
-## Mudanças Principais
+## Mudanças Detalhadas
 
-1. **`saveTokenRef`**: Armazena referência estável da função
-2. **`didLoad` flag**: Evita execuções duplicadas dentro do mesmo efeito
-3. **Dependência `user?.id`**: Usa ID primitivo em vez do objeto inteiro
-4. **Removido `saveToken` das deps**: Usa ref para chamar a função
+| Arquivo | Mudança | Motivo |
+|---------|---------|--------|
+| `usePushNotifications.tsx` | Adicionar `useMemo` para platformInfo | Evitar recálculo de isIOS/isAndroid |
+| `usePushNotifications.tsx` | Adicionar `toastRef` | Remover toast das dependências |
+| `usePushNotifications.tsx` | Atualizar useEffect de foreground | Usar ref ao invés de toast |
+| `usePushNotifications.tsx` | Atualizar return statement | Usar valores memoizados |
+| `PushDiagnostics.tsx` | Adicionar `initializedRef` | Evitar múltiplas execuções |
 
 ---
 
@@ -128,17 +136,17 @@ useEffect(() => {
 
 | Antes | Depois |
 |-------|--------|
-| Loop contínuo de re-render | Carrega token uma única vez |
-| Tela piscando toda hora | Tela estável |
-| Não consegue abrir Preferências | Preferências funcionam normalmente |
+| Tela piscando constantemente no iPhone | Tela estável |
+| Re-renders infinitos | Render único no mount |
+| useEffects executando múltiplas vezes | useEffects executando apenas quando necessário |
 
 ---
 
-## Por que isso afeta mais o Android?
+## Por que afeta mais o iPhone?
 
-1. **Timing diferente**: Android Chrome pode inicializar Service Workers mais lentamente
-2. **Permission flicker**: Estado de permissão pode oscilar brevemente
-3. **FCM behavior**: Firebase no Android pode emitir mais eventos de atualização
-4. **Memory/CPU**: Devices Android variados podem processar efeitos em tempos diferentes
+1. **Safari/WebKit**: Tem comportamento diferente com Service Workers
+2. **iOS PWA**: Pode disparar eventos de visibilidade mais frequentemente
+3. **Memory pressure**: iOS pode forçar re-renders em situações de baixa memória
+4. **Firebase SDK**: Pode ter comportamentos específicos no iOS
 
-A correção estabiliza o comportamento em **todas** as plataformas (iOS, Android, Desktop).
+A correção estabiliza o hook em **todas** as plataformas, mas terá maior impacto no iPhone onde o problema é mais visível.
