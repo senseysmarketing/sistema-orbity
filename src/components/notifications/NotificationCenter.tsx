@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Settings, CheckCheck, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { NotificationItem } from "./NotificationItem";
-import { NotificationPreferences } from "./NotificationPreferences";
 import { useNotifications } from "@/hooks/useNotifications";
 
 interface NotificationCenterProps {
@@ -19,8 +19,8 @@ interface NotificationCenterProps {
 }
 
 export function NotificationCenter({ onClose }: NotificationCenterProps) {
+  const navigate = useNavigate();
   const { notifications, loading, markAllAsRead, enableDoNotDisturb } = useNotifications();
-  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread' | 'today'>('unread');
 
   const handleDoNotDisturb = (hours: number) => {
@@ -86,7 +86,10 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
             variant="ghost"
             size="icon"
             className="h-8 w-8 md:h-9 md:w-9"
-            onClick={() => setPreferencesOpen(true)}
+            onClick={() => {
+              onClose();
+              navigate('/dashboard/settings/notifications');
+            }}
           >
             <Settings className="h-4 w-4" />
           </Button>
@@ -183,11 +186,6 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
           </ScrollArea>
         </TabsContent>
       </Tabs>
-
-      <NotificationPreferences 
-        open={preferencesOpen}
-        onOpenChange={setPreferencesOpen}
-      />
     </>
   );
 }
