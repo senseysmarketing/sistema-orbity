@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -133,9 +133,15 @@ export function PushDiagnostics({
     }
   }, [checkSwStatus, permission, isStandaloneMode, isIOS, token, addLog]);
 
+  // Usar ref para evitar re-execução desnecessária
+  const initializedRef = useRef(false);
+  
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    
     refreshDiagnostics();
-  }, []);
+  }, [refreshDiagnostics]);
 
   const copyToClipboard = async (text: string, label: string) => {
     try {
