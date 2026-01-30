@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, Messaging } from 'firebase/messaging';
 import { supabase } from '@/integrations/supabase/client';
@@ -62,6 +62,17 @@ export function usePushNotifications() {
   const firebaseAppRef = useRef<FirebaseApp | null>(null);
   const messagingRef = useRef<Messaging | null>(null);
   const saveTokenRef = useRef<(token: string) => Promise<void>>();
+  const toastRef = useRef(toast);
+  
+  // Memoizar detecção de plataforma (só calcula uma vez - user agent não muda durante sessão)
+  const platformInfo = useMemo(() => ({
+    isIOS: isIOS(),
+    isAndroid: isAndroid(),
+    isStandalone: isStandalone(),
+  }), []);
+  
+  // Manter refs atualizadas
+  toastRef.current = toast;
 
   // Check if Firebase config is available
   const hasFirebaseConfig = Boolean(
@@ -363,8 +374,8 @@ export function usePushNotifications() {
       const unsubscribe = onMessage(messaging, (payload) => {
         console.log('[Push] Foreground message received:', payload);
         
-        // Show toast for foreground messages
-        toast({
+        // Show toast for foreground messages (usar ref para evitar dependência instável)
+        toastRef.current({
           title: payload.notification?.title || 'Nova notificação',
           description: payload.notification?.body,
         });
@@ -381,7 +392,7 @@ export function usePushNotifications() {
     } catch (error) {
       console.error('[Push] Error setting up foreground listener:', error);
     }
-  }, [isSupported, permission, hasFirebaseConfig, getFirebaseMessaging, toast]);
+  }, [isSupported, permission, hasFirebaseConfig, getFirebaseMessaging]);
 
   // Load existing token on mount
   useEffect(() => {
@@ -430,8 +441,8 @@ export function usePushNotifications() {
     isLoading,
     hasFirebaseConfig,
     isStandaloneMode,
-    isIOS: isIOS(),
-    isAndroid: isAndroid(),
+    isIOS: platformInfo.isIOS,
+    isAndroid: platformInfo.isAndroid,
     requestPermission,
     disablePushNotifications,
   };
