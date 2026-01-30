@@ -38,6 +38,7 @@ import Clients from "./pages/Clients";
 import ClientDetail from "./pages/ClientDetail";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Install from "./pages/Install";
+import NotificationSettings from "./pages/NotificationSettings";
 import { UpdatePrompt } from "./components/pwa/UpdatePrompt";
 
 const queryClient = new QueryClient({
@@ -113,6 +114,7 @@ const App = () => (
                           <Route path="import" element={<Import />} />
                           <Route path="reports" element={<Reports />} />
                           <Route path="settings" element={<Settings />} />
+                          <Route path="settings/notifications" element={<NotificationSettings />} />
                           <Route path="master" element={<Master />} />
                         </Route>
                         
