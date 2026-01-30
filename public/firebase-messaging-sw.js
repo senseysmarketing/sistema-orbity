@@ -6,9 +6,10 @@ self.addEventListener('install', () => {
   // NÃO usar skipWaiting() aqui - deixar o PWA controlar a atualização
 });
 
-self.addEventListener('activate', () => {
+self.addEventListener('activate', (event) => {
   console.log('[SW] Activating...');
-  // NÃO usar clients.claim() aqui - evita assumir controle e forçar reload
+  // Assumir controle imediato para receber push events - ESSENCIAL para iOS PWA
+  event.waitUntil(clients.claim());
 });
 
 // Handler para mensagens do client (skipWaiting controlado pelo PWA)
