@@ -187,17 +187,58 @@ export function usePushNotifications() {
     const android = isAndroid();
     const deviceType = getDeviceType();
 
+    const deviceInfo = {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      language: navigator.language,
+      standalone: standalone,
+      displayMode: standalone ? 'standalone' : 'browser',
+      isIOS: ios,
+      isAndroid: android,
+      deviceType: deviceType,
+      generatedAt: new Date().toISOString(),
+    };
+
     try {
-      // Step 1: Buscar tokens existentes do usuário
-      const { data: existingTokens } = await supabase
+      // Step 1: Verificar se o token já existe (ativo ou inativo)
+      const { data: existingToken } = await supabase
+        .from('push_subscriptions')
+        .select('id, is_active')
+        .eq('user_id', user.id)
+        .eq('fcm_token', fcmToken)
+        .maybeSingle();
+
+      // Step 2: Se token existe mas está INATIVO, REATIVAR explicitamente
+      if (existingToken && !existingToken.is_active) {
+        console.log('[Push] Reativando token existente que estava inativo');
+        const { error: reactivateError } = await supabase
+          .from('push_subscriptions')
+          .update({ 
+            is_active: true,
+            agency_id: currentAgency.id,
+            device_info: deviceInfo,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingToken.id);
+        
+        if (!reactivateError) {
+          console.log(`[Push] Token reativado com sucesso para ${deviceType}`);
+          return; // Token já salvo e reativado
+        } else {
+          console.warn('[Push] Erro ao reativar token:', reactivateError);
+        }
+      }
+
+      // Step 3: Buscar tokens ATIVOS do usuário para desativar duplicados do mesmo dispositivo
+      const { data: activeTokens } = await supabase
         .from('push_subscriptions')
         .select('id, fcm_token, device_info')
         .eq('user_id', user.id)
         .eq('is_active', true);
 
-      // Step 2: Desativar apenas tokens do MESMO tipo de dispositivo (exceto o atual)
-      if (existingTokens && existingTokens.length > 0) {
-        const tokensToDeactivate = existingTokens.filter(sub => {
+      // Step 4: Desativar apenas tokens do MESMO tipo de dispositivo (exceto o atual)
+      if (activeTokens && activeTokens.length > 0) {
+        const tokensToDeactivate = activeTokens.filter(sub => {
           // Se é o mesmo token, não desativa
           if (sub.fcm_token === fcmToken) return false;
           
@@ -221,22 +262,12 @@ export function usePushNotifications() {
         }
       }
 
-      // Step 3: Upsert the new token with deviceType no device_info
+      // Step 5: Upsert the new token with deviceType no device_info
       const { error } = await supabase.from('push_subscriptions').upsert({
         user_id: user.id,
         agency_id: currentAgency.id,
         fcm_token: fcmToken,
-        device_info: {
-          userAgent: navigator.userAgent,
-          platform: navigator.platform,
-          language: navigator.language,
-          standalone: standalone,
-          displayMode: standalone ? 'standalone' : 'browser',
-          isIOS: ios,
-          isAndroid: android,
-          deviceType: deviceType,
-          generatedAt: new Date().toISOString(),
-        },
+        device_info: deviceInfo,
         platform: 'web',
         is_active: true,
         updated_at: new Date().toISOString(),
