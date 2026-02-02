@@ -246,14 +246,18 @@ export function useSocialMediaPosts() {
       const { data: userData } = await supabase.auth.getUser();
       const userId = userData.user?.id;
 
-      // Se scheduled_date mudou, resetar notification_sent_at
+      // Se post_date ou scheduled_date mudou, resetar notification_sent_at para permitir nova notificação
       const finalUpdates: any = { 
         ...updates,
         updated_by: userId  // Passa quem fez a ação para o trigger excluir das notificações
       };
-      if (updates.scheduled_date) {
-        const originalPost = posts.find(p => p.id === id);
-        if (originalPost && originalPost.scheduled_date !== updates.scheduled_date) {
+      
+      const originalPost = posts.find(p => p.id === id);
+      if (originalPost) {
+        const postDateChanged = updates.post_date && originalPost.post_date !== updates.post_date;
+        const scheduledDateChanged = updates.scheduled_date && originalPost.scheduled_date !== updates.scheduled_date;
+        
+        if (postDateChanged || scheduledDateChanged) {
           finalUpdates.notification_sent_at = null;
         }
       }
