@@ -1,135 +1,143 @@
 
 
-# Correção: Post Desaparece ao Arrastar no Kanban de Social Media
+# Ajuste das Notificações "Post Próximo de Publicar"
 
-## Diagnóstico
+## Problema Atual
 
-**O post NÃO foi excluído.** Ele existe no banco de dados, mas está com um status inválido que não corresponde a nenhuma coluna do Kanban.
+O sistema de notificações de posts próximos de publicar está usando o campo **`scheduled_date`** (que é o campo legado mantido por compatibilidade), enquanto agora existem dois campos distintos:
 
-### Evidências encontradas:
+| Campo | Significado | Uso Correto |
+|-------|-------------|-------------|
+| `due_date` | Data limite para a arte ficar pronta | Notificar responsáveis pela criação |
+| `post_date` | Data real de publicação do conteúdo | **Notificação "próximo de publicar"** |
+| `scheduled_date` | Campo legado (atualmente sincronizado com post_date) | Manter por compatibilidade |
 
-| Campo | Valor |
-|-------|-------|
-| Post ID | `387f67bc-ed53-4c72-99d2-48e2da09d2de` |
-| Título | Caixa de perguntas (Stories) |
-| Cliente | Juliano Fiuza Oioli |
-| Status atual | `33efe0b1-624b-42bb-af1c-af1b53903415` |
-| Última alteração | 02/02/2026 às 13:47 por Laryssa |
+### Problemas identificados:
 
-### Histórico de ações:
-```text
-13:11:57 - Laryssa → Status alterado para "Em Criação" ✅ (funcionou)
-13:47:56 - Laryssa → Status alterado para "33efe0b1-624b-42bb-af1c-af1b53903415" ❌ (UUID inválido)
-```
-
----
-
-## Causa Raiz
-
-O bug está no `handleDragEnd` do `PostKanban.tsx`:
-
-```typescript
-const newStatus = over.id as string; // ❌ BUG
-```
-
-Quando um post é arrastado e passa **por cima de outro post** antes de soltar na coluna, o `over.id` retorna o **ID do post** (UUID) em vez do **ID da coluna** (slug como `pending_approval`).
-
-Isso acontece porque o `SortableContext` dentro de cada coluna registra os cards como droppables também.
+1. **Campo errado**: A edge function `process-notifications` usa `scheduled_date` em vez de `post_date`
+2. **Tempo incorreto**: Notifica 3 horas antes (padrão do `post_advance_hours`) em vez de 1 hora antes
+3. **Reset de notificação**: O hook `useSocialMediaPosts` reseta `notification_sent_at` apenas quando `scheduled_date` muda, mas deveria resetar quando `post_date` muda
 
 ---
 
 ## Solução
 
-Modificar a função `handleDragEnd` para:
-1. Verificar se o `over.id` é um ID de coluna válido
-2. Se não for, descobrir a coluna correta usando `active.data.current.sortable.containerId` ou verificando se é um post e buscando a coluna do post de destino
+### Arquivo 1: `supabase/functions/process-notifications/index.ts`
+
+Modificar a função `processPosts()` para:
+
+1. Buscar e usar o campo `post_date` em vez de `scheduled_date`
+2. Alterar a lógica de tempo para 1 hora antes
+3. Tratar casos onde `post_date` é null (fallback para `scheduled_date`)
+
+#### Mudanças na query (linha ~499):
+
+```typescript
+// Antes
+.select(`
+  id,
+  title,
+  scheduled_date,
+  agency_id,
+  notification_sent_at,
+  agencies!inner(...)
+`)
+.gte('scheduled_date', now.toISOString())
+
+// Depois
+.select(`
+  id,
+  title,
+  scheduled_date,
+  post_date,
+  agency_id,
+  notification_sent_at,
+  agencies!inner(...)
+`)
+// Filtrar posts com post_date futuro (ou scheduled_date como fallback)
+```
+
+#### Mudanças na lógica de tempo (linha ~531-537):
+
+```typescript
+// Antes
+const advanceHours = prefs?.post_advance_hours ?? 3;
+const scheduledDate = new Date(post.scheduled_date);
+const notificationTime = addHours(now, advanceHours);
+
+if (scheduledDate <= notificationTime) {
+  // cria notificação
+}
+
+// Depois
+const ADVANCE_HOURS = 1; // Fixo: 1 hora antes
+const postDate = new Date(post.post_date || post.scheduled_date); // Usar post_date com fallback
+const notificationTime = addHours(now, ADVANCE_HOURS);
+
+if (postDate <= notificationTime) {
+  // cria notificação
+}
+```
 
 ---
 
-## Arquivo a Modificar
+### Arquivo 2: `src/hooks/useSocialMediaPosts.tsx`
+
+Ajustar o reset do `notification_sent_at` para considerar também quando `post_date` muda.
+
+#### Mudança na função `updatePost` (linha ~249-259):
+
+```typescript
+// Antes: só verifica scheduled_date
+if (updates.scheduled_date) {
+  const originalPost = posts.find(p => p.id === id);
+  if (originalPost && originalPost.scheduled_date !== updates.scheduled_date) {
+    finalUpdates.notification_sent_at = null;
+  }
+}
+
+// Depois: verifica post_date também
+const originalPost = posts.find(p => p.id === id);
+if (originalPost) {
+  const postDateChanged = updates.post_date && originalPost.post_date !== updates.post_date;
+  const scheduledDateChanged = updates.scheduled_date && originalPost.scheduled_date !== updates.scheduled_date;
+  
+  if (postDateChanged || scheduledDateChanged) {
+    finalUpdates.notification_sent_at = null;
+  }
+}
+```
+
+---
+
+## Comportamento Final
+
+| Antes | Depois |
+|-------|--------|
+| Usa `scheduled_date` | Usa `post_date` (com fallback para `scheduled_date`) |
+| Notifica 3 horas antes | Notifica **1 hora antes** |
+| Reset só quando `scheduled_date` muda | Reset quando `post_date` ou `scheduled_date` muda |
+
+---
+
+## Fluxo de Notificação
+
+```text
+1. Post criado com post_date = 14:00
+2. Cron roda a cada hora verificando posts
+3. Às 13:00:
+   - Calcula: 13:00 + 1h = 14:00
+   - post_date (14:00) <= 14:00 ✓
+   - Notificação enviada: "📱 Post próximo de publicar"
+4. Post aparece com título e link para /social-media
+```
+
+---
+
+## Resumo das Mudanças
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/social-media/PostKanban.tsx` | Corrigir `handleDragEnd` |
-
----
-
-## Correção Técnica
-
-### Nova lógica para `handleDragEnd`:
-
-```typescript
-const handleDragEnd = async (event: DragEndEvent) => {
-  const { active, over } = event;
-
-  if (!over) {
-    setActivePost(null);
-    return;
-  }
-
-  const postId = active.id as string;
-  let newStatus = over.id as string;
-
-  // Verificar se over.id é um ID de coluna válido
-  const isValidColumn = allColumns.some(col => col.id === newStatus);
-
-  if (!isValidColumn) {
-    // over.id pode ser o ID de outro post - precisamos descobrir em qual coluna o post foi solto
-    // Buscar a coluna do post de destino usando os dados do DnD
-    const overData = over.data.current;
-    
-    if (overData?.sortable?.containerId) {
-      newStatus = overData.sortable.containerId;
-    } else {
-      // Fallback: se não conseguir determinar a coluna, não faz nada
-      setActivePost(null);
-      return;
-    }
-  }
-
-  // Verificar novamente após correção
-  if (!allColumns.some(col => col.id === newStatus)) {
-    console.warn('Status de destino inválido:', newStatus);
-    setActivePost(null);
-    return;
-  }
-
-  const post = posts.find(p => p.id === postId);
-  
-  // Só atualiza se o status realmente mudou
-  if (post && post.status !== newStatus) {
-    // ... resto da lógica existente
-  }
-
-  setActivePost(null);
-};
-```
-
----
-
-## Correção Imediata do Post
-
-Além da correção do código, o post da Laryssa precisa ter seu status corrigido manualmente:
-
-```sql
-UPDATE social_media_posts 
-SET status = 'pending_approval'
-WHERE id = '387f67bc-ed53-4c72-99d2-48e2da09d2de';
-```
-
----
-
-## Melhorias Adicionais
-
-1. **Validação antes de salvar**: Verificar se o status é válido antes de chamar `updatePost`
-2. **Rollback em caso de erro**: Já existe, mas precisa tratar o caso de status inválido
-3. **Log para debug**: Adicionar console.log temporário para monitorar os IDs
-
----
-
-## Passos de Implementação
-
-1. Corrigir a lógica de `handleDragEnd` para validar o status de destino
-2. Executar SQL para corrigir o post afetado
-3. Testar arrastar posts entre colunas em diferentes cenários
+| `supabase/functions/process-notifications/index.ts` | Usar `post_date`, notificar 1h antes |
+| `src/hooks/useSocialMediaPosts.tsx` | Reset de notificação quando `post_date` muda |
 
