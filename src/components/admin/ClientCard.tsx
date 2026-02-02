@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Building, Calendar, DollarSign, MoreHorizontal, Edit, Eye, Trash2, FileText, Bell, UserX } from "lucide-react";
+import { Building, Calendar, DollarSign, MoreHorizontal, Edit, Eye, Trash2, FileText, Bell, UserX, Play } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -33,6 +33,8 @@ interface ClientCardProps {
   onView: (client: Client) => void;
   onEdit: (client: Client) => void;
   onDelete: (client: Client) => void;
+  onDeactivate?: (client: Client) => void;
+  onReactivate?: (client: Client) => void;
   onGenerateContract: (client: Client) => void;
   onCreateReminder: (client: Client) => void;
   onGeneratePayment?: (client: Client) => void;
@@ -48,6 +50,8 @@ export function ClientCard({
   onView,
   onEdit,
   onDelete,
+  onDeactivate,
+  onReactivate,
   onGenerateContract,
   onCreateReminder,
   onGeneratePayment,
@@ -177,13 +181,32 @@ export function ClientCard({
                   <Bell className="mr-2 h-4 w-4" />
                   Criar Lembrete
                 </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={(e) => { e.stopPropagation(); onDelete(client); }}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Desativar
-                </DropdownMenuItem>
+                {client.active ? (
+                  <DropdownMenuItem 
+                    onClick={(e) => { e.stopPropagation(); onDeactivate?.(client); }}
+                    className="text-orange-600 focus:text-orange-600"
+                  >
+                    <UserX className="mr-2 h-4 w-4" />
+                    Desativar
+                  </DropdownMenuItem>
+                ) : (
+                  <>
+                    <DropdownMenuItem 
+                      onClick={(e) => { e.stopPropagation(); onReactivate?.(client); }}
+                      className="text-green-600 focus:text-green-600"
+                    >
+                      <Play className="mr-2 h-4 w-4" />
+                      Reativar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={(e) => { e.stopPropagation(); onDelete(client); }}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Excluir Permanentemente
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
