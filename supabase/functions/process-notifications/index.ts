@@ -492,13 +492,17 @@ async function processPosts() {
   const now = new Date();
   const oneDayAgo = addHours(now, -24);
 
-  // Get all upcoming posts
+  // Get all upcoming posts - usa post_date (data de publicação) com fallback para scheduled_date
+  // Notificação é enviada 1 hora antes da publicação
+  const POST_ADVANCE_HOURS = 1;
+  
   const { data: posts, error } = await supabase
     .from('social_media_posts')
     .select(`
       id,
       title,
       scheduled_date,
+      post_date,
       agency_id,
       notification_sent_at,
       agencies!inner(
@@ -506,7 +510,6 @@ async function processPosts() {
       )
     `)
     .eq('archived', false)
-    .gte('scheduled_date', now.toISOString())
     .or(`notification_sent_at.is.null,notification_sent_at.lt.${oneDayAgo.toISOString()}`);
 
   if (error) {
@@ -514,27 +517,30 @@ async function processPosts() {
     return;
   }
 
-  console.log(`📊 Found ${posts?.length || 0} posts to notify`);
+  // Filtrar posts com data de publicação futura
+  const upcomingPosts = (posts || []).filter(post => {
+    const postDate = post.post_date || post.scheduled_date;
+    return postDate && new Date(postDate) >= now;
+  });
+
+  console.log(`📊 Found ${upcomingPosts.length} posts to notify`);
 
   // Build list of potential notifications with user+post deduplication
   const potentialNotifications: { notification: NotificationData; tracking: BatchTrackingRecord }[] = [];
   const postsToUpdate: string[] = [];
 
-  for (const post of posts || []) {
+  for (const post of upcomingPosts) {
     if (!post.agency_id) continue;
 
     const agencyUsers = (post.agencies as any)?.agency_users || [];
     
+    // Usar post_date (data real de publicação) com fallback para scheduled_date
+    const postDate = new Date(post.post_date || post.scheduled_date);
+    const notificationTime = addHours(now, POST_ADVANCE_HOURS);
+    
     for (const user of agencyUsers) {
-      // Get user preferences for advance time
-      const prefs = await getUserPreferences(user.user_id, post.agency_id);
-      const advanceHours = prefs?.post_advance_hours ?? 3;
-      
-      const scheduledDate = new Date(post.scheduled_date);
-      const notificationTime = addHours(now, advanceHours);
-      
-      // Only notify if within the advance window
-      if (scheduledDate <= notificationTime) {
+      // Only notify if within the advance window (1 hour before)
+      if (postDate <= notificationTime) {
         const canSend = await checkUserPreferences(user.user_id, post.agency_id, 'posts');
         if (!canSend) continue;
 
