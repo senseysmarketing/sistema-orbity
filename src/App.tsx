@@ -39,7 +39,7 @@ import ClientDetail from "./pages/ClientDetail";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Install from "./pages/Install";
 import NotificationSettings from "./pages/NotificationSettings";
-import { UpdatePrompt } from "./components/pwa/UpdatePrompt";
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -120,7 +120,7 @@ const App = () => (
                         
                         <Route path="*" element={<NotFound />} />
                       </Routes>
-                      <UpdatePrompt />
+                      
                     </PaymentMiddlewareProvider>
                   </BrowserRouter>
                 </TooltipProvider>
