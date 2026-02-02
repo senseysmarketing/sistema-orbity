@@ -1,144 +1,204 @@
 
-# Correção: Nome do Status no Histórico de Movimentações
+# Correção: Fluxo de Desativação/Exclusão de Clientes
 
-## Problema
+## Problema Identificado
 
-No histórico de movimentações do modal de detalhes de posts, o status está sendo exibido como um código UUID (ex: `33efe0b1-624b-42bb-af1c-af1b53903415`) em vez do nome legível (ex: "Aguardando Aprovação").
+Na tela Administrativa, na aba de Clientes, ao clicar nos três pontos do menu dropdown:
 
----
+| Local | Comportamento Atual | Comportamento Esperado |
+|-------|---------------------|------------------------|
+| ClientCard (Cards) | Mostra "Desativar" | Correto (já implementado) |
+| Tabela (Table view) | Mostra "Excluir" | Deveria mostrar "Desativar" ou "Reativar" |
+| Cards na tabela | Mostra "Excluir" | Deveria mostrar "Desativar" ou "Reativar" |
 
-## Causa
-
-O histórico salva dois campos relevantes:
-
-| Campo | Valor salvo | Problema |
-|-------|-------------|----------|
-| `entry.status` | UUID ou slug do status | Não traduzido para nome |
-| `entry.action` | "Status alterado para: {nome ou UUID}" | Se não encontrar o nome, salva o UUID |
-
-Quando o bug de drag-and-drop aconteceu (já corrigido), o status foi salvo como UUID e o campo `action` foi gerado com esse UUID.
-
-Atualmente, o `PostDetailsDialog.tsx` exibe diretamente:
-```tsx
-{entry.action || `Status: ${entry.status}`}
-```
-
-Sem traduzir UUIDs para nomes de status.
+**Regra de negócio solicitada:**
+1. Cliente **ativo** → Mostrar opção "Desativar"
+2. Cliente **inativo** → Mostrar opções "Reativar" e "Excluir Permanentemente"
+3. **Exclusão definitiva** só é permitida para clientes já desativados
 
 ---
 
-## Solução
-
-Modificar o `PostDetailsDialog.tsx` para:
-
-1. **Buscar status customizados** da tabela `social_media_custom_statuses`
-2. **Criar função de tradução** que converte UUID/slug para nome legível
-3. **Aplicar tradução** no texto exibido do histórico
-
----
-
-## Arquivo a Modificar
+## Arquivos a Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/social-media/PostDetailsDialog.tsx` | Buscar status e traduzir histórico |
+| `src/pages/Admin.tsx` | Ajustar dropdowns na table view e adicionar Alert para desativar |
+| `src/components/admin/ClientCard.tsx` | Adicionar lógica para mostrar Reativar/Excluir se inativo |
 
 ---
 
-## Implementação Técnica
+## Implementação
 
-### 1. Adicionar query para buscar status customizados
+### 1. ClientCard.tsx
 
+Modificar o dropdown para:
+- **Se ativo**: Mostrar "Desativar" (já está assim)
+- **Se inativo**: Mostrar "Reativar" e "Excluir Permanentemente"
+
+Adicionar novas props:
 ```typescript
-import { useQuery } from "@tanstack/react-query";
-import { useAgency } from "@/hooks/useAgency";
-
-// Dentro do componente:
-const { currentAgency } = useAgency();
-
-const { data: customStatuses = [] } = useQuery({
-  queryKey: ['custom-statuses', currentAgency?.id],
-  queryFn: async () => {
-    if (!currentAgency?.id) return [];
-    const { data } = await supabase
-      .from('social_media_custom_statuses')
-      .select('id, slug, name')
-      .eq('agency_id', currentAgency.id);
-    return data || [];
-  },
-  enabled: !!currentAgency?.id,
-});
+onDeactivate?: (client: Client) => void;
+onReactivate?: (client: Client) => void;
 ```
 
-### 2. Criar mapa de tradução combinando status padrões e customizados
-
-```typescript
-const statusNameMap = useMemo(() => {
-  const map: Record<string, string> = {
-    // Status padrões (por slug)
-    draft: "Briefing",
-    in_creation: "Em Criação", 
-    pending_approval: "Aguardando Aprovação",
-    approved: "Aprovado",
-    published: "Publicado",
-    rejected: "Rejeitado",
-  };
-  
-  // Adicionar status customizados (por ID e por slug)
-  customStatuses.forEach(status => {
-    map[status.id] = status.name;
-    map[status.slug] = status.name;
-  });
-  
-  return map;
-}, [customStatuses]);
+Atualizar o menu dropdown:
+```tsx
+{client.active ? (
+  <DropdownMenuItem 
+    onClick={(e) => { e.stopPropagation(); onDeactivate?.(client); }}
+    className="text-orange-600 focus:text-orange-600"
+  >
+    <UserX className="mr-2 h-4 w-4" />
+    Desativar
+  </DropdownMenuItem>
+) : (
+  <>
+    <DropdownMenuItem 
+      onClick={(e) => { e.stopPropagation(); onReactivate?.(client); }}
+      className="text-green-600 focus:text-green-600"
+    >
+      <Play className="mr-2 h-4 w-4" />
+      Reativar
+    </DropdownMenuItem>
+    <DropdownMenuItem 
+      onClick={(e) => { e.stopPropagation(); onDelete(client); }}
+      className="text-destructive focus:text-destructive"
+    >
+      <Trash2 className="mr-2 h-4 w-4" />
+      Excluir Permanentemente
+    </DropdownMenuItem>
+  </>
+)}
 ```
 
-### 3. Função para traduzir o texto do histórico
+### 2. Admin.tsx
+
+**2.1 Atualizar chamada do ClientCard:**
+```tsx
+<ClientCard
+  ...
+  onDeactivate={handleDeactivateClient}
+  onReactivate={handleReactivateClient}
+  onDelete={handleDeleteClient}
+  ...
+/>
+```
+
+**2.2 Ajustar dropdown na table view (linha ~2371):**
+
+Alterar de:
+```tsx
+<DropdownMenuItem onClick={() => handleDeleteClient(client)} className="text-red-600">
+  <Trash2 className="mr-2 h-4 w-4" />
+  Excluir
+</DropdownMenuItem>
+```
+
+Para:
+```tsx
+{client.active ? (
+  <DropdownMenuItem 
+    onClick={() => handleDeactivateClient(client)} 
+    className="text-orange-600"
+  >
+    <UserX className="mr-2 h-4 w-4" />
+    Desativar
+  </DropdownMenuItem>
+) : (
+  <>
+    <DropdownMenuItem 
+      onClick={() => handleReactivateClient(client)} 
+      className="text-green-600"
+    >
+      <Play className="mr-2 h-4 w-4" />
+      Reativar
+    </DropdownMenuItem>
+    <DropdownMenuItem 
+      onClick={() => handleDeleteClient(client)} 
+      className="text-red-600"
+    >
+      <Trash2 className="mr-2 h-4 w-4" />
+      Excluir Permanentemente
+    </DropdownMenuItem>
+  </>
+)}
+```
+
+**2.3 Atualizar o Alert Dialog de exclusão:**
+
+Modificar para deixar claro que é exclusão permanente:
+```tsx
+<AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Excluir Cliente Permanentemente</AlertDialogTitle>
+      <AlertDialogDescription>
+        Tem certeza que deseja excluir permanentemente o cliente "{clientToDelete?.name}"? 
+        <br /><br />
+        <strong className="text-destructive">Esta ação não pode ser desfeita.</strong> Todos os dados relacionados 
+        (pagamentos, histórico, etc.) serão removidos permanentemente.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+      <AlertDialogAction 
+        onClick={confirmDeleteClient}
+        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+      >
+        Excluir Permanentemente
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
+```
+
+**2.4 Adicionar validação de segurança na função confirmDeleteClient:**
 
 ```typescript
-const translateHistoryAction = (entry: any): string => {
-  if (entry.action) {
-    // Verificar se o action contém um UUID ou slug que precisa ser traduzido
-    // Formato: "Status alterado para: {status}"
-    const match = entry.action.match(/Status alterado para:\s*(.+)$/);
-    if (match) {
-      const statusValue = match[1].trim();
-      const translatedName = statusNameMap[statusValue] || statusValue;
-      return `Status alterado para: ${translatedName}`;
-    }
-    return entry.action;
+const confirmDeleteClient = async () => {
+  if (!clientToDelete) return;
+  
+  // Segurança: só permite excluir clientes inativos
+  if (clientToDelete.active) {
+    toast({
+      title: "Operação não permitida",
+      description: "Você precisa desativar o cliente antes de excluí-lo permanentemente.",
+      variant: "destructive"
+    });
+    setDeleteDialogOpen(false);
+    setClientToDelete(null);
+    return;
   }
   
-  // Fallback: traduzir entry.status diretamente
-  const translatedStatus = statusNameMap[entry.status] || entry.status;
-  return `Status: ${translatedStatus}`;
+  // ... resto da lógica existente
 };
 ```
 
-### 4. Atualizar renderização do histórico
+---
 
-```tsx
-{/* Antes */}
-<p className="text-sm">{entry.action || `Status: ${entry.status}`}</p>
+## Fluxo Final
 
-{/* Depois */}
-<p className="text-sm">{translateHistoryAction(entry)}</p>
+```text
+Usuário clica nos 3 pontos do cliente
+         │
+         ▼
+    Cliente está ativo?
+    ┌─────┴─────┐
+   SIM         NÃO
+    │           │
+    ▼           ▼
+"Desativar"   "Reativar" + "Excluir Permanentemente"
+    │           │              │
+    ▼           ▼              ▼
+ Desativa    Reativa     Confirma exclusão
+ cliente     cliente     (deleta do banco)
 ```
 
 ---
 
-## Resultado Esperado
+## Resumo das Mudanças
 
-| Antes | Depois |
-|-------|--------|
-| "Status alterado para: 33efe0b1-624b-42bb-af1c-af1b53903415" | "Status alterado para: Aguardando Aprovação" |
-| "Status: pending_approval" | "Status: Aguardando Aprovação" |
-
----
-
-## Benefícios
-
-1. **Corrige dados históricos** - Posts com UUID no histórico serão exibidos corretamente
-2. **Suporta status customizados** - Status criados pela agência também serão traduzidos
-3. **Fallback seguro** - Se não encontrar tradução, mantém o valor original
+| Arquivo | Mudança |
+|---------|---------|
+| `ClientCard.tsx` | Adicionar props e lógica condicional no dropdown |
+| `Admin.tsx` | Ajustar dropdowns nas visualizações em tabela, passar novas props ao ClientCard, validação de segurança |
