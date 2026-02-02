@@ -1,104 +1,59 @@
 
 
-# Ajuste: Navegação para Configurações via Central de Notificações
+# Remoção do Aviso de Atualização do PWA
 
 ## Problema
 
-Ao clicar no ícone de engrenagem (⚙️) na Central de Notificações do header, ainda abre o modal antigo ao invés de navegar para a página dedicada `/dashboard/settings/notifications`.
+O alerta "Atualização Disponível" aparece constantemente e está incomodando os usuários. Mesmo com cooldown configurado (4h para X, 24h para "Mais tarde"), o sistema verifica atualizações a cada hora e mostra o popup repetidamente.
+
+---
 
 ## Solução
 
-Modificar o `NotificationCenter` para usar `useNavigate` e fechar o popover/drawer antes de navegar para a página.
+Remover completamente o componente `UpdatePrompt` da aplicação. As atualizações do PWA ainda acontecerão automaticamente quando o usuário recarregar a página, mas sem a notificação intrusiva.
 
 ---
 
-## Arquivo a Modificar
+## Mudanças
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/components/notifications/NotificationCenter.tsx` | Substituir abertura de modal por navegação |
+| Arquivo | Ação | Descrição |
+|---------|------|-----------|
+| `src/App.tsx` | Modificar | Remover import e uso do `<UpdatePrompt />` |
+| `src/components/pwa/UpdatePrompt.tsx` | Deletar | Remover arquivo (opcional - pode manter caso queira reativar no futuro) |
 
 ---
 
-## Mudanças Detalhadas
+## Código a Modificar
 
-### 1. Adicionar import do `useNavigate`
+### `src/App.tsx`
 
+**Remover linha 45:**
 ```typescript
-import { useNavigate } from "react-router-dom";
+import { UpdatePrompt } from "./components/pwa/UpdatePrompt";
 ```
 
-### 2. Remover estado e import do modal
-
-**Remover:**
+**Remover linha 108:**
 ```typescript
-import { NotificationPreferences } from "./NotificationPreferences";
-// ...
-const [preferencesOpen, setPreferencesOpen] = useState(false);
-```
-
-### 3. Adicionar hook de navegação
-
-```typescript
-const navigate = useNavigate();
-```
-
-### 4. Modificar botão de configurações
-
-**Antes:**
-```typescript
-<Button
-  variant="ghost"
-  size="icon"
-  className="h-8 w-8 md:h-9 md:w-9"
-  onClick={() => setPreferencesOpen(true)}
->
-  <Settings className="h-4 w-4" />
-</Button>
-```
-
-**Depois:**
-```typescript
-<Button
-  variant="ghost"
-  size="icon"
-  className="h-8 w-8 md:h-9 md:w-9"
-  onClick={() => {
-    onClose(); // Fecha o popover/drawer primeiro
-    navigate('/dashboard/settings/notifications');
-  }}
->
-  <Settings className="h-4 w-4" />
-</Button>
-```
-
-### 5. Remover componente modal do JSX
-
-**Remover:**
-```typescript
-<NotificationPreferences 
-  open={preferencesOpen}
-  onOpenChange={setPreferencesOpen}
-/>
+<UpdatePrompt />
 ```
 
 ---
 
-## Fluxo Após Implementação
+## Como as Atualizações Funcionarão Após a Remoção
 
-```text
-Header → Ícone de Sino 🔔 → Abre Central de Notificações
-                                    ↓
-                    Clica no ícone de Engrenagem ⚙️
-                                    ↓
-                    Fecha popover/drawer automaticamente
-                                    ↓
-                    Navega para /dashboard/settings/notifications
-```
+O PWA continuará funcionando normalmente:
+- O Service Worker ainda será registrado via `vite-plugin-pwa`
+- Atualizações serão baixadas em segundo plano
+- Quando o usuário recarregar a página, a nova versão será ativada automaticamente
+- Sem interrupções ou popups
 
 ---
 
-## Benefício
+## Resultado
 
-Agora tanto o caminho por **Configurações → Notificações** quanto pelo **Sino → Engrenagem** levam para a mesma página dedicada, evitando o problema de refresh loop no mobile.
+| Antes | Depois |
+|-------|--------|
+| Popup aparece frequentemente | Sem popup |
+| Usuário precisa clicar para dispensar | Atualizações silenciosas |
+| Experiência interrompida | Experiência fluida |
 
