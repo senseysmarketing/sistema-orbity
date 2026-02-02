@@ -1,143 +1,144 @@
 
+# Correção: Nome do Status no Histórico de Movimentações
 
-# Ajuste das Notificações "Post Próximo de Publicar"
+## Problema
 
-## Problema Atual
+No histórico de movimentações do modal de detalhes de posts, o status está sendo exibido como um código UUID (ex: `33efe0b1-624b-42bb-af1c-af1b53903415`) em vez do nome legível (ex: "Aguardando Aprovação").
 
-O sistema de notificações de posts próximos de publicar está usando o campo **`scheduled_date`** (que é o campo legado mantido por compatibilidade), enquanto agora existem dois campos distintos:
+---
 
-| Campo | Significado | Uso Correto |
-|-------|-------------|-------------|
-| `due_date` | Data limite para a arte ficar pronta | Notificar responsáveis pela criação |
-| `post_date` | Data real de publicação do conteúdo | **Notificação "próximo de publicar"** |
-| `scheduled_date` | Campo legado (atualmente sincronizado com post_date) | Manter por compatibilidade |
+## Causa
 
-### Problemas identificados:
+O histórico salva dois campos relevantes:
 
-1. **Campo errado**: A edge function `process-notifications` usa `scheduled_date` em vez de `post_date`
-2. **Tempo incorreto**: Notifica 3 horas antes (padrão do `post_advance_hours`) em vez de 1 hora antes
-3. **Reset de notificação**: O hook `useSocialMediaPosts` reseta `notification_sent_at` apenas quando `scheduled_date` muda, mas deveria resetar quando `post_date` muda
+| Campo | Valor salvo | Problema |
+|-------|-------------|----------|
+| `entry.status` | UUID ou slug do status | Não traduzido para nome |
+| `entry.action` | "Status alterado para: {nome ou UUID}" | Se não encontrar o nome, salva o UUID |
+
+Quando o bug de drag-and-drop aconteceu (já corrigido), o status foi salvo como UUID e o campo `action` foi gerado com esse UUID.
+
+Atualmente, o `PostDetailsDialog.tsx` exibe diretamente:
+```tsx
+{entry.action || `Status: ${entry.status}`}
+```
+
+Sem traduzir UUIDs para nomes de status.
 
 ---
 
 ## Solução
 
-### Arquivo 1: `supabase/functions/process-notifications/index.ts`
+Modificar o `PostDetailsDialog.tsx` para:
 
-Modificar a função `processPosts()` para:
-
-1. Buscar e usar o campo `post_date` em vez de `scheduled_date`
-2. Alterar a lógica de tempo para 1 hora antes
-3. Tratar casos onde `post_date` é null (fallback para `scheduled_date`)
-
-#### Mudanças na query (linha ~499):
-
-```typescript
-// Antes
-.select(`
-  id,
-  title,
-  scheduled_date,
-  agency_id,
-  notification_sent_at,
-  agencies!inner(...)
-`)
-.gte('scheduled_date', now.toISOString())
-
-// Depois
-.select(`
-  id,
-  title,
-  scheduled_date,
-  post_date,
-  agency_id,
-  notification_sent_at,
-  agencies!inner(...)
-`)
-// Filtrar posts com post_date futuro (ou scheduled_date como fallback)
-```
-
-#### Mudanças na lógica de tempo (linha ~531-537):
-
-```typescript
-// Antes
-const advanceHours = prefs?.post_advance_hours ?? 3;
-const scheduledDate = new Date(post.scheduled_date);
-const notificationTime = addHours(now, advanceHours);
-
-if (scheduledDate <= notificationTime) {
-  // cria notificação
-}
-
-// Depois
-const ADVANCE_HOURS = 1; // Fixo: 1 hora antes
-const postDate = new Date(post.post_date || post.scheduled_date); // Usar post_date com fallback
-const notificationTime = addHours(now, ADVANCE_HOURS);
-
-if (postDate <= notificationTime) {
-  // cria notificação
-}
-```
+1. **Buscar status customizados** da tabela `social_media_custom_statuses`
+2. **Criar função de tradução** que converte UUID/slug para nome legível
+3. **Aplicar tradução** no texto exibido do histórico
 
 ---
 
-### Arquivo 2: `src/hooks/useSocialMediaPosts.tsx`
-
-Ajustar o reset do `notification_sent_at` para considerar também quando `post_date` muda.
-
-#### Mudança na função `updatePost` (linha ~249-259):
-
-```typescript
-// Antes: só verifica scheduled_date
-if (updates.scheduled_date) {
-  const originalPost = posts.find(p => p.id === id);
-  if (originalPost && originalPost.scheduled_date !== updates.scheduled_date) {
-    finalUpdates.notification_sent_at = null;
-  }
-}
-
-// Depois: verifica post_date também
-const originalPost = posts.find(p => p.id === id);
-if (originalPost) {
-  const postDateChanged = updates.post_date && originalPost.post_date !== updates.post_date;
-  const scheduledDateChanged = updates.scheduled_date && originalPost.scheduled_date !== updates.scheduled_date;
-  
-  if (postDateChanged || scheduledDateChanged) {
-    finalUpdates.notification_sent_at = null;
-  }
-}
-```
-
----
-
-## Comportamento Final
-
-| Antes | Depois |
-|-------|--------|
-| Usa `scheduled_date` | Usa `post_date` (com fallback para `scheduled_date`) |
-| Notifica 3 horas antes | Notifica **1 hora antes** |
-| Reset só quando `scheduled_date` muda | Reset quando `post_date` ou `scheduled_date` muda |
-
----
-
-## Fluxo de Notificação
-
-```text
-1. Post criado com post_date = 14:00
-2. Cron roda a cada hora verificando posts
-3. Às 13:00:
-   - Calcula: 13:00 + 1h = 14:00
-   - post_date (14:00) <= 14:00 ✓
-   - Notificação enviada: "📱 Post próximo de publicar"
-4. Post aparece com título e link para /social-media
-```
-
----
-
-## Resumo das Mudanças
+## Arquivo a Modificar
 
 | Arquivo | Ação |
 |---------|------|
-| `supabase/functions/process-notifications/index.ts` | Usar `post_date`, notificar 1h antes |
-| `src/hooks/useSocialMediaPosts.tsx` | Reset de notificação quando `post_date` muda |
+| `src/components/social-media/PostDetailsDialog.tsx` | Buscar status e traduzir histórico |
 
+---
+
+## Implementação Técnica
+
+### 1. Adicionar query para buscar status customizados
+
+```typescript
+import { useQuery } from "@tanstack/react-query";
+import { useAgency } from "@/hooks/useAgency";
+
+// Dentro do componente:
+const { currentAgency } = useAgency();
+
+const { data: customStatuses = [] } = useQuery({
+  queryKey: ['custom-statuses', currentAgency?.id],
+  queryFn: async () => {
+    if (!currentAgency?.id) return [];
+    const { data } = await supabase
+      .from('social_media_custom_statuses')
+      .select('id, slug, name')
+      .eq('agency_id', currentAgency.id);
+    return data || [];
+  },
+  enabled: !!currentAgency?.id,
+});
+```
+
+### 2. Criar mapa de tradução combinando status padrões e customizados
+
+```typescript
+const statusNameMap = useMemo(() => {
+  const map: Record<string, string> = {
+    // Status padrões (por slug)
+    draft: "Briefing",
+    in_creation: "Em Criação", 
+    pending_approval: "Aguardando Aprovação",
+    approved: "Aprovado",
+    published: "Publicado",
+    rejected: "Rejeitado",
+  };
+  
+  // Adicionar status customizados (por ID e por slug)
+  customStatuses.forEach(status => {
+    map[status.id] = status.name;
+    map[status.slug] = status.name;
+  });
+  
+  return map;
+}, [customStatuses]);
+```
+
+### 3. Função para traduzir o texto do histórico
+
+```typescript
+const translateHistoryAction = (entry: any): string => {
+  if (entry.action) {
+    // Verificar se o action contém um UUID ou slug que precisa ser traduzido
+    // Formato: "Status alterado para: {status}"
+    const match = entry.action.match(/Status alterado para:\s*(.+)$/);
+    if (match) {
+      const statusValue = match[1].trim();
+      const translatedName = statusNameMap[statusValue] || statusValue;
+      return `Status alterado para: ${translatedName}`;
+    }
+    return entry.action;
+  }
+  
+  // Fallback: traduzir entry.status diretamente
+  const translatedStatus = statusNameMap[entry.status] || entry.status;
+  return `Status: ${translatedStatus}`;
+};
+```
+
+### 4. Atualizar renderização do histórico
+
+```tsx
+{/* Antes */}
+<p className="text-sm">{entry.action || `Status: ${entry.status}`}</p>
+
+{/* Depois */}
+<p className="text-sm">{translateHistoryAction(entry)}</p>
+```
+
+---
+
+## Resultado Esperado
+
+| Antes | Depois |
+|-------|--------|
+| "Status alterado para: 33efe0b1-624b-42bb-af1c-af1b53903415" | "Status alterado para: Aguardando Aprovação" |
+| "Status: pending_approval" | "Status: Aguardando Aprovação" |
+
+---
+
+## Benefícios
+
+1. **Corrige dados históricos** - Posts com UUID no histórico serão exibidos corretamente
+2. **Suporta status customizados** - Status criados pela agência também serão traduzidos
+3. **Fallback seguro** - Se não encontrar tradução, mantém o valor original
