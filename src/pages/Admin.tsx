@@ -591,14 +591,27 @@ export default function Admin() {
   };
   const confirmDeleteClient = async () => {
     if (!clientToDelete) return;
+    
+    // Segurança: só permite excluir clientes inativos
+    if (clientToDelete.active) {
+      toast({
+        title: "Operação não permitida",
+        description: "Você precisa desativar o cliente antes de excluí-lo permanentemente.",
+        variant: "destructive"
+      });
+      setDeleteDialogOpen(false);
+      setClientToDelete(null);
+      return;
+    }
+    
     try {
       const {
         error
       } = await supabase.from('clients').delete().eq('id', clientToDelete.id);
       if (error) throw error;
       toast({
-        title: "Cliente excluído",
-        description: "Cliente excluído com sucesso!"
+        title: "Cliente excluído permanentemente",
+        description: "Cliente e todos os dados relacionados foram excluídos com sucesso!"
       });
       fetchData();
     } catch (error: any) {
@@ -2268,10 +2281,23 @@ export default function Admin() {
                             <FileText className="mr-2 h-4 w-4" />
                             Gerar Contrato
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteClient(client)} className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir
-                          </DropdownMenuItem>
+                          {client.active ? (
+                            <DropdownMenuItem onClick={() => handleDeactivateClient(client)} className="text-orange-600">
+                              <UserX className="mr-2 h-4 w-4" />
+                              Desativar
+                            </DropdownMenuItem>
+                          ) : (
+                            <>
+                              <DropdownMenuItem onClick={() => handleReactivateClient(client)} className="text-green-600">
+                                <Play className="mr-2 h-4 w-4" />
+                                Reativar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDeleteClient(client)} className="text-red-600">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Excluir Permanentemente
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -2382,10 +2408,23 @@ export default function Admin() {
                                   <Edit className="mr-2 h-4 w-4" />
                                   Editar
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteClient(client)} className="text-red-600">
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Excluir
-                                </DropdownMenuItem>
+                                {client.active ? (
+                                  <DropdownMenuItem onClick={() => handleDeactivateClient(client)} className="text-orange-600">
+                                    <UserX className="mr-2 h-4 w-4" />
+                                    Desativar
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <>
+                                    <DropdownMenuItem onClick={() => handleReactivateClient(client)} className="text-green-600">
+                                      <Play className="mr-2 h-4 w-4" />
+                                      Reativar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDeleteClient(client)} className="text-red-600">
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Excluir Permanentemente
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </td>
@@ -3215,19 +3254,25 @@ export default function Admin() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogTitle>Excluir Cliente Permanentemente</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o cliente "{clientToDelete?.name}"? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir permanentemente o cliente "{clientToDelete?.name}"? 
+              <br /><br />
+              <strong className="text-destructive">Esta ação não pode ser desfeita.</strong> Todos os dados relacionados 
+              (pagamentos, histórico, etc.) serão removidos permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteClient}>
-              Excluir
+            <AlertDialogAction 
+              onClick={confirmDeleteClient}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir Permanentemente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-        </AlertDialog>
+      </AlertDialog>
 
 
         {/* Dialog de confirmação de exclusão de despesa */}
