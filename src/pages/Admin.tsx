@@ -2138,6 +2138,8 @@ export default function Admin() {
                     onView={handleViewClient}
                     onEdit={handleEditClient}
                     onDelete={handleDeleteClient}
+                    onDeactivate={handleDeactivateClient}
+                    onReactivate={handleReactivateClient}
                     onGenerateContract={(client) => navigate('/contracts')}
                     onCreateReminder={(client) => navigate('/reminders')}
                     onGeneratePayment={(client) => {
