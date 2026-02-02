@@ -7,7 +7,7 @@ import { ptBR } from "date-fns/locale";
 import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History, ListTodo, Users, Lock, Copy, Clock } from "lucide-react";
 import { SocialMediaPost, Subtask } from "@/hooks/useSocialMediaPosts";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PostAssignedUsers } from "./PostAssignedUsers";
@@ -15,6 +15,8 @@ import { useDeletePermission } from "@/hooks/useDeletePermission";
 import { LinkifyText } from "@/lib/linkify";
 import { AttachmentsDisplay, Attachment } from "@/components/ui/file-attachments";
 import { PostDueDateBadge, getDueDateStatus } from "./PostDueDateBadge";
+import { useQuery } from "@tanstack/react-query";
+import { useAgency } from "@/hooks/useAgency";
 
 interface PostDetailsDialogProps {
   post: SocialMediaPost | null;
@@ -66,6 +68,61 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
   const [assignedUsers, setAssignedUsers] = useState<any[]>([]);
   
   const { canDelete, isCreator, isAdmin, creatorName: permissionCreatorName } = useDeletePermission(post?.created_by);
+  const { currentAgency } = useAgency();
+
+  // Buscar status customizados para tradução
+  const { data: customStatuses = [] } = useQuery({
+    queryKey: ['social-media-custom-statuses', currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data } = await supabase
+        .from('social_media_custom_statuses')
+        .select('id, slug, name')
+        .eq('agency_id', currentAgency.id);
+      return data || [];
+    },
+    enabled: !!currentAgency?.id,
+  });
+
+  // Mapa de tradução de status (slug/UUID -> nome legível)
+  const statusNameMap = useMemo(() => {
+    const map: Record<string, string> = {
+      // Status padrões (por slug)
+      draft: "Briefing",
+      in_creation: "Em Criação",
+      pending_approval: "Aguardando Aprovação",
+      approved: "Aprovado",
+      published: "Publicado",
+      rejected: "Rejeitado",
+    };
+    
+    // Adicionar status customizados (por ID e por slug)
+    customStatuses.forEach((status: { id: string; slug: string; name: string }) => {
+      map[status.id] = status.name;
+      map[status.slug] = status.name;
+    });
+    
+    return map;
+  }, [customStatuses]);
+
+  // Função para traduzir o texto do histórico
+  const translateHistoryAction = (entry: any): string => {
+    if (entry.action) {
+      // Verificar se o action contém um UUID ou slug que precisa ser traduzido
+      // Formato: "Status alterado para: {status}"
+      const match = entry.action.match(/Status alterado para:\s*(.+)$/);
+      if (match) {
+        const statusValue = match[1].trim();
+        const translatedName = statusNameMap[statusValue] || statusValue;
+        return `Status alterado para: ${translatedName}`;
+      }
+      return entry.action;
+    }
+    
+    // Fallback: traduzir entry.status diretamente
+    const translatedStatus = statusNameMap[entry.status] || entry.status;
+    return `Status: ${translatedStatus}`;
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -350,7 +407,7 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
                     {post.approval_history && Array.isArray(post.approval_history) && post.approval_history.map((entry: any, index: number) => (
                       <div key={index} className="flex items-start gap-2 p-2 rounded-md bg-muted/50">
                         <div className="flex-1">
-                          <p className="text-sm">{entry.action || `Status: ${entry.status}`}</p>
+                          <p className="text-sm">{translateHistoryAction(entry)}</p>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <span>{format(new Date(entry.timestamp), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
                             {entry.user_name && (
