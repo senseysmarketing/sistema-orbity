@@ -1,66 +1,122 @@
 
-# Correção: Botão Desativar não funciona no ClientCard
+# Diagnóstico e Correção: Notificações Push não funcionam no Android
 
 ## Problema Identificado
 
-O botão "Desativar" no menu dropdown do `ClientCard` não executa nenhuma ação porque as props `onDeactivate` e `onReactivate` **não estão sendo passadas** para o componente.
+A usuária **Suellen** (suhpratess08@gmail.com) não recebe notificações push no celular Android, mas recebe normalmente no desktop.
 
-| Arquivo | Problema |
-|---------|----------|
-| `src/pages/Admin.tsx` (linha 2130-2147) | Props `onDeactivate` e `onReactivate` não estão sendo passadas ao ClientCard |
+### Situação Atual dos Tokens:
 
-### Código Atual (linha 2130-2147):
-```tsx
-<ClientCard
-  key={client.id}
-  client={client}
-  paymentsThisYear={paymentsThisYear}
-  totalPaymentsYear={totalPaymentsYear}
-  nextPaymentDate={nextPayment?.due_date || null}
-  nextPaymentStatus={nextPayment?.status || null}
-  currentMonthPaymentStatus={computedCurrentMonthStatus}
-  onView={handleViewClient}
-  onEdit={handleEditClient}
-  onDelete={handleDeleteClient}                    // ✓ Passado
-  onGenerateContract={(client) => navigate('/contracts')}
-  onCreateReminder={(client) => navigate('/reminders')}
-  onGeneratePayment={(client) => { ... }}
-  // ❌ FALTANDO: onDeactivate e onReactivate
-/>
-```
+| Dispositivo | Status | Última Atualização |
+|-------------|--------|-------------------|
+| Desktop (Windows) | ✅ Ativo | 02/02 13:50 |
+| Android PWA | ❌ Inativo | 02/02 16:27 |
+
+---
+
+## Causa Raiz
+
+O token Android foi **desativado automaticamente** pelo sistema quando o FCM retornou erro "UNREGISTERED" durante o envio de uma notificação.
+
+**Problema no fluxo de reativação:**
+Quando a usuária abre o app no celular novamente, o sistema tenta salvar o token via `upsert`. Porém, como o token já existe no banco com `is_active: false`, o upsert não está conseguindo reativá-lo corretamente porque o campo `is_active: true` não é aplicado na atualização.
 
 ---
 
 ## Solução
 
-Adicionar as duas props faltantes na chamada do `ClientCard`:
+Modificar a função `saveToken` no hook `usePushNotifications` para garantir que tokens existentes sejam **sempre reativados** ao abrir o app.
 
-```tsx
-<ClientCard
-  key={client.id}
-  client={client}
-  paymentsThisYear={paymentsThisYear}
-  totalPaymentsYear={totalPaymentsYear}
-  nextPaymentDate={nextPayment?.due_date || null}
-  nextPaymentStatus={nextPayment?.status || null}
-  currentMonthPaymentStatus={computedCurrentMonthStatus}
-  onView={handleViewClient}
-  onEdit={handleEditClient}
-  onDelete={handleDeleteClient}
-  onDeactivate={handleDeactivateClient}            // ✅ ADICIONAR
-  onReactivate={handleReactivateClient}            // ✅ ADICIONAR
-  onGenerateContract={(client) => navigate('/contracts')}
-  onCreateReminder={(client) => navigate('/reminders')}
-  onGeneratePayment={(client) => { ... }}
-/>
+### Arquivo a Modificar
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/hooks/usePushNotifications.tsx` | Adicionar lógica para forçar reativação de token existente |
+
+---
+
+## Implementação Técnica
+
+### Modificar `saveToken` (linhas 179-256)
+
+Adicionar uma etapa extra que **reativa explicitamente** o token se ele já existe mas está inativo:
+
+```typescript
+const saveToken = useCallback(async (fcmToken: string) => {
+  if (!user || !currentAgency) {
+    console.log('[Push] Cannot save token - no user or agency');
+    return;
+  }
+
+  const standalone = isStandalone();
+  const ios = isIOS();
+  const android = isAndroid();
+  const deviceType = getDeviceType();
+
+  try {
+    // Step 1: Verificar se o token já existe (ativo ou inativo)
+    const { data: existingToken } = await supabase
+      .from('push_subscriptions')
+      .select('id, is_active')
+      .eq('user_id', user.id)
+      .eq('fcm_token', fcmToken)
+      .maybeSingle();
+
+    // Step 2: Se token existe mas está inativo, REATIVAR explicitamente
+    if (existingToken && !existingToken.is_active) {
+      console.log('[Push] Reativando token existente que estava inativo');
+      const { error: reactivateError } = await supabase
+        .from('push_subscriptions')
+        .update({ 
+          is_active: true,
+          device_info: { ... },  // atualizar device_info
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingToken.id);
+      
+      if (!reactivateError) {
+        console.log('[Push] Token reativado com sucesso');
+        return; // Token já salvo e reativado
+      }
+    }
+
+    // Step 3: Desativar tokens do mesmo tipo de dispositivo (código existente)
+    // ...
+
+    // Step 4: Upsert do token (código existente)
+    // ...
+  } catch (error) {
+    console.error('[Push] Failed to save token:', error);
+  }
+}, [user, currentAgency]);
 ```
 
 ---
 
-## Resumo da Correção
+## Solução Imediata para a Usuária
+
+Enquanto a correção de código é implementada, a usuária pode resolver o problema manualmente:
+
+1. Abrir o app no celular Android
+2. Ir em **Configurações > Notificações > Canais de Notificação**
+3. Expandir **Push Notifications**
+4. Clicar em **⚙️ Diagnóstico Firebase** 
+5. Clicar no botão **"Reativar Push"**
+6. Após a reativação, clicar em **"Ativar"** novamente
+
+---
+
+## Benefícios da Correção
+
+1. **Tokens inativos são reativados automaticamente** quando o usuário abre o app
+2. **Não depende de ação manual** do usuário
+3. **Resolve o problema de tokens que expiraram** e foram desativados pelo FCM
+4. **Mantém suporte a múltiplos dispositivos** simultâneos
+
+---
+
+## Resumo das Alterações
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/Admin.tsx` | Adicionar `onDeactivate={handleDeactivateClient}` e `onReactivate={handleReactivateClient}` nas linhas 2140-2141 |
-
-Essa é uma correção simples de 2 linhas que vai resolver o problema do botão Desativar/Reativar no `ClientCard`.
+| `src/hooks/usePushNotifications.tsx` | Adicionar verificação e reativação explícita de tokens inativos antes do upsert |
