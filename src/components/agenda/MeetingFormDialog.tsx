@@ -14,7 +14,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
-import { Plus, X, Wand2, Calendar, Users, Check } from "lucide-react";
+import { Plus, X, Wand2, Calendar, Users, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { z } from "zod";
 import { format, addMinutes } from "date-fns";
@@ -101,6 +102,7 @@ export const MeetingFormDialog = ({
   const [selectedDuration, setSelectedDuration] = useState<number | null>(60);
   const [syncToGoogleCalendar, setSyncToGoogleCalendar] = useState(false);
   const [participantsPopoverOpen, setParticipantsPopoverOpen] = useState(false);
+  const [leadsPopoverOpen, setLeadsPopoverOpen] = useState(false);
 
   // Initialize sync checkbox based on Google Calendar connection
   useEffect(() => {
@@ -152,8 +154,9 @@ export const MeetingFormDialog = ({
       if (!currentAgency?.id) return [];
       const { data } = await supabase
         .from("leads")
-        .select("id, name")
-        .eq("agency_id", currentAgency.id);
+        .select("id, name, created_at")
+        .eq("agency_id", currentAgency.id)
+        .order("created_at", { ascending: false });
       return data || [];
     },
     enabled: !!currentAgency?.id,
@@ -487,27 +490,55 @@ export const MeetingFormDialog = ({
 
             <div className="space-y-2">
               <Label htmlFor="lead_id">Lead</Label>
-              <Select
-                value={formData.lead_id || "none"}
-                onValueChange={(value) => {
-                  setFormData({ ...formData, lead_id: value === "none" ? "" : value });
-                  if (value !== "none") {
-                    setSelectedClientIds([]);
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um lead" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  {leads.map((lead) => (
-                    <SelectItem key={lead.id} value={lead.id}>
-                      {lead.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={leadsPopoverOpen} onOpenChange={setLeadsPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={leadsPopoverOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {formData.lead_id
+                      ? leads.find((l) => l.id === formData.lead_id)?.name
+                      : "Selecione um lead..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar lead..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum lead encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="none"
+                          onSelect={() => {
+                            setFormData({ ...formData, lead_id: "" });
+                            setLeadsPopoverOpen(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", !formData.lead_id ? "opacity-100" : "opacity-0")} />
+                          Nenhum
+                        </CommandItem>
+                        {leads.map((lead) => (
+                          <CommandItem
+                            key={lead.id}
+                            value={lead.name}
+                            onSelect={() => {
+                              setFormData({ ...formData, lead_id: lead.id });
+                              setSelectedClientIds([]);
+                              setLeadsPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", formData.lead_id === lead.id ? "opacity-100" : "opacity-0")} />
+                            {lead.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
