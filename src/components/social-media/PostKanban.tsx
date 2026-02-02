@@ -197,38 +197,67 @@ export function PostKanban({ isCreateDialogOpen, onCreateDialogOpenChange }: Pos
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && active.id !== over.id) {
-      const postId = active.id as string;
-      const newStatus = over.id as string;
-      const post = posts.find(p => p.id === postId);
+    if (!over) {
+      setActivePost(null);
+      return;
+    }
+
+    const postId = active.id as string;
+    let newStatus = over.id as string;
+
+    // Verificar se over.id é um ID de coluna válido
+    const isValidColumn = allColumns.some(col => col.id === newStatus);
+
+    if (!isValidColumn) {
+      // over.id pode ser o ID de outro post - precisamos descobrir em qual coluna o post foi solto
+      const overData = over.data.current;
       
-      if (post) {
-        // Buscar dados do usuário
-        const { data: userData } = await supabase.auth.getUser();
-        const userId = userData.user?.id;
-        
-        // Buscar nome do usuário do perfil
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('name')
-          .eq('user_id', userId)
-          .single();
-        
-        // Adicionar entrada ao histórico
-        const approvalHistory = post.approval_history || [];
-        const newEntry = {
-          status: newStatus,
-          timestamp: new Date().toISOString(),
-          user_id: userId,
-          user_name: profileData?.name || 'Usuário desconhecido',
-          action: `Status alterado para: ${allColumns.find(c => c.id === newStatus)?.title || newStatus}`
-        };
-        
-        await updatePost(postId, { 
-          status: newStatus,
-          approval_history: [...approvalHistory, newEntry]
-        });
+      if (overData?.sortable?.containerId) {
+        newStatus = overData.sortable.containerId;
+      } else {
+        // Fallback: se não conseguir determinar a coluna, não faz nada
+        console.warn('Não foi possível determinar a coluna de destino:', over.id);
+        setActivePost(null);
+        return;
       }
+    }
+
+    // Verificar novamente após correção
+    if (!allColumns.some(col => col.id === newStatus)) {
+      console.warn('Status de destino inválido:', newStatus);
+      setActivePost(null);
+      return;
+    }
+
+    const post = posts.find(p => p.id === postId);
+    
+    // Só atualiza se o status realmente mudou
+    if (post && post.status !== newStatus) {
+      // Buscar dados do usuário
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      
+      // Buscar nome do usuário do perfil
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('user_id', userId)
+        .single();
+      
+      // Adicionar entrada ao histórico
+      const approvalHistory = post.approval_history || [];
+      const newEntry = {
+        status: newStatus,
+        timestamp: new Date().toISOString(),
+        user_id: userId,
+        user_name: profileData?.name || 'Usuário desconhecido',
+        action: `Status alterado para: ${allColumns.find(c => c.id === newStatus)?.title || newStatus}`
+      };
+      
+      await updatePost(postId, { 
+        status: newStatus,
+        approval_history: [...approvalHistory, newEntry]
+      });
     }
 
     setActivePost(null);
