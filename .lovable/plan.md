@@ -1,21 +1,39 @@
 
 
-# Filtro de Usuários: Mostrar Apenas Quem Tem Reuniões
+# Adicionar Popover de Reuniões no "+X mais" da Agenda
 
 ## Objetivo
 
-Alterar o filtro de "Responsável" para mostrar **apenas usuários que participam ou organizam reuniões**, eliminando a query separada de `agency_users` e derivando a lista diretamente das reuniões existentes.
+Tornar o indicador "+X mais" clicável no calendário mensal da Agenda, exibindo um **Popover** com a lista completa de reuniões do dia, igual ao comportamento do calendário de Social Media.
 
 ---
 
-## Benefícios
+## Comportamento Atual vs Proposto
 
-| Antes | Depois |
-|-------|--------|
-| Busca todos os usuários da agência | Deriva lista das próprias reuniões |
-| Usuários inativos aparecem | Apenas quem tem reuniões aparece |
-| Query extra no banco | Sem query adicional (usa dados já carregados) |
-| Filtro poluído | Filtro limpo e relevante |
+| Atual | Proposto |
+|-------|----------|
+| Clique em qualquer lugar do dia → muda para visualização de dia | Clique no "+X mais" → abre popover com lista de reuniões |
+| "+X mais" é texto estático | "+X mais" é botão interativo |
+| Usuário precisa mudar de visualização para ver todas | Usuário vê todas sem sair da visualização mensal |
+
+---
+
+## Referência: SocialMediaCalendar
+
+O componente `SocialMediaCalendar.tsx` usa:
+
+```typescript
+<Popover>
+  <PopoverTrigger asChild>
+    <div>...</div> {/* Célula do dia */}
+  </PopoverTrigger>
+  <PopoverContent className="w-72 p-0" align="start">
+    <ScrollArea>
+      {/* Lista de posts */}
+    </ScrollArea>
+  </PopoverContent>
+</Popover>
+```
 
 ---
 
@@ -23,155 +41,127 @@ Alterar o filtro de "Responsável" para mostrar **apenas usuários que participa
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/Agenda.tsx` | Derivar usuários das reuniões em vez de buscar da tabela |
+| `src/components/agenda/MonthView.tsx` | Adicionar Popover no "+X mais" |
 
 ---
 
 ## Implementação
 
-### Remover Query de agency_users
-
-A query atual (linhas 24-41) que busca todos os usuários será **removida**.
-
-### Derivar Usuários das Reuniões
-
-Criar um `useMemo` que extrai usuários únicos das reuniões:
+### 1. Adicionar Imports
 
 ```typescript
-// Derivar usuários que aparecem nas reuniões (organizador ou participante)
-const usersWithMeetings = useMemo(() => {
-  const userMap = new Map<string, { id: string; name: string }>();
-  
-  for (const meeting of meetings) {
-    // Adicionar organizador
-    if (meeting.organizer_id && meeting.organizer) {
-      userMap.set(meeting.organizer_id, {
-        id: meeting.organizer_id,
-        name: meeting.organizer.name || "Usuário"
-      });
-    }
-    
-    // Adicionar participantes (precisamos buscar os nomes)
-    // Por enquanto, usar ID como fallback
-    for (const participantId of (meeting.participants || [])) {
-      if (!userMap.has(participantId)) {
-        userMap.set(participantId, {
-          id: participantId,
-          name: participantId // Será melhorado abaixo
-        });
-      }
-    }
-  }
-  
-  return Array.from(userMap.values());
-}, [meetings]);
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ptBR } from "date-fns/locale";
 ```
 
-### Buscar Nomes dos Participantes
+### 2. Alterar a Estrutura do "+X mais"
 
-Como os nomes dos participantes não vêm no hook `useMeetings`, faremos uma query apenas para os IDs encontrados:
-
+De (texto estático):
 ```typescript
-// Buscar nomes apenas dos usuários que têm reuniões
-const participantIds = useMemo(() => {
-  const ids = new Set<string>();
-  for (const meeting of meetings) {
-    for (const pId of (meeting.participants || [])) {
-      ids.add(pId);
-    }
-  }
-  return Array.from(ids);
-}, [meetings]);
+{hasMore && (
+  <div className="text-xs text-muted-foreground px-1.5 py-0.5">
+    +{remainingCount} mais
+  </div>
+)}
+```
 
-const { data: participantProfiles = [] } = useQuery({
-  queryKey: ["participant-profiles", participantIds],
-  queryFn: async () => {
-    if (participantIds.length === 0) return [];
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, name")
-      .in("id", participantIds);
-    return data || [];
-  },
-  enabled: participantIds.length > 0,
-});
-
-// Montar lista final de usuários com nomes
-const agencyUsers = useMemo(() => {
-  const userMap = new Map<string, AgencyUser>();
-  
-  // Adicionar organizadores (já têm nome via join no hook)
-  for (const meeting of meetings) {
-    if (meeting.organizer_id && meeting.organizer?.name) {
-      userMap.set(meeting.organizer_id, {
-        id: meeting.organizer_id,
-        name: meeting.organizer.name
-      });
-    }
-  }
-  
-  // Adicionar participantes com nomes da query
-  for (const profile of participantProfiles) {
-    if (!userMap.has(profile.id)) {
-      userMap.set(profile.id, {
-        id: profile.id,
-        name: profile.name || "Usuário"
-      });
-    }
-  }
-  
-  // Ordenar por nome
-  return Array.from(userMap.values())
-    .sort((a, b) => a.name.localeCompare(b.name));
-}, [meetings, participantProfiles]);
+Para (Popover interativo):
+```typescript
+{hasMore && (
+  <Popover>
+    <PopoverTrigger asChild>
+      <button 
+        className="text-xs text-primary hover:underline px-1.5 py-0.5 cursor-pointer"
+        onClick={(e) => e.stopPropagation()} // Evita acionar onDayClick
+      >
+        +{remainingCount} mais
+      </button>
+    </PopoverTrigger>
+    <PopoverContent className="w-72 p-0" align="start">
+      <div className="p-3 border-b">
+        <p className="text-sm font-medium">
+          {format(day, "d 'de' MMMM", { locale: ptBR })} ({dayMeetings.length} reuniões)
+        </p>
+      </div>
+      <ScrollArea className="max-h-60">
+        <div className="p-2 space-y-1">
+          {dayMeetings.map((meeting) => (
+            <MeetingBlock
+              key={meeting.id}
+              meeting={meeting}
+              onClick={() => onMeetingClick(meeting)}
+              variant="month"
+            />
+          ))}
+        </div>
+      </ScrollArea>
+    </PopoverContent>
+  </Popover>
+)}
 ```
 
 ---
 
-## Fluxo de Dados
+## Detalhes Técnicos
+
+### Stop Propagation
+O `onClick={(e) => e.stopPropagation()}` no botão evita que o clique no "+X mais" acione o `onDayClick(day)` da célula pai, que mudaria para visualização de dia.
+
+### Estilo do Botão
+- Cor primária (`text-primary`) para indicar que é clicável
+- Hover com underline para feedback visual
+- Mesmo padding do texto original
+
+### Conteúdo do Popover
+- Header com data formatada e quantidade de reuniões
+- Lista scrollável com altura máxima (max-h-60)
+- Mesmo `MeetingBlock` usado na visualização, mantendo consistência
+
+---
+
+## Fluxo de Interação
 
 ```text
-Reuniões carregadas
+Usuário vê dia com reuniões
        │
-       ▼
-Extrair IDs únicos (organizador + participantes)
+       ├── Clique em reunião visível → abre detalhes (atual)
        │
-       ├── Organizadores → nome já vem no join
+       ├── Clique no "+X mais" → abre popover com TODAS as reuniões
+       │       │
+       │       └── Clique em qualquer reunião → abre detalhes
        │
-       └── Participantes → buscar nomes via query
-       │
-       ▼
-Montar lista de usuários para o filtro
-       │
-       ▼
-Mostrar apenas quem tem reuniões
+       └── Clique em área vazia do dia → muda para visualização de dia (atual)
 ```
 
 ---
 
-## Resultado Visual
+## Visual Final
 
-Antes (todos da agência):
 ```text
-☑ Ana Silva
-☑ Bruno Costa
-☑ Carlos Lima      ← Nunca teve reunião
-☑ Diana Martins    ← Nunca teve reunião
-☑ Eduardo Santos
+┌─────────────────────────┐
+│ 3                       │
+│ ┌─────────────────────┐ │
+│ │ 10:00 Call Rápida   │ │  ← Clicável para detalhes
+│ └─────────────────────┘ │
+│ ┌─────────────────────┐ │
+│ │ 10:00 Reunião       │ │  ← Clicável para detalhes
+│ └─────────────────────┘ │
+│ ┌─────────────────────┐ │
+│ │ 14:30 Apresentação  │ │  ← Clicável para detalhes
+│ └─────────────────────┘ │
+│ +3 mais ← CLICÁVEL      │  ← Abre popover com todas
+└─────────────────────────┘
+
+     ┌──────────────────────────┐
+     │ 3 de Fevereiro (6)       │
+     ├──────────────────────────┤
+     │ 10:00 Call Rápida        │
+     │ 10:00 Reunião com João   │
+     │ 14:30 Apresentação       │
+     │ 15:00 Alinhamento        │
+     │ 16:00 Workshop           │
+     │ 17:30 Fechamento         │
+     └──────────────────────────┘
 ```
-
-Depois (apenas com reuniões):
-```text
-☑ Ana Silva
-☑ Bruno Costa
-☑ Eduardo Santos
-```
-
----
-
-## Comportamento do Filtro
-
-- **Se não houver reuniões**: Seção de filtro por usuário não aparece
-- **Usuário novo cria reunião**: Aparece automaticamente no filtro
-- **Reunião excluída**: Se era a única do usuário, ele sai do filtro
 
