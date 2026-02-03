@@ -1,172 +1,177 @@
 
 
-# Adicionar Filtro por Usuário na Agenda
+# Filtro de Usuários: Mostrar Apenas Quem Tem Reuniões
 
 ## Objetivo
 
-Adicionar um filtro por usuário na sidebar de filtros da Agenda, posicionado **antes** dos filtros de Tipo e Status. O filtro mostrará reuniões onde o usuário selecionado é **organizador** ou **participante**.
+Alterar o filtro de "Responsável" para mostrar **apenas usuários que participam ou organizam reuniões**, eliminando a query separada de `agency_users` e derivando a lista diretamente das reuniões existentes.
 
 ---
 
-## Arquivos a Modificar
+## Benefícios
+
+| Antes | Depois |
+|-------|--------|
+| Busca todos os usuários da agência | Deriva lista das próprias reuniões |
+| Usuários inativos aparecem | Apenas quem tem reuniões aparece |
+| Query extra no banco | Sem query adicional (usa dados já carregados) |
+| Filtro poluído | Filtro limpo e relevante |
+
+---
+
+## Arquivo a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/agenda/CalendarFilters.tsx` | Adicionar seção de filtro por usuário |
-| `src/pages/Agenda.tsx` | Adicionar state e lógica de filtragem por usuário |
+| `src/pages/Agenda.tsx` | Derivar usuários das reuniões em vez de buscar da tabela |
 
 ---
 
 ## Implementação
 
-### 1. Atualizar CalendarFilters.tsx
+### Remover Query de agency_users
 
-Adicionar nova prop e seção de filtro:
+A query atual (linhas 24-41) que busca todos os usuários será **removida**.
+
+### Derivar Usuários das Reuniões
+
+Criar um `useMemo` que extrai usuários únicos das reuniões:
 
 ```typescript
-// Nova interface de usuário para filtro
-interface AgencyUser {
-  id: string;
-  name: string;
-}
-
-interface CalendarFiltersProps {
-  // Novo filtro de usuário
-  users: AgencyUser[];
-  userFilters: string[];
-  onUserFilterChange: (userIds: string[]) => void;
-  // Existentes
-  typeFilters: MeetingTypeFilter[];
-  statusFilters: MeetingStatusFilter[];
-  onTypeFilterChange: (types: MeetingTypeFilter[]) => void;
-  onStatusFilterChange: (statuses: MeetingStatusFilter[]) => void;
-}
+// Derivar usuários que aparecem nas reuniões (organizador ou participante)
+const usersWithMeetings = useMemo(() => {
+  const userMap = new Map<string, { id: string; name: string }>();
+  
+  for (const meeting of meetings) {
+    // Adicionar organizador
+    if (meeting.organizer_id && meeting.organizer) {
+      userMap.set(meeting.organizer_id, {
+        id: meeting.organizer_id,
+        name: meeting.organizer.name || "Usuário"
+      });
+    }
+    
+    // Adicionar participantes (precisamos buscar os nomes)
+    // Por enquanto, usar ID como fallback
+    for (const participantId of (meeting.participants || [])) {
+      if (!userMap.has(participantId)) {
+        userMap.set(participantId, {
+          id: participantId,
+          name: participantId // Será melhorado abaixo
+        });
+      }
+    }
+  }
+  
+  return Array.from(userMap.values());
+}, [meetings]);
 ```
 
-Nova seção no componente (antes de Tipo):
+### Buscar Nomes dos Participantes
+
+Como os nomes dos participantes não vêm no hook `useMeetings`, faremos uma query apenas para os IDs encontrados:
 
 ```typescript
-{/* Filtro de Usuário - PRIMEIRO */}
-<div className="space-y-2">
-  <p className="text-xs font-medium text-muted-foreground uppercase">
-    Responsável
-  </p>
-  {users.map((user) => (
-    <div key={user.id} className="flex items-center gap-2">
-      <Checkbox
-        id={`user-${user.id}`}
-        checked={userFilters.includes(user.id)}
-        onCheckedChange={() => toggleUserFilter(user.id)}
-      />
-      <User className="h-3 w-3 text-muted-foreground" />
-      <Label htmlFor={`user-${user.id}`} className="text-sm cursor-pointer">
-        {user.name}
-      </Label>
-    </div>
-  ))}
-</div>
+// Buscar nomes apenas dos usuários que têm reuniões
+const participantIds = useMemo(() => {
+  const ids = new Set<string>();
+  for (const meeting of meetings) {
+    for (const pId of (meeting.participants || [])) {
+      ids.add(pId);
+    }
+  }
+  return Array.from(ids);
+}, [meetings]);
 
-<div className="border-t pt-4" /> {/* Separador antes de Tipo */}
-```
-
----
-
-### 2. Atualizar Agenda.tsx
-
-Adicionar query para buscar usuários e lógica de filtragem:
-
-```typescript
-// Nova query para buscar usuários da agência
-const { data: agencyUsers = [] } = useQuery({
-  queryKey: ["agency-users", currentAgency?.id],
+const { data: participantProfiles = [] } = useQuery({
+  queryKey: ["participant-profiles", participantIds],
   queryFn: async () => {
-    if (!currentAgency?.id) return [];
+    if (participantIds.length === 0) return [];
     const { data } = await supabase
-      .from("agency_users")
-      .select(`
-        user_id,
-        profiles:profiles!agency_users_user_id_fkey(name)
-      `)
-      .eq("agency_id", currentAgency.id);
-    return (data || []).map(item => ({
-      id: item.user_id,
-      name: (item.profiles as any)?.name || "Usuário",
-    }));
+      .from("profiles")
+      .select("id, name")
+      .in("id", participantIds);
+    return data || [];
   },
-  enabled: !!currentAgency?.id,
+  enabled: participantIds.length > 0,
 });
 
-// Novo state para filtro de usuário (todos selecionados por padrão)
-const [userFilters, setUserFilters] = useState<string[]>([]);
-
-// Inicializar filtro com todos os usuários quando carregarem
-useEffect(() => {
-  if (agencyUsers.length > 0 && userFilters.length === 0) {
-    setUserFilters(agencyUsers.map(u => u.id));
+// Montar lista final de usuários com nomes
+const agencyUsers = useMemo(() => {
+  const userMap = new Map<string, AgencyUser>();
+  
+  // Adicionar organizadores (já têm nome via join no hook)
+  for (const meeting of meetings) {
+    if (meeting.organizer_id && meeting.organizer?.name) {
+      userMap.set(meeting.organizer_id, {
+        id: meeting.organizer_id,
+        name: meeting.organizer.name
+      });
+    }
   }
-}, [agencyUsers]);
-
-// Atualizar lógica de filtragem
-const filteredMeetings = useMemo(() => {
-  return meetings.filter((meeting) => {
-    const typeMatch = typeFilters.includes(meeting.meeting_type);
-    const statusMatch = statusFilters.includes(meeting.status);
-    
-    // Filtro por usuário: organizador OU participante
-    const userMatch = userFilters.length === 0 || 
-      userFilters.includes(meeting.organizer_id) ||
-      (meeting.participants || []).some(p => userFilters.includes(p));
-    
-    return typeMatch && statusMatch && userMatch;
-  });
-}, [meetings, typeFilters, statusFilters, userFilters]);
+  
+  // Adicionar participantes com nomes da query
+  for (const profile of participantProfiles) {
+    if (!userMap.has(profile.id)) {
+      userMap.set(profile.id, {
+        id: profile.id,
+        name: profile.name || "Usuário"
+      });
+    }
+  }
+  
+  // Ordenar por nome
+  return Array.from(userMap.values())
+    .sort((a, b) => a.name.localeCompare(b.name));
+}, [meetings, participantProfiles]);
 ```
 
 ---
 
-## Lógica de Filtragem
-
-A reunião aparece se o usuário selecionado é:
-- **Organizador** (`organizer_id`)
-- **Participante** (está no array `participants`)
-
-| Cenário | Resultado |
-|---------|-----------|
-| Usuário é organizador | ✅ Aparece |
-| Usuário é participante | ✅ Aparece |
-| Usuário não está relacionado | ❌ Oculta |
-| Nenhum filtro selecionado | ✅ Mostra todas |
-
----
-
-## Layout Final dos Filtros
+## Fluxo de Dados
 
 ```text
-┌─────────────────────────┐
-│ Filtros                 │
-├─────────────────────────┤
-│ RESPONSÁVEL             │  ← NOVO (primeiro)
-│ ☑ Ana Silva             │
-│ ☑ Bruno Costa           │
-│ ☑ Carlos Lima           │
-├─────────────────────────┤
-│ TIPO                    │
-│ ☑ 🟢 Comercial          │
-│ ☑ 🔵 Cliente            │
-│ ...                     │
-├─────────────────────────┤
-│ STATUS                  │
-│ ☑ Agendada              │
-│ ☑ Concluída             │
-│ ...                     │
-└─────────────────────────┘
+Reuniões carregadas
+       │
+       ▼
+Extrair IDs únicos (organizador + participantes)
+       │
+       ├── Organizadores → nome já vem no join
+       │
+       └── Participantes → buscar nomes via query
+       │
+       ▼
+Montar lista de usuários para o filtro
+       │
+       ▼
+Mostrar apenas quem tem reuniões
 ```
 
 ---
 
-## Comportamento Padrão
+## Resultado Visual
 
-- **Ao carregar**: Todos os usuários selecionados (mostra todas as reuniões)
-- **Desmarcar usuário**: Oculta reuniões onde ele é organizador/participante
-- **Nenhum selecionado**: Mostra todas (fallback para não esconder tudo)
+Antes (todos da agência):
+```text
+☑ Ana Silva
+☑ Bruno Costa
+☑ Carlos Lima      ← Nunca teve reunião
+☑ Diana Martins    ← Nunca teve reunião
+☑ Eduardo Santos
+```
+
+Depois (apenas com reuniões):
+```text
+☑ Ana Silva
+☑ Bruno Costa
+☑ Eduardo Santos
+```
+
+---
+
+## Comportamento do Filtro
+
+- **Se não houver reuniões**: Seção de filtro por usuário não aparece
+- **Usuário novo cria reunião**: Aparece automaticamente no filtro
+- **Reunião excluída**: Se era a única do usuário, ele sai do filtro
 
