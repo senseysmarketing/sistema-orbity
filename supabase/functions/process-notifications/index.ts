@@ -504,10 +504,9 @@ async function processPosts() {
       scheduled_date,
       post_date,
       agency_id,
+      created_by,
       notification_sent_at,
-      agencies!inner(
-        agency_users(user_id)
-      )
+      post_assignments(user_id)
     `)
     .eq('archived', false)
     .or(`notification_sent_at.is.null,notification_sent_at.lt.${oneDayAgo.toISOString()}`);
@@ -532,21 +531,37 @@ async function processPosts() {
   for (const post of upcomingPosts) {
     if (!post.agency_id) continue;
 
-    const agencyUsers = (post.agencies as any)?.agency_users || [];
+    // Pegar usuários atribuídos ao post
+    const assignedUserIds = ((post as any).post_assignments || []).map((a: any) => a.user_id);
+
+    // Combinar criador + atribuídos (sem duplicatas)
+    const recipientSet = new Set<string>();
+
+    // Sempre adicionar o criador
+    if ((post as any).created_by) {
+      recipientSet.add((post as any).created_by);
+    }
+
+    // Adicionar todos os atribuídos
+    for (const userId of assignedUserIds) {
+      recipientSet.add(userId);
+    }
+
+    const recipients = Array.from(recipientSet);
     
     // Usar post_date (data real de publicação) com fallback para scheduled_date
     const postDate = new Date(post.post_date || post.scheduled_date);
     const notificationTime = addHours(now, POST_ADVANCE_HOURS);
     
-    for (const user of agencyUsers) {
+    for (const userId of recipients) {
       // Only notify if within the advance window (1 hour before)
       if (postDate <= notificationTime) {
-        const canSend = await checkUserPreferences(user.user_id, post.agency_id, 'posts');
+        const canSend = await checkUserPreferences(userId, post.agency_id, 'posts');
         if (!canSend) continue;
 
         potentialNotifications.push({
           notification: {
-            user_id: user.user_id,
+            user_id: userId,
             agency_id: post.agency_id,
             type: 'post',
             priority: 'medium',
@@ -562,14 +577,14 @@ async function processPosts() {
           tracking: {
             notification_type: 'post_upcoming',
             entity_id: post.id,
-            user_id: user.user_id,
+            user_id: userId,
             agency_id: post.agency_id,
           }
         });
       }
     }
 
-    if (agencyUsers.length > 0) {
+    if (recipients.length > 0) {
       postsToUpdate.push(post.id);
     }
   }
