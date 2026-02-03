@@ -1,69 +1,116 @@
 
 
-# Correção: Notificações de Reunião Duplicadas e Typo no Resumo Diário
+# Correção: Notificar Apenas Usuários Atribuídos ao Post
 
-## Problemas Identificados
+## Objetivo
 
-### Problema 1: Typo "3 reuniãoões"
+Alterar a lógica de notificação "Post próximo de publicar" para enviar apenas para:
+1. **Usuários atribuídos ao post** (via tabela `post_assignments`)
+2. **Fallback para o criador** se ninguém estiver atribuído
 
-| Arquivo | Linha | Código Atual | Código Correto |
-|---------|-------|--------------|----------------|
-| `process-notifications/index.ts` | 1219 | `${meetingsCount} reunião${meetingsCount > 1 ? 'ões' : ''}` | `${meetingsCount} ${meetingsCount > 1 ? 'reuniões' : 'reunião'}` |
+## Situação Atual
 
-O template atual concatena "reunião" + "ões" = "reuniãoões" ❌
+A query atual (linhas 499-511) busca **todos os usuários da agência** através do join:
+```typescript
+agencies!inner(
+  agency_users(user_id)
+)
+```
 
----
-
-### Problema 2: Notificações de Reunião Duplicadas
-
-Observação do screenshot: 3 notificações "Reunião em breve - Call Rápida" enviadas com 15 minutos de intervalo (12m, 27m, 42m atrás).
-
-**Causa raiz:**
-- Linha 716: `batchCheckNotifications(trackingRecords, 1)` usa intervalo de **1 hora** para deduplicação
-- Como a janela de notificação começa 1 hora antes da reunião, o job pode enviar múltiplas vezes durante esse período
-- O intervalo de 1 hora é **insuficiente** porque o cron roda a cada minuto e pode haver pequenas variações de timing
-
-**Solução:** Aumentar o intervalo de deduplicação para **24 horas**, garantindo que cada reunião gere apenas 1 notificação por dia por usuário.
+Isso resulta em TODOS os membros da agência recebendo notificação para CADA post.
 
 ---
 
-## Arquivos a Modificar
+## Solução Proposta
+
+### Arquivo a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `supabase/functions/process-notifications/index.ts` | Corrigir typo e aumentar intervalo de deduplicação |
+| `supabase/functions/process-notifications/index.ts` | Alterar query e lógica de destinatários |
 
 ---
 
 ## Implementação
 
-### 1. Corrigir Typo (linha 1219)
+### 1. Alterar Query para Buscar Atribuições e Criador (linhas 499-513)
 
 De:
 ```typescript
-parts.push(`${meetingsCount} reunião${meetingsCount > 1 ? 'ões' : ''}`);
+const { data: posts, error } = await supabase
+  .from('social_media_posts')
+  .select(`
+    id,
+    title,
+    scheduled_date,
+    post_date,
+    agency_id,
+    notification_sent_at,
+    agencies!inner(
+      agency_users(user_id)
+    )
+  `)
 ```
 
 Para:
 ```typescript
-parts.push(`${meetingsCount} ${meetingsCount > 1 ? 'reuniões' : 'reunião'}`);
+const { data: posts, error } = await supabase
+  .from('social_media_posts')
+  .select(`
+    id,
+    title,
+    scheduled_date,
+    post_date,
+    agency_id,
+    created_by,
+    notification_sent_at,
+    post_assignments(user_id)
+  `)
 ```
 
 ---
 
-### 2. Aumentar Intervalo de Deduplicação de Reuniões (linha 716)
+### 2. Alterar Lógica de Destinatários (linhas 532-570)
 
 De:
 ```typescript
-const recentlySent = await batchCheckNotifications(trackingRecords, 1);
+const agencyUsers = (post.agencies as any)?.agency_users || [];
+// ... loop por todos os usuários da agência
 ```
 
 Para:
 ```typescript
-const recentlySent = await batchCheckNotifications(trackingRecords, 24);
+// Pegar usuários atribuídos ao post
+const assignedUsers = (post.post_assignments || []).map((a: any) => a.user_id);
+
+// Fallback para o criador se ninguém estiver atribuído
+const recipients = assignedUsers.length > 0 
+  ? assignedUsers 
+  : (post.created_by ? [post.created_by] : []);
+
+// Enviar apenas para os destinatários relevantes
+for (const userId of recipients) {
+  // ... lógica de notificação existente
+}
 ```
 
-Isso garante que uma reunião só gera **1 notificação por dia** para cada usuário, independente de quantas vezes o job rode.
+---
+
+### 3. Ajustar Condição de Atualização (linhas 572-574)
+
+De:
+```typescript
+if (agencyUsers.length > 0) {
+  postsToUpdate.push(post.id);
+}
+```
+
+Para:
+```typescript
+if (recipients.length > 0) {
+  postsToUpdate.push(post.id);
+}
+```
 
 ---
 
@@ -71,17 +118,29 @@ Isso garante que uma reunião só gera **1 notificação por dia** para cada usu
 
 | Antes | Depois |
 |-------|--------|
-| "3 reuniãoões" | "3 reuniões" |
-| Múltiplas notificações para mesma reunião | Apenas 1 notificação por reunião por dia |
+| Todos da agência recebem notificação | Apenas atribuídos (ou criador) recebem |
+| Spam de notificações para todos | Notificação direcionada e relevante |
 
 ---
 
-## Detalhes Técnicos
+## Fluxo de Decisão
 
-A função `batchCheckNotifications(records, minIntervalHours)` verifica na tabela `notification_tracking` se já foi enviada uma notificação para aquela combinação `(entity_id, user_id)` nas últimas `minIntervalHours` horas.
+```text
+Post próximo de publicar?
+    │
+    ▼
+Tem usuários atribuídos?
+    │
+    ├── SIM → Notifica apenas os atribuídos
+    │
+    └── NÃO → Notifica o criador do post
+```
 
-Ao mudar de 1 para 24 horas:
-- O sistema verifica se já enviou notificação para essa reunião+usuário nas últimas 24h
-- Se já enviou, pula (não cria nova notificação)
-- Como reuniões geralmente não duram mais de 24h, isso efetivamente limita a 1 notificação por reunião
+---
+
+## Resumo das Alterações
+
+1. **Query**: Remover join com `agency_users`, adicionar join com `post_assignments` e campo `created_by`
+2. **Lógica**: Usar atribuídos com fallback para criador
+3. **Condição**: Ajustar verificação para usar `recipients` em vez de `agencyUsers`
 
