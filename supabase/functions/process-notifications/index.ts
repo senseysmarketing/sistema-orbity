@@ -713,7 +713,7 @@ async function processMeetings() {
   });
 
   // Verificar em batch quais já foram enviadas
-  const recentlySent = await batchCheckNotifications(trackingRecords, 1);
+  const recentlySent = await batchCheckNotifications(trackingRecords, 24);
 
   const notificationsToCreate: NotificationData[] = [];
   const toTrack: BatchTrackingRecord[] = [];
@@ -1216,7 +1216,7 @@ async function processDailySummary() {
         }
 
         if (meetingsCount > 0) {
-          parts.push(`${meetingsCount} reunião${meetingsCount > 1 ? 'ões' : ''}`);
+          parts.push(`${meetingsCount} ${meetingsCount > 1 ? 'reuniões' : 'reunião'}`);
         }
         
         // Join with commas and replace last comma with "e"
