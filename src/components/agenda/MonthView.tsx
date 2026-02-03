@@ -11,9 +11,12 @@ import {
   isSameMonth,
   isToday
 } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const TIMEZONE = "America/Sao_Paulo";
 const MAX_VISIBLE_MEETINGS = 3;
@@ -103,9 +106,35 @@ export const MonthView = ({ currentDate, meetings, onMeetingClick, onDayClick }:
                     />
                   ))}
                   {hasMore && (
-                    <div className="text-xs text-muted-foreground px-1.5 py-0.5">
-                      +{remainingCount} mais
-                    </div>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button 
+                          className="text-xs text-primary hover:underline px-1.5 py-0.5 cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          +{remainingCount} mais
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-72 p-0" align="start">
+                        <div className="p-3 border-b">
+                          <p className="text-sm font-medium">
+                            {format(day, "d 'de' MMMM", { locale: ptBR })} ({dayMeetings.length} reuniões)
+                          </p>
+                        </div>
+                        <ScrollArea className="max-h-60">
+                          <div className="p-2 space-y-1">
+                            {dayMeetings.map((meeting) => (
+                              <MeetingBlock
+                                key={meeting.id}
+                                meeting={meeting}
+                                onClick={() => onMeetingClick(meeting)}
+                                variant="month"
+                              />
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
                   )}
                 </div>
               </div>
