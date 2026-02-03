@@ -1,11 +1,14 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useMeetings, Meeting } from "@/hooks/useMeetings";
+import { useAgency } from "@/hooks/useAgency";
+import { supabase } from "@/integrations/supabase/client";
 import { MeetingFormDialog } from "@/components/agenda/MeetingFormDialog";
 import { MeetingDetailsDialog } from "@/components/agenda/MeetingDetailsDialog";
 import { CalendarHeader } from "@/components/agenda/CalendarHeader";
 import { MiniCalendar } from "@/components/agenda/MiniCalendar";
 import { WeeklySummary } from "@/components/agenda/WeeklySummary";
-import { CalendarFilters, MeetingTypeFilter, MeetingStatusFilter } from "@/components/agenda/CalendarFilters";
+import { CalendarFilters, MeetingTypeFilter, MeetingStatusFilter, AgencyUser } from "@/components/agenda/CalendarFilters";
 import { WeekView } from "@/components/agenda/WeekView";
 import { DayView } from "@/components/agenda/DayView";
 import { MonthView } from "@/components/agenda/MonthView";
@@ -15,6 +18,27 @@ type ViewMode = "month" | "week" | "day";
 
 export default function Agenda() {
   const { meetings, isLoading } = useMeetings();
+  const { currentAgency } = useAgency();
+
+  // Query para buscar usuários da agência
+  const { data: agencyUsers = [] } = useQuery({
+    queryKey: ["agency-users-agenda", currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data } = await supabase
+        .from("agency_users")
+        .select(`
+          user_id,
+          profiles:profiles!agency_users_user_id_fkey(name)
+        `)
+        .eq("agency_id", currentAgency.id);
+      return (data || []).map(item => ({
+        id: item.user_id,
+        name: (item.profiles as any)?.name || "Usuário",
+      })) as AgencyUser[];
+    },
+    enabled: !!currentAgency?.id,
+  });
   
   // State
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -27,6 +51,7 @@ export default function Agenda() {
   const [prefilledDateTime, setPrefilledDateTime] = useState<{ date: Date; hour: number } | null>(null);
   
   // Filters
+  const [userFilters, setUserFilters] = useState<string[]>([]);
   const [typeFilters, setTypeFilters] = useState<MeetingTypeFilter[]>([
     "commercial", "client", "internal", "quick_call", "workshop", "results"
   ]);
@@ -34,14 +59,27 @@ export default function Agenda() {
     "scheduled", "completed", "cancelled", "no_show"
   ]);
 
+  // Inicializar filtro de usuários com todos selecionados
+  useEffect(() => {
+    if (agencyUsers.length > 0 && userFilters.length === 0) {
+      setUserFilters(agencyUsers.map(u => u.id));
+    }
+  }, [agencyUsers, userFilters.length]);
+
   // Filtered meetings
   const filteredMeetings = useMemo(() => {
     return meetings.filter((meeting) => {
       const typeMatch = typeFilters.includes(meeting.meeting_type as MeetingTypeFilter);
       const statusMatch = statusFilters.includes(meeting.status as MeetingStatusFilter);
-      return typeMatch && statusMatch;
+      
+      // Filtro por usuário: organizador OU participante
+      const userMatch = userFilters.length === 0 || 
+        userFilters.includes(meeting.organizer_id) ||
+        (meeting.participants || []).some(p => userFilters.includes(p));
+      
+      return typeMatch && statusMatch && userMatch;
     });
-  }, [meetings, typeFilters, statusFilters]);
+  }, [meetings, typeFilters, statusFilters, userFilters]);
 
   // Handlers
   const handleMeetingClick = (meeting: Meeting) => {
@@ -130,6 +168,9 @@ export default function Agenda() {
               currentDate={currentDate} 
             />
             <CalendarFilters
+              users={agencyUsers}
+              userFilters={userFilters}
+              onUserFilterChange={setUserFilters}
               typeFilters={typeFilters}
               statusFilters={statusFilters}
               onTypeFilterChange={setTypeFilters}
