@@ -20,25 +20,59 @@ export default function Agenda() {
   const { meetings, isLoading } = useMeetings();
   const { currentAgency } = useAgency();
 
-  // Query para buscar usuários da agência
-  const { data: agencyUsers = [] } = useQuery({
-    queryKey: ["agency-users-agenda", currentAgency?.id],
+  // Extrair IDs de participantes únicos das reuniões
+  const participantIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const meeting of meetings) {
+      for (const pId of (meeting.participants || [])) {
+        ids.add(pId);
+      }
+    }
+    return Array.from(ids);
+  }, [meetings]);
+
+  // Buscar nomes apenas dos participantes (organizadores já vêm no join)
+  const { data: participantProfiles = [] } = useQuery({
+    queryKey: ["participant-profiles", participantIds],
     queryFn: async () => {
-      if (!currentAgency?.id) return [];
+      if (participantIds.length === 0) return [];
       const { data } = await supabase
-        .from("agency_users")
-        .select(`
-          user_id,
-          profiles:profiles!agency_users_user_id_fkey(name)
-        `)
-        .eq("agency_id", currentAgency.id);
-      return (data || []).map(item => ({
-        id: item.user_id,
-        name: (item.profiles as any)?.name || "Usuário",
-      })) as AgencyUser[];
+        .from("profiles")
+        .select("user_id, name")
+        .in("user_id", participantIds);
+      return data || [];
     },
-    enabled: !!currentAgency?.id,
+    enabled: participantIds.length > 0,
   });
+
+  // Montar lista de usuários que têm reuniões (organizador ou participante)
+  const agencyUsers = useMemo(() => {
+    const userMap = new Map<string, AgencyUser>();
+    
+    // Adicionar organizadores (já têm nome via join no hook)
+    for (const meeting of meetings) {
+      if (meeting.organizer_id && meeting.organizer?.name) {
+        userMap.set(meeting.organizer_id, {
+          id: meeting.organizer_id,
+          name: meeting.organizer.name
+        });
+      }
+    }
+    
+    // Adicionar participantes com nomes da query
+    for (const profile of participantProfiles) {
+      if (!userMap.has(profile.user_id)) {
+        userMap.set(profile.user_id, {
+          id: profile.user_id,
+          name: profile.name || "Usuário"
+        });
+      }
+    }
+    
+    // Ordenar por nome
+    return Array.from(userMap.values())
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [meetings, participantProfiles]);
   
   // State
   const [currentDate, setCurrentDate] = useState(new Date());
