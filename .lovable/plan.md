@@ -1,29 +1,24 @@
 
 
-# Correção: Notificar Apenas Usuários Atribuídos ao Post
+# Correção: Notificar Criador + Usuários Atribuídos ao Post
 
 ## Objetivo
 
-Alterar a lógica de notificação "Post próximo de publicar" para enviar apenas para:
-1. **Usuários atribuídos ao post** (via tabela `post_assignments`)
-2. **Fallback para o criador** se ninguém estiver atribuído
+Alterar a lógica de notificação "Post próximo de publicar" para enviar para:
+1. **O criador do post** (sempre)
+2. **Usuários atribuídos ao post** (via tabela `post_assignments`)
 
-## Situação Atual
-
-A query atual (linhas 499-511) busca **todos os usuários da agência** através do join:
-```typescript
-agencies!inner(
-  agency_users(user_id)
-)
-```
-
-Isso resulta em TODOS os membros da agência recebendo notificação para CADA post.
+Sem duplicatas - se o criador também estiver atribuído, recebe apenas 1 notificação.
 
 ---
 
-## Solução Proposta
+## Situação Atual
 
-### Arquivo a Modificar
+A query atual busca **todos os usuários da agência** através do join com `agency_users`, resultando em spam para todos.
+
+---
+
+## Arquivo a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
@@ -33,19 +28,12 @@ Isso resulta em TODOS os membros da agência recebendo notificação para CADA p
 
 ## Implementação
 
-### 1. Alterar Query para Buscar Atribuições e Criador (linhas 499-513)
+### 1. Alterar Query (linhas 499-513)
 
 De:
 ```typescript
-const { data: posts, error } = await supabase
-  .from('social_media_posts')
-  .select(`
-    id,
-    title,
-    scheduled_date,
-    post_date,
-    agency_id,
-    notification_sent_at,
+.select(`
+    id, title, scheduled_date, post_date, agency_id, notification_sent_at,
     agencies!inner(
       agency_users(user_id)
     )
@@ -54,15 +42,8 @@ const { data: posts, error } = await supabase
 
 Para:
 ```typescript
-const { data: posts, error } = await supabase
-  .from('social_media_posts')
-  .select(`
-    id,
-    title,
-    scheduled_date,
-    post_date,
-    agency_id,
-    created_by,
+.select(`
+    id, title, scheduled_date, post_date, agency_id, created_by,
     notification_sent_at,
     post_assignments(user_id)
   `)
@@ -70,33 +51,43 @@ const { data: posts, error } = await supabase
 
 ---
 
-### 2. Alterar Lógica de Destinatários (linhas 532-570)
+### 2. Alterar Lógica de Destinatários (linhas 532-575)
 
 De:
 ```typescript
 const agencyUsers = (post.agencies as any)?.agency_users || [];
-// ... loop por todos os usuários da agência
+for (const user of agencyUsers) { ... }
 ```
 
 Para:
 ```typescript
 // Pegar usuários atribuídos ao post
-const assignedUsers = (post.post_assignments || []).map((a: any) => a.user_id);
+const assignedUserIds = (post.post_assignments || []).map((a: any) => a.user_id);
 
-// Fallback para o criador se ninguém estiver atribuído
-const recipients = assignedUsers.length > 0 
-  ? assignedUsers 
-  : (post.created_by ? [post.created_by] : []);
+// Combinar criador + atribuídos (sem duplicatas)
+const recipientSet = new Set<string>();
 
-// Enviar apenas para os destinatários relevantes
+// Sempre adicionar o criador
+if (post.created_by) {
+  recipientSet.add(post.created_by);
+}
+
+// Adicionar todos os atribuídos
+for (const userId of assignedUserIds) {
+  recipientSet.add(userId);
+}
+
+const recipients = Array.from(recipientSet);
+
+// Enviar para cada destinatário único
 for (const userId of recipients) {
-  // ... lógica de notificação existente
+  // ... lógica de notificação existente (substituir user.user_id por userId)
 }
 ```
 
 ---
 
-### 3. Ajustar Condição de Atualização (linhas 572-574)
+### 3. Ajustar Condição de Atualização (linha 572-574)
 
 De:
 ```typescript
@@ -118,8 +109,8 @@ if (recipients.length > 0) {
 
 | Antes | Depois |
 |-------|--------|
-| Todos da agência recebem notificação | Apenas atribuídos (ou criador) recebem |
-| Spam de notificações para todos | Notificação direcionada e relevante |
+| Todos da agência recebem | Apenas criador + atribuídos recebem |
+| Spam para toda equipe | Notificação direcionada |
 
 ---
 
@@ -129,18 +120,22 @@ if (recipients.length > 0) {
 Post próximo de publicar?
     │
     ▼
-Tem usuários atribuídos?
+Combinar destinatários únicos:
+    ├── Criador do post (sempre incluído)
+    └── Usuários atribuídos ao post
     │
-    ├── SIM → Notifica apenas os atribuídos
-    │
-    └── NÃO → Notifica o criador do post
+    ▼
+Notificar cada um (sem duplicatas)
 ```
 
 ---
 
-## Resumo das Alterações
+## Exemplo Prático
 
-1. **Query**: Remover join com `agency_users`, adicionar join com `post_assignments` e campo `created_by`
-2. **Lógica**: Usar atribuídos com fallback para criador
-3. **Condição**: Ajustar verificação para usar `recipients` em vez de `agencyUsers`
+| Cenário | Quem recebe |
+|---------|-------------|
+| Criador: Ana, Atribuídos: [Bruno, Carlos] | Ana, Bruno, Carlos (3 notificações) |
+| Criador: Ana, Atribuídos: [Ana, Bruno] | Ana, Bruno (2 notificações - Ana não duplica) |
+| Criador: Ana, Atribuídos: [] | Ana (1 notificação) |
+| Criador: null, Atribuídos: [Bruno] | Bruno (1 notificação) |
 
