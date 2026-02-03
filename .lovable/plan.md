@@ -1,122 +1,87 @@
 
-# Diagnóstico e Correção: Notificações Push não funcionam no Android
 
-## Problema Identificado
+# Correção: Notificações de Reunião Duplicadas e Typo no Resumo Diário
 
-A usuária **Suellen** (suhpratess08@gmail.com) não recebe notificações push no celular Android, mas recebe normalmente no desktop.
+## Problemas Identificados
 
-### Situação Atual dos Tokens:
+### Problema 1: Typo "3 reuniãoões"
 
-| Dispositivo | Status | Última Atualização |
-|-------------|--------|-------------------|
-| Desktop (Windows) | ✅ Ativo | 02/02 13:50 |
-| Android PWA | ❌ Inativo | 02/02 16:27 |
+| Arquivo | Linha | Código Atual | Código Correto |
+|---------|-------|--------------|----------------|
+| `process-notifications/index.ts` | 1219 | `${meetingsCount} reunião${meetingsCount > 1 ? 'ões' : ''}` | `${meetingsCount} ${meetingsCount > 1 ? 'reuniões' : 'reunião'}` |
 
----
-
-## Causa Raiz
-
-O token Android foi **desativado automaticamente** pelo sistema quando o FCM retornou erro "UNREGISTERED" durante o envio de uma notificação.
-
-**Problema no fluxo de reativação:**
-Quando a usuária abre o app no celular novamente, o sistema tenta salvar o token via `upsert`. Porém, como o token já existe no banco com `is_active: false`, o upsert não está conseguindo reativá-lo corretamente porque o campo `is_active: true` não é aplicado na atualização.
+O template atual concatena "reunião" + "ões" = "reuniãoões" ❌
 
 ---
 
-## Solução
+### Problema 2: Notificações de Reunião Duplicadas
 
-Modificar a função `saveToken` no hook `usePushNotifications` para garantir que tokens existentes sejam **sempre reativados** ao abrir o app.
+Observação do screenshot: 3 notificações "Reunião em breve - Call Rápida" enviadas com 15 minutos de intervalo (12m, 27m, 42m atrás).
 
-### Arquivo a Modificar
+**Causa raiz:**
+- Linha 716: `batchCheckNotifications(trackingRecords, 1)` usa intervalo de **1 hora** para deduplicação
+- Como a janela de notificação começa 1 hora antes da reunião, o job pode enviar múltiplas vezes durante esse período
+- O intervalo de 1 hora é **insuficiente** porque o cron roda a cada minuto e pode haver pequenas variações de timing
+
+**Solução:** Aumentar o intervalo de deduplicação para **24 horas**, garantindo que cada reunião gere apenas 1 notificação por dia por usuário.
+
+---
+
+## Arquivos a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/hooks/usePushNotifications.tsx` | Adicionar lógica para forçar reativação de token existente |
+| `supabase/functions/process-notifications/index.ts` | Corrigir typo e aumentar intervalo de deduplicação |
 
 ---
 
-## Implementação Técnica
+## Implementação
 
-### Modificar `saveToken` (linhas 179-256)
+### 1. Corrigir Typo (linha 1219)
 
-Adicionar uma etapa extra que **reativa explicitamente** o token se ele já existe mas está inativo:
-
+De:
 ```typescript
-const saveToken = useCallback(async (fcmToken: string) => {
-  if (!user || !currentAgency) {
-    console.log('[Push] Cannot save token - no user or agency');
-    return;
-  }
+parts.push(`${meetingsCount} reunião${meetingsCount > 1 ? 'ões' : ''}`);
+```
 
-  const standalone = isStandalone();
-  const ios = isIOS();
-  const android = isAndroid();
-  const deviceType = getDeviceType();
-
-  try {
-    // Step 1: Verificar se o token já existe (ativo ou inativo)
-    const { data: existingToken } = await supabase
-      .from('push_subscriptions')
-      .select('id, is_active')
-      .eq('user_id', user.id)
-      .eq('fcm_token', fcmToken)
-      .maybeSingle();
-
-    // Step 2: Se token existe mas está inativo, REATIVAR explicitamente
-    if (existingToken && !existingToken.is_active) {
-      console.log('[Push] Reativando token existente que estava inativo');
-      const { error: reactivateError } = await supabase
-        .from('push_subscriptions')
-        .update({ 
-          is_active: true,
-          device_info: { ... },  // atualizar device_info
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingToken.id);
-      
-      if (!reactivateError) {
-        console.log('[Push] Token reativado com sucesso');
-        return; // Token já salvo e reativado
-      }
-    }
-
-    // Step 3: Desativar tokens do mesmo tipo de dispositivo (código existente)
-    // ...
-
-    // Step 4: Upsert do token (código existente)
-    // ...
-  } catch (error) {
-    console.error('[Push] Failed to save token:', error);
-  }
-}, [user, currentAgency]);
+Para:
+```typescript
+parts.push(`${meetingsCount} ${meetingsCount > 1 ? 'reuniões' : 'reunião'}`);
 ```
 
 ---
 
-## Solução Imediata para a Usuária
+### 2. Aumentar Intervalo de Deduplicação de Reuniões (linha 716)
 
-Enquanto a correção de código é implementada, a usuária pode resolver o problema manualmente:
+De:
+```typescript
+const recentlySent = await batchCheckNotifications(trackingRecords, 1);
+```
 
-1. Abrir o app no celular Android
-2. Ir em **Configurações > Notificações > Canais de Notificação**
-3. Expandir **Push Notifications**
-4. Clicar em **⚙️ Diagnóstico Firebase** 
-5. Clicar no botão **"Reativar Push"**
-6. Após a reativação, clicar em **"Ativar"** novamente
+Para:
+```typescript
+const recentlySent = await batchCheckNotifications(trackingRecords, 24);
+```
 
----
-
-## Benefícios da Correção
-
-1. **Tokens inativos são reativados automaticamente** quando o usuário abre o app
-2. **Não depende de ação manual** do usuário
-3. **Resolve o problema de tokens que expiraram** e foram desativados pelo FCM
-4. **Mantém suporte a múltiplos dispositivos** simultâneos
+Isso garante que uma reunião só gera **1 notificação por dia** para cada usuário, independente de quantas vezes o job rode.
 
 ---
 
-## Resumo das Alterações
+## Resultado Esperado
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/hooks/usePushNotifications.tsx` | Adicionar verificação e reativação explícita de tokens inativos antes do upsert |
+| Antes | Depois |
+|-------|--------|
+| "3 reuniãoões" | "3 reuniões" |
+| Múltiplas notificações para mesma reunião | Apenas 1 notificação por reunião por dia |
+
+---
+
+## Detalhes Técnicos
+
+A função `batchCheckNotifications(records, minIntervalHours)` verifica na tabela `notification_tracking` se já foi enviada uma notificação para aquela combinação `(entity_id, user_id)` nas últimas `minIntervalHours` horas.
+
+Ao mudar de 1 para 24 horas:
+- O sistema verifica se já enviou notificação para essa reunião+usuário nas últimas 24h
+- Se já enviou, pula (não cria nova notificação)
+- Como reuniões geralmente não duram mais de 24h, isso efetivamente limita a 1 notificação por reunião
+
