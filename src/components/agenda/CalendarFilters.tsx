@@ -7,13 +7,22 @@ import {
   Building, 
   PhoneCall, 
   GraduationCap, 
-  PresentationIcon 
+  PresentationIcon,
+  User
 } from "lucide-react";
 
 export type MeetingTypeFilter = "commercial" | "client" | "internal" | "quick_call" | "workshop" | "results";
 export type MeetingStatusFilter = "scheduled" | "completed" | "cancelled" | "no_show";
 
+export interface AgencyUser {
+  id: string;
+  name: string;
+}
+
 interface CalendarFiltersProps {
+  users: AgencyUser[];
+  userFilters: string[];
+  onUserFilterChange: (userIds: string[]) => void;
   typeFilters: MeetingTypeFilter[];
   statusFilters: MeetingStatusFilter[];
   onTypeFilterChange: (types: MeetingTypeFilter[]) => void;
@@ -37,11 +46,21 @@ const meetingStatuses: { value: MeetingStatusFilter; label: string }[] = [
 ];
 
 export const CalendarFilters = ({
+  users,
+  userFilters,
+  onUserFilterChange,
   typeFilters,
   statusFilters,
   onTypeFilterChange,
   onStatusFilterChange,
 }: CalendarFiltersProps) => {
+  const toggleUserFilter = (userId: string) => {
+    if (userFilters.includes(userId)) {
+      onUserFilterChange(userFilters.filter((id) => id !== userId));
+    } else {
+      onUserFilterChange([...userFilters, userId]);
+    }
+  };
   const toggleTypeFilter = (type: MeetingTypeFilter) => {
     if (typeFilters.includes(type)) {
       onTypeFilterChange(typeFilters.filter((t) => t !== type));
@@ -64,7 +83,30 @@ export const CalendarFilters = ({
         <CardTitle className="text-sm font-medium">Filtros</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
+        {/* Filtro de Usuário - PRIMEIRO */}
+        {users.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase">Responsável</p>
+            {users.map((user) => (
+              <div key={user.id} className="flex items-center gap-2">
+                <Checkbox
+                  id={`user-${user.id}`}
+                  checked={userFilters.includes(user.id)}
+                  onCheckedChange={() => toggleUserFilter(user.id)}
+                />
+                <User className="h-3 w-3 text-muted-foreground" />
+                <Label 
+                  htmlFor={`user-${user.id}`} 
+                  className="text-sm cursor-pointer"
+                >
+                  {user.name}
+                </Label>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="border-t pt-4 space-y-2">
           <p className="text-xs font-medium text-muted-foreground uppercase">Tipo</p>
           {meetingTypes.map((type) => {
             const Icon = type.icon;
