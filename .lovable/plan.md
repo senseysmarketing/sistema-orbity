@@ -1,141 +1,172 @@
 
 
-# Correção: Notificar Criador + Usuários Atribuídos ao Post
+# Adicionar Filtro por Usuário na Agenda
 
 ## Objetivo
 
-Alterar a lógica de notificação "Post próximo de publicar" para enviar para:
-1. **O criador do post** (sempre)
-2. **Usuários atribuídos ao post** (via tabela `post_assignments`)
-
-Sem duplicatas - se o criador também estiver atribuído, recebe apenas 1 notificação.
+Adicionar um filtro por usuário na sidebar de filtros da Agenda, posicionado **antes** dos filtros de Tipo e Status. O filtro mostrará reuniões onde o usuário selecionado é **organizador** ou **participante**.
 
 ---
 
-## Situação Atual
-
-A query atual busca **todos os usuários da agência** através do join com `agency_users`, resultando em spam para todos.
-
----
-
-## Arquivo a Modificar
+## Arquivos a Modificar
 
 | Arquivo | Mudança |
 |---------|---------|
-| `supabase/functions/process-notifications/index.ts` | Alterar query e lógica de destinatários |
+| `src/components/agenda/CalendarFilters.tsx` | Adicionar seção de filtro por usuário |
+| `src/pages/Agenda.tsx` | Adicionar state e lógica de filtragem por usuário |
 
 ---
 
 ## Implementação
 
-### 1. Alterar Query (linhas 499-513)
+### 1. Atualizar CalendarFilters.tsx
 
-De:
+Adicionar nova prop e seção de filtro:
+
 ```typescript
-.select(`
-    id, title, scheduled_date, post_date, agency_id, notification_sent_at,
-    agencies!inner(
-      agency_users(user_id)
-    )
-  `)
+// Nova interface de usuário para filtro
+interface AgencyUser {
+  id: string;
+  name: string;
+}
+
+interface CalendarFiltersProps {
+  // Novo filtro de usuário
+  users: AgencyUser[];
+  userFilters: string[];
+  onUserFilterChange: (userIds: string[]) => void;
+  // Existentes
+  typeFilters: MeetingTypeFilter[];
+  statusFilters: MeetingStatusFilter[];
+  onTypeFilterChange: (types: MeetingTypeFilter[]) => void;
+  onStatusFilterChange: (statuses: MeetingStatusFilter[]) => void;
+}
 ```
 
-Para:
+Nova seção no componente (antes de Tipo):
+
 ```typescript
-.select(`
-    id, title, scheduled_date, post_date, agency_id, created_by,
-    notification_sent_at,
-    post_assignments(user_id)
-  `)
+{/* Filtro de Usuário - PRIMEIRO */}
+<div className="space-y-2">
+  <p className="text-xs font-medium text-muted-foreground uppercase">
+    Responsável
+  </p>
+  {users.map((user) => (
+    <div key={user.id} className="flex items-center gap-2">
+      <Checkbox
+        id={`user-${user.id}`}
+        checked={userFilters.includes(user.id)}
+        onCheckedChange={() => toggleUserFilter(user.id)}
+      />
+      <User className="h-3 w-3 text-muted-foreground" />
+      <Label htmlFor={`user-${user.id}`} className="text-sm cursor-pointer">
+        {user.name}
+      </Label>
+    </div>
+  ))}
+</div>
+
+<div className="border-t pt-4" /> {/* Separador antes de Tipo */}
 ```
 
 ---
 
-### 2. Alterar Lógica de Destinatários (linhas 532-575)
+### 2. Atualizar Agenda.tsx
 
-De:
+Adicionar query para buscar usuários e lógica de filtragem:
+
 ```typescript
-const agencyUsers = (post.agencies as any)?.agency_users || [];
-for (const user of agencyUsers) { ... }
-```
+// Nova query para buscar usuários da agência
+const { data: agencyUsers = [] } = useQuery({
+  queryKey: ["agency-users", currentAgency?.id],
+  queryFn: async () => {
+    if (!currentAgency?.id) return [];
+    const { data } = await supabase
+      .from("agency_users")
+      .select(`
+        user_id,
+        profiles:profiles!agency_users_user_id_fkey(name)
+      `)
+      .eq("agency_id", currentAgency.id);
+    return (data || []).map(item => ({
+      id: item.user_id,
+      name: (item.profiles as any)?.name || "Usuário",
+    }));
+  },
+  enabled: !!currentAgency?.id,
+});
 
-Para:
-```typescript
-// Pegar usuários atribuídos ao post
-const assignedUserIds = (post.post_assignments || []).map((a: any) => a.user_id);
+// Novo state para filtro de usuário (todos selecionados por padrão)
+const [userFilters, setUserFilters] = useState<string[]>([]);
 
-// Combinar criador + atribuídos (sem duplicatas)
-const recipientSet = new Set<string>();
+// Inicializar filtro com todos os usuários quando carregarem
+useEffect(() => {
+  if (agencyUsers.length > 0 && userFilters.length === 0) {
+    setUserFilters(agencyUsers.map(u => u.id));
+  }
+}, [agencyUsers]);
 
-// Sempre adicionar o criador
-if (post.created_by) {
-  recipientSet.add(post.created_by);
-}
-
-// Adicionar todos os atribuídos
-for (const userId of assignedUserIds) {
-  recipientSet.add(userId);
-}
-
-const recipients = Array.from(recipientSet);
-
-// Enviar para cada destinatário único
-for (const userId of recipients) {
-  // ... lógica de notificação existente (substituir user.user_id por userId)
-}
+// Atualizar lógica de filtragem
+const filteredMeetings = useMemo(() => {
+  return meetings.filter((meeting) => {
+    const typeMatch = typeFilters.includes(meeting.meeting_type);
+    const statusMatch = statusFilters.includes(meeting.status);
+    
+    // Filtro por usuário: organizador OU participante
+    const userMatch = userFilters.length === 0 || 
+      userFilters.includes(meeting.organizer_id) ||
+      (meeting.participants || []).some(p => userFilters.includes(p));
+    
+    return typeMatch && statusMatch && userMatch;
+  });
+}, [meetings, typeFilters, statusFilters, userFilters]);
 ```
 
 ---
 
-### 3. Ajustar Condição de Atualização (linha 572-574)
+## Lógica de Filtragem
 
-De:
-```typescript
-if (agencyUsers.length > 0) {
-  postsToUpdate.push(post.id);
-}
-```
+A reunião aparece se o usuário selecionado é:
+- **Organizador** (`organizer_id`)
+- **Participante** (está no array `participants`)
 
-Para:
-```typescript
-if (recipients.length > 0) {
-  postsToUpdate.push(post.id);
-}
-```
+| Cenário | Resultado |
+|---------|-----------|
+| Usuário é organizador | ✅ Aparece |
+| Usuário é participante | ✅ Aparece |
+| Usuário não está relacionado | ❌ Oculta |
+| Nenhum filtro selecionado | ✅ Mostra todas |
 
 ---
 
-## Resultado Esperado
-
-| Antes | Depois |
-|-------|--------|
-| Todos da agência recebem | Apenas criador + atribuídos recebem |
-| Spam para toda equipe | Notificação direcionada |
-
----
-
-## Fluxo de Decisão
+## Layout Final dos Filtros
 
 ```text
-Post próximo de publicar?
-    │
-    ▼
-Combinar destinatários únicos:
-    ├── Criador do post (sempre incluído)
-    └── Usuários atribuídos ao post
-    │
-    ▼
-Notificar cada um (sem duplicatas)
+┌─────────────────────────┐
+│ Filtros                 │
+├─────────────────────────┤
+│ RESPONSÁVEL             │  ← NOVO (primeiro)
+│ ☑ Ana Silva             │
+│ ☑ Bruno Costa           │
+│ ☑ Carlos Lima           │
+├─────────────────────────┤
+│ TIPO                    │
+│ ☑ 🟢 Comercial          │
+│ ☑ 🔵 Cliente            │
+│ ...                     │
+├─────────────────────────┤
+│ STATUS                  │
+│ ☑ Agendada              │
+│ ☑ Concluída             │
+│ ...                     │
+└─────────────────────────┘
 ```
 
 ---
 
-## Exemplo Prático
+## Comportamento Padrão
 
-| Cenário | Quem recebe |
-|---------|-------------|
-| Criador: Ana, Atribuídos: [Bruno, Carlos] | Ana, Bruno, Carlos (3 notificações) |
-| Criador: Ana, Atribuídos: [Ana, Bruno] | Ana, Bruno (2 notificações - Ana não duplica) |
-| Criador: Ana, Atribuídos: [] | Ana (1 notificação) |
-| Criador: null, Atribuídos: [Bruno] | Bruno (1 notificação) |
+- **Ao carregar**: Todos os usuários selecionados (mostra todas as reuniões)
+- **Desmarcar usuário**: Oculta reuniões onde ele é organizador/participante
+- **Nenhum selecionado**: Mostra todas (fallback para não esconder tudo)
 
