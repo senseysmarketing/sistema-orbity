@@ -23,12 +23,12 @@ export function PaymentForm({ open, onOpenChange, onSuccess, payment, preselecte
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [formData, setFormData] = useState({
-    client_id: payment?.client_id || preselectedClient?.id || '',
-    amount: payment?.amount || preselectedClient?.monthly_value || '',
-    due_date: payment?.due_date ? payment.due_date.split('T')[0] : '',
-    paid_date: payment?.paid_date ? payment.paid_date.split('T')[0] : '',
-    status: payment?.status || 'pending',
-    description: payment?.description || '',
+    client_id: '',
+    amount: '',
+    due_date: '',
+    paid_date: '',
+    status: 'pending',
+    description: '',
   });
 
   useEffect(() => {
@@ -36,6 +36,9 @@ export function PaymentForm({ open, onOpenChange, onSuccess, payment, preselecte
   }, [currentAgency]);
 
   useEffect(() => {
+    // Só processa quando o dialog abre
+    if (!open) return;
+    
     if (payment) {
       setFormData({
         client_id: payment.client_id || '',
@@ -69,7 +72,7 @@ export function PaymentForm({ open, onOpenChange, onSuccess, payment, preselecte
         description: '',
       });
     }
-  }, [payment, preselectedClient, open]);
+  }, [open, payment, preselectedClient]);
 
   const fetchClients = async () => {
     if (!currentAgency) return;
@@ -102,7 +105,7 @@ export function PaymentForm({ open, onOpenChange, onSuccess, payment, preselecte
         amount: parseFloat(formData.amount as string),
         due_date: formData.due_date,
         paid_date: formData.paid_date || null,
-        status: formData.status,
+        status: formData.status as 'pending' | 'paid' | 'overdue',
         description: formData.description || null,
         agency_id: currentAgency?.id,
       };
@@ -151,23 +154,30 @@ export function PaymentForm({ open, onOpenChange, onSuccess, payment, preselecte
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
               <Label htmlFor="client_id">Cliente *</Label>
-              <Select
-                value={formData.client_id}
-                onValueChange={handleClientChange}
-                required
-                disabled={!!preselectedClient}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {preselectedClient ? (
+                <Input
+                  value={preselectedClient.name}
+                  disabled
+                  className="bg-muted cursor-not-allowed"
+                />
+              ) : (
+                <Select
+                  value={formData.client_id}
+                  onValueChange={handleClientChange}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
