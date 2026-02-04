@@ -18,6 +18,7 @@ interface Lead {
   status: string;
   value: number;
   created_at: string;
+  won_at?: string | null;
 }
 
 interface CRMInvestmentMetricsProps {
@@ -36,7 +37,7 @@ export function CRMInvestmentMetrics({
   manualInvestment = 0,
 }: CRMInvestmentMetricsProps) {
   const metrics = useMemo(() => {
-    // Filter by date range if provided
+    // Leads filtrados por data de CRIAÇÃO (entrada no funil)
     let filteredLeads = leads;
     if (dateRange?.from && dateRange?.to) {
       filteredLeads = leads.filter(lead => {
@@ -52,9 +53,18 @@ export function CRMInvestmentMetrics({
     const meetings = filteredLeads.filter(l => 
       ['meeting', 'proposal', 'won'].includes(l.status)
     ).length;
-    const wonLeads = filteredLeads.filter(l => l.status === 'won');
-    const wonCount = wonLeads.length;
+
+    // Vendas filtradas por data de FECHAMENTO (won_at) - considera TODOS os leads
+    const wonLeads = dateRange?.from && dateRange?.to
+      ? leads.filter(l => {
+          if (l.status !== 'won') return false;
+          const wonAt = l.won_at ? new Date(l.won_at) : null;
+          if (!wonAt) return false;
+          return wonAt >= dateRange.from && wonAt <= dateRange.to;
+        })
+      : leads.filter(l => l.status === 'won');
     
+    const wonCount = wonLeads.length;
     const revenue = wonLeads.reduce((sum, lead) => sum + (lead.value || 0), 0);
     const roas = investment > 0 ? revenue / investment : 0;
     const conversionRate = totalLeads > 0 ? (wonCount / totalLeads) * 100 : 0;
