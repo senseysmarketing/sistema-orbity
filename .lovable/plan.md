@@ -1,39 +1,18 @@
 
+# Corrigir Carregamento do Cliente no Formulário de Pagamento
 
-# Adicionar Popover de Reuniões no "+X mais" da Agenda
+## Problema Identificado
 
-## Objetivo
+Ao clicar em "Gerar Pagamento" a partir do card de um cliente, o formulário abre mas:
+1. O campo "Cliente" não mostra o nome do cliente selecionado (mostra "Selecione um cliente")
+2. Ao tentar salvar, ocorre erro porque o `client_id` pode não estar sendo processado corretamente
 
-Tornar o indicador "+X mais" clicável no calendário mensal da Agenda, exibindo um **Popover** com a lista completa de reuniões do dia, igual ao comportamento do calendário de Social Media.
+### Causa Raiz
 
----
+O componente `Select` do Radix UI só exibe o valor selecionado quando ele existe na lista de opções (`clients`). Quando o formulário abre com `preselectedClient`, duas condições podem causar o problema:
 
-## Comportamento Atual vs Proposto
-
-| Atual | Proposto |
-|-------|----------|
-| Clique em qualquer lugar do dia → muda para visualização de dia | Clique no "+X mais" → abre popover com lista de reuniões |
-| "+X mais" é texto estático | "+X mais" é botão interativo |
-| Usuário precisa mudar de visualização para ver todas | Usuário vê todas sem sair da visualização mensal |
-
----
-
-## Referência: SocialMediaCalendar
-
-O componente `SocialMediaCalendar.tsx` usa:
-
-```typescript
-<Popover>
-  <PopoverTrigger asChild>
-    <div>...</div> {/* Célula do dia */}
-  </PopoverTrigger>
-  <PopoverContent className="w-72 p-0" align="start">
-    <ScrollArea>
-      {/* Lista de posts */}
-    </ScrollArea>
-  </PopoverContent>
-</Popover>
-```
+1. **Race condition**: A lista de `clients` ainda não foi carregada quando o formulário abre
+2. **Referência no useEffect**: O `formData` é inicializado com valores default antes do `preselectedClient` estar disponível
 
 ---
 
@@ -41,127 +20,161 @@ O componente `SocialMediaCalendar.tsx` usa:
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/agenda/MonthView.tsx` | Adicionar Popover no "+X mais" |
+| `src/components/admin/PaymentForm.tsx` | Corrigir inicialização e exibição do cliente pré-selecionado |
 
 ---
 
-## Implementação
+## Solução
 
-### 1. Adicionar Imports
+### 1. Exibir Nome do Cliente Quando Pré-selecionado
+
+Quando temos um `preselectedClient`, mostrar o nome diretamente em vez de depender do Select:
 
 ```typescript
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { ptBR } from "date-fns/locale";
-```
-
-### 2. Alterar a Estrutura do "+X mais"
-
-De (texto estático):
-```typescript
-{hasMore && (
-  <div className="text-xs text-muted-foreground px-1.5 py-0.5">
-    +{remainingCount} mais
-  </div>
+{preselectedClient ? (
+  <Input
+    value={preselectedClient.name}
+    disabled
+    className="bg-muted"
+  />
+) : (
+  <Select
+    value={formData.client_id}
+    onValueChange={handleClientChange}
+    required
+  >
+    {/* ... opções ... */}
+  </Select>
 )}
 ```
 
-Para (Popover interativo):
+### 2. Garantir que o formData seja Resetado Corretamente
+
+Atualizar o `useEffect` para garantir timing correto:
+
 ```typescript
-{hasMore && (
-  <Popover>
-    <PopoverTrigger asChild>
-      <button 
-        className="text-xs text-primary hover:underline px-1.5 py-0.5 cursor-pointer"
-        onClick={(e) => e.stopPropagation()} // Evita acionar onDayClick
-      >
-        +{remainingCount} mais
-      </button>
-    </PopoverTrigger>
-    <PopoverContent className="w-72 p-0" align="start">
-      <div className="p-3 border-b">
-        <p className="text-sm font-medium">
-          {format(day, "d 'de' MMMM", { locale: ptBR })} ({dayMeetings.length} reuniões)
-        </p>
-      </div>
-      <ScrollArea className="max-h-60">
-        <div className="p-2 space-y-1">
-          {dayMeetings.map((meeting) => (
-            <MeetingBlock
-              key={meeting.id}
-              meeting={meeting}
-              onClick={() => onMeetingClick(meeting)}
-              variant="month"
-            />
-          ))}
-        </div>
-      </ScrollArea>
-    </PopoverContent>
-  </Popover>
-)}
+useEffect(() => {
+  // Só processa quando o dialog abre
+  if (!open) return;
+  
+  if (payment) {
+    setFormData({
+      client_id: payment.client_id || '',
+      amount: payment.amount || '',
+      due_date: payment.due_date ? payment.due_date.split('T')[0] : '',
+      paid_date: payment.paid_date ? payment.paid_date.split('T')[0] : '',
+      status: payment.status || 'pending',
+      description: payment.description || '',
+    });
+  } else if (preselectedClient) {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth();
+    const defaultDueDate = new Date(currentYear, currentMonth, 15);
+    
+    setFormData({
+      client_id: preselectedClient.id,
+      amount: preselectedClient.monthly_value?.toString() || '',
+      due_date: defaultDueDate.toISOString().split('T')[0],
+      paid_date: '',
+      status: 'pending',
+      description: '',
+    });
+  } else {
+    setFormData({
+      client_id: '',
+      amount: '',
+      due_date: '',
+      paid_date: '',
+      status: 'pending',
+      description: '',
+    });
+  }
+}, [open, payment, preselectedClient]);
 ```
 
 ---
 
-## Detalhes Técnicos
+## Mudanças Detalhadas
 
-### Stop Propagation
-O `onClick={(e) => e.stopPropagation()}` no botão evita que o clique no "+X mais" acione o `onDayClick(day)` da célula pai, que mudaria para visualização de dia.
+### Linha 25-32: Inicialização Simplificada
+Remover lógica de inicialização que usa `preselectedClient`:
 
-### Estilo do Botão
-- Cor primária (`text-primary`) para indicar que é clicável
-- Hover com underline para feedback visual
-- Mesmo padding do texto original
+```typescript
+const [formData, setFormData] = useState({
+  client_id: '',
+  amount: '',
+  due_date: '',
+  paid_date: '',
+  status: 'pending',
+  description: '',
+});
+```
 
-### Conteúdo do Popover
-- Header com data formatada e quantidade de reuniões
-- Lista scrollável com altura máxima (max-h-60)
-- Mesmo `MeetingBlock` usado na visualização, mantendo consistência
+### Linhas 38-72: useEffect com Verificação de `open`
+Adicionar verificação `if (!open) return;` no início para garantir que o formData só seja populado quando o dialog realmente abrir.
+
+### Linhas 152-171: Campo Cliente com Renderização Condicional
+Substituir o Select por Input quando `preselectedClient` existir:
+
+```typescript
+<div className="grid gap-2">
+  <Label htmlFor="client_id">Cliente *</Label>
+  {preselectedClient ? (
+    <Input
+      value={preselectedClient.name}
+      disabled
+      className="bg-muted cursor-not-allowed"
+    />
+  ) : (
+    <Select
+      value={formData.client_id}
+      onValueChange={handleClientChange}
+      required
+    >
+      <SelectTrigger>
+        <SelectValue placeholder="Selecione um cliente" />
+      </SelectTrigger>
+      <SelectContent>
+        {clients.map((client) => (
+          <SelectItem key={client.id} value={client.id}>
+            {client.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )}
+</div>
+```
 
 ---
 
-## Fluxo de Interação
+## Resultado Esperado
+
+| Antes | Depois |
+|-------|--------|
+| Campo mostra "Selecione um cliente" | Campo mostra "Space Imob" (nome do cliente) |
+| Erro ao salvar por client_id inválido | Pagamento criado com sucesso |
+| Dependência da lista de clientes carregada | Exibe nome direto do `preselectedClient` |
+
+---
+
+## Fluxo Corrigido
 
 ```text
-Usuário vê dia com reuniões
-       │
-       ├── Clique em reunião visível → abre detalhes (atual)
-       │
-       ├── Clique no "+X mais" → abre popover com TODAS as reuniões
-       │       │
-       │       └── Clique em qualquer reunião → abre detalhes
-       │
-       └── Clique em área vazia do dia → muda para visualização de dia (atual)
+1. Usuário clica "Gerar Pagamento" no card
+           │
+2. setPreselectedClientForPayment({ id, name, monthly_value })
+           │
+3. setPaymentFormOpen(true)
+           │
+4. Dialog abre → useEffect detecta open=true
+           │
+5. formData.client_id = preselectedClient.id
+           │
+6. Input exibe preselectedClient.name (não depende de clients[])
+           │
+7. Usuário clica "Criar"
+           │
+8. handleSubmit envia client_id correto → ✅ Sucesso
 ```
-
----
-
-## Visual Final
-
-```text
-┌─────────────────────────┐
-│ 3                       │
-│ ┌─────────────────────┐ │
-│ │ 10:00 Call Rápida   │ │  ← Clicável para detalhes
-│ └─────────────────────┘ │
-│ ┌─────────────────────┐ │
-│ │ 10:00 Reunião       │ │  ← Clicável para detalhes
-│ └─────────────────────┘ │
-│ ┌─────────────────────┐ │
-│ │ 14:30 Apresentação  │ │  ← Clicável para detalhes
-│ └─────────────────────┘ │
-│ +3 mais ← CLICÁVEL      │  ← Abre popover com todas
-└─────────────────────────┘
-
-     ┌──────────────────────────┐
-     │ 3 de Fevereiro (6)       │
-     ├──────────────────────────┤
-     │ 10:00 Call Rápida        │
-     │ 10:00 Reunião com João   │
-     │ 14:30 Apresentação       │
-     │ 15:00 Alinhamento        │
-     │ 16:00 Workshop           │
-     │ 17:30 Fechamento         │
-     └──────────────────────────┘
-```
-
