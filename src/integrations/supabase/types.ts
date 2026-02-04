@@ -2176,6 +2176,7 @@ export type Database = {
           temperature: string
           updated_at: string
           value: number | null
+          won_at: string | null
         }
         Insert: {
           agency_id: string
@@ -2199,6 +2200,7 @@ export type Database = {
           temperature?: string
           updated_at?: string
           value?: number | null
+          won_at?: string | null
         }
         Update: {
           agency_id?: string
@@ -2222,6 +2224,7 @@ export type Database = {
           temperature?: string
           updated_at?: string
           value?: number | null
+          won_at?: string | null
         }
         Relationships: []
       }

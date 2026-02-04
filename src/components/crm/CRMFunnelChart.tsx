@@ -8,6 +8,7 @@ interface Lead {
   status: string;
   value: number;
   created_at: string;
+  won_at?: string | null;
 }
 
 interface CRMFunnelChartProps {

@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Users, Target, DollarSign, AlertTriangle, TrendingUp, TrendingDown, Settings, Info } from "lucide-react";
+import { CalendarIcon, Users, Target, DollarSign, AlertTriangle, TrendingUp, TrendingDown, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CRMFunnelChart } from "./CRMFunnelChart";
 import { CRMInvestmentMetrics } from "./CRMInvestmentMetrics";
@@ -24,6 +23,7 @@ interface Lead {
   value: number;
   created_at: string;
   next_contact: string | null;
+  won_at?: string | null;
 }
 
 interface CRMDashboardProps {
@@ -92,13 +92,22 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
   const totalInvestment = metaInvestment + manualInvestment;
 
   const metrics = useMemo(() => {
+    // Leads filtrados por data de CRIAÇÃO (entrada no funil)
     const filteredLeads = leads.filter(lead => {
       const createdAt = new Date(lead.created_at);
       return createdAt >= dateRange.from && createdAt <= dateRange.to;
     });
 
     const totalLeads = filteredLeads.length;
-    const wonLeads = filteredLeads.filter(l => normalizeLeadStatusToDb(l.status) === 'won');
+
+    // Vendas filtradas por data de FECHAMENTO (won_at) - considera TODOS os leads
+    const wonLeads = leads.filter(l => {
+      if (normalizeLeadStatusToDb(l.status) !== 'won') return false;
+      const wonAt = l.won_at ? new Date(l.won_at) : null;
+      if (!wonAt) return false;
+      return wonAt >= dateRange.from && wonAt <= dateRange.to;
+    });
+
     const wonCount = wonLeads.length;
     const revenue = wonLeads.reduce((sum, l) => sum + (l.value || 0), 0);
     const conversionRate = totalLeads > 0 ? (wonCount / totalLeads) * 100 : 0;
