@@ -156,14 +156,16 @@ export function WeeklyPlanningView() {
         }
       })
       .sort((a, b) => {
-        // Sort: overdue first, then by readiness (ascending), then alphabetically
-        if (a.hasOverdue && !b.hasOverdue) return -1;
-        if (!a.hasOverdue && b.hasOverdue) return 1;
-        if (a.weekTotal === 0 && b.weekTotal > 0) return -1;
-        if (a.weekTotal > 0 && b.weekTotal === 0) return 1;
-        if (a.readinessPercentage !== b.readinessPercentage) {
-          return a.readinessPercentage - b.readinessPercentage;
+        // 1. Clientes COM posts primeiro (ordenados do maior para menor)
+        if (a.weekTotal > 0 && b.weekTotal === 0) return -1;
+        if (a.weekTotal === 0 && b.weekTotal > 0) return 1;
+        
+        // 2. Entre clientes com posts: ordenar por quantidade (maior primeiro)
+        if (a.weekTotal !== b.weekTotal) {
+          return b.weekTotal - a.weekTotal;
         }
+        
+        // 3. Alfabético como desempate
         return a.clientName.localeCompare(b.clientName);
       });
   }, [clientPlans, searchQuery, readinessFilter]);
