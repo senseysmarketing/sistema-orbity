@@ -1,13 +1,17 @@
+import { useMemo } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, ExternalLink } from "lucide-react";
-import { ClientWeekPlan, categorizeStatus, translateStatus } from "./types";
+import { ClientWeekPlan, categorizeStatus } from "./types";
 import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useQuery } from "@tanstack/react-query";
+import { useAgency } from "@/hooks/useAgency";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ClientPlanningDetailsProps {
   plan: ClientWeekPlan | null;
@@ -26,20 +30,56 @@ export function ClientPlanningDetails({
   onViewPost,
   weekDays 
 }: ClientPlanningDetailsProps) {
+  const { currentAgency } = useAgency();
+
+  // Fetch custom statuses for UUID translation
+  const { data: customStatuses = [] } = useQuery({
+    queryKey: ['social-media-custom-statuses', currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data } = await supabase
+        .from('social_media_custom_statuses')
+        .select('id, name, slug, color')
+        .eq('agency_id', currentAgency.id);
+      return data || [];
+    },
+    enabled: !!currentAgency?.id,
+  });
+
+  // Build dynamic status map with defaults + custom statuses
+  const statusMap = useMemo(() => {
+    const map: Record<string, { label: string }> = {
+      draft: { label: 'Briefing' },
+      briefing: { label: 'Briefing' },
+      in_creation: { label: 'Em Criação' },
+      pending_approval: { label: 'Aguardando Aprovação' },
+      approved: { label: 'Aprovado' },
+      published: { label: 'Publicado' },
+      revision: { label: 'Em Revisão' },
+    };
+    
+    customStatuses.forEach(status => {
+      map[status.id] = { label: status.name };
+      map[status.slug] = { label: status.name };
+    });
+    
+    return map;
+  }, [customStatuses]);
+
   if (!plan) return null;
 
   const allPosts = Object.values(plan.days).flatMap(d => d.posts);
   const platforms = [...new Set(allPosts.map(p => p.platform))];
 
   const getStatusBadge = (status: string) => {
+    const statusInfo = statusMap[status] || { label: status };
     const category = categorizeStatus(status);
-    const displayLabel = translateStatus(status);
     const colors = {
       ready: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
       inProgress: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
       draft: "bg-muted text-muted-foreground",
     };
-    return <Badge className={colors[category]}>{displayLabel}</Badge>;
+    return <Badge className={colors[category]}>{statusInfo.label}</Badge>;
   };
 
   const getOverallBadge = () => {
