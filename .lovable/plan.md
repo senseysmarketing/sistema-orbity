@@ -1,203 +1,218 @@
 
+# Painel de Planejamento Semanal por Cliente
 
-# Adicionar Campo `won_at` na Tabela Leads
+## Entendimento do Problema
 
-## Objetivo
-
-Criar um campo dedicado `won_at` na tabela `leads` para registrar a data/hora exata em que uma venda foi fechada, com atualização automática via trigger quando o status mudar para "won".
-
----
-
-## Problema Resolvido
-
-| Situação | Antes | Depois |
-|----------|-------|--------|
-| Lead criado em Janeiro, fechado em Fevereiro | Aparece nos relatórios de Janeiro | Aparece nos relatórios de Fevereiro |
-| Data de fechamento da venda | Aproximada (`updated_at`) | Precisa (`won_at`) |
-| Relatórios de receita | Por data de criação do lead | Por data de fechamento da venda |
+Com 41 clientes ativos e 264 posts em andamento, a social media precisa de uma visão estruturada para:
+- Saber rapidamente quais materiais de cada cliente estão prontos
+- Verificar semana a semana se o planejamento está completo
+- Identificar clientes sem conteúdo programado
+- Ter controle individual do progresso de cada cliente
 
 ---
 
-## Arquivos a Modificar
+## Solução Proposta: Nova Aba "Planejamento"
 
-| Arquivo | Mudança |
-|---------|---------|
-| Nova migration SQL | Adicionar coluna `won_at` e trigger automático |
-| `src/components/crm/CRMDashboard.tsx` | Usar `won_at` para filtrar receita |
-| `src/components/crm/CRMInvestmentMetrics.tsx` | Usar `won_at` para métricas de vendas |
-| `src/components/crm/CRMFunnelChart.tsx` | Considerar `won_at` para vendas no funil |
+Criar uma nova aba no módulo Social Media chamada **"Planejamento"** com visualizacao focada em controle semanal por cliente.
+
+### Funcionalidades Principais
+
+1. **Visao Semanal por Cliente**
+   - Grid onde cada linha representa um cliente
+   - Colunas representam os dias da semana selecionada
+   - Celulas mostram quantidade de posts por status
+
+2. **Indicadores de Prontidao**
+   - Verde: Material pronto (aprovado/publicado)
+   - Amarelo: Em andamento (criacao/aprovacao)
+   - Vermelho: Sem conteudo planejado
+   - Cinza: Rascunho/Briefing
+
+3. **Filtros e Navegacao**
+   - Navegacao por semanas (anterior/proxima)
+   - Filtro por status de prontidao
+   - Busca por nome de cliente
+
+4. **Card de Resumo do Cliente** (ao clicar em uma linha)
+   - Total de posts da semana
+   - Breakdown por status
+   - Lista de posts pendentes
+   - Link rapido para criar novo post
+
+5. **Alertas Visuais**
+   - Clientes sem nenhum post na semana
+   - Posts atrasados (data passou e nao foi publicado)
+   - Prazo de entrega proximo (due_date)
 
 ---
 
-## Implementação
+## Layout Visual
 
-### 1. Migration SQL
+```text
++------------------------------------------------------------------+
+|  Planejamento Semanal                      < Semana >   [Filtros] |
++------------------------------------------------------------------+
+|  Semana de 10 a 16 de Fevereiro de 2026                          |
++------------------------------------------------------------------+
+|  CLIENTE        | SEG | TER | QUA | QUI | SEX | SAB | DOM | TOTAL |
++------------------------------------------------------------------+
+|  Space Imob     |  1  |  -  |  2  |  -  |  1  |  -  |  -  |   4   |
+|  [Verde 75%]    | [V] |     | [V] |     | [A] |     |     |       |
++------------------------------------------------------------------+
+|  ABC Marketing  |  -  |  1  |  -  |  -  |  -  |  -  |  -  |   1   |
+|  [Vermelho]     |     | [R] |     |     |     |     |     |       |
++------------------------------------------------------------------+
+|  XYZ Corp       |  2  |  1  |  1  |  2  |  1  |  -  |  -  |   7   |
+|  [Verde 100%]   | [V] | [V] | [V] | [V] | [V] |     |     |       |
++------------------------------------------------------------------+
 
-```sql
--- Adicionar coluna won_at
-ALTER TABLE public.leads 
-ADD COLUMN IF NOT EXISTS won_at TIMESTAMP WITH TIME ZONE DEFAULT NULL;
-
--- Criar índice para consultas por período de vendas
-CREATE INDEX IF NOT EXISTS idx_leads_won_at 
-ON public.leads (won_at) 
-WHERE won_at IS NOT NULL;
-
--- Trigger para atualizar won_at automaticamente
-CREATE OR REPLACE FUNCTION public.set_lead_won_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  -- Se status mudou para 'won' e won_at ainda não está definido
-  IF NEW.status = 'won' AND OLD.status IS DISTINCT FROM 'won' THEN
-    NEW.won_at := NOW();
-  END IF;
-  
-  -- Se status saiu de 'won', limpar won_at
-  IF OLD.status = 'won' AND NEW.status IS DISTINCT FROM 'won' THEN
-    NEW.won_at := NULL;
-  END IF;
-  
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Criar trigger
-DROP TRIGGER IF EXISTS set_lead_won_at_trigger ON public.leads;
-CREATE TRIGGER set_lead_won_at_trigger
-  BEFORE UPDATE ON public.leads
-  FOR EACH ROW
-  EXECUTE FUNCTION public.set_lead_won_at();
-
--- Retroativamente preencher won_at para leads já ganhos (usando updated_at como aproximação)
-UPDATE public.leads 
-SET won_at = updated_at 
-WHERE status = 'won' AND won_at IS NULL;
+Legenda: [V]=Aprovado/Publicado  [A]=Em Aprovacao  [C]=Em Criacao  [R]=Rascunho
 ```
 
-### 2. Alterar Filtro no Dashboard
+---
 
-No `CRMDashboard.tsx`, separar a lógica:
-- **Total de leads**: filtrar por `created_at` (entrada no funil)
-- **Receita/vendas**: filtrar por `won_at` (fechamento)
+## Arquivos a Criar/Modificar
 
-```typescript
-const metrics = useMemo(() => {
-  // Leads filtrados por data de criação (entrada no funil)
-  const filteredLeads = leads.filter(lead => {
-    const createdAt = new Date(lead.created_at);
-    return createdAt >= dateRange.from && createdAt <= dateRange.to;
-  });
+| Arquivo | Acao | Descricao |
+|---------|------|-----------|
+| `src/components/social-media/WeeklyPlanningView.tsx` | Criar | Componente principal do painel |
+| `src/components/social-media/planning/ClientWeekRow.tsx` | Criar | Linha do grid por cliente |
+| `src/components/social-media/planning/DayCell.tsx` | Criar | Celula do dia com indicadores |
+| `src/components/social-media/planning/ClientPlanningDetails.tsx` | Criar | Sheet lateral com detalhes |
+| `src/components/social-media/planning/PlanningMetrics.tsx` | Criar | Cards de metricas no topo |
+| `src/pages/SocialMedia.tsx` | Modificar | Adicionar nova aba "Planejamento" |
 
-  const totalLeads = filteredLeads.length;
+---
 
-  // Vendas filtradas por data de FECHAMENTO (won_at)
-  const wonLeads = leads.filter(l => {
-    if (normalizeLeadStatusToDb(l.status) !== 'won') return false;
-    const wonAt = l.won_at ? new Date(l.won_at) : null;
-    if (!wonAt) return false;
-    return wonAt >= dateRange.from && wonAt <= dateRange.to;
-  });
-
-  const wonCount = wonLeads.length;
-  const revenue = wonLeads.reduce((sum, l) => sum + (l.value || 0), 0);
-  
-  // Taxa de conversão considerando leads criados no período
-  const conversionRate = totalLeads > 0 ? (wonCount / totalLeads) * 100 : 0;
-  // ...
-}, [leads, dateRange]);
-```
-
-### 3. Atualizar Interface Lead
-
-Adicionar `won_at` ao tipo Lead usado nos componentes:
+## Componente Principal: WeeklyPlanningView
 
 ```typescript
-interface Lead {
-  // ... campos existentes
-  won_at?: string | null;
+// Estrutura do dados agrupados
+interface ClientWeekPlan {
+  clientId: string;
+  clientName: string;
+  days: {
+    [date: string]: {
+      posts: SocialMediaPost[];
+      ready: number;      // aprovado + publicado
+      inProgress: number; // em criacao + aguardando
+      draft: number;      // rascunho/briefing
+    };
+  };
+  weekTotal: number;
+  readinessPercentage: number; // % de posts prontos
+  hasOverdue: boolean;
 }
 ```
 
-### 4. Atualizar CRMInvestmentMetrics
+### Metricas do Topo
 
-Mesma lógica: usar `won_at` para filtrar vendas em vez de `created_at`:
-
-```typescript
-const wonLeads = filteredLeads.filter(l => {
-  if (l.status !== 'won') return false;
-  const wonAt = l.won_at ? new Date(l.won_at) : null;
-  if (!wonAt) return false;
-  return wonAt >= dateRange.from && wonAt <= dateRange.to;
-});
-```
+- **Clientes Cobertos**: Quantos clientes tem pelo menos 1 post na semana
+- **Taxa de Prontidao Geral**: % de posts prontos vs total
+- **Alertas**: Clientes sem conteudo + Posts atrasados
+- **Posts da Semana**: Total de posts programados
 
 ---
 
-## Fluxo do Sistema
+## Sheet de Detalhes do Cliente
+
+Ao clicar em um cliente, abre um Sheet lateral mostrando:
+
+1. **Cabecalho**
+   - Nome do cliente
+   - Badge de status geral (pronto/atencao/pendente)
+
+2. **Resumo da Semana**
+   - Posts por status (barra de progresso)
+   - Plataformas usadas
+
+3. **Lista de Posts**
+   - Agrupados por dia
+   - Status colorido
+   - Titulo + plataforma
+   - Acao rapida: ver detalhes
+
+4. **Acoes Rapidas**
+   - Criar novo post para este cliente
+   - Ver todos os posts do cliente
+   - Filtrar Kanban por este cliente
+
+---
+
+## Fluxo de Uso
 
 ```text
-Lead criado (Janeiro)
-    │
-    ├── created_at = 2026-01-15
-    │
-    └── status = 'leads' → won_at = NULL
-          │
-          ▼
-Lead passa por estágios
-    │
-    └── status = 'proposal' → won_at = NULL (ainda)
-          │
-          ▼
-Venda fechada (Fevereiro)
-    │
-    ├── status = 'won'
-    │
-    └── TRIGGER → won_at = 2026-02-04 ✓
-          │
-          ▼
-Dashboard Fevereiro
-    │
-    ├── Total leads: filtra por created_at
-    │
-    └── Receita: filtra por won_at → Lead aparece! ✓
+Social Media chega no trabalho
+        |
+        v
+Abre aba "Planejamento"
+        |
+        v
+Ve rapidamente todos clientes da semana
+        |
+        +----> Cliente verde: OK, pronto
+        |
+        +----> Cliente amarelo: Verificar progresso
+        |              |
+        |              v
+        |         Clica na linha
+        |              |
+        |              v
+        |         Ve detalhes no Sheet
+        |              |
+        |              v
+        |         Identifica post pendente
+        |
+        +----> Cliente vermelho: Sem conteudo
+                       |
+                       v
+                  Clica "Criar Post"
+                       |
+                       v
+                  Abre formulario com cliente pre-selecionado
 ```
 
 ---
 
-## Comportamento do Trigger
+## Implementacao Tecnica
 
-| Ação | won_at |
-|------|--------|
-| Lead muda para `won` | Preenchido com timestamp atual |
-| Lead sai de `won` (ex: volta para `proposal`) | Limpo para NULL |
-| Lead já era `won` e permanece `won` | Mantém valor original |
-| Novo lead criado como `won` (direto) | Preenchido no INSERT |
+### 1. Estrutura de Dados
+- Reutilizar `useSocialMediaPosts` existente
+- Agrupar posts por `client_id` e `post_date` (ou `scheduled_date`)
+- Calcular metricas de prontidao por cliente
+
+### 2. Performance
+- Memoizar agrupamentos com `useMemo`
+- Virtualizar lista se necessario (muitos clientes)
+- Cache ja existente no hook de posts
+
+### 3. Responsividade
+- Desktop: Grid completo com 7 dias
+- Tablet: Grid com scroll horizontal
+- Mobile: Lista de clientes com resumo simplificado
+
+### 4. Integracao
+- Clique em celula abre posts do dia no Sheet
+- Botao "Criar Post" pre-preenche cliente
+- Link para filtrar Kanban por cliente
 
 ---
 
-## Métricas Afetadas
+## Resultado Esperado
 
-| Métrica | Filtro Usado |
-|---------|--------------|
-| Total de Leads | `created_at` |
-| Leads por Estágio | `created_at` |
-| **Receita Confirmada** | `won_at` |
-| **Taxa de Conversão** | `created_at` (entrada) vs `won_at` (saída) |
-| **ROAS** | `won_at` (receita do período) |
-| **Ticket Médio** | `won_at` |
-| **CPA** | `won_at` |
+| Antes | Depois |
+|-------|--------|
+| Navegar Kanban buscando posts de cada cliente | Ver todos clientes e status da semana em uma tela |
+| Nao saber se cliente tem conteudo planejado | Indicador visual claro de cobertura |
+| Verificar manualmente cada dia | Grid semanal com visao consolidada |
+| Dificil priorizar trabalho | Clientes sem conteudo destacados em vermelho |
 
 ---
 
-## Resultado Visual no Dashboard
+## Beneficios
 
-Cenário: Lead "Empresa X" criado em Janeiro, fechado em Fevereiro
-
-**Dashboard Janeiro:**
-- Total Leads: 1 (criado neste mês)
-- Receita: R$ 0 (não foi fechado neste mês)
-
-**Dashboard Fevereiro:**
-- Total Leads: 0 (não foi criado neste mês)
-- Receita: R$ 5.000 (fechado neste mês) ✓
-
+1. **Visao Macro**: Enxergar toda a semana de todos os clientes em uma tela
+2. **Priorizacao**: Identificar rapidamente quem precisa de atencao
+3. **Controle**: Saber exatamente o status de cada material
+4. **Produtividade**: Menos tempo navegando, mais tempo criando
+5. **Proatividade**: Antecipar problemas antes que virem urgencias
