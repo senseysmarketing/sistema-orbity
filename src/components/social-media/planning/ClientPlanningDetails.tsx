@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, ExternalLink } from "lucide-react";
-import { ClientWeekPlan, categorizeStatus } from "./types";
+import { ClientWeekPlan, categorizeStatus, translateStatus } from "./types";
 import { SocialMediaPost } from "@/hooks/useSocialMediaPosts";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -33,12 +33,13 @@ export function ClientPlanningDetails({
 
   const getStatusBadge = (status: string) => {
     const category = categorizeStatus(status);
+    const displayLabel = translateStatus(status);
     const colors = {
       ready: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
       inProgress: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
       draft: "bg-muted text-muted-foreground",
     };
-    return <Badge className={colors[category]}>{status}</Badge>;
+    return <Badge className={colors[category]}>{displayLabel}</Badge>;
   };
 
   const getOverallBadge = () => {
@@ -67,17 +68,17 @@ export function ClientPlanningDetails({
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="w-full sm:max-w-md">
-        <SheetHeader className="space-y-3">
+      <SheetContent className="w-full sm:max-w-md flex flex-col h-full">
+        <SheetHeader className="space-y-3 shrink-0">
           <div className="flex items-start justify-between gap-2">
             <SheetTitle className="text-left">{plan.clientName}</SheetTitle>
             {getOverallBadge()}
           </div>
         </SheetHeader>
 
-        <div className="mt-6 space-y-6">
+        <div className="mt-6 flex-1 flex flex-col min-h-0 space-y-6">
           {/* Summary */}
-          <div className="space-y-3">
+          <div className="space-y-3 shrink-0">
             <h4 className="text-sm font-medium">Resumo da Semana</h4>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
@@ -96,9 +97,9 @@ export function ClientPlanningDetails({
           </div>
 
           {/* Posts by day */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium">Posts da Semana</h4>
-            <ScrollArea className="h-[300px] pr-4">
+          <div className="flex-1 flex flex-col min-h-0 space-y-3">
+            <h4 className="text-sm font-medium shrink-0">Posts da Semana</h4>
+            <ScrollArea className="flex-1 pr-4">
               {postsByDay.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">
                   Nenhum post programado para esta semana
@@ -136,7 +137,7 @@ export function ClientPlanningDetails({
           </div>
 
           {/* Quick actions */}
-          <div className="space-y-2 pt-4 border-t">
+          <div className="shrink-0 space-y-2 pt-4 border-t">
             <Button 
               className="w-full" 
               onClick={() => onCreatePost(plan.clientId)}
