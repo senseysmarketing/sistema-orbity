@@ -1,232 +1,119 @@
 
 
-# Enriquecer Linhas de Clientes no Planejamento Semanal
+# Correção: Traduzir UUIDs de Status Customizados
 
-## Analise do Problema
+## Problema Identificado
 
-Atualmente cada linha mostra apenas:
-- Nome do cliente
-- Badge de porcentagem
-- Numeros nos dias da semana
-- Total
+Na aba "Planejamento", os posts estão mostrando códigos UUID como status:
+- `d9ae55c5-4b45-4c34-899c-69cc10004940`
+- `63c9cf9d-f96d-4c04-8186-ad9ea1c3a485`
 
-Isso deixa as linhas "vazias" e nao comunica informacoes uteis sobre o que esta sendo planejado para cada cliente.
-
----
-
-## Dados Disponiveis para Agregar
-
-Analisando os posts do banco e o codigo existente, podemos adicionar:
-
-| Dado | Fonte | Utilidade |
-|------|-------|-----------|
-| Plataformas usadas | `post.platform` | Saber onde o cliente vai postar (IG, FB, LI) |
-| Tipos de conteudo | `post.post_type` | Mix de feed, stories, reels, carrossel |
-| Usuarios atribuidos | `post.assigned_users` | Quem esta trabalhando no cliente |
-| Posts atrasados | `hasOverdue` | Alertas visuais |
-| Proxima entrega | `due_date` | Urgencia |
+Isso acontece porque:
+1. Posts podem ter **status customizados** (criados na aba Configurações)
+2. O campo `post.status` armazena o **UUID** do status customizado
+3. A função `translateStatus()` atual só mapeia slugs padrão (draft, in_creation, etc)
+4. Quando o status é um UUID, não há tradução e o UUID é exibido diretamente
 
 ---
 
-## Proposta de Melhoria Visual
+## Solução
 
-### Nova Estrutura da Linha
-
-```text
-+----------------+------------------------------------------+-------+
-| CLIENTE        | SEG TER QUA QUI SEX SAB DOM              | TOTAL |
-+----------------+------------------------------------------+-------+
-| Conecta Assess |                                          |       |
-| [43%] [IG][FB] |  1   2   1   1   2   -   -              |   7   |
-| @Maria @João   |                                          |       |
-+----------------+------------------------------------------+-------+
-```
-
-### Elementos Adicionados por Linha
-
-1. **Icones de Plataformas**
-   - Mini icones coloridos (IG rosa, FB azul, LI azul escuro)
-   - Mostra onde o cliente vai postar na semana
-
-2. **Resumo de Tipos de Conteudo**
-   - Icones pequenos: Feed, Stories, Reels, Carrossel
-   - Mostra o mix de conteudo planejado
-
-3. **Responsaveis (Avatares)**
-   - Iniciais ou nomes dos usuarios atribuidos aos posts da semana
-   - Limite de 2-3 nomes + "+X"
-
-4. **Indicador de Urgencia**
-   - Icone de alerta se tem post com due_date proximo
-   - Borda vermelha se tem atraso
+Buscar os status customizados do banco e criar um mapa de tradução dinâmico que inclua tanto os status padrão quanto os customizados.
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Alteracao |
+| Arquivo | Alteração |
 |---------|-----------|
-| `src/components/social-media/planning/types.ts` | Adicionar campos agregados ao ClientWeekPlan |
-| `src/components/social-media/WeeklyPlanningView.tsx` | Calcular plataformas, tipos e usuarios por cliente |
-| `src/components/social-media/planning/ClientWeekRow.tsx` | Renderizar informacoes extras |
+| `src/components/social-media/planning/ClientPlanningDetails.tsx` | Buscar status customizados e traduzir UUIDs |
 
 ---
 
-## Implementacao
+## Implementação
 
-### 1. Atualizar Tipos (types.ts)
+### 1. Buscar Status Customizados
+
+Adicionar query para buscar os status customizados da agência:
 
 ```typescript
-export interface ClientWeekPlan {
-  clientId: string;
-  clientName: string;
-  days: Record<string, DayData>;
-  weekTotal: number;
-  readyCount: number;
-  readinessPercentage: number;
-  hasOverdue: boolean;
-  
-  // NOVOS CAMPOS
-  platforms: string[];           // ['instagram', 'facebook']
-  contentTypes: string[];        // ['feed', 'reels', 'stories']
-  assignedUsers: {               // Usuarios trabalhando neste cliente
-    name: string;
-    count: number;               // Quantos posts
-  }[];
-  nearestDueDate: Date | null;   // Proxima entrega
-  hasUrgentDeadline: boolean;    // Due date em ate 2 dias
-}
+import { useQuery } from "@tanstack/react-query";
+import { useAgency } from "@/hooks/useAgency";
+import { supabase } from "@/integrations/supabase/client";
+
+// Dentro do componente
+const { currentAgency } = useAgency();
+
+const { data: customStatuses = [] } = useQuery({
+  queryKey: ['custom-statuses', currentAgency?.id],
+  queryFn: async () => {
+    if (!currentAgency?.id) return [];
+    const { data } = await supabase
+      .from('social_media_custom_statuses')
+      .select('id, name, slug, color')
+      .eq('agency_id', currentAgency.id);
+    return data || [];
+  },
+  enabled: !!currentAgency?.id,
+});
 ```
 
-### 2. Agregar Dados (WeeklyPlanningView.tsx)
+### 2. Criar Mapa de Tradução Dinâmico
 
-Ao construir cada ClientWeekPlan:
+Combinar status padrão com customizados:
 
 ```typescript
-// Coletar plataformas unicas
-const platforms = new Set<string>();
-const contentTypes = new Set<string>();
-const usersMap = new Map<string, { name: string; count: number }>();
-let nearestDueDate: Date | null = null;
-
-// Para cada post do cliente na semana
-weekPosts.forEach(post => {
-  if (post.platform) platforms.add(post.platform);
-  if (post.post_type) contentTypes.add(post.post_type);
+const statusMap = useMemo(() => {
+  const map: Record<string, { label: string; color: string }> = {
+    // Status padrão
+    draft: { label: 'Briefing', color: 'bg-gray-500' },
+    in_creation: { label: 'Em Criação', color: 'bg-blue-500' },
+    pending_approval: { label: 'Aguardando Aprovação', color: 'bg-yellow-500' },
+    approved: { label: 'Aprovado', color: 'bg-green-500' },
+    published: { label: 'Publicado', color: 'bg-purple-500' },
+  };
   
-  // Usuarios
-  post.assigned_users?.forEach(user => {
-    const existing = usersMap.get(user.user_id);
-    if (existing) existing.count++;
-    else usersMap.set(user.user_id, { name: user.name, count: 1 });
+  // Adicionar status customizados (por ID e por slug)
+  customStatuses.forEach(status => {
+    map[status.id] = { label: status.name, color: status.color };
+    map[status.slug] = { label: status.name, color: status.color };
   });
   
-  // Proxima due_date
-  if (post.due_date) {
-    const dueDate = parseISO(post.due_date);
-    if (!nearestDueDate || dueDate < nearestDueDate) {
-      nearestDueDate = dueDate;
-    }
-  }
-});
-
-plan.platforms = Array.from(platforms);
-plan.contentTypes = Array.from(contentTypes);
-plan.assignedUsers = Array.from(usersMap.values())
-  .sort((a, b) => b.count - a.count);
-plan.nearestDueDate = nearestDueDate;
-plan.hasUrgentDeadline = nearestDueDate && differenceInDays(nearestDueDate, today) <= 2;
+  return map;
+}, [customStatuses]);
 ```
 
-### 3. Atualizar Layout da Linha (ClientWeekRow.tsx)
+### 3. Atualizar Função getStatusBadge
 
-```tsx
-<div className="grid gap-2 py-3 px-3 ..." style={{ gridTemplateColumns: "minmax(200px, 1fr) repeat(7, 40px) 50px" }}>
-  {/* Coluna do cliente - expandida */}
-  <div className="flex flex-col gap-1">
-    {/* Linha 1: Nome */}
-    <div className="flex items-center gap-2">
-      <p className="font-medium text-sm truncate">{plan.clientName}</p>
-      {plan.hasUrgentDeadline && (
-        <Clock className="h-3.5 w-3.5 text-orange-500" />
-      )}
-    </div>
-    
-    {/* Linha 2: Badge + Plataformas + Tipos */}
-    <div className="flex items-center gap-2 flex-wrap">
-      {getReadinessBadge()}
-      
-      {/* Plataformas */}
-      <div className="flex items-center gap-0.5">
-        {plan.platforms.includes('instagram') && (
-          <Instagram className="h-3.5 w-3.5 text-pink-500" />
-        )}
-        {plan.platforms.includes('facebook') && (
-          <Facebook className="h-3.5 w-3.5 text-blue-600" />
-        )}
-        {plan.platforms.includes('linkedin') && (
-          <Linkedin className="h-3.5 w-3.5 text-blue-800" />
-        )}
-      </div>
-      
-      {/* Tipos de conteudo */}
-      <div className="flex items-center gap-0.5 text-muted-foreground">
-        {plan.contentTypes.includes('feed') && (
-          <Image className="h-3 w-3" title="Feed" />
-        )}
-        {plan.contentTypes.includes('reels') && (
-          <Film className="h-3 w-3" title="Reels" />
-        )}
-        {plan.contentTypes.includes('stories') && (
-          <Zap className="h-3 w-3" title="Stories" />
-        )}
-        {plan.contentTypes.includes('carrossel') && (
-          <LayoutGrid className="h-3 w-3" title="Carrossel" />
-        )}
-      </div>
-    </div>
-    
-    {/* Linha 3: Usuarios atribuidos */}
-    {plan.assignedUsers.length > 0 && (
-      <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-        <Users className="h-3 w-3" />
-        {plan.assignedUsers.slice(0, 2).map(u => u.name.split(' ')[0]).join(', ')}
-        {plan.assignedUsers.length > 2 && ` +${plan.assignedUsers.length - 2}`}
-      </div>
-    )}
-  </div>
-  
-  {/* Dias e Total continuam iguais */}
-</div>
+```typescript
+const getStatusBadge = (status: string) => {
+  const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-500' };
+  const category = categorizeStatus(status);
+  const colors = {
+    ready: "bg-green-100 text-green-700",
+    inProgress: "bg-blue-100 text-blue-700",
+    draft: "bg-muted text-muted-foreground",
+  };
+  return <Badge className={colors[category]}>{statusInfo.label}</Badge>;
+};
 ```
 
 ---
 
-## Resultado Visual
+## Resultado
 
-```text
-ANTES:
-+------------------+------------------------------+-------+
-| Conecta Assesson |  1   2   1   1   2   -   -  |   7   |
-| [43%]            |                              |       |
-+------------------+------------------------------+-------+
-
-DEPOIS:
-+------------------------+------------------------------+-------+
-| Conecta Assessoria     |  1   2   1   1   2   -   -  |   7   |
-| [43%] [IG][FB] 📷🎬    |                              |       |
-| 👤 Maria, João +1      |                              |       |
-+------------------------+------------------------------+-------+
-```
+| Antes | Depois |
+|-------|--------|
+| `d9ae55c5-4b45-4c34-899c-69cc10004940` | Nome do Status Customizado |
+| `63c9cf9d-f96d-4c04-8186-ad9ea1c3a485` | Nome do Status Customizado |
+| `draft` | Briefing |
+| `pending_approval` | Aguardando Aprovação |
 
 ---
 
-## Beneficios
+## Benefícios
 
-| Aspecto | Melhoria |
-|---------|----------|
-| Contexto | Saber onde e que tipo de conteudo vai postar |
-| Responsabilidade | Ver quem esta trabalhando em cada cliente |
-| Urgencia | Identificar clientes com prazos proximos |
-| Priorizacao | Mais informacao para decidir por onde comecar |
+1. **UX melhorada**: Usuários veem nomes legíveis em vez de códigos
+2. **Consistência**: Mesmos nomes usados no Kanban aparecem no Planejamento
+3. **Dinamismo**: Novos status customizados são automaticamente suportados
 
