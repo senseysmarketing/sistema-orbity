@@ -7,6 +7,12 @@ export interface DayData {
   draft: number;      // draft/briefing
 }
 
+export interface AssignedUserSummary {
+  userId: string;
+  name: string;
+  count: number;
+}
+
 export interface ClientWeekPlan {
   clientId: string;
   clientName: string;
@@ -15,6 +21,12 @@ export interface ClientWeekPlan {
   readyCount: number;
   readinessPercentage: number;
   hasOverdue: boolean;
+  // Enriched fields
+  platforms: string[];
+  contentTypes: string[];
+  assignedUsers: AssignedUserSummary[];
+  nearestDueDate: Date | null;
+  hasUrgentDeadline: boolean;
 }
 
 export type ReadinessFilter = 'all' | 'ready' | 'in_progress' | 'pending' | 'overdue';

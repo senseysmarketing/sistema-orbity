@@ -3,7 +3,7 @@ import { useSocialMediaPosts, SocialMediaPost } from "@/hooks/useSocialMediaPost
 import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfWeek, endOfWeek, addWeeks, eachDayOfInterval, parseISO } from "date-fns";
+import { format, startOfWeek, endOfWeek, addWeeks, eachDayOfInterval, parseISO, differenceInDays, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,6 +86,29 @@ export function WeeklyPlanningView() {
         readyCount: 0,
         readinessPercentage: 0,
         hasOverdue: false,
+        platforms: [],
+        contentTypes: [],
+        assignedUsers: [],
+        nearestDueDate: null,
+        hasUrgentDeadline: false,
+      });
+    });
+
+    // Track aggregated data per client
+    const clientAggregates = new Map<string, {
+      platforms: Set<string>;
+      contentTypes: Set<string>;
+      usersMap: Map<string, { userId: string; name: string; count: number }>;
+      nearestDueDate: Date | null;
+    }>();
+
+    // Initialize aggregates
+    clients.forEach(client => {
+      clientAggregates.set(client.id, {
+        platforms: new Set(),
+        contentTypes: new Set(),
+        usersMap: new Map(),
+        nearestDueDate: null,
       });
     });
 
@@ -94,7 +117,8 @@ export function WeeklyPlanningView() {
       if (!post.client_id) return;
       
       const plan = planMap.get(post.client_id);
-      if (!plan) return;
+      const aggregate = clientAggregates.get(post.client_id);
+      if (!plan || !aggregate) return;
 
       const postDate = post.post_date || post.scheduled_date;
       const dateKey = format(parseISO(postDate), 'yyyy-MM-dd');
@@ -121,13 +145,51 @@ export function WeeklyPlanningView() {
       if (postDateObj < today && category !== 'ready') {
         plan.hasOverdue = true;
       }
+
+      // Aggregate platforms and content types
+      if (post.platform) aggregate.platforms.add(post.platform);
+      if (post.post_type) aggregate.contentTypes.add(post.post_type);
+
+      // Aggregate assigned users
+      post.assigned_users?.forEach(user => {
+        const existing = aggregate.usersMap.get(user.user_id);
+        if (existing) {
+          existing.count++;
+        } else {
+          aggregate.usersMap.set(user.user_id, {
+            userId: user.user_id,
+            name: user.name || 'Usuário',
+            count: 1,
+          });
+        }
+      });
+
+      // Track nearest due date
+      if (post.due_date) {
+        const dueDate = parseISO(post.due_date);
+        if (!aggregate.nearestDueDate || dueDate < aggregate.nearestDueDate) {
+          aggregate.nearestDueDate = dueDate;
+        }
+      }
     });
 
-    // Calculate percentages
-    planMap.forEach(plan => {
+    // Calculate percentages and apply aggregates
+    const todayStart = startOfDay(today);
+    planMap.forEach((plan, clientId) => {
       plan.readinessPercentage = plan.weekTotal > 0 
         ? Math.round((plan.readyCount / plan.weekTotal) * 100) 
         : 0;
+
+      const aggregate = clientAggregates.get(clientId);
+      if (aggregate) {
+        plan.platforms = Array.from(aggregate.platforms);
+        plan.contentTypes = Array.from(aggregate.contentTypes);
+        plan.assignedUsers = Array.from(aggregate.usersMap.values())
+          .sort((a, b) => b.count - a.count);
+        plan.nearestDueDate = aggregate.nearestDueDate;
+        plan.hasUrgentDeadline = aggregate.nearestDueDate !== null && 
+          differenceInDays(aggregate.nearestDueDate, todayStart) <= 2;
+      }
     });
 
     return Array.from(planMap.values());
