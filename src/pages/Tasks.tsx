@@ -462,6 +462,15 @@ export default function Tasks() {
       return;
     }
 
+    if (!newTask.task_type) {
+      toast({
+        title: "Erro",
+        description: "O tipo da tarefa é obrigatório.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { data: taskData, error } = await supabase
         .from("tasks")
@@ -588,6 +597,15 @@ export default function Tasks() {
       toast({
         title: "Erro",
         description: "O título da tarefa é obrigatório.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newTask.task_type) {
+      toast({
+        title: "Erro",
+        description: "O tipo da tarefa é obrigatório.",
         variant: "destructive",
       });
       return;
@@ -1262,7 +1280,7 @@ export default function Tasks() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-task_type">Tipo</Label>
+              <Label htmlFor="edit-task_type">Tipo *</Label>
               <Select
                 value={newTask.task_type}
                 onValueChange={(value) => setNewTask({ ...newTask, task_type: value })}
