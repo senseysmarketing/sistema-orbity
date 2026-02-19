@@ -73,16 +73,17 @@ const Index = () => {
 
       const myTaskIds = assignments?.map((a: any) => a.task_id) || [];
 
-      // Build task query — assigned OR created by me
+      // Build task query — ONLY tasks assigned to the user
       let taskQuery = supabase
         .from('tasks')
         .select('*, clients(name)')
         .eq('agency_id', currentAgency.id);
 
-      if (myTaskIds.length > 0) {
-        taskQuery = taskQuery.or(`id.in.(${myTaskIds.join(',')}),created_by.eq.${profile.user_id}`);
+      if (myTaskIds.length === 0) {
+        // No assignments = no tasks in personal dashboard
+        setMyTasks([]);
       } else {
-        taskQuery = taskQuery.eq('created_by', profile.user_id);
+        taskQuery = taskQuery.in('id', myTaskIds);
       }
 
       // 2. My post assignments
@@ -96,8 +97,7 @@ const Index = () => {
       // 3. Meetings (created by me or in my agency for today+)
       const todayStr = new Date().toISOString().split('T')[0];
 
-      const [tasksRes, meetingsRes, postsRes] = await Promise.all([
-        taskQuery,
+      const [meetingsRes, postsRes] = await Promise.all([
         supabase
           .from('meetings')
           .select('*, clients(name)')
@@ -116,7 +116,10 @@ const Index = () => {
           : Promise.resolve({ data: [] }),
       ]);
 
-      setMyTasks(tasksRes.data || []);
+      if (myTaskIds.length > 0) {
+        const tasksRes = await taskQuery;
+        setMyTasks(tasksRes.data || []);
+      }
       setMyMeetings(
         (meetingsRes.data || []).map((m: any) => ({
           ...m,
