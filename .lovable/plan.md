@@ -1,100 +1,107 @@
 
-# Correção definitiva: RLS + Drag-and-drop no CustomStatusManager de Social Media
+# Replicar exatamente o padrão de Tarefas no Social Media
 
-## Diagnóstico confirmado
+## Diagnóstico
 
-Consultando o banco diretamente, as políticas atuais são:
+| Aspecto | Tarefas (funciona) | Social Media (problema) |
+|---|---|---|
+| Status padrão | Salvos no banco (`task_statuses`, `is_default=true`) | Hard-coded no frontend, nunca inseridos no banco |
+| DndContext | Único, engloba todos os status | Dois blocos separados — padrões estáticos, customizados arrastáveis |
+| Reordenação | Todos arrastáveis (padrão + custom) | Só customizados |
+| Tabela | `task_statuses` | `social_media_custom_statuses` |
 
-| Política | Operação | Função usada |
-|----------|----------|--------------|
-| Agency admins can insert custom statuses | INSERT | `is_agency_admin(agency_id)` ← **ERRADO** |
-| Agency admins can update custom statuses | UPDATE | `is_agency_admin(agency_id)` ← **ERRADO** |
-| Agency admins can delete custom statuses | DELETE | `is_agency_admin(agency_id)` ← **ERRADO** |
-| Agency members can view custom statuses | SELECT | `user_belongs_to_agency(agency_id)` ← correto |
+A tabela `social_media_custom_statuses` já tem coluna `is_default` — a estrutura é 100% compatível com a lógica de Tarefas. Os status padrão simplesmente nunca foram inseridos no banco para nenhuma agência.
 
-As tentativas anteriores de migração **não foram aplicadas corretamente** — as políticas antigas ainda existem no banco com `is_agency_admin`. Giovanna não é admin, então toda operação de escrita falha.
+## Solução — 1 arquivo, replicar exatamente o TaskStatusManager
 
-O arquivo `src/components/social-media/settings/CustomStatusManager.tsx` **não tem nenhum código de drag-and-drop** — o `GripVertical` é puramente visual. O CRM (`src/components/crm/CustomStatusManager.tsx`) já tem a implementação completa com `@dnd-kit`.
+### `src/components/social-media/settings/CustomStatusManager.tsx`
 
----
+**1. Remover o array hard-coded `defaultStatuses`** — ele passa a ser um array de referência `DEFAULT_STATUSES` usado apenas para inicialização no banco (igual ao TaskStatusManager):
 
-## Parte 1 — Migração SQL (corrigir RLS de vez)
-
-```sql
--- Remover todas as políticas de escrita que usam is_agency_admin
-DROP POLICY IF EXISTS "Agency admins can insert custom statuses" ON social_media_custom_statuses;
-DROP POLICY IF EXISTS "Agency admins can update custom statuses" ON social_media_custom_statuses;
-DROP POLICY IF EXISTS "Agency admins can delete custom statuses" ON social_media_custom_statuses;
-
--- Recriar usando user_belongs_to_agency (qualquer membro da agência)
-CREATE POLICY "Agency members can insert custom statuses"
-ON social_media_custom_statuses FOR INSERT TO authenticated
-WITH CHECK (user_belongs_to_agency(agency_id));
-
-CREATE POLICY "Agency members can update custom statuses"
-ON social_media_custom_statuses FOR UPDATE TO authenticated
-USING (user_belongs_to_agency(agency_id))
-WITH CHECK (user_belongs_to_agency(agency_id));
-
-CREATE POLICY "Agency members can delete custom statuses"
-ON social_media_custom_statuses FOR DELETE TO authenticated
-USING (user_belongs_to_agency(agency_id));
+```ts
+const DEFAULT_STATUSES = [
+  { slug: "draft", name: "Briefing", color: "bg-gray-500", order_position: 0 },
+  { slug: "in_creation", name: "Em Criação", color: "bg-blue-500", order_position: 1 },
+  { slug: "pending_approval", name: "Aguardando Aprovação", color: "bg-yellow-500", order_position: 2 },
+  { slug: "approved", name: "Aprovado", color: "bg-green-500", order_position: 3 },
+  { slug: "published", name: "Publicado", color: "bg-purple-500", order_position: 4 },
+];
 ```
 
----
+**2. Query unificada** — busca TODOS os status da agência (`is_default=true` e `false`), igual ao TaskStatusManager:
+```ts
+queryKey: ["social-media-statuses-all", currentAgency?.id]
+// sem filtro is_default=false
+.order("order_position")
+```
 
-## Parte 2 — Reescrita completa do CustomStatusManager.tsx de Social Media
+**3. `initializeDefaultsMutation`** — igual ao TaskStatusManager, insere os padrões no banco se não existirem ainda para a agência:
+```ts
+// Verifica quais slugs padrão já existem no banco
+// Insere apenas os que faltam com is_default=true
+// Dispara ao carregar se dbStatuses.length === 0 ou faltam padrões
+```
 
-O componente será reescrito seguindo exatamente o padrão do CRM que já funciona. Diferenças importantes em relação ao CRM:
+**4. `useEffect` de inicialização** — idêntico ao TaskStatusManager:
+```ts
+useEffect(() => {
+  if (currentAgency?.id && !isLoading && dbStatuses.filter(s => s.is_default).length < DEFAULT_STATUSES.length) {
+    initializeDefaultsMutation.mutate();
+  }
+}, [currentAgency?.id, isLoading, dbStatuses.length]);
+```
 
-- Os status **padrão** do Social Media são hard-coded no frontend (não existem no banco), então ficam **fixos no topo, fora do DndContext**
-- Apenas os status **customizados** (que existem no banco) ficam dentro do `DndContext` e são arrastáveis
-- A `reorderMutation` salva `order_position` apenas para status customizados
+**5. `allStatuses` via `useMemo`** — lista combinada ordenada por `order_position`:
+```ts
+const allStatuses = useMemo(() => {
+  return [...dbStatuses].sort((a, b) => a.order_position - b.order_position);
+}, [dbStatuses]);
+```
 
-### Estrutura do componente final:
+**6. `SortableStatusItem` atualizado** — recebe `status.is_default`:
+- Se `is_default=true`: exibe `(Padrão)`, sem toggle, sem lixeira
+- Se `is_default=false`: exibe toggle ativo/inativo + lixeira
+- Drag handle (`GripVertical`) funcional para **todos**
+
+**7. `reorderMutation`** — salva `order_position` na tabela `social_media_custom_statuses` para TODOS os items (padrão e customizados), igual ao TaskStatusManager:
+```ts
+supabase.from("social_media_custom_statuses").update({ order_position }).eq("id", id)
+```
+
+**8. `handleDragEnd`** — opera sobre `allStatuses` (lista completa), igual ao TaskStatusManager.
+
+**9. DndContext único** — engloba toda a lista, sem separação:
+```tsx
+<DndContext onDragEnd={handleDragEnd}>
+  <SortableContext items={allStatuses.map(s => s.id)}>
+    {allStatuses.map(status => <SortableStatusItem ... />)}
+  </SortableContext>
+</DndContext>
+```
+
+## Resultado visual final
 
 ```text
-[Formulário de adição — igual ao atual]
+[Formulário: nome + cor + botão adicionar]
 
-[Status Padrões — lista estática, sem arrastar]
-  ● Briefing       (Padrão)
-  ● Em Criação     (Padrão)
-  ● Aguardando Aprovação  (Padrão)
-  ● Aprovado       (Padrão)
-  ● Publicado      (Padrão)
-
-[Status Customizados — dentro do DndContext, arrastáveis]
-  ⠿ ● Onboarding   [toggle ativo/inativo] [lixeira]
-  ⠿ ● Em Revisão   [toggle ativo/inativo] [lixeira]
+[Lista única arrastável]
+  ⠿ ● Briefing                (Padrão)
+  ⠿ ● Em Criação              (Padrão)
+  ⠿ ● Aguardando Aprovação    (Padrão)
+  ⠿ ● Aprovado                (Padrão)
+  ⠿ ● Publicado               (Padrão)
+  ⠿ ● Em Revisão   [toggle]   [🗑]
+  ⠿ ● Onboarding   [toggle]   [🗑]
 ```
 
-### Código do `SortableStatusItem` (sub-componente com drag funcional):
-- Usa `useSortable({ id: status.id })` do `@dnd-kit/sortable`
-- O `GripVertical` recebe `{...attributes}` e `{...listeners}` para ser o handle de arraste
-- Aplica `opacity: 0.5` enquanto está sendo arrastado (`isDragging`)
+Todos os itens são arrastáveis. A nova ordem é salva no banco imediatamente.
 
-### `reorderMutation`:
-- Recebe array de `{ id, order_position }`
-- Faz `Promise.all` de updates no banco para cada item customizado reordenado
-- Chama `invalidateStatuses()` no `onSuccess`
+## Arquivo modificado
 
-### `handleDragEnd`:
-- Busca índice do item arrastado e do destino apenas dentro de `customStatuses`
-- Usa `arrayMove` para reordenar o array
-- Gera updates com índices 0, 1, 2... e chama `reorderMutation`
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/social-media/settings/CustomStatusManager.tsx` | Reescrita completa seguindo exatamente o padrão do `TaskStatusManager.tsx` — status padrão inseridos no banco, DndContext único para tudo |
 
----
+## Observação importante
 
-## Arquivos modificados
-
-| Arquivo | Tipo | Descrição |
-|---------|------|-----------|
-| Nova migration SQL | Banco | Substituir `is_agency_admin` → `user_belongs_to_agency` nas 3 políticas de escrita |
-| `src/components/social-media/settings/CustomStatusManager.tsx` | Frontend | Adicionar DnD completo com `@dnd-kit`, `SortableStatusItem` e `reorderMutation` |
-
-## Resultado esperado
-
-- Giovanna (e qualquer membro da agência) consegue criar, editar e excluir status sem erro de RLS
-- Status customizados exibem o ícone de arrastar funcional (igual ao print de referência)
-- A nova ordem é salva no banco imediatamente após soltar o item
-- Status padrão permanecem fixos no topo e não são arrastáveis
+Na primeira vez que uma agência acessar as configurações após essa mudança, os 5 status padrão serão inseridos automaticamente no banco (mesmo comportamento de Tarefas). A reordenação funciona para todos.
