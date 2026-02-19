@@ -2546,6 +2546,67 @@ export type Database = {
         }
         Relationships: []
       }
+      notes: {
+        Row: {
+          agency_id: string | null
+          color: string | null
+          content: string | null
+          created_at: string | null
+          id: string
+          is_favorite: boolean | null
+          is_pinned: boolean | null
+          title: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          agency_id?: string | null
+          color?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          is_pinned?: boolean | null
+          title?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          agency_id?: string | null
+          color?: string | null
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          is_favorite?: boolean | null
+          is_pinned?: boolean | null
+          title?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "notes_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       notification_delivery_logs: {
         Row: {
           agency_id: string
@@ -3342,6 +3403,105 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "reminders"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      routine_completions: {
+        Row: {
+          completed_at: string | null
+          id: string
+          month_number: number | null
+          routine_id: string
+          user_id: string
+          week_number: number | null
+          year: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          id?: string
+          month_number?: number | null
+          routine_id: string
+          user_id: string
+          week_number?: number | null
+          year?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          id?: string
+          month_number?: number | null
+          routine_id?: string
+          user_id?: string
+          week_number?: number | null
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routine_completions_routine_id_fkey"
+            columns: ["routine_id"]
+            isOneToOne: false
+            referencedRelation: "routines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      routines: {
+        Row: {
+          agency_id: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          order_position: number | null
+          title: string
+          type: string
+          updated_at: string | null
+          user_id: string
+          week_days: number[] | null
+        }
+        Insert: {
+          agency_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          order_position?: number | null
+          title: string
+          type: string
+          updated_at?: string | null
+          user_id: string
+          week_days?: number[] | null
+        }
+        Update: {
+          agency_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          order_position?: number | null
+          title?: string
+          type?: string
+          updated_at?: string | null
+          user_id?: string
+          week_days?: number[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routines_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routines_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "routines_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
           },
         ]
       }
