@@ -4,20 +4,27 @@ import { useAgency } from '@/hooks/useAgency';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from 'react-router-dom';
-import { format, isToday, isBefore, startOfDay, isThisWeek, startOfMonth } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { format, isToday, isBefore, startOfDay } from 'date-fns';
 
 import { MyDayHeader } from '@/components/dashboard/MyDayHeader';
-import { MyStatusCards } from '@/components/dashboard/MyStatusCards';
 import { MyTasksList } from '@/components/dashboard/MyTasksList';
-import { MyAgendaAndPosts } from '@/components/dashboard/MyAgendaAndPosts';
+import { MyPostsList } from '@/components/dashboard/MyPostsList';
+import { RoutineBlock } from '@/components/dashboard/RoutineBlock';
+import { NotesBlock } from '@/components/dashboard/NotesBlock';
+import { DayTimeline } from '@/components/dashboard/DayTimeline';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics';
 
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
-import { startOfMonth as startMonth } from 'date-fns';
+import { ChevronDown, ChevronUp, BarChart3, Calendar, Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+
+function addDays(date: Date, days: number) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
 
 const Index = () => {
   const { profile } = useAuth();
@@ -73,19 +80,6 @@ const Index = () => {
 
       const myTaskIds = assignments?.map((a: any) => a.task_id) || [];
 
-      // Build task query — ONLY tasks assigned to the user
-      let taskQuery = supabase
-        .from('tasks')
-        .select('*, clients(name)')
-        .eq('agency_id', currentAgency.id);
-
-      if (myTaskIds.length === 0) {
-        // No assignments = no tasks in personal dashboard
-        setMyTasks([]);
-      } else {
-        taskQuery = taskQuery.in('id', myTaskIds);
-      }
-
       // 2. My post assignments
       const { data: postAssignments } = await supabase
         .from('post_assignments')
@@ -94,7 +88,7 @@ const Index = () => {
 
       const myPostIds = postAssignments?.map((a: any) => a.post_id) || [];
 
-      // 3. Meetings (created by me or in my agency for today+)
+      // 3. Meetings (agency, today+)
       const todayStr = new Date().toISOString().split('T')[0];
 
       const [meetingsRes, postsRes] = await Promise.all([
@@ -117,9 +111,16 @@ const Index = () => {
       ]);
 
       if (myTaskIds.length > 0) {
-        const tasksRes = await taskQuery;
+        const tasksRes = await supabase
+          .from('tasks')
+          .select('*, clients(name)')
+          .eq('agency_id', currentAgency.id)
+          .in('id', myTaskIds);
         setMyTasks(tasksRes.data || []);
+      } else {
+        setMyTasks([]);
       }
+
       setMyMeetings(
         (meetingsRes.data || []).map((m: any) => ({
           ...m,
@@ -147,14 +148,7 @@ const Index = () => {
   const fetchAgencyMetrics = async () => {
     if (!currentAgency) return;
     try {
-      const [
-        clientsRes,
-        leadsRes,
-        meetingsRes,
-        tasksRes,
-        postsRes,
-        paymentsRes,
-      ] = await Promise.all([
+      const [clientsRes, leadsRes, meetingsRes, tasksRes, postsRes, paymentsRes] = await Promise.all([
         supabase.from('clients').select('id,active').eq('agency_id', currentAgency.id),
         supabase.from('leads').select('id,status').eq('agency_id', currentAgency.id),
         supabase.from('meetings').select('id,start_time,status').eq('agency_id', currentAgency.id),
@@ -215,7 +209,7 @@ const Index = () => {
     fetchMyData();
   }, [fetchMyData]);
 
-  // --- Computed values from personal tasks ---
+  // --- Computed values ---
   const today = startOfDay(new Date());
 
   const todayTasks = myTasks.filter(t => {
@@ -235,13 +229,6 @@ const Index = () => {
 
   const todayMeetings = myMeetings.filter(m => isToday(new Date(m.start_time)));
   const nextMeeting = todayMeetings[0] || null;
-  const nextMeetingTime = nextMeeting
-    ? format(new Date(nextMeeting.start_time), 'HH:mm')
-    : null;
-
-  const postsToReview = myPosts.filter(p =>
-    ['pending_approval', 'revision'].includes(p.status)
-  );
 
   // Tasks visible in list: overdue + today + this week (not done)
   const visibleTasks = myTasks.filter(t => {
@@ -250,12 +237,6 @@ const Index = () => {
     const d = new Date(t.due_date);
     return isBefore(startOfDay(d), startOfDay(addDays(new Date(), 7)));
   });
-
-  function addDays(date: Date, days: number) {
-    const result = new Date(date);
-    result.setDate(result.getDate() + days);
-    return result;
-  }
 
   if (loading) {
     return (
@@ -268,7 +249,7 @@ const Index = () => {
   return (
     <div className="space-y-4 md:space-y-5">
 
-      {/* 1. Header personalizado "Meu Dia" */}
+      {/* 1. Header "Meu Dia" */}
       <MyDayHeader
         userName={profile?.name || 'Usuário'}
         agencyName={currentAgency?.name || ''}
@@ -278,38 +259,55 @@ const Index = () => {
         overdueCount={overdueTasks.length}
       />
 
-      {/* 2. Cards de status pessoal */}
-      <MyStatusCards
-        todayTasksCount={todayTasks.length}
-        overdueTasksCount={overdueTasks.length}
-        nextMeetingTime={nextMeetingTime}
-        postsToReviewCount={postsToReview.length}
-        onCardClick={(section) => {
-          if (section === 'tasks' || section === 'overdue') navigate('/dashboard/tasks');
-          if (section === 'meeting') navigate('/dashboard/agenda');
-          if (section === 'posts') navigate('/dashboard/social-media');
-        }}
-      />
+      {/* Próxima reunião do dia — banner compacto */}
+      {nextMeeting && (
+        <button
+          onClick={() => navigate('/dashboard/agenda')}
+          className="w-full flex items-center gap-3 rounded-xl border bg-primary/5 border-primary/20 px-4 py-2.5 hover:bg-primary/10 transition-colors text-left"
+        >
+          <Calendar className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-sm font-medium text-primary">Próxima reunião:</span>
+          <span className="text-sm text-foreground flex-1 line-clamp-1">{nextMeeting.title}</span>
+          <div className="flex items-center gap-1 shrink-0">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-sm font-semibold text-primary">
+              {format(new Date(nextMeeting.start_time), 'HH:mm')}
+            </span>
+          </div>
+          {todayMeetings.length > 1 && (
+            <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+              +{todayMeetings.length - 1}
+            </Badge>
+          )}
+        </button>
+      )}
 
-      {/* 3. Grid principal: Tarefas | Agenda & Posts */}
+      {/* 2. Grid: Tarefas | Posts */}
       <div className="grid gap-4 md:grid-cols-2">
         <MyTasksList
           tasks={visibleTasks}
           onTasksChange={fetchMyData}
           onViewAll={() => navigate('/dashboard/tasks')}
         />
-        <MyAgendaAndPosts
-          meetings={myMeetings}
+        <MyPostsList
           posts={myPosts}
-          onViewAgenda={() => navigate('/dashboard/agenda')}
-          onViewPosts={() => navigate('/dashboard/social-media')}
+          onViewAll={() => navigate('/dashboard/social-media')}
         />
       </div>
 
-      {/* 4. Ações Rápidas */}
+      {/* 3. Rotinas */}
+      <RoutineBlock />
+
+      {/* 4. Grid: Bloco de Notas | Linha do Tempo */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <NotesBlock />
+        <DayTimeline />
+      </div>
+
+      {/* 5. Ações Rápidas */}
       <QuickActions />
 
-      {/* 5. Métricas da Agência — apenas admins, colapsável */}
+      {/* 6. Métricas da Agência — colapsável, só admins */}
       {isAdmin && (
         <Collapsible open={metricsOpen} onOpenChange={setMetricsOpen}>
           <CollapsibleTrigger asChild>
