@@ -54,9 +54,9 @@ export function PostKanban({ isCreateDialogOpen, onCreateDialogOpenChange }: Pos
     return copy;
   };
 
-  // Buscar status customizados
+  // Buscar todos os status ativos da agência (padrão + customizados), ordenados por order_position
   const { data: customStatuses = [] } = useQuery({
-    queryKey: ['custom-statuses', currentAgency?.id],
+    queryKey: ['social-media-statuses-kanban', currentAgency?.id],
     queryFn: async () => {
       if (!currentAgency?.id) return [];
       const { data, error } = await supabase
@@ -71,23 +71,13 @@ export function PostKanban({ isCreateDialogOpen, onCreateDialogOpenChange }: Pos
     enabled: !!currentAgency?.id,
   });
 
-  // Combinar colunas padrão com status customizados
+  // Colunas derivadas 100% do banco — sem hard-code
   const allColumns = useMemo(() => {
-    const defaultCols = [
-      { id: "draft", title: "Briefing", color: "bg-gray-500" },
-      { id: "in_creation", title: "Em Criação", color: "bg-blue-500" },
-      { id: "pending_approval", title: "Aguardando Aprovação", color: "bg-yellow-500" },
-      { id: "approved", title: "Aprovado", color: "bg-green-500" },
-      { id: "published", title: "Publicado", color: "bg-purple-500" },
-    ];
-    
-    const customCols = customStatuses.map(status => ({
+    return customStatuses.map(status => ({
       id: status.slug,
       title: status.name,
       color: status.color,
     }));
-    
-    return [...defaultCols, ...customCols];
   }, [customStatuses]);
 
   // Buscar clientes ativos em ordem alfabética diretamente do banco
