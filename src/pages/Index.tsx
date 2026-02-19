@@ -226,8 +226,8 @@ const Index = () => {
   });
 
   const doneTodayTasks = myTasks.filter(t => {
-    if (t.status !== 'done' || !t.updated_at) return false;
-    return isToday(new Date(t.updated_at));
+    if (t.status !== 'done' || !t.due_date) return false;
+    return isToday(new Date(t.due_date));
   });
 
   const todayMeetings = myMeetings.filter(m => isToday(new Date(m.start_time)));
