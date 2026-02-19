@@ -1,52 +1,47 @@
 
-# Correção: Progresso do Dia no Dashboard
+# Correção: Contagem de Tarefas — Somente Atribuídas ao Usuário
 
-## Problema
+## Problema Atual
 
-A barra de progresso mostra "39 de 41 tarefas de hoje concluídas", mas o número 41 está incorreto.
-
-O cálculo atual é:
-```
-todayTasksTotal = todayTasks.length + doneTodayTasks.length
+A query de tarefas usa dois critérios combinados com OR:
+```typescript
+taskQuery.or(`id.in.(${myTaskIds.join(',')}),created_by.eq.${profile.user_id}`)
 ```
 
-Onde:
-- `todayTasks` = tarefas com `due_date = hoje` e `status !== 'done'` ✅
-- `doneTodayTasks` = tarefas com `status = 'done'` e `updated_at = hoje` ❌
-
-O problema está em `doneTodayTasks`: ela captura **todas** as tarefas concluídas hoje, independente da data de vencimento. Então o usuário que concluiu 39 tarefas antigas hoje, todas entram na conta — inflacionando o total para 41.
+Isso significa que **qualquer tarefa criada pelo usuário** entra na lista, mesmo que ele não esteja atribuído a ela. Um admin que criou 40 tarefas para outros membros da equipe veria todas elas no próprio dashboard — causando a contagem inflada de "39 de 41 tarefas".
 
 ## Solução
 
-Substituir `doneTodayTasks` por uma versão que filtra apenas tarefas com `due_date = hoje` que já foram concluídas:
+Simplificar a query para buscar **apenas** as tarefas onde o usuário está atribuído em `task_assignments`. Se não houver atribuições, retornar lista vazia em vez de tarefas criadas.
 
 ```typescript
-// ANTES (errado) — pega tudo que foi concluído HOJE
-const doneTodayTasks = myTasks.filter(t => {
-  if (t.status !== 'done' || !t.updated_at) return false;
-  return isToday(new Date(t.updated_at));
-});
+// ANTES — pega tarefas atribuídas OU criadas pelo usuário
+if (myTaskIds.length > 0) {
+  taskQuery = taskQuery.or(`id.in.(${myTaskIds.join(',')}),created_by.eq.${profile.user_id}`);
+} else {
+  taskQuery = taskQuery.eq('created_by', profile.user_id);
+}
 
-// DEPOIS (correto) — pega só o que foi concluído E vence HOJE
-const doneTodayTasks = myTasks.filter(t => {
-  if (t.status !== 'done' || !t.due_date) return false;
-  return isToday(new Date(t.due_date));
-});
+// DEPOIS — pega SOMENTE tarefas atribuídas ao usuário
+if (myTaskIds.length > 0) {
+  taskQuery = taskQuery.in('id', myTaskIds);
+} else {
+  // Sem atribuições = sem tarefas no dashboard pessoal
+  setMyTasks([]);
+  // (pula a query)
+}
 ```
-
-Com isso:
-- `todayTasksTotal` = tarefas pendentes hoje + tarefas concluídas que vencem hoje
-- `todayTasksDone` = tarefas concluídas que vencem hoje
 
 ## Arquivo a Modificar
 
-`src/pages/Index.tsx` — linha 228 a 231
+`src/pages/Index.tsx` — bloco de construção da query de tarefas (linhas 76-86)
 
-## Resultado
+## Impacto
 
-| Cenário | Antes | Depois |
-|---------|-------|--------|
-| Usuário com 2 tarefas hoje e 39 antigas concluídas | "39 de 41 concluídas" (errado) | "0 de 2 concluídas" (correto) |
-| Usuário conclui 1 das 2 tarefas de hoje | "40 de 41 concluídas" (errado) | "1 de 2 concluídas" (correto) |
+| Situação | Antes | Depois |
+|----------|-------|--------|
+| Admin criou 40 tarefas, está atribuído em 2 | Mostra 42 tarefas | Mostra 2 tarefas |
+| Usuário sem atribuições, criou 5 tarefas | Mostra 5 tarefas | Mostra 0 tarefas |
+| Usuário atribuído em 3 tarefas | Mostra 3 tarefas | Mostra 3 tarefas ✅ |
 
-A barra passará a refletir somente o progresso do dia atual do usuário, não o histórico geral de conclusões.
+O dashboard passa a ser um reflexo fiel somente do que foi **delegado/atribuído** ao usuário — que é o comportamento esperado de um "Meu Dia" pessoal.
