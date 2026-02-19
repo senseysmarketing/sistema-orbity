@@ -1,63 +1,67 @@
 
-# Correção: Criação de Status Customizados no Kanban de Social Media
+# Correção: Permissão para todos os membros criarem status + Drag-and-drop de reordenação
 
-## Diagnóstico
+## Problema 1 — RLS ainda restrito a admins
 
-O erro `new row violates row-level security policy for table "social_media_custom_statuses"` ocorre porque a política RLS de gerenciamento (`Agency admins can manage custom statuses`) cobre ALL operations mas **não possui cláusula `WITH CHECK`**.
+As políticas atuais exigem `is_agency_admin(agency_id)` para INSERT, UPDATE e DELETE. O usuário "Giovanna" não é admin, por isso continua recebendo erro de RLS ao tentar criar um status.
 
-No PostgreSQL, para operações de `INSERT` e `UPDATE`, o RLS exige que tanto o `USING` (filtragem de leitura) quanto o `WITH CHECK` (validação de escrita) estejam definidos. Quando a política usa `FOR ALL` sem `WITH CHECK`, o banco aplica o `USING` como verificação de escrita — mas como a `agency_id` do novo registro ainda não existe na tabela no momento do INSERT, a função `is_agency_admin(agency_id)` retorna `false`, bloqueando a inserção.
+A solução é alterar as 3 políticas (INSERT, UPDATE, DELETE) para usar `user_belongs_to_agency(agency_id)` — permitindo que qualquer membro autenticado da agência gerencie os status.
 
-## Solução em 2 partes
-
-### Parte 1 — Corrigir a política RLS (migração SQL)
-
-Recriar as políticas com separação clara entre `SELECT`, `INSERT`, `UPDATE` e `DELETE`:
-
+**Migração SQL:**
 ```sql
--- Remover política antiga
-DROP POLICY IF EXISTS "Agency admins can manage custom statuses" ON social_media_custom_statuses;
+-- Remover políticas restritivas
+DROP POLICY IF EXISTS "Agency admins can insert custom statuses" ON social_media_custom_statuses;
+DROP POLICY IF EXISTS "Agency admins can update custom statuses" ON social_media_custom_statuses;
+DROP POLICY IF EXISTS "Agency admins can delete custom statuses" ON social_media_custom_statuses;
 
--- Política para INSERT (com WITH CHECK no agency_id enviado)
-CREATE POLICY "Agency admins can insert custom statuses"
-ON social_media_custom_statuses FOR INSERT
-TO authenticated
-WITH CHECK (is_agency_admin(agency_id));
+-- Criar políticas abertas para qualquer membro da agência
+CREATE POLICY "Agency members can insert custom statuses"
+ON social_media_custom_statuses FOR INSERT TO authenticated
+WITH CHECK (user_belongs_to_agency(agency_id));
 
--- Política para UPDATE
-CREATE POLICY "Agency admins can update custom statuses"
-ON social_media_custom_statuses FOR UPDATE
-TO authenticated
-USING (is_agency_admin(agency_id))
-WITH CHECK (is_agency_admin(agency_id));
+CREATE POLICY "Agency members can update custom statuses"
+ON social_media_custom_statuses FOR UPDATE TO authenticated
+USING (user_belongs_to_agency(agency_id))
+WITH CHECK (user_belongs_to_agency(agency_id));
 
--- Política para DELETE
-CREATE POLICY "Agency admins can delete custom statuses"
-ON social_media_custom_statuses FOR DELETE
-TO authenticated
-USING (is_agency_admin(agency_id));
+CREATE POLICY "Agency members can delete custom statuses"
+ON social_media_custom_statuses FOR DELETE TO authenticated
+USING (user_belongs_to_agency(agency_id));
 ```
 
-### Parte 2 — Garantir sincronização em todos os componentes
+## Problema 2 — Falta de drag-and-drop para reordenar
 
-Após criar o novo status, ele precisa aparecer automaticamente em:
+Assim como no gerenciador de status de tarefas (`src/components/crm/CustomStatusManager.tsx`), o componente de Social Media não tem reordenação por arrastar. O ícone `GripVertical` existe visualmente mas não funciona.
 
-| Componente | Status atual | Ajuste |
-|-----------|-------------|--------|
-| `PostKanban.tsx` | ✅ Já busca `custom_statuses` ativos | Nenhum |
-| `PostFormDialog.tsx` | Busca custom statuses mas precisa verificar | Confirmar que inclui novos status no select |
-| `PostDetailsDialog.tsx` | Busca custom statuses | Confirmar funcionamento |
-| `CustomStatusManager.tsx` | Cria status sem `is_active` explícito | Garantir `is_active: true` no insert |
+A solução é replicar a mesma lógica de DnD já existente no projeto.
 
-**Problema adicional no `CustomStatusManager.tsx`:** O insert não envia `is_active: true` explicitamente — apesar de o banco ter `DEFAULT true`, é boa prática enviá-lo. Mais importante: após criar o status, o invalidate de queries usa só `["custom-statuses"]` sem o `agency_id`, o que pode não refrescar o Kanban (que usa `['custom-statuses', currentAgency?.id]`).
+## Arquivo a modificar
 
-## Arquivos a Modificar
+`src/components/social-media/settings/CustomStatusManager.tsx`:
+1. Importar `DndContext`, `SortableContext`, `useSortable`, `arrayMove` do `@dnd-kit`
+2. Criar componente `SortableStatusItem` com drag handle funcional
+3. Adicionar `reorderMutation` que salva a nova `order_position` no banco para status customizados
+4. O drag-and-drop se aplica apenas aos status **customizados** (os padrão ficam fixos no topo)
 
-1. **Migração SQL** — corrigir política RLS com `WITH CHECK`
-2. **`src/components/social-media/settings/CustomStatusManager.tsx`** — adicionar `is_active: true` no insert e corrigir invalidação de queries para incluir o `agency_id`
+## Estrutura final do componente
 
-## Resultado Esperado
+```text
+[Status Padrões — fixos, sem arrastar]
+  ● Briefing       (Padrão)
+  ● Em Criação     (Padrão)
+  ● Aguardando Aprovação (Padrão)
+  ● Aprovado       (Padrão)
+  ● Publicado      (Padrão)
 
-- Admin consegue criar, editar e excluir status customizados sem erro RLS
-- Novo status aparece imediatamente como coluna no Kanban
-- Novo status aparece no select de status do formulário de criação/edição de post
-- Todas as abas (Calendário, Planejamento Semanal, Detalhes do Post) sincronizam com o novo status
+[Status Customizados — arrastáveis]
+  ⠿ ● Onboarding   [toggle] [lixeira]
+  ⠿ ● Em Revisão   [toggle] [lixeira]
+```
+
+## Resumo das mudanças
+
+| O quê | Arquivo | Descrição |
+|-------|---------|-----------|
+| Migração SQL | Nova migration | Troca `is_agency_admin` → `user_belongs_to_agency` nas 3 políticas |
+| Permissão | `CustomStatusManager.tsx` | Qualquer membro pode criar/editar/excluir |
+| Drag-and-drop | `CustomStatusManager.tsx` | Reordenação de status customizados com persistência no banco |
