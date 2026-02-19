@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getISOWeek, getMonth, getYear } from 'date-fns';
-import { Flame, Plus, Trash2, GripVertical, CheckSquare } from 'lucide-react';
+import { getISOWeek, getMonth, getYear, getDay, getDate, getHours, getMinutes } from 'date-fns';
+import { Flame, Plus, Trash2, CheckSquare, AlertTriangle, Clock, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -19,6 +19,8 @@ interface Routine {
   title: string;
   type: 'weekly' | 'monthly';
   week_days: number[];
+  day_of_month: number | null;
+  scheduled_time: string | null;
   order_position: number;
   is_active: boolean;
 }
@@ -29,6 +31,24 @@ interface Completion {
   week_number?: number;
   month_number?: number;
   year: number;
+}
+
+// ISO day mapping: Monday=1, Tuesday=2, ..., Sunday=7
+// JS getDay: Sunday=0, Monday=1, ..., Saturday=6
+// We'll use 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 7=Sun (ISO)
+const WEEK_DAYS = [
+  { label: 'Seg', short: 'S', iso: 1 },
+  { label: 'Ter', short: 'T', iso: 2 },
+  { label: 'Qua', short: 'Q', iso: 3 },
+  { label: 'Qui', short: 'Q', iso: 4 },
+  { label: 'Sex', short: 'S', iso: 5 },
+  { label: 'Sáb', short: 'S', iso: 6 },
+  { label: 'Dom', short: 'D', iso: 7 },
+];
+
+function toISODay(jsDay: number): number {
+  // JS Sunday=0 → ISO 7, JS Monday=1 → ISO 1, etc.
+  return jsDay === 0 ? 7 : jsDay;
 }
 
 function calcStreak(completions: Completion[], routineIds: string[], currentWeek: number, currentYear: number): number {
@@ -47,6 +67,144 @@ function calcStreak(completions: Completion[], routineIds: string[], currentWeek
   return streak;
 }
 
+function isLate(routine: Routine, now: Date, currentWeek: number, currentMonth: number, currentYear: number, completions: Completion[]): boolean {
+  const isoToday = toISODay(getDay(now));
+  const todayDate = getDate(now);
+  const nowH = getHours(now);
+  const nowM = getMinutes(now);
+
+  if (routine.type === 'weekly') {
+    const done = completions.some(c => c.routine_id === routine.id && c.week_number === currentWeek && c.year === currentYear);
+    if (done) return false;
+    const days = routine.week_days || [];
+    if (routine.scheduled_time) {
+      const [h, m] = routine.scheduled_time.split(':').map(Number);
+      // Late if any scheduled day before today, OR today but time passed
+      return days.some(d => d < isoToday || (d === isoToday && (nowH > h || (nowH === h && nowM >= m))));
+    } else {
+      // Without time: late if any scheduled day < today
+      return days.some(d => d < isoToday);
+    }
+  } else {
+    const done = completions.some(c => c.routine_id === routine.id && c.month_number === currentMonth && c.year === currentYear);
+    if (done) return false;
+    const dom = routine.day_of_month;
+    if (!dom) return false;
+    if (dom < todayDate) return true;
+    if (dom === todayDate && routine.scheduled_time) {
+      const [h, m] = routine.scheduled_time.split(':').map(Number);
+      return nowH > h || (nowH === h && nowM >= m);
+    }
+    return false;
+  }
+}
+
+// ─── Add Routine Form ───────────────────────────────────────────────────────
+
+interface AddFormProps {
+  type: 'weekly' | 'monthly';
+  preselectedDay?: number; // ISO day
+  onSave: (data: { title: string; week_days: number[]; scheduled_time: string; day_of_month: number | null }) => Promise<void>;
+  onCancel: () => void;
+}
+
+function AddRoutineForm({ type, preselectedDay, onSave, onCancel }: AddFormProps) {
+  const [title, setTitle] = useState('');
+  const [selectedDays, setSelectedDays] = useState<number[]>(preselectedDay ? [preselectedDay] : []);
+  const [time, setTime] = useState('');
+  const [dayOfMonth, setDayOfMonth] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const toggleDay = (iso: number) => {
+    setSelectedDays(prev => prev.includes(iso) ? prev.filter(d => d !== iso) : [...prev, iso]);
+  };
+
+  const handleSave = async () => {
+    if (!title.trim()) return;
+    if (type === 'weekly' && selectedDays.length === 0) return;
+    if (type === 'monthly' && !dayOfMonth) return;
+    setSaving(true);
+    await onSave({
+      title: title.trim(),
+      week_days: selectedDays,
+      scheduled_time: time || '',
+      day_of_month: type === 'monthly' ? parseInt(dayOfMonth) : null,
+    });
+    setSaving(false);
+  };
+
+  return (
+    <div className="border border-border rounded-lg p-3 space-y-3 bg-background">
+      <div className="flex items-center gap-2">
+        <Input
+          placeholder="Nome da rotina..."
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSave()}
+          className="h-8 text-sm flex-1"
+          autoFocus
+        />
+        <Button variant="ghost" size="sm" onClick={onCancel} className="h-8 w-8 p-0">
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      {type === 'weekly' && (
+        <div className="flex gap-1 flex-wrap">
+          {WEEK_DAYS.map(d => (
+            <button
+              key={d.iso}
+              type="button"
+              onClick={() => toggleDay(d.iso)}
+              className={cn(
+                'w-8 h-8 rounded-md text-xs font-medium border transition-colors',
+                selectedDays.includes(d.iso)
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'border-border text-muted-foreground hover:border-primary hover:text-foreground'
+              )}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {type === 'monthly' && (
+        <Input
+          type="number"
+          min={1}
+          max={31}
+          placeholder="Dia do mês (1–31)"
+          value={dayOfMonth}
+          onChange={e => setDayOfMonth(e.target.value)}
+          className="h-8 text-sm"
+        />
+      )}
+
+      <div className="flex items-center gap-2">
+        <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <Input
+          type="time"
+          value={time}
+          onChange={e => setTime(e.target.value)}
+          className="h-8 text-sm w-32"
+        />
+        <span className="text-xs text-muted-foreground">Horário opcional</span>
+        <Button
+          size="sm"
+          onClick={handleSave}
+          disabled={saving || !title.trim() || (type === 'weekly' && selectedDays.length === 0) || (type === 'monthly' && !dayOfMonth)}
+          className="h-8 px-3 ml-auto"
+        >
+          {saving ? '...' : 'Salvar'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ─────────────────────────────────────────────────────────
+
 export function RoutineBlock() {
   const { profile } = useAuth();
   const { currentAgency } = useAgency();
@@ -56,14 +214,14 @@ export function RoutineBlock() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [completions, setCompletions] = useState<Completion[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newTitle, setNewTitle] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
+  const [showAddDay, setShowAddDay] = useState<number | null>(null); // ISO day or -1 for monthly
+  const [showMonthlyAdd, setShowMonthlyAdd] = useState(false);
 
   const now = new Date();
   const currentWeek = getISOWeek(now);
   const currentMonth = getMonth(now) + 1;
   const currentYear = getYear(now);
+  const isoToday = toISODay(getDay(now));
 
   const fetchData = async () => {
     if (!profile) return;
@@ -99,38 +257,34 @@ export function RoutineBlock() {
         setCompletions(prev => prev.filter(c => c.id !== comp.id));
       }
     } else {
-      const payload: any = {
-        routine_id: routine.id,
-        user_id: profile.user_id,
-        year: currentYear,
-      };
+      const payload: any = { routine_id: routine.id, user_id: profile.user_id, year: currentYear };
       if (routine.type === 'weekly') payload.week_number = currentWeek;
       else payload.month_number = currentMonth;
-
       const { data } = await supabase.from('routine_completions').insert(payload).select().single();
       if (data) setCompletions(prev => [...prev, data as Completion]);
     }
   };
 
-  const handleAdd = async () => {
-    if (!newTitle.trim() || !profile || !currentAgency) return;
-    setAdding(true);
-    const { data, error } = await supabase.from('routines').insert({
-      title: newTitle.trim(),
+  const handleAdd = async (data: { title: string; week_days: number[]; scheduled_time: string; day_of_month: number | null }) => {
+    if (!profile || !currentAgency) return;
+    const { data: newRoutine, error } = await supabase.from('routines').insert({
+      title: data.title,
       type: tab,
       user_id: profile.user_id,
       agency_id: currentAgency.id,
+      week_days: tab === 'weekly' ? data.week_days : [],
+      scheduled_time: data.scheduled_time || null,
+      day_of_month: data.day_of_month,
       order_position: routines.filter(r => r.type === tab).length,
     }).select().single();
 
     if (error) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     } else {
-      setRoutines(prev => [...prev, data as Routine]);
-      setNewTitle('');
-      setShowAdd(false);
+      setRoutines(prev => [...prev, newRoutine as Routine]);
+      setShowAddDay(null);
+      setShowMonthlyAdd(false);
     }
-    setAdding(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -138,11 +292,206 @@ export function RoutineBlock() {
     setRoutines(prev => prev.filter(r => r.id !== id));
   };
 
-  const filtered = routines.filter(r => r.type === tab);
-  const completedCount = filtered.filter(r => isCompleted(r)).length;
-  const progress = filtered.length > 0 ? Math.round((completedCount / filtered.length) * 100) : 0;
   const weeklyRoutines = routines.filter(r => r.type === 'weekly');
+  const monthlyRoutines = routines.filter(r => r.type === 'monthly').sort((a, b) => (a.day_of_month || 0) - (b.day_of_month || 0));
+
+  // Progress for current tab
+  const tabRoutines = tab === 'weekly' ? weeklyRoutines : monthlyRoutines;
+  const completedCount = tabRoutines.filter(r => isCompleted(r)).length;
+  const progress = tabRoutines.length > 0 ? Math.round((completedCount / tabRoutines.length) * 100) : 0;
+
   const streak = calcStreak(completions, weeklyRoutines.map(r => r.id), currentWeek, currentYear);
+
+  // ─── Weekly column view ─────────────────────────────────────────────────
+
+  const WeeklyView = () => (
+    <div className="overflow-x-auto -mx-1 px-1">
+      <div className="flex gap-2 min-w-[560px]">
+        {WEEK_DAYS.map(day => {
+          const isToday = day.iso === isoToday;
+          const dayRoutines = weeklyRoutines.filter(r => (r.week_days || []).includes(day.iso));
+          const isAddingHere = showAddDay === day.iso;
+
+          return (
+            <div
+              key={day.iso}
+              className={cn(
+                'flex-1 rounded-lg border p-2 min-h-[120px] flex flex-col gap-1.5',
+                isToday ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/20'
+              )}
+            >
+              {/* Column header */}
+              <div className="flex items-center justify-between mb-1">
+                <span className={cn('text-xs font-semibold', isToday ? 'text-primary' : 'text-muted-foreground')}>
+                  {day.label}
+                </span>
+                {isToday && <Badge variant="outline" className="text-[10px] h-4 px-1 border-primary/40 text-primary bg-primary/10">Hoje</Badge>}
+              </div>
+
+              {/* Routines */}
+              {loading ? (
+                <div className="h-8 bg-muted animate-pulse rounded" />
+              ) : (
+                dayRoutines.map(routine => {
+                  const done = isCompleted(routine);
+                  const late = !done && isLate(routine, now, currentWeek, currentMonth, currentYear, completions);
+                  return (
+                    <div
+                      key={routine.id}
+                      className={cn(
+                        'group rounded-md p-1.5 text-xs border transition-colors',
+                        done ? 'bg-primary/5 border-primary/20' : late ? 'bg-destructive/5 border-destructive/20' : 'bg-background border-border hover:border-primary/30'
+                      )}
+                    >
+                      <div className="flex items-start gap-1.5">
+                        <Checkbox
+                          checked={done}
+                          onCheckedChange={() => handleToggle(routine)}
+                          className="mt-0.5 shrink-0 h-3.5 w-3.5"
+                        />
+                        <span className={cn('flex-1 leading-tight break-words', done && 'line-through text-muted-foreground')}>
+                          {routine.title}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(routine.id)}
+                          className="h-4 w-4 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive shrink-0"
+                        >
+                          <Trash2 className="h-2.5 w-2.5" />
+                        </Button>
+                      </div>
+                      {(routine.scheduled_time || late) && (
+                        <div className="flex items-center gap-1 mt-1 pl-5">
+                          {routine.scheduled_time && (
+                            <span className={cn('text-[10px]', late ? 'text-destructive font-medium' : 'text-muted-foreground')}>
+                              {routine.scheduled_time.slice(0, 5)}
+                            </span>
+                          )}
+                          {late && <AlertTriangle className="h-2.5 w-2.5 text-destructive" />}
+                          {late && <span className="text-[10px] text-destructive font-medium">Atrasada</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+
+              {/* Add inline for this column */}
+              {isAddingHere ? (
+                <AddRoutineForm
+                  type="weekly"
+                  preselectedDay={day.iso}
+                  onSave={handleAdd}
+                  onCancel={() => setShowAddDay(null)}
+                />
+              ) : (
+                <button
+                  onClick={() => { setShowAddDay(day.iso); setShowMonthlyAdd(false); }}
+                  className="mt-auto text-[10px] text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5 pt-1"
+                >
+                  <Plus className="h-2.5 w-2.5" /> Add
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  // ─── Monthly table view ─────────────────────────────────────────────────
+
+  const MonthlyView = () => {
+    return (
+      <div className="space-y-3">
+        {monthlyRoutines.length === 0 && !showMonthlyAdd ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Nenhuma rotina mensal ainda.<br />
+            <span className="text-xs">Clique em "+ Adicionar" para criar uma.</span>
+          </p>
+        ) : (
+          <div className="rounded-lg border border-border overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-muted/50 border-b border-border">
+                  <th className="text-left px-2 py-1.5 text-muted-foreground font-medium w-10">Dia</th>
+                  <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Rotina</th>
+                  <th className="text-left px-2 py-1.5 text-muted-foreground font-medium w-14">Horário</th>
+                  <th className="text-left px-2 py-1.5 text-muted-foreground font-medium w-24">Status</th>
+                  <th className="w-6" />
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyRoutines.map((routine, i) => {
+                  const done = isCompleted(routine);
+                  const late = !done && isLate(routine, now, currentWeek, currentMonth, currentYear, completions);
+                  return (
+                    <tr key={routine.id} className={cn('border-b border-border last:border-0 group', i % 2 === 0 ? 'bg-background' : 'bg-muted/20')}>
+                      <td className="px-2 py-2 font-mono text-muted-foreground">
+                        {routine.day_of_month ? String(routine.day_of_month).padStart(2, '0') : '—'}
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <Checkbox
+                            checked={done}
+                            onCheckedChange={() => handleToggle(routine)}
+                            className="shrink-0 h-3.5 w-3.5"
+                          />
+                          <span className={cn(done && 'line-through text-muted-foreground')}>{routine.title}</span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-2 text-muted-foreground">
+                        {routine.scheduled_time ? routine.scheduled_time.slice(0, 5) : '—'}
+                      </td>
+                      <td className="px-2 py-2">
+                        {done ? (
+                          <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-primary/30 text-primary bg-primary/10">✅ Concluída</Badge>
+                        ) : late ? (
+                          <Badge variant="outline" className="text-[10px] h-4 px-1.5 border-destructive/30 text-destructive bg-destructive/5 gap-0.5">
+                            <AlertTriangle className="h-2 w-2" /> Atrasada
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-[10px]">Pendente</span>
+                        )}
+                      </td>
+                      <td className="px-1 py-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(routine.id)}
+                          className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {showMonthlyAdd ? (
+          <AddRoutineForm
+            type="monthly"
+            onSave={handleAdd}
+            onCancel={() => setShowMonthlyAdd(false)}
+          />
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setShowMonthlyAdd(true); setShowAddDay(null); }}
+            className="w-full h-8 text-xs border-dashed text-muted-foreground hover:text-foreground gap-1"
+          >
+            <Plus className="h-3.5 w-3.5" /> Adicionar rotina mensal
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <Card>
@@ -152,99 +501,45 @@ export function RoutineBlock() {
             <CheckSquare className="h-4 w-4 text-primary" />
             Minhas Rotinas
             {streak > 0 && (
-              <Badge variant="outline" className="border-orange-200 text-orange-600 bg-orange-50 gap-1">
+              <Badge variant="outline" className="border-destructive/30 text-destructive bg-destructive/10 gap-1">
                 <Flame className="h-3 w-3" /> {streak} sem.
               </Badge>
             )}
           </CardTitle>
-          <Button variant="ghost" size="sm" onClick={() => setShowAdd(!showAdd)} className="h-7 gap-1 text-xs">
-            <Plus className="h-3.5 w-3.5" /> Adicionar
-          </Button>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <Tabs value={tab} onValueChange={v => setTab(v as 'weekly' | 'monthly')}>
+        <Tabs value={tab} onValueChange={v => { setTab(v as 'weekly' | 'monthly'); setShowAddDay(null); setShowMonthlyAdd(false); }}>
           <TabsList className="h-8">
             <TabsTrigger value="weekly" className="text-xs">Semanal</TabsTrigger>
             <TabsTrigger value="monthly" className="text-xs">Mensal</TabsTrigger>
           </TabsList>
 
-          {['weekly', 'monthly'].map(t => (
-            <TabsContent key={t} value={t} className="mt-3 space-y-3">
-              {/* Progress */}
-              {filtered.length > 0 && (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{completedCount} de {filtered.length} concluídas</span>
-                    <span className="font-semibold text-primary">{progress}%</span>
-                  </div>
-                  <Progress value={progress} className="h-1.5" />
+          <TabsContent value="weekly" className="mt-3 space-y-3">
+            {tabRoutines.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{completedCount} de {tabRoutines.length} concluídas esta semana</span>
+                  <span className="font-semibold text-primary">{progress}%</span>
                 </div>
-              )}
+                <Progress value={progress} className="h-1.5" />
+              </div>
+            )}
+            <WeeklyView />
+          </TabsContent>
 
-              {/* Add form */}
-              {showAdd && tab === t && (
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Nome da rotina..."
-                    value={newTitle}
-                    onChange={e => setNewTitle(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                    className="h-8 text-sm"
-                    autoFocus
-                  />
-                  <Button size="sm" onClick={handleAdd} disabled={adding || !newTitle.trim()} className="h-8 px-3">
-                    {adding ? '...' : 'OK'}
-                  </Button>
+          <TabsContent value="monthly" className="mt-3 space-y-3">
+            {tabRoutines.length > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{completedCount} de {tabRoutines.length} concluídas este mês</span>
+                  <span className="font-semibold text-primary">{progress}%</span>
                 </div>
-              )}
-
-              {/* Routine list */}
-              {loading ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map(i => <div key={i} className="h-8 bg-muted animate-pulse rounded" />)}
-                </div>
-              ) : filtered.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Nenhuma rotina {t === 'weekly' ? 'semanal' : 'mensal'} ainda.<br />
-                  <span className="text-xs">Clique em "Adicionar" para criar uma.</span>
-                </p>
-              ) : (
-                <div className="space-y-1">
-                  {filtered.map(routine => {
-                    const done = isCompleted(routine);
-                    return (
-                      <div key={routine.id} className={cn(
-                        'flex items-center gap-3 py-2 px-2 rounded-lg group transition-colors',
-                        done ? 'bg-primary/5' : 'hover:bg-muted/40',
-                      )}>
-                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground/30 shrink-0 cursor-grab" />
-                        <Checkbox
-                          checked={done}
-                          onCheckedChange={() => handleToggle(routine)}
-                          className="shrink-0"
-                        />
-                        <span className={cn(
-                          'flex-1 text-sm',
-                          done && 'line-through text-muted-foreground',
-                        )}>
-                          {routine.title}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(routine.id)}
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </TabsContent>
-          ))}
+                <Progress value={progress} className="h-1.5" />
+              </div>
+            )}
+            <MonthlyView />
+          </TabsContent>
         </Tabs>
       </CardContent>
     </Card>
