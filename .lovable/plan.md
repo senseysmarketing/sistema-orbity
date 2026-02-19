@@ -1,117 +1,105 @@
 
-# Melhorar Bloco de Rotinas: Visão por Dia + Horário + Status de Atraso
+# Correção do RoutineBlock + Integração com Linha do Tempo
 
-## O que muda
+## Problemas Identificados
 
-A aba "Semanal" do `RoutineBlock` passa de uma lista simples para uma **visão em colunas por dia da semana**, inspirada no Notion. Cada rotina semanal é criada com os dias em que deve ocorrer e um horário opcional. Se o horário passou e a rotina não foi marcada, ela aparece como "atrasada".
+### Bug 1: Formulário de adicionar fecha sozinho (Weekly e Monthly)
 
-A aba "Mensal" mantém o layout de lista atual (com dia do mês + horário), que já é o padrão mais adequado para tarefas mensais.
+O problema está na arquitetura do componente. `WeeklyView` e `MonthlyView` são **funções definidas dentro** de `RoutineBlock`:
 
----
-
-## Banco de Dados — Migração necessária
-
-A tabela `routines` atual tem `week_days` (array de inteiros) mas **não tem campo de horário**. Precisamos adicionar duas colunas:
-
-| Coluna | Tipo | Descrição |
-|---|---|---|
-| `scheduled_time` | `TIME` nullable | Horário opcional (ex: `09:00`) |
-| `day_of_month` | `INTEGER` nullable | Dia do mês para rotinas mensais (1–31) |
-
-`day_of_month` é necessário pois na visão mensal do Notion aparece o "Dia" da tarefa (coluna "Dia" = 01, 05, 28).
-
-**SQL da migração:**
-```sql
-ALTER TABLE routines ADD COLUMN IF NOT EXISTS scheduled_time TIME;
-ALTER TABLE routines ADD COLUMN IF NOT EXISTS day_of_month INTEGER;
+```typescript
+// PROBLEMA: recriada a cada render do pai
+const WeeklyView = () => ( ... );
+const MonthlyView = () => ( ... );
 ```
 
-Sem RLS novo — usa as políticas já existentes da tabela `routines`.
+Quando o usuário clica em "+ Add", o estado `showAddDay` muda → `RoutineBlock` re-renderiza → `WeeklyView` é uma **função nova** → React desmonta e remonta o componente → o formulário some.
+
+**Solução:** Transformar `WeeklyView` e `MonthlyView` em componentes externos ao `RoutineBlock` (definidos fora da função), recebendo todas as props necessárias. Isso garante identidade estável e evita a destruição do formulário.
+
+### Bug 2: Mensal não funciona
+
+Mesmo problema. O `MonthlyView` renderiza dentro do `RoutineBlock`, então qualquer mudança de estado no pai (inclusive `setShowMonthlyAdd(true)`) causa a recriação do componente, fechando o formulário antes que o usuário possa interagir.
 
 ---
 
-## Lógica de Atraso
+## Solução Técnica
 
-Uma rotina é considerada **atrasada** quando:
+### Reestruturação do RoutineBlock
 
-- **Semanal com horário**: o dia da semana atual corresponde a um dos `week_days` da rotina, o horário atual passou de `scheduled_time`, e ela ainda não foi marcada como concluída nesta semana.
-- **Semanal sem horário**: apenas aparece destacada se o dia já passou na semana (ex: segunda marcada, hoje é quarta → atrasada).
-- **Mensal com horário**: `day_of_month` passou, ou é hoje mas o horário passou, e não foi concluída neste mês.
+Extrair `WeeklyView` e `MonthlyView` como componentes de nível de módulo (fora do `export function RoutineBlock`), passando os dados via props:
 
-A lógica de atraso é calculada no frontend com `date-fns` (`getDay()`, `getHours()`, `getMinutes()`), sem query extra.
+```typescript
+// Fora do componente principal — identidade estável garantida
+interface WeeklyViewProps {
+  weeklyRoutines: Routine[];
+  completions: Completion[];
+  loading: boolean;
+  showAddDay: number | null;
+  setShowAddDay: (v: number | null) => void;
+  setShowMonthlyAdd: (v: boolean) => void;
+  isCompleted: (r: Routine) => boolean;
+  isLate: (r: Routine) => boolean;
+  handleToggle: (r: Routine) => void;
+  handleDelete: (id: string) => void;
+  handleAdd: (data: ...) => Promise<void>;
+  isoToday: number;
+}
+
+function WeeklyView(props: WeeklyViewProps) { ... }
+
+interface MonthlyViewProps { ... }
+function MonthlyView(props: MonthlyViewProps) { ... }
+```
+
+Isso resolve **os dois bugs** de uma só vez.
 
 ---
 
-## Interface — Aba Semanal: Colunas por Dia
+## Integração com Linha do Tempo
 
-### Layout
+### O que muda na DayTimeline
+
+A `DayTimeline` atual só exibe notificações. Vamos adicionar uma segunda fonte de dados: **rotinas do usuário que têm horário configurado para hoje**.
+
+**Fluxo de dados:**
+1. Buscar rotinas do usuário com `scheduled_time IS NOT NULL`
+2. Filtrar as que são do dia atual (weekly: `week_days` contém o dia de hoje; monthly: `day_of_month` = dia de hoje)
+3. Combinar com os eventos de notificação em uma lista unificada, ordenada por horário
+4. Exibir rotinas como eventos "planejados" (com ícone de rotina `CheckSquare`) e distinguir entre:
+   - **Pendente** (horário ainda não passou) — cor neutra
+   - **Atrasada** (horário passou, não concluída) — cor destrutiva
+   - **Concluída** (marcada como feita) — cor primária com ✓
+
+### Tipos de eventos na timeline combinada
+
+```typescript
+type TimelineItem =
+  | { source: 'notification'; data: TimelineEvent }
+  | { source: 'routine'; data: Routine; status: 'pending' | 'late' | 'done'; time: string };
+```
+
+### Ordenação
+
+- Notificações ordenadas por `created_at` (já existente)
+- Rotinas ordenadas por `scheduled_time`
+- As duas listas são **mescladas** em ordem cronológica
+- Rotinas sem horário não aparecem na timeline (só aparecem no RoutineBlock)
+
+### UI das rotinas na timeline
 
 ```text
-[Semanal]  ← aba ativa
-┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-│  Segunda     │ │  Terça       │ │  Quarta ←hoje│ │  Quinta      │ │  Sexta       │
-│──────────────│ │──────────────│ │──────────────│ │──────────────│ │──────────────│
-│ ☑ Checar     │ │ ☑ Checar     │ │ ☐ Checar    │ │ ☐ Checar     │ │ ☐ Checar     │
-│   métricas   │ │   métricas   │ │   métricas  │ │   métricas   │ │   métricas   │
-│   09:00      │ │   09:00      │ │   09:00 ⚠️  │ │   09:00      │ │   09:00      │
-│              │ │              │ │             │ │              │ │              │
-│ + Adicionar  │ │ + Adicionar  │ │ + Adicionar │ │ + Adicionar  │ │ + Adicionar  │
-└──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
+┌─────────────────────────────────────────┐
+│  09:00  [☐] Checar métricas de clientes │  ← Pendente (antes da hora)
+│  10:00  [⚠️] Enviar relatório           │  ← Atrasada (hora passou)
+│  11:14  [✅] Checar e-mails             │  ← Concluída
+│  12:03  [🎯] Novo lead: João Silva      │  ← Notificação normal
+└─────────────────────────────────────────┘
 ```
 
-- **5 colunas** (Seg → Sex), com scroll horizontal no mobile
-- Coluna do **dia atual** tem destaque sutil (fundo levemente colorido + label em negrito)
-- Rotinas aparecem **nas colunas dos dias** em que estão configuradas (`week_days`)
-- Badge "Hoje" na coluna atual
-- Ícone ⚠️ + texto vermelho para rotinas atrasadas
-- Cada coluna tem "+ Adicionar" que abre o formulário pré-selecionando aquele dia
-
-### Card de rotina dentro da coluna
-```text
-┌────────────────────────────┐
-│ ☐  Checar métricas         │  ← Checkbox + título
-│    09:00  ⚠️ Atrasada       │  ← horário + badge de atraso (se aplicável)
-└────────────────────────────┘
-```
-
-- Clique no checkbox → toggle de completion (mesmo mecanismo atual)
-- Hover → aparece botão de deletar (🗑)
-
----
-
-## Interface — Aba Mensal: Lista com dia do mês
-
-```text
-[Mensal]
-┌─────────────────────────────────────────────────────────────────┐
-│  Dia  │  Rotina                  │  Horário  │  Status          │
-│───────│──────────────────────────│───────────│──────────────────│
-│  01   │ ☑ Faturar Clientes       │  10:00    │  ✅ Concluída    │
-│  05   │ ☑ Pagamento de Salários  │  09:00    │  ✅ Concluída    │
-│  19   │ ☐ Reunião de Resultados  │  14:00    │  ⚠️ Atrasada     │
-│  28   │ ☐ Planejamento SM        │  —        │  Pendente        │
-└─────────────────────────────────────────────────────────────────┘
-[ + Adicionar rotina mensal ]
-```
-
-- Ordenado por `day_of_month`
-- Badge de atraso: se `day_of_month` < dia atual do mês e não foi concluída
-- Progress bar mantida no topo
-
----
-
-## Formulário de Adição (novo)
-
-Ao clicar "+ Adicionar" abre um formulário inline (ou popover) com os campos:
-
-| Campo | Tipo | Obrigatório |
-|---|---|---|
-| Nome da rotina | Input texto | Sim |
-| Dias da semana | Checkboxes (Seg/Ter/Qua/Qui/Sex/Sáb/Dom) | Sim (semanal) |
-| Horário | Input time (HH:MM) | Não |
-| Dia do mês | Input number (1–31) | Sim (mensal) |
-
-No fluxo de "+ Adicionar" dentro de uma **coluna específica**, o dia daquela coluna já vem pré-marcado.
+- Badge de tipo: "Rotina" em roxo/indigo, diferenciando de notificações
+- Clique na rotina → marca como concluída diretamente na timeline (toggle)
+- Atualização automática: quando o usuário marca no RoutineBlock, a timeline reflete (ambos compartilham o mesmo query ao Supabase)
 
 ---
 
@@ -119,24 +107,20 @@ No fluxo de "+ Adicionar" dentro de uma **coluna específica**, o dia daquela co
 
 | Arquivo | Mudança |
 |---|---|
-| `src/components/dashboard/RoutineBlock.tsx` | Reescrita completa: visão semanal em colunas, visão mensal em tabela, lógica de atraso, formulário expandido com horário/dia |
+| `src/components/dashboard/RoutineBlock.tsx` | Extração de `WeeklyView` e `MonthlyView` para fora do componente pai (correção dos bugs) |
+| `src/components/dashboard/DayTimeline.tsx` | Adicionar segunda fonte de dados (rotinas de hoje com horário), mesclar e ordenar, UI diferenciada, toggle de conclusão inline |
 
-### Novo arquivo necessário (migração):
-| Migração | Conteúdo |
-|---|---|
-| `add_time_to_routines` | `ALTER TABLE routines ADD COLUMN scheduled_time TIME; ADD COLUMN day_of_month INTEGER;` |
+### Sem mudanças de banco
 
----
-
-## O que NÃO muda
-
-- Lógica de streak (🔥) — mantida
-- Tabela `routine_completions` — sem alteração, já tem tudo necessário
-- Aba Mensal usa o mesmo mecanismo de completions (por `month_number` + `year`)
-- RLS policies — sem alteração
+Tudo reutiliza as tabelas já existentes:
+- `routines` — filtrado por `user_id` + `scheduled_time IS NOT NULL`
+- `routine_completions` — para determinar status (concluída/pendente)
+- `notifications` — mantida como está
 
 ---
 
-## Resultado final
+## Resultado Final
 
-A rotina semanal ficará visualmente idêntica à inspiração do Notion: colunas por dia, itens com checkbox, destaque para o dia atual, e badge de atraso quando o horário passou. A rotina mensal ficará em formato de tabela com dia do mês e horário, também com indicador de atraso. Tudo dentro do mesmo card do dashboard, sem poluir a tela.
+- O botão "+ Add" da view semanal vai abrir o formulário corretamente e ele não vai fechar sozinho
+- A view mensal vai exibir o botão e o formulário funcionando
+- A Linha do Tempo vai mostrar as rotinas do dia com horário, integradas com as notificações, permitindo inclusive marcar como concluída direto da timeline
