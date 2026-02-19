@@ -3448,9 +3448,11 @@ export type Database = {
         Row: {
           agency_id: string | null
           created_at: string | null
+          day_of_month: number | null
           id: string
           is_active: boolean | null
           order_position: number | null
+          scheduled_time: string | null
           title: string
           type: string
           updated_at: string | null
@@ -3460,9 +3462,11 @@ export type Database = {
         Insert: {
           agency_id?: string | null
           created_at?: string | null
+          day_of_month?: number | null
           id?: string
           is_active?: boolean | null
           order_position?: number | null
+          scheduled_time?: string | null
           title: string
           type: string
           updated_at?: string | null
@@ -3472,9 +3476,11 @@ export type Database = {
         Update: {
           agency_id?: string | null
           created_at?: string | null
+          day_of_month?: number | null
           id?: string
           is_active?: boolean | null
           order_position?: number | null
+          scheduled_time?: string | null
           title?: string
           type?: string
           updated_at?: string | null

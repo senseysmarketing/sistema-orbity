@@ -1,0 +1,2 @@
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS scheduled_time TIME;
+ALTER TABLE routines ADD COLUMN IF NOT EXISTS day_of_month INTEGER;
