@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
@@ -38,30 +38,33 @@ const colorOptions = [
   { value: "bg-pink-500", label: "Rosa" },
 ];
 
-// Status padrão fixos (não existem no banco)
-const defaultStatuses = [
-  { id: "default-1", slug: "draft", name: "Briefing", color: "bg-gray-500", is_default: true, order_position: 0 },
-  { id: "default-2", slug: "in_creation", name: "Em Criação", color: "bg-blue-500", is_default: true, order_position: 1 },
-  { id: "default-3", slug: "pending_approval", name: "Aguardando Aprovação", color: "bg-yellow-500", is_default: true, order_position: 2 },
-  { id: "default-4", slug: "approved", name: "Aprovado", color: "bg-green-500", is_default: true, order_position: 3 },
-  { id: "default-5", slug: "published", name: "Publicado", color: "bg-purple-500", is_default: true, order_position: 4 },
+const DEFAULT_STATUSES = [
+  { slug: "draft", name: "Briefing", color: "bg-gray-500", order_position: 0 },
+  { slug: "in_creation", name: "Em Criação", color: "bg-blue-500", order_position: 1 },
+  { slug: "pending_approval", name: "Aguardando Aprovação", color: "bg-yellow-500", order_position: 2 },
+  { slug: "approved", name: "Aprovado", color: "bg-green-500", order_position: 3 },
+  { slug: "published", name: "Publicado", color: "bg-purple-500", order_position: 4 },
 ];
 
-interface CustomStatus {
+interface StatusItem {
   id: string;
+  slug: string;
   name: string;
   color: string;
+  is_default: boolean;
   is_active: boolean;
   order_position: number;
 }
 
-interface SortableStatusItemProps {
-  status: CustomStatus;
+function SortableStatusItem({
+  status,
+  onToggle,
+  onDelete,
+}: {
+  status: StatusItem;
   onToggle: (id: string, isActive: boolean) => void;
   onDelete: (id: string) => void;
-}
-
-function SortableStatusItem({ status, onToggle, onDelete }: SortableStatusItemProps) {
+}) {
   const {
     attributes,
     listeners,
@@ -93,19 +96,26 @@ function SortableStatusItem({ status, onToggle, onDelete }: SortableStatusItemPr
         </div>
         <div className={`h-3 w-3 rounded-full ${status.color}`} />
         <span className="font-medium">{status.name}</span>
+        {status.is_default && (
+          <span className="text-xs text-muted-foreground">(Padrão)</span>
+        )}
       </div>
       <div className="flex items-center gap-2">
-        <Switch
-          checked={status.is_active ?? true}
-          onCheckedChange={(checked) => onToggle(status.id, checked)}
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onDelete(status.id)}
-        >
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
+        {!status.is_default && (
+          <>
+            <Switch
+              checked={status.is_active}
+              onCheckedChange={(checked) => onToggle(status.id, checked)}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(status.id)}
+            >
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -123,39 +133,84 @@ export function CustomStatusManager() {
     })
   );
 
-  const { data: customStatuses = [] } = useQuery({
-    queryKey: ["custom-statuses", currentAgency?.id],
+  const { data: dbStatuses = [], isLoading } = useQuery({
+    queryKey: ["social-media-statuses-all", currentAgency?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("social_media_custom_statuses")
         .select("*")
         .eq("agency_id", currentAgency?.id)
-        .eq("is_default", false)
         .order("order_position");
       if (error) throw error;
-      return (data || []) as CustomStatus[];
+      return data as StatusItem[];
     },
     enabled: !!currentAgency?.id,
   });
 
+  const initializeDefaultsMutation = useMutation({
+    mutationFn: async () => {
+      const existingDefaults = dbStatuses.filter((s) => s.is_default);
+      if (existingDefaults.length >= DEFAULT_STATUSES.length) return;
+
+      const existingSlugs = existingDefaults.map((s) => s.slug);
+      const missingDefaults = DEFAULT_STATUSES.filter(
+        (d) => !existingSlugs.includes(d.slug)
+      );
+
+      if (missingDefaults.length === 0) return;
+
+      const { error } = await supabase.from("social_media_custom_statuses").insert(
+        missingDefaults.map((d) => ({
+          agency_id: currentAgency?.id,
+          slug: d.slug,
+          name: d.name,
+          color: d.color,
+          is_default: true,
+          is_active: true,
+          order_position: d.order_position,
+        }))
+      );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["social-media-statuses-all"] });
+      queryClient.invalidateQueries({ queryKey: ["custom-statuses"] });
+    },
+  });
+
+  useEffect(() => {
+    if (currentAgency?.id && !isLoading && dbStatuses.length === 0) {
+      initializeDefaultsMutation.mutate();
+    } else if (
+      currentAgency?.id &&
+      !isLoading &&
+      dbStatuses.filter((s) => s.is_default).length < DEFAULT_STATUSES.length
+    ) {
+      initializeDefaultsMutation.mutate();
+    }
+  }, [currentAgency?.id, isLoading, dbStatuses.length]);
+
+  const allStatuses = useMemo(() => {
+    return [...dbStatuses].sort((a, b) => a.order_position - b.order_position);
+  }, [dbStatuses]);
+
   const invalidateStatuses = () => {
+    queryClient.invalidateQueries({ queryKey: ["social-media-statuses-all"] });
     queryClient.invalidateQueries({ queryKey: ["custom-statuses"] });
-    queryClient.invalidateQueries({ queryKey: ["custom-statuses", currentAgency?.id] });
   };
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
-        .from("social_media_custom_statuses")
-        .insert({
-          agency_id: currentAgency?.id,
-          name: newStatus.name,
-          slug: newStatus.name.toLowerCase().replace(/\s+/g, "_"),
-          color: newStatus.color,
-          is_active: true,
-          is_default: false,
-          order_position: customStatuses.length,
-        });
+      const maxOrder = Math.max(...allStatuses.map((s) => s.order_position), -1);
+      const { error } = await supabase.from("social_media_custom_statuses").insert({
+        agency_id: currentAgency?.id,
+        name: newStatus.name,
+        slug: newStatus.name.toLowerCase().replace(/\s+/g, "_"),
+        color: newStatus.color,
+        is_default: false,
+        is_active: true,
+        order_position: maxOrder + 1,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -198,7 +253,10 @@ export function CustomStatusManager() {
   const reorderMutation = useMutation({
     mutationFn: async (updates: { id: string; order_position: number }[]) => {
       const promises = updates.map(({ id, order_position }) =>
-        supabase.from("social_media_custom_statuses").update({ order_position }).eq("id", id)
+        supabase
+          .from("social_media_custom_statuses")
+          .update({ order_position })
+          .eq("id", id)
       );
       await Promise.all(promises);
     },
@@ -213,25 +271,47 @@ export function CustomStatusManager() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+
     if (over && active.id !== over.id) {
-      const oldIndex = customStatuses.findIndex((s) => s.id === active.id);
-      const newIndex = customStatuses.findIndex((s) => s.id === over.id);
-      const reordered = arrayMove(customStatuses, oldIndex, newIndex);
-      const updates = reordered.map((s, i) => ({ id: s.id, order_position: i }));
+      const oldIndex = allStatuses.findIndex((s) => s.id === active.id);
+      const newIndex = allStatuses.findIndex((s) => s.id === over.id);
+
+      const reordered = arrayMove(allStatuses, oldIndex, newIndex);
+      const updates = reordered.map((status, index) => ({
+        id: status.id,
+        order_position: index,
+      }));
+
       reorderMutation.mutate(updates);
     }
   };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Status do Kanban</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-12 bg-muted rounded-lg" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Status do Kanban</CardTitle>
         <CardDescription>
-          Arraste para reordenar os status personalizados. Status padrão não podem ser excluídos.
+          Arraste para reordenar todas as colunas, incluindo os status padrão. Status padrão não podem ser excluídos.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Formulário de adição */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <Label>Nome do Status</Label>
@@ -265,49 +345,27 @@ export function CustomStatusManager() {
           </div>
         </div>
 
-        {/* Status padrão — fixos, sem DnD */}
-        <div className="space-y-2">
-          {defaultStatuses.map((status) => (
-            <div
-              key={status.id}
-              className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
-            >
-              <div className="flex items-center gap-3">
-                <div className="h-4 w-4 flex items-center justify-center">
-                  <GripVertical className="h-4 w-4 text-muted-foreground/30" />
-                </div>
-                <div className={`h-3 w-3 rounded-full ${status.color}`} />
-                <span className="font-medium">{status.name}</span>
-                <span className="text-xs text-muted-foreground">(Padrão)</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Status customizados — arrastáveis */}
-        {customStatuses.length > 0 && (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={allStatuses.map((s) => s.id)}
+            strategy={verticalListSortingStrategy}
           >
-            <SortableContext
-              items={customStatuses.map((s) => s.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-2">
-                {customStatuses.map((status) => (
-                  <SortableStatusItem
-                    key={status.id}
-                    status={status}
-                    onToggle={(id, isActive) => toggleMutation.mutate({ id, isActive })}
-                    onDelete={(id) => deleteMutation.mutate(id)}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        )}
+            <div className="space-y-2">
+              {allStatuses.map((status) => (
+                <SortableStatusItem
+                  key={status.id}
+                  status={status}
+                  onToggle={(id, isActive) => toggleMutation.mutate({ id, isActive })}
+                  onDelete={(id) => deleteMutation.mutate(id)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       </CardContent>
     </Card>
   );
