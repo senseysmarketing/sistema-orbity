@@ -174,7 +174,7 @@ export function CustomStatusManager() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["social-media-statuses-all"] });
-      queryClient.invalidateQueries({ queryKey: ["custom-statuses"] });
+      queryClient.invalidateQueries({ queryKey: ["social-media-statuses-kanban"] });
     },
   });
 
@@ -196,7 +196,7 @@ export function CustomStatusManager() {
 
   const invalidateStatuses = () => {
     queryClient.invalidateQueries({ queryKey: ["social-media-statuses-all"] });
-    queryClient.invalidateQueries({ queryKey: ["custom-statuses"] });
+    queryClient.invalidateQueries({ queryKey: ["social-media-statuses-kanban"] });
   };
 
   const createMutation = useMutation({
