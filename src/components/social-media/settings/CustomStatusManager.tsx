@@ -56,6 +56,11 @@ export function CustomStatusManager() {
     return [...defaultStatuses, ...customStatuses];
   }, [customStatuses]);
 
+  const invalidateStatuses = () => {
+    queryClient.invalidateQueries({ queryKey: ["custom-statuses"] });
+    queryClient.invalidateQueries({ queryKey: ["custom-statuses", currentAgency?.id] });
+  };
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase
@@ -65,13 +70,14 @@ export function CustomStatusManager() {
           name: newStatus.name,
           slug: newStatus.slug || newStatus.name.toLowerCase().replace(/\s+/g, "_"),
           color: newStatus.color,
+          is_active: true,
           order_position: allStatuses.length,
         });
       
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["custom-statuses"] });
+      invalidateStatuses();
       setNewStatus({ name: "", slug: "", color: "bg-blue-500" });
       toast.success("Status criado com sucesso");
     },
@@ -90,7 +96,7 @@ export function CustomStatusManager() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["custom-statuses"] });
+      invalidateStatuses();
       toast.success("Status excluído");
     },
   });
@@ -105,7 +111,7 @@ export function CustomStatusManager() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["custom-statuses"] });
+      invalidateStatuses();
     },
   });
 
