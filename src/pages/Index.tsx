@@ -1,680 +1,331 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  LayoutDashboard, TrendingUp, Users, Calendar, Target,
-  MessageSquare, Monitor, FileText, Briefcase, BarChart3,
-  CheckSquare, Share2
-} from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAgency } from '@/hooks/useAgency';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics';
-import { QuickActions } from '@/components/dashboard/QuickActions';
-import { RecentActivity } from '@/components/dashboard/RecentActivity';
-import { UpcomingTasks } from '@/components/dashboard/UpcomingTasks';
 import { useNavigate } from 'react-router-dom';
-import { startOfMonth, format } from 'date-fns';
+import { format, isToday, isBefore, startOfDay, isThisWeek, startOfMonth } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+import { MyDayHeader } from '@/components/dashboard/MyDayHeader';
+import { MyStatusCards } from '@/components/dashboard/MyStatusCards';
+import { MyTasksList } from '@/components/dashboard/MyTasksList';
+import { MyAgendaAndPosts } from '@/components/dashboard/MyAgendaAndPosts';
+import { QuickActions } from '@/components/dashboard/QuickActions';
+import { DashboardMetrics } from '@/components/dashboard/DashboardMetrics';
+
+import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown, ChevronUp, BarChart3 } from 'lucide-react';
+import { startOfMonth as startMonth } from 'date-fns';
 
 const Index = () => {
   const { profile } = useAuth();
   const { currentAgency, isAgencyAdmin } = useAgency();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const isAdmin = isAgencyAdmin();
+
   const [loading, setLoading] = useState(true);
+  const [metricsOpen, setMetricsOpen] = useState(false);
   const [showSensitiveData, setShowSensitiveData] = useState(() => {
     const saved = localStorage.getItem('dashboard_show_sensitive_data');
-    // Se não houver preferência salva, padrão é FALSE (oculto)
     return saved !== null ? saved === 'true' : false;
   });
 
-  // Salvar preferência de privacidade no localStorage
   useEffect(() => {
     localStorage.setItem('dashboard_show_sensitive_data', String(showSensitiveData));
   }, [showSensitiveData]);
-  const [realAdSpend, setRealAdSpend] = useState(0);
-  const [data, setData] = useState({
-    clients: [],
-    leads: [],
-    meetings: [],
-    tasks: [],
-    socialPosts: [],
-    contracts: [],
-    payments: [],
-    campaigns: [],
+
+  // --- Personal data ---
+  const [myTasks, setMyTasks] = useState<any[]>([]);
+  const [myMeetings, setMyMeetings] = useState<any[]>([]);
+  const [myPosts, setMyPosts] = useState<any[]>([]);
+
+  // --- Agency-wide metrics (admins only) ---
+  const [agencyMetrics, setAgencyMetrics] = useState({
+    totalClients: 0,
+    activeClients: 0,
+    totalLeads: 0,
+    convertedLeads: 0,
+    totalMeetings: 0,
+    upcomingMeetings: 0,
+    totalTasks: 0,
+    completedTasks: 0,
+    overdueTasks: 0,
+    totalSocialPosts: 0,
+    publishedPosts: 0,
+    monthlyRevenue: 0,
+    adSpend: 0,
   });
 
-  const fetchRealInvestments = useCallback(async () => {
-    if (!currentAgency?.id) return;
-    
+  const fetchMyData = useCallback(async () => {
+    if (!profile || !currentAgency) return;
+    setLoading(true);
+
     try {
-      let totalSpend = 0;
-      
-      // 1. Buscar Meta Ads spend da conta selecionada
-      const { data: agency } = await supabase
-        .from('agencies')
-        .select('crm_ad_account_id')
-        .eq('id', currentAgency.id)
-        .single();
+      // 1. My task assignments
+      const { data: assignments } = await supabase
+        .from('task_assignments')
+        .select('task_id')
+        .eq('user_id', profile.user_id);
 
-      if (agency?.crm_ad_account_id) {
-        const { data: account } = await supabase
-          .from('selected_ad_accounts')
-          .select('current_month_spend')
-          .eq('id', agency.crm_ad_account_id)
-          .single();
-        
-        totalSpend += Number(account?.current_month_spend || 0);
+      const myTaskIds = assignments?.map((a: any) => a.task_id) || [];
+
+      // Build task query — assigned OR created by me
+      let taskQuery = supabase
+        .from('tasks')
+        .select('*, clients(name)')
+        .eq('agency_id', currentAgency.id);
+
+      if (myTaskIds.length > 0) {
+        taskQuery = taskQuery.or(`id.in.(${myTaskIds.join(',')}),created_by.eq.${profile.user_id}`);
+      } else {
+        taskQuery = taskQuery.eq('created_by', profile.user_id);
       }
 
-      // 2. Buscar investimentos manuais do mês
-      const monthStr = format(startOfMonth(new Date()), 'yyyy-MM-01');
-      const { data: manualData } = await supabase
-        .from('crm_investments')
-        .select('amount')
-        .eq('agency_id', currentAgency.id)
-        .eq('reference_month', monthStr);
-      
-      if (manualData) {
-        totalSpend += manualData.reduce((sum, inv) => sum + Number(inv.amount), 0);
+      // 2. My post assignments
+      const { data: postAssignments } = await supabase
+        .from('post_assignments')
+        .select('post_id')
+        .eq('user_id', profile.user_id);
+
+      const myPostIds = postAssignments?.map((a: any) => a.post_id) || [];
+
+      // 3. Meetings (created by me or in my agency for today+)
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      const [tasksRes, meetingsRes, postsRes] = await Promise.all([
+        taskQuery,
+        supabase
+          .from('meetings')
+          .select('*, clients(name)')
+          .eq('agency_id', currentAgency.id)
+          .gte('start_time', `${todayStr}T00:00:00`)
+          .neq('status', 'cancelled')
+          .order('start_time', { ascending: true })
+          .limit(20),
+        myPostIds.length > 0
+          ? supabase
+              .from('social_media_posts')
+              .select('*, clients(name)')
+              .eq('agency_id', currentAgency.id)
+              .in('id', myPostIds)
+              .neq('status', 'published')
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      setMyTasks(tasksRes.data || []);
+      setMyMeetings(
+        (meetingsRes.data || []).map((m: any) => ({
+          ...m,
+          client_name: m.clients?.name,
+        }))
+      );
+      setMyPosts(
+        ((postsRes as any).data || []).map((p: any) => ({
+          ...p,
+          client_name: p.clients?.name,
+        }))
+      );
+
+      // Admin: fetch agency-wide metrics
+      if (isAdmin) {
+        await fetchAgencyMetrics();
       }
-
-      setRealAdSpend(totalSpend);
-    } catch (error) {
-      console.error('Error fetching real investments:', error);
-    }
-  }, [currentAgency?.id]);
-
-  useEffect(() => {
-    fetchDashboardData();
-    fetchRealInvestments();
-  }, [profile, currentAgency?.id, fetchRealInvestments]);
-
-  const fetchDashboardData = async () => {
-    if (!profile || !currentAgency) {
+    } catch (error: any) {
+      toast({ title: 'Erro ao carregar dados', description: error.message, variant: 'destructive' });
+    } finally {
       setLoading(false);
-      return;
     }
-    
-    try {
-      setLoading(true);
+  }, [profile?.user_id, currentAgency?.id, isAdmin]);
 
+  const fetchAgencyMetrics = async () => {
+    if (!currentAgency) return;
+    try {
       const [
         clientsRes,
         leadsRes,
         meetingsRes,
         tasksRes,
-        socialPostsRes,
-        contractsRes,
+        postsRes,
         paymentsRes,
-        campaignsRes,
       ] = await Promise.all([
-        supabase.from('clients').select('*').eq('agency_id', currentAgency.id),
-        supabase.from('leads').select('*').eq('agency_id', currentAgency.id),
-        supabase.from('meetings').select('*').eq('agency_id', currentAgency.id),
-        supabase.from('tasks').select('*, clients(name)').eq('agency_id', currentAgency.id),
-        supabase.from('social_media_posts').select('*').eq('agency_id', currentAgency.id),
-        supabase.from('contracts').select('*').eq('agency_id', currentAgency.id),
-        supabase.from('client_payments').select('*').eq('agency_id', currentAgency.id),
-        supabase.from('campaigns').select('*').eq('agency_id', currentAgency.id),
+        supabase.from('clients').select('id,active').eq('agency_id', currentAgency.id),
+        supabase.from('leads').select('id,status').eq('agency_id', currentAgency.id),
+        supabase.from('meetings').select('id,start_time,status').eq('agency_id', currentAgency.id),
+        supabase.from('tasks').select('id,status,due_date').eq('agency_id', currentAgency.id),
+        supabase.from('social_media_posts').select('id,status').eq('agency_id', currentAgency.id),
+        supabase.from('client_payments').select('amount,due_date,status,client_id').eq('agency_id', currentAgency.id),
       ]);
 
-      setData({
-        clients: clientsRes.data || [],
-        leads: leadsRes.data || [],
-        meetings: meetingsRes.data || [],
-        tasks: tasksRes.data || [],
-        socialPosts: socialPostsRes.data || [],
-        contracts: contractsRes.data || [],
-        payments: paymentsRes.data || [],
-        campaigns: campaignsRes.data || [],
+      const today = new Date();
+      const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      const year = today.getFullYear();
+      const month = today.getMonth() + 1;
+      const startStr = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+      const clients = clientsRes.data || [];
+      const leads = leadsRes.data || [];
+      const meetings = meetingsRes.data || [];
+      const tasks = tasksRes.data || [];
+      const posts = postsRes.data || [];
+      const payments = paymentsRes.data || [];
+
+      const activeClientIds = clients.filter((c: any) => c.active).map((c: any) => c.id);
+      const paymentsThisMonth = payments.filter((p: any) =>
+        p.due_date >= startStr && p.due_date <= endStr && activeClientIds.includes(p.client_id)
+      );
+      const monthlyRevenue = paymentsThisMonth.reduce((s: number, p: any) => s + (p.amount || 0), 0);
+
+      setAgencyMetrics({
+        totalClients: clients.length,
+        activeClients: clients.filter((c: any) => c.active).length,
+        totalLeads: leads.length,
+        convertedLeads: leads.filter((l: any) => l.status === 'client').length,
+        totalMeetings: meetings.filter((m: any) => {
+          const d = new Date(m.start_time);
+          return d >= thisMonth && d < nextMonth;
+        }).length,
+        upcomingMeetings: meetings.filter((m: any) => new Date(m.start_time) >= today && m.status !== 'cancelled').length,
+        totalTasks: tasks.length,
+        completedTasks: tasks.filter((t: any) => t.status === 'done').length,
+        overdueTasks: tasks.filter((t: any) => {
+          const d = t.due_date ? new Date(t.due_date) : null;
+          return d && d < today && t.status !== 'done';
+        }).length,
+        totalSocialPosts: posts.length,
+        publishedPosts: posts.filter((p: any) => p.status === 'published').length,
+        monthlyRevenue,
+        adSpend: 0,
       });
-
-    } catch (error: any) {
-      toast({
-        title: "Erro ao carregar dados",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching agency metrics', err);
     }
   };
 
-  const metrics = useMemo(() => {
-    const today = new Date();
-    const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  useEffect(() => {
+    fetchMyData();
+  }, [fetchMyData]);
 
-    // Clientes
-    const activeClients = data.clients.filter((c: any) => c.active).length;
-    
-    // Receita Mensal - baseada em pagamentos do mês atual
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
-    const selectedMonth = `${year}-${String(month).padStart(2, '0')}`;
-    const startStr = `${selectedMonth}-01`;
-    const lastDay = new Date(year, month, 0).getDate();
-    const endStr = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
-    
-    // Filtrar pagamentos do mês apenas de clientes ativos
-    const activeClientIds = data.clients.filter((c: any) => c.active).map((c: any) => c.id);
-    const paymentsThisMonth = data.payments.filter((payment: any) => {
-      return payment.due_date >= startStr && 
-             payment.due_date <= endStr &&
-             activeClientIds.includes(payment.client_id);
-    });
-    
-    const monthlyRevenue = paymentsThisMonth.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+  // --- Computed values from personal tasks ---
+  const today = startOfDay(new Date());
 
-    // Leads
-    const totalLeads = data.leads.length;
-    const convertedLeads = data.leads.filter((l: any) => l.status === 'client').length;
+  const todayTasks = myTasks.filter(t => {
+    if (!t.due_date || t.status === 'done') return false;
+    return isToday(new Date(t.due_date));
+  });
 
-    // Reuniões
-    const upcomingMeetings = data.meetings.filter((m: any) => {
-      const meetingDate = new Date(m.start_time);
-      return meetingDate >= today && m.status !== 'cancelled';
-    }).length;
-    const thisMonthMeetings = data.meetings.filter((m: any) => {
-      const meetingDate = new Date(m.start_time);
-      return meetingDate >= thisMonth && meetingDate < nextMonth;
-    }).length;
+  const overdueTasks = myTasks.filter(t => {
+    if (!t.due_date || t.status === 'done') return false;
+    return isBefore(startOfDay(new Date(t.due_date)), today);
+  });
 
-    // Tarefas
-    const totalTasks = data.tasks.length;
-    const completedTasks = data.tasks.filter((t: any) => t.status === 'done').length;
-    const overdueTasks = data.tasks.filter((t: any) => {
-      const dueDate = t.due_date ? new Date(t.due_date) : null;
-      return dueDate && dueDate < today && t.status !== 'done';
-    }).length;
+  const doneTodayTasks = myTasks.filter(t => {
+    if (t.status !== 'done' || !t.updated_at) return false;
+    return isToday(new Date(t.updated_at));
+  });
 
-    // Social Media
-    const totalSocialPosts = data.socialPosts.length;
-    const publishedPosts = data.socialPosts.filter((p: any) => p.status === 'published').length;
+  const todayMeetings = myMeetings.filter(m => isToday(new Date(m.start_time)));
+  const nextMeeting = todayMeetings[0] || null;
+  const nextMeetingTime = nextMeeting
+    ? format(new Date(nextMeeting.start_time), 'HH:mm')
+    : null;
 
-    // Investimento em ads (dados reais do CRM)
-    const adSpend = realAdSpend;
+  const postsToReview = myPosts.filter(p =>
+    ['pending_approval', 'revision'].includes(p.status)
+  );
 
-    return {
-      totalClients: data.clients.length,
-      activeClients,
-      totalLeads,
-      convertedLeads,
-      totalMeetings: thisMonthMeetings,
-      upcomingMeetings,
-      totalTasks,
-      completedTasks,
-      overdueTasks,
-      totalSocialPosts,
-      publishedPosts,
-      monthlyRevenue,
-      adSpend,
-    };
-  }, [data, realAdSpend]);
+  // Tasks visible in list: overdue + today + this week (not done)
+  const visibleTasks = myTasks.filter(t => {
+    if (t.status === 'done') return false;
+    if (!t.due_date) return false;
+    const d = new Date(t.due_date);
+    return isBefore(startOfDay(d), startOfDay(addDays(new Date(), 7)));
+  });
 
-  // Atividades recentes
-  const recentActivities = useMemo(() => {
-    const activities = [];
-
-    // Tarefas concluídas recentemente
-    const recentCompletedTasks = data.tasks
-      .filter((t: any) => t.status === 'done')
-      .slice(0, 3)
-      .map((t: any) => ({
-        id: `task-${t.id}`,
-        type: 'task' as const,
-        title: t.title,
-        description: `Tarefa concluída${t.clients?.name ? ` - ${t.clients.name}` : ''}`,
-        timestamp: t.updated_at,
-      }));
-
-    // Reuniões recentes
-    const recentMeetings = data.meetings
-      .filter((m: any) => m.status === 'completed')
-      .slice(0, 3)
-      .map((m: any) => ({
-        id: `meeting-${m.id}`,
-        type: 'meeting' as const,
-        title: m.title,
-        description: `Reunião realizada`,
-        timestamp: m.start_time,
-      }));
-
-    // Posts publicados
-    const recentPosts = data.socialPosts
-      .filter((p: any) => p.status === 'published')
-      .slice(0, 2)
-      .map((p: any) => ({
-        id: `post-${p.id}`,
-        type: 'post' as const,
-        title: p.content?.substring(0, 50) || 'Post publicado',
-        description: `Publicado em ${p.platform}`,
-        timestamp: p.published_at || p.created_at,
-      }));
-
-    // Novos leads
-    const recentLeads = data.leads
-      .slice(0, 2)
-      .map((l: any) => ({
-        id: `lead-${l.id}`,
-        type: 'lead' as const,
-        title: l.name,
-        description: `Novo lead - ${l.status}`,
-        timestamp: l.created_at,
-      }));
-
-    // Contratos criados
-    const recentContracts = data.contracts
-      .slice(0, 2)
-      .map((c: any) => ({
-        id: `contract-${c.id}`,
-        type: 'contract' as const,
-        title: c.client_name,
-        description: `Contrato criado`,
-        timestamp: c.created_at,
-      }));
-
-    return [...recentCompletedTasks, ...recentMeetings, ...recentPosts, ...recentLeads, ...recentContracts]
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, 8);
-  }, [data]);
-
-  // Próximas tarefas
-  const upcomingTasks = useMemo(() => {
-    const today = new Date();
-    return data.tasks
-      .filter((t: any) => {
-        const dueDate = t.due_date ? new Date(t.due_date) : null;
-        return t.status !== 'done' && dueDate;
-      })
-      .sort((a: any, b: any) => {
-        const dateA = new Date(a.due_date);
-        const dateB = new Date(b.due_date);
-        return dateA.getTime() - dateB.getTime();
-      })
-      .map((t: any) => ({
-        id: t.id,
-        title: t.title,
-        due_date: t.due_date,
-        priority: t.priority || 'medium',
-        status: t.status,
-        client_name: t.clients?.name,
-      }));
-  }, [data]);
-
-  const getRoleGreeting = () => {
-    if (!profile) return "Bem-vindo";
-    const firstName = profile.name.split(' ')[0];
-    switch (profile.role) {
-      case 'agency_admin':
-        return `Olá, ${firstName}! 👋`;
-      case 'agency_user':
-        return `Olá, ${firstName}! 👋`;
-      default:
-        return `Olá, ${firstName}!`;
-    }
-  };
-
-  const getRoleSubtitle = () => {
-    if (!profile) return "";
-    switch (profile.role) {
-      case 'agency_admin':
-        return "Visão geral completa da sua agência";
-      case 'agency_user':
-        return "Suas tarefas e atividades do dia";
-      default:
-        return "Dashboard principal";
-    }
-  };
+  function addDays(date: Date, days: number) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+  }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-2 md:flex-row md:justify-between md:items-start">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
-            <LayoutDashboard className="h-6 w-6 md:h-8 md:w-8 text-primary" />
-            {getRoleGreeting()}
-          </h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">
-            {getRoleSubtitle()}
-          </p>
-        </div>
-        <div className="text-left md:text-right">
-          <p className="text-xs md:text-sm text-muted-foreground">Agência</p>
-          <p className="font-semibold text-sm md:text-base">{currentAgency?.name || 'Carregando...'}</p>
-        </div>
-      </div>
+    <div className="space-y-4 md:space-y-5">
 
-      {/* Métricas Principais */}
-      <DashboardMetrics 
-        metrics={metrics} 
-        showSensitiveData={showSensitiveData}
-        onToggleSensitiveData={() => setShowSensitiveData(!showSensitiveData)}
-        isAdmin={isAgencyAdmin()}
+      {/* 1. Header personalizado "Meu Dia" */}
+      <MyDayHeader
+        userName={profile?.name || 'Usuário'}
+        agencyName={currentAgency?.name || ''}
+        avatarUrl={profile?.avatar_url}
+        todayTasksTotal={todayTasks.length + doneTodayTasks.length}
+        todayTasksDone={doneTodayTasks.length}
+        overdueCount={overdueTasks.length}
       />
 
-      {/* Conteúdo por Tabs */}
-      <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList className="flex w-full overflow-x-auto scrollbar-hide">
-          <TabsTrigger value="overview" className="flex-shrink-0 gap-1 md:gap-2">
-            <LayoutDashboard className="h-4 w-4" />
-            <span className="hidden sm:inline">Visão Geral</span>
-          </TabsTrigger>
-          <TabsTrigger value="tasks" className="flex-shrink-0 gap-1 md:gap-2">
-            <CheckSquare className="h-4 w-4" />
-            <span className="hidden sm:inline">Tarefas</span>
-          </TabsTrigger>
-          <TabsTrigger value="crm" className="flex-shrink-0 gap-1 md:gap-2">
-            <Target className="h-4 w-4" />
-            <span className="hidden sm:inline">CRM</span>
-          </TabsTrigger>
-          <TabsTrigger value="social" className="flex-shrink-0 gap-1 md:gap-2">
-            <Share2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Social</span>
-          </TabsTrigger>
-          <TabsTrigger value="performance" className="flex-shrink-0 gap-1 md:gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Performance</span>
-          </TabsTrigger>
-        </TabsList>
+      {/* 2. Cards de status pessoal */}
+      <MyStatusCards
+        todayTasksCount={todayTasks.length}
+        overdueTasksCount={overdueTasks.length}
+        nextMeetingTime={nextMeetingTime}
+        postsToReviewCount={postsToReview.length}
+        onCardClick={(section) => {
+          if (section === 'tasks' || section === 'overdue') navigate('/dashboard/tasks');
+          if (section === 'meeting') navigate('/dashboard/agenda');
+          if (section === 'posts') navigate('/dashboard/social-media');
+        }}
+      />
 
-        {/* Visão Geral */}
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <QuickActions />
-            <RecentActivity activities={recentActivities} />
-          </div>
-          
-          <UpcomingTasks tasks={upcomingTasks} />
-        </TabsContent>
+      {/* 3. Grid principal: Tarefas | Agenda & Posts */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <MyTasksList
+          tasks={visibleTasks}
+          onTasksChange={fetchMyData}
+          onViewAll={() => navigate('/dashboard/tasks')}
+        />
+        <MyAgendaAndPosts
+          meetings={myMeetings}
+          posts={myPosts}
+          onViewAgenda={() => navigate('/dashboard/agenda')}
+          onViewPosts={() => navigate('/dashboard/social-media')}
+        />
+      </div>
 
-        {/* Tarefas */}
-        <TabsContent value="tasks" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total de Tarefas</CardTitle>
-                <Briefcase className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metrics.totalTasks}</div>
-                <p className="text-xs text-muted-foreground">
-                  {metrics.completedTasks} concluídas
-                </p>
-              </CardContent>
-            </Card>
+      {/* 4. Ações Rápidas */}
+      <QuickActions />
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Tarefas Atrasadas</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">{metrics.overdueTasks}</div>
-                <p className="text-xs text-muted-foreground">
-                  Requerem atenção imediata
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Taxa de Conclusão</CardTitle>
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {metrics.totalTasks > 0 ? Math.round((metrics.completedTasks / metrics.totalTasks) * 100) : 0}%
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Performance da equipe
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <UpcomingTasks tasks={upcomingTasks} />
-          
-          <div className="flex justify-end">
-            <Button onClick={() => navigate('/dashboard/tasks')}>
-              Ver Todas as Tarefas
+      {/* 5. Métricas da Agência — apenas admins, colapsável */}
+      {isAdmin && (
+        <Collapsible open={metricsOpen} onOpenChange={setMetricsOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" className="w-full gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Métricas da Agência
+              {metricsOpen ? <ChevronUp className="h-4 w-4 ml-auto" /> : <ChevronDown className="h-4 w-4 ml-auto" />}
             </Button>
-          </div>
-        </TabsContent>
-
-        {/* CRM */}
-        <TabsContent value="crm" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total de Leads</CardTitle>
-                <Target className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metrics.totalLeads}</div>
-                <p className="text-xs text-muted-foreground">
-                  {metrics.convertedLeads} convertidos
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Taxa de Conversão</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {metrics.totalLeads > 0 ? Math.round((metrics.convertedLeads / metrics.totalLeads) * 100) : 0}%
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Lead para cliente
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Reuniões Agendadas</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{metrics.upcomingMeetings}</div>
-                <p className="text-xs text-muted-foreground">
-                  {metrics.totalMeetings} no mês
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => navigate('/dashboard/crm')}>
-              Acessar CRM
-            </Button>
-            <Button onClick={() => navigate('/dashboard/agenda')}>
-              Ver Agenda
-            </Button>
-          </div>
-        </TabsContent>
-
-        {/* Social Media */}
-        <TabsContent value="social" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Posts Criados</CardTitle>
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metrics.totalSocialPosts}</div>
-                <p className="text-xs text-muted-foreground">
-                  Total de conteúdos
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Posts Publicados</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{metrics.publishedPosts}</div>
-                <p className="text-xs text-muted-foreground">
-                  {metrics.totalSocialPosts > 0 ? Math.round((metrics.publishedPosts / metrics.totalSocialPosts) * 100) : 0}% do planejado
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Taxa de Publicação</CardTitle>
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {metrics.totalSocialPosts > 0 ? Math.round((metrics.publishedPosts / metrics.totalSocialPosts) * 100) : 0}%
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Performance de entrega
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={() => navigate('/dashboard/social-media')}>
-              Acessar Social Media
-            </Button>
-          </div>
-        </TabsContent>
-
-        {/* Performance */}
-        <TabsContent value="performance" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{metrics.activeClients}</div>
-                <p className="text-xs text-muted-foreground">
-                  De {metrics.totalClients} total
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Contratos Ativos</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{data.contracts.filter((c: any) => c.status === 'active').length}</div>
-                <p className="text-xs text-muted-foreground">
-                  {data.contracts.length} total
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Campanhas Ativas</CardTitle>
-                <Monitor className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{data.campaigns.filter((c: any) => c.status === 'active').length}</div>
-                <p className="text-xs text-muted-foreground">
-                  Tráfego pago rodando
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Receita Mensal</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {new Intl.NumberFormat('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                    minimumFractionDigits: 0,
-                  }).format(metrics.monthlyRevenue)}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Contratos recorrentes
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Resumo de Performance</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Produtividade</p>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>Tarefas concluídas</span>
-                      <span>{metrics.completedTasks}/{metrics.totalTasks}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Posts publicados</span>
-                      <span>{metrics.publishedPosts}/{metrics.totalSocialPosts}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Leads convertidos</span>
-                      <span>{metrics.convertedLeads}/{metrics.totalLeads}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Eficiência</p>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>Taxa de conclusão de tarefas</span>
-                      <span className="text-green-600 font-medium">
-                        {metrics.totalTasks > 0 ? Math.round((metrics.completedTasks / metrics.totalTasks) * 100) : 0}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Taxa de conversão CRM</span>
-                      <span className="text-green-600 font-medium">
-                        {metrics.totalLeads > 0 ? Math.round((metrics.convertedLeads / metrics.totalLeads) * 100) : 0}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Taxa de publicação</span>
-                      <span className="text-green-600 font-medium">
-                        {metrics.totalSocialPosts > 0 ? Math.round((metrics.publishedPosts / metrics.totalSocialPosts) * 100) : 0}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-4">
+            <DashboardMetrics
+              metrics={agencyMetrics}
+              showSensitiveData={showSensitiveData}
+              onToggleSensitiveData={() => setShowSensitiveData(!showSensitiveData)}
+              isAdmin={isAdmin}
+            />
+          </CollapsibleContent>
+        </Collapsible>
+      )}
     </div>
   );
 };
