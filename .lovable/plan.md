@@ -1,107 +1,68 @@
 
-# Replicar exatamente o padrão de Tarefas no Social Media
+# Corrigir colunas duplicadas no Kanban de Social Media
 
-## Diagnóstico
+## Causa raiz confirmada
 
-| Aspecto | Tarefas (funciona) | Social Media (problema) |
-|---|---|---|
-| Status padrão | Salvos no banco (`task_statuses`, `is_default=true`) | Hard-coded no frontend, nunca inseridos no banco |
-| DndContext | Único, engloba todos os status | Dois blocos separados — padrões estáticos, customizados arrastáveis |
-| Reordenação | Todos arrastáveis (padrão + custom) | Só customizados |
-| Tabela | `task_statuses` | `social_media_custom_statuses` |
+No banco, a agência tem os seguintes status (em ordem):
 
-A tabela `social_media_custom_statuses` já tem coluna `is_default` — a estrutura é 100% compatível com a lógica de Tarefas. Os status padrão simplesmente nunca foram inseridos no banco para nenhuma agência.
+| order_position | slug | name | is_default |
+|---|---|---|---|
+| 0 | draft | Briefing | true |
+| 1 | aguardando_material | Aguardando Material | false |
+| 2 | in_creation | Em Criação | true |
+| 3 | pending_approval | Aguardando Aprovação | true |
+| 4 | approved | Aprovado | true |
+| 5 | published | Publicado | true |
 
-## Solução — 1 arquivo, replicar exatamente o TaskStatusManager
-
-### `src/components/social-media/settings/CustomStatusManager.tsx`
-
-**1. Remover o array hard-coded `defaultStatuses`** — ele passa a ser um array de referência `DEFAULT_STATUSES` usado apenas para inicialização no banco (igual ao TaskStatusManager):
+O problema está em `PostKanban.tsx` nas linhas 75–91:
 
 ```ts
-const DEFAULT_STATUSES = [
-  { slug: "draft", name: "Briefing", color: "bg-gray-500", order_position: 0 },
-  { slug: "in_creation", name: "Em Criação", color: "bg-blue-500", order_position: 1 },
-  { slug: "pending_approval", name: "Aguardando Aprovação", color: "bg-yellow-500", order_position: 2 },
-  { slug: "approved", name: "Aprovado", color: "bg-green-500", order_position: 3 },
-  { slug: "published", name: "Publicado", color: "bg-purple-500", order_position: 4 },
-];
+// ❌ CÓDIGO ATUAL — gera duplicatas
+const allColumns = useMemo(() => {
+  const defaultCols = [          // ← 5 colunas hard-coded
+    { id: "draft", title: "Briefing", ... },
+    { id: "in_creation", title: "Em Criação", ... },
+    ...
+  ];
+  const customCols = customStatuses.map(...); // ← todos do banco (inclui is_default=true E false)
+  return [...defaultCols, ...customCols];     // ← duplica os 5 padrões!
+}, [customStatuses]);
 ```
 
-**2. Query unificada** — busca TODOS os status da agência (`is_default=true` e `false`), igual ao TaskStatusManager:
+Como os status padrão agora vivem no banco (igual a Tarefas), o `PostKanban` não deve mais ter nenhuma lista hard-coded. Deve buscar tudo do banco.
+
+## Correção — 1 arquivo
+
+### `src/components/social-media/PostKanban.tsx`
+
+**1. Remover o array `defaultCols` hard-coded** (linhas 76–82)
+
+**2. Alterar a query `custom-statuses`** para buscar **todos** os status ativos da agência (sem filtro adicional além de `is_active = true`), já ordenados por `order_position` — exatamente como está, mas o `useMemo` de `allColumns` passa a usar só o resultado do banco:
+
 ```ts
-queryKey: ["social-media-statuses-all", currentAgency?.id]
-// sem filtro is_default=false
-.order("order_position")
+// ✅ NOVO — usa apenas o banco, sem hard-code
+const allColumns = useMemo(() => {
+  return customStatuses.map(status => ({
+    id: status.slug,
+    title: status.name,
+    color: status.color,
+  }));
+}, [customStatuses]);
 ```
 
-**3. `initializeDefaultsMutation`** — igual ao TaskStatusManager, insere os padrões no banco se não existirem ainda para a agência:
-```ts
-// Verifica quais slugs padrão já existem no banco
-// Insere apenas os que faltam com is_default=true
-// Dispara ao carregar se dbStatuses.length === 0 ou faltam padrões
-```
+A query já filtra `is_active = true` e ordena por `order_position`, então a ordem do Kanban refletirá automaticamente qualquer reordenação feita em Configurações.
 
-**4. `useEffect` de inicialização** — idêntico ao TaskStatusManager:
-```ts
-useEffect(() => {
-  if (currentAgency?.id && !isLoading && dbStatuses.filter(s => s.is_default).length < DEFAULT_STATUSES.length) {
-    initializeDefaultsMutation.mutate();
-  }
-}, [currentAgency?.id, isLoading, dbStatuses.length]);
-```
+**3. Renomear a queryKey** de `'custom-statuses'` para `'social-media-statuses-kanban'` para evitar conflito de cache com a query do `CustomStatusManager` (que usa `'social-media-statuses-all'` e inclui status inativos).
 
-**5. `allStatuses` via `useMemo`** — lista combinada ordenada por `order_position`:
-```ts
-const allStatuses = useMemo(() => {
-  return [...dbStatuses].sort((a, b) => a.order_position - b.order_position);
-}, [dbStatuses]);
-```
+## Resultado esperado
 
-**6. `SortableStatusItem` atualizado** — recebe `status.is_default`:
-- Se `is_default=true`: exibe `(Padrão)`, sem toggle, sem lixeira
-- Se `is_default=false`: exibe toggle ativo/inativo + lixeira
-- Drag handle (`GripVertical`) funcional para **todos**
-
-**7. `reorderMutation`** — salva `order_position` na tabela `social_media_custom_statuses` para TODOS os items (padrão e customizados), igual ao TaskStatusManager:
-```ts
-supabase.from("social_media_custom_statuses").update({ order_position }).eq("id", id)
-```
-
-**8. `handleDragEnd`** — opera sobre `allStatuses` (lista completa), igual ao TaskStatusManager.
-
-**9. DndContext único** — engloba toda a lista, sem separação:
-```tsx
-<DndContext onDragEnd={handleDragEnd}>
-  <SortableContext items={allStatuses.map(s => s.id)}>
-    {allStatuses.map(status => <SortableStatusItem ... />)}
-  </SortableContext>
-</DndContext>
-```
-
-## Resultado visual final
-
-```text
-[Formulário: nome + cor + botão adicionar]
-
-[Lista única arrastável]
-  ⠿ ● Briefing                (Padrão)
-  ⠿ ● Em Criação              (Padrão)
-  ⠿ ● Aguardando Aprovação    (Padrão)
-  ⠿ ● Aprovado                (Padrão)
-  ⠿ ● Publicado               (Padrão)
-  ⠿ ● Em Revisão   [toggle]   [🗑]
-  ⠿ ● Onboarding   [toggle]   [🗑]
-```
-
-Todos os itens são arrastáveis. A nova ordem é salva no banco imediatamente.
+- Sem colunas duplicadas
+- A ordem das colunas no Kanban reflete exatamente a ordem configurada em Configurações → Status do Kanban
+- Status customizados como "Aguardando Material" aparecem na posição correta (order_position 1, entre Briefing e Em Criação)
+- Ao reordenar ou criar novos status em Configurações, o Kanban atualiza automaticamente
 
 ## Arquivo modificado
 
 | Arquivo | Mudança |
-|---------|---------|
-| `src/components/social-media/settings/CustomStatusManager.tsx` | Reescrita completa seguindo exatamente o padrão do `TaskStatusManager.tsx` — status padrão inseridos no banco, DndContext único para tudo |
-
-## Observação importante
-
-Na primeira vez que uma agência acessar as configurações após essa mudança, os 5 status padrão serão inseridos automaticamente no banco (mesmo comportamento de Tarefas). A reordenação funciona para todos.
+|---|---|
+| `src/components/social-media/PostKanban.tsx` | Remover `defaultCols` hard-coded; `allColumns` passa a derivar 100% da query do banco |
