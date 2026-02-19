@@ -1,47 +1,63 @@
 
-# Correção: Contagem de Tarefas — Somente Atribuídas ao Usuário
+# Correção: Criação de Status Customizados no Kanban de Social Media
 
-## Problema Atual
+## Diagnóstico
 
-A query de tarefas usa dois critérios combinados com OR:
-```typescript
-taskQuery.or(`id.in.(${myTaskIds.join(',')}),created_by.eq.${profile.user_id}`)
+O erro `new row violates row-level security policy for table "social_media_custom_statuses"` ocorre porque a política RLS de gerenciamento (`Agency admins can manage custom statuses`) cobre ALL operations mas **não possui cláusula `WITH CHECK`**.
+
+No PostgreSQL, para operações de `INSERT` e `UPDATE`, o RLS exige que tanto o `USING` (filtragem de leitura) quanto o `WITH CHECK` (validação de escrita) estejam definidos. Quando a política usa `FOR ALL` sem `WITH CHECK`, o banco aplica o `USING` como verificação de escrita — mas como a `agency_id` do novo registro ainda não existe na tabela no momento do INSERT, a função `is_agency_admin(agency_id)` retorna `false`, bloqueando a inserção.
+
+## Solução em 2 partes
+
+### Parte 1 — Corrigir a política RLS (migração SQL)
+
+Recriar as políticas com separação clara entre `SELECT`, `INSERT`, `UPDATE` e `DELETE`:
+
+```sql
+-- Remover política antiga
+DROP POLICY IF EXISTS "Agency admins can manage custom statuses" ON social_media_custom_statuses;
+
+-- Política para INSERT (com WITH CHECK no agency_id enviado)
+CREATE POLICY "Agency admins can insert custom statuses"
+ON social_media_custom_statuses FOR INSERT
+TO authenticated
+WITH CHECK (is_agency_admin(agency_id));
+
+-- Política para UPDATE
+CREATE POLICY "Agency admins can update custom statuses"
+ON social_media_custom_statuses FOR UPDATE
+TO authenticated
+USING (is_agency_admin(agency_id))
+WITH CHECK (is_agency_admin(agency_id));
+
+-- Política para DELETE
+CREATE POLICY "Agency admins can delete custom statuses"
+ON social_media_custom_statuses FOR DELETE
+TO authenticated
+USING (is_agency_admin(agency_id));
 ```
 
-Isso significa que **qualquer tarefa criada pelo usuário** entra na lista, mesmo que ele não esteja atribuído a ela. Um admin que criou 40 tarefas para outros membros da equipe veria todas elas no próprio dashboard — causando a contagem inflada de "39 de 41 tarefas".
+### Parte 2 — Garantir sincronização em todos os componentes
 
-## Solução
+Após criar o novo status, ele precisa aparecer automaticamente em:
 
-Simplificar a query para buscar **apenas** as tarefas onde o usuário está atribuído em `task_assignments`. Se não houver atribuições, retornar lista vazia em vez de tarefas criadas.
+| Componente | Status atual | Ajuste |
+|-----------|-------------|--------|
+| `PostKanban.tsx` | ✅ Já busca `custom_statuses` ativos | Nenhum |
+| `PostFormDialog.tsx` | Busca custom statuses mas precisa verificar | Confirmar que inclui novos status no select |
+| `PostDetailsDialog.tsx` | Busca custom statuses | Confirmar funcionamento |
+| `CustomStatusManager.tsx` | Cria status sem `is_active` explícito | Garantir `is_active: true` no insert |
 
-```typescript
-// ANTES — pega tarefas atribuídas OU criadas pelo usuário
-if (myTaskIds.length > 0) {
-  taskQuery = taskQuery.or(`id.in.(${myTaskIds.join(',')}),created_by.eq.${profile.user_id}`);
-} else {
-  taskQuery = taskQuery.eq('created_by', profile.user_id);
-}
+**Problema adicional no `CustomStatusManager.tsx`:** O insert não envia `is_active: true` explicitamente — apesar de o banco ter `DEFAULT true`, é boa prática enviá-lo. Mais importante: após criar o status, o invalidate de queries usa só `["custom-statuses"]` sem o `agency_id`, o que pode não refrescar o Kanban (que usa `['custom-statuses', currentAgency?.id]`).
 
-// DEPOIS — pega SOMENTE tarefas atribuídas ao usuário
-if (myTaskIds.length > 0) {
-  taskQuery = taskQuery.in('id', myTaskIds);
-} else {
-  // Sem atribuições = sem tarefas no dashboard pessoal
-  setMyTasks([]);
-  // (pula a query)
-}
-```
+## Arquivos a Modificar
 
-## Arquivo a Modificar
+1. **Migração SQL** — corrigir política RLS com `WITH CHECK`
+2. **`src/components/social-media/settings/CustomStatusManager.tsx`** — adicionar `is_active: true` no insert e corrigir invalidação de queries para incluir o `agency_id`
 
-`src/pages/Index.tsx` — bloco de construção da query de tarefas (linhas 76-86)
+## Resultado Esperado
 
-## Impacto
-
-| Situação | Antes | Depois |
-|----------|-------|--------|
-| Admin criou 40 tarefas, está atribuído em 2 | Mostra 42 tarefas | Mostra 2 tarefas |
-| Usuário sem atribuições, criou 5 tarefas | Mostra 5 tarefas | Mostra 0 tarefas |
-| Usuário atribuído em 3 tarefas | Mostra 3 tarefas | Mostra 3 tarefas ✅ |
-
-O dashboard passa a ser um reflexo fiel somente do que foi **delegado/atribuído** ao usuário — que é o comportamento esperado de um "Meu Dia" pessoal.
+- Admin consegue criar, editar e excluir status customizados sem erro RLS
+- Novo status aparece imediatamente como coluna no Kanban
+- Novo status aparece no select de status do formulário de criação/edição de post
+- Todas as abas (Calendário, Planejamento Semanal, Detalhes do Post) sincronizam com o novo status
