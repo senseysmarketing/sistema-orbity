@@ -90,16 +90,22 @@ export function PostKanban({ isCreateDialogOpen, onCreateDialogOpenChange }: Pos
     return [...defaultCols, ...customCols];
   }, [customStatuses]);
 
-  // Obter lista de clientes únicos
-  const uniqueClients = useMemo(() => {
-    const clientsMap = new Map();
-    posts.forEach(post => {
-      if (post.client_id && post.clients) {
-        clientsMap.set(post.client_id, post.clients.name);
-      }
-    });
-    return Array.from(clientsMap, ([id, name]) => ({ id, name }));
-  }, [posts]);
+  // Buscar clientes ativos em ordem alfabética diretamente do banco
+  const { data: uniqueClients = [] } = useQuery({
+    queryKey: ['active-clients-filter', currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name')
+        .eq('agency_id', currentAgency.id)
+        .eq('active', true)
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentAgency?.id,
+  });
 
   // Obter lista de usuários únicos atribuídos aos posts
   const uniqueUsers = useMemo(() => {
