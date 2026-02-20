@@ -141,12 +141,16 @@ const Index = () => {
         }))
       );
 
-      // Filter out native published, custom published, and any orphaned UUID statuses
+      // Filter out native published, custom published, archived, and any orphaned UUID statuses
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const validCustomStatusIds = new Set(customStatuses.map(s => s.id));
       const rawPosts = ((postsRes as any).data || []) as any[];
       const activePosts = rawPosts.filter(p => {
         if (p.status === 'published') return false;
-        if (publishedCustomIds.includes(p.status)) return false;
         if (p.archived) return false;
+        if (publishedCustomIds.includes(p.status)) return false;
+        // Se status é um UUID mas não existe nos custom statuses conhecidos → status órfão → ignorar
+        if (UUID_REGEX.test(p.status) && !validCustomStatusIds.has(p.status)) return false;
         return true;
       });
 
