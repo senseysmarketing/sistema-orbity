@@ -49,6 +49,7 @@ const Index = () => {
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [myMeetings, setMyMeetings] = useState<any[]>([]);
   const [myPosts, setMyPosts] = useState<any[]>([]);
+  const [myPostCustomStatuses, setMyPostCustomStatuses] = useState<{ id: string; name: string; color: string }[]>([]);
 
   // --- Agency-wide metrics (admins only) ---
   const [agencyMetrics, setAgencyMetrics] = useState({
@@ -91,7 +92,7 @@ const Index = () => {
       // 3. Meetings (agency, today+)
       const todayStr = new Date().toISOString().split('T')[0];
 
-      const [meetingsRes, postsRes] = await Promise.all([
+      const [meetingsRes, postsRes, customStatusesRes] = await Promise.all([
         supabase
           .from('meetings')
           .select('*, clients(name)')
@@ -105,10 +106,22 @@ const Index = () => {
               .from('social_media_posts')
               .select('*, clients(name)')
               .eq('agency_id', currentAgency.id)
+              .eq('archived', false)
               .in('id', myPostIds)
-              .neq('status', 'published')
           : Promise.resolve({ data: [] }),
+        supabase
+          .from('social_media_custom_statuses')
+          .select('id, name, color')
+          .eq('agency_id', currentAgency.id),
       ]);
+
+      const customStatuses = (customStatusesRes.data || []) as { id: string; name: string; color: string }[];
+      setMyPostCustomStatuses(customStatuses);
+
+      // IDs of custom statuses that mean "published" — exclude them from dashboard
+      const publishedCustomIds = customStatuses
+        .filter(s => s.name.toLowerCase().includes('public'))
+        .map(s => s.id);
 
       if (myTaskIds.length > 0) {
         const tasksRes = await supabase
@@ -127,8 +140,18 @@ const Index = () => {
           client_name: m.clients?.name,
         }))
       );
+
+      // Filter out native published, custom published, and any orphaned UUID statuses
+      const rawPosts = ((postsRes as any).data || []) as any[];
+      const activePosts = rawPosts.filter(p => {
+        if (p.status === 'published') return false;
+        if (publishedCustomIds.includes(p.status)) return false;
+        if (p.archived) return false;
+        return true;
+      });
+
       setMyPosts(
-        ((postsRes as any).data || []).map((p: any) => ({
+        activePosts.map((p: any) => ({
           ...p,
           client_name: p.clients?.name,
         }))
@@ -291,6 +314,7 @@ const Index = () => {
         />
         <MyPostsList
           posts={myPosts}
+          customStatuses={myPostCustomStatuses}
           onViewAll={() => navigate('/dashboard/social-media')}
         />
       </div>
