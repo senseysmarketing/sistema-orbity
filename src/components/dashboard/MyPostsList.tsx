@@ -17,6 +17,7 @@ interface Post {
 
 interface MyPostsListProps {
   posts: Post[];
+  customStatuses?: { id: string; name: string; color: string }[];
   onViewAll?: () => void;
 }
 
@@ -29,7 +30,7 @@ const platformIcons: Record<string, string> = {
   youtube: '▶️',
 };
 
-const statusConfig: Record<string, { label: string; className: string }> = {
+const nativeStatusConfig: Record<string, { label: string; className: string }> = {
   pending_approval: { label: 'Aprovação', className: 'border-amber-200 text-amber-700 bg-amber-50' },
   in_creation: { label: 'Em Criação', className: 'border-blue-200 text-blue-700 bg-blue-50' },
   revision: { label: 'Revisão', className: 'border-purple-200 text-purple-700 bg-purple-50' },
@@ -37,7 +38,13 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   scheduled: { label: 'Agendado', className: 'border-sky-200 text-sky-700 bg-sky-50' },
 };
 
-export function MyPostsList({ posts, onViewAll }: MyPostsListProps) {
+export function MyPostsList({ posts, customStatuses, onViewAll }: MyPostsListProps) {
+  const getStatusConfig = (status: string) => {
+    if (nativeStatusConfig[status]) return nativeStatusConfig[status];
+    const custom = customStatuses?.find(s => s.id === status);
+    if (custom) return { label: custom.name, className: 'border-gray-200 text-gray-700 bg-gray-50' };
+    return { label: 'Pendente', className: 'border-gray-200 text-gray-600 bg-gray-50' };
+  };
   const today = startOfDay(new Date());
 
   const overduePosts = posts.filter(p => {
@@ -66,7 +73,7 @@ export function MyPostsList({ posts, onViewAll }: MyPostsListProps) {
   const PostRow = ({ post, showDate = false }: { post: Post; showDate?: boolean }) => {
     const isOverdue = post.scheduled_date && isBefore(startOfDay(new Date(post.scheduled_date)), today);
     const icon = platformIcons[post.platform?.toLowerCase() || ''] || '📄';
-    const cfg = statusConfig[post.status] || { label: post.status, className: '' };
+    const cfg = getStatusConfig(post.status);
 
     return (
       <div className={cn(
