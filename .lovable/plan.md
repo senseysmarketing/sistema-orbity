@@ -1,74 +1,133 @@
 
-# Correção Definitiva: Posts com Status Órfão Sumindo do Dashboard
+# Novos Blocos: Tarefas Solicitadas e Posts Solicitados no Dashboard
 
-## Diagnóstico Confirmado (via banco)
+## Conceito
 
-Os 3 posts problemáticos têm status com UUIDs que **não existem** em `social_media_custom_statuses`:
-- `50450643-fbea-4f63-aeb0-65c1e89cb888` → não existe na tabela
-- `d915d6dd-6570-4401-b7c1-d9e99ad4bace` → não existe na tabela
+Dois novos blocos aparecem logo abaixo de "Minhas Tarefas" e "Meus Posts", formando um segundo grid 2 colunas. Eles mostram o que o usuário delegou para outros membros da equipe — permitindo acompanhar o progresso sem precisar ir até a tela de tarefas ou social media.
 
-Por isso o filtro atual falha: ele busca custom statuses da agência e exclui os que contêm "public" no nome — mas esses UUIDs nem aparecem na lista, então não são excluídos. Os posts ficam visíveis no dashboard com status "Pendente" (o fallback do `MyPostsList`).
+- **Tarefas Solicitadas**: tarefas criadas pelo usuário (`created_by = user_id`) mas atribuídas a outra pessoa
+- **Posts Solicitados**: posts criados pelo usuário (`created_by = user_id`) mas atribuídos a outra pessoa
 
----
+## Lógica de Dados
 
-## Abordagem: Dupla correção
-
-### 1. Banco de Dados — Resetar posts com status órfão
-
-Criar uma migração que atualiza os posts que têm status UUID inválido (não presente em `social_media_custom_statuses`) para o status nativo `'published'` — já que esses posts eram antigos e provavelmente já foram publicados.
-
-**SQL da migração:**
-```sql
--- Resetar posts cujo status UUID não existe em social_media_custom_statuses
-UPDATE social_media_posts p
-SET status = 'published'
-WHERE 
-  p.status NOT IN ('pending_approval', 'in_creation', 'revision', 'approved', 'scheduled', 'published')
-  AND NOT EXISTS (
-    SELECT 1 FROM social_media_custom_statuses cs 
-    WHERE cs.id::text = p.status 
-    AND cs.agency_id = p.agency_id
-  );
+### Tarefas Solicitadas
 ```
+tasks WHERE created_by = profile.user_id
+  AND id NOT IN (task_assignments WHERE user_id = profile.user_id)
+  AND status != 'done'
+  AND archived = false
+```
+Ou seja: tarefas que eu criei mas não estou executando eu mesmo. Exibe: título, responsável(eis), prazo, prioridade, status.
 
-Isso resolve o problema na raiz: os posts com status inválido viram `published` e são filtrados naturalmente.
+### Posts Solicitados
+```
+social_media_posts WHERE created_by = profile.user_id
+  AND id NOT IN (post_assignments WHERE user_id = profile.user_id)
+  AND status != 'published'
+  AND archived = false
+```
+Exibe: título, responsável(eis), data agendada, status, plataforma.
 
-### 2. Frontend — Filtro defensivo adicional em `Index.tsx`
+## Novos Componentes
 
-Mesmo após a migração, adicionar uma camada extra de proteção: **verificar se o status do post é um UUID válido que existe nos custom statuses carregados**. Se o status for um UUID mas não estiver em nenhum custom status conhecido, filtrar o post do dashboard.
+### `src/components/dashboard/RequestedTasksList.tsx`
+Componente espelhado no `MyTasksList` mas com diferenças visuais:
+- Título: **"Tarefas Solicitadas"** com ícone `SendHorizontal`
+- Cada linha mostra: título da tarefa + nome(s) do(s) responsável(eis) atribuído(s) + badge de prioridade + prazo
+- Seções: Atrasadas / Hoje / Esta Semana (mesma lógica)
+- Estado vazio: "Nenhuma tarefa solicitada pendente"
+- Sem checkbox de completar (o usuário não é o executor)
 
-**Lógica nova:**
+### `src/components/dashboard/RequestedPostsList.tsx`
+Componente espelhado no `MyPostsList` com diferenças visuais:
+- Título: **"Posts Solicitados"** com ícone `SendHorizontal`
+- Cada linha mostra: título do post + nome(s) do(s) responsável(eis) + badge de status + data agendada
+- Seções: Atrasados / Hoje / Esta Semana / Pendentes (mesma lógica)
+- Estado vazio: "Nenhum post solicitado pendente"
+
+## Mudanças em `Index.tsx`
+
+### Novos estados
 ```typescript
-const validCustomStatusIds = new Set(customStatuses.map(s => s.id));
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const activePosts = rawPosts.filter(p => {
-  if (p.status === 'published') return false;
-  if (p.archived) return false;
-  // Se status é um UUID mas não existe nos custom statuses → status órfão → ignorar
-  if (UUID_REGEX.test(p.status) && !validCustomStatusIds.has(p.status)) return false;
-  // Excluir custom statuses que equivalem a "publicado"
-  if (publishedCustomIds.includes(p.status)) return false;
-  return true;
-});
+const [requestedTasks, setRequestedTasks] = useState<any[]>([]);
+const [requestedPosts, setRequestedPosts] = useState<any[]>([]);
 ```
 
----
+### Dentro de `fetchMyData`
+Buscar tarefas criadas pelo usuário logado que não estão nos seus próprios task_assignments:
+```typescript
+// Tarefas solicitadas pelo usuário (criadas mas não auto-atribuídas)
+const { data: createdTasks } = await supabase
+  .from('tasks')
+  .select('*, clients(name), task_assignments(user_id, profiles(name))')
+  .eq('agency_id', currentAgency.id)
+  .eq('created_by', profile.user_id)
+  .neq('status', 'done')
+  .eq('archived', false);
 
-## Arquivos Modificados
+// Filtrar fora as que o próprio usuário também executa
+const filteredRequestedTasks = (createdTasks || []).filter(t =>
+  !myTaskIds.includes(t.id)
+);
+setRequestedTasks(filteredRequestedTasks);
 
-| Arquivo/Migração | Mudança |
+// Posts solicitados (criados mas não auto-atribuídos)
+const { data: createdPosts } = await supabase
+  .from('social_media_posts')
+  .select('*, clients(name), post_assignments(user_id, profiles(name))')
+  .eq('agency_id', currentAgency.id)
+  .eq('created_by', profile.user_id)
+  .neq('status', 'published')
+  .eq('archived', false);
+
+const filteredRequestedPosts = (createdPosts || []).filter(p =>
+  !myPostIds.includes(p.id)
+);
+setRequestedPosts(filteredRequestedPosts);
+```
+
+### No JSX — novo grid abaixo do grid de Tarefas/Posts
+```jsx
+{/* 5. Grid: Tarefas Solicitadas | Posts Solicitados */}
+<div className="grid gap-4 md:grid-cols-2">
+  <RequestedTasksList
+    tasks={requestedTasks}
+    onViewAll={() => navigate('/dashboard/tasks')}
+  />
+  <RequestedPostsList
+    posts={requestedPosts}
+    customStatuses={myPostCustomStatuses}
+    onViewAll={() => navigate('/dashboard/social-media')}
+  />
+</div>
+```
+
+## Exibição dos Responsáveis
+
+Cada linha nos novos blocos mostra o nome de quem está executando (via join com `task_assignments → profiles`):
+
+```
+[✉] Reels da Semana                    [Em Criação]
+     Maria Silva • 28 fev
+```
+
+Se não houver ninguém atribuído ainda: exibe "Sem responsável" em cinza.
+
+## Arquivos Modificados/Criados
+
+| Arquivo | Operação |
 |---|---|
-| Nova migração SQL | `UPDATE social_media_posts SET status = 'published' WHERE status UUID não existe em custom_statuses` |
-| `src/pages/Index.tsx` | Adicionar filtro defensivo: posts com status UUID órfão são excluídos do dashboard |
+| `src/components/dashboard/RequestedTasksList.tsx` | Criar |
+| `src/components/dashboard/RequestedPostsList.tsx` | Criar |
+| `src/pages/Index.tsx` | Editar — novos estados, nova query, novo grid no JSX |
 
-## O que NÃO muda
+## Ordem Final do Dashboard
 
-- `MyPostsList.tsx` — sem alteração (o fallback "Pendente" pode permanecer como UI safety)
-- Estrutura do kanban de Social Media — sem alteração
-- Nenhum dado é apagado — os posts são preservados com status `published` (que já é o estado correto deles)
-
-## Resultado Final
-
-- Os 3 posts problemáticos (2x Stories - Paragon, Reels da Semana: XXXXX, 2x Stories - Horiz) serão resetados para `published` e desaparecerão do dashboard
-- Futuras instâncias de status órfão também serão filtradas pelo código defensivo, protegendo todos os usuários da plataforma
+1. Header "Meu Dia"
+2. Banner próxima reunião
+3. Bloco de Notas + Linha do Tempo
+4. Rotinas
+5. Minhas Tarefas + Meus Posts
+6. **Tarefas Solicitadas + Posts Solicitados** (NOVO)
+7. Ações Rápidas
+8. Métricas da Agência (admin)
