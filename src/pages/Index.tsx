@@ -309,7 +309,16 @@ const Index = () => {
         </button>
       )}
 
-      {/* 2. Grid: Tarefas | Posts */}
+      {/* 2. Grid: Bloco de Notas | Linha do Tempo */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <NotesBlock />
+        <DayTimeline />
+      </div>
+
+      {/* 3. Rotinas */}
+      <RoutineBlock />
+
+      {/* 4. Grid: Tarefas | Posts */}
       <div className="grid gap-4 md:grid-cols-2">
         <MyTasksList
           tasks={visibleTasks}
@@ -321,15 +330,6 @@ const Index = () => {
           customStatuses={myPostCustomStatuses}
           onViewAll={() => navigate('/dashboard/social-media')}
         />
-      </div>
-
-      {/* 3. Rotinas */}
-      <RoutineBlock />
-
-      {/* 4. Grid: Bloco de Notas | Linha do Tempo */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <NotesBlock />
-        <DayTimeline />
       </div>
 
       {/* 5. Ações Rápidas */}
