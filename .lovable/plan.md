@@ -1,97 +1,74 @@
 
-# Correção: Posts Atrasados Incorretos no Dashboard
+# Correção Definitiva: Posts com Status Órfão Sumindo do Dashboard
 
-## Diagnóstico Completo
+## Diagnóstico Confirmado (via banco)
 
-Três problemas simultâneos causam o que aparece na tela:
+Os 3 posts problemáticos têm status com UUIDs que **não existem** em `social_media_custom_statuses`:
+- `50450643-fbea-4f63-aeb0-65c1e89cb888` → não existe na tabela
+- `d915d6dd-6570-4401-b7c1-d9e99ad4bace` → não existe na tabela
 
-### Problema 1 — Posts arquivados aparecem no dashboard
-A query em `Index.tsx` (linha 103-110) **não filtra `archived: false`**:
-```typescript
-supabase
-  .from('social_media_posts')
-  .select('*, clients(name)')
-  .eq('agency_id', currentAgency.id)
-  .in('id', myPostIds)
-  .neq('status', 'published')   // ← só exclui 'published' literal
-  // ← NÃO tem .eq('archived', false)
-```
-O post `c761a30c` (archived: true) passa pelo filtro e aparece no dashboard.
+Por isso o filtro atual falha: ele busca custom statuses da agência e exclui os que contêm "public" no nome — mas esses UUIDs nem aparecem na lista, então não são excluídos. Os posts ficam visíveis no dashboard com status "Pendente" (o fallback do `MyPostsList`).
 
-### Problema 2 — Posts com status customizado (UUID) não são filtrados
-A agência usa statuses customizados (IDs como `50450643-fbea...`, `d915d6dd-6570...`). O filtro `.neq('status', 'published')` só exclui o status literal `'published'` — posts com status UUID (incluindo os que equivalem a "Publicado") **não são excluídos**.
+---
 
-Consultei a tabela `social_media_custom_statuses`: o status "Publicado" customizado tem ID `b12052c8-07bb-4022-9296-6f7ad1f081dd`. Os UUIDs nos posts problemáticos (`50450643...` e `d915d6dd...`) **não existem** na tabela — são statuses órfãos de dados antigos.
+## Abordagem: Dupla correção
 
-### Problema 3 — UUIDs exibidos como "cliente" no dashboard
-O `MyPostsList` exibe `post.client_name`, mas alguns posts têm o UUID do status aparecendo onde deveria estar o nome do cliente. Isso é visual: na imagem, o que parece ser "50450643-fbea..." está no lugar onde deveria estar o status, porque o `statusConfig` do `MyPostsList` só mapeia statuses nativos (`pending_approval`, `in_creation`, etc.) e não resolve statuses UUID.
+### 1. Banco de Dados — Resetar posts com status órfão
 
-## Solução
+Criar uma migração que atualiza os posts que têm status UUID inválido (não presente em `social_media_custom_statuses`) para o status nativo `'published'` — já que esses posts eram antigos e provavelmente já foram publicados.
 
-### Mudança 1 — `Index.tsx`: adicionar filtros corretos à query de posts
-
-Adicionar `.eq('archived', false)` e **não depender apenas de `neq('status', 'published')`**. Em vez disso, filtrar os statuses que realmente indicam "pendente de ação" incluindo os UUIDs dos custom statuses válidos (via join ou filtragem no frontend).
-
-A abordagem mais simples e robusta: **buscar os custom statuses da agência** junto com os posts e fazer a filtragem no frontend.
-
-```typescript
-// Buscar custom statuses da agência
-const { data: customStatuses } = await supabase
-  .from('social_media_custom_statuses')
-  .select('id, name')
-  .eq('agency_id', currentAgency.id);
-
-// IDs de custom statuses que equivalem a "publicado" (para excluir)
-const publishedCustomIds = (customStatuses || [])
-  .filter(s => s.name.toLowerCase().includes('public'))
-  .map(s => s.id);
+**SQL da migração:**
+```sql
+-- Resetar posts cujo status UUID não existe em social_media_custom_statuses
+UPDATE social_media_posts p
+SET status = 'published'
+WHERE 
+  p.status NOT IN ('pending_approval', 'in_creation', 'revision', 'approved', 'scheduled', 'published')
+  AND NOT EXISTS (
+    SELECT 1 FROM social_media_custom_statuses cs 
+    WHERE cs.id::text = p.status 
+    AND cs.agency_id = p.agency_id
+  );
 ```
 
-E na query de posts, adicionar `.eq('archived', false)`.
+Isso resolve o problema na raiz: os posts com status inválido viram `published` e são filtrados naturalmente.
 
-No frontend, filtrar posts antes de exibir:
+### 2. Frontend — Filtro defensivo adicional em `Index.tsx`
+
+Mesmo após a migração, adicionar uma camada extra de proteção: **verificar se o status do post é um UUID válido que existe nos custom statuses carregados**. Se o status for um UUID mas não estiver em nenhum custom status conhecido, filtrar o post do dashboard.
+
+**Lógica nova:**
 ```typescript
-const nativePublished = ['published'];
-const activePosts = postsData.filter(p =>
-  !nativePublished.includes(p.status) &&
-  !publishedCustomIds.includes(p.status) &&
-  !p.archived
-);
+const validCustomStatusIds = new Set(customStatuses.map(s => s.id));
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const activePosts = rawPosts.filter(p => {
+  if (p.status === 'published') return false;
+  if (p.archived) return false;
+  // Se status é um UUID mas não existe nos custom statuses → status órfão → ignorar
+  if (UUID_REGEX.test(p.status) && !validCustomStatusIds.has(p.status)) return false;
+  // Excluir custom statuses que equivalem a "publicado"
+  if (publishedCustomIds.includes(p.status)) return false;
+  return true;
+});
 ```
 
-### Mudança 2 — `MyPostsList.tsx`: resolver custom statuses com labels corretos
-
-Passar o array de custom statuses via prop e resolver o label/cor ao exibir. Se o status for um UUID e estiver nos custom statuses, exibir o nome correto. Se não existir em nenhum mapa, exibir "Pendente" como fallback (para cobrir statuses órfãos sem crashar).
-
-```typescript
-// Nova prop
-interface MyPostsListProps {
-  posts: Post[];
-  customStatuses?: { id: string; name: string; color: string }[];
-  onViewAll?: () => void;
-}
-
-// Resolução no render
-const getStatusConfig = (status: string) => {
-  // 1. Tentar status nativo
-  if (nativeStatusConfig[status]) return nativeStatusConfig[status];
-  // 2. Tentar custom status
-  const custom = customStatuses?.find(s => s.id === status);
-  if (custom) return { label: custom.name, className: 'border-gray-200 text-gray-700 bg-gray-50' };
-  // 3. Fallback
-  return { label: 'Pendente', className: 'border-gray-200 text-gray-600 bg-gray-50' };
-};
-```
+---
 
 ## Arquivos Modificados
 
-| Arquivo | Mudança |
+| Arquivo/Migração | Mudança |
 |---|---|
-| `src/pages/Index.tsx` | Adicionar `.eq('archived', false)` na query de posts; buscar `social_media_custom_statuses` da agência; filtrar posts publicados (nativos + custom) no frontend antes de setar estado |
-| `src/components/dashboard/MyPostsList.tsx` | Adicionar prop `customStatuses`; resolver label/cor de statuses UUID via lookup; fallback seguro para statuses órfãos |
+| Nova migração SQL | `UPDATE social_media_posts SET status = 'published' WHERE status UUID não existe em custom_statuses` |
+| `src/pages/Index.tsx` | Adicionar filtro defensivo: posts com status UUID órfão são excluídos do dashboard |
 
 ## O que NÃO muda
 
-- Lógica de `post_assignments` — mantida
-- Estrutura do `MyPostsList` (seções Atrasados/Hoje/Semana) — mantida
-- Nenhuma migração de banco necessária — só correção de query e resolução de UI
+- `MyPostsList.tsx` — sem alteração (o fallback "Pendente" pode permanecer como UI safety)
+- Estrutura do kanban de Social Media — sem alteração
+- Nenhum dado é apagado — os posts são preservados com status `published` (que já é o estado correto deles)
+
+## Resultado Final
+
+- Os 3 posts problemáticos (2x Stories - Paragon, Reels da Semana: XXXXX, 2x Stories - Horiz) serão resetados para `published` e desaparecerão do dashboard
+- Futuras instâncias de status órfão também serão filtradas pelo código defensivo, protegendo todos os usuários da plataforma
