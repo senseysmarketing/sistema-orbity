@@ -9,6 +9,8 @@ import { format, isToday, isBefore, startOfDay } from 'date-fns';
 import { MyDayHeader } from '@/components/dashboard/MyDayHeader';
 import { MyTasksList } from '@/components/dashboard/MyTasksList';
 import { MyPostsList } from '@/components/dashboard/MyPostsList';
+import { RequestedTasksList } from '@/components/dashboard/RequestedTasksList';
+import { RequestedPostsList } from '@/components/dashboard/RequestedPostsList';
 import { RoutineBlock } from '@/components/dashboard/RoutineBlock';
 import { NotesBlock } from '@/components/dashboard/NotesBlock';
 import { DayTimeline } from '@/components/dashboard/DayTimeline';
@@ -50,6 +52,8 @@ const Index = () => {
   const [myMeetings, setMyMeetings] = useState<any[]>([]);
   const [myPosts, setMyPosts] = useState<any[]>([]);
   const [myPostCustomStatuses, setMyPostCustomStatuses] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [requestedTasks, setRequestedTasks] = useState<any[]>([]);
+  const [requestedPosts, setRequestedPosts] = useState<any[]>([]);
 
   // --- Agency-wide metrics (admins only) ---
   const [agencyMetrics, setAgencyMetrics] = useState({
@@ -160,6 +164,29 @@ const Index = () => {
           client_name: p.clients?.name,
         }))
       );
+
+      // Tarefas solicitadas (criadas pelo usuário mas não auto-atribuídas)
+      const { data: createdTasks } = await supabase
+        .from('tasks')
+        .select('*, clients(name), task_assignments(user_id, profiles(name))')
+        .eq('agency_id', currentAgency.id)
+        .eq('created_by', profile.user_id)
+        .neq('status', 'done');
+
+      const filteredRequestedTasks = (createdTasks || []).filter((t: any) => !myTaskIds.includes(t.id));
+      setRequestedTasks(filteredRequestedTasks);
+
+      // Posts solicitados (criados pelo usuário mas não auto-atribuídos)
+      const { data: createdPosts } = await supabase
+        .from('social_media_posts')
+        .select('*, clients(name), post_assignments(user_id, profiles(name))')
+        .eq('agency_id', currentAgency.id)
+        .eq('created_by', profile.user_id)
+        .neq('status', 'published')
+        .eq('archived', false);
+
+      const filteredRequestedPosts = (createdPosts || []).filter((p: any) => !myPostIds.includes(p.id));
+      setRequestedPosts(filteredRequestedPosts);
 
       // Admin: fetch agency-wide metrics
       if (isAdmin) {
@@ -332,7 +359,20 @@ const Index = () => {
         />
       </div>
 
-      {/* 5. Ações Rápidas */}
+      {/* 5. Grid: Tarefas Solicitadas | Posts Solicitados */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <RequestedTasksList
+          tasks={requestedTasks}
+          onViewAll={() => navigate('/dashboard/tasks')}
+        />
+        <RequestedPostsList
+          posts={requestedPosts}
+          customStatuses={myPostCustomStatuses}
+          onViewAll={() => navigate('/dashboard/social-media')}
+        />
+      </div>
+
+      {/* 6. Ações Rápidas */}
       <QuickActions />
 
       {/* 6. Métricas da Agência — colapsável, só admins */}
