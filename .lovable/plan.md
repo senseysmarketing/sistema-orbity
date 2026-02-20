@@ -1,126 +1,97 @@
 
-# Correção do RoutineBlock + Integração com Linha do Tempo
+# Correção: Posts Atrasados Incorretos no Dashboard
 
-## Problemas Identificados
+## Diagnóstico Completo
 
-### Bug 1: Formulário de adicionar fecha sozinho (Weekly e Monthly)
+Três problemas simultâneos causam o que aparece na tela:
 
-O problema está na arquitetura do componente. `WeeklyView` e `MonthlyView` são **funções definidas dentro** de `RoutineBlock`:
+### Problema 1 — Posts arquivados aparecem no dashboard
+A query em `Index.tsx` (linha 103-110) **não filtra `archived: false`**:
+```typescript
+supabase
+  .from('social_media_posts')
+  .select('*, clients(name)')
+  .eq('agency_id', currentAgency.id)
+  .in('id', myPostIds)
+  .neq('status', 'published')   // ← só exclui 'published' literal
+  // ← NÃO tem .eq('archived', false)
+```
+O post `c761a30c` (archived: true) passa pelo filtro e aparece no dashboard.
+
+### Problema 2 — Posts com status customizado (UUID) não são filtrados
+A agência usa statuses customizados (IDs como `50450643-fbea...`, `d915d6dd-6570...`). O filtro `.neq('status', 'published')` só exclui o status literal `'published'` — posts com status UUID (incluindo os que equivalem a "Publicado") **não são excluídos**.
+
+Consultei a tabela `social_media_custom_statuses`: o status "Publicado" customizado tem ID `b12052c8-07bb-4022-9296-6f7ad1f081dd`. Os UUIDs nos posts problemáticos (`50450643...` e `d915d6dd...`) **não existem** na tabela — são statuses órfãos de dados antigos.
+
+### Problema 3 — UUIDs exibidos como "cliente" no dashboard
+O `MyPostsList` exibe `post.client_name`, mas alguns posts têm o UUID do status aparecendo onde deveria estar o nome do cliente. Isso é visual: na imagem, o que parece ser "50450643-fbea..." está no lugar onde deveria estar o status, porque o `statusConfig` do `MyPostsList` só mapeia statuses nativos (`pending_approval`, `in_creation`, etc.) e não resolve statuses UUID.
+
+## Solução
+
+### Mudança 1 — `Index.tsx`: adicionar filtros corretos à query de posts
+
+Adicionar `.eq('archived', false)` e **não depender apenas de `neq('status', 'published')`**. Em vez disso, filtrar os statuses que realmente indicam "pendente de ação" incluindo os UUIDs dos custom statuses válidos (via join ou filtragem no frontend).
+
+A abordagem mais simples e robusta: **buscar os custom statuses da agência** junto com os posts e fazer a filtragem no frontend.
 
 ```typescript
-// PROBLEMA: recriada a cada render do pai
-const WeeklyView = () => ( ... );
-const MonthlyView = () => ( ... );
+// Buscar custom statuses da agência
+const { data: customStatuses } = await supabase
+  .from('social_media_custom_statuses')
+  .select('id, name')
+  .eq('agency_id', currentAgency.id);
+
+// IDs de custom statuses que equivalem a "publicado" (para excluir)
+const publishedCustomIds = (customStatuses || [])
+  .filter(s => s.name.toLowerCase().includes('public'))
+  .map(s => s.id);
 ```
 
-Quando o usuário clica em "+ Add", o estado `showAddDay` muda → `RoutineBlock` re-renderiza → `WeeklyView` é uma **função nova** → React desmonta e remonta o componente → o formulário some.
+E na query de posts, adicionar `.eq('archived', false)`.
 
-**Solução:** Transformar `WeeklyView` e `MonthlyView` em componentes externos ao `RoutineBlock` (definidos fora da função), recebendo todas as props necessárias. Isso garante identidade estável e evita a destruição do formulário.
+No frontend, filtrar posts antes de exibir:
+```typescript
+const nativePublished = ['published'];
+const activePosts = postsData.filter(p =>
+  !nativePublished.includes(p.status) &&
+  !publishedCustomIds.includes(p.status) &&
+  !p.archived
+);
+```
 
-### Bug 2: Mensal não funciona
+### Mudança 2 — `MyPostsList.tsx`: resolver custom statuses com labels corretos
 
-Mesmo problema. O `MonthlyView` renderiza dentro do `RoutineBlock`, então qualquer mudança de estado no pai (inclusive `setShowMonthlyAdd(true)`) causa a recriação do componente, fechando o formulário antes que o usuário possa interagir.
-
----
-
-## Solução Técnica
-
-### Reestruturação do RoutineBlock
-
-Extrair `WeeklyView` e `MonthlyView` como componentes de nível de módulo (fora do `export function RoutineBlock`), passando os dados via props:
+Passar o array de custom statuses via prop e resolver o label/cor ao exibir. Se o status for um UUID e estiver nos custom statuses, exibir o nome correto. Se não existir em nenhum mapa, exibir "Pendente" como fallback (para cobrir statuses órfãos sem crashar).
 
 ```typescript
-// Fora do componente principal — identidade estável garantida
-interface WeeklyViewProps {
-  weeklyRoutines: Routine[];
-  completions: Completion[];
-  loading: boolean;
-  showAddDay: number | null;
-  setShowAddDay: (v: number | null) => void;
-  setShowMonthlyAdd: (v: boolean) => void;
-  isCompleted: (r: Routine) => boolean;
-  isLate: (r: Routine) => boolean;
-  handleToggle: (r: Routine) => void;
-  handleDelete: (id: string) => void;
-  handleAdd: (data: ...) => Promise<void>;
-  isoToday: number;
+// Nova prop
+interface MyPostsListProps {
+  posts: Post[];
+  customStatuses?: { id: string; name: string; color: string }[];
+  onViewAll?: () => void;
 }
 
-function WeeklyView(props: WeeklyViewProps) { ... }
-
-interface MonthlyViewProps { ... }
-function MonthlyView(props: MonthlyViewProps) { ... }
+// Resolução no render
+const getStatusConfig = (status: string) => {
+  // 1. Tentar status nativo
+  if (nativeStatusConfig[status]) return nativeStatusConfig[status];
+  // 2. Tentar custom status
+  const custom = customStatuses?.find(s => s.id === status);
+  if (custom) return { label: custom.name, className: 'border-gray-200 text-gray-700 bg-gray-50' };
+  // 3. Fallback
+  return { label: 'Pendente', className: 'border-gray-200 text-gray-600 bg-gray-50' };
+};
 ```
-
-Isso resolve **os dois bugs** de uma só vez.
-
----
-
-## Integração com Linha do Tempo
-
-### O que muda na DayTimeline
-
-A `DayTimeline` atual só exibe notificações. Vamos adicionar uma segunda fonte de dados: **rotinas do usuário que têm horário configurado para hoje**.
-
-**Fluxo de dados:**
-1. Buscar rotinas do usuário com `scheduled_time IS NOT NULL`
-2. Filtrar as que são do dia atual (weekly: `week_days` contém o dia de hoje; monthly: `day_of_month` = dia de hoje)
-3. Combinar com os eventos de notificação em uma lista unificada, ordenada por horário
-4. Exibir rotinas como eventos "planejados" (com ícone de rotina `CheckSquare`) e distinguir entre:
-   - **Pendente** (horário ainda não passou) — cor neutra
-   - **Atrasada** (horário passou, não concluída) — cor destrutiva
-   - **Concluída** (marcada como feita) — cor primária com ✓
-
-### Tipos de eventos na timeline combinada
-
-```typescript
-type TimelineItem =
-  | { source: 'notification'; data: TimelineEvent }
-  | { source: 'routine'; data: Routine; status: 'pending' | 'late' | 'done'; time: string };
-```
-
-### Ordenação
-
-- Notificações ordenadas por `created_at` (já existente)
-- Rotinas ordenadas por `scheduled_time`
-- As duas listas são **mescladas** em ordem cronológica
-- Rotinas sem horário não aparecem na timeline (só aparecem no RoutineBlock)
-
-### UI das rotinas na timeline
-
-```text
-┌─────────────────────────────────────────┐
-│  09:00  [☐] Checar métricas de clientes │  ← Pendente (antes da hora)
-│  10:00  [⚠️] Enviar relatório           │  ← Atrasada (hora passou)
-│  11:14  [✅] Checar e-mails             │  ← Concluída
-│  12:03  [🎯] Novo lead: João Silva      │  ← Notificação normal
-└─────────────────────────────────────────┘
-```
-
-- Badge de tipo: "Rotina" em roxo/indigo, diferenciando de notificações
-- Clique na rotina → marca como concluída diretamente na timeline (toggle)
-- Atualização automática: quando o usuário marca no RoutineBlock, a timeline reflete (ambos compartilham o mesmo query ao Supabase)
-
----
 
 ## Arquivos Modificados
 
 | Arquivo | Mudança |
 |---|---|
-| `src/components/dashboard/RoutineBlock.tsx` | Extração de `WeeklyView` e `MonthlyView` para fora do componente pai (correção dos bugs) |
-| `src/components/dashboard/DayTimeline.tsx` | Adicionar segunda fonte de dados (rotinas de hoje com horário), mesclar e ordenar, UI diferenciada, toggle de conclusão inline |
+| `src/pages/Index.tsx` | Adicionar `.eq('archived', false)` na query de posts; buscar `social_media_custom_statuses` da agência; filtrar posts publicados (nativos + custom) no frontend antes de setar estado |
+| `src/components/dashboard/MyPostsList.tsx` | Adicionar prop `customStatuses`; resolver label/cor de statuses UUID via lookup; fallback seguro para statuses órfãos |
 
-### Sem mudanças de banco
+## O que NÃO muda
 
-Tudo reutiliza as tabelas já existentes:
-- `routines` — filtrado por `user_id` + `scheduled_time IS NOT NULL`
-- `routine_completions` — para determinar status (concluída/pendente)
-- `notifications` — mantida como está
-
----
-
-## Resultado Final
-
-- O botão "+ Add" da view semanal vai abrir o formulário corretamente e ele não vai fechar sozinho
-- A view mensal vai exibir o botão e o formulário funcionando
-- A Linha do Tempo vai mostrar as rotinas do dia com horário, integradas com as notificações, permitindo inclusive marcar como concluída direto da timeline
+- Lógica de `post_assignments` — mantida
+- Estrutura do `MyPostsList` (seções Atrasados/Hoje/Semana) — mantida
+- Nenhuma migração de banco necessária — só correção de query e resolução de UI
