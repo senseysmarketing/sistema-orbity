@@ -267,7 +267,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
               )}
 
               {/* Campos de Redes Sociais */}
-              {(task.platform || task.post_type || task.post_date || task.hashtags?.length || task.creative_instructions) && (
+              {(task.platform || task.post_type || task.post_date || task.hashtags?.length) && (
                 <>
                   <Separator />
                   <div className="space-y-3">
@@ -315,17 +315,22 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                         </div>
                       </div>
                     )}
-                    {task.creative_instructions && (
-                      <div className="flex items-start gap-2">
-                        <Palette className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">Instruções Criativas</p>
-                          <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
-                            <LinkifyText text={task.creative_instructions} />
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Instruções Criativas - para Redes Sociais e Criativos */}
+              {task.creative_instructions && (
+                <>
+                  <Separator />
+                  <div className="flex items-start gap-2">
+                    <Palette className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Instruções Criativas</p>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
+                        <LinkifyText text={task.creative_instructions} />
+                      </p>
+                    </div>
                   </div>
                 </>
               )}

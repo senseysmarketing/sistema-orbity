@@ -18,7 +18,7 @@ export interface TaskType {
 // Tipos padrão do sistema
 const DEFAULT_TYPES: Omit<TaskType, "id" | "agency_id" | "created_at">[] = [
   { slug: "reuniao", name: "Reunião", icon: "📅", is_default: true, is_active: true },
-  { slug: "design", name: "Design", icon: "🎨", is_default: true, is_active: true },
+  { slug: "criativos", name: "Criativos", icon: "🎨", is_default: true, is_active: true },
   { slug: "desenvolvimento", name: "Desenvolvimento", icon: "💻", is_default: true, is_active: true },
   { slug: "conteudo", name: "Conteúdo", icon: "✍️", is_default: true, is_active: true },
   { slug: "suporte", name: "Suporte", icon: "🛠️", is_default: true, is_active: true },
