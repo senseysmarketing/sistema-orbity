@@ -751,6 +751,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
                       platform: result.platform || prev.platform,
                       post_type: result.post_type || prev.post_type,
                       hashtags: result.hashtags?.join(", ") || prev.hashtags,
+                      priority: result.priority || prev.priority,
+                      ...(result.suggested_date ? { post_date: result.suggested_date.split("T")[0], scheduled_date: result.suggested_date } : {}),
                     }));
                     setFormStep(2);
                   }

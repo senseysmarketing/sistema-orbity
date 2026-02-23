@@ -22,6 +22,7 @@ const TASK_TOOLS = [
           suggested_type: { type: "string", description: "Sugestão de tipo baseado no contexto (ex: design, copy, video, social_media, trafego, reuniao, outro)" },
           mentioned_clients: { type: "array", items: { type: "string" }, description: "Nomes de clientes ou empresas mencionados pelo usuário no texto. Extraia apenas nomes próprios de pessoas ou empresas que pareçam ser clientes." },
           mentioned_users: { type: "array", items: { type: "string" }, description: "Nomes de pessoas mencionadas como responsáveis ou que devem executar a tarefa. Extraia nomes próprios de pessoas que o usuário indica como executores (ex: 'a Laryssa vai fazer', 'atribuir pro João')." },
+          suggested_date: { type: "string", description: "Data de vencimento mencionada pelo usuário no formato ISO 8601 (YYYY-MM-DDTHH:mm:ss). Extraia de expressões como 'entregar sexta', 'dia 28', 'amanhã', 'próxima segunda', etc. Use a data atual fornecida no system prompt como referência para calcular datas relativas." },
         },
         required: ["title", "description", "priority"],
         additionalProperties: false,
@@ -47,6 +48,8 @@ const POST_TOOLS = [
           creative_instructions: { type: "string", description: "Instruções de arte/criação para o designer ou editor. Para posts de imagem: inclua sugestões de headlines, subtítulos, CTAs e textos de apoio que devem aparecer na arte. Para vídeos/reels: inclua um mini roteiro com os pontos principais, cenas sugeridas e textos em tela. Adapte ao tipo de conteúdo (feed, stories, reels, carrossel, vídeo)." },
           mentioned_clients: { type: "array", items: { type: "string" }, description: "Nomes de clientes ou empresas mencionados pelo usuário no texto. Extraia apenas nomes próprios de pessoas ou empresas que pareçam ser clientes." },
           mentioned_users: { type: "array", items: { type: "string" }, description: "Nomes de pessoas mencionadas como responsáveis ou que devem executar o post. Extraia nomes próprios de pessoas que o usuário indica como executores (ex: 'a Laryssa vai fazer', 'atribuir pro João')." },
+          priority: { type: "string", enum: ["low", "medium", "high"], description: "Prioridade do post. Use 'high' se o usuário mencionar urgência, pressa ou prioridade alta. Use 'low' para coisas sem pressa. Default: 'medium'." },
+          suggested_date: { type: "string", description: "Data de publicação mencionada pelo usuário no formato ISO 8601 (YYYY-MM-DDTHH:mm:ss). Extraia de expressões como 'postar na quarta', 'dia 28', 'amanhã', 'próxima segunda', etc. Use a data atual fornecida no system prompt como referência para calcular datas relativas." },
         },
         required: ["title", "description", "platform", "post_type", "hashtags", "creative_instructions"],
         additionalProperties: false,
@@ -83,10 +86,10 @@ const DEFAULT_REPORT_PROMPT =
   "Você é um gestor de tráfego pago profissional. Gere uma mensagem direcionada ao cliente com os resultados do período. Inclua um resumo dos dados, uma análise da performance (pontos positivos e o que pode melhorar) e sugestões de próximo passo. Use tom profissional mas acessível, formate para WhatsApp com emojis e negrito (*texto*).";
 
 const TASK_TECHNICAL_INSTRUCTIONS =
-  " IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Se o usuário mencionar nomes de pessoas como responsáveis ou executores da tarefa (ex: 'a Laryssa vai fazer', 'pro João'), extraia esses nomes no campo mentioned_users. Responda sempre em português brasileiro.";
+  " IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Se o usuário mencionar nomes de pessoas como responsáveis ou executores da tarefa (ex: 'a Laryssa vai fazer', 'pro João'), extraia esses nomes no campo mentioned_users. Se o usuário mencionar uma data ou prazo (ex: 'entregar sexta', 'dia 28', 'amanhã', 'próxima segunda'), calcule a data correta usando a data atual como referência e preencha suggested_date no formato ISO 8601. Responda sempre em português brasileiro.";
 
 const POST_TECHNICAL_INSTRUCTIONS =
-  " IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Se o usuário mencionar nomes de pessoas como responsáveis ou executores do post (ex: 'a Laryssa vai fazer', 'pro João'), extraia esses nomes no campo mentioned_users. Responda em português brasileiro.";
+  " IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Se o usuário mencionar nomes de pessoas como responsáveis ou executores do post (ex: 'a Laryssa vai fazer', 'pro João'), extraia esses nomes no campo mentioned_users. Se o usuário mencionar uma data de publicação (ex: 'postar na quarta', 'dia 28', 'amanhã'), calcule a data correta usando a data atual como referência e preencha suggested_date no formato ISO 8601. Se mencionar urgência ou prioridade, preencha o campo priority. Responda em português brasileiro.";
 
 const REPORT_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: A mensagem deve ser direcionada ao cliente (não ao gestor). Use formatação WhatsApp: *negrito* para destaques, emojis para tornar visual. Inclua os números formatados em reais (R$). Responda em português brasileiro. A mensagem deve ser completa e pronta para enviar.";
@@ -139,14 +142,17 @@ serve(async (req) => {
     let tools: any[];
     let toolChoice: any;
 
+    const now = new Date();
+    const dateContext = ` Data e hora atual: ${now.toISOString()} (${now.toLocaleDateString("pt-BR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}).`;
+
     if (type === "prefill_task") {
       const basePrompt = customPrompt || DEFAULT_TASK_PROMPT;
-      systemPrompt = basePrompt + TASK_TECHNICAL_INSTRUCTIONS;
+      systemPrompt = basePrompt + TASK_TECHNICAL_INSTRUCTIONS + dateContext;
       tools = TASK_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_task_data" } };
     } else if (type === "prefill_post") {
       const basePrompt = customPrompt || DEFAULT_POST_PROMPT;
-      systemPrompt = basePrompt + POST_TECHNICAL_INSTRUCTIONS;
+      systemPrompt = basePrompt + POST_TECHNICAL_INSTRUCTIONS + dateContext;
       tools = POST_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_post_data" } };
     } else if (type === "report_traffic") {
