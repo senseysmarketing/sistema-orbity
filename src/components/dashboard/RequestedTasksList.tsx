@@ -56,6 +56,12 @@ export function RequestedTasksList({ tasks, onViewAll }: RequestedTasksListProps
     return !isToday(d) && !isBefore(d, today) && isThisWeek(d, { locale: ptBR });
   });
 
+  const pendingTasks = tasks.filter(t => {
+    if (!t.due_date) return true;
+    const d = new Date(t.due_date);
+    return !isToday(d) && !isBefore(d, today) && !isThisWeek(d, { locale: ptBR });
+  });
+
   const TaskRow = ({ task, showDate = false }: { task: RequestedTask; showDate?: boolean }) => {
     const isOverdue = task.due_date && isBefore(startOfDay(new Date(task.due_date)), today);
     const assignees = task.task_assignments || [];
@@ -104,7 +110,7 @@ export function RequestedTasksList({ tasks, onViewAll }: RequestedTasksListProps
     );
   };
 
-  const isEmpty = overdueTasks.length === 0 && todayTasks.length === 0 && weekTasks.length === 0;
+  const isEmpty = overdueTasks.length === 0 && todayTasks.length === 0 && weekTasks.length === 0 && pendingTasks.length === 0;
 
   return (
     <Card className="h-full">
@@ -147,6 +153,17 @@ export function RequestedTasksList({ tasks, onViewAll }: RequestedTasksListProps
             </h4>
             <div>
               {todayTasks.map(t => <TaskRow key={t.id} task={t} />)}
+            </div>
+          </div>
+        )}
+
+        {pendingTasks.length > 0 && (
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Pendentes ({pendingTasks.length})
+            </h4>
+            <div>
+              {pendingTasks.map(t => <TaskRow key={t.id} task={t} showDate={!!t.due_date} />)}
             </div>
           </div>
         )}

@@ -168,25 +168,55 @@ const Index = () => {
       // Tarefas solicitadas (criadas pelo usuário mas não auto-atribuídas)
       const { data: createdTasks } = await supabase
         .from('tasks')
-        .select('*, clients(name), task_assignments(user_id, profiles(name))')
+        .select('*, clients(name), task_assignments(user_id)')
         .eq('agency_id', currentAgency.id)
         .eq('created_by', profile.user_id)
         .eq('archived', false)
         .neq('status', 'done');
 
-      const filteredRequestedTasks = (createdTasks || []).filter((t: any) => !myTaskIds.includes(t.id));
-      setRequestedTasks(filteredRequestedTasks);
-
       // Posts solicitados (criados pelo usuário mas não auto-atribuídos)
       const { data: createdPosts } = await supabase
         .from('social_media_posts')
-        .select('*, clients(name), post_assignments(user_id, profiles(name))')
+        .select('*, clients(name), post_assignments(user_id)')
         .eq('agency_id', currentAgency.id)
         .eq('created_by', profile.user_id)
         .neq('status', 'published')
         .eq('archived', false);
 
-      const filteredRequestedPosts = (createdPosts || []).filter((p: any) => !myPostIds.includes(p.id));
+      // Collect all user_ids from assignments to fetch profiles in one query
+      const allUserIds = new Set<string>();
+      (createdTasks || []).forEach((t: any) => t.task_assignments?.forEach((a: any) => allUserIds.add(a.user_id)));
+      (createdPosts || []).forEach((p: any) => p.post_assignments?.forEach((a: any) => allUserIds.add(a.user_id)));
+
+      let profilesMap: Record<string, string> = {};
+      if (allUserIds.size > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('user_id, name')
+          .in('user_id', Array.from(allUserIds));
+        (profilesData || []).forEach((p: any) => { profilesMap[p.user_id] = p.name; });
+      }
+
+      // Enrich assignments with profile names
+      const enrichAssignments = (items: any[], assignmentKey: string) =>
+        items.map((item: any) => ({
+          ...item,
+          [assignmentKey]: (item[assignmentKey] || []).map((a: any) => ({
+            ...a,
+            profiles: { name: profilesMap[a.user_id] || null },
+          })),
+        }));
+
+      const filteredRequestedTasks = enrichAssignments(
+        (createdTasks || []).filter((t: any) => !myTaskIds.includes(t.id)),
+        'task_assignments'
+      );
+      setRequestedTasks(filteredRequestedTasks);
+
+      const filteredRequestedPosts = enrichAssignments(
+        (createdPosts || []).filter((p: any) => !myPostIds.includes(p.id)),
+        'post_assignments'
+      );
       setRequestedPosts(filteredRequestedPosts);
 
       // Admin: fetch agency-wide metrics
