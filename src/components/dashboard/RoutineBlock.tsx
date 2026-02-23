@@ -30,6 +30,7 @@ export interface Completion {
   routine_id: string;
   week_number?: number;
   month_number?: number;
+  day_of_week?: number | null;
   year: number;
 }
 
@@ -48,15 +49,18 @@ export function toISODay(jsDay: number): number {
   return jsDay === 0 ? 7 : jsDay;
 }
 
-function calcStreak(completions: Completion[], routineIds: string[], currentWeek: number, currentYear: number): number {
-  if (routineIds.length === 0) return 0;
+function calcStreak(completions: Completion[], weeklyRoutines: Routine[], currentWeek: number, currentYear: number): number {
+  if (weeklyRoutines.length === 0) return 0;
   let streak = 0;
   let w = currentWeek - 1;
   const y = currentYear;
   while (w >= 1) {
     const weekComps = completions.filter(c => c.week_number === w && c.year === y);
-    const completedIds = new Set(weekComps.map(c => c.routine_id));
-    const allDone = routineIds.every(id => completedIds.has(id));
+    // Check that every routine has all its days completed
+    const allDone = weeklyRoutines.every(r => {
+      const days = r.week_days || [];
+      return days.every(day => weekComps.some(c => c.routine_id === r.id && c.day_of_week === day));
+    });
     if (!allDone) break;
     streak++;
     w--;
@@ -78,15 +82,20 @@ export function isRoutineLate(
   const nowM = getMinutes(now);
 
   if (routine.type === 'weekly') {
-    const done = completions.some(c => c.routine_id === routine.id && c.week_number === currentWeek && c.year === currentYear);
-    if (done) return false;
     const days = routine.week_days || [];
-    if (routine.scheduled_time) {
-      const [h, m] = routine.scheduled_time.split(':').map(Number);
-      return days.some(d => d < isoToday || (d === isoToday && (nowH > h || (nowH === h && nowM >= m))));
-    } else {
-      return days.some(d => d < isoToday);
-    }
+    // Check each individual day
+    return days.some(d => {
+      const dayDone = completions.some(c =>
+        c.routine_id === routine.id && c.week_number === currentWeek && c.year === currentYear && c.day_of_week === d
+      );
+      if (dayDone) return false;
+      if (d < isoToday) return true;
+      if (d === isoToday && routine.scheduled_time) {
+        const [h, m] = routine.scheduled_time.split(':').map(Number);
+        return nowH > h || (nowH === h && nowM >= m);
+      }
+      return false;
+    });
   } else {
     const done = completions.some(c => c.routine_id === routine.id && c.month_number === currentMonth && c.year === currentYear);
     if (done) return false;
@@ -99,6 +108,43 @@ export function isRoutineLate(
     }
     return false;
   }
+}
+
+/** Check if a specific day of a weekly routine is completed */
+export function isWeeklyDayCompleted(
+  routineId: string,
+  dayIso: number,
+  currentWeek: number,
+  currentYear: number,
+  completions: Completion[]
+): boolean {
+  return completions.some(c =>
+    c.routine_id === routineId && c.week_number === currentWeek && c.year === currentYear && c.day_of_week === dayIso
+  );
+}
+
+/** Check if a specific day of a weekly routine is late */
+export function isWeeklyDayLate(
+  routine: Routine,
+  dayIso: number,
+  now: Date,
+  currentWeek: number,
+  currentYear: number,
+  completions: Completion[]
+): boolean {
+  const isoToday = toISODay(getDay(now));
+  const nowH = getHours(now);
+  const nowM = getMinutes(now);
+
+  const done = isWeeklyDayCompleted(routine.id, dayIso, currentWeek, currentYear, completions);
+  if (done) return false;
+
+  if (dayIso < isoToday) return true;
+  if (dayIso === isoToday && routine.scheduled_time) {
+    const [h, m] = routine.scheduled_time.split(':').map(Number);
+    return nowH > h || (nowH === h && nowM >= m);
+  }
+  return false;
 }
 
 // ─── Add Routine Form ───────────────────────────────────────────────────────
@@ -218,7 +264,7 @@ interface WeeklyViewProps {
   currentWeek: number;
   currentMonth: number;
   currentYear: number;
-  handleToggle: (r: Routine) => void;
+  handleToggle: (r: Routine, dayIso: number) => void;
   handleDelete: (id: string) => void;
   handleAdd: (data: { title: string; week_days: number[]; scheduled_time: string; day_of_month: number | null }) => Promise<void>;
 }
@@ -228,14 +274,11 @@ function WeeklyView({
   isoToday, now, currentWeek, currentMonth, currentYear,
   handleToggle, handleDelete, handleAdd,
 }: WeeklyViewProps) {
-  const isCompleted = (routine: Routine) =>
-    completions.some(c => c.routine_id === routine.id && c.week_number === currentWeek && c.year === currentYear);
-
   return (
     <div className="overflow-x-auto -mx-1 px-1">
       <div className="flex gap-2 min-w-[560px]">
         {WEEK_DAYS.map(day => {
-          const isToday = day.iso === isoToday;
+          const isDayToday = day.iso === isoToday;
           const dayRoutines = weeklyRoutines.filter(r => (r.week_days || []).includes(day.iso));
           const isAddingHere = showAddDay === day.iso;
 
@@ -244,14 +287,14 @@ function WeeklyView({
               key={day.iso}
               className={cn(
                 'flex-1 rounded-lg border p-2 min-h-[120px] flex flex-col gap-1.5',
-                isToday ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/20'
+                isDayToday ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/20'
               )}
             >
               <div className="flex items-center justify-between mb-1">
-                <span className={cn('text-xs font-semibold', isToday ? 'text-primary' : 'text-muted-foreground')}>
+                <span className={cn('text-xs font-semibold', isDayToday ? 'text-primary' : 'text-muted-foreground')}>
                   {day.label}
                 </span>
-                {isToday && (
+                {isDayToday && (
                   <Badge variant="outline" className="text-[10px] h-4 px-1 border-primary/40 text-primary bg-primary/10">Hoje</Badge>
                 )}
               </div>
@@ -260,8 +303,8 @@ function WeeklyView({
                 <div className="h-8 bg-muted animate-pulse rounded" />
               ) : (
                 dayRoutines.map(routine => {
-                  const done = isCompleted(routine);
-                  const late = !done && isRoutineLate(routine, now, currentWeek, currentMonth, currentYear, completions);
+                  const done = isWeeklyDayCompleted(routine.id, day.iso, currentWeek, currentYear, completions);
+                  const late = !done && isWeeklyDayLate(routine, day.iso, now, currentWeek, currentYear, completions);
                   return (
                     <div
                       key={routine.id}
@@ -275,7 +318,7 @@ function WeeklyView({
                       <div className="flex items-start gap-1.5">
                         <Checkbox
                           checked={done}
-                          onCheckedChange={() => handleToggle(routine)}
+                          onCheckedChange={() => handleToggle(routine, day.iso)}
                           className="mt-0.5 shrink-0 h-3.5 w-3.5"
                         />
                         <span className={cn('flex-1 leading-tight break-words', done && 'line-through text-muted-foreground')}>
@@ -344,7 +387,7 @@ interface MonthlyViewProps {
   currentWeek: number;
   currentMonth: number;
   currentYear: number;
-  handleToggle: (r: Routine) => void;
+  handleToggle: (r: Routine, dayIso?: number) => void;
   handleDelete: (id: string) => void;
   handleAdd: (data: { title: string; week_days: number[]; scheduled_time: string; day_of_month: number | null }) => Promise<void>;
 }
@@ -487,32 +530,48 @@ export function RoutineBlock() {
 
   useEffect(() => { fetchData(); }, [profile?.user_id]);
 
-  const isCompleted = (routine: Routine) => {
-    if (routine.type === 'weekly') {
-      return completions.some(c => c.routine_id === routine.id && c.week_number === currentWeek && c.year === currentYear);
-    }
-    return completions.some(c => c.routine_id === routine.id && c.month_number === currentMonth && c.year === currentYear);
-  };
-
-  const handleToggle = async (routine: Routine) => {
+  const handleToggle = async (routine: Routine, dayIso?: number) => {
     if (!profile) return;
-    const done = isCompleted(routine);
-    if (done) {
-      const comp = completions.find(c => {
-        if (c.routine_id !== routine.id) return false;
-        if (routine.type === 'weekly') return c.week_number === currentWeek && c.year === currentYear;
-        return c.month_number === currentMonth && c.year === currentYear;
-      });
-      if (comp) {
-        await supabase.from('routine_completions').delete().eq('id', comp.id);
-        setCompletions(prev => prev.filter(c => c.id !== comp.id));
+
+    if (routine.type === 'weekly' && dayIso !== undefined) {
+      const done = isWeeklyDayCompleted(routine.id, dayIso, currentWeek, currentYear, completions);
+      if (done) {
+        const comp = completions.find(c =>
+          c.routine_id === routine.id && c.week_number === currentWeek && c.year === currentYear && c.day_of_week === dayIso
+        );
+        if (comp) {
+          await supabase.from('routine_completions').delete().eq('id', comp.id);
+          setCompletions(prev => prev.filter(c => c.id !== comp.id));
+        }
+      } else {
+        const payload: any = {
+          routine_id: routine.id,
+          user_id: profile.user_id,
+          year: currentYear,
+          week_number: currentWeek,
+          day_of_week: dayIso,
+        };
+        const { data } = await supabase.from('routine_completions').insert(payload).select().single();
+        if (data) setCompletions(prev => [...prev, data as Completion]);
       }
     } else {
-      const payload: any = { routine_id: routine.id, user_id: profile.user_id, year: currentYear };
-      if (routine.type === 'weekly') payload.week_number = currentWeek;
-      else payload.month_number = currentMonth;
-      const { data } = await supabase.from('routine_completions').insert(payload).select().single();
-      if (data) setCompletions(prev => [...prev, data as Completion]);
+      // Monthly toggle (unchanged logic)
+      const done = completions.some(c =>
+        c.routine_id === routine.id && c.month_number === currentMonth && c.year === currentYear
+      );
+      if (done) {
+        const comp = completions.find(c =>
+          c.routine_id === routine.id && c.month_number === currentMonth && c.year === currentYear
+        );
+        if (comp) {
+          await supabase.from('routine_completions').delete().eq('id', comp.id);
+          setCompletions(prev => prev.filter(c => c.id !== comp.id));
+        }
+      } else {
+        const payload: any = { routine_id: routine.id, user_id: profile.user_id, year: currentYear, month_number: currentMonth };
+        const { data } = await supabase.from('routine_completions').insert(payload).select().single();
+        if (data) setCompletions(prev => [...prev, data as Completion]);
+      }
     }
   };
 
@@ -546,10 +605,24 @@ export function RoutineBlock() {
   const weeklyRoutines = routines.filter(r => r.type === 'weekly');
   const monthlyRoutines = routines.filter(r => r.type === 'monthly').sort((a, b) => (a.day_of_month || 0) - (b.day_of_month || 0));
 
-  const tabRoutines = tab === 'weekly' ? weeklyRoutines : monthlyRoutines;
-  const completedCount = tabRoutines.filter(r => isCompleted(r)).length;
-  const progress = tabRoutines.length > 0 ? Math.round((completedCount / tabRoutines.length) * 100) : 0;
-  const streak = calcStreak(completions, weeklyRoutines.map(r => r.id), currentWeek, currentYear);
+  // Weekly progress: count total day-slots vs completed day-slots
+  const totalWeeklySlots = weeklyRoutines.reduce((sum, r) => sum + (r.week_days || []).length, 0);
+  const completedWeeklySlots = weeklyRoutines.reduce((sum, r) => {
+    return sum + (r.week_days || []).filter(d =>
+      isWeeklyDayCompleted(r.id, d, currentWeek, currentYear, completions)
+    ).length;
+  }, 0);
+
+  // Monthly progress
+  const monthlyCompleted = monthlyRoutines.filter(r =>
+    completions.some(c => c.routine_id === r.id && c.month_number === currentMonth && c.year === currentYear)
+  ).length;
+
+  const isWeeklyTab = tab === 'weekly';
+  const progressTotal = isWeeklyTab ? totalWeeklySlots : monthlyRoutines.length;
+  const progressDone = isWeeklyTab ? completedWeeklySlots : monthlyCompleted;
+  const progress = progressTotal > 0 ? Math.round((progressDone / progressTotal) * 100) : 0;
+  const streak = calcStreak(completions, weeklyRoutines, currentWeek, currentYear);
 
   return (
     <Card>
@@ -574,10 +647,10 @@ export function RoutineBlock() {
           </TabsList>
 
           <TabsContent value="weekly" className="mt-3 space-y-3">
-            {tabRoutines.length > 0 && (
+            {progressTotal > 0 && (
               <div className="space-y-1">
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{completedCount} de {tabRoutines.length} concluídas esta semana</span>
+                  <span>{progressDone} de {progressTotal} concluídas esta semana</span>
                   <span className="font-semibold text-primary">{progress}%</span>
                 </div>
                 <Progress value={progress} className="h-1.5" />
@@ -601,13 +674,13 @@ export function RoutineBlock() {
           </TabsContent>
 
           <TabsContent value="monthly" className="mt-3 space-y-3">
-            {tabRoutines.length > 0 && (
+            {monthlyRoutines.length > 0 && (
               <div className="space-y-1">
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{completedCount} de {tabRoutines.length} concluídas este mês</span>
-                  <span className="font-semibold text-primary">{progress}%</span>
+                  <span>{monthlyCompleted} de {monthlyRoutines.length} concluídas este mês</span>
+                  <span className="font-semibold text-primary">{Math.round(monthlyRoutines.length > 0 ? (monthlyCompleted / monthlyRoutines.length) * 100 : 0)}%</span>
                 </div>
-                <Progress value={progress} className="h-1.5" />
+                <Progress value={monthlyRoutines.length > 0 ? Math.round((monthlyCompleted / monthlyRoutines.length) * 100) : 0} className="h-1.5" />
               </div>
             )}
             <MonthlyView
