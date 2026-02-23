@@ -1,71 +1,48 @@
 
+# Corrigir Tarefas/Posts Solicitados que nao aparecem
 
-# Correcoes no Dashboard: Tarefas/Posts Solicitados, Timeline e Rotinas
+## Problema Raiz
 
-## Problema 1: Tarefas/Posts Solicitados nao aparecem
+As queries de "Tarefas Solicitadas" e "Posts Solicitados" no `Index.tsx` estao retornando **erro 400** do Supabase:
 
-A query de tarefas solicitadas no `Index.tsx` (linha 169) nao filtra `archived = false`. Tarefas arquivadas estao poluindo ou impedindo a exibicao. Alem disso, tasks com status customizado equivalente a "done" (como `em_revisao`) nao sao filtradas, mas isso e menor.
+```
+"Could not find a relationship between 'task_assignments' and 'profiles'"
+"Could not find a relationship between 'post_assignments' and 'profiles'"
+```
 
-**Correcao**: Adicionar `.eq('archived', false)` na query de tarefas solicitadas.
+A causa e que nao existe foreign key de `task_assignments.user_id` para `profiles`, nem de `post_assignments.user_id` para `profiles`. O Supabase PostgREST nao consegue fazer o join `task_assignments(user_id, profiles(name))`.
 
-## Problema 2: Timeline nao exibe tarefas/posts solicitados
+Como resultado, ambas as queries falham silenciosamente (retornam `null`), e o componente recebe um array vazio.
 
-O componente `DayTimeline.tsx` so busca notificacoes e rotinas. Nao busca tarefas nem posts do usuario para o dia. O usuario quer ver suas tarefas (com `due_date` de hoje) e posts (com `scheduled_date` de hoje) tambem na linha do tempo, incluindo os solicitados.
+## Solucao
 
-**Correcao**: No `DayTimeline.tsx`, buscar tambem:
-- Tarefas atribuidas ao usuario com `due_date` de hoje
-- Posts atribuidos ao usuario com `scheduled_date` de hoje
-- Tarefas criadas pelo usuario (solicitadas) com `due_date` de hoje
-- Posts criados pelo usuario (solicitados) com `scheduled_date` de hoje
+Alterar as queries no `Index.tsx` para buscar tarefas/posts **sem o join aninhado de profiles**. Em vez disso, buscar apenas `task_assignments(user_id)` e `post_assignments(user_id)`, e depois fazer uma segunda query para buscar os nomes dos usuarios.
 
-Exibi-los como itens na timeline usando o horario do `due_date` (se tiver hora) ou no topo (se for apenas data).
-
-## Problema 3: Rotinas com multiplos dias tratadas como uma so
-
-Este e o bug principal. A tabela `routine_completions` rastreia conclusao por **semana** (`week_number`), nao por **dia**. Uma rotina com `week_days: [1, 3, 5]` (Seg, Qua, Sex) ao ser marcada como concluida na segunda-feira, cria um registro com `week_number = X`, e isso faz o sistema considerar TODOS os dias daquela semana como concluidos.
-
-**Correcao**:
-1. Adicionar coluna `day_of_week` (integer, nullable) na tabela `routine_completions`
-2. Ao marcar/desmarcar uma rotina semanal, salvar o `day_of_week` especifico
-3. Atualizar `isCompleted()` para verificar por dia especifico
-4. Atualizar `isRoutineLate()` para verificar cada dia individualmente
-5. Na `WeeklyView`, verificar conclusao por dia
-6. Na `DayTimeline`, verificar conclusao por dia
+Tambem adicionar na `RequestedTasksList` uma secao "Pendentes" para tarefas sem data ou com data futura (alem desta semana), igual ja existe no `RequestedPostsList`.
 
 ## Mudancas Tecnicas
 
-### Migracao de Banco
+### `src/pages/Index.tsx`
 
-Adicionar coluna `day_of_week` na tabela `routine_completions`:
+Alterar as duas queries (linhas 169-175 e 181-187):
 
-```sql
-ALTER TABLE routine_completions ADD COLUMN day_of_week integer;
+**Antes:**
+```
+task_assignments(user_id, profiles(name))
 ```
 
-### Arquivos Modificados
+**Depois:**
+```
+task_assignments(user_id)
+```
+
+Apos buscar as tarefas/posts, fazer uma query separada para `profiles` usando os `user_id`s encontrados nas assignments, e montar o objeto `profiles: { name }` manualmente antes de passar para os componentes.
+
+### `src/components/dashboard/RequestedTasksList.tsx`
+
+Adicionar secao "Pendentes" para tarefas sem `due_date` ou com data alem desta semana (mesma logica que `RequestedPostsList` ja tem com `pendingNoDue`). Atualizar o calculo de `isEmpty` para incluir essa nova secao.
 
 | Arquivo | Descricao |
 |---|---|
-| `src/pages/Index.tsx` | Adicionar filtro `archived = false` na query de tarefas solicitadas |
-| `src/components/dashboard/DayTimeline.tsx` | Buscar e exibir tarefas e posts do dia na timeline |
-| `src/components/dashboard/RoutineBlock.tsx` | Alterar `isCompleted`, `handleToggle`, `isRoutineLate` e `WeeklyView` para usar `day_of_week` |
-
-### Detalhes de cada arquivo
-
-**Index.tsx**: Linha 173, adicionar `.eq('archived', false)` na query de `createdTasks`.
-
-**DayTimeline.tsx**:
-- Buscar `task_assignments` do usuario para pegar IDs de tarefas
-- Buscar tarefas com `due_date` de hoje
-- Buscar `post_assignments` do usuario para pegar IDs de posts
-- Buscar posts com `scheduled_date` de hoje
-- Buscar tarefas/posts criados pelo usuario (solicitados) com data de hoje
-- Montar items de timeline para cada um, usando o horario do `due_date`/`scheduled_date`
-
-**RoutineBlock.tsx**:
-- `isCompleted(routine)` para weekly: verificar `c.day_of_week === dayIso` alem de `c.week_number`
-- `handleToggle(routine)`: receber o `dayIso` como parametro, incluir `day_of_week` no insert
-- `isRoutineLate()`: verificar cada dia individualmente contra completions com `day_of_week` correspondente
-- `WeeklyView`: passar o dia especifico ao chamar `handleToggle`
-- Progresso semanal: contar total de slots (soma de `week_days.length` de cada rotina) vs completions com `day_of_week`
-
+| `src/pages/Index.tsx` | Corrigir queries removendo join invalido e buscando profiles separadamente |
+| `src/components/dashboard/RequestedTasksList.tsx` | Adicionar secao "Pendentes" para tarefas sem data |
