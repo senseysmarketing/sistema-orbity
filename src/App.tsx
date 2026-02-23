@@ -39,6 +39,8 @@ import ClientDetail from "./pages/ClientDetail";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Install from "./pages/Install";
 import NotificationSettings from "./pages/NotificationSettings";
+import Projects from "./pages/Projects";
+import ProjectDetail from "./pages/ProjectDetail";
 
 
 const queryClient = new QueryClient({
@@ -103,6 +105,8 @@ const App = () => (
                           <Route index element={<Index />} />
                           <Route path="clients" element={<Clients />} />
                           <Route path="clients/:id" element={<ClientDetail />} />
+                          <Route path="projects" element={<Projects />} />
+                          <Route path="projects/:id" element={<ProjectDetail />} />
                           <Route path="tasks" element={<Tasks />} />
                           <Route path="reminders" element={<Reminders />} />
                           <Route path="crm" element={<CRM />} />
