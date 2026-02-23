@@ -1,16 +1,13 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, LayoutGrid, Settings, TrendingUp, Plus, ClipboardList } from "lucide-react";
+import { Calendar, Settings, TrendingUp, ClipboardList } from "lucide-react";
 import { SocialMediaCalendar } from "@/components/social-media/SocialMediaCalendar";
-import { PostKanban } from "@/components/social-media/PostKanban";
 import { SocialMediaSettings } from "@/components/social-media/SocialMediaSettings";
 import { SocialMediaAnalytics } from "@/components/social-media/SocialMediaAnalytics";
 import { WeeklyPlanningView } from "@/components/social-media/WeeklyPlanningView";
-import { Button } from "@/components/ui/button";
 
 export default function SocialMedia() {
   const [activeTab, setActiveTab] = useState("planning");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -21,16 +18,10 @@ export default function SocialMedia() {
             Gerencie todo o workflow de criação de conteúdo para redes sociais
           </p>
         </div>
-        {activeTab === "kanban" && (
-          <Button onClick={() => setIsCreateDialogOpen(true)} className="h-9">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline ml-2">Novo Post</span>
-          </Button>
-        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
           <TabsTrigger value="planning" className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4" />
             <span className="hidden sm:inline">Planejamento</span>
@@ -38,10 +29,6 @@ export default function SocialMedia() {
           <TabsTrigger value="calendar" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             <span className="hidden sm:inline">Calendário</span>
-          </TabsTrigger>
-          <TabsTrigger value="kanban" className="flex items-center gap-2">
-            <LayoutGrid className="h-4 w-4" />
-            <span className="hidden sm:inline">Kanban</span>
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
@@ -59,13 +46,6 @@ export default function SocialMedia() {
 
         <TabsContent value="calendar" className="space-y-4">
           <SocialMediaCalendar />
-        </TabsContent>
-
-        <TabsContent value="kanban" className="space-y-4">
-          <PostKanban 
-            isCreateDialogOpen={isCreateDialogOpen}
-            onCreateDialogOpenChange={setIsCreateDialogOpen}
-          />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">

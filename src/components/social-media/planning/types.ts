@@ -1,7 +1,7 @@
-import { SocialMediaPost } from '@/hooks/useSocialMediaPosts';
+import { SocialMediaTask } from '@/hooks/useSocialMediaTasks';
 
 export interface DayData {
-  posts: SocialMediaPost[];
+  posts: SocialMediaTask[];
   ready: number;      // approved + published
   inProgress: number; // in_creation + pending_approval
   draft: number;      // draft/briefing
@@ -32,9 +32,9 @@ export interface ClientWeekPlan {
 export type ReadinessFilter = 'all' | 'ready' | 'in_progress' | 'pending' | 'overdue';
 
 export const STATUS_CATEGORIES = {
-  ready: ['approved', 'published', 'aprovado', 'publicado'],
-  inProgress: ['in_creation', 'pending_approval', 'em_criacao', 'aguardando_aprovacao', 'revisao'],
-  draft: ['draft', 'briefing', 'rascunho'],
+  ready: ['approved', 'published', 'aprovado', 'publicado', 'completed', 'done'],
+  inProgress: ['in_creation', 'pending_approval', 'em_criacao', 'aguardando_aprovacao', 'revisao', 'in_progress', 'review', 'revision'],
+  draft: ['draft', 'briefing', 'rascunho', 'todo', 'pending'],
 } as const;
 
 export const STATUS_DISPLAY_LABELS: Record<string, string> = {
@@ -51,6 +51,13 @@ export const STATUS_DISPLAY_LABELS: Record<string, string> = {
   aprovado: 'Aprovado',
   publicado: 'Publicado',
   revisao: 'Em Revisão',
+  // Task statuses
+  todo: 'Briefing',
+  pending: 'Briefing',
+  in_progress: 'Em Criação',
+  review: 'Aguardando Aprovação',
+  completed: 'Publicado',
+  done: 'Publicado',
 };
 
 export function translateStatus(status: string): string {
