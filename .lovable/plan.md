@@ -1,51 +1,61 @@
 
+# Detecção de Data e Prioridade pela IA
 
-# Auto-vincular Usuarios Mencionados via IA
+## Problema Identificado
 
-## Resumo
+Analisando o código, encontrei dois problemas:
 
-Adicionar extração automática de nomes de usuários mencionados no texto da IA, usando o mesmo padrão de match fuzzy que já funciona para clientes. Quando o usuário disser algo como "quero que a Laryssa faça...", a IA extrairá "Laryssa" e o sistema vinculará automaticamente ao perfil correspondente.
+1. **Posts - Prioridade não aplicada**: A IA não tem campo `priority` no tool `extract_post_data`, e mesmo que tivesse, o callback do prefill não aplica a prioridade ao `formData` (linhas 746-754 do PostFormDialog).
+
+2. **Posts e Tarefas - Data ignorada**: Nenhum dos tools (`extract_post_data` e `extract_task_data`) possui campo de data. Quando o usuário diz "postar na quarta" ou "entregar dia 28", a IA simplesmente ignora essa informação.
 
 ## O que muda para o usuário
 
-- Ao mencionar nomes de membros da equipe no texto para a IA (ex: "a Laryssa vai fazer", "atribuir pro João"), o campo "Usuários atribuídos" será preenchido automaticamente
-- Funciona tanto para Tarefas quanto para Posts
-- Usa o mesmo match fuzzy que já existe para clientes (normaliza acentos, case insensitive, match parcial)
+- Ao mencionar uma data no texto (ex: "postar na quarta-feira", "para o dia 28/02", "entregar amanhã"), a IA preencherá automaticamente o campo de data correspondente
+- Ao mencionar prioridade nos posts (ex: "urgente", "prioridade alta"), o campo de prioridade será preenchido automaticamente
+- Para tarefas, a prioridade já funcionava corretamente - apenas a data será adicionada
 
 ## Mudanças Técnicas
 
 ### 1. Edge Function `ai-assist/index.ts`
 
-Adicionar campo `mentioned_users` nos dois tools (TASK_TOOLS e POST_TOOLS):
-- Tipo: array de strings
-- Descrição: "Nomes de pessoas mencionadas como responsáveis ou que devem executar a tarefa/post. Extraia nomes próprios de pessoas que o usuário indica como executores."
+**POST_TOOLS** - Adicionar dois campos:
+- `priority`: enum ["low", "medium", "high"] - "Prioridade do post. Use 'high' se o usuário mencionar urgência."
+- `suggested_date`: string - "Data mencionada pelo usuário no formato ISO 8601 (YYYY-MM-DDTHH:mm:ss). Extraia de expressões como 'postar na quarta', 'dia 28', 'amanhã', etc."
 
-Adicionar nas instruções técnicas (TASK_TECHNICAL_INSTRUCTIONS e POST_TECHNICAL_INSTRUCTIONS) a orientação para extrair nomes de usuários mencionados.
+**TASK_TOOLS** - Adicionar um campo:
+- `suggested_date`: string - "Data de vencimento mencionada pelo usuário no formato ISO 8601 (YYYY-MM-DDTHH:mm:ss). Extraia de expressões como 'entregar sexta', 'dia 28', 'amanhã', etc."
+
+**Instruções Técnicas** - Adicionar em ambos (TASK e POST):
+- Orientação para a IA considerar a data atual ao interpretar datas relativas ("amanhã", "próxima segunda")
+- Enviar a data atual no system prompt para contexto temporal
+
+**System Prompt** - Incluir a data atual (gerada no momento da requisição) para que a IA calcule datas relativas corretamente.
 
 ### 2. `src/hooks/useAIAssist.tsx`
 
-Adicionar `mentioned_users?: string[]` nas interfaces `TaskPrefillResult` e `PostPrefillResult`.
+- Adicionar `suggested_date?: string` em `PostPrefillResult`
+- Adicionar `priority?: string` em `PostPrefillResult`
+- Adicionar `suggested_date?: string` em `TaskPrefillResult`
 
-### 3. `src/pages/Tasks.tsx`
+### 3. `src/components/social-media/PostFormDialog.tsx`
 
-No callback do AI prefill (passo 1), após o match de clientes, adicionar match de usuários:
-- Usar a mesma função `normalize` que já existe
-- Comparar `result.mentioned_users` contra `profiles` (que já está carregado)
-- Setar `newTask.assigned_users` com os user_ids correspondentes
+No callback do AI prefill (linha 746), adicionar:
+- Aplicar `result.priority` ao `formData.priority`
+- Aplicar `result.suggested_date` ao `formData.post_date` (e consequentemente `scheduled_date`)
 
-### 4. `src/components/social-media/PostFormDialog.tsx`
+### 4. `src/pages/Tasks.tsx`
 
-No callback do AI prefill (passo 1), após o match de clientes, adicionar match de usuários:
-- Comparar `result.mentioned_users` contra `profiles` (que já está carregado)
-- Chamar `setSelectedUserIds` com os IDs correspondentes
+No callback do AI prefill (linha 927), adicionar:
+- Aplicar `result.suggested_date` ao `newTask.due_date`
 
 ## Arquivos Modificados
 
 | Arquivo | Operação | Descrição |
 |---|---|---|
-| `supabase/functions/ai-assist/index.ts` | Editar | Adicionar `mentioned_users` nos tools e instruções |
-| `src/hooks/useAIAssist.tsx` | Editar | Adicionar campo na interface |
-| `src/pages/Tasks.tsx` | Editar | Match fuzzy de usuários no prefill |
-| `src/components/social-media/PostFormDialog.tsx` | Editar | Match fuzzy de usuários no prefill |
+| `supabase/functions/ai-assist/index.ts` | Editar | Adicionar campos de data e prioridade nos tools + data atual no prompt |
+| `src/hooks/useAIAssist.tsx` | Editar | Adicionar campos nas interfaces |
+| `src/components/social-media/PostFormDialog.tsx` | Editar | Aplicar prioridade e data do resultado da IA |
+| `src/pages/Tasks.tsx` | Editar | Aplicar data do resultado da IA |
 
 Nenhuma mudança de banco de dados necessária.
