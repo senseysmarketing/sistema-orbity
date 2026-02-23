@@ -23,14 +23,11 @@ type RoutineStatus = 'pending' | 'late' | 'done';
 
 interface TimelineItem {
   id: string;
-  time: string; // HH:MM for sorting
+  time: string;
   source: 'notification' | 'routine' | 'task' | 'post';
-  // notification
   notif?: TimelineEvent;
-  // routine
   routine?: Routine;
   routineStatus?: RoutineStatus;
-  // task/post
   itemTitle?: string;
   itemStatus?: string;
   itemClientName?: string;
@@ -68,7 +65,7 @@ export function DayTimeline() {
     if (!profile || !currentAgency) return;
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const [notifsRes, routinesRes, completionsRes, taskAssignRes, postAssignRes] = await Promise.all([
+    const [notifsRes, routinesRes, completionsRes, taskAssignRes] = await Promise.all([
       supabase
         .from('notifications')
         .select('id, type, title, message, created_at, action_url')
@@ -92,23 +89,18 @@ export function DayTimeline() {
         .from('task_assignments')
         .select('task_id')
         .eq('user_id', profile.user_id),
-      supabase
-        .from('post_assignments')
-        .select('post_id')
-        .eq('user_id', profile.user_id),
     ]);
 
     const notifs: TimelineEvent[] = notifsRes.data || [];
     const routines: Routine[] = (routinesRes.data || []) as Routine[];
     const completions: Completion[] = (completionsRes.data || []) as Completion[];
     const myTaskIds = (taskAssignRes.data || []).map((a: any) => a.task_id);
-    const myPostIds = (postAssignRes.data || []).map((a: any) => a.post_id);
 
-    // Fetch tasks for today (assigned + created/requested)
+    // Fetch ALL tasks for today (both regular and social media — unified)
     const assignedTasksRes = myTaskIds.length > 0
       ? await supabase
           .from('tasks')
-          .select('id, title, status, due_date, clients(name)')
+          .select('id, title, status, due_date, task_type, metadata, clients(name)')
           .eq('agency_id', currentAgency.id)
           .eq('archived', false)
           .gte('due_date', `${todayStr}T00:00:00`)
@@ -118,42 +110,17 @@ export function DayTimeline() {
 
     const createdTasksRes = await supabase
       .from('tasks')
-      .select('id, title, status, due_date, clients(name)')
+      .select('id, title, status, due_date, task_type, metadata, clients(name)')
       .eq('agency_id', currentAgency.id)
       .eq('created_by', profile.user_id)
       .eq('archived', false)
       .gte('due_date', `${todayStr}T00:00:00`)
       .lte('due_date', `${todayStr}T23:59:59`);
 
-    const assignedPostsRes = myPostIds.length > 0
-      ? await supabase
-          .from('social_media_posts')
-          .select('id, title, status, scheduled_date, clients(name)')
-          .eq('agency_id', currentAgency.id)
-          .eq('archived', false)
-          .gte('scheduled_date', `${todayStr}T00:00:00`)
-          .lte('scheduled_date', `${todayStr}T23:59:59`)
-          .in('id', myPostIds)
-      : { data: [] };
-
-    const createdPostsRes = await supabase
-      .from('social_media_posts')
-      .select('id, title, status, scheduled_date, clients(name)')
-      .eq('agency_id', currentAgency.id)
-      .eq('created_by', profile.user_id)
-      .eq('archived', false)
-      .gte('scheduled_date', `${todayStr}T00:00:00`)
-      .lte('scheduled_date', `${todayStr}T23:59:59`);
-
     // Merge and deduplicate tasks
     const allTasks = [...(assignedTasksRes.data || [])];
     const taskIdSet = new Set(allTasks.map((t: any) => t.id));
     const createdOnlyTasks = ((createdTasksRes.data || []) as any[]).filter((t: any) => !taskIdSet.has(t.id));
-
-    // Merge and deduplicate posts
-    const allPosts = [...(assignedPostsRes.data || [])];
-    const postIdSet = new Set(allPosts.map((p: any) => p.id));
-    const createdOnlyPosts = ((createdPostsRes.data || []) as any[]).filter((p: any) => !postIdSet.has(p.id));
 
     // Filter routines applicable to today
     const todayRoutines = routines.filter(r => {
@@ -172,7 +139,7 @@ export function DayTimeline() {
       notif: n,
     }));
 
-    // Build timeline items from routines (per-day check)
+    // Build timeline items from routines
     const routineItems: TimelineItem[] = todayRoutines.map(r => {
       let isDone: boolean;
       let late: boolean;
@@ -194,76 +161,34 @@ export function DayTimeline() {
       };
     });
 
-    // Build timeline items from tasks
-    const taskItems: TimelineItem[] = allTasks.map((t: any) => {
+    // Build timeline items from tasks (both regular and social media)
+    const buildTaskItem = (t: any, isRequested: boolean): TimelineItem => {
       const dueDate = new Date(t.due_date);
       const timeStr = format(dueDate, 'HH:mm');
+      const isSocialMedia = t.task_type === 'redes_sociais';
       return {
-        id: `task-${t.id}`,
-        time: timeStr === '00:00' ? '08:00' : timeStr,
-        source: 'task',
-        itemTitle: t.title,
+        id: `${isRequested ? 'task-req' : 'task'}-${t.id}`,
+        time: timeStr === '00:00' ? (isSocialMedia ? '09:00' : '08:00') : timeStr,
+        source: isSocialMedia ? 'post' : 'task',
+        itemTitle: t.title || (isSocialMedia ? 'Post sem título' : t.title),
         itemStatus: t.status,
         itemClientName: t.clients?.name,
-        isRequested: false,
+        isRequested,
       };
-    });
+    };
 
-    const requestedTaskItems: TimelineItem[] = createdOnlyTasks.map((t: any) => {
-      const dueDate = new Date(t.due_date);
-      const timeStr = format(dueDate, 'HH:mm');
-      return {
-        id: `task-req-${t.id}`,
-        time: timeStr === '00:00' ? '08:00' : timeStr,
-        source: 'task',
-        itemTitle: t.title,
-        itemStatus: t.status,
-        itemClientName: t.clients?.name,
-        isRequested: true,
-      };
-    });
-
-    // Build timeline items from posts
-    const postItems: TimelineItem[] = allPosts.map((p: any) => {
-      const schedDate = new Date(p.scheduled_date);
-      const timeStr = format(schedDate, 'HH:mm');
-      return {
-        id: `post-${p.id}`,
-        time: timeStr === '00:00' ? '09:00' : timeStr,
-        source: 'post',
-        itemTitle: p.title || 'Post sem título',
-        itemStatus: p.status,
-        itemClientName: p.clients?.name,
-        isRequested: false,
-      };
-    });
-
-    const requestedPostItems: TimelineItem[] = createdOnlyPosts.map((p: any) => {
-      const schedDate = new Date(p.scheduled_date);
-      const timeStr = format(schedDate, 'HH:mm');
-      return {
-        id: `post-req-${p.id}`,
-        time: timeStr === '00:00' ? '09:00' : timeStr,
-        source: 'post',
-        itemTitle: p.title || 'Post sem título',
-        itemStatus: p.status,
-        itemClientName: p.clients?.name,
-        isRequested: true,
-      };
-    });
+    const taskItems: TimelineItem[] = allTasks.map((t: any) => buildTaskItem(t, false));
+    const requestedTaskItems: TimelineItem[] = createdOnlyTasks.map((t: any) => buildTaskItem(t, true));
 
     // Merge and sort chronologically
     const merged = [
       ...routineItems,
       ...taskItems,
       ...requestedTaskItems,
-      ...postItems,
-      ...requestedPostItems,
       ...notifItems,
     ].sort((a, b) => {
       if (a.time < b.time) return -1;
       if (a.time > b.time) return 1;
-      // routines > tasks > posts > notifications at same time
       const priority = { routine: 0, task: 1, post: 2, notification: 3 };
       return (priority[a.source] || 3) - (priority[b.source] || 3);
     });
