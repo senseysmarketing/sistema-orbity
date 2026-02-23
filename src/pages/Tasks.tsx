@@ -4,6 +4,8 @@ import { AIPreFillStep } from "@/components/ui/ai-prefill-step";
 import { useAIAssist, TaskPrefillResult } from "@/hooks/useAIAssist";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 import { FileAttachments, Attachment } from "@/components/ui/file-attachments";
+import { WizardStepIndicator } from "@/components/ui/wizard-step-indicator";
+import { WizardReviewStep } from "@/components/ui/wizard-review-step";
 import {
   DndContext,
   DragEndEvent,
@@ -93,7 +95,7 @@ export default function Tasks() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
-  const [createStep, setCreateStep] = useState<"prefill" | "form">("prefill");
+  const [createStep, setCreateStep] = useState<number>(1);
   const { preFillTask, loading: aiLoading } = useAIAssist();
 
   // Filtros e busca
@@ -570,7 +572,7 @@ export default function Tasks() {
 
     incrementUsageCount(template.id);
     setIsTemplateSelectorOpen(false);
-    setCreateStep("form");
+    setCreateStep(2);
     setIsDialogOpen(true);
 
     toast({
@@ -742,7 +744,7 @@ export default function Tasks() {
       task_type: task.task_type || "",
     });
     setIsDetailDialogOpen(false);
-    setCreateStep("form");
+    setCreateStep(2);
     setIsDialogOpen(true);
   };
 
@@ -856,7 +858,7 @@ export default function Tasks() {
           )}
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
               setIsDialogOpen(open);
-              if (!open) setCreateStep("prefill");
+              if (!open) setCreateStep(1);
             }}>
             <DialogTrigger asChild>
               <Button className="flex items-center gap-2 h-9">
@@ -865,194 +867,264 @@ export default function Tasks() {
               </Button>
             </DialogTrigger>
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
-            {createStep === "prefill" ? (
-              <>
-                <DialogHeader className="flex-shrink-0">
-                  <DialogTitle>Nova Tarefa</DialogTitle>
-                  <DialogDescription>Use a IA para preencher automaticamente ou preencha manualmente.</DialogDescription>
-                </DialogHeader>
-                <AIPreFillStep
-                  type="task"
-                  loading={aiLoading}
-                  onResult={() => {}}
-                  onSkip={() => setCreateStep("form")}
-                  onSubmit={async (text) => {
-                    const result = await preFillTask(text, currentAgency?.id);
-                    if (result) {
-                      // Match mentioned clients against agency clients
-                      let matchedClientIds: string[] = [];
-                      if (result.mentioned_clients?.length && clients.length > 0) {
-                        const normalize = (s: string) =>
-                          s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                        matchedClientIds = clients
-                          .filter((c) =>
-                            result.mentioned_clients!.some((mention) => {
-                              const nMention = normalize(mention);
-                              const nClient = normalize(c.name);
-                              return nClient.includes(nMention) || nMention.includes(nClient);
-                            })
-                          )
-                          .map((c) => c.id);
-                      }
-                      setNewTask((prev) => ({
-                        ...prev,
-                        title: result.title || prev.title,
-                        description: result.description || prev.description,
-                        priority: result.priority || prev.priority,
-                        task_type: result.suggested_type || prev.task_type,
-                        client_ids: matchedClientIds.length > 0 ? matchedClientIds : prev.client_ids,
-                      }));
-                      setCreateStep("form");
-                    }
-                  }}
-                />
-              </>
-            ) : (
-              <>
             <DialogHeader className="flex-shrink-0">
-              <DialogTitle>Criar Nova Tarefa</DialogTitle>
-              <DialogDescription>Preencha as informações ou use um template.</DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto pr-2 min-h-0">
-            <div className="grid gap-4 py-4">
-              {/* Botão de Template */}
-              {templates.length > 0 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsTemplateSelectorOpen(true)}
-                  className="flex items-center gap-2 justify-center border-dashed"
-                >
-                  <FileText className="h-4 w-4" />
-                  Usar Template
-                </Button>
+              <DialogTitle>Nova Tarefa</DialogTitle>
+              {createStep === 1 && (
+                <DialogDescription>Use a IA para preencher automaticamente ou preencha manualmente.</DialogDescription>
               )}
-              <div className="grid gap-2">
-                <Label htmlFor="title">Título *</Label>
-                <Input
-                  id="title"
-                  value={newTask.title}
-                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                  placeholder="Digite o título da tarefa"
+            </DialogHeader>
+
+            {/* Wizard Step Indicator - só mostra a partir do passo 2 */}
+            {createStep > 1 && (
+              <div className="flex-shrink-0 pb-2">
+                <WizardStepIndicator
+                  currentStep={createStep - 1}
+                  totalSteps={3}
+                  stepLabels={["Básico", "Detalhes", "Revisão"]}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="description">Descrição</Label>
-                <Textarea
-                  id="description"
-                  value={newTask.description}
-                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                  placeholder="Digite a descrição da tarefa"
-                  rows={3}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={newTask.status}
-                    onValueChange={(value: any) => setNewTask({ ...newTask, status: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {statuses.map((status) => (
-                        <SelectItem key={status.slug} value={status.slug}>
-                          {status.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="priority">Prioridade</Label>
-                  <Select
-                    value={newTask.priority}
-                    onValueChange={(value: any) => setNewTask({ ...newTask, priority: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Baixa</SelectItem>
-                      <SelectItem value="medium">Média</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="task_type">Tipo *</Label>
-                <Select
-                  value={newTask.task_type}
-                  onValueChange={(value) => setNewTask({ ...newTask, task_type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {types.map((type) => (
-                      <SelectItem key={type.slug} value={type.slug}>
-                        {type.icon} {type.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="assigned_users">Atribuir usuários</Label>
-                  <MultiUserSelector
-                    users={profiles}
-                    selectedUserIds={newTask.assigned_users}
-                    onSelectionChange={(userIds) => setNewTask({ ...newTask, assigned_users: userIds })}
-                    placeholder="Selecionar usuários..."
-                    emptyText="Nenhum usuário disponível."
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Clientes</Label>
-                  <MultiClientSelector
-                    clients={clients}
-                    selectedClientIds={newTask.client_ids}
-                    onSelectionChange={(ids) => setNewTask({ ...newTask, client_ids: ids })}
-                    placeholder="Selecionar clientes..."
-                  />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="due_date">Data de Vencimento</Label>
-                <Input
-                  id="due_date"
-                  type="date"
-                  value={newTask.due_date}
-                  onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-                />
-              </div>
-              <SubtaskManager
-                subtasks={newTask.subtasks}
-                onChange={(subtasks) => setNewTask({ ...newTask, subtasks })}
+            )}
+
+            {/* Passo 1: IA */}
+            {createStep === 1 && (
+              <AIPreFillStep
+                type="task"
+                loading={aiLoading}
+                onResult={() => {}}
+                onSkip={() => setCreateStep(2)}
+                onSubmit={async (text) => {
+                  const result = await preFillTask(text, currentAgency?.id);
+                  if (result) {
+                    let matchedClientIds: string[] = [];
+                    if (result.mentioned_clients?.length && clients.length > 0) {
+                      const normalize = (s: string) =>
+                        s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                      matchedClientIds = clients
+                        .filter((c) =>
+                          result.mentioned_clients!.some((mention) => {
+                            const nMention = normalize(mention);
+                            const nClient = normalize(c.name);
+                            return nClient.includes(nMention) || nMention.includes(nClient);
+                          })
+                        )
+                        .map((c) => c.id);
+                    }
+                    setNewTask((prev) => ({
+                      ...prev,
+                      title: result.title || prev.title,
+                      description: result.description || prev.description,
+                      priority: result.priority || prev.priority,
+                      task_type: result.suggested_type || prev.task_type,
+                      client_ids: matchedClientIds.length > 0 ? matchedClientIds : prev.client_ids,
+                    }));
+                    setCreateStep(2);
+                  }
+                }}
               />
-              <div className="grid gap-2">
-                <Label>Anexos</Label>
-                <FileAttachments
-                  attachments={newTask.attachments}
-                  onChange={(attachments) => setNewTask({ ...newTask, attachments })}
-                  bucket="task-attachments"
-                  entityId={selectedTask?.id}
-                />
-              </div>
-            </div>
-            </div>
-            <DialogFooter className="flex-shrink-0 pt-4 border-t">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleCreateTask} style={{ backgroundColor: "#150a26", color: "white" }}>
-                Criar Tarefa
-              </Button>
-            </DialogFooter>
+            )}
+
+            {/* Passo 2: Básico */}
+            {createStep === 2 && (
+              <>
+                <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+                  <div className="grid gap-4 py-4">
+                    {templates.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsTemplateSelectorOpen(true)}
+                        className="flex items-center gap-2 justify-center border-dashed"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Usar Template
+                      </Button>
+                    )}
+                    <div className="grid gap-2">
+                      <Label htmlFor="title">Título *</Label>
+                      <Input
+                        id="title"
+                        value={newTask.title}
+                        onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                        placeholder="Digite o título da tarefa"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="description">Descrição</Label>
+                      <Textarea
+                        id="description"
+                        value={newTask.description}
+                        onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                        placeholder="Digite a descrição da tarefa"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="task_type">Tipo *</Label>
+                      <Select
+                        value={newTask.task_type}
+                        onValueChange={(value) => setNewTask({ ...newTask, task_type: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {types.map((type) => (
+                            <SelectItem key={type.slug} value={type.slug}>
+                              {type.icon} {type.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="flex-shrink-0 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setCreateStep(1)}>
+                    Voltar
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (!newTask.title.trim()) {
+                        toast({ title: "Erro", description: "O título é obrigatório.", variant: "destructive" });
+                        return;
+                      }
+                      if (!newTask.task_type) {
+                        toast({ title: "Erro", description: "O tipo é obrigatório.", variant: "destructive" });
+                        return;
+                      }
+                      setCreateStep(3);
+                    }}
+                  >
+                    Próximo
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+
+            {/* Passo 3: Detalhes */}
+            {createStep === 3 && (
+              <>
+                <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="status">Status</Label>
+                        <Select
+                          value={newTask.status}
+                          onValueChange={(value: any) => setNewTask({ ...newTask, status: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {statuses.map((status) => (
+                              <SelectItem key={status.slug} value={status.slug}>
+                                {status.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="priority">Prioridade</Label>
+                        <Select
+                          value={newTask.priority}
+                          onValueChange={(value: any) => setNewTask({ ...newTask, priority: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">Baixa</SelectItem>
+                            <SelectItem value="medium">Média</SelectItem>
+                            <SelectItem value="high">Alta</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="due_date">Data de Vencimento</Label>
+                      <Input
+                        id="due_date"
+                        type="date"
+                        value={newTask.due_date}
+                        onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label>Clientes</Label>
+                        <MultiClientSelector
+                          clients={clients}
+                          selectedClientIds={newTask.client_ids}
+                          onSelectionChange={(ids) => setNewTask({ ...newTask, client_ids: ids })}
+                          placeholder="Selecionar clientes..."
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Atribuir usuários</Label>
+                        <MultiUserSelector
+                          users={profiles}
+                          selectedUserIds={newTask.assigned_users}
+                          onSelectionChange={(userIds) => setNewTask({ ...newTask, assigned_users: userIds })}
+                          placeholder="Selecionar usuários..."
+                          emptyText="Nenhum usuário disponível."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="flex-shrink-0 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setCreateStep(2)}>
+                    Voltar
+                  </Button>
+                  <Button onClick={() => setCreateStep(4)}>
+                    Próximo
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
+
+            {/* Passo 4: Revisão */}
+            {createStep === 4 && (
+              <>
+                <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+                  <div className="grid gap-4 py-4">
+                    <WizardReviewStep
+                      fields={[
+                        { label: "Título", value: newTask.title },
+                        { label: "Tipo", value: types.find(t => t.slug === newTask.task_type)?.name ? `${types.find(t => t.slug === newTask.task_type)?.icon} ${types.find(t => t.slug === newTask.task_type)?.name}` : "" },
+                        { label: "Descrição", value: newTask.description },
+                        { label: "Status", value: statuses.find(s => s.slug === newTask.status)?.name || "" },
+                        { label: "Prioridade", value: getPriorityLabel(newTask.priority) },
+                        { label: "Data de Vencimento", value: newTask.due_date ? formatDateBR(newTask.due_date) : "" },
+                        { label: "Clientes", value: newTask.client_ids.map(id => clients.find(c => c.id === id)?.name).filter(Boolean).join(", ") },
+                        { label: "Usuários", value: newTask.assigned_users.map(id => profiles.find(p => p.user_id === id)?.name).filter(Boolean).join(", ") },
+                      ]}
+                    />
+                    <SubtaskManager
+                      subtasks={newTask.subtasks}
+                      onChange={(subtasks) => setNewTask({ ...newTask, subtasks })}
+                    />
+                    <div className="grid gap-2">
+                      <Label>Anexos</Label>
+                      <FileAttachments
+                        attachments={newTask.attachments}
+                        onChange={(attachments) => setNewTask({ ...newTask, attachments })}
+                        bucket="task-attachments"
+                        entityId={selectedTask?.id}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="flex-shrink-0 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setCreateStep(3)}>
+                    Voltar
+                  </Button>
+                  <Button onClick={handleCreateTask}>
+                    Criar Tarefa
+                  </Button>
+                </DialogFooter>
               </>
             )}
           </DialogContent>

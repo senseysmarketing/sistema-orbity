@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAIAssist, PostPrefillResult } from "@/hooks/useAIAssist";
 import { AIPreFillStep } from "@/components/ui/ai-prefill-step";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,8 @@ import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
 import { MultiClientSelector } from "@/components/clients/MultiClientSelector";
 import { useClientRelations } from "@/hooks/useClientRelations";
 import { FileAttachments, Attachment } from "@/components/ui/file-attachments";
+import { WizardStepIndicator } from "@/components/ui/wizard-step-indicator";
+import { WizardReviewStep } from "@/components/ui/wizard-review-step";
 import { Info } from "lucide-react";
 
 interface PostFormDialogProps {
@@ -45,7 +47,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [dueDateManuallyEdited, setDueDateManuallyEdited] = useState(false);
-  const [formStep, setFormStep] = useState<"prefill" | "form">("prefill");
+  const [formStep, setFormStep] = useState<number>(1);
   const { preFillPost, loading: aiLoading } = useAIAssist();
 
   // Helper para calcular due_date baseado em post_date
@@ -563,277 +565,352 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     }
   };
 
-  // Reset form step when dialog opens/closes
   const isCreating = !editPost;
-  const showPrefill = isCreating && formStep === "prefill";
+
+  // Helper labels
+  const getPriorityLabel = (p: string) => ({ low: "Baixa", medium: "Média", high: "Alta" }[p] || p);
+  const getPlatformLabel = (p: string) => activePlatforms.find(pl => pl.slug === p)?.name || p;
+  const getContentTypeLabel = (t: string) => allContentTypes.find(ct => ct.slug === t)?.name || t;
 
   return (
     <Dialog open={open} onOpenChange={(o) => {
       onOpenChange(o);
-      if (!o) setFormStep("prefill");
+      if (!o) setFormStep(1);
     }}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        {showPrefill ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Novo Post</DialogTitle>
-            </DialogHeader>
-            <AIPreFillStep
-              type="post"
-              loading={aiLoading}
-              onResult={() => {}}
-              onSkip={() => setFormStep("form")}
-              onSubmit={async (text) => {
-                const result = await preFillPost(text, currentAgency?.id);
-                if (result) {
-                  // Match mentioned clients against agency clients
-                  if (result.mentioned_clients?.length && clients.length > 0) {
-                    const normalize = (s: string) =>
-                      s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                    const matchedIds = clients
-                      .filter((c) =>
-                        result.mentioned_clients!.some((mention) => {
-                          const nMention = normalize(mention);
-                          const nClient = normalize(c.name);
-                          return nClient.includes(nMention) || nMention.includes(nClient);
-                        })
-                      )
-                      .map((c) => c.id);
-                    if (matchedIds.length > 0) {
-                      setSelectedClientIds(matchedIds);
-                    }
-                  }
-                  setFormData((prev) => ({
-                    ...prev,
-                    title: result.title || prev.title,
-                    description: result.description || prev.description,
-                    platform: result.platform || prev.platform,
-                    post_type: result.post_type || prev.post_type,
-                    hashtags: result.hashtags?.join(", ") || prev.hashtags,
-                  }));
-                  setFormStep("form");
-                }
-              }}
-            />
-          </>
-        ) : (
-          <>
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>{editPost ? "Editar Postagem" : "Nova Postagem"}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="title">Título *</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              required
+        {/* Wizard indicator for creation - shows from step 2 onwards */}
+        {isCreating && formStep > 1 && (
+          <div className="flex-shrink-0 pb-2">
+            <WizardStepIndicator
+              currentStep={formStep - 1}
+              totalSteps={4}
+              stepLabels={["Básico", "Agendamento", "Detalhes", "Revisão"]}
             />
           </div>
+        )}
 
-          <div>
-            <Label htmlFor="description">Legenda/Texto</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={4}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        {/* Editing: show full form */}
+        {editPost ? (
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto space-y-4 pr-2 min-h-0">
             <div>
-              <Label htmlFor="platform">Plataforma *</Label>
-              <Select value={formData.platform} onValueChange={(value) => setFormData({ ...formData, platform: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {activePlatforms.map(platform => (
-                    <SelectItem key={platform.slug} value={platform.slug}>
-                      {platform.icon} {platform.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="title">Título *</Label>
+              <Input id="title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required />
             </div>
-
             <div>
-              <Label htmlFor="post_type">Tipo de Conteúdo *</Label>
-              <Select value={formData.post_type} onValueChange={(value) => setFormData({ ...formData, post_type: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {allContentTypes.map(type => (
-                    <SelectItem key={type.slug} value={type.slug}>
-                      {type.icon} {type.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="description">Legenda/Texto</Label>
+              <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={4} />
             </div>
-          </div>
-
-          <div>
-            <Label>Clientes</Label>
-            <MultiClientSelector
-              clients={clients}
-              selectedClientIds={selectedClientIds}
-              onSelectionChange={setSelectedClientIds}
-              placeholder="Selecionar clientes..."
-            />
-          </div>
-
-          {/* Seção de Datas */}
-          <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
-            <h4 className="font-medium text-sm flex items-center gap-2">
-              📅 Datas de Publicação e Entrega
-            </h4>
-            
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="post_date">Data de Postagem *</Label>
-                <Input
-                  id="post_date"
-                  type="datetime-local"
-                  value={toLocalDatetimeString(new Date(formData.post_date))}
-                  onChange={(e) => {
+                <Label>Plataforma *</Label>
+                <Select value={formData.platform} onValueChange={(value) => setFormData({ ...formData, platform: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {activePlatforms.map(p => <SelectItem key={p.slug} value={p.slug}>{p.icon} {p.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Tipo de Conteúdo *</Label>
+                <Select value={formData.post_type} onValueChange={(value) => setFormData({ ...formData, post_type: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {allContentTypes.map(t => <SelectItem key={t.slug} value={t.slug}>{t.icon} {t.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Clientes</Label>
+              <MultiClientSelector clients={clients} selectedClientIds={selectedClientIds} onSelectionChange={setSelectedClientIds} placeholder="Selecionar clientes..." />
+            </div>
+            <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
+              <h4 className="font-medium text-sm flex items-center gap-2">📅 Datas de Publicação e Entrega</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="post_date">Data de Postagem *</Label>
+                  <Input id="post_date" type="datetime-local" value={toLocalDatetimeString(new Date(formData.post_date))} onChange={(e) => {
                     const localDateTime = new Date(e.target.value);
                     const newPostDate = localDateTime.toISOString();
-                    setFormData({ 
-                      ...formData, 
-                      post_date: newPostDate,
-                      scheduled_date: newPostDate // Manter sincronizado
-                    });
-                    // Recalcular due_date se não foi editado manualmente
+                    setFormData({ ...formData, post_date: newPostDate, scheduled_date: newPostDate });
                     if (!dueDateManuallyEdited) {
                       const daysBefore = getDefaultDueDateDaysBefore();
                       const newDueDate = calculateDueDate(newPostDate, daysBefore);
                       setFormData(prev => ({ ...prev, due_date: newDueDate }));
                     }
-                  }}
-                  required
-                />
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  <Info className="h-3 w-3" />
-                  Quando o conteúdo vai ao ar
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="due_date">Data Limite da Arte</Label>
-                <Input
-                  id="due_date"
-                  type="datetime-local"
-                  value={formData.due_date ? toLocalDatetimeString(new Date(formData.due_date)) : ""}
-                  onChange={(e) => {
+                  }} required />
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Info className="h-3 w-3" />Quando o conteúdo vai ao ar</p>
+                </div>
+                <div>
+                  <Label htmlFor="due_date">Data Limite da Arte</Label>
+                  <Input id="due_date" type="datetime-local" value={formData.due_date ? toLocalDatetimeString(new Date(formData.due_date)) : ""} onChange={(e) => {
                     const localDateTime = new Date(e.target.value);
                     setFormData({ ...formData, due_date: localDateTime.toISOString() });
                     setDueDateManuallyEdited(true);
-                  }}
-                />
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  <Info className="h-3 w-3" />
-                  Até quando a arte precisa estar pronta
-                </p>
+                  }} />
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Info className="h-3 w-3" />Até quando a arte precisa estar pronta</p>
+                </div>
               </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="status">Status *</Label>
-              {editPost ? (
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>Status *</Label>
                 <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {customStatuses.map(status => (
-                      <SelectItem key={status.id} value={status.slug}>
-                        {status.name}
-                      </SelectItem>
-                    ))}
+                    {customStatuses.map(s => <SelectItem key={s.id} value={s.slug}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
-              ) : (
-                <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
-                  {customStatuses.find(s => s.slug === formData.status)?.name || "Briefing"}
-                </div>
-              )}
+              </div>
+              <div>
+                <Label>Prioridade *</Label>
+                <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Baixa</SelectItem>
+                    <SelectItem value="medium">Média</SelectItem>
+                    <SelectItem value="high">Alta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-
             <div>
-              <Label htmlFor="priority">Prioridade *</Label>
-              <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Baixa</SelectItem>
-                  <SelectItem value="medium">Média</SelectItem>
-                  <SelectItem value="high">Alta</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Atribuir a Usuários</Label>
+              <MultiUserSelector users={profiles} selectedUserIds={selectedUserIds} onSelectionChange={setSelectedUserIds} />
             </div>
-          </div>
+            <div>
+              <Label htmlFor="hashtags">Hashtags (separadas por vírgula)</Label>
+              <Input id="hashtags" value={formData.hashtags} onChange={(e) => setFormData({ ...formData, hashtags: e.target.value })} placeholder="marketing, digital, socialmedia" />
+            </div>
+            <div>
+              <Label htmlFor="notes">Observações Internas</Label>
+              <Textarea id="notes" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={3} />
+            </div>
+            <div>
+              <Label>Anexos</Label>
+              <FileAttachments attachments={attachments} onChange={setAttachments} bucket="post-attachments" entityId={editPost?.id} />
+            </div>
+            <SubtaskManager subtasks={formData.subtasks} onChange={(subtasks) => setFormData({ ...formData, subtasks })} />
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+              <Button type="submit" disabled={loading}>{loading ? "Salvando..." : "Atualizar"}</Button>
+            </div>
+          </form>
+        ) : (
+          <>
+            {/* Step 1: AI */}
+            {formStep === 1 && (
+              <AIPreFillStep
+                type="post"
+                loading={aiLoading}
+                onResult={() => {}}
+                onSkip={() => setFormStep(2)}
+                onSubmit={async (text) => {
+                  const result = await preFillPost(text, currentAgency?.id);
+                  if (result) {
+                    if (result.mentioned_clients?.length && clients.length > 0) {
+                      const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                      const matchedIds = clients
+                        .filter((c) => result.mentioned_clients!.some((mention) => {
+                          const nMention = normalize(mention);
+                          const nClient = normalize(c.name);
+                          return nClient.includes(nMention) || nMention.includes(nClient);
+                        }))
+                        .map((c) => c.id);
+                      if (matchedIds.length > 0) setSelectedClientIds(matchedIds);
+                    }
+                    setFormData((prev) => ({
+                      ...prev,
+                      title: result.title || prev.title,
+                      description: result.description || prev.description,
+                      platform: result.platform || prev.platform,
+                      post_type: result.post_type || prev.post_type,
+                      hashtags: result.hashtags?.join(", ") || prev.hashtags,
+                    }));
+                    setFormStep(2);
+                  }
+                }}
+              />
+            )}
 
-          <div>
-            <Label>Atribuir a Usuários</Label>
-            <MultiUserSelector
-              users={profiles}
-              selectedUserIds={selectedUserIds}
-              onSelectionChange={setSelectedUserIds}
-            />
-          </div>
+            {/* Step 2: Básico */}
+            {formStep === 2 && (
+              <>
+                <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+                  <div className="grid gap-4 py-4">
+                    <div>
+                      <Label htmlFor="title">Título *</Label>
+                      <Input id="title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Título da postagem" />
+                    </div>
+                    <div>
+                      <Label htmlFor="description">Legenda/Texto</Label>
+                      <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={4} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Plataforma *</Label>
+                        <Select value={formData.platform} onValueChange={(value) => setFormData({ ...formData, platform: value })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {activePlatforms.map(p => <SelectItem key={p.slug} value={p.slug}>{p.icon} {p.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Tipo de Conteúdo *</Label>
+                        <Select value={formData.post_type} onValueChange={(value) => setFormData({ ...formData, post_type: value })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {allContentTypes.map(t => <SelectItem key={t.slug} value={t.slug}>{t.icon} {t.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="flex-shrink-0 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setFormStep(1)}>Voltar</Button>
+                  <Button onClick={() => {
+                    if (!formData.title.trim()) {
+                      toast({ title: "Erro", description: "O título é obrigatório.", variant: "destructive" });
+                      return;
+                    }
+                    setFormStep(3);
+                  }}>Próximo</Button>
+                </DialogFooter>
+              </>
+            )}
 
-          <div>
-            <Label htmlFor="hashtags">Hashtags (separadas por vírgula)</Label>
-            <Input
-              id="hashtags"
-              value={formData.hashtags}
-              onChange={(e) => setFormData({ ...formData, hashtags: e.target.value })}
-              placeholder="marketing, digital, socialmedia"
-            />
-          </div>
+            {/* Step 3: Agendamento */}
+            {formStep === 3 && (
+              <>
+                <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+                  <div className="grid gap-4 py-4">
+                    <div>
+                      <Label>Clientes</Label>
+                      <MultiClientSelector clients={clients} selectedClientIds={selectedClientIds} onSelectionChange={setSelectedClientIds} placeholder="Selecionar clientes..." />
+                    </div>
+                    <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
+                      <h4 className="font-medium text-sm flex items-center gap-2">📅 Datas de Publicação e Entrega</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="post_date">Data de Postagem *</Label>
+                          <Input id="post_date" type="datetime-local" value={toLocalDatetimeString(new Date(formData.post_date))} onChange={(e) => {
+                            const localDateTime = new Date(e.target.value);
+                            const newPostDate = localDateTime.toISOString();
+                            setFormData({ ...formData, post_date: newPostDate, scheduled_date: newPostDate });
+                            if (!dueDateManuallyEdited) {
+                              const daysBefore = getDefaultDueDateDaysBefore();
+                              const newDueDate = calculateDueDate(newPostDate, daysBefore);
+                              setFormData(prev => ({ ...prev, due_date: newDueDate }));
+                            }
+                          }} required />
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Info className="h-3 w-3" />Quando o conteúdo vai ao ar</p>
+                        </div>
+                        <div>
+                          <Label htmlFor="due_date">Data Limite da Arte</Label>
+                          <Input id="due_date" type="datetime-local" value={formData.due_date ? toLocalDatetimeString(new Date(formData.due_date)) : ""} onChange={(e) => {
+                            const localDateTime = new Date(e.target.value);
+                            setFormData({ ...formData, due_date: localDateTime.toISOString() });
+                            setDueDateManuallyEdited(true);
+                          }} />
+                          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Info className="h-3 w-3" />Até quando a arte precisa estar pronta</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="flex-shrink-0 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setFormStep(2)}>Voltar</Button>
+                  <Button onClick={() => setFormStep(4)}>Próximo</Button>
+                </DialogFooter>
+              </>
+            )}
 
-          <div>
-            <Label htmlFor="notes">Observações Internas</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
-            />
-          </div>
+            {/* Step 4: Detalhes */}
+            {formStep === 4 && (
+              <>
+                <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Status</Label>
+                        <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
+                          {customStatuses.find(s => s.slug === formData.status)?.name || "Briefing"}
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Prioridade *</Label>
+                        <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">Baixa</SelectItem>
+                            <SelectItem value="medium">Média</SelectItem>
+                            <SelectItem value="high">Alta</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Atribuir a Usuários</Label>
+                      <MultiUserSelector users={profiles} selectedUserIds={selectedUserIds} onSelectionChange={setSelectedUserIds} />
+                    </div>
+                    <div>
+                      <Label htmlFor="hashtags">Hashtags (separadas por vírgula)</Label>
+                      <Input id="hashtags" value={formData.hashtags} onChange={(e) => setFormData({ ...formData, hashtags: e.target.value })} placeholder="marketing, digital, socialmedia" />
+                    </div>
+                    <div>
+                      <Label htmlFor="notes">Observações Internas</Label>
+                      <Textarea id="notes" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={3} />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="flex-shrink-0 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setFormStep(3)}>Voltar</Button>
+                  <Button onClick={() => setFormStep(5)}>Próximo</Button>
+                </DialogFooter>
+              </>
+            )}
 
-          <div>
-            <Label>Anexos</Label>
-            <FileAttachments
-              attachments={attachments}
-              onChange={setAttachments}
-              bucket="post-attachments"
-              entityId={editPost?.id}
-            />
-          </div>
-
-          <SubtaskManager
-            subtasks={formData.subtasks}
-            onChange={(subtasks) => setFormData({ ...formData, subtasks })}
-          />
-
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Salvando..." : editPost ? "Atualizar" : "Criar Postagem"}
-            </Button>
-          </div>
-        </form>
+            {/* Step 5: Revisão */}
+            {formStep === 5 && (
+              <>
+                <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+                  <div className="grid gap-4 py-4">
+                    <WizardReviewStep
+                      fields={[
+                        { label: "Título", value: formData.title },
+                        { label: "Plataforma", value: getPlatformLabel(formData.platform) },
+                        { label: "Tipo", value: getContentTypeLabel(formData.post_type) },
+                        { label: "Legenda", value: formData.description },
+                        { label: "Clientes", value: selectedClientIds.map(id => clients.find(c => c.id === id)?.name).filter(Boolean).join(", ") },
+                        { label: "Data de Postagem", value: new Date(formData.post_date).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) },
+                        { label: "Data Limite da Arte", value: formData.due_date ? new Date(formData.due_date).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "" },
+                        { label: "Prioridade", value: getPriorityLabel(formData.priority) },
+                        { label: "Usuários", value: selectedUserIds.map(id => profiles.find(p => p.user_id === id)?.name).filter(Boolean).join(", ") },
+                        { label: "Hashtags", value: formData.hashtags },
+                        { label: "Observações", value: formData.notes },
+                      ]}
+                    />
+                    <div>
+                      <Label>Anexos</Label>
+                      <FileAttachments attachments={attachments} onChange={setAttachments} bucket="post-attachments" />
+                    </div>
+                    <SubtaskManager subtasks={formData.subtasks} onChange={(subtasks) => setFormData({ ...formData, subtasks })} />
+                  </div>
+                </div>
+                <DialogFooter className="flex-shrink-0 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setFormStep(4)}>Voltar</Button>
+                  <Button onClick={(e) => { e.preventDefault(); handleSubmit(e as any); }} disabled={loading}>
+                    {loading ? "Salvando..." : "Criar Postagem"}
+                  </Button>
+                </DialogFooter>
+              </>
+            )}
           </>
         )}
       </DialogContent>
