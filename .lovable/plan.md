@@ -1,62 +1,209 @@
 
 
-# Corrigir drag-and-drop do CRM Kanban
+# Tela de Projetos - Plano de Implementacao
 
-## Problema
+## Visao Geral
 
-Ao soltar um lead sobre outro card (e nao diretamente na area vazia da coluna), o `over.id` retorna o UUID do card de destino, nao o statusKey da coluna. O codigo atual verifica se `over.id` e um status valido e, como nao e, descarta o evento silenciosamente.
+Criar um modulo completo de Gestao de Projetos com dashboard executivo, detalhe por projeto com abas, e status/saude calculados automaticamente. O item de menu ficara acima de "Tarefas Gerais" no sidebar.
 
-O Kanban de Social Media ja resolve isso buscando o `containerId` do sortable context. O CRM Kanban precisa da mesma logica.
+---
 
-## Solucao
+## Fase 1 - Entrega Principal (este plano)
 
-Alterar `handleDragEnd` em `src/components/crm/LeadsKanban.tsx` para:
+### 1. Banco de Dados (Migration SQL)
 
-1. Verificar se `over.id` e um statusKey valido
-2. Se nao for, buscar `over.data.current?.sortable?.containerId` (que e o ID da coluna pai)
-3. Usar esse containerId como o novo status
+Criar as seguintes tabelas:
 
-## Mudanca tecnica
+**`projects`** - Tabela principal
+| Coluna | Tipo | Descricao |
+|---|---|---|
+| id | uuid PK | |
+| agency_id | uuid FK agencies | |
+| client_id | uuid FK clients | Cliente vinculado |
+| name | text | Nome do projeto |
+| description | text | Descricao |
+| project_type | text | Tipo (trafego, social media, SEO, branding, site, outro) |
+| contract_value | numeric | Valor do contrato |
+| start_date | date | Data inicio |
+| end_date | date | Data fim prevista |
+| is_recurring | boolean | Projeto recorrente? |
+| recurrence_interval | text | monthly, quarterly, etc |
+| created_by | uuid | Quem criou |
+| responsible_id | uuid | Responsavel principal |
+| created_at | timestamptz | |
+| updated_at | timestamptz | |
+| archived | boolean default false | |
 
-Arquivo: `src/components/crm/LeadsKanban.tsx`, funcao `handleDragEnd` (linhas 156-218)
+**`project_tasks`** - Tarefas do projeto (kanban proprio)
+| Coluna | Tipo | Descricao |
+|---|---|---|
+| id | uuid PK | |
+| project_id | uuid FK projects | |
+| agency_id | uuid | |
+| title | text | |
+| description | text | |
+| status | text | backlog, in_progress, review, done |
+| priority | text | low, medium, high, urgent |
+| assigned_to | uuid | |
+| due_date | date | |
+| completed_at | timestamptz | |
+| subtasks | jsonb | Checklist interno |
+| sort_order | int | Ordem no kanban |
+| created_at / updated_at | timestamptz | |
 
-Substituir a logica de resolucao do `newStatus`:
+**`project_milestones`** - Marcos
+| Coluna | Tipo | Descricao |
+|---|---|---|
+| id | uuid PK | |
+| project_id | uuid FK | |
+| title | text | Nome do marco |
+| description | text | |
+| due_date | date | Data prevista |
+| completed_at | timestamptz | |
+| sort_order | int | Ordem |
+| created_at | timestamptz | |
 
-```ts
-// Atual (quebrado):
-const newStatus = over.id as string;
-if (!statusConfig[newStatus]) { return; }
+**`project_payments`** - Parcelas financeiras
+| Coluna | Tipo | Descricao |
+|---|---|---|
+| id | uuid PK | |
+| project_id | uuid FK | |
+| amount | numeric | Valor da parcela |
+| due_date | date | Vencimento |
+| paid_at | timestamptz | Data pagamento |
+| status | text | pending, paid, overdue |
+| description | text | |
+| created_at | timestamptz | |
 
-// Corrigido:
-let newStatus = over.id as string;
+**`project_notes`** - Anotacoes/comunicacao
+| Coluna | Tipo | Descricao |
+|---|---|---|
+| id | uuid PK | |
+| project_id | uuid FK | |
+| content | text | |
+| created_by | uuid | |
+| created_at | timestamptz | |
 
-if (!statusConfig[newStatus]) {
-  // over.id e um card — buscar a coluna pai via sortable context
-  const containerId = over.data.current?.sortable?.containerId;
-  if (containerId && statusConfig[containerId]) {
-    newStatus = containerId;
-  } else {
-    setActiveId(null);
-    setDraggedLead(null);
-    return;
-  }
-}
+**RLS Policies** (mesmo padrao do sistema):
+- SELECT: todos os membros da agencia
+- INSERT/UPDATE/DELETE: todos os membros da agencia (projetos sao colaborativos)
+
+**Trigger**: `update_updated_at_column` nas tabelas projects e project_tasks.
+
+---
+
+### 2. Arquivos Frontend
+
+**Novos arquivos a criar:**
+
+| Arquivo | Descricao |
+|---|---|
+| `src/pages/Projects.tsx` | Pagina principal (dashboard executivo + lista) |
+| `src/pages/ProjectDetail.tsx` | Detalhe do projeto com abas |
+| `src/hooks/useProjects.tsx` | Hook com queries e mutations |
+| `src/components/projects/ProjectMetricsCards.tsx` | Cards superiores (ativos, concluidos, atrasados, risco, receita) |
+| `src/components/projects/ProjectsTable.tsx` | Tabela de projetos com progresso, saude, prazo |
+| `src/components/projects/ProjectFormDialog.tsx` | Dialog para criar/editar projeto |
+| `src/components/projects/ProjectOverview.tsx` | Aba Overview do detalhe |
+| `src/components/projects/ProjectTasksKanban.tsx` | Aba Tarefas (kanban 4 colunas) |
+| `src/components/projects/ProjectFinancial.tsx` | Aba Financeiro |
+| `src/components/projects/ProjectNotes.tsx` | Aba Comunicacao/Notas |
+| `src/components/projects/ProjectMilestones.tsx` | Aba Marcos/Timeline |
+| `src/components/projects/ProjectHealthBadge.tsx` | Badge visual de saude (verde/amarelo/vermelho) |
+| `src/components/projects/ProjectStatusBadge.tsx` | Status calculado automaticamente |
+
+**Arquivos a modificar:**
+
+| Arquivo | Mudanca |
+|---|---|
+| `src/components/layout/AppSidebar.tsx` | Adicionar "Projetos" acima de "Tarefas Gerais" com icone FolderKanban |
+| `src/App.tsx` | Adicionar rotas `/dashboard/projects` e `/dashboard/projects/:id` |
+
+---
+
+### 3. Logica de Status Automatico
+
+O status sera calculado no frontend com base em:
+
+```text
+Se todas as tarefas estao em "done" -> Concluido
+Se data fim < hoje e nao concluido -> Atrasado  
+Se % concluido < 30% e mais de 50% do prazo passou -> Em Risco
+Se tem tarefas vencidas -> Em Risco
+Caso contrario -> Em Andamento
+Se nenhuma tarefa existe -> Planejamento
 ```
 
-Tambem ajustar a comparacao de status atual do lead (linha 176) para usar `normalizeStatusToDb` e comparar com `dbStatus` da coluna de destino, evitando falsos "sem mudanca":
+### 4. Health Score (0-100)
 
-```ts
-const displayStatus = statusConfig[newStatus].title;
-const dbStatus = mapDisplayStatusToDatabase(displayStatus);
-const currentNormalized = normalizeStatusToDb(lead.status);
+Calculado com base em 4 fatores (25 pontos cada):
 
-if (currentNormalized.toLowerCase() === dbStatus.toLowerCase()) {
-  // Mesmo status, nao faz nada
-  setActiveId(null);
-  setDraggedLead(null);
-  return;
-}
+```text
+Prazo: 25 pts se dentro do prazo, proporcional se proximo, 0 se atrasado
+Progresso: 25 pts * (% tarefas concluidas / % tempo decorrido)
+Pendencias: 25 pts se nao tem tarefas vencidas, -5 por cada vencida
+Financeiro: 25 pts * (% pago / % tempo decorrido)
 ```
 
-Nenhum outro arquivo precisa ser alterado.
+Visualizacao:
+- 80-100: Verde (Saudavel)
+- 50-79: Amarelo (Atencao)
+- <50: Vermelho (Critico)
 
+---
+
+### 5. Fluxo de Navegacao
+
+```text
+Sidebar: "Projetos"
+  -> /dashboard/projects (lista + metricas)
+     -> Clique no projeto
+        -> /dashboard/projects/:id (detalhe com abas)
+           - Overview
+           - Tarefas (Kanban)
+           - Financeiro
+           - Marcos
+           - Notas
+```
+
+---
+
+### 6. Detalhes da Interface
+
+**Dashboard (pagina principal):**
+- 6 cards superiores: Ativos, Concluidos, Atrasados, Em Risco, Receita Ativa, Margem Estimada
+- Tabela com colunas: Cliente, Projeto, Status, Progresso (barra %), Prazo (dias restantes), Saude (badge), Responsavel
+- Botao "Novo Projeto" abre dialog wizard
+- Filtros: status, cliente, responsavel
+
+**Detalhe do projeto:**
+- Header com nome, cliente, status badge, health score
+- 5 abas usando Tabs do shadcn
+- Kanban de tarefas com drag-and-drop (dnd-kit, mesmo padrao usado no CRM/Tasks)
+
+---
+
+## Itens Adiados para Fases Futuras
+
+Os seguintes itens serao implementados apos a fase 1:
+
+- Projetos recorrentes (criacao automatica mensal)
+- Permissoes por cliente (portal do cliente)
+- Integracao WhatsApp na aba comunicacao
+- Graficos na dashboard (projetos por status, timeline, receita por mes)
+- Alertas automaticos (notificacoes)
+- SLA e indicadores avancados (taxa retrabalho, tempo medio)
+- Metas por projeto (entrega, financeira, performance)
+
+---
+
+## Resumo Tecnico
+
+| Item | Quantidade |
+|---|---|
+| Tabelas novas | 5 (projects, project_tasks, project_milestones, project_payments, project_notes) |
+| Paginas novas | 2 (Projects, ProjectDetail) |
+| Componentes novos | ~12 |
+| Hook novo | 1 (useProjects) |
+| Arquivos modificados | 2 (AppSidebar, App.tsx) |
+| RLS Policies | 10 (SELECT + ALL para cada tabela) |
