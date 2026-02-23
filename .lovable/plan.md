@@ -1,129 +1,60 @@
 
-# Wizard para Criacao de Tarefas e Posts
+# Campo "Instruções de Arte" nos Posts
 
 ## Resumo
 
-Transformar os formularios de criacao de Tarefas e Posts do formato atual (tela unica com todos os campos) para um formato wizard passo-a-passo, onde o primeiro passo e o preenchimento com IA (que ja existe) e os passos seguintes apresentam os campos agrupados logicamente para o usuario conferir/alterar.
+Adicionar um novo campo **"Instruções de Arte"** nos posts de social media. O campo serve para orientar o designer/editor sobre o que deve conter na arte ou vídeo: headlines, subtítulos, CTAs, textos de apoio, ou um mini roteiro para vídeos. A IA preencherá esse campo automaticamente no prefill, e o prompt pode ser personalizado por agência.
 
-## O que o usuario vera
+## O que muda para o usuário
 
-### Tarefas - Wizard de 4 passos
+- O label "Legenda/Texto" passa a ser apenas **"Legenda"**
+- Novo campo **"Instruções de Arte"** aparece logo abaixo da Legenda, com um placeholder explicativo
+- No wizard de criação (passo 2 - Básico), o campo aparece entre Legenda e Plataforma/Tipo
+- No formulário de edição, aparece no mesmo local
+- Na revisão (passo 5), o campo é exibido no resumo
+- A IA preenche automaticamente com sugestões de headlines, CTAs, roteiro, etc., adaptadas ao tipo de conteúdo (feed, reels, carrossel, vídeo)
 
-1. **IA** - Preenchimento Inteligente (ja existe, mantido como esta)
-2. **Basico** - Titulo, Descricao, Tipo da tarefa
-3. **Detalhes** - Prioridade, Status, Data de vencimento, Clientes, Usuarios atribuidos
-4. **Revisao** - Resumo de tudo preenchido com botao "Criar Tarefa" + Subtarefas e Anexos
+## Mudanças Técnicas
 
-### Posts - Wizard de 5 passos
+### 1. Migração de banco de dados
 
-1. **IA** - Preenchimento Inteligente (ja existe, mantido como esta)
-2. **Basico** - Titulo, Legenda/Texto, Plataforma, Tipo de Conteudo
-3. **Agendamento** - Clientes, Data de Postagem, Data Limite da Arte
-4. **Detalhes** - Prioridade, Usuarios, Hashtags, Observacoes
-5. **Revisao** - Resumo de tudo + Subtarefas e Anexos com botao "Criar Postagem"
+Adicionar coluna `creative_instructions` (text, nullable) na tabela `social_media_posts`:
 
-### Indicador de Progresso (ambos)
+```text
+ALTER TABLE social_media_posts ADD COLUMN creative_instructions text;
+```
 
-No topo do dialog, uma barra com circulos numerados e labels para cada etapa (similar ao print de referencia), com barra de progresso conectando os circulos. Etapas completadas ficam com fundo verde, a etapa atual com borda destacada.
+### 2. Edge Function `ai-assist` - Campo `creative_instructions` no POST_TOOLS
 
-### Navegacao
+Adicionar o campo `creative_instructions` no tool `extract_post_data`:
+- Descrição: "Sugestões de criação para a arte ou vídeo. Inclua headlines, subtítulos, CTAs, textos de apoio. Para vídeos, inclua um mini roteiro com os pontos principais."
 
-- Botoes "Voltar" e "Proximo" no rodape do dialog
-- O botao "Pular e preencher manualmente" do passo IA avanca para o passo 2
-- Na edicao de posts/tarefas existentes, o wizard NAO aparece - o formulario completo e exibido diretamente (como e hoje), pois nao faz sentido usar wizard para editar
+Atualizar o `DEFAULT_POST_PROMPT` para instruir a IA a gerar as instruções de arte adaptadas ao tipo de conteúdo.
 
-## Mudancas Tecnicas
+### 3. `PostFormDialog.tsx`
 
-### 1. Novo componente `WizardStepIndicator`
+- Adicionar `creative_instructions` ao `formData`
+- Renomear label "Legenda/Texto" para "Legenda"
+- Adicionar campo "Instruções de Arte" (Textarea) no passo 2 do wizard e no formulário de edição
+- Incluir no resultado do AI prefill: `creative_instructions: result.creative_instructions`
+- Incluir na revisão (passo 5)
+- Incluir no `handleSubmit` para salvar no banco
 
-**Arquivo:** `src/components/ui/wizard-step-indicator.tsx` (novo)
+### 4. `useAIAssist.tsx` - Atualizar interface
 
-Componente reutilizavel que renderiza a barra de progresso com:
-- Props: `currentStep`, `totalSteps`, `stepLabels` (array de strings)
-- Circulos numerados com labels
-- Linha de progresso conectando os circulos
-- Estados: completado (verde), ativo (primario), pendente (cinza)
+Adicionar `creative_instructions?: string` na interface `PostPrefillResult`.
 
-### 2. Refatorar criacao de Tarefas em `Tasks.tsx`
+### 5. Componentes de visualização
 
-**Arquivo:** `src/pages/Tasks.tsx`
+Exibir o campo "Instruções de Arte" no `PostDetailsDialog.tsx` e no `PostCard.tsx` (se houver espaço, apenas no details dialog).
 
-Atualmente o estado `createStep` e `"prefill" | "form"`. Sera alterado para um numero:
-- `createStep: number` (1 = IA, 2 = Basico, 3 = Detalhes, 4 = Revisao)
+## Arquivos Modificados
 
-O conteudo do dialog na criacao sera dividido:
-
-**Passo 1 (IA):** Componente `AIPreFillStep` existente. "Pular" e "apos preencher" avancam para passo 2.
-
-**Passo 2 (Basico):**
-- Titulo (obrigatorio)
-- Descricao
-- Tipo (obrigatorio)
-- Templates (botao "Usar Template" mantido aqui)
-
-**Passo 3 (Detalhes):**
-- Status + Prioridade (lado a lado)
-- Data de vencimento
-- Clientes + Usuarios atribuidos (lado a lado)
-
-**Passo 4 (Revisao):**
-- Resumo compacto de todos os campos preenchidos (cards com label/valor)
-- Subtarefas + Anexos (editaveis neste passo)
-- Botao "Criar Tarefa" no lugar de "Proximo"
-
-Validacao entre passos:
-- Passo 2 -> 3: exige titulo e tipo
-- Passo 3 -> 4: sem validacao obrigatoria
-
-O dialog de edicao de tarefas NAO sera alterado - continua com o formulario completo como esta.
-
-### 3. Refatorar criacao de Posts em `PostFormDialog.tsx`
-
-**Arquivo:** `src/components/social-media/PostFormDialog.tsx`
-
-Atualmente `formStep` e `"prefill" | "form"`. Sera alterado para numero:
-- `formStep: number` (1 = IA, 2 = Basico, 3 = Agendamento, 4 = Detalhes, 5 = Revisao)
-
-**Passo 1 (IA):** AIPreFillStep existente.
-
-**Passo 2 (Basico):**
-- Titulo (obrigatorio)
-- Legenda/Texto
-- Plataforma + Tipo de Conteudo (lado a lado)
-
-**Passo 3 (Agendamento):**
-- Clientes
-- Secao de Datas (Post Date + Due Date) - mantida identica ao bloco atual com bg-muted
-
-**Passo 4 (Detalhes):**
-- Status (readonly na criacao como ja esta) + Prioridade
-- Usuarios atribuidos
-- Hashtags
-- Observacoes
-
-**Passo 5 (Revisao):**
-- Resumo de todos campos
-- Subtarefas + Anexos
-- Botao "Criar Postagem"
-
-Validacao entre passos:
-- Passo 2 -> 3: exige titulo
-
-Na edicao (`editPost`), o wizard NAO aparece - formulario completo como hoje.
-
-### 4. Componente de Revisao reutilizavel
-
-**Arquivo:** `src/components/ui/wizard-review-step.tsx` (novo)
-
-Componente que recebe um array de `{ label, value }` e renderiza uma lista de campos preenchidos em formato compacto (grid 2 colunas), facilitando a conferencia rapida antes de submeter.
-
-## Arquivos Modificados/Criados
-
-| Arquivo | Operacao | Descricao |
+| Arquivo | Operação | Descrição |
 |---|---|---|
-| `src/components/ui/wizard-step-indicator.tsx` | Criar | Indicador de progresso wizard reutilizavel |
-| `src/components/ui/wizard-review-step.tsx` | Criar | Componente de revisao reutilizavel |
-| `src/pages/Tasks.tsx` | Editar | Substituir dialog de criacao por wizard de 4 passos |
-| `src/components/social-media/PostFormDialog.tsx` | Editar | Substituir dialog de criacao por wizard de 5 passos |
-
-Nenhuma mudanca de banco de dados. Nenhuma mudanca em edge functions.
+| Migração SQL | Criar | Adicionar coluna `creative_instructions` |
+| `supabase/functions/ai-assist/index.ts` | Editar | Adicionar campo no POST_TOOLS e atualizar prompt |
+| `src/components/social-media/PostFormDialog.tsx` | Editar | Novo campo no formulário e wizard |
+| `src/hooks/useAIAssist.tsx` | Editar | Adicionar campo na interface |
+| `src/components/social-media/PostDetailsDialog.tsx` | Editar | Exibir instruções de arte |
+| `src/hooks/useSocialMediaPosts.tsx` | Verificar | Garantir que o campo é salvo/lido |
