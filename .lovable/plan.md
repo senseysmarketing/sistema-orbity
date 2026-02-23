@@ -1,61 +1,129 @@
 
-# Corrigir Posts em "Publicado" sem Historico + Proteger Workflow
+# Wizard para Criacao de Tarefas e Posts
 
-## Problema Identificado
+## Resumo
 
-O formulario de criacao de posts permite selecionar qualquer status, incluindo "Publicado", no momento da criacao. Isso faz com que posts sejam criados diretamente em "Publicado" sem passar pelo workflow e sem registro no historico de movimentacoes.
+Transformar os formularios de criacao de Tarefas e Posts do formato atual (tela unica com todos os campos) para um formato wizard passo-a-passo, onde o primeiro passo e o preenchimento com IA (que ja existe) e os passos seguintes apresentam os campos agrupados logicamente para o usuario conferir/alterar.
 
-42 posts da agencia foram criados assim pela Suellen, o que explica o historico vazio.
+## O que o usuario vera
 
-## Solucao (2 partes)
+### Tarefas - Wizard de 4 passos
 
-### Parte 1: Travar status na criacao de posts
+1. **IA** - Preenchimento Inteligente (ja existe, mantido como esta)
+2. **Basico** - Titulo, Descricao, Tipo da tarefa
+3. **Detalhes** - Prioridade, Status, Data de vencimento, Clientes, Usuarios atribuidos
+4. **Revisao** - Resumo de tudo preenchido com botao "Criar Tarefa" + Subtarefas e Anexos
 
-Ao **criar** um novo post, o campo de status sera automaticamente definido como o primeiro status da lista (Briefing/draft) e o dropdown ficara desabilitado ou oculto. O usuario so pode alterar o status via drag-and-drop no Kanban (que registra historico) ou editando o post depois.
+### Posts - Wizard de 5 passos
 
-Ao **editar** um post existente, o dropdown de status continua disponivel normalmente, mas a mudanca de status sera registrada no historico (isso ja funciona).
+1. **IA** - Preenchimento Inteligente (ja existe, mantido como esta)
+2. **Basico** - Titulo, Legenda/Texto, Plataforma, Tipo de Conteudo
+3. **Agendamento** - Clientes, Data de Postagem, Data Limite da Arte
+4. **Detalhes** - Prioridade, Usuarios, Hashtags, Observacoes
+5. **Revisao** - Resumo de tudo + Subtarefas e Anexos com botao "Criar Postagem"
+
+### Indicador de Progresso (ambos)
+
+No topo do dialog, uma barra com circulos numerados e labels para cada etapa (similar ao print de referencia), com barra de progresso conectando os circulos. Etapas completadas ficam com fundo verde, a etapa atual com borda destacada.
+
+### Navegacao
+
+- Botoes "Voltar" e "Proximo" no rodape do dialog
+- O botao "Pular e preencher manualmente" do passo IA avanca para o passo 2
+- Na edicao de posts/tarefas existentes, o wizard NAO aparece - o formulario completo e exibido diretamente (como e hoje), pois nao faz sentido usar wizard para editar
+
+## Mudancas Tecnicas
+
+### 1. Novo componente `WizardStepIndicator`
+
+**Arquivo:** `src/components/ui/wizard-step-indicator.tsx` (novo)
+
+Componente reutilizavel que renderiza a barra de progresso com:
+- Props: `currentStep`, `totalSteps`, `stepLabels` (array de strings)
+- Circulos numerados com labels
+- Linha de progresso conectando os circulos
+- Estados: completado (verde), ativo (primario), pendente (cinza)
+
+### 2. Refatorar criacao de Tarefas em `Tasks.tsx`
+
+**Arquivo:** `src/pages/Tasks.tsx`
+
+Atualmente o estado `createStep` e `"prefill" | "form"`. Sera alterado para um numero:
+- `createStep: number` (1 = IA, 2 = Basico, 3 = Detalhes, 4 = Revisao)
+
+O conteudo do dialog na criacao sera dividido:
+
+**Passo 1 (IA):** Componente `AIPreFillStep` existente. "Pular" e "apos preencher" avancam para passo 2.
+
+**Passo 2 (Basico):**
+- Titulo (obrigatorio)
+- Descricao
+- Tipo (obrigatorio)
+- Templates (botao "Usar Template" mantido aqui)
+
+**Passo 3 (Detalhes):**
+- Status + Prioridade (lado a lado)
+- Data de vencimento
+- Clientes + Usuarios atribuidos (lado a lado)
+
+**Passo 4 (Revisao):**
+- Resumo compacto de todos os campos preenchidos (cards com label/valor)
+- Subtarefas + Anexos (editaveis neste passo)
+- Botao "Criar Tarefa" no lugar de "Proximo"
+
+Validacao entre passos:
+- Passo 2 -> 3: exige titulo e tipo
+- Passo 3 -> 4: sem validacao obrigatoria
+
+O dialog de edicao de tarefas NAO sera alterado - continua com o formulario completo como esta.
+
+### 3. Refatorar criacao de Posts em `PostFormDialog.tsx`
 
 **Arquivo:** `src/components/social-media/PostFormDialog.tsx`
-- Na criacao (`!editPost`): forcar `status` para o primeiro custom status (slug do primeiro item da lista ordenada por `order_position`) e esconder o dropdown de status
-- Na edicao (`editPost`): manter o dropdown visivel como esta hoje
 
-### Parte 2: Corrigir posts existentes com historico vazio
+Atualmente `formStep` e `"prefill" | "form"`. Sera alterado para numero:
+- `formStep: number` (1 = IA, 2 = Basico, 3 = Agendamento, 4 = Detalhes, 5 = Revisao)
 
-Criar uma query SQL para resetar os posts que estao em 'published' com historico vazio, movendo-os de volta para 'draft' (Briefing). Isso permite que a equipe reposicione cada post no status correto.
+**Passo 1 (IA):** AIPreFillStep existente.
 
-```text
-UPDATE social_media_posts
-SET status = 'draft', updated_at = now()
-WHERE agency_id = '7bef1258-af3d-48cc-b3a7-f79fac29c7c0'
-  AND status = 'published'
-  AND (approval_history IS NULL OR approval_history::text = '[]');
-```
+**Passo 2 (Basico):**
+- Titulo (obrigatorio)
+- Legenda/Texto
+- Plataforma + Tipo de Conteudo (lado a lado)
 
-Isso afeta 42 posts que nao tem historico de movimentacao. Os posts que FORAM legitimamente publicados (com historico) nao serao afetados.
+**Passo 3 (Agendamento):**
+- Clientes
+- Secao de Datas (Post Date + Due Date) - mantida identica ao bloco atual com bg-muted
 
-## Detalhe Tecnico
+**Passo 4 (Detalhes):**
+- Status (readonly na criacao como ja esta) + Prioridade
+- Usuarios atribuidos
+- Hashtags
+- Observacoes
 
-### `PostFormDialog.tsx`
+**Passo 5 (Revisao):**
+- Resumo de todos campos
+- Subtarefas + Anexos
+- Botao "Criar Postagem"
 
-Mudanca na renderizacao do formulario:
+Validacao entre passos:
+- Passo 2 -> 3: exige titulo
 
-```text
-Se esta criando (!editPost):
-  - Setar formData.status = primeiro status (draft)
-  - Nao renderizar o dropdown de status
-  - Exibir apenas um Badge/Label informativo: "Status: Briefing"
+Na edicao (`editPost`), o wizard NAO aparece - formulario completo como hoje.
 
-Se esta editando (editPost):
-  - Manter o dropdown de status como esta hoje
-  - Continua registrando mudancas no historico
-```
+### 4. Componente de Revisao reutilizavel
 
-## Arquivos Modificados
+**Arquivo:** `src/components/ui/wizard-review-step.tsx` (novo)
 
-| Arquivo | Mudanca |
-|---|---|
-| `src/components/social-media/PostFormDialog.tsx` | Esconder dropdown de status na criacao, forcar primeiro status |
+Componente que recebe um array de `{ label, value }` e renderiza uma lista de campos preenchidos em formato compacto (grid 2 colunas), facilitando a conferencia rapida antes de submeter.
 
-## Acao Manual Necessaria
+## Arquivos Modificados/Criados
 
-Apos a implementacao, sera necessario executar a query SQL de correcao para resetar os 42 posts afetados. Isso pode ser feito diretamente no Supabase SQL Editor ou posso incluir como migracao.
+| Arquivo | Operacao | Descricao |
+|---|---|---|
+| `src/components/ui/wizard-step-indicator.tsx` | Criar | Indicador de progresso wizard reutilizavel |
+| `src/components/ui/wizard-review-step.tsx` | Criar | Componente de revisao reutilizavel |
+| `src/pages/Tasks.tsx` | Editar | Substituir dialog de criacao por wizard de 4 passos |
+| `src/components/social-media/PostFormDialog.tsx` | Editar | Substituir dialog de criacao por wizard de 5 passos |
+
+Nenhuma mudanca de banco de dados. Nenhuma mudanca em edge functions.
