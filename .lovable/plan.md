@@ -1,61 +1,71 @@
 
 
-# Corrigir Largura da Seção de Análise
+# Correcoes no Dashboard: Tarefas/Posts Solicitados, Timeline e Rotinas
 
-## Problema
+## Problema 1: Tarefas/Posts Solicitados nao aparecem
 
-A seção expandida de análise está dentro de um `<TableCell colSpan={9}>`. Embora tecnicamente ocupe todas as colunas, a largura é limitada pela largura renderizada da tabela, que é determinada pelo conteúdo das 9 colunas (nomes curtos, valores numéricos pequenos). O `<table>` HTML não expande além do necessário para seu conteúdo, mesmo com `w-full`.
+A query de tarefas solicitadas no `Index.tsx` (linha 169) nao filtra `archived = false`. Tarefas arquivadas estao poluindo ou impedindo a exibicao. Alem disso, tasks com status customizado equivalente a "done" (como `em_revisao`) nao sao filtradas, mas isso e menor.
 
-## Solução
+**Correcao**: Adicionar `.eq('archived', false)` na query de tarefas solicitadas.
 
-Mover o conteúdo expandido (cards semanais + análise IA) para **fora da tabela**, renderizando-o como um bloco separado abaixo da `<Table>`. Quando uma campanha é expandida, o bloco aparece entre a tabela e o restante do conteúdo, ocupando 100% da largura do `CardContent`.
+## Problema 2: Timeline nao exibe tarefas/posts solicitados
 
-A tabela continua exibindo as linhas das campanhas normalmente. O `Collapsible` com o conteúdo de análise passa a ser renderizado fora do `<Table>`, como um `<div>` irmão.
+O componente `DayTimeline.tsx` so busca notificacoes e rotinas. Nao busca tarefas nem posts do usuario para o dia. O usuario quer ver suas tarefas (com `due_date` de hoje) e posts (com `scheduled_date` de hoje) tambem na linha do tempo, incluindo os solicitados.
 
-## Mudança Técnica
+**Correcao**: No `DayTimeline.tsx`, buscar tambem:
+- Tarefas atribuidas ao usuario com `due_date` de hoje
+- Posts atribuidos ao usuario com `scheduled_date` de hoje
+- Tarefas criadas pelo usuario (solicitadas) com `due_date` de hoje
+- Posts criados pelo usuario (solicitados) com `scheduled_date` de hoje
 
-### `src/components/traffic/CampaignsAndReports.tsx`
+Exibi-los como itens na timeline usando o horario do `due_date` (se tiver hora) ou no topo (se for apenas data).
 
-**Estrutura atual (simplificada):**
-```text
-CardContent
-  Table
-    TableBody
-      map(campaigns =>
-        TableRow (dados da campanha + botão Análise)
-        Collapsible > TableRow > TableCell colSpan=9
-          grid (cards + IA)   <-- PRESO na largura da tabela
-      )
+## Problema 3: Rotinas com multiplos dias tratadas como uma so
+
+Este e o bug principal. A tabela `routine_completions` rastreia conclusao por **semana** (`week_number`), nao por **dia**. Uma rotina com `week_days: [1, 3, 5]` (Seg, Qua, Sex) ao ser marcada como concluida na segunda-feira, cria um registro com `week_number = X`, e isso faz o sistema considerar TODOS os dias daquela semana como concluidos.
+
+**Correcao**:
+1. Adicionar coluna `day_of_week` (integer, nullable) na tabela `routine_completions`
+2. Ao marcar/desmarcar uma rotina semanal, salvar o `day_of_week` especifico
+3. Atualizar `isCompleted()` para verificar por dia especifico
+4. Atualizar `isRoutineLate()` para verificar cada dia individualmente
+5. Na `WeeklyView`, verificar conclusao por dia
+6. Na `DayTimeline`, verificar conclusao por dia
+
+## Mudancas Tecnicas
+
+### Migracao de Banco
+
+Adicionar coluna `day_of_week` na tabela `routine_completions`:
+
+```sql
+ALTER TABLE routine_completions ADD COLUMN day_of_week integer;
 ```
 
-**Estrutura nova:**
-```text
-CardContent
-  Table
-    TableBody
-      map(campaigns =>
-        TableRow (dados da campanha + botão Análise)
-      )
-  
-  {expandedCampaign && (
-    <div className="w-full border-t bg-muted/50 p-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-        <div>Cards semanais</div>
-        <div>Análise IA</div>
-      </div>
-    </div>
-  )}
-```
+### Arquivos Modificados
 
-Mudanças específicas:
-1. Remover o bloco `<Collapsible>` de dentro do `<TableBody>`
-2. Após o fechamento de `</Table>`, adicionar o conteúdo expandido condicionalmente quando `expandedCampaign` corresponder a uma campanha
-3. O conteúdo usará `w-full` diretamente como `<div>`, sem estar preso dentro de `<table>`
-4. Remover imports de `Collapsible` e `CollapsibleContent` se não forem mais usados
-
-## Arquivo Modificado
-
-| Arquivo | Descrição |
+| Arquivo | Descricao |
 |---|---|
-| `src/components/traffic/CampaignsAndReports.tsx` | Mover seção expandida para fora da tabela |
+| `src/pages/Index.tsx` | Adicionar filtro `archived = false` na query de tarefas solicitadas |
+| `src/components/dashboard/DayTimeline.tsx` | Buscar e exibir tarefas e posts do dia na timeline |
+| `src/components/dashboard/RoutineBlock.tsx` | Alterar `isCompleted`, `handleToggle`, `isRoutineLate` e `WeeklyView` para usar `day_of_week` |
+
+### Detalhes de cada arquivo
+
+**Index.tsx**: Linha 173, adicionar `.eq('archived', false)` na query de `createdTasks`.
+
+**DayTimeline.tsx**:
+- Buscar `task_assignments` do usuario para pegar IDs de tarefas
+- Buscar tarefas com `due_date` de hoje
+- Buscar `post_assignments` do usuario para pegar IDs de posts
+- Buscar posts com `scheduled_date` de hoje
+- Buscar tarefas/posts criados pelo usuario (solicitados) com data de hoje
+- Montar items de timeline para cada um, usando o horario do `due_date`/`scheduled_date`
+
+**RoutineBlock.tsx**:
+- `isCompleted(routine)` para weekly: verificar `c.day_of_week === dayIso` alem de `c.week_number`
+- `handleToggle(routine)`: receber o `dayIso` como parametro, incluir `day_of_week` no insert
+- `isRoutineLate()`: verificar cada dia individualmente contra completions com `day_of_week` correspondente
+- `WeeklyView`: passar o dia especifico ao chamar `handleToggle`
+- Progresso semanal: contar total de slots (soma de `week_days.length` de cada rotina) vs completions com `day_of_week`
 
