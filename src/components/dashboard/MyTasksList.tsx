@@ -1,14 +1,10 @@
-import { useState } from 'react';
-import { format, isToday, isBefore, startOfDay, isThisWeek, addDays } from 'date-fns';
+import { format, isToday, isBefore, startOfDay, isThisWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { AlertCircle, ChevronRight, Clock } from 'lucide-react';
+import { AlertCircle, ChevronRight, Clock, CircleDot } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 
 interface Task {
   id: string;
@@ -37,9 +33,21 @@ const priorityLabels: Record<string, string> = {
   low: 'Baixa',
 };
 
-export function MyTasksList({ tasks, onTasksChange, onViewAll }: MyTasksListProps) {
-  const { toast } = useToast();
-  const [completing, setCompleting] = useState<Set<string>>(new Set());
+const statusLabels: Record<string, string> = {
+  todo: 'Pendente',
+  in_progress: 'Em andamento',
+  in_review: 'Em revisão',
+  done: 'Concluída',
+};
+
+const statusVariant: Record<string, 'outline' | 'secondary' | 'warning' | 'success'> = {
+  todo: 'outline',
+  in_progress: 'secondary',
+  in_review: 'warning',
+  done: 'success',
+};
+
+export function MyTasksList({ tasks, onViewAll }: MyTasksListProps) {
   const today = startOfDay(new Date());
 
   const overdueTasks = tasks.filter(t => {
@@ -58,23 +66,6 @@ export function MyTasksList({ tasks, onTasksChange, onViewAll }: MyTasksListProp
     return !isToday(d) && !isBefore(d, today) && isThisWeek(d, { locale: ptBR });
   });
 
-  const handleComplete = async (taskId: string) => {
-    setCompleting(prev => new Set(prev).add(taskId));
-    try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ status: 'done' })
-        .eq('id', taskId);
-
-      if (error) throw error;
-      onTasksChange?.();
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
-    } finally {
-      setCompleting(prev => { const s = new Set(prev); s.delete(taskId); return s; });
-    }
-  };
-
   const TaskRow = ({ task, showDate = false }: { task: Task; showDate?: boolean }) => {
     const isOverdue = task.due_date && isBefore(startOfDay(new Date(task.due_date)), today);
     return (
@@ -82,12 +73,7 @@ export function MyTasksList({ tasks, onTasksChange, onViewAll }: MyTasksListProp
         'flex items-start gap-3 py-2.5 border-b last:border-b-0',
         isOverdue && 'bg-destructive/5 rounded-lg px-2 -mx-2',
       )}>
-        <Checkbox
-          checked={task.status === 'done'}
-          disabled={completing.has(task.id)}
-          onCheckedChange={() => handleComplete(task.id)}
-          className="mt-0.5 shrink-0"
-        />
+        <CircleDot className={cn('h-4 w-4 mt-0.5 shrink-0', isOverdue ? 'text-destructive' : 'text-muted-foreground')} />
         <div className="flex-1 min-w-0">
           <p className={cn(
             'text-sm font-medium leading-snug line-clamp-2',
@@ -109,10 +95,10 @@ export function MyTasksList({ tasks, onTasksChange, onViewAll }: MyTasksListProp
           </div>
         </div>
         <Badge
-          variant="outline"
-          className={cn('text-xs shrink-0', priorityColors[task.priority])}
+          variant={statusVariant[task.status] || 'outline'}
+          className="text-xs shrink-0"
         >
-          {priorityLabels[task.priority]}
+          {statusLabels[task.status] || task.status}
         </Badge>
       </div>
     );
