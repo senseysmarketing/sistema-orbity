@@ -879,12 +879,28 @@ export default function Tasks() {
                   onSubmit={async (text) => {
                     const result = await preFillTask(text);
                     if (result) {
+                      // Match mentioned clients against agency clients
+                      let matchedClientIds: string[] = [];
+                      if (result.mentioned_clients?.length && clients.length > 0) {
+                        const normalize = (s: string) =>
+                          s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        matchedClientIds = clients
+                          .filter((c) =>
+                            result.mentioned_clients!.some((mention) => {
+                              const nMention = normalize(mention);
+                              const nClient = normalize(c.name);
+                              return nClient.includes(nMention) || nMention.includes(nClient);
+                            })
+                          )
+                          .map((c) => c.id);
+                      }
                       setNewTask((prev) => ({
                         ...prev,
                         title: result.title || prev.title,
                         description: result.description || prev.description,
                         priority: result.priority || prev.priority,
                         task_type: result.suggested_type || prev.task_type,
+                        client_ids: matchedClientIds.length > 0 ? matchedClientIds : prev.client_ids,
                       }));
                       setCreateStep("form");
                     }

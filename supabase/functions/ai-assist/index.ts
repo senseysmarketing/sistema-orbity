@@ -19,6 +19,7 @@ const TASK_TOOLS = [
           description: { type: "string", description: "Descrição profissional e estruturada, sem erros de gramática" },
           priority: { type: "string", enum: ["low", "medium", "high"], description: "Prioridade da tarefa" },
           suggested_type: { type: "string", description: "Sugestão de tipo baseado no contexto (ex: design, copy, video, social_media, trafego, reuniao, outro)" },
+          mentioned_clients: { type: "array", items: { type: "string" }, description: "Nomes de clientes ou empresas mencionados pelo usuário no texto. Extraia apenas nomes próprios de pessoas ou empresas que pareçam ser clientes." },
         },
         required: ["title", "description", "priority"],
         additionalProperties: false,
@@ -41,6 +42,7 @@ const POST_TOOLS = [
           platform: { type: "string", enum: ["instagram", "facebook", "linkedin", "twitter", "tiktok", "youtube"], description: "Plataforma sugerida" },
           post_type: { type: "string", enum: ["feed", "stories", "reels", "carrossel", "video"], description: "Tipo de conteúdo" },
           hashtags: { type: "array", items: { type: "string" }, description: "Hashtags relevantes" },
+          mentioned_clients: { type: "array", items: { type: "string" }, description: "Nomes de clientes ou empresas mencionados pelo usuário no texto. Extraia apenas nomes próprios de pessoas ou empresas que pareçam ser clientes." },
         },
         required: ["title", "description", "platform", "post_type", "hashtags"],
         additionalProperties: false,
@@ -75,12 +77,12 @@ serve(async (req) => {
 
     if (type === "prefill_task") {
       systemPrompt =
-        "Você é um assistente de agência de marketing digital. Extraia os dados estruturados de uma tarefa a partir da descrição do usuário. Gere um título conciso e uma descrição profissional, estruturada e sem erros de gramática. Responda sempre em português brasileiro.";
+        "Você é um assistente de agência de marketing digital. Extraia os dados estruturados de uma tarefa a partir da descrição do usuário. Gere um título conciso e uma descrição profissional, estruturada e sem erros de gramática. IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Responda sempre em português brasileiro.";
       tools = TASK_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_task_data" } };
     } else if (type === "prefill_post") {
       systemPrompt =
-        "Você é um social media manager profissional. Extraia os dados de um post para redes sociais a partir da descrição do usuário. Gere uma legenda envolvente, profissional e adaptada para a plataforma sugerida. Inclua hashtags relevantes. Responda em português brasileiro.";
+        "Você é um social media manager profissional. Extraia os dados de um post para redes sociais a partir da descrição do usuário. Gere uma legenda envolvente, profissional e adaptada para a plataforma sugerida. Inclua hashtags relevantes. IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Responda em português brasileiro.";
       tools = POST_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_post_data" } };
     } else {

@@ -7,6 +7,7 @@ export interface TaskPrefillResult {
   description: string;
   priority: "low" | "medium" | "high";
   suggested_type?: string;
+  mentioned_clients?: string[];
 }
 
 export interface PostPrefillResult {
@@ -15,6 +16,7 @@ export interface PostPrefillResult {
   platform: string;
   post_type: string;
   hashtags: string[];
+  mentioned_clients?: string[];
 }
 
 export function useAIAssist() {
