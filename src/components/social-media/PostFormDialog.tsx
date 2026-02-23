@@ -67,6 +67,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
   const [formData, setFormData] = useState({
     title: "",
     description: "",
+    creative_instructions: "",
     scheduled_date: defaultDate?.toISOString() || new Date().toISOString(),
     post_date: defaultDate?.toISOString() || new Date().toISOString(),
     due_date: "",
@@ -94,6 +95,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
       setFormData({
         title: editPost.title,
         description: editPost.description || "",
+        creative_instructions: (editPost as any).creative_instructions || "",
         scheduled_date: editPost.scheduled_date,
         post_date: effectivePostDate,
         due_date: editPost.due_date || "",
@@ -121,6 +123,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
       setFormData({
         title: "",
         description: "",
+        creative_instructions: "",
         scheduled_date: defaultPostDate,
         post_date: defaultPostDate,
         due_date: calculateDueDate(defaultPostDate, daysBefore),
@@ -412,9 +415,10 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     try {
       const data = {
         ...formData,
-        client_id: selectedClientIds[0] || null, // Keep first client for backward compatibility
-        scheduled_date: formData.post_date, // Manter scheduled_date sincronizado com post_date para compatibilidade
+        client_id: selectedClientIds[0] || null,
+        scheduled_date: formData.post_date,
         hashtags: formData.hashtags.split(",").map(h => h.trim()).filter(Boolean),
+        creative_instructions: formData.creative_instructions || null,
         attachments: attachments as any,
         mentions: [],
         approval_history: [],
@@ -601,8 +605,12 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
               <Input id="title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required />
             </div>
             <div>
-              <Label htmlFor="description">Legenda/Texto</Label>
+              <Label htmlFor="description">Legenda</Label>
               <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={4} />
+            </div>
+            <div>
+              <Label htmlFor="creative_instructions">Instruções de Arte</Label>
+              <Textarea id="creative_instructions" value={formData.creative_instructions} onChange={(e) => setFormData({ ...formData, creative_instructions: e.target.value })} rows={3} placeholder="Headlines, CTAs, textos de apoio, roteiro para vídeo..." />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -727,6 +735,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
                       ...prev,
                       title: result.title || prev.title,
                       description: result.description || prev.description,
+                      creative_instructions: result.creative_instructions || prev.creative_instructions,
                       platform: result.platform || prev.platform,
                       post_type: result.post_type || prev.post_type,
                       hashtags: result.hashtags?.join(", ") || prev.hashtags,
@@ -746,9 +755,13 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
                       <Label htmlFor="title">Título *</Label>
                       <Input id="title" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Título da postagem" />
                     </div>
-                    <div>
-                      <Label htmlFor="description">Legenda/Texto</Label>
+                     <div>
+                      <Label htmlFor="description">Legenda</Label>
                       <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={4} />
+                    </div>
+                    <div>
+                      <Label htmlFor="creative_instructions">Instruções de Arte</Label>
+                      <Textarea id="creative_instructions" value={formData.creative_instructions} onChange={(e) => setFormData({ ...formData, creative_instructions: e.target.value })} rows={3} placeholder="Headlines, CTAs, textos de apoio, roteiro para vídeo..." />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -887,6 +900,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
                         { label: "Plataforma", value: getPlatformLabel(formData.platform) },
                         { label: "Tipo", value: getContentTypeLabel(formData.post_type) },
                         { label: "Legenda", value: formData.description },
+                        { label: "Instruções de Arte", value: formData.creative_instructions },
                         { label: "Clientes", value: selectedClientIds.map(id => clients.find(c => c.id === id)?.name).filter(Boolean).join(", ") },
                         { label: "Data de Postagem", value: new Date(formData.post_date).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) },
                         { label: "Data Limite da Arte", value: formData.due_date ? new Date(formData.due_date).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "" },

@@ -4103,6 +4103,7 @@ export type Database = {
           client_id: string | null
           created_at: string | null
           created_by: string
+          creative_instructions: string | null
           description: string | null
           due_date: string | null
           hashtags: string[] | null
@@ -4131,6 +4132,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           created_by: string
+          creative_instructions?: string | null
           description?: string | null
           due_date?: string | null
           hashtags?: string[] | null
@@ -4159,6 +4161,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           created_by?: string
+          creative_instructions?: string | null
           description?: string | null
           due_date?: string | null
           hashtags?: string[] | null

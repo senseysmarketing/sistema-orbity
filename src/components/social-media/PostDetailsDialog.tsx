@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History, ListTodo, Users, Lock, Copy, Clock } from "lucide-react";
+import { Pencil, Trash2, Calendar, User, Hash, Building2, Target, History, ListTodo, Users, Lock, Copy, Clock, Palette } from "lucide-react";
 import { SocialMediaPost, Subtask } from "@/hooks/useSocialMediaPosts";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect, useMemo } from "react";
@@ -298,10 +298,22 @@ export function PostDetailsDialog({ post, open, onOpenChange, onEdit, onDelete, 
 
               {post.description && (
                 <div>
-                  <p className="text-sm font-medium mb-1">Descrição</p>
+                  <p className="text-sm font-medium mb-1">Legenda</p>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                     <LinkifyText text={post.description} />
                   </p>
+                </div>
+              )}
+
+              {(post as any).creative_instructions && (
+                <div className="flex items-start gap-2">
+                  <Palette className="h-4 w-4 mt-1 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium mb-1">Instruções de Arte</p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {(post as any).creative_instructions}
+                    </p>
+                  </div>
                 </div>
               )}
 

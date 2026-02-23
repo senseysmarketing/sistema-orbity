@@ -1,0 +1,1 @@
+ALTER TABLE public.social_media_posts ADD COLUMN creative_instructions text;
