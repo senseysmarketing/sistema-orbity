@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, CheckCircle, Sparkles, Edit3, Info, X } from "lucide-react";
+import { Copy, CheckCircle, Sparkles, Edit3, Info, Loader2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useAIAssist } from "@/hooks/useAIAssist";
 
 interface ReportData {
   accountName: string;
@@ -24,12 +25,16 @@ interface ReportGeneratorModalProps {
   isOpen: boolean;
   onClose: () => void;
   reportData: ReportData | null;
+  agencyId?: string;
 }
 
-export function ReportGeneratorModal({ isOpen, onClose, reportData }: ReportGeneratorModalProps) {
+export function ReportGeneratorModal({ isOpen, onClose, reportData, agencyId }: ReportGeneratorModalProps) {
   const [copiedTemplate, setCopiedTemplate] = useState<number | null>(null);
   const [customMessage, setCustomMessage] = useState("");
+  const [aiReport, setAiReport] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
   const { toast } = useToast();
+  const { generateReport } = useAIAssist();
 
   if (!reportData) return null;
 
@@ -60,6 +65,26 @@ export function ReportGeneratorModal({ isOpen, onClose, reportData }: ReportGene
         variant: "destructive"
       });
     }
+  };
+
+  const handleGenerateAI = async () => {
+    setAiLoading(true);
+    const content = `Dados do período:
+- Conta: ${reportData.accountName}
+- Período: ${reportData.period}
+- Investimento: R$ ${reportData.totalSpend.toFixed(2)}
+- Impressões: ${reportData.totalImpressions}
+- Cliques: ${reportData.totalClicks}
+- Conversões: ${reportData.totalConversions}
+- CTR: ${reportData.avgCTR.toFixed(2)}%
+- CPC: R$ ${reportData.avgCPC.toFixed(2)}
+- CPM: R$ ${reportData.avgCPM.toFixed(2)}`;
+
+    const result = await generateReport(content, agencyId);
+    if (result?.message) {
+      setAiReport(result.message);
+    }
+    setAiLoading(false);
   };
 
   const { accountName, period, totalSpend, totalImpressions, totalClicks, totalConversions, avgCTR, avgCPC, avgCPM } = reportData;
@@ -163,12 +188,83 @@ Estratégia + Otimização = RESULTADOS! ✨`
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="templates" className="mt-4">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="ai" className="mt-4">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="ai" className="flex items-center gap-1">
+              <Sparkles className="h-3 w-3" />
+              Relatório IA
+            </TabsTrigger>
             <TabsTrigger value="templates">Templates</TabsTrigger>
             <TabsTrigger value="custom">Personalizado</TabsTrigger>
             <TabsTrigger value="variables">Variáveis</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="ai" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Relatório Gerado por IA
+                </CardTitle>
+                <CardDescription>
+                  A IA analisa os dados do período e gera uma mensagem completa com feedback e sugestões, pronta para enviar ao cliente
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {!aiReport && !aiLoading && (
+                  <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                    <Sparkles className="h-12 w-12 text-muted-foreground/40" />
+                    <p className="text-sm text-muted-foreground text-center max-w-md">
+                      Clique no botão abaixo para gerar um relatório personalizado com análise de performance e sugestões de próximos passos
+                    </p>
+                    <Button onClick={handleGenerateAI} disabled={aiLoading}>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Gerar com IA
+                    </Button>
+                  </div>
+                )}
+
+                {aiLoading && (
+                  <div className="flex flex-col items-center justify-center py-8 space-y-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground">Analisando dados e gerando relatório...</p>
+                  </div>
+                )}
+
+                {aiReport && !aiLoading && (
+                  <div className="space-y-3">
+                    <div className="bg-muted/50 p-4 rounded-lg max-h-80 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap text-sm font-mono">
+                        {aiReport}
+                      </pre>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => copyToClipboard(aiReport, -3)}
+                        variant={copiedTemplate === -3 ? "default" : "outline"}
+                      >
+                        {copiedTemplate === -3 ? (
+                          <>
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Copiado!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copiar
+                          </>
+                        )}
+                      </Button>
+                      <Button onClick={handleGenerateAI} variant="outline">
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Regenerar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="templates" className="space-y-4 mt-4">
             <div className="grid gap-4 md:grid-cols-2">

@@ -574,6 +574,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
           isOpen={isReportModalOpen}
           onClose={() => setIsReportModalOpen(false)}
           reportData={reportData}
+          agencyId={currentAgency?.id}
         />
       </div>
     </>
