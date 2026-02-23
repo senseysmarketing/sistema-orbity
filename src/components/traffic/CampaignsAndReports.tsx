@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar } from 'recharts';
-import { Collapsible, CollapsibleContent } from '@radix-ui/react-collapsible';
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
@@ -538,8 +538,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
               </TableHeader>
               <TableBody>
                 {activeCampaigns.map((campaign) => (
-                  <>
-                    <TableRow key={campaign.id}>
+                    <TableRow key={campaign.id} className={expandedCampaign === campaign.id ? 'bg-muted/30' : ''}>
                       <TableCell className="font-medium" title={campaign.name}>
                         {truncateText(campaign.name)}
                       </TableCell>
@@ -558,7 +557,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                       <TableCell>
                         <Button 
                           onClick={() => handleWeeklyAnalysis(campaign.id)}
-                          variant="outline" 
+                          variant={expandedCampaign === campaign.id ? "default" : "outline"}
                           size="sm"
                         >
                           <BarChart className="mr-1 h-3 w-3" />
@@ -566,97 +565,95 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                         </Button>
                       </TableCell>
                     </TableRow>
-                    
-                    <Collapsible open={expandedCampaign === campaign.id}>
-                      <CollapsibleContent asChild>
-                        <TableRow>
-                          <TableCell colSpan={9} className="p-0">
-                            <div className="border-t bg-muted/50 p-4">
-                              {loadingAnalysis ? (
-                                <div className="text-center py-8">
-                                  <RefreshCw className="h-6 w-6 animate-spin mx-auto" />
-                                  <p className="text-sm text-muted-foreground mt-2">Carregando análise...</p>
-                                </div>
-                              ) : weeklyAnalysis.length > 0 ? (
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
-                                  {/* Left: Weekly Cards */}
-                                  <div>
-                                    <h4 className="font-medium mb-3">Análise das Últimas 4 Semanas</h4>
-                                    <div className="grid grid-cols-2 gap-3">
-                                      {weeklyAnalysis.map((week, index) => (
-                                        <Card key={index}>
-                                          <CardHeader className="pb-2">
-                                            <CardTitle className="text-sm">{week.week}</CardTitle>
-                                          </CardHeader>
-                                          <CardContent className="text-sm space-y-1">
-                                            <p>Gasto: {formatCurrency(week.spend || 0)}</p>
-                                            <p>Conversões: {week.conversions || 0}</p>
-                                            <p>CPC: {formatCurrency(week.cpc || 0)}</p>
-                                            <p>CTR: {(week.ctr || 0).toFixed(2)}%</p>
-                                          </CardContent>
-                                        </Card>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  {/* Right: AI Analysis */}
-                                  <div>
-                                    <div className="flex items-center justify-between mb-3">
-                                      <h4 className="font-medium flex items-center gap-2">
-                                        <Sparkles className="h-4 w-4 text-primary" />
-                                        Análise da IA
-                                      </h4>
-                                      {aiAnalysis[campaign.id] && (
-                                        <div className="flex gap-2">
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => copyToClipboard(aiAnalysis[campaign.id])}
-                                          >
-                                            <Copy className="h-3 w-3 mr-1" />
-                                            Copiar
-                                          </Button>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => handleAIAnalysisWithData(campaign)}
-                                            disabled={aiAnalysisLoading === campaign.id}
-                                          >
-                                            <RotateCcw className="h-3 w-3 mr-1" />
-                                            Regenerar
-                                          </Button>
-                                        </div>
-                                      )}
-                                    </div>
-                                    {aiAnalysisLoading === campaign.id ? (
-                                      <div className="flex items-center justify-center py-8 border rounded-lg bg-background">
-                                        <Loader2 className="h-5 w-5 animate-spin mr-2 text-primary" />
-                                        <span className="text-sm text-muted-foreground">Analisando com IA...</span>
-                                      </div>
-                                    ) : aiAnalysis[campaign.id] ? (
-                                      <div className="bg-background rounded-lg p-4 text-sm whitespace-pre-wrap border max-h-[400px] overflow-y-auto">
-                                        {aiAnalysis[campaign.id]}
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center justify-center py-8 border rounded-lg bg-background text-sm text-muted-foreground">
-                                        Aguardando análise...
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              ) : (
-                                <p className="text-muted-foreground">Nenhum dado semanal disponível.</p>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </>
                 ))}
               </TableBody>
             </Table>
           )}
+
+          {/* Expanded analysis - OUTSIDE the table for full width */}
+          {expandedCampaign && (() => {
+            const campaign = activeCampaigns.find(c => c.id === expandedCampaign);
+            if (!campaign) return null;
+            return (
+              <div className="w-full border-t bg-muted/50 p-6">
+                {loadingAnalysis ? (
+                  <div className="text-center py-8">
+                    <RefreshCw className="h-6 w-6 animate-spin mx-auto" />
+                    <p className="text-sm text-muted-foreground mt-2">Carregando análise de "{truncateText(campaign.name, 50)}"...</p>
+                  </div>
+                ) : weeklyAnalysis.length > 0 ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+                    {/* Left: Weekly Cards */}
+                    <div>
+                      <h4 className="font-medium mb-3">Análise das Últimas 4 Semanas</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        {weeklyAnalysis.map((week, index) => (
+                          <Card key={index}>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-sm">{week.week}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="text-sm space-y-1">
+                              <p>Gasto: {formatCurrency(week.spend || 0)}</p>
+                              <p>Conversões: {week.conversions || 0}</p>
+                              <p>CPC: {formatCurrency(week.cpc || 0)}</p>
+                              <p>CTR: {(week.ctr || 0).toFixed(2)}%</p>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Right: AI Analysis */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                          Análise da IA
+                        </h4>
+                        {aiAnalysis[campaign.id] && (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => copyToClipboard(aiAnalysis[campaign.id])}
+                            >
+                              <Copy className="h-3 w-3 mr-1" />
+                              Copiar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleAIAnalysisWithData(campaign)}
+                              disabled={aiAnalysisLoading === campaign.id}
+                            >
+                              <RotateCcw className="h-3 w-3 mr-1" />
+                              Regenerar
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      {aiAnalysisLoading === campaign.id ? (
+                        <div className="flex items-center justify-center py-8 border rounded-lg bg-background">
+                          <Loader2 className="h-5 w-5 animate-spin mr-2 text-primary" />
+                          <span className="text-sm text-muted-foreground">Analisando com IA...</span>
+                        </div>
+                      ) : aiAnalysis[campaign.id] ? (
+                        <div className="bg-background rounded-lg p-4 text-sm whitespace-pre-wrap border max-h-[400px] overflow-y-auto">
+                          {aiAnalysis[campaign.id]}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center py-8 border rounded-lg bg-background text-sm text-muted-foreground">
+                          Aguardando análise...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">Nenhum dado semanal disponível.</p>
+                )}
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
