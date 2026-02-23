@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X } from "lucide-react";
+import { AIPreFillStep } from "@/components/ui/ai-prefill-step";
+import { useAIAssist, TaskPrefillResult } from "@/hooks/useAIAssist";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 import { FileAttachments, Attachment } from "@/components/ui/file-attachments";
 import {
@@ -91,6 +93,8 @@ export default function Tasks() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
+  const [createStep, setCreateStep] = useState<"prefill" | "form">("prefill");
+  const { preFillTask, loading: aiLoading } = useAIAssist();
 
   // Filtros e busca
   const [searchTerm, setSearchTerm] = useState("");
@@ -566,6 +570,7 @@ export default function Tasks() {
 
     incrementUsageCount(template.id);
     setIsTemplateSelectorOpen(false);
+    setCreateStep("form");
     setIsDialogOpen(true);
 
     toast({
@@ -737,6 +742,7 @@ export default function Tasks() {
       task_type: task.task_type || "",
     });
     setIsDetailDialogOpen(false);
+    setCreateStep("form");
     setIsDialogOpen(true);
   };
 
@@ -848,7 +854,10 @@ export default function Tasks() {
               onOpenFullSelector={() => setIsTemplateSelectorOpen(true)}
             />
           )}
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) setCreateStep("prefill");
+            }}>
             <DialogTrigger asChild>
               <Button className="flex items-center gap-2 h-9">
                 <Plus className="h-4 w-4" />
@@ -856,6 +865,34 @@ export default function Tasks() {
               </Button>
             </DialogTrigger>
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden">
+            {createStep === "prefill" ? (
+              <>
+                <DialogHeader className="flex-shrink-0">
+                  <DialogTitle>Nova Tarefa</DialogTitle>
+                  <DialogDescription>Use a IA para preencher automaticamente ou preencha manualmente.</DialogDescription>
+                </DialogHeader>
+                <AIPreFillStep
+                  type="task"
+                  loading={aiLoading}
+                  onResult={() => {}}
+                  onSkip={() => setCreateStep("form")}
+                  onSubmit={async (text) => {
+                    const result = await preFillTask(text);
+                    if (result) {
+                      setNewTask((prev) => ({
+                        ...prev,
+                        title: result.title || prev.title,
+                        description: result.description || prev.description,
+                        priority: result.priority || prev.priority,
+                        task_type: result.suggested_type || prev.task_type,
+                      }));
+                      setCreateStep("form");
+                    }
+                  }}
+                />
+              </>
+            ) : (
+              <>
             <DialogHeader className="flex-shrink-0">
               <DialogTitle>Criar Nova Tarefa</DialogTitle>
               <DialogDescription>Preencha as informações ou use um template.</DialogDescription>
@@ -1000,6 +1037,8 @@ export default function Tasks() {
                 Criar Tarefa
               </Button>
             </DialogFooter>
+              </>
+            )}
           </DialogContent>
         </Dialog>
         </div>

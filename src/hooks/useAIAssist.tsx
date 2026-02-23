@@ -1,0 +1,88 @@
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+export interface TaskPrefillResult {
+  title: string;
+  description: string;
+  priority: "low" | "medium" | "high";
+  suggested_type?: string;
+}
+
+export interface PostPrefillResult {
+  title: string;
+  description: string;
+  platform: string;
+  post_type: string;
+  hashtags: string[];
+}
+
+export function useAIAssist() {
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const callAI = async (type: string, content: string) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-assist", {
+        body: { type, content },
+      });
+
+      if (error) {
+        // Check for rate limit / payment errors
+        const msg = error.message || "";
+        if (msg.includes("429") || msg.includes("rate") || msg.includes("limite")) {
+          toast({
+            title: "Limite de requisições",
+            description: "Tente novamente em alguns segundos.",
+            variant: "destructive",
+          });
+        } else if (msg.includes("402") || msg.includes("créditos") || msg.includes("payment")) {
+          toast({
+            title: "Créditos esgotados",
+            description: "Adicione créditos de IA ao workspace para continuar.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Erro na IA",
+            description: "Não foi possível processar. Tente novamente.",
+            variant: "destructive",
+          });
+        }
+        return null;
+      }
+
+      if (data?.error) {
+        toast({
+          title: "Erro",
+          description: data.error,
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      return data?.result || null;
+    } catch (e) {
+      console.error("AI assist error:", e);
+      toast({
+        title: "Erro",
+        description: "Falha ao conectar com a IA.",
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const preFillTask = async (text: string): Promise<TaskPrefillResult | null> => {
+    return callAI("prefill_task", text);
+  };
+
+  const preFillPost = async (text: string): Promise<PostPrefillResult | null> => {
+    return callAI("prefill_post", text);
+  };
+
+  return { preFillTask, preFillPost, loading };
+}
