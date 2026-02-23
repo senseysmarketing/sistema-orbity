@@ -1,101 +1,61 @@
 
-# Relatorio com IA no Controle de Trafego
+# Corrigir Posts em "Publicado" sem Historico + Proteger Workflow
 
-## Resumo
+## Problema Identificado
 
-Adicionar uma aba "IA" como primeira aba no modal "Gerar Relatorio" que usa a IA para analisar os dados do periodo e gerar uma mensagem personalizada direcionada ao cliente, com feedback e follow-up sobre os resultados. Tambem adicionar um terceiro card de prompt personalizavel na aba de configuracoes de IA.
+O formulario de criacao de posts permite selecionar qualquer status, incluindo "Publicado", no momento da criacao. Isso faz com que posts sejam criados diretamente em "Publicado" sem passar pelo workflow e sem registro no historico de movimentacoes.
 
-## O que o usuario vera
+42 posts da agencia foram criados assim pela Suellen, o que explica o historico vazio.
 
-### No modal "Gerar Relatorio"
-- Nova aba "Relatorio IA" como primeira aba (antes de Templates, Personalizado e Variaveis)
-- Um botao "Gerar com IA" que envia os dados do periodo para a IA
-- A IA retorna uma mensagem formatada e direcionada ao cliente, com:
-  - Resumo dos dados (gasto, impressoes, cliques, conversoes, CTR, CPC, CPM)
-  - Analise/feedback sobre a performance do periodo
-  - Sugestoes de proximo passo / follow-up
-- Botao "Copiar" para copiar a mensagem gerada
-- Botao "Regenerar" para gerar novamente com a mesma base de dados
+## Solucao (2 partes)
 
-### Nas Configuracoes > IA
-- Terceiro card: "Prompt para Relatorios de Trafego"
-- Permite personalizar como a IA gera a analise e o tom da mensagem ao cliente
+### Parte 1: Travar status na criacao de posts
 
-## Mudancas Tecnicas
+Ao **criar** um novo post, o campo de status sera automaticamente definido como o primeiro status da lista (Briefing/draft) e o dropdown ficara desabilitado ou oculto. O usuario so pode alterar o status via drag-and-drop no Kanban (que registra historico) ou editando o post depois.
 
-### 1. Edge Function `ai-assist` - Novo tipo `report_traffic`
+Ao **editar** um post existente, o dropdown de status continua disponivel normalmente, mas a mudanca de status sera registrada no historico (isso ja funciona).
 
-Adicionar um terceiro tipo de processamento na edge function:
-- Novo tool `extract_report_data` com campo `message` (string) - a mensagem formatada para o cliente
-- System prompt padrao: instrui a IA a analisar os dados de trafego pago e gerar uma mensagem profissional direcionada ao cliente, com feedback sobre performance e sugestoes de proximo passo
-- Busca prompt customizado da agencia (prompt_type = 'report') se existir
-- Os dados do periodo sao passados como contexto no conteudo do usuario
+**Arquivo:** `src/components/social-media/PostFormDialog.tsx`
+- Na criacao (`!editPost`): forcar `status` para o primeiro custom status (slug do primeiro item da lista ordenada por `order_position`) e esconder o dropdown de status
+- Na edicao (`editPost`): manter o dropdown visivel como esta hoje
 
-### 2. `ReportGeneratorModal.tsx` - Nova aba "Relatorio IA"
+### Parte 2: Corrigir posts existentes com historico vazio
 
-- Adicionar aba "Relatorio IA" com icone Sparkles como primeira aba
-- TabsList passa de 3 para 4 colunas
-- Conteudo da aba:
-  - Botao "Gerar com IA" (estado loading com spinner)
-  - Area de exibicao da mensagem gerada (textarea readonly ou pre formatado)
-  - Botoes "Copiar" e "Regenerar"
-- Receber `agencyId` como prop para passar na chamada da IA
-- Usar `useAIAssist` ou chamar diretamente `supabase.functions.invoke("ai-assist")`
-
-### 3. `AISettingsManager.tsx` - Terceiro card de prompt
-
-- Adicionar estado `reportPrompt` seguindo o mesmo padrao de `taskPrompt` e `postPrompt`
-- Novo card "Prompt para Relatorios" com placeholder padrao
-- Grid passa de 2 para 3 colunas (ou empilha em mobile)
-- `fetchPrompts` busca tambem prompt_type = 'report'
-- `savePrompt` suporta type = 'report'
-
-### 4. `CampaignsAndReports.tsx` - Passar agencyId ao modal
-
-- Passar `currentAgency?.id` como prop para o `ReportGeneratorModal`
-
-### 5. `useAIAssist.tsx` - Novo tipo de resultado (opcional)
-
-- Adicionar interface `ReportPrefillResult` com campo `message: string`
-- Adicionar metodo `generateReport` que chama `callAI("report_traffic", ...)`
-
-## Logica da IA para Relatorios
-
-O conteudo enviado ao usuario da IA sera um JSON stringificado com os dados:
+Criar uma query SQL para resetar os posts que estao em 'published' com historico vazio, movendo-os de volta para 'draft' (Briefing). Isso permite que a equipe reposicione cada post no status correto.
 
 ```text
-Dados do periodo:
-- Conta: {accountName}
-- Periodo: {period}
-- Investimento: R$ {totalSpend}
-- Impressoes: {totalImpressions}
-- Cliques: {totalClicks}
-- Conversoes: {totalConversions}
-- CTR: {avgCTR}%
-- CPC: R$ {avgCPC}
-- CPM: R$ {avgCPM}
+UPDATE social_media_posts
+SET status = 'draft', updated_at = now()
+WHERE agency_id = '7bef1258-af3d-48cc-b3a7-f79fac29c7c0'
+  AND status = 'published'
+  AND (approval_history IS NULL OR approval_history::text = '[]');
 ```
 
-O system prompt instrui a IA a:
-1. Gerar uma mensagem direcionada ao cliente (nao ao gestor)
-2. Incluir resumo dos numeros formatados
-3. Analisar a performance (bom/ruim/medio) com base nas metricas
-4. Sugerir proximos passos ou otimizacoes
-5. Tom profissional mas acessivel
-6. Formatar para WhatsApp (com emojis e negrito com asteriscos)
+Isso afeta 42 posts que nao tem historico de movimentacao. Os posts que FORAM legitimamente publicados (com historico) nao serao afetados.
 
-## Prompt Padrao para Relatorios
+## Detalhe Tecnico
 
-"Voce e um gestor de trafego pago profissional. Gere uma mensagem direcionada ao cliente com os resultados do periodo. Inclua um resumo dos dados, uma analise da performance e sugestoes de proximo passo. Use tom profissional mas acessivel, formate para WhatsApp com emojis e negrito (*texto*)."
+### `PostFormDialog.tsx`
+
+Mudanca na renderizacao do formulario:
+
+```text
+Se esta criando (!editPost):
+  - Setar formData.status = primeiro status (draft)
+  - Nao renderizar o dropdown de status
+  - Exibir apenas um Badge/Label informativo: "Status: Briefing"
+
+Se esta editando (editPost):
+  - Manter o dropdown de status como esta hoje
+  - Continua registrando mudancas no historico
+```
 
 ## Arquivos Modificados
 
-| Arquivo | Operacao | Descricao |
-|---|---|---|
-| `supabase/functions/ai-assist/index.ts` | Editar | Adicionar tipo `report_traffic` com tool e prompt |
-| `src/components/traffic/ReportGeneratorModal.tsx` | Editar | Nova aba "Relatorio IA" como primeira aba |
-| `src/components/traffic/CampaignsAndReports.tsx` | Editar | Passar agencyId ao modal |
-| `src/components/settings/AISettingsManager.tsx` | Editar | Terceiro card para prompt de relatorios |
-| `src/hooks/useAIAssist.tsx` | Editar | Novo metodo generateReport |
+| Arquivo | Mudanca |
+|---|---|
+| `src/components/social-media/PostFormDialog.tsx` | Esconder dropdown de status na criacao, forcar primeiro status |
 
-Nenhum arquivo novo. Nenhuma mudanca de banco de dados (a tabela `agency_ai_prompts` ja suporta qualquer prompt_type).
+## Acao Manual Necessaria
+
+Apos a implementacao, sera necessario executar a query SQL de correcao para resetar os 42 posts afetados. Isso pode ser feito diretamente no Supabase SQL Editor ou posso incluir como migracao.
