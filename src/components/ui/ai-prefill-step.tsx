@@ -88,7 +88,8 @@ export function AIPreFillStep({ type, onResult, onSkip, loading, onSubmit }: AIP
         </div>
         <h3 className="text-lg font-semibold">Preenchimento Inteligente</h3>
         <p className="text-sm text-muted-foreground max-w-sm">
-          Descreva {type === "task" ? "a tarefa" : "o post"} em suas palavras e a IA preencherá os campos automaticamente.
+          Descreva {type === "task" ? "a tarefa" : "o post"} em suas palavras e vamos preencher os campos
+          automaticamente.
         </p>
       </div>
 
@@ -146,11 +147,7 @@ export function AIPreFillStep({ type, onResult, onSkip, loading, onSubmit }: AIP
       </Tabs>
 
       <div className="flex flex-col items-center gap-3 w-full">
-        <Button
-          onClick={handleSubmit}
-          disabled={!text.trim() || loading}
-          className="w-full gap-2"
-        >
+        <Button onClick={handleSubmit} disabled={!text.trim() || loading} className="w-full gap-2">
           {loading ? (
             <>
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
