@@ -1,47 +1,71 @@
 
 
-# Reverter posts incorretamente marcados como "Publicado"
+# Corrigir status do CRM desaparecendo para membros
 
-## Problema
+## Problema identificado
 
-17 posts foram incorretamente movidos para o status "published" (Publicado) mesmo tendo datas de publicacao futuras. Isso ocorreu em atualizacoes em massa hoje (23/02) por volta das 14:15 e 15:15.
+A politica de seguranca (RLS) da tabela `lead_statuses` exige que o usuario seja **admin ou owner** para **qualquer operacao**, incluindo leitura. Isso significa que membros comuns da agencia nao conseguem carregar os status do Kanban.
+
+Consequencias:
+- A pagina de configuracoes mostra a lista de status vazia
+- O pipeline usa um fallback com apenas os 7 status padrao, sem incluir o "Desqualificados" customizado
+- Colunas customizadas nao aparecem no Kanban
+
+## Causa raiz
+
+A tabela `lead_statuses` tem uma unica RLS policy:
+```
+Policy: "Agency admins can manage lead statuses"
+Command: ALL
+Condition: is_agency_admin(agency_id)
+```
+
+Usuarios com role `member` falham nessa verificacao e recebem 0 registros.
 
 ## Solucao
 
-Executar um UPDATE no banco de dados para reverter esses 17 posts para o status `draft` (Briefing - status inicial do workflow).
+### 1. Corrigir RLS da tabela `lead_statuses` (SQL migration)
 
-## Posts afetados
+Substituir a politica unica por duas:
 
-| Titulo | Data Publicacao | Cliente |
-|---|---|---|
-| Aprovacao social | 23/02 | T&B |
-| Video imovel | 24/02 | T&B |
-| Carrossel institucional | 24/02 | Outro |
-| Carrossel informativo | 25/02 | T&B |
-| Caixinha de perguntas | 26/02 | T&B |
-| Estatico informativo | 26/02 | Outro |
-| Post estatico | 27/02 | T&B |
-| Reels conforme a demanda | 27/02 | Outro |
-| CTA | 28/02 | T&B |
-| Caixinha de perguntas | 02/03 | T&B |
-| Carrossel imovel | 02/03 | T&B |
-| Video imovel | 03/03 | T&B |
-| Post estatico | 04/03 | T&B |
-| Dicas | 05/03 | T&B |
-| Reels imovel | 06/03 | T&B |
-| CTA | 07/03 | T&B |
-| Carrossel informativo | 10/03 | Outro |
-
-## Mudanca tecnica
-
-Um unico comando SQL via migration:
+- **SELECT**: permitir para todos os membros da agencia (qualquer role)
+- **INSERT/UPDATE/DELETE**: manter apenas para admins e owners
 
 ```sql
-UPDATE social_media_posts
-SET status = 'draft'
-WHERE status = 'published'
-  AND scheduled_date > '2026-02-23';
+-- Remover policy antiga
+DROP POLICY IF EXISTS "Agency admins can manage lead statuses" ON lead_statuses;
+
+-- Leitura para todos os membros da agencia
+CREATE POLICY "Agency members can view lead statuses"
+  ON lead_statuses FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM agency_users
+      WHERE agency_users.user_id = auth.uid()
+      AND agency_users.agency_id = lead_statuses.agency_id
+    )
+  );
+
+-- Escrita apenas para admins/owners
+CREATE POLICY "Agency admins can manage lead statuses"
+  ON lead_statuses FOR ALL
+  USING (is_agency_admin(agency_id))
+  WITH CHECK (is_agency_admin(agency_id));
 ```
 
-Isso revertera todos os 17 posts para "Briefing" (slug `draft`).
+### 2. Melhorar normalizacao de status customizados no frontend
 
+Arquivo: `src/components/crm/LeadsKanban.tsx`
+
+Ajustar a funcao `normalizeStatusToDb` e o agrupamento de leads para comparar status de forma case-insensitive, garantindo que leads salvos com variantes como "desqualificados" (minusculo) sejam agrupados corretamente na coluna "Desqualificados".
+
+| Arquivo | Tipo de mudanca |
+|---|---|
+| Migration SQL | Dividir RLS policy: leitura para membros, escrita para admins |
+| `src/components/crm/LeadsKanban.tsx` | Comparacao case-insensitive no agrupamento de leads |
+
+## Resultado esperado
+
+- Todos os membros da agencia verao os status no pipeline e na pagina de configuracoes
+- O status "Desqualificados" aparecera como coluna no Kanban
+- Apenas admins/owners poderao criar, editar ou excluir status
