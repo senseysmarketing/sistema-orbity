@@ -1,6 +1,6 @@
 import { format, isToday, isBefore, startOfDay, isThisWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { AlertCircle, ChevronRight, Clock, CircleDot } from 'lucide-react';
+import { AlertCircle, ChevronRight, Clock, CircleDot, ClipboardList } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -95,6 +95,7 @@ export function MyTasksList({ tasks, onViewAll }: MyTasksListProps) {
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-primary" />
             Minhas Tarefas
           </CardTitle>
           <Button variant="ghost" size="sm" onClick={onViewAll} className="text-xs gap-1">
