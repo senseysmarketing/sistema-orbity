@@ -1,55 +1,61 @@
 
 
-# Auto-Analise IA + Layout Lado a Lado
+# Corrigir Largura da Seção de Análise
 
-## Resumo
+## Problema
 
-Duas mudancas na secao expandida de analise de campanhas:
+A seção expandida de análise está dentro de um `<TableCell colSpan={9}>`. Embora tecnicamente ocupe todas as colunas, a largura é limitada pela largura renderizada da tabela, que é determinada pelo conteúdo das 9 colunas (nomes curtos, valores numéricos pequenos). O `<table>` HTML não expande além do necessário para seu conteúdo, mesmo com `w-full`.
 
-1. **Auto-trigger**: Ao clicar em "Analise", a analise da IA sera gerada automaticamente junto com os dados semanais (sem precisar de um segundo clique)
-2. **Layout lado a lado**: Cards semanais a esquerda, analise da IA a direita, ocupando a largura total da secao
+## Solução
 
-## Analise do Layout
+Mover o conteúdo expandido (cards semanais + análise IA) para **fora da tabela**, renderizando-o como um bloco separado abaixo da `<Table>`. Quando uma campanha é expandida, o bloco aparece entre a tabela e o restante do conteúdo, ocupando 100% da largura do `CardContent`.
 
-O conteudo expandido esta dentro de um `<TableCell colSpan={9}>`, que ja ocupa a largura total da tabela. Nao ha `max-width` limitando - o `AppLayout` usa apenas `flex-1 p-4 md:p-6`. O problema e que os cards semanais e a analise IA estao empilhados verticalmente (`mt-4`). A solucao e coloca-los dentro de um `grid grid-cols-1 lg:grid-cols-2 gap-6`.
+A tabela continua exibindo as linhas das campanhas normalmente. O `Collapsible` com o conteúdo de análise passa a ser renderizado fora do `<Table>`, como um `<div>` irmão.
 
-## Mudancas Tecnicas
+## Mudança Técnica
 
 ### `src/components/traffic/CampaignsAndReports.tsx`
 
-**1. Auto-trigger da analise IA**
-
-Na funcao `handleWeeklyAnalysis`, apos carregar os dados semanais com sucesso, chamar automaticamente `handleAIAnalysis(campaign)`. Para isso, precisamos passar a campanha como parametro e aguardar os dados semanais.
-
-**2. Layout lado a lado**
-
-Reorganizar o conteudo dentro do `<TableCell>`:
-
+**Estrutura atual (simplificada):**
+```text
+CardContent
+  Table
+    TableBody
+      map(campaigns =>
+        TableRow (dados da campanha + botão Análise)
+        Collapsible > TableRow > TableCell colSpan=9
+          grid (cards + IA)   <-- PRESO na largura da tabela
+      )
 ```
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-  <!-- Esquerda: Cards semanais -->
-  <div>
-    <h4>Analise das Ultimas Semanas</h4>
-    <div class="grid grid-cols-2 gap-3">
-      ...cards...
-    </div>
-  </div>
+
+**Estrutura nova:**
+```text
+CardContent
+  Table
+    TableBody
+      map(campaigns =>
+        TableRow (dados da campanha + botão Análise)
+      )
   
-  <!-- Direita: Analise IA -->
-  <div>
-    <h5>Analise da IA</h5>
-    ...conteudo ou loading...
-  </div>
-</div>
+  {expandedCampaign && (
+    <div className="w-full border-t bg-muted/50 p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+        <div>Cards semanais</div>
+        <div>Análise IA</div>
+      </div>
+    </div>
+  )}
 ```
 
-Os cards semanais passam de `grid-cols-4` para `grid-cols-2` (ja que agora ocupam metade da largura).
-
-O botao "Analisar com IA" sera removido pois a analise ja sera disparada automaticamente.
+Mudanças específicas:
+1. Remover o bloco `<Collapsible>` de dentro do `<TableBody>`
+2. Após o fechamento de `</Table>`, adicionar o conteúdo expandido condicionalmente quando `expandedCampaign` corresponder a uma campanha
+3. O conteúdo usará `w-full` diretamente como `<div>`, sem estar preso dentro de `<table>`
+4. Remover imports de `Collapsible` e `CollapsibleContent` se não forem mais usados
 
 ## Arquivo Modificado
 
-| Arquivo | Descricao |
+| Arquivo | Descrição |
 |---|---|
-| `src/components/traffic/CampaignsAndReports.tsx` | Auto-trigger IA + layout grid lado a lado |
+| `src/components/traffic/CampaignsAndReports.tsx` | Mover seção expandida para fora da tabela |
 
