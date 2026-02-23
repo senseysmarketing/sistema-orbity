@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, Lock, Bell, Palette, Save, Shield, CreditCard, Users, Puzzle, Trash2 } from "lucide-react";
+import { User, Lock, Bell, Palette, Save, Shield, CreditCard, Users, Puzzle, Trash2, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,7 @@ import { UsersManagement } from "@/components/admin/UsersManagement";
 import { NotificationSummaryCard } from "@/components/notifications/NotificationSummaryCard";
 import { NotificationChannelsConfig } from "@/components/notifications/NotificationChannelsConfig";
 import { GoogleCalendarIntegration } from "@/components/settings/GoogleCalendarIntegration";
+import { AISettingsManager } from "@/components/settings/AISettingsManager";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -239,7 +240,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="flex w-full overflow-x-auto scrollbar-hide md:grid md:grid-cols-7">
+        <TabsList className="flex w-full overflow-x-auto scrollbar-hide md:grid md:grid-cols-8">
           <TabsTrigger value="profile" className="flex-shrink-0 gap-1 md:gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Perfil</span>
@@ -252,6 +253,12 @@ export default function Settings() {
             <TabsTrigger value="users" className="flex-shrink-0 gap-1 md:gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Usuários</span>
+            </TabsTrigger>
+          )}
+          {isAgencyAdmin && (
+            <TabsTrigger value="ai" className="flex-shrink-0 gap-1 md:gap-2">
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">IA</span>
             </TabsTrigger>
           )}
           <TabsTrigger value="integrations" className="flex-shrink-0 gap-1 md:gap-2">
@@ -382,6 +389,12 @@ export default function Settings() {
               </div>
               <UsersManagement />
             </div>
+          </TabsContent>
+        )}
+
+        {isAgencyAdmin && (
+          <TabsContent value="ai" className="space-y-4">
+            <AISettingsManager />
           </TabsContent>
         )}
 
