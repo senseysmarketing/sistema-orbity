@@ -1,60 +1,51 @@
 
-# Campo "Instruções de Arte" nos Posts
+
+# Auto-vincular Usuarios Mencionados via IA
 
 ## Resumo
 
-Adicionar um novo campo **"Instruções de Arte"** nos posts de social media. O campo serve para orientar o designer/editor sobre o que deve conter na arte ou vídeo: headlines, subtítulos, CTAs, textos de apoio, ou um mini roteiro para vídeos. A IA preencherá esse campo automaticamente no prefill, e o prompt pode ser personalizado por agência.
+Adicionar extração automática de nomes de usuários mencionados no texto da IA, usando o mesmo padrão de match fuzzy que já funciona para clientes. Quando o usuário disser algo como "quero que a Laryssa faça...", a IA extrairá "Laryssa" e o sistema vinculará automaticamente ao perfil correspondente.
 
 ## O que muda para o usuário
 
-- O label "Legenda/Texto" passa a ser apenas **"Legenda"**
-- Novo campo **"Instruções de Arte"** aparece logo abaixo da Legenda, com um placeholder explicativo
-- No wizard de criação (passo 2 - Básico), o campo aparece entre Legenda e Plataforma/Tipo
-- No formulário de edição, aparece no mesmo local
-- Na revisão (passo 5), o campo é exibido no resumo
-- A IA preenche automaticamente com sugestões de headlines, CTAs, roteiro, etc., adaptadas ao tipo de conteúdo (feed, reels, carrossel, vídeo)
+- Ao mencionar nomes de membros da equipe no texto para a IA (ex: "a Laryssa vai fazer", "atribuir pro João"), o campo "Usuários atribuídos" será preenchido automaticamente
+- Funciona tanto para Tarefas quanto para Posts
+- Usa o mesmo match fuzzy que já existe para clientes (normaliza acentos, case insensitive, match parcial)
 
 ## Mudanças Técnicas
 
-### 1. Migração de banco de dados
+### 1. Edge Function `ai-assist/index.ts`
 
-Adicionar coluna `creative_instructions` (text, nullable) na tabela `social_media_posts`:
+Adicionar campo `mentioned_users` nos dois tools (TASK_TOOLS e POST_TOOLS):
+- Tipo: array de strings
+- Descrição: "Nomes de pessoas mencionadas como responsáveis ou que devem executar a tarefa/post. Extraia nomes próprios de pessoas que o usuário indica como executores."
 
-```text
-ALTER TABLE social_media_posts ADD COLUMN creative_instructions text;
-```
+Adicionar nas instruções técnicas (TASK_TECHNICAL_INSTRUCTIONS e POST_TECHNICAL_INSTRUCTIONS) a orientação para extrair nomes de usuários mencionados.
 
-### 2. Edge Function `ai-assist` - Campo `creative_instructions` no POST_TOOLS
+### 2. `src/hooks/useAIAssist.tsx`
 
-Adicionar o campo `creative_instructions` no tool `extract_post_data`:
-- Descrição: "Sugestões de criação para a arte ou vídeo. Inclua headlines, subtítulos, CTAs, textos de apoio. Para vídeos, inclua um mini roteiro com os pontos principais."
+Adicionar `mentioned_users?: string[]` nas interfaces `TaskPrefillResult` e `PostPrefillResult`.
 
-Atualizar o `DEFAULT_POST_PROMPT` para instruir a IA a gerar as instruções de arte adaptadas ao tipo de conteúdo.
+### 3. `src/pages/Tasks.tsx`
 
-### 3. `PostFormDialog.tsx`
+No callback do AI prefill (passo 1), após o match de clientes, adicionar match de usuários:
+- Usar a mesma função `normalize` que já existe
+- Comparar `result.mentioned_users` contra `profiles` (que já está carregado)
+- Setar `newTask.assigned_users` com os user_ids correspondentes
 
-- Adicionar `creative_instructions` ao `formData`
-- Renomear label "Legenda/Texto" para "Legenda"
-- Adicionar campo "Instruções de Arte" (Textarea) no passo 2 do wizard e no formulário de edição
-- Incluir no resultado do AI prefill: `creative_instructions: result.creative_instructions`
-- Incluir na revisão (passo 5)
-- Incluir no `handleSubmit` para salvar no banco
+### 4. `src/components/social-media/PostFormDialog.tsx`
 
-### 4. `useAIAssist.tsx` - Atualizar interface
-
-Adicionar `creative_instructions?: string` na interface `PostPrefillResult`.
-
-### 5. Componentes de visualização
-
-Exibir o campo "Instruções de Arte" no `PostDetailsDialog.tsx` e no `PostCard.tsx` (se houver espaço, apenas no details dialog).
+No callback do AI prefill (passo 1), após o match de clientes, adicionar match de usuários:
+- Comparar `result.mentioned_users` contra `profiles` (que já está carregado)
+- Chamar `setSelectedUserIds` com os IDs correspondentes
 
 ## Arquivos Modificados
 
 | Arquivo | Operação | Descrição |
 |---|---|---|
-| Migração SQL | Criar | Adicionar coluna `creative_instructions` |
-| `supabase/functions/ai-assist/index.ts` | Editar | Adicionar campo no POST_TOOLS e atualizar prompt |
-| `src/components/social-media/PostFormDialog.tsx` | Editar | Novo campo no formulário e wizard |
+| `supabase/functions/ai-assist/index.ts` | Editar | Adicionar `mentioned_users` nos tools e instruções |
 | `src/hooks/useAIAssist.tsx` | Editar | Adicionar campo na interface |
-| `src/components/social-media/PostDetailsDialog.tsx` | Editar | Exibir instruções de arte |
-| `src/hooks/useSocialMediaPosts.tsx` | Verificar | Garantir que o campo é salvo/lido |
+| `src/pages/Tasks.tsx` | Editar | Match fuzzy de usuários no prefill |
+| `src/components/social-media/PostFormDialog.tsx` | Editar | Match fuzzy de usuários no prefill |
+
+Nenhuma mudança de banco de dados necessária.
