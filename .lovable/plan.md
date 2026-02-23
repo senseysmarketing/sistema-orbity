@@ -1,71 +1,62 @@
 
 
-# Corrigir status do CRM desaparecendo para membros
+# Corrigir drag-and-drop do CRM Kanban
 
-## Problema identificado
+## Problema
 
-A politica de seguranca (RLS) da tabela `lead_statuses` exige que o usuario seja **admin ou owner** para **qualquer operacao**, incluindo leitura. Isso significa que membros comuns da agencia nao conseguem carregar os status do Kanban.
+Ao soltar um lead sobre outro card (e nao diretamente na area vazia da coluna), o `over.id` retorna o UUID do card de destino, nao o statusKey da coluna. O codigo atual verifica se `over.id` e um status valido e, como nao e, descarta o evento silenciosamente.
 
-Consequencias:
-- A pagina de configuracoes mostra a lista de status vazia
-- O pipeline usa um fallback com apenas os 7 status padrao, sem incluir o "Desqualificados" customizado
-- Colunas customizadas nao aparecem no Kanban
-
-## Causa raiz
-
-A tabela `lead_statuses` tem uma unica RLS policy:
-```
-Policy: "Agency admins can manage lead statuses"
-Command: ALL
-Condition: is_agency_admin(agency_id)
-```
-
-Usuarios com role `member` falham nessa verificacao e recebem 0 registros.
+O Kanban de Social Media ja resolve isso buscando o `containerId` do sortable context. O CRM Kanban precisa da mesma logica.
 
 ## Solucao
 
-### 1. Corrigir RLS da tabela `lead_statuses` (SQL migration)
+Alterar `handleDragEnd` em `src/components/crm/LeadsKanban.tsx` para:
 
-Substituir a politica unica por duas:
+1. Verificar se `over.id` e um statusKey valido
+2. Se nao for, buscar `over.data.current?.sortable?.containerId` (que e o ID da coluna pai)
+3. Usar esse containerId como o novo status
 
-- **SELECT**: permitir para todos os membros da agencia (qualquer role)
-- **INSERT/UPDATE/DELETE**: manter apenas para admins e owners
+## Mudanca tecnica
 
-```sql
--- Remover policy antiga
-DROP POLICY IF EXISTS "Agency admins can manage lead statuses" ON lead_statuses;
+Arquivo: `src/components/crm/LeadsKanban.tsx`, funcao `handleDragEnd` (linhas 156-218)
 
--- Leitura para todos os membros da agencia
-CREATE POLICY "Agency members can view lead statuses"
-  ON lead_statuses FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM agency_users
-      WHERE agency_users.user_id = auth.uid()
-      AND agency_users.agency_id = lead_statuses.agency_id
-    )
-  );
+Substituir a logica de resolucao do `newStatus`:
 
--- Escrita apenas para admins/owners
-CREATE POLICY "Agency admins can manage lead statuses"
-  ON lead_statuses FOR ALL
-  USING (is_agency_admin(agency_id))
-  WITH CHECK (is_agency_admin(agency_id));
+```ts
+// Atual (quebrado):
+const newStatus = over.id as string;
+if (!statusConfig[newStatus]) { return; }
+
+// Corrigido:
+let newStatus = over.id as string;
+
+if (!statusConfig[newStatus]) {
+  // over.id e um card — buscar a coluna pai via sortable context
+  const containerId = over.data.current?.sortable?.containerId;
+  if (containerId && statusConfig[containerId]) {
+    newStatus = containerId;
+  } else {
+    setActiveId(null);
+    setDraggedLead(null);
+    return;
+  }
+}
 ```
 
-### 2. Melhorar normalizacao de status customizados no frontend
+Tambem ajustar a comparacao de status atual do lead (linha 176) para usar `normalizeStatusToDb` e comparar com `dbStatus` da coluna de destino, evitando falsos "sem mudanca":
 
-Arquivo: `src/components/crm/LeadsKanban.tsx`
+```ts
+const displayStatus = statusConfig[newStatus].title;
+const dbStatus = mapDisplayStatusToDatabase(displayStatus);
+const currentNormalized = normalizeStatusToDb(lead.status);
 
-Ajustar a funcao `normalizeStatusToDb` e o agrupamento de leads para comparar status de forma case-insensitive, garantindo que leads salvos com variantes como "desqualificados" (minusculo) sejam agrupados corretamente na coluna "Desqualificados".
+if (currentNormalized.toLowerCase() === dbStatus.toLowerCase()) {
+  // Mesmo status, nao faz nada
+  setActiveId(null);
+  setDraggedLead(null);
+  return;
+}
+```
 
-| Arquivo | Tipo de mudanca |
-|---|---|
-| Migration SQL | Dividir RLS policy: leitura para membros, escrita para admins |
-| `src/components/crm/LeadsKanban.tsx` | Comparacao case-insensitive no agrupamento de leads |
+Nenhum outro arquivo precisa ser alterado.
 
-## Resultado esperado
-
-- Todos os membros da agencia verao os status no pipeline e na pagina de configuracoes
-- O status "Desqualificados" aparecera como coluna no Kanban
-- Apenas admins/owners poderao criar, editar ou excluir status
