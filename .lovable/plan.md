@@ -1,55 +1,98 @@
 
 
-# Simplificacao do Dashboard e Notificacoes pos-unificacao
+# Analise de Tarefas com IA Integrada
 
 ## Resumo
 
-Agora que posts e tarefas vivem na mesma tabela `tasks`, o Dashboard e a tela de preferencias de notificacoes podem ser simplificados. No Dashboard, os blocos separados de "Meus Posts" e "Posts Solicitados" serao removidos -- seus itens serao absorvidos nos blocos unificados de "Minhas Tarefas" e "Tarefas Solicitadas". Na tela de notificacoes, a secao separada de "Posts (por evento)" sera unificada dentro da secao de "Tarefas".
+Atualizar a aba de analises da tela de tarefas para refletir a unificacao (incluindo dados de tarefas de redes sociais), adicionar breakdown por tipo de tarefa, e integrar a IA para gerar analises profundas com recomendacoes acionaveis sobre distribuicao de carga, produtividade e gargalos.
 
 ---
 
 ## Alteracoes
 
-### 1. Dashboard (Index.tsx) -- Unificar blocos
+### 1. Atualizar query no TaskAnalytics.tsx
 
-**Remover** os blocos separados de `MyPostsList` e `RequestedPostsList`. Os itens de `task_type = 'redes_sociais'` ja estao na tabela `tasks` e serao exibidos junto com as tarefas regulares.
+A query atual nao busca `task_type`. Adicionar este campo ao select para permitir breakdown por tipo (regular, redes sociais, criativos, etc).
 
-Alteracoes concretas:
-- Remover imports de `MyPostsList` e `RequestedPostsList`
-- Remover state de `myPosts`, `myPostCustomStatuses`, `requestedPosts`
-- Remover a query de `social_media_custom_statuses`
-- Na fetch de tarefas, **nao filtrar** por `task_type` -- todas as tasks (regulares + redes_sociais) aparecem juntas
-- Remover o grid de 2 colunas "Tarefas | Posts" e "Solicitadas | Posts Solicitados"
-- Manter apenas um bloco `MyTasksList` em largura total
-- Manter apenas um bloco `RequestedTasksList` em largura total
-- Remover logica de `mapTaskStatusToSocial` do Index
-- Nas metricas da agencia, simplificar removendo contagem separada de `totalSocialPosts` e `publishedPosts`
+```
+select: id, title, status, priority, client_id, due_date,
+        created_at, updated_at, archived, task_type,
+        clients(name), task_assignments(user_id)
+```
 
-### 2. MyTasksList.tsx -- Adicionar icone
+### 2. Atualizar types.ts
 
-Adicionar um icone `ClipboardList` (ou similar) ao titulo "Minhas Tarefas" para ficar consistente com o icone `SendHorizontal` de "Tarefas Solicitadas".
+Adicionar `task_type` ao `TaskWithAssignments` e criar nova interface `TypeDistribution` para o breakdown por tipo.
 
-### 3. Preferencias de Notificacao (NotificationPreferencesPage.tsx)
+### 3. Novo componente: TypeBreakdownChart
 
-Simplificar a tela unificando posts e tarefas:
+Card com grafico de pizza ou barras horizontais mostrando a distribuicao de tarefas por tipo (`redes_sociais`, `criativos`, `conteudo`, etc). Permite visualizar rapidamente como a carga esta dividida entre tipos de trabalho.
 
-- **Secao "O que notificar"**: Remover o toggle separado de `posts_enabled` ("Posts de Social Media"). Posts sao tarefas agora.
-- **Secao "Posts (por evento)"**: Remover o card inteiro. Os eventos `post.assigned`, `post.status_changed`, `post.updated_important` serao cobertos pelos equivalentes de tarefas.
-- **Secao "Regras do time"**: Remover a regra separada "Notificar admins quando post for publicado" (ja coberta pela regra de tarefa concluida).
-- Remover todo o state de `postEvents` e `agencyPostRules`
-- Remover logica de save/fetch de `POST_EVENT_KEYS`
+### 4. Atualizar MetricsCards.tsx
 
-### 4. NotificationPreferences.tsx (modal legado)
+Adicionar um 5o card com "Tipos de Tarefa" mostrando quantos tipos distintos existem e o tipo mais comum do periodo, para dar contexto rapido.
 
-Este componente modal e uma versao duplicada da pagina. Aplicar as mesmas simplificacoes ou, se nao for mais utilizado em nenhum lugar, deletar.
+### 5. Novo componente: AIAnalysisCard
 
-### 5. DashboardMetrics.tsx
+Este e o componente principal da integracao com IA. Sera um Card com:
 
-Remover as metricas separadas de "Posts" (`totalSocialPosts`, `publishedPosts`) se existirem como cards distintos, ja que agora sao contados dentro de "Tarefas".
+- Botao "Gerar Analise com IA" que envia os dados agregados do periodo para a edge function
+- Area de texto renderizado com a resposta da IA (formatada em markdown simples)
+- Loading state enquanto a IA processa
+- Cache da analise por sessao (para nao chamar a IA a cada re-render)
 
-### 6. Limpeza de arquivos
+**Dados enviados para a IA:**
+- Total de tarefas, concluidas, atrasadas, sem atribuicao
+- Taxa de conclusao atual vs mes anterior
+- Ranking dos usuarios (nome, tarefas atribuidas, concluidas, atrasadas, taxa de conclusao, tempo medio)
+- Ranking dos clientes (nome, total, concluidas, atrasadas, taxa)
+- Distribuicao por tipo de tarefa
+- Picos de demanda por dia
+- Se e mes atual ou historico
 
-Avaliar se `MyPostsList.tsx` e `RequestedPostsList.tsx` podem ser deletados, ja que nao serao mais usados no Dashboard.
+**O que a IA vai retornar:**
+- Resumo executivo do periodo
+- Analise de distribuicao de carga (quem esta sobrecarregado, quem pode receber mais)
+- Identificacao de gargalos (revisoes paradas, tarefas sem dono)
+- Clientes que precisam de atencao prioritaria
+- Sugestoes praticas de melhoria (redistribuir tarefas, ajustar prazos, etc)
+- Nota de performance geral (de 1 a 10)
+
+### 6. Atualizar edge function ai-assist
+
+Adicionar novo tipo `analytics_review` que recebe os dados agregados e retorna a analise estruturada. Usar tool calling para extrair dados estruturados.
+
+Nova tool:
+```
+extract_analytics_review:
+  - summary: string (resumo executivo)
+  - workload_analysis: string (analise de distribuicao)
+  - bottlenecks: string (gargalos identificados)
+  - client_alerts: string (clientes que precisam de atencao)
+  - suggestions: string[] (lista de sugestoes praticas)
+  - performance_score: number (nota de 1 a 10)
+  - performance_label: string (ex: "Bom", "Excelente", "Precisa Melhorar")
+```
+
+### 7. Atualizar useAIAssist hook
+
+Adicionar nova funcao `analyzeTaskPeriod` que chama o tipo `analytics_review` e retorna o resultado tipado.
+
+### 8. Atualizar SmartInsights.tsx (tasks)
+
+Manter os insights programaticos existentes, mas posicionar o `AIAnalysisCard` logo abaixo deles, para complementar as regras fixas com a analise contextual da IA.
+
+### 9. Layout final do TaskAnalytics
+
+Ordem dos componentes:
+1. Header com seletor de mes (existente)
+2. MetricsCards (atualizado)
+3. AIAnalysisCard (novo - posicao de destaque)
+4. TeamPerformanceTable (existente)
+5. WorkloadChart (existente)
+6. TypeBreakdownChart (novo)
+7. SmartInsights (existente)
+8. ClientAnalysis (existente)
 
 ---
 
@@ -57,35 +100,55 @@ Avaliar se `MyPostsList.tsx` e `RequestedPostsList.tsx` podem ser deletados, ja 
 
 | Arquivo | Alteracao |
 |---|---|
-| `src/pages/Index.tsx` | Remover blocos de Posts, unificar fetch, simplificar metricas |
-| `src/components/dashboard/MyTasksList.tsx` | Adicionar icone ao titulo |
-| `src/components/notifications/NotificationPreferencesPage.tsx` | Remover secao Posts, unificar eventos |
-| `src/components/notifications/NotificationPreferences.tsx` | Mesmas simplificacoes ou deletar |
+| `src/components/tasks/TaskAnalytics.tsx` | Adicionar task_type na query, calcular distribuicao por tipo, integrar AIAnalysisCard e TypeBreakdownChart |
+| `src/components/tasks/analytics/types.ts` | Adicionar task_type ao TaskWithAssignments, nova interface AIAnalysisResult e TypeDistribution |
+| `src/components/tasks/analytics/MetricsCards.tsx` | Ajuste menor para refletir dados unificados |
+| `src/hooks/useAIAssist.tsx` | Nova funcao analyzeTaskPeriod e interface AIAnalysisResult |
+| `supabase/functions/ai-assist/index.ts` | Novo tipo analytics_review com tool calling |
 
-## Arquivos possivelmente deletados
+## Novos arquivos
 
-| Arquivo | Motivo |
+| Arquivo | Descricao |
 |---|---|
-| `src/components/dashboard/MyPostsList.tsx` | Nao mais utilizado |
-| `src/components/dashboard/RequestedPostsList.tsx` | Nao mais utilizado |
+| `src/components/tasks/analytics/AIAnalysisCard.tsx` | Card com botao para gerar analise IA, exibicao da resposta formatada, loading state |
+| `src/components/tasks/analytics/TypeBreakdownChart.tsx` | Grafico de distribuicao por tipo de tarefa |
 
 ---
 
 ## Detalhes tecnicos
 
-### Index.tsx - Nova logica de fetch simplificada
+### Edge function - novo tipo analytics_review
 
-A fetch de tarefas deixa de separar `regularTasks` vs `socialTasks`. Todas as tasks atribuidas ao usuario (independente de `task_type`) sao exibidas no bloco "Minhas Tarefas". O mesmo para tarefas criadas pelo usuario mas delegadas a terceiros em "Tarefas Solicitadas".
+System prompt para a IA:
+```
+Voce e um analista de produtividade de agencias de marketing digital. 
+Analise os dados de tarefas do periodo e gere um feedback completo 
+para o gestor. Seja direto, pratico e baseado nos numeros. 
+Identifique padroes, gargalos e oportunidades de melhoria.
+```
 
-O filtro de visibilidade continua o mesmo: tarefas com `due_date` nos proximos 7 dias e nao concluidas. Para tarefas de redes sociais sem `due_date` mas com `metadata.post_date`, o campo `due_date` devera ser utilizado (ja mapeado na migracao).
+Payload enviado (exemplo):
+```json
+{
+  "type": "analytics_review",
+  "content": "Periodo: Fevereiro 2026\nTotal: 45 tarefas | Concluidas: 32 (71%) | Atrasadas: 5 | Sem atribuicao: 3\nMes anterior: 65%\n\nEquipe:\n- Ana: 15 tarefas, 12 concluidas (80%), 1 atrasada, tempo medio 3.2 dias\n- Carlos: 18 tarefas, 10 concluidas (56%), 3 atrasadas, tempo medio 5.1 dias\n...\n\nClientes:\n- Cliente A: 12 tarefas, 10 concluidas (83%), 0 atrasadas\n- Cliente B: 8 tarefas, 3 concluidas (38%), 2 atrasadas\n...\n\nDistribuicao por tipo:\n- redes_sociais: 20 (44%)\n- criativos: 12 (27%)\n- conteudo: 8 (18%)\n- outros: 5 (11%)"
+}
+```
 
-### NotificationPreferencesPage.tsx - Eventos unificados
+### AIAnalysisCard - comportamento
 
-Os event keys ficam apenas:
-- `task.assigned`
-- `task.status_changed`
-- `task.updated_important`
-- `task.comment_added` (em breve)
+- Ao clicar "Gerar Analise", os dados agregados sao serializados em texto e enviados para a edge function
+- A resposta e cacheada em state local (nao persiste entre navegacoes)
+- Se o mes mudar, o cache e limpo e o usuario pode gerar nova analise
+- A nota de performance (1-10) e exibida como um badge colorido
+- As sugestoes sao renderizadas como uma lista com icones
 
-Os event keys `post.*` deixam de ser salvos/lidos. Registros existentes na tabela `notification_event_preferences` com `post.*` permanecem mas sao ignorados.
+### TypeBreakdownChart
 
+- Grafico de barras horizontal (recharts) ou donut chart
+- Cores por tipo: redes_sociais (rosa), criativos (roxo), conteudo (azul), desenvolvimento (verde), outros (cinza)
+- Labels em portugues com nomes amigaveis dos tipos
+
+### Prompt customizavel
+
+O tipo `analytics_review` tambem consulta a tabela `agency_ai_prompts` com `prompt_type = 'analytics'`, permitindo que cada agencia personalize o tom e foco da analise. A tela de configuracoes de IA (`AISettingsManager`) sera estendida com um novo campo para este prompt.
