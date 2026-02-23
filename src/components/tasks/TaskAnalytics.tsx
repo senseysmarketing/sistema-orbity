@@ -12,7 +12,9 @@ import { TeamPerformanceTable } from "./analytics/TeamPerformanceTable";
 import { WorkloadChart } from "./analytics/WorkloadChart";
 import { ClientAnalysis } from "./analytics/ClientAnalysis";
 import { SmartInsights } from "./analytics/SmartInsights";
-import { UserMetrics, ClientMetrics, TaskWithAssignments, Profile } from "./analytics/types";
+import { AIAnalysisCard } from "./analytics/AIAnalysisCard";
+import { TypeBreakdownChart } from "./analytics/TypeBreakdownChart";
+import { UserMetrics, ClientMetrics, TaskWithAssignments, Profile, TypeDistribution } from "./analytics/types";
 
 interface Task {
   id: string;
@@ -86,7 +88,7 @@ export function TaskAnalytics({ tasks: currentTasks, profiles, clients, getAssig
         .from('tasks')
         .select(`
           id, title, status, priority, client_id, due_date, 
-          created_at, updated_at, archived,
+          created_at, updated_at, archived, task_type,
           clients(name),
           task_assignments(user_id)
         `)
@@ -320,6 +322,32 @@ export function TaskAnalytics({ tasks: currentTasks, profiles, clients, getAssig
       }
     });
 
+    // Type distribution
+    const TYPE_LABELS: Record<string, string> = {
+      redes_sociais: 'Redes Sociais',
+      criativos: 'Criativos',
+      conteudo: 'Conteúdo',
+      desenvolvimento: 'Desenvolvimento',
+      suporte: 'Suporte',
+      administrativo: 'Administrativo',
+      reuniao: 'Reunião',
+    };
+
+    const typeCountMap: Record<string, number> = {};
+    tasks.forEach(task => {
+      const t = task.task_type || 'outros';
+      typeCountMap[t] = (typeCountMap[t] || 0) + 1;
+    });
+
+    const typeDistribution: TypeDistribution[] = Object.entries(typeCountMap)
+      .map(([type, count]) => ({
+        type,
+        label: TYPE_LABELS[type] || type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' '),
+        count,
+        percentage: total > 0 ? Math.round((count / total) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
     // Users with overdue tasks count
     const usersWithOverdue = userMetrics.filter(u => u.overdueCount > 0).length;
 
@@ -333,6 +361,7 @@ export function TaskAnalytics({ tasks: currentTasks, profiles, clients, getAssig
       userMetrics,
       clientMetrics,
       tasksPerDay,
+      typeDistribution,
       usersWithOverdue
     };
   }, [monthTasks, agencyProfiles]);
@@ -400,6 +429,22 @@ export function TaskAnalytics({ tasks: currentTasks, profiles, clients, getAssig
             usersWithOverdue={analyticsData.usersWithOverdue}
           />
 
+          {/* AI Analysis Card */}
+          <AIAnalysisCard
+            selectedMonth={selectedMonth}
+            total={analyticsData.total}
+            completed={analyticsData.completed}
+            completionRate={analyticsData.completionRate}
+            previousMonthRate={previousMonthRate}
+            overdue={analyticsData.overdue}
+            unassigned={analyticsData.unassigned}
+            userMetrics={analyticsData.userMetrics}
+            clientMetrics={analyticsData.clientMetrics}
+            typeDistribution={analyticsData.typeDistribution}
+            tasksPerDay={analyticsData.tasksPerDay}
+            isCurrentMonth={isCurrentMonth}
+          />
+
           {/* Team Performance Table */}
           <TeamPerformanceTable 
             userMetrics={analyticsData.userMetrics}
@@ -408,6 +453,9 @@ export function TaskAnalytics({ tasks: currentTasks, profiles, clients, getAssig
 
           {/* Workload Chart */}
           <WorkloadChart userMetrics={analyticsData.userMetrics} />
+
+          {/* Type Breakdown Chart */}
+          <TypeBreakdownChart distribution={analyticsData.typeDistribution} />
 
           {/* Smart Insights */}
           <SmartInsights
