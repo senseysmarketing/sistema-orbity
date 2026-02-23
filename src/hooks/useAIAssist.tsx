@@ -23,11 +23,11 @@ export function useAIAssist() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const callAI = async (type: string, content: string) => {
+  const callAI = async (type: string, content: string, agencyId?: string) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("ai-assist", {
-        body: { type, content },
+        body: { type, content, agency_id: agencyId },
       });
 
       if (error) {
@@ -78,12 +78,12 @@ export function useAIAssist() {
     }
   };
 
-  const preFillTask = async (text: string): Promise<TaskPrefillResult | null> => {
-    return callAI("prefill_task", text);
+  const preFillTask = async (text: string, agencyId?: string): Promise<TaskPrefillResult | null> => {
+    return callAI("prefill_task", text, agencyId);
   };
 
-  const preFillPost = async (text: string): Promise<PostPrefillResult | null> => {
-    return callAI("prefill_post", text);
+  const preFillPost = async (text: string, agencyId?: string): Promise<PostPrefillResult | null> => {
+    return callAI("prefill_post", text, agencyId);
   };
 
   return { preFillTask, preFillPost, loading };

@@ -575,7 +575,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
               onResult={() => {}}
               onSkip={() => setFormStep("form")}
               onSubmit={async (text) => {
-                const result = await preFillPost(text);
+                const result = await preFillPost(text, currentAgency?.id);
                 if (result) {
                   // Match mentioned clients against agency clients
                   if (result.mentioned_clients?.length && clients.length > 0) {

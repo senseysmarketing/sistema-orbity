@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -51,13 +52,25 @@ const POST_TOOLS = [
   },
 ];
 
+const DEFAULT_TASK_PROMPT =
+  "Você é um assistente de agência de marketing digital. Extraia os dados estruturados de uma tarefa a partir da descrição do usuário. Gere um título conciso e uma descrição profissional, estruturada e sem erros de gramática.";
+
+const DEFAULT_POST_PROMPT =
+  "Você é um social media manager profissional. Extraia os dados de um post para redes sociais a partir da descrição do usuário. Gere uma legenda envolvente, profissional e adaptada para a plataforma sugerida. Inclua hashtags relevantes.";
+
+const TASK_TECHNICAL_INSTRUCTIONS =
+  " IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Responda sempre em português brasileiro.";
+
+const POST_TECHNICAL_INSTRUCTIONS =
+  " IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Responda em português brasileiro.";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { type, content } = await req.json();
+    const { type, content, agency_id } = await req.json();
 
     if (!content || !type) {
       return new Response(JSON.stringify({ error: "type e content são obrigatórios" }), {
@@ -71,18 +84,43 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY não configurada");
     }
 
+    // Fetch custom prompt if agency_id provided
+    let customPrompt: string | null = null;
+    if (agency_id) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const sb = createClient(supabaseUrl, supabaseKey);
+        
+        const promptType = type === "prefill_task" ? "task" : "post";
+        const { data } = await sb
+          .from("agency_ai_prompts")
+          .select("custom_prompt")
+          .eq("agency_id", agency_id)
+          .eq("prompt_type", promptType)
+          .maybeSingle();
+
+        if (data?.custom_prompt) {
+          customPrompt = data.custom_prompt;
+        }
+      } catch (e) {
+        console.error("Error fetching custom prompt:", e);
+        // Continue with default prompt
+      }
+    }
+
     let systemPrompt: string;
     let tools: any[];
     let toolChoice: any;
 
     if (type === "prefill_task") {
-      systemPrompt =
-        "Você é um assistente de agência de marketing digital. Extraia os dados estruturados de uma tarefa a partir da descrição do usuário. Gere um título conciso e uma descrição profissional, estruturada e sem erros de gramática. IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Responda sempre em português brasileiro.";
+      const basePrompt = customPrompt || DEFAULT_TASK_PROMPT;
+      systemPrompt = basePrompt + TASK_TECHNICAL_INSTRUCTIONS;
       tools = TASK_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_task_data" } };
     } else if (type === "prefill_post") {
-      systemPrompt =
-        "Você é um social media manager profissional. Extraia os dados de um post para redes sociais a partir da descrição do usuário. Gere uma legenda envolvente, profissional e adaptada para a plataforma sugerida. Inclua hashtags relevantes. IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Responda em português brasileiro.";
+      const basePrompt = customPrompt || DEFAULT_POST_PROMPT;
+      systemPrompt = basePrompt + POST_TECHNICAL_INSTRUCTIONS;
       tools = POST_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_post_data" } };
     } else {

@@ -877,7 +877,7 @@ export default function Tasks() {
                   onResult={() => {}}
                   onSkip={() => setCreateStep("form")}
                   onSubmit={async (text) => {
-                    const result = await preFillTask(text);
+                    const result = await preFillTask(text, currentAgency?.id);
                     if (result) {
                       // Match mentioned clients against agency clients
                       let matchedClientIds: string[] = [];

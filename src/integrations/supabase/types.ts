@@ -235,6 +235,55 @@ export type Database = {
           },
         ]
       }
+      agency_ai_prompts: {
+        Row: {
+          agency_id: string
+          created_at: string
+          custom_prompt: string
+          id: string
+          prompt_type: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          custom_prompt: string
+          id?: string
+          prompt_type: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          custom_prompt?: string
+          id?: string
+          prompt_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_ai_prompts_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_ai_prompts_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "agency_ai_prompts_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       agency_notification_rules: {
         Row: {
           agency_id: string
