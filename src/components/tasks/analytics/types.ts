@@ -44,8 +44,26 @@ export interface TaskWithAssignments {
   created_at: string;
   updated_at: string;
   archived?: boolean;
+  task_type?: string | null;
   clients?: { name: string } | null;
   task_assignments?: { user_id: string }[];
+}
+
+export interface TypeDistribution {
+  type: string;
+  label: string;
+  count: number;
+  percentage: number;
+}
+
+export interface AIAnalysisResult {
+  summary: string;
+  workload_analysis: string;
+  bottlenecks: string;
+  client_alerts: string;
+  suggestions: string[];
+  performance_score: number;
+  performance_label: string;
 }
 
 export interface Profile {

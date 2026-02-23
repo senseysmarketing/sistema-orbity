@@ -37,6 +37,16 @@ export interface CampaignAnalysisResult {
   analysis: string;
 }
 
+export interface AnalyticsReviewResult {
+  summary: string;
+  workload_analysis: string;
+  bottlenecks: string;
+  client_alerts: string;
+  suggestions: string[];
+  performance_score: number;
+  performance_label: string;
+}
+
 export function useAIAssist() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -111,5 +121,9 @@ export function useAIAssist() {
     return callAI("campaign_analysis", content, agencyId);
   };
 
-  return { preFillTask, preFillPost, generateReport, analyzeCampaign, loading };
+  const analyzeTaskPeriod = async (content: string, agencyId?: string): Promise<AnalyticsReviewResult | null> => {
+    return callAI("analytics_review", content, agencyId);
+  };
+
+  return { preFillTask, preFillPost, generateReport, analyzeCampaign, analyzeTaskPeriod, loading };
 }

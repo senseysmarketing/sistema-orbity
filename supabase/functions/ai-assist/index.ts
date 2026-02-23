@@ -98,6 +98,30 @@ const CAMPAIGN_ANALYSIS_TOOLS = [
   },
 ];
 
+const ANALYTICS_REVIEW_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "extract_analytics_review",
+      description: "Gere uma análise completa de produtividade da equipe baseada nos dados agregados do período.",
+      parameters: {
+        type: "object",
+        properties: {
+          summary: { type: "string", description: "Resumo executivo do período em 2-3 frases, destacando os números mais importantes." },
+          workload_analysis: { type: "string", description: "Análise da distribuição de carga entre os membros da equipe. Identifique quem está sobrecarregado e quem pode receber mais tarefas." },
+          bottlenecks: { type: "string", description: "Gargalos identificados: revisões paradas, tarefas sem dono, atrasos recorrentes." },
+          client_alerts: { type: "string", description: "Clientes que precisam de atenção prioritária baseado em taxas de conclusão baixas ou muitos atrasos." },
+          suggestions: { type: "array", items: { type: "string" }, description: "Lista de 3-5 sugestões práticas e acionáveis de melhoria para o gestor." },
+          performance_score: { type: "number", description: "Nota de performance geral da equipe de 1 a 10, baseada na taxa de conclusão, atrasos e distribuição." },
+          performance_label: { type: "string", description: "Label da nota: 'Crítico' (1-3), 'Precisa Melhorar' (4-5), 'Bom' (6-7), 'Muito Bom' (8-9), 'Excelente' (10)." },
+        },
+        required: ["summary", "workload_analysis", "bottlenecks", "client_alerts", "suggestions", "performance_score", "performance_label"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
 const DEFAULT_TASK_PROMPT =
   "Você é um assistente de agência de marketing digital. Extraia os dados estruturados de uma tarefa a partir da descrição do usuário. Gere um título conciso e uma descrição profissional, estruturada e sem erros de gramática. Se o usuário descrever conteúdo para redes sociais (ex: 'criar um post no Instagram', 'publicar um reels sobre...', 'fazer um carrossel', 'stories para o cliente X'), defina suggested_type como 'redes_sociais' e preencha os campos platform, post_type, hashtags e creative_instructions. Se o usuário descrever arte, banner, criativo, material visual, campanha publicitária, peça gráfica ou qualquer demanda para designer (ex: 'criar um banner', 'arte para campanha', 'criativo para anúncio'), defina suggested_type como 'criativos' e preencha creative_instructions com orientações visuais detalhadas.";
 
@@ -110,6 +134,9 @@ const DEFAULT_REPORT_PROMPT =
 const DEFAULT_CAMPAIGN_ANALYSIS_PROMPT =
   "Você é um analista sênior de tráfego pago. Analise os dados semanais da campanha e gere um feedback completo. Compare a evolução semana a semana identificando tendências (custo subindo/descendo, conversões melhorando/piorando, CTR e CPC). Destaque pontos de atenção e dê recomendações práticas e acionáveis de otimização. Formate para WhatsApp com emojis e negrito (*texto*) para fácil compartilhamento.";
 
+const DEFAULT_ANALYTICS_REVIEW_PROMPT =
+  "Você é um analista de produtividade de agências de marketing digital. Analise os dados de tarefas do período e gere um feedback completo para o gestor. Seja direto, prático e baseado nos números. Identifique padrões, gargalos e oportunidades de melhoria. Considere a distribuição de carga entre membros, taxas de conclusão por cliente e por tipo de tarefa, e sugira ações concretas.";
+
 const TASK_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Se o usuário mencionar nomes de pessoas como responsáveis ou executores da tarefa (ex: 'a Laryssa vai fazer', 'pro João'), extraia esses nomes no campo mentioned_users. Se o usuário mencionar uma data ou prazo (ex: 'entregar sexta', 'dia 28', 'amanhã', 'próxima segunda'), calcule a data correta usando a data atual como referência e preencha suggested_date no formato ISO 8601. Responda sempre em português brasileiro.";
 
@@ -121,6 +148,9 @@ const REPORT_TECHNICAL_INSTRUCTIONS =
 
 const CAMPAIGN_ANALYSIS_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: A análise é direcionada ao gestor de tráfego (não ao cliente). Use formatação WhatsApp: *negrito* para destaques, emojis para tornar visual. Compare métricas entre semanas com percentuais de variação quando possível. Identifique padrões e anomalias. Dê recomendações específicas e acionáveis. Responda em português brasileiro.";
+
+const ANALYTICS_REVIEW_TECHNICAL_INSTRUCTIONS =
+  " IMPORTANTE: A análise é direcionada ao gestor da agência. Seja objetivo e prático. Use dados concretos (nomes, números, percentuais). As sugestões devem ser acionáveis e específicas. A nota de performance deve refletir: taxa de conclusão (peso maior), atrasos, distribuição equilibrada e tarefas sem dono. Responda em português brasileiro.";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -150,7 +180,7 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const sb = createClient(supabaseUrl, supabaseKey);
         
-        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : "report";
+        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : type === "analytics_review" ? "analytics" : "report";
         const { data } = await sb
           .from("agency_ai_prompts")
           .select("custom_prompt")
@@ -193,8 +223,13 @@ serve(async (req) => {
       systemPrompt = basePrompt + CAMPAIGN_ANALYSIS_TECHNICAL_INSTRUCTIONS;
       tools = CAMPAIGN_ANALYSIS_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_campaign_analysis" } };
+    } else if (type === "analytics_review") {
+      const basePrompt = customPrompt || DEFAULT_ANALYTICS_REVIEW_PROMPT;
+      systemPrompt = basePrompt + ANALYTICS_REVIEW_TECHNICAL_INSTRUCTIONS;
+      tools = ANALYTICS_REVIEW_TOOLS;
+      toolChoice = { type: "function", function: { name: "extract_analytics_review" } };
     } else {
-      return new Response(JSON.stringify({ error: "Tipo inválido. Use prefill_task, prefill_post, report_traffic ou campaign_analysis." }), {
+      return new Response(JSON.stringify({ error: "Tipo inválido. Use prefill_task, prefill_post, report_traffic, campaign_analysis ou analytics_review." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
