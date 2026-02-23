@@ -1,67 +1,80 @@
 
-
-# Auto-vincular Clientes Mencionados via IA
+# Prompts de IA Personalizaveis por Agencia
 
 ## Resumo
 
-Quando o usuario mencionar o nome de um cliente no texto de descricao da tarefa ou post, a IA vai identificar e retornar os nomes mencionados. O frontend faz o match contra a lista de clientes da agencia e pre-seleciona automaticamente no campo "Clientes".
+Adicionar uma aba "IA" nas Configuracoes (Settings) onde o admin da agencia pode personalizar os prompts usados pela IA ao pre-preencher tarefas e posts. Cada agencia tera seus proprios prompts salvos no banco, permitindo adaptar o tom de voz, nicho e particularidades do negocio.
 
-## Como Funciona
+## O que o usuario vera
 
-```text
-Usuario digita: "Criar criativo para o Juliano do Campeche, 350m²..."
-  -> IA extrai: mentioned_clients: ["Juliano"]
-  -> Frontend busca na lista de clientes: "Juliano Campeche Imoveis" (match parcial)
-  -> Campo "Clientes" pre-selecionado com esse cliente
-```
+Na pagina de Configuracoes, uma nova aba "IA" (com icone Sparkles) aparecera para admins da agencia. Dentro dela, dois cards separados:
 
-## Mudancas
+1. **Prompt para Tarefas** - Textarea com o prompt atual como placeholder/default, onde o admin pode personalizar como a IA gera titulos, descricoes e prioridades de tarefas
+2. **Prompt para Posts** - Textarea com o prompt atual como placeholder/default, onde o admin pode personalizar como a IA gera legendas, hashtags e tipo de conteudo
 
-### 1. Edge Function `ai-assist` - Adicionar campo `mentioned_clients`
+Cada card tera:
+- Textarea com o prompt personalizado
+- Botao "Restaurar padrao" para voltar ao prompt original
+- Botao "Salvar"
+- Dica explicativa sobre o que o prompt controla
 
-Adicionar `mentioned_clients` como campo opcional nos dois tools (task e post):
+## Mudancas Tecnicas
 
-- **TASK_TOOLS**: adicionar `mentioned_clients` (array of strings) - "Nomes de clientes ou empresas mencionados pelo usuario"
-- **POST_TOOLS**: adicionar `mentioned_clients` (array of strings) - mesmo
-
-Atualizar os system prompts para instruir a IA a extrair nomes de clientes/empresas mencionados no texto.
-
-### 2. Frontend - Passar lista de clientes e fazer match
-
-**`src/pages/Tasks.tsx`** (onSubmit do AIPreFillStep):
-- Apos receber `result.mentioned_clients`, fazer match fuzzy contra `clients[]`
-- Match: normalizar strings (lowercase, remover acentos) e verificar se o nome do cliente contem o termo mencionado ou vice-versa
-- Setar `client_ids` no `newTask` com os IDs encontrados
-
-**`src/components/social-media/PostFormDialog.tsx`** (onSubmit do AIPreFillStep):
-- Mesma logica: match dos `mentioned_clients` contra a lista de clientes
-- Setar `selectedClientIds` com os IDs encontrados
-
-### 3. Hook `useAIAssist` - Atualizar tipos
-
-Adicionar `mentioned_clients?: string[]` nas interfaces `TaskPrefillResult` e `PostPrefillResult`.
-
-## Logica de Match (Frontend)
+### 1. Nova tabela: `agency_ai_prompts`
 
 ```text
-Para cada nome em mentioned_clients:
-  1. Normalizar: lowercase, remover acentos
-  2. Para cada cliente da agencia:
-     - Normalizar nome do cliente
-     - Verificar se clienteNorm.includes(mencionadoNorm) OU mencionadoNorm.includes(clienteNorm)
-  3. Se encontrar match, adicionar o client.id ao array de selecionados
-  4. Remover duplicatas
+- id (uuid, PK)
+- agency_id (uuid, FK -> agencies, unique constraint com prompt_type)
+- prompt_type (text: 'task' ou 'post')
+- custom_prompt (text)
+- created_at (timestamp)
+- updated_at (timestamp)
+
+Constraint: UNIQUE(agency_id, prompt_type)
+RLS: leitura para membros da agencia, escrita para admins
 ```
 
-Essa abordagem simples e suficiente porque os nomes sao curtos e o contexto e limitado (clientes da mesma agencia).
+### 2. Edge Function `ai-assist` - Buscar prompt customizado
 
-## Arquivos Modificados
+Antes de chamar a IA, a edge function recebe o `agency_id` no body da requisicao. Ela consulta `agency_ai_prompts` para verificar se existe um prompt personalizado para aquela agencia e tipo. Se existir, concatena o prompt customizado ao system prompt base (mantendo as instrucoes tecnicas obrigatorias como extrair mentioned_clients e responder em PT-BR).
 
-| Arquivo | Mudanca |
-|---|---|
-| `supabase/functions/ai-assist/index.ts` | Adicionar `mentioned_clients` nos tools + atualizar prompts |
-| `src/hooks/useAIAssist.tsx` | Adicionar `mentioned_clients` nos tipos |
-| `src/pages/Tasks.tsx` | Match de clientes no callback do AI result |
-| `src/components/social-media/PostFormDialog.tsx` | Match de clientes no callback do AI result |
+Logica:
+```text
+System prompt final = prompt_customizado_da_agencia + instrucoes_tecnicas_fixas
+```
 
-Nenhum arquivo novo. Nenhuma mudanca de banco de dados.
+As instrucoes tecnicas fixas (extrair mentioned_clients, responder em PT-BR, gerar titulo conciso) sao sempre adicionadas ao final, garantindo que a IA continue funcionando corretamente mesmo com prompts customizados.
+
+### 3. Novo componente: `AISettingsManager`
+
+Componente que renderiza os dois cards de prompt (tarefas e posts). Usa queries para buscar/salvar os prompts da agencia.
+
+### 4. Settings.tsx - Nova aba "IA"
+
+Adicionar aba "IA" com icone Sparkles na pagina de configuracoes, visivel apenas para admins. Grid de colunas atualizado de 7 para 8.
+
+### 5. Frontend - Passar `agency_id` nas chamadas
+
+O hook `useAIAssist` e os componentes que chamam `preFillTask`/`preFillPost` passam o `agency_id` para a edge function.
+
+## Arquivos
+
+| Arquivo | Operacao | Descricao |
+|---|---|---|
+| Migracao SQL | Criar | Tabela `agency_ai_prompts` com RLS |
+| `src/components/settings/AISettingsManager.tsx` | Criar | Componente com os dois cards de prompt |
+| `src/pages/Settings.tsx` | Editar | Adicionar aba "IA" com Sparkles |
+| `supabase/functions/ai-assist/index.ts` | Editar | Receber agency_id, buscar prompt customizado, concatenar ao system prompt |
+| `src/hooks/useAIAssist.tsx` | Editar | Passar agency_id nas chamadas |
+| `src/pages/Tasks.tsx` | Editar | Passar agency_id ao chamar preFillTask |
+| `src/components/social-media/PostFormDialog.tsx` | Editar | Passar agency_id ao chamar preFillPost |
+
+## Prompts Padrao (exibidos como placeholder)
+
+**Tarefas:**
+"Voce e um assistente de agencia de marketing digital. Gere um titulo conciso e uma descricao profissional, estruturada e sem erros de gramatica para a tarefa descrita."
+
+**Posts:**
+"Voce e um social media manager profissional. Gere uma legenda envolvente, profissional e adaptada para a plataforma sugerida. Inclua hashtags relevantes."
+
+Esses textos aparecem como placeholder nos textareas. Se o admin nao personalizar, o comportamento atual e mantido.
