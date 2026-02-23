@@ -1,102 +1,79 @@
 
 
-# Fase 1: Adicionar tipo "Redes Sociais" e campos extras nas tarefas
+# Renomear "Design" para "Criativos" e adicionar campos extras
 
 ## Resumo
 
-Adicionar o tipo de tarefa "Redes Sociais" com campos condicionais (plataforma, data de publicacao, hashtags, instrucoes criativas) que aparecem apenas quando esse tipo e selecionado. Atualizar a IA de preenchimento para detectar automaticamente quando uma tarefa e de redes sociais e preencher esses campos extras.
+Renomear o tipo de tarefa "Design" para "Criativos" (slug: `criativos`) e exibir o campo "Instrucoes Criativas" quando esse tipo for selecionado, assim como ja acontece com "Redes Sociais". Isso permite que designers recebam orientacoes visuais tanto para demandas de social media quanto para criativos de campanhas, artes avulsas, etc.
+
+## Impacto nos dados
+
+Existem 132 tarefas com `task_type = 'design'` no banco. Sera necessario:
+- Migration SQL para renomear `design` -> `criativos` em todas as tarefas existentes
+- Migration SQL para renomear o slug na tabela `task_types` das agencias que ja inicializaram os tipos padrao
 
 ## Alteracoes
 
-### 1. Migration SQL - Adicionar colunas na tabela `tasks`
+### 1. Migration SQL
 
-Novas colunas opcionais:
+```sql
+-- Renomear slug nas tarefas existentes
+UPDATE tasks SET task_type = 'criativos' WHERE task_type = 'design';
 
-| Coluna | Tipo | Descricao |
-|---|---|---|
-| `platform` | text | Plataforma (instagram, facebook, linkedin, etc.) |
-| `post_type` | text | Tipo de conteudo (feed, stories, reels, carrossel, video) |
-| `post_date` | timestamptz | Data de publicacao programada |
-| `hashtags` | text[] | Array de hashtags |
-| `creative_instructions` | text | Instrucoes de arte/criacao |
-
-### 2. Adicionar tipo padrao "Redes Sociais" no `useTaskTypes.tsx`
-
-Adicionar na lista `DEFAULT_TYPES`:
-
-```
-{ slug: "redes_sociais", name: "Redes Sociais", icon: "📱", is_default: true, is_active: true }
+-- Renomear slug e nome na tabela de tipos
+UPDATE task_types SET slug = 'criativos', name = 'Criativos' 
+WHERE slug = 'design' AND is_default = true;
 ```
 
-### 3. Atualizar o wizard de criacao (Tasks.tsx)
+### 2. useTaskTypes.tsx
 
-**Estado do formulario**: Adicionar campos `platform`, `post_type`, `post_date`, `hashtags`, `creative_instructions` ao `newTask`.
+Alterar a entrada no `DEFAULT_TYPES`:
 
-**Passo 2 (Basico)**: Quando `task_type === "redes_sociais"`, mostrar campos condicionais:
-- Plataforma (Select com opcoes: Instagram, Facebook, LinkedIn, Twitter, TikTok, YouTube)
-- Tipo de conteudo (Select: Feed, Stories, Reels, Carrossel, Video)
+De: `{ slug: "design", name: "Design", icon: "🎨", ... }`
+Para: `{ slug: "criativos", name: "Criativos", icon: "🎨", ... }`
 
-**Passo 3 (Detalhes)**: Quando `task_type === "redes_sociais"`, mostrar:
-- Data de publicacao (datetime-local, alem da due_date que ja existe)
-- Hashtags (Input de texto separado por virgula)
-- Instrucoes de arte/criacao (Textarea)
+### 3. Tasks.tsx - Logica condicional dos campos extras
 
-**Passo 4 (Revisao)**: Incluir os novos campos na tela de revisao quando presentes.
+Atualmente os campos extras (instrucoes criativas, etc.) so aparecem para `redes_sociais`. Precisamos criar uma logica que mostre:
 
-**handleCreateTask / handleUpdateTask**: Salvar os novos campos no banco.
+- **Para "Redes Sociais"**: todos os campos (plataforma, tipo conteudo, data publicacao, hashtags, instrucoes criativas)
+- **Para "Criativos"**: apenas o campo "Instrucoes Criativas" (sem plataforma, tipo de conteudo, hashtags, data de publicacao - pois criativos nao sao necessariamente para redes sociais)
 
-### 4. Atualizar dialogo de edicao (Tasks.tsx)
+Isso sera feito com um helper: `const hasCreativeFields = ["redes_sociais", "criativos"].includes(newTask.task_type)`
 
-No formulario de edicao existente, adicionar os mesmos campos condicionais quando `task_type === "redes_sociais"`.
+Nos pontos de save (`handleCreateTask` e `handleUpdateTask`), a logica de persistencia sera ajustada:
+- `platform`, `post_type`, `post_date`, `hashtags`: apenas para `redes_sociais`
+- `creative_instructions`: para `redes_sociais` OU `criativos`
 
-### 5. Atualizar `TaskDetailsDialog.tsx`
+### 4. Tasks.tsx - Wizard (Passo 3 - Detalhes) e Edicao
 
-Exibir os campos extras (plataforma, tipo de conteudo, data de publicacao, hashtags, instrucoes criativas) quando presentes.
+Adicionar o campo "Instrucoes Criativas" quando `task_type === "criativos"`, separado dos campos de redes sociais.
 
-### 6. Atualizar a Edge Function `ai-assist`
+### 5. Tasks.tsx - Revisao (Passo 4)
 
-Modificar o tool `extract_task_data` para incluir campos de redes sociais:
-- `platform` (opcional)
-- `post_type` (opcional)
-- `hashtags` (opcional, array)
-- `creative_instructions` (opcional)
+Incluir "Instrucoes Criativas" na revisao quando presente para o tipo `criativos`.
 
-Atualizar o system prompt de tarefas para instruir a IA: "Se o usuario descrever um conteudo para redes sociais, defina suggested_type como 'redes_sociais' e preencha os campos de plataforma, tipo de conteudo, hashtags e instrucoes criativas."
+### 6. TaskDetailsDialog.tsx
 
-### 7. Atualizar `useAIAssist.tsx`
+Exibir "Instrucoes Criativas" tambem para tarefas do tipo `criativos`.
 
-Adicionar os novos campos ao tipo `TaskPrefillResult`:
-- `platform?: string`
-- `post_type?: string`
-- `hashtags?: string[]`
-- `creative_instructions?: string`
+### 7. Edge Function ai-assist
 
-### 8. Atualizar logica de aplicacao do resultado da IA (Tasks.tsx)
+Atualizar o prompt e a descricao do `suggested_type` para incluir `criativos`:
+- Se o usuario descrever arte, banner, criativo, campanha publicitaria, material visual: usar `criativos`
+- Atualizar a descricao de `creative_instructions` para preencher tambem quando `suggested_type` for `criativos`
 
-No callback `onSubmit` do `AIPreFillStep`, mapear os novos campos do resultado da IA para o formulario quando `suggested_type === "redes_sociais"`.
+### 8. useAIAssist.tsx
 
-### 9. Interface da Task (Tasks.tsx)
-
-Atualizar a interface `Task` local para incluir os novos campos opcionais.
+Nenhuma alteracao necessaria - os campos `creative_instructions` ja existem no tipo.
 
 ## Arquivos modificados
 
 | Arquivo | Alteracao |
 |---|---|
-| Migration SQL | Adicionar 5 colunas na tabela `tasks` |
-| `src/hooks/useTaskTypes.tsx` | Adicionar tipo "Redes Sociais" aos defaults |
-| `src/hooks/useAIAssist.tsx` | Novos campos em `TaskPrefillResult` |
-| `src/pages/Tasks.tsx` | Campos condicionais no wizard, edicao e estado |
-| `src/components/tasks/TaskDetailsDialog.tsx` | Exibir campos extras de redes sociais |
-| `supabase/functions/ai-assist/index.ts` | Novos campos no tool e prompt de tarefas |
-
-## Detalhes tecnicos
-
-### Campos condicionais no formulario
-
-Os campos extras so aparecem quando `newTask.task_type === "redes_sociais"`. Isso mantem o formulario limpo para outros tipos de tarefa. As plataformas e tipos de conteudo reutilizam as mesmas opcoes ja existentes no modulo de Social Media (Instagram, Facebook, LinkedIn, etc. e Feed, Stories, Reels, etc.), buscando tambem os tipos customizados da agencia quando disponiveis.
-
-### IA inteligente
-
-A IA recebe instrucoes para detectar automaticamente quando o usuario descreve algo para redes sociais (ex: "criar um post no Instagram", "publicar um reels sobre...") e preenche `suggested_type: "redes_sociais"` junto com plataforma, tipo de conteudo, hashtags e instrucoes criativas. Para demandas que nao sao de redes sociais, os campos extras ficam vazios e o formulario mostra apenas os campos padrao.
+| Migration SQL | Renomear slug `design` -> `criativos` em `tasks` e `task_types` |
+| `src/hooks/useTaskTypes.tsx` | Renomear default type |
+| `src/pages/Tasks.tsx` | Logica condicional expandida para `criativos` |
+| `src/components/tasks/TaskDetailsDialog.tsx` | Exibir instrucoes criativas para tipo `criativos` |
+| `supabase/functions/ai-assist/index.ts` | Atualizar prompt e tool description |
 
