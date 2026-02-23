@@ -30,6 +30,7 @@ export function AISettingsManager() {
   const [taskPrompt, setTaskPrompt] = useState<PromptState>({ value: "", saved: "", loading: true, dirty: false });
   const [postPrompt, setPostPrompt] = useState<PromptState>({ value: "", saved: "", loading: true, dirty: false });
   const [reportPrompt, setReportPrompt] = useState<PromptState>({ value: "", saved: "", loading: true, dirty: false });
+  const [campaignPrompt, setCampaignPrompt] = useState<PromptState>({ value: "", saved: "", loading: true, dirty: false });
 
   useEffect(() => {
     if (!currentAgency?.id) return;
@@ -52,16 +53,18 @@ export function AISettingsManager() {
     const taskP = prompts.find((p) => p.prompt_type === "task")?.custom_prompt || "";
     const postP = prompts.find((p) => p.prompt_type === "post")?.custom_prompt || "";
     const reportP = prompts.find((p) => p.prompt_type === "report")?.custom_prompt || "";
+    const campaignP = prompts.find((p) => p.prompt_type === "campaign_analysis")?.custom_prompt || "";
 
     setTaskPrompt({ value: taskP, saved: taskP, loading: false, dirty: false });
     setPostPrompt({ value: postP, saved: postP, loading: false, dirty: false });
     setReportPrompt({ value: reportP, saved: reportP, loading: false, dirty: false });
+    setCampaignPrompt({ value: campaignP, saved: campaignP, loading: false, dirty: false });
   };
 
-  const savePrompt = async (type: "task" | "post" | "report", value: string) => {
+  const savePrompt = async (type: "task" | "post" | "report" | "campaign_analysis", value: string) => {
     if (!currentAgency?.id) return;
 
-    const setter = type === "task" ? setTaskPrompt : type === "post" ? setPostPrompt : setReportPrompt;
+    const setter = type === "task" ? setTaskPrompt : type === "post" ? setPostPrompt : type === "campaign_analysis" ? setCampaignPrompt : setReportPrompt;
     setter((prev) => ({ ...prev, loading: true }));
 
     try {
@@ -106,13 +109,13 @@ export function AISettingsManager() {
     }
   };
 
-  const restoreDefault = (type: "task" | "post" | "report") => {
-    const setter = type === "task" ? setTaskPrompt : type === "post" ? setPostPrompt : setReportPrompt;
+  const restoreDefault = (type: "task" | "post" | "report" | "campaign_analysis") => {
+    const setter = type === "task" ? setTaskPrompt : type === "post" ? setPostPrompt : type === "campaign_analysis" ? setCampaignPrompt : setReportPrompt;
     setter((prev) => ({ ...prev, value: "", dirty: prev.saved !== "" }));
   };
 
   const renderCard = (
-    type: "task" | "post" | "report",
+    type: "task" | "post" | "report" | "campaign_analysis",
     title: string,
     description: string,
     placeholder: string,
@@ -206,6 +209,14 @@ export function AISettingsManager() {
           DEFAULT_REPORT_PROMPT,
           reportPrompt,
           setReportPrompt
+        )}
+        {renderCard(
+          "campaign_analysis",
+          "Prompt para Análise de Campanhas",
+          "Personaliza como a IA analisa dados semanais de campanhas e gera feedback com tendências e recomendações.",
+          "Você é um analista sênior de tráfego pago. Analise os dados semanais da campanha e gere um feedback completo com tendências, pontos de atenção e recomendações práticas de otimização.",
+          campaignPrompt,
+          setCampaignPrompt
         )}
       </div>
     </div>

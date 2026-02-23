@@ -76,6 +76,24 @@ const REPORT_TOOLS = [
   },
 ];
 
+const CAMPAIGN_ANALYSIS_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "extract_campaign_analysis",
+      description: "Gere uma análise completa de performance de campanha de tráfego pago baseada nos dados semanais.",
+      parameters: {
+        type: "object",
+        properties: {
+          analysis: { type: "string", description: "Análise completa formatada para WhatsApp com emojis e negrito (*texto*). Deve conter: 1) Resumo geral da campanha, 2) Tendências identificadas semana a semana (custo, conversões, CTR, CPC), 3) Pontos de atenção e alertas, 4) Recomendações práticas de otimização." },
+        },
+        required: ["analysis"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
 const DEFAULT_TASK_PROMPT =
   "Você é um assistente de agência de marketing digital. Extraia os dados estruturados de uma tarefa a partir da descrição do usuário. Gere um título conciso e uma descrição profissional, estruturada e sem erros de gramática.";
 
@@ -85,6 +103,9 @@ const DEFAULT_POST_PROMPT =
 const DEFAULT_REPORT_PROMPT =
   "Você é um gestor de tráfego pago profissional. Gere uma mensagem direcionada ao cliente com os resultados do período. Inclua um resumo dos dados, uma análise da performance (pontos positivos e o que pode melhorar) e sugestões de próximo passo. Use tom profissional mas acessível, formate para WhatsApp com emojis e negrito (*texto*).";
 
+const DEFAULT_CAMPAIGN_ANALYSIS_PROMPT =
+  "Você é um analista sênior de tráfego pago. Analise os dados semanais da campanha e gere um feedback completo. Compare a evolução semana a semana identificando tendências (custo subindo/descendo, conversões melhorando/piorando, CTR e CPC). Destaque pontos de atenção e dê recomendações práticas e acionáveis de otimização. Formate para WhatsApp com emojis e negrito (*texto*) para fácil compartilhamento.";
+
 const TASK_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Se o usuário mencionar nomes de pessoas como responsáveis ou executores da tarefa (ex: 'a Laryssa vai fazer', 'pro João'), extraia esses nomes no campo mentioned_users. Se o usuário mencionar uma data ou prazo (ex: 'entregar sexta', 'dia 28', 'amanhã', 'próxima segunda'), calcule a data correta usando a data atual como referência e preencha suggested_date no formato ISO 8601. Responda sempre em português brasileiro.";
 
@@ -93,6 +114,9 @@ const POST_TECHNICAL_INSTRUCTIONS =
 
 const REPORT_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: A mensagem deve ser direcionada ao cliente (não ao gestor). Use formatação WhatsApp: *negrito* para destaques, emojis para tornar visual. Inclua os números formatados em reais (R$). Responda em português brasileiro. A mensagem deve ser completa e pronta para enviar.";
+
+const CAMPAIGN_ANALYSIS_TECHNICAL_INSTRUCTIONS =
+  " IMPORTANTE: A análise é direcionada ao gestor de tráfego (não ao cliente). Use formatação WhatsApp: *negrito* para destaques, emojis para tornar visual. Compare métricas entre semanas com percentuais de variação quando possível. Identifique padrões e anomalias. Dê recomendações específicas e acionáveis. Responda em português brasileiro.";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -122,7 +146,7 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const sb = createClient(supabaseUrl, supabaseKey);
         
-        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : "report";
+        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : "report";
         const { data } = await sb
           .from("agency_ai_prompts")
           .select("custom_prompt")
@@ -160,8 +184,13 @@ serve(async (req) => {
       systemPrompt = basePrompt + REPORT_TECHNICAL_INSTRUCTIONS;
       tools = REPORT_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_report_data" } };
+    } else if (type === "campaign_analysis") {
+      const basePrompt = customPrompt || DEFAULT_CAMPAIGN_ANALYSIS_PROMPT;
+      systemPrompt = basePrompt + CAMPAIGN_ANALYSIS_TECHNICAL_INSTRUCTIONS;
+      tools = CAMPAIGN_ANALYSIS_TOOLS;
+      toolChoice = { type: "function", function: { name: "extract_campaign_analysis" } };
     } else {
-      return new Response(JSON.stringify({ error: "Tipo inválido. Use prefill_task, prefill_post ou report_traffic." }), {
+      return new Response(JSON.stringify({ error: "Tipo inválido. Use prefill_task, prefill_post, report_traffic ou campaign_analysis." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

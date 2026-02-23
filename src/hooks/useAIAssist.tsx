@@ -29,6 +29,10 @@ export interface ReportPrefillResult {
   message: string;
 }
 
+export interface CampaignAnalysisResult {
+  analysis: string;
+}
+
 export function useAIAssist() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -99,5 +103,9 @@ export function useAIAssist() {
     return callAI("report_traffic", content, agencyId);
   };
 
-  return { preFillTask, preFillPost, generateReport, loading };
+  const analyzeCampaign = async (content: string, agencyId?: string): Promise<CampaignAnalysisResult | null> => {
+    return callAI("campaign_analysis", content, agencyId);
+  };
+
+  return { preFillTask, preFillPost, generateReport, analyzeCampaign, loading };
 }
