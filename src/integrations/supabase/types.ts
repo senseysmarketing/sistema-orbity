@@ -4979,11 +4979,16 @@ export type Database = {
           client_id: string | null
           created_at: string
           created_by: string
+          creative_instructions: string | null
           description: string | null
           due_date: string | null
+          hashtags: string[] | null
           history: Json | null
           id: string
           notification_sent_at: string | null
+          platform: string | null
+          post_date: string | null
+          post_type: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           status: string
           subtasks: Json | null
@@ -5000,11 +5005,16 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           created_by: string
+          creative_instructions?: string | null
           description?: string | null
           due_date?: string | null
+          hashtags?: string[] | null
           history?: Json | null
           id?: string
           notification_sent_at?: string | null
+          platform?: string | null
+          post_date?: string | null
+          post_type?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           status?: string
           subtasks?: Json | null
@@ -5021,11 +5031,16 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           created_by?: string
+          creative_instructions?: string | null
           description?: string | null
           due_date?: string | null
+          hashtags?: string[] | null
           history?: Json | null
           id?: string
           notification_sent_at?: string | null
+          platform?: string | null
+          post_date?: string | null
+          post_type?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           status?: string
           subtasks?: Json | null

@@ -71,6 +71,11 @@ interface Task {
   subtasks?: Subtask[];
   attachments?: Attachment[];
   task_type?: string | null;
+  platform?: string | null;
+  post_type?: string | null;
+  post_date?: string | null;
+  hashtags?: string[] | null;
+  creative_instructions?: string | null;
 }
 
 interface Profile {
@@ -133,6 +138,11 @@ export default function Tasks() {
     subtasks: Subtask[];
     attachments: Attachment[];
     task_type: string;
+    platform: string;
+    post_type: string;
+    post_date: string;
+    hashtags: string;
+    creative_instructions: string;
   }>({
     title: "",
     description: "",
@@ -145,6 +155,11 @@ export default function Tasks() {
     subtasks: [],
     attachments: [],
     task_type: "",
+    platform: "",
+    post_type: "",
+    post_date: "",
+    hashtags: "",
+    creative_instructions: "",
   });
 
   const { updateClientRelations } = useClientRelations();
@@ -478,6 +493,11 @@ export default function Tasks() {
     }
 
     try {
+      const isSocial = newTask.task_type === "redes_sociais";
+      const hashtagsArray = isSocial && newTask.hashtags.trim()
+        ? newTask.hashtags.split(",").map(h => h.trim()).filter(Boolean)
+        : null;
+
       const { data: taskData, error } = await supabase
         .from("tasks")
         .insert([{
@@ -493,6 +513,11 @@ export default function Tasks() {
           subtasks: newTask.subtasks as any,
           attachments: newTask.attachments as any,
           task_type: newTask.task_type || null,
+          platform: isSocial ? (newTask.platform || null) : null,
+          post_type: isSocial ? (newTask.post_type || null) : null,
+          post_date: isSocial && newTask.post_date ? dateOnlyToISO(newTask.post_date) : null,
+          hashtags: hashtagsArray,
+          creative_instructions: isSocial ? (newTask.creative_instructions || null) : null,
         }])
         .select()
         .single();
@@ -525,6 +550,11 @@ export default function Tasks() {
         subtasks: [],
         attachments: [],
         task_type: "",
+        platform: "",
+        post_type: "",
+        post_date: "",
+        hashtags: "",
+        creative_instructions: "",
       });
       setIsDialogOpen(false);
       fetchTasks();
@@ -568,6 +598,11 @@ export default function Tasks() {
       })),
       attachments: [],
       task_type: (template as any).default_task_type || "",
+      platform: "",
+      post_type: "",
+      post_date: "",
+      hashtags: "",
+      creative_instructions: "",
     });
 
     incrementUsageCount(template.id);
@@ -595,6 +630,11 @@ export default function Tasks() {
       subtasks: task.subtasks || [],
       attachments: task.attachments || [],
       task_type: task.task_type || "",
+      platform: task.platform || "",
+      post_type: task.post_type || "",
+      post_date: task.post_date ? task.post_date.split("T")[0] : "",
+      hashtags: task.hashtags?.join(", ") || "",
+      creative_instructions: task.creative_instructions || "",
     });
     setIsEditDialogOpen(true);
   };
@@ -645,6 +685,11 @@ export default function Tasks() {
         changes.push(`Data de vencimento: ${oldDate} → ${newDate}`);
       }
 
+      const isSocialEdit = newTask.task_type === "redes_sociais";
+      const hashtagsArrayEdit = isSocialEdit && newTask.hashtags.trim()
+        ? newTask.hashtags.split(",").map(h => h.trim()).filter(Boolean)
+        : null;
+
       const updates: any = {
         title: newTask.title,
         description: newTask.description,
@@ -656,7 +701,12 @@ export default function Tasks() {
         subtasks: newTask.subtasks as any,
         attachments: newTask.attachments as any,
         task_type: newTask.task_type || null,
-        updated_by: profile?.user_id,  // Passa quem fez a ação para excluir das notificações
+        platform: isSocialEdit ? (newTask.platform || null) : null,
+        post_type: isSocialEdit ? (newTask.post_type || null) : null,
+        post_date: isSocialEdit && newTask.post_date ? dateOnlyToISO(newTask.post_date) : null,
+        hashtags: hashtagsArrayEdit,
+        creative_instructions: isSocialEdit ? (newTask.creative_instructions || null) : null,
+        updated_by: profile?.user_id,
       };
 
       // Reset notification_sent_at if due_date changed
@@ -723,7 +773,6 @@ export default function Tasks() {
   };
 
   const handleDuplicateTask = (task: Task) => {
-    // Buscar os clientes e usuários atribuídos da tarefa original
     const taskAssignedUsers = getAssignedUsers(task.id);
     
     setNewTask({
@@ -742,6 +791,11 @@ export default function Tasks() {
       })) || [],
       attachments: [],
       task_type: task.task_type || "",
+      platform: task.platform || "",
+      post_type: task.post_type || "",
+      post_date: "",
+      hashtags: task.hashtags?.join(", ") || "",
+      creative_instructions: task.creative_instructions || "",
     });
     setIsDetailDialogOpen(false);
     setCreateStep(2);
@@ -933,6 +987,10 @@ export default function Tasks() {
                       client_ids: matchedClientIds.length > 0 ? matchedClientIds : prev.client_ids,
                       assigned_users: matchedUserIds.length > 0 ? matchedUserIds : prev.assigned_users,
                       ...(result.suggested_date ? { due_date: result.suggested_date.split("T")[0] } : {}),
+                      ...(result.platform ? { platform: result.platform } : {}),
+                      ...(result.post_type ? { post_type: result.post_type } : {}),
+                      ...(result.hashtags?.length ? { hashtags: result.hashtags.join(", ") } : {}),
+                      ...(result.creative_instructions ? { creative_instructions: result.creative_instructions } : {}),
                     }));
                     setCreateStep(2);
                   }
@@ -993,6 +1051,49 @@ export default function Tasks() {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Campos condicionais de Redes Sociais */}
+                    {newTask.task_type === "redes_sociais" && (
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                          <Label>Plataforma</Label>
+                          <Select
+                            value={newTask.platform}
+                            onValueChange={(value) => setNewTask({ ...newTask, platform: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a plataforma" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="instagram">Instagram</SelectItem>
+                              <SelectItem value="facebook">Facebook</SelectItem>
+                              <SelectItem value="linkedin">LinkedIn</SelectItem>
+                              <SelectItem value="twitter">Twitter/X</SelectItem>
+                              <SelectItem value="tiktok">TikTok</SelectItem>
+                              <SelectItem value="youtube">YouTube</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Tipo de Conteúdo</Label>
+                          <Select
+                            value={newTask.post_type}
+                            onValueChange={(value) => setNewTask({ ...newTask, post_type: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="feed">Feed</SelectItem>
+                              <SelectItem value="stories">Stories</SelectItem>
+                              <SelectItem value="reels">Reels</SelectItem>
+                              <SelectItem value="carrossel">Carrossel</SelectItem>
+                              <SelectItem value="video">Vídeo</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <DialogFooter className="flex-shrink-0 pt-4 border-t">
@@ -1068,6 +1169,37 @@ export default function Tasks() {
                         onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
                       />
                     </div>
+
+                    {/* Campos condicionais de Redes Sociais */}
+                    {newTask.task_type === "redes_sociais" && (
+                      <>
+                        <div className="grid gap-2">
+                          <Label>Data de Publicação</Label>
+                          <Input
+                            type="date"
+                            value={newTask.post_date}
+                            onChange={(e) => setNewTask({ ...newTask, post_date: e.target.value })}
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Hashtags</Label>
+                          <Input
+                            value={newTask.hashtags}
+                            onChange={(e) => setNewTask({ ...newTask, hashtags: e.target.value })}
+                            placeholder="Ex: #marketing, #design, #social"
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Instruções Criativas</Label>
+                          <Textarea
+                            value={newTask.creative_instructions}
+                            onChange={(e) => setNewTask({ ...newTask, creative_instructions: e.target.value })}
+                            placeholder="Instruções de arte, roteiro, textos na arte, CTAs..."
+                            rows={3}
+                          />
+                        </div>
+                      </>
+                    )}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <Label>Clientes</Label>
@@ -1117,6 +1249,13 @@ export default function Tasks() {
                         { label: "Data de Vencimento", value: newTask.due_date ? formatDateBR(newTask.due_date) : "" },
                         { label: "Clientes", value: newTask.client_ids.map(id => clients.find(c => c.id === id)?.name).filter(Boolean).join(", ") },
                         { label: "Usuários", value: newTask.assigned_users.map(id => profiles.find(p => p.user_id === id)?.name).filter(Boolean).join(", ") },
+                        ...(newTask.task_type === "redes_sociais" ? [
+                          { label: "Plataforma", value: newTask.platform ? newTask.platform.charAt(0).toUpperCase() + newTask.platform.slice(1) : "" },
+                          { label: "Tipo de Conteúdo", value: newTask.post_type ? newTask.post_type.charAt(0).toUpperCase() + newTask.post_type.slice(1) : "" },
+                          { label: "Data de Publicação", value: newTask.post_date ? formatDateBR(newTask.post_date) : "" },
+                          { label: "Hashtags", value: newTask.hashtags },
+                          { label: "Instruções Criativas", value: newTask.creative_instructions },
+                        ] : []),
                       ]}
                     />
                     <SubtaskManager
@@ -1441,6 +1580,77 @@ export default function Tasks() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Campos condicionais de Redes Sociais na edição */}
+            {newTask.task_type === "redes_sociais" && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Plataforma</Label>
+                    <Select
+                      value={newTask.platform}
+                      onValueChange={(value) => setNewTask({ ...newTask, platform: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a plataforma" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="instagram">Instagram</SelectItem>
+                        <SelectItem value="facebook">Facebook</SelectItem>
+                        <SelectItem value="linkedin">LinkedIn</SelectItem>
+                        <SelectItem value="twitter">Twitter/X</SelectItem>
+                        <SelectItem value="tiktok">TikTok</SelectItem>
+                        <SelectItem value="youtube">YouTube</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Tipo de Conteúdo</Label>
+                    <Select
+                      value={newTask.post_type}
+                      onValueChange={(value) => setNewTask({ ...newTask, post_type: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="feed">Feed</SelectItem>
+                        <SelectItem value="stories">Stories</SelectItem>
+                        <SelectItem value="reels">Reels</SelectItem>
+                        <SelectItem value="carrossel">Carrossel</SelectItem>
+                        <SelectItem value="video">Vídeo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Data de Publicação</Label>
+                  <Input
+                    type="date"
+                    value={newTask.post_date}
+                    onChange={(e) => setNewTask({ ...newTask, post_date: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Hashtags</Label>
+                  <Input
+                    value={newTask.hashtags}
+                    onChange={(e) => setNewTask({ ...newTask, hashtags: e.target.value })}
+                    placeholder="Ex: #marketing, #design, #social"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Instruções Criativas</Label>
+                  <Textarea
+                    value={newTask.creative_instructions}
+                    onChange={(e) => setNewTask({ ...newTask, creative_instructions: e.target.value })}
+                    placeholder="Instruções de arte, roteiro, textos na arte, CTAs..."
+                    rows={3}
+                  />
+                </div>
+              </>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="edit-assigned_users">Atribuir usuários</Label>

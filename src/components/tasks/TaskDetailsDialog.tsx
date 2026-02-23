@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock, Copy } from "lucide-react";
+import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock, Copy, Hash, Smartphone, Palette, CalendarClock } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
@@ -35,6 +35,11 @@ interface Task {
   history?: any[];
   subtasks?: Subtask[];
   attachments?: Attachment[];
+  platform?: string | null;
+  post_type?: string | null;
+  post_date?: string | null;
+  hashtags?: string[] | null;
+  creative_instructions?: string | null;
 }
 
 interface Client {
@@ -259,6 +264,70 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
               {/* Anexos */}
               {task.attachments && task.attachments.length > 0 && (
                 <AttachmentsDisplay attachments={task.attachments} />
+              )}
+
+              {/* Campos de Redes Sociais */}
+              {(task.platform || task.post_type || task.post_date || task.hashtags?.length || task.creative_instructions) && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      <Smartphone className="h-4 w-4 text-muted-foreground" />
+                      Redes Sociais
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {task.platform && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Plataforma</p>
+                          <p className="text-sm font-medium capitalize">{task.platform}</p>
+                        </div>
+                      )}
+                      {task.post_type && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Tipo de Conteúdo</p>
+                          <p className="text-sm font-medium capitalize">{task.post_type}</p>
+                        </div>
+                      )}
+                    </div>
+                    {task.post_date && (
+                      <div className="flex items-start gap-2">
+                        <CalendarClock className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Data de Publicação</p>
+                          <p className="text-sm font-medium">
+                            {format(new Date(task.post_date), "PPP", { locale: ptBR })}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {task.hashtags && task.hashtags.length > 0 && (
+                      <div className="flex items-start gap-2">
+                        <Hash className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Hashtags</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {task.hashtags.map((tag, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs">
+                                {tag.startsWith("#") ? tag : `#${tag}`}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {task.creative_instructions && (
+                      <div className="flex items-start gap-2">
+                        <Palette className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Instruções Criativas</p>
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
+                            <LinkifyText text={task.creative_instructions} />
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
 

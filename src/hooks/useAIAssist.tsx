@@ -10,6 +10,10 @@ export interface TaskPrefillResult {
   suggested_date?: string;
   mentioned_clients?: string[];
   mentioned_users?: string[];
+  platform?: string;
+  post_type?: string;
+  hashtags?: string[];
+  creative_instructions?: string;
 }
 
 export interface PostPrefillResult {

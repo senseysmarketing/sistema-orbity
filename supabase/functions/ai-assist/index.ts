@@ -19,10 +19,14 @@ const TASK_TOOLS = [
           title: { type: "string", description: "Título conciso da tarefa" },
           description: { type: "string", description: "Descrição profissional e estruturada, sem erros de gramática" },
           priority: { type: "string", enum: ["low", "medium", "high"], description: "Prioridade da tarefa" },
-          suggested_type: { type: "string", description: "Sugestão de tipo baseado no contexto (ex: design, copy, video, social_media, trafego, reuniao, outro)" },
+          suggested_type: { type: "string", description: "Sugestão de tipo baseado no contexto. Se o usuário descrever conteúdo para redes sociais (post, reels, stories, carrossel, etc.), use 'redes_sociais'. Outros exemplos: design, conteudo, desenvolvimento, suporte, administrativo, reuniao." },
           mentioned_clients: { type: "array", items: { type: "string" }, description: "Nomes de clientes ou empresas mencionados pelo usuário no texto. Extraia apenas nomes próprios de pessoas ou empresas que pareçam ser clientes." },
           mentioned_users: { type: "array", items: { type: "string" }, description: "Nomes de pessoas mencionadas como responsáveis ou que devem executar a tarefa. Extraia nomes próprios de pessoas que o usuário indica como executores (ex: 'a Laryssa vai fazer', 'atribuir pro João')." },
           suggested_date: { type: "string", description: "Data de vencimento mencionada pelo usuário no formato ISO 8601 (YYYY-MM-DDTHH:mm:ss). Extraia de expressões como 'entregar sexta', 'dia 28', 'amanhã', 'próxima segunda', etc. Use a data atual fornecida no system prompt como referência para calcular datas relativas." },
+          platform: { type: "string", enum: ["instagram", "facebook", "linkedin", "twitter", "tiktok", "youtube"], description: "Plataforma de rede social, se aplicável. Preencher apenas quando suggested_type for 'redes_sociais'." },
+          post_type: { type: "string", enum: ["feed", "stories", "reels", "carrossel", "video"], description: "Tipo de conteúdo para rede social. Preencher apenas quando suggested_type for 'redes_sociais'." },
+          hashtags: { type: "array", items: { type: "string" }, description: "Hashtags relevantes para o conteúdo de redes sociais. Preencher apenas quando suggested_type for 'redes_sociais'." },
+          creative_instructions: { type: "string", description: "Instruções de arte/criação para o designer. Para posts de imagem: headlines, subtítulos, CTAs. Para vídeos/reels: mini roteiro. Preencher apenas quando suggested_type for 'redes_sociais'." },
         },
         required: ["title", "description", "priority"],
         additionalProperties: false,
@@ -95,7 +99,7 @@ const CAMPAIGN_ANALYSIS_TOOLS = [
 ];
 
 const DEFAULT_TASK_PROMPT =
-  "Você é um assistente de agência de marketing digital. Extraia os dados estruturados de uma tarefa a partir da descrição do usuário. Gere um título conciso e uma descrição profissional, estruturada e sem erros de gramática.";
+  "Você é um assistente de agência de marketing digital. Extraia os dados estruturados de uma tarefa a partir da descrição do usuário. Gere um título conciso e uma descrição profissional, estruturada e sem erros de gramática. Se o usuário descrever conteúdo para redes sociais (ex: 'criar um post no Instagram', 'publicar um reels sobre...', 'fazer um carrossel', 'stories para o cliente X'), defina suggested_type como 'redes_sociais' e preencha os campos platform, post_type, hashtags e creative_instructions.";
 
 const DEFAULT_POST_PROMPT =
   "Você é um social media manager profissional. Extraia os dados de um post para redes sociais a partir da descrição do usuário. Gere uma legenda envolvente, profissional e adaptada para a plataforma sugerida. Inclua hashtags relevantes. Gere também instruções de arte/criação detalhadas para o designer: para posts de imagem inclua headlines, subtítulos, CTAs e textos que devem aparecer na arte; para vídeos/reels inclua um mini roteiro com os pontos principais e textos em tela.";
