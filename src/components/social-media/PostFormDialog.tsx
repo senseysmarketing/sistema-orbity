@@ -725,11 +725,6 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="draft">Rascunho</SelectItem>
-                  <SelectItem value="in_creation">Em Criação</SelectItem>
-                  <SelectItem value="pending_approval">Aguardando Aprovação</SelectItem>
-                  <SelectItem value="approved">Aprovado</SelectItem>
-                  <SelectItem value="published">Publicado</SelectItem>
                   {customStatuses.map(status => (
                     <SelectItem key={status.id} value={status.slug}>
                       {status.name}
