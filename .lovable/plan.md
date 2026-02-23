@@ -1,79 +1,162 @@
 
 
-# Renomear "Design" para "Criativos" e adicionar campos extras
+# Fase 2: Espelhamento no Social Media — Ler da tabela `tasks`
 
 ## Resumo
 
-Renomear o tipo de tarefa "Design" para "Criativos" (slug: `criativos`) e exibir o campo "Instrucoes Criativas" quando esse tipo for selecionado, assim como ja acontece com "Redes Sociais". Isso permite que designers recebam orientacoes visuais tanto para demandas de social media quanto para criativos de campanhas, artes avulsas, etc.
+A tela de Social Media deixa de ler da tabela `social_media_posts` e passa a consumir dados da tabela `tasks` filtrados por `task_type = 'redes_sociais'`. O Kanban de posts e removido (fica apenas na tela de Tarefas). Calendario, Planejamento Semanal, Analises e Configuracoes sao mantidos.
 
-## Impacto nos dados
+## Mudanca conceitual
 
-Existem 132 tarefas com `task_type = 'design'` no banco. Sera necessario:
-- Migration SQL para renomear `design` -> `criativos` em todas as tarefas existentes
-- Migration SQL para renomear o slug na tabela `task_types` das agencias que ja inicializaram os tipos padrao
+```text
+ANTES:
+  Social Media -> useSocialMediaPosts() -> social_media_posts table
+  Tasks        -> tasks table
 
-## Alteracoes
-
-### 1. Migration SQL
-
-```sql
--- Renomear slug nas tarefas existentes
-UPDATE tasks SET task_type = 'criativos' WHERE task_type = 'design';
-
--- Renomear slug e nome na tabela de tipos
-UPDATE task_types SET slug = 'criativos', name = 'Criativos' 
-WHERE slug = 'design' AND is_default = true;
+DEPOIS:
+  Social Media -> useSocialMediaTasks() -> tasks table (WHERE task_type = 'redes_sociais')
+  Tasks        -> tasks table (todos os tipos)
 ```
 
-### 2. useTaskTypes.tsx
+## Alteracoes detalhadas
 
-Alterar a entrada no `DEFAULT_TYPES`:
+### 1. Novo hook: `useSocialMediaTasks.tsx`
 
-De: `{ slug: "design", name: "Design", icon: "🎨", ... }`
-Para: `{ slug: "criativos", name: "Criativos", icon: "🎨", ... }`
+Criar um hook que busca tarefas do tipo `redes_sociais` da tabela `tasks` e as formata para uma interface compativel com os componentes de Social Media existentes.
 
-### 3. Tasks.tsx - Logica condicional dos campos extras
+**Dados buscados:**
+- `tasks` com `task_type = 'redes_sociais'` e `agency_id = currentAgency.id`
+- Join com `clients(name)` via `task_clients` (junction table)
+- Join com `task_assignments(user_id)` para usuarios atribuidos
+- Profiles dos usuarios para nomes
 
-Atualmente os campos extras (instrucoes criativas, etc.) so aparecem para `redes_sociais`. Precisamos criar uma logica que mostre:
+**Interface de saida (`SocialMediaTask`):**
+Mapeamento dos campos da task para os campos que o Calendario e Planejamento esperam:
 
-- **Para "Redes Sociais"**: todos os campos (plataforma, tipo conteudo, data publicacao, hashtags, instrucoes criativas)
-- **Para "Criativos"**: apenas o campo "Instrucoes Criativas" (sem plataforma, tipo de conteudo, hashtags, data de publicacao - pois criativos nao sao necessariamente para redes sociais)
+| Campo Social Media | Campo Task |
+|---|---|
+| `id` | `id` |
+| `title` | `title` |
+| `description` | `description` |
+| `client_id` | Derivado de `task_clients` |
+| `client_name` | Via join |
+| `scheduled_date` | `post_date` (data de publicacao) ou `due_date` como fallback |
+| `post_date` | `post_date` |
+| `due_date` | `due_date` |
+| `post_type` | `post_type` |
+| `platform` | `platform` |
+| `status` | `status` (mapeado para os status de social media) |
+| `priority` | `priority` |
+| `hashtags` | `hashtags` |
+| `creative_instructions` | `creative_instructions` |
+| `assigned_users` | Via `task_assignments` + profiles |
+| `archived` | Derivado de status `completed`/`done` |
 
-Isso sera feito com um helper: `const hasCreativeFields = ["redes_sociais", "criativos"].includes(newTask.task_type)`
+**Mapeamento de status Tasks -> Social Media:**
+Os status de tarefas precisam ser traduzidos para o vocabulario de Social Media:
 
-Nos pontos de save (`handleCreateTask` e `handleUpdateTask`), a logica de persistencia sera ajustada:
-- `platform`, `post_type`, `post_date`, `hashtags`: apenas para `redes_sociais`
-- `creative_instructions`: para `redes_sociais` OU `criativos`
+| Status Task | Mapeamento Social |
+|---|---|
+| `todo` / `pending` | `draft` (Briefing) |
+| `in_progress` | `in_creation` (Em Criacao) |
+| `review` / `revision` | `pending_approval` |
+| `completed` / `done` | `published` |
+| Status customizados | Manter como estao |
 
-### 4. Tasks.tsx - Wizard (Passo 3 - Detalhes) e Edicao
+### 2. Atualizar `SocialMediaCalendar.tsx`
 
-Adicionar o campo "Instrucoes Criativas" quando `task_type === "criativos"`, separado dos campos de redes sociais.
+- Trocar `useSocialMediaPosts` por `useSocialMediaTasks`
+- Remover `PostFormDialog` e `PostDetailsDialog` — ao clicar num item do calendario, redirecionar para a tela de Tarefas ou abrir o `TaskDetailsDialog`
+- O botao "Nova Postagem" redireciona para criacao de tarefa com tipo pre-selecionado `redes_sociais`
+- Adaptar campos: usar `post_date || due_date` como data de exibicao no calendario
 
-### 5. Tasks.tsx - Revisao (Passo 4)
+### 3. Atualizar `WeeklyPlanningView.tsx`
 
-Incluir "Instrucoes Criativas" na revisao quando presente para o tipo `criativos`.
+- Trocar `useSocialMediaPosts` por `useSocialMediaTasks`
+- O botao "Criar Post" no painel lateral passa a navegar para criacao de tarefa com tipo `redes_sociais` e cliente pre-selecionado
+- Ao clicar em "Ver Post", abre `TaskDetailsDialog` em vez de `PostDetailsDialog`
+- Adaptar a logica de categorize status para os status de task
 
-### 6. TaskDetailsDialog.tsx
+### 4. Atualizar `planning/types.ts`
 
-Exibir "Instrucoes Criativas" tambem para tarefas do tipo `criativos`.
+- Trocar referencia de `SocialMediaPost` para `SocialMediaTask` (do novo hook)
+- Ajustar `STATUS_CATEGORIES` para incluir status de tasks (`todo`, `in_progress`, `review`, `completed`)
+- Ajustar `categorizeStatus` para funcionar com os status da tabela de tasks
 
-### 7. Edge Function ai-assist
+### 5. Atualizar `ClientWeekRow.tsx` e `ClientPlanningDetails.tsx`
 
-Atualizar o prompt e a descricao do `suggested_type` para incluir `criativos`:
-- Se o usuario descrever arte, banner, criativo, campanha publicitaria, material visual: usar `criativos`
-- Atualizar a descricao de `creative_instructions` para preencher tambem quando `suggested_type` for `criativos`
+- Trocar tipo `SocialMediaPost` por `SocialMediaTask`
+- Ajustar campos referenciados (ex: `post.post_date || post.scheduled_date` -> `task.post_date || task.due_date`)
 
-### 8. useAIAssist.tsx
+### 6. Atualizar `SocialMediaAnalytics.tsx`
 
-Nenhuma alteracao necessaria - os campos `creative_instructions` ja existem no tipo.
+- Trocar queries de `social_media_posts` para `tasks` com filtro `task_type = 'redes_sociais'`
+- Ajustar campos: `scheduled_date` -> `post_date` ou `due_date`
+- Ajustar `post_assignments` -> `task_assignments`
+
+### 7. Remover aba Kanban da pagina `SocialMedia.tsx`
+
+- Remover tab "Kanban" e o import de `PostKanban`
+- Remover o botao "Novo Post" que aparecia apenas na aba Kanban
+- A pagina fica com 4 abas: Planejamento, Calendario, Analises, Configuracoes
+
+### 8. Atualizar `ClientPosts.tsx` (detalhe do cliente)
+
+- Trocar query de `social_media_posts` para `tasks` com `task_type = 'redes_sociais'`
+- Usar junction table `task_clients` em vez de `post_clients`
+- Manter a mesma interface visual
+
+### 9. Atualizar `DayTimeline.tsx` (dashboard)
+
+- Trocar queries de `social_media_posts` para `tasks` com `task_type = 'redes_sociais'`
+- Ajustar campos para os da tabela tasks
+
+### 10. Atualizar `MyPostsList.tsx` (dashboard)
+
+- Se este componente recebe posts externamente, garantir que o componente pai passe tarefas `redes_sociais` em vez de posts da tabela antiga
+
+### 11. Atualizar `DayCell.tsx`
+
+- Trocar tipo para `SocialMediaTask`
+- Manter logica visual inalterada
 
 ## Arquivos modificados
 
 | Arquivo | Alteracao |
 |---|---|
-| Migration SQL | Renomear slug `design` -> `criativos` em `tasks` e `task_types` |
-| `src/hooks/useTaskTypes.tsx` | Renomear default type |
-| `src/pages/Tasks.tsx` | Logica condicional expandida para `criativos` |
-| `src/components/tasks/TaskDetailsDialog.tsx` | Exibir instrucoes criativas para tipo `criativos` |
-| `supabase/functions/ai-assist/index.ts` | Atualizar prompt e tool description |
+| `src/hooks/useSocialMediaTasks.tsx` | **NOVO** - Hook que le tasks tipo redes_sociais |
+| `src/pages/SocialMedia.tsx` | Remover aba Kanban e botao Novo Post |
+| `src/components/social-media/SocialMediaCalendar.tsx` | Usar novo hook, redirecionar para Tasks |
+| `src/components/social-media/WeeklyPlanningView.tsx` | Usar novo hook, redirecionar para Tasks |
+| `src/components/social-media/planning/types.ts` | Trocar tipo e ajustar categorias de status |
+| `src/components/social-media/planning/ClientWeekRow.tsx` | Trocar tipo |
+| `src/components/social-media/planning/ClientPlanningDetails.tsx` | Trocar tipo e acoes |
+| `src/components/social-media/planning/DayCell.tsx` | Trocar tipo |
+| `src/components/social-media/planning/PlanningMetrics.tsx` | Trocar tipo |
+| `src/components/social-media/SocialMediaAnalytics.tsx` | Queries da tabela tasks |
+| `src/components/social-media/analytics/*.tsx` | Trocar tipos |
+| `src/components/clients/ClientPosts.tsx` | Query da tabela tasks |
+| `src/components/clients/ClientOverview.tsx` | Query da tabela tasks |
+| `src/components/dashboard/DayTimeline.tsx` | Query da tabela tasks |
+
+## O que NAO sera alterado nesta fase
+
+- **PostFormDialog, PostDetailsDialog, PostCard, PostKanban, SortablePostCard, PostKanbanColumn**: Estes componentes continuam existindo no codigo mas nao serao mais referenciados pela tela de Social Media. Poderao ser removidos numa fase futura de limpeza.
+- **useSocialMediaPosts hook**: Permanece no codigo para nao quebrar nada, sera removido numa fase futura.
+- **Tabela social_media_posts**: Os dados existentes permanecem intocados. A migracao de dados historicos pode ser feita numa fase futura.
+- **SocialMediaSettings**: Permanece inalterado — continua gerenciando status customizados, tipos de conteudo e plataformas.
+
+## Consideracoes tecnicas
+
+### Mapeamento de status
+
+A tabela `tasks` usa status como `todo`, `in_progress`, `review`, `completed` e tambem status customizados da agencia. O calendario e planejamento de Social Media categorizam status em 3 grupos (ready, inProgress, draft). A funcao `categorizeStatus` sera atualizada para reconhecer ambos os vocabularios.
+
+### Relacao tarefa-cliente
+
+A tabela `tasks` usa a junction table `task_clients` para a relacao N:N com clientes. O Planejamento Semanal agrupa por cliente, entao uma tarefa vinculada a multiplos clientes aparecera em cada linha de cliente.
+
+### Navegacao entre modulos
+
+Ao clicar num post no calendario ou planejamento, o usuario sera redirecionado para a tela de Tarefas (ou abrira o TaskDetailsDialog inline). Isso reforça a unificacao — toda a execucao acontece em Tarefas.
 
