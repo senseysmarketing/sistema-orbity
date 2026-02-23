@@ -487,137 +487,125 @@ async function processTasks() {
 }
 
 async function processPosts() {
-  console.log('📱 Processing post notifications...');
+  console.log('📱 Processing social media task notifications...');
   
   const now = new Date();
   const oneDayAgo = addHours(now, -24);
 
-  // Get all upcoming posts - usa post_date (data de publicação) com fallback para scheduled_date
-  // Notificação é enviada 1 hora antes da publicação
+  // Get all upcoming social media tasks - uses post_date with fallback to due_date
   const POST_ADVANCE_HOURS = 1;
   
-  const { data: posts, error } = await supabase
-    .from('social_media_posts')
+  const { data: tasks, error } = await supabase
+    .from('tasks')
     .select(`
       id,
       title,
-      scheduled_date,
       post_date,
+      due_date,
       agency_id,
       created_by,
       notification_sent_at,
-      post_assignments(user_id)
+      task_assignments(user_id)
     `)
+    .eq('task_type', 'redes_sociais')
     .eq('archived', false)
     .or(`notification_sent_at.is.null,notification_sent_at.lt.${oneDayAgo.toISOString()}`);
 
   if (error) {
-    console.error('Error fetching posts:', error);
+    console.error('Error fetching social media tasks:', error);
     return;
   }
 
-  // Filtrar posts com data de publicação futura
-  const upcomingPosts = (posts || []).filter(post => {
-    const postDate = post.post_date || post.scheduled_date;
+  // Filter tasks with future publication date
+  const upcomingTasks = (tasks || []).filter(task => {
+    const postDate = task.post_date || task.due_date;
     return postDate && new Date(postDate) >= now;
   });
 
-  console.log(`📊 Found ${upcomingPosts.length} posts to notify`);
+  console.log(`📊 Found ${upcomingTasks.length} social media tasks to notify`);
 
-  // Build list of potential notifications with user+post deduplication
   const potentialNotifications: { notification: NotificationData; tracking: BatchTrackingRecord }[] = [];
-  const postsToUpdate: string[] = [];
+  const tasksToUpdate: string[] = [];
 
-  for (const post of upcomingPosts) {
-    if (!post.agency_id) continue;
+  for (const task of upcomingTasks) {
+    if (!task.agency_id) continue;
 
-    // Pegar usuários atribuídos ao post
-    const assignedUserIds = ((post as any).post_assignments || []).map((a: any) => a.user_id);
+    const assignedUserIds = ((task as any).task_assignments || []).map((a: any) => a.user_id);
 
-    // Combinar criador + atribuídos (sem duplicatas)
     const recipientSet = new Set<string>();
-
-    // Sempre adicionar o criador
-    if ((post as any).created_by) {
-      recipientSet.add((post as any).created_by);
+    if ((task as any).created_by) {
+      recipientSet.add((task as any).created_by);
     }
-
-    // Adicionar todos os atribuídos
     for (const userId of assignedUserIds) {
       recipientSet.add(userId);
     }
 
     const recipients = Array.from(recipientSet);
     
-    // Usar post_date (data real de publicação) com fallback para scheduled_date
-    const postDate = new Date(post.post_date || post.scheduled_date);
+    const postDate = new Date(task.post_date || task.due_date);
     const notificationTime = addHours(now, POST_ADVANCE_HOURS);
     
     for (const userId of recipients) {
-      // Only notify if within the advance window (1 hour before)
       if (postDate <= notificationTime) {
-        const canSend = await checkUserPreferences(userId, post.agency_id, 'posts');
+        const canSend = await checkUserPreferences(userId, task.agency_id, 'posts');
         if (!canSend) continue;
 
         potentialNotifications.push({
           notification: {
             user_id: userId,
-            agency_id: post.agency_id,
+            agency_id: task.agency_id,
             type: 'post',
             priority: 'medium',
             title: '📱 Post próximo de publicar',
-            message: post.title || 'Post sem título',
+            message: task.title || 'Post sem título',
             action_url: '/social-media',
             action_label: 'Ver post',
             metadata: { 
-              post_id: post.id,
+              task_id: task.id,
               play_sound: true
             },
           },
           tracking: {
             notification_type: 'post_upcoming',
-            entity_id: post.id,
+            entity_id: task.id,
             user_id: userId,
-            agency_id: post.agency_id,
+            agency_id: task.agency_id,
           }
         });
       }
     }
 
     if (recipients.length > 0) {
-      postsToUpdate.push(post.id);
+      tasksToUpdate.push(task.id);
     }
   }
 
-  // Batch check which notifications were already sent (dedupe by user+post)
   const trackingRecords = potentialNotifications.map(p => p.tracking);
   const recentlySent = await batchCheckNotifications(trackingRecords, 24);
 
-  // Filter out already sent notifications
   const filteredNotifications = potentialNotifications.filter(p => {
     const key = `${p.tracking.entity_id}_${p.tracking.user_id}`;
     const alreadySent = recentlySent.has(key);
     if (alreadySent) {
-      console.log(`⏭️ Skipping post ${p.tracking.entity_id} for user ${p.tracking.user_id} - already notified`);
+      console.log(`⏭️ Skipping task ${p.tracking.entity_id} for user ${p.tracking.user_id} - already notified`);
     }
     return !alreadySent;
   });
 
-  // Create notifications and track them
   const notificationsToCreate = filteredNotifications.map(p => p.notification);
   const toTrack = filteredNotifications.map(p => p.tracking);
 
   await batchCreateNotifications(notificationsToCreate);
   await batchTrackNotifications(toTrack);
 
-  if (postsToUpdate.length > 0) {
+  if (tasksToUpdate.length > 0) {
     await supabase
-      .from('social_media_posts')
+      .from('tasks')
       .update({ notification_sent_at: new Date().toISOString() })
-      .in('id', postsToUpdate);
+      .in('id', tasksToUpdate);
   }
 
-  console.log(`✅ Created ${notificationsToCreate.length} post notifications (filtered from ${potentialNotifications.length})`);
+  console.log(`✅ Created ${notificationsToCreate.length} social media task notifications (filtered from ${potentialNotifications.length})`);
 }
 
 async function processLeads() {
@@ -1164,26 +1152,29 @@ async function processDailySummary() {
         console.error(`Error counting tasks for user ${user.user_id}:`, tasksError);
       }
 
-      // Count posts assigned to THIS USER scheduled for today
+      // Count social media tasks assigned to THIS USER for today
       const { count: userPostsCount, error: postsError } = await supabase
-        .from('post_assignments')
+        .from('task_assignments')
         .select(`
-          post_id,
-          social_media_posts!inner(
+          task_id,
+          tasks!inner(
             id,
-            scheduled_date,
+            post_date,
+            due_date,
             archived,
-            agency_id
+            agency_id,
+            task_type
           )
         `, { count: 'exact', head: true })
         .eq('user_id', user.user_id)
-        .eq('social_media_posts.agency_id', agency.id)
-        .eq('social_media_posts.archived', false)
-        .gte('social_media_posts.scheduled_date', todayBrasilia.toISOString())
-        .lte('social_media_posts.scheduled_date', endOfDayBrasilia.toISOString());
+        .eq('tasks.agency_id', agency.id)
+        .eq('tasks.archived', false)
+        .eq('tasks.task_type', 'redes_sociais')
+        .gte('tasks.due_date', todayBrasilia.toISOString())
+        .lte('tasks.due_date', endOfDayBrasilia.toISOString());
 
       if (postsError) {
-        console.error(`Error counting posts for user ${user.user_id}:`, postsError);
+        console.error(`Error counting social media tasks for user ${user.user_id}:`, postsError);
       }
 
       // Count meetings where THIS USER is organizer OR participant

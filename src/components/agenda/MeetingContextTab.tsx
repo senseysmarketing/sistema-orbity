@@ -19,7 +19,7 @@ const TIMEZONE = "America/Sao_Paulo";
 export const MeetingContextTab = ({ meeting }: MeetingContextTabProps) => {
   const { currentAgency } = useAgency();
   const entityId = meeting.client_id || meeting.lead_id;
-  const entityType = meeting.client_id ? "client" : "lead";
+  const _entityType = meeting.client_id ? "client" : "lead";
 
   // Fetch previous meetings with the same client/lead
   const { data: previousMeetings = [], isLoading: loadingMeetings } = useQuery({
@@ -86,19 +86,29 @@ export const MeetingContextTab = ({ meeting }: MeetingContextTabProps) => {
     enabled: !!meeting.client_id && !!currentAgency?.id,
   });
 
-  // Fetch upcoming posts
+  // Fetch upcoming social media tasks
   const { data: upcomingPosts = [], isLoading: loadingPosts } = useQuery({
     queryKey: ["context-posts", meeting.client_id],
     queryFn: async () => {
       if (!meeting.client_id || !currentAgency?.id) return [];
 
+      // Get task IDs linked to this client via task_clients
+      const { data: taskClientLinks } = await supabase
+        .from("task_clients")
+        .select("task_id")
+        .eq("client_id", meeting.client_id);
+
+      const taskIds = taskClientLinks?.map(tc => tc.task_id) || [];
+      if (taskIds.length === 0) return [];
+
       const { data } = await supabase
-        .from("social_media_posts")
-        .select("id, title, platform, scheduled_date, status")
+        .from("tasks")
+        .select("id, title, platform, post_date, due_date, status")
         .eq("agency_id", currentAgency.id)
-        .eq("client_id", meeting.client_id)
-        .in("status", ["draft", "pending_approval", "scheduled"])
-        .order("scheduled_date", { ascending: true })
+        .eq("task_type", "redes_sociais")
+        .in("id", taskIds)
+        .in("status", ["todo", "in_progress", "review"])
+        .order("post_date", { ascending: true })
         .limit(5);
 
       return data || [];
@@ -242,16 +252,16 @@ export const MeetingContextTab = ({ meeting }: MeetingContextTabProps) => {
               </div>
               {upcomingPosts.length > 0 ? (
                 <div className="space-y-2">
-                  {upcomingPosts.map((post: any) => (
+              {upcomingPosts.map((post: any) => (
                     <div
                       key={post.id}
                       className="flex items-center justify-between p-2 rounded-md bg-muted/50"
                     >
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{post.title}</p>
-                        {post.scheduled_date && (
+                        {(post.post_date || post.due_date) && (
                           <p className="text-xs text-muted-foreground">
-                            {format(new Date(post.scheduled_date), "dd/MM/yyyy", { locale: ptBR })}
+                            {format(new Date(post.post_date || post.due_date), "dd/MM/yyyy", { locale: ptBR })}
                           </p>
                         )}
                       </div>

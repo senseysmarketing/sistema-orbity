@@ -359,52 +359,71 @@ Deno.serve(async (req) => {
     }
     console.log("Tasks created");
 
-    // 11. Create social media posts
+    // 11. Create social media tasks (as tasks with task_type = 'redes_sociais')
     const platforms = ["instagram", "facebook", "linkedin", "tiktok"];
-    const postStatuses = ["rascunho", "aprovacao", "agendado", "publicado"];
-    const contentTypes = ["feed", "stories", "reels", "carousel"];
+    const postTypes = ["feed", "stories", "reels", "carousel"];
 
-    const posts = [
-      { title: "Promoção de Verão - Bella Vita", content: "Aproveite nossos tratamentos com até 30% OFF! ☀️", platform: "instagram", status: "publicado", content_type: "feed" },
-      { title: "Novo cardápio - Sabor & Arte", content: "Conheça nossos novos pratos da temporada 🍽️", platform: "instagram", status: "agendado", content_type: "carousel" },
-      { title: "Imóvel em destaque - Prime", content: "Apartamento 3 quartos em localização privilegiada 🏠", platform: "facebook", status: "publicado", content_type: "feed" },
-      { title: "Dicas de treino - FitLife", content: "5 exercícios para fazer em casa 💪", platform: "instagram", status: "aprovacao", content_type: "reels" },
-      { title: "Lançamento produto - TechStore", content: "Chegou o novo smartphone! Confira as especificações 📱", platform: "instagram", status: "rascunho", content_type: "feed" },
-      { title: "Artigo jurídico - Silva & Associados", content: "Entenda seus direitos trabalhistas", platform: "linkedin", status: "publicado", content_type: "feed" },
-      { title: "Pets da semana - Patinhas", content: "Conheça os fofinhos disponíveis para adoção 🐕", platform: "instagram", status: "agendado", content_type: "carousel" },
-      { title: "Curso de inglês - Fluent", content: "Matrículas abertas com condições especiais! 📚", platform: "facebook", status: "aprovacao", content_type: "feed" },
-      { title: "Óculos tendência - Visão Perfeita", content: "As armações que são sucesso nesta temporada 👓", platform: "instagram", status: "publicado", content_type: "stories" },
-      { title: "Novo empreendimento - Horizonte", content: "Conheça o residencial Vista Mar 🌊", platform: "facebook", status: "agendado", content_type: "feed" },
-      { title: "Sorriso perfeito - Odonto Smile", content: "Clareamento dental com resultados incríveis ✨", platform: "instagram", status: "rascunho", content_type: "reels" },
-      { title: "Vagas abertas - RH Plus", content: "Oportunidades para profissionais de TI", platform: "linkedin", status: "publicado", content_type: "feed" },
-      { title: "Bastidores - Bella Vita", content: "Um dia na clínica com nossa equipe 👩‍⚕️", platform: "instagram", status: "aprovacao", content_type: "stories" },
-      { title: "Receita especial - Sabor & Arte", content: "Aprenda a fazer nosso risoto premiado 🍚", platform: "instagram", status: "agendado", content_type: "reels" },
-      { title: "Depoimento cliente - FitLife", content: "Transformação incrível em 6 meses 🏋️", platform: "instagram", status: "publicado", content_type: "feed" }
+    const socialPosts = [
+      { title: "Promoção de Verão - Bella Vita", description: "Aproveite nossos tratamentos com até 30% OFF! ☀️", platform: "instagram", status: "completed", post_type: "feed" },
+      { title: "Novo cardápio - Sabor & Arte", description: "Conheça nossos novos pratos da temporada 🍽️", platform: "instagram", status: "review", post_type: "carousel" },
+      { title: "Imóvel em destaque - Prime", description: "Apartamento 3 quartos em localização privilegiada 🏠", platform: "facebook", status: "completed", post_type: "feed" },
+      { title: "Dicas de treino - FitLife", description: "5 exercícios para fazer em casa 💪", platform: "instagram", status: "review", post_type: "reels" },
+      { title: "Lançamento produto - TechStore", description: "Chegou o novo smartphone! Confira as especificações 📱", platform: "instagram", status: "todo", post_type: "feed" },
+      { title: "Artigo jurídico - Silva & Associados", description: "Entenda seus direitos trabalhistas", platform: "linkedin", status: "completed", post_type: "feed" },
+      { title: "Pets da semana - Patinhas", description: "Conheça os fofinhos disponíveis para adoção 🐕", platform: "instagram", status: "review", post_type: "carousel" },
+      { title: "Curso de inglês - Fluent", description: "Matrículas abertas com condições especiais! 📚", platform: "facebook", status: "review", post_type: "feed" },
+      { title: "Óculos tendência - Visão Perfeita", description: "As armações que são sucesso nesta temporada 👓", platform: "instagram", status: "completed", post_type: "stories" },
+      { title: "Novo empreendimento - Horizonte", description: "Conheça o residencial Vista Mar 🌊", platform: "facebook", status: "review", post_type: "feed" },
+      { title: "Sorriso perfeito - Odonto Smile", description: "Clareamento dental com resultados incríveis ✨", platform: "instagram", status: "todo", post_type: "reels" },
+      { title: "Vagas abertas - RH Plus", description: "Oportunidades para profissionais de TI", platform: "linkedin", status: "completed", post_type: "feed" },
+      { title: "Bastidores - Bella Vita", description: "Um dia na clínica com nossa equipe 👩‍⚕️", platform: "instagram", status: "review", post_type: "stories" },
+      { title: "Receita especial - Sabor & Arte", description: "Aprenda a fazer nosso risoto premiado 🍚", platform: "instagram", status: "review", post_type: "reels" },
+      { title: "Depoimento cliente - FitLife", description: "Transformação incrível em 6 meses 🏋️", platform: "instagram", status: "completed", post_type: "feed" }
     ];
 
-    for (let i = 0; i < posts.length; i++) {
-      const post = posts[i];
+    for (let i = 0; i < socialPosts.length; i++) {
+      const post = socialPosts[i];
       const clientId = clientIds[i % clientIds.length];
 
-      const { data: existingPost } = await supabase
-        .from("social_media_posts")
+      const { data: existingTask } = await supabase
+        .from("tasks")
         .select("id")
         .eq("agency_id", agencyId)
         .eq("title", post.title)
+        .eq("task_type", "redes_sociais")
         .single();
 
-      if (!existingPost) {
-        const scheduledDate = new Date(Date.now() + (Math.random() * 14 - 7) * 24 * 60 * 60 * 1000);
-        await supabase.from("social_media_posts").insert({
-          ...post,
+      if (!existingTask) {
+        const postDate = new Date(Date.now() + (Math.random() * 14 - 7) * 24 * 60 * 60 * 1000);
+        const { data: newTask } = await supabase.from("tasks").insert({
+          title: post.title,
+          description: post.description,
+          platform: post.platform,
+          post_type: post.post_type,
+          status: post.status,
+          priority: "medium",
+          task_type: "redes_sociais",
           agency_id: agencyId,
-          client_id: clientId,
           created_by: userId,
-          scheduled_date: scheduledDate.toISOString()
-        });
+          post_date: postDate.toISOString().split('T')[0],
+          due_date: postDate.toISOString().split('T')[0]
+        }).select("id").single();
+
+        // Link to client via task_clients
+        if (newTask) {
+          await supabase.from("task_clients").insert({
+            task_id: newTask.id,
+            client_id: clientId
+          });
+          // Assign to user
+          await supabase.from("task_assignments").insert({
+            task_id: newTask.id,
+            user_id: userId
+          });
+        }
       }
     }
-    console.log("Social media posts created");
+    console.log("Social media tasks created");
 
     // 12. Create meetings
     const meetings = [
@@ -531,7 +550,7 @@ Deno.serve(async (req) => {
           clients: clientIds.length,
           leads: leads.length,
           tasks: tasks.length,
-          posts: posts.length,
+          socialPosts: socialPosts.length,
           meetings: meetings.length,
           reminders: reminders.length
         }
