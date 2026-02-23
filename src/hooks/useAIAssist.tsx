@@ -8,6 +8,7 @@ export interface TaskPrefillResult {
   priority: "low" | "medium" | "high";
   suggested_type?: string;
   mentioned_clients?: string[];
+  mentioned_users?: string[];
 }
 
 export interface PostPrefillResult {
@@ -18,6 +19,7 @@ export interface PostPrefillResult {
   hashtags: string[];
   creative_instructions?: string;
   mentioned_clients?: string[];
+  mentioned_users?: string[];
 }
 
 export interface ReportPrefillResult {

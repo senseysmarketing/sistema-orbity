@@ -731,6 +731,18 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
                         .map((c) => c.id);
                       if (matchedIds.length > 0) setSelectedClientIds(matchedIds);
                     }
+                    // Match fuzzy de usuários mencionados
+                    if (result.mentioned_users?.length && profiles.length > 0) {
+                      const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                      const matchedUserIds = profiles
+                        .filter((p: any) => result.mentioned_users!.some((mention) => {
+                          const nMention = normalize(mention);
+                          const nProfile = normalize(p.name);
+                          return nProfile.includes(nMention) || nMention.includes(nProfile);
+                        }))
+                        .map((p: any) => p.user_id);
+                      if (matchedUserIds.length > 0) setSelectedUserIds(matchedUserIds);
+                    }
                     setFormData((prev) => ({
                       ...prev,
                       title: result.title || prev.title,

@@ -909,6 +909,21 @@ export default function Tasks() {
                         )
                         .map((c) => c.id);
                     }
+                    // Match fuzzy de usuários mencionados
+                    let matchedUserIds: string[] = [];
+                    if (result.mentioned_users?.length && profiles.length > 0) {
+                      const normalize = (s: string) =>
+                        s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                      matchedUserIds = profiles
+                        .filter((p) =>
+                          result.mentioned_users!.some((mention) => {
+                            const nMention = normalize(mention);
+                            const nProfile = normalize(p.name);
+                            return nProfile.includes(nMention) || nMention.includes(nProfile);
+                          })
+                        )
+                        .map((p) => p.user_id);
+                    }
                     setNewTask((prev) => ({
                       ...prev,
                       title: result.title || prev.title,
@@ -916,6 +931,7 @@ export default function Tasks() {
                       priority: result.priority || prev.priority,
                       task_type: result.suggested_type || prev.task_type,
                       client_ids: matchedClientIds.length > 0 ? matchedClientIds : prev.client_ids,
+                      assigned_users: matchedUserIds.length > 0 ? matchedUserIds : prev.assigned_users,
                     }));
                     setCreateStep(2);
                   }
