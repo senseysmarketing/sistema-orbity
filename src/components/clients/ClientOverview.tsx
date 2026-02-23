@@ -23,15 +23,18 @@ export function ClientOverview({ client }: ClientOverviewProps) {
   const { data: stats } = useQuery({
     queryKey: ["client-stats", client.id],
     queryFn: async () => {
-      const [tasksRes, postsRes, meetingsRes, credentialsRes] = await Promise.all([
-        supabase
-          .from("tasks")
-          .select("id, status", { count: "exact" })
-          .eq("client_id", client.id),
-        supabase
-          .from("social_media_posts")
-          .select("id, status", { count: "exact" })
-          .eq("client_id", client.id),
+      // Get task IDs linked to this client via task_clients
+      const { data: taskClientLinks } = await supabase
+        .from("task_clients")
+        .select("task_id")
+        .eq("client_id", client.id);
+
+      const taskIds = taskClientLinks?.map(tc => tc.task_id) || [];
+
+      const [tasksRes, meetingsRes, credentialsRes] = await Promise.all([
+        taskIds.length > 0
+          ? supabase.from("tasks").select("id, status, task_type", { count: "exact" }).in("id", taskIds)
+          : Promise.resolve({ data: [], count: 0, error: null }),
         supabase
           .from("meetings")
           .select("id", { count: "exact" })
@@ -42,13 +45,15 @@ export function ClientOverview({ client }: ClientOverviewProps) {
           .eq("client_id", client.id),
       ]);
 
-      const pendingTasks = tasksRes.data?.filter(t => t.status !== "done" && t.status !== "cancelled").length || 0;
-      const scheduledPosts = postsRes.data?.filter(p => p.status === "approved" || p.status === "scheduled").length || 0;
+      const allTasks = tasksRes.data || [];
+      const pendingTasks = allTasks.filter((t: any) => t.status !== "done" && t.status !== "completed" && t.status !== "cancelled").length;
+      const socialTasks = allTasks.filter((t: any) => t.task_type === "redes_sociais");
+      const scheduledPosts = socialTasks.filter((t: any) => t.status === "review").length;
 
       return {
-        totalTasks: tasksRes.count || 0,
+        totalTasks: tasksRes.count || allTasks.length,
         pendingTasks,
-        totalPosts: postsRes.count || 0,
+        totalPosts: socialTasks.length,
         scheduledPosts,
         totalMeetings: meetingsRes.count || 0,
         totalCredentials: credentialsRes.count || 0,

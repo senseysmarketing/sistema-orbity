@@ -3100,7 +3100,7 @@ export type Database = {
           },
         ]
       }
-      post_assignments: {
+      post_assignments_deprecated: {
         Row: {
           assigned_at: string | null
           assigned_by: string | null
@@ -3133,7 +3133,7 @@ export type Database = {
             foreignKeyName: "post_assignments_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
-            referencedRelation: "social_media_posts"
+            referencedRelation: "social_media_posts_deprecated"
             referencedColumns: ["id"]
           },
         ]
@@ -3169,7 +3169,7 @@ export type Database = {
             foreignKeyName: "post_clients_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
-            referencedRelation: "social_media_posts"
+            referencedRelation: "social_media_posts_deprecated"
             referencedColumns: ["id"]
           },
         ]
@@ -4073,7 +4073,7 @@ export type Database = {
             foreignKeyName: "social_media_assignments_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
-            referencedRelation: "social_media_posts"
+            referencedRelation: "social_media_posts_deprecated"
             referencedColumns: ["id"]
           },
         ]
@@ -4230,7 +4230,7 @@ export type Database = {
             foreignKeyName: "social_media_notifications_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
-            referencedRelation: "social_media_posts"
+            referencedRelation: "social_media_posts_deprecated"
             referencedColumns: ["id"]
           },
         ]
@@ -4360,7 +4360,7 @@ export type Database = {
           },
         ]
       }
-      social_media_posts: {
+      social_media_posts_deprecated: {
         Row: {
           agency_id: string
           approval_history: Json | null
@@ -5556,15 +5556,10 @@ export type Database = {
       }
     }
     Functions: {
-      apply_post_event_rules: {
-        Args: { p_agency_id: string; p_event_key: string; p_payload: Json }
-        Returns: undefined
-      }
       apply_task_event_rules: {
         Args: { p_agency_id: string; p_event_key: string; p_payload: Json }
         Returns: undefined
       }
-      archive_old_approved_posts: { Args: never; Returns: number }
       check_agency_limits: {
         Args: {
           agency_uuid: string
