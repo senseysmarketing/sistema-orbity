@@ -7,6 +7,7 @@ export interface TaskPrefillResult {
   description: string;
   priority: "low" | "medium" | "high";
   suggested_type?: string;
+  suggested_date?: string;
   mentioned_clients?: string[];
   mentioned_users?: string[];
 }
@@ -18,6 +19,8 @@ export interface PostPrefillResult {
   post_type: string;
   hashtags: string[];
   creative_instructions?: string;
+  priority?: "low" | "medium" | "high";
+  suggested_date?: string;
   mentioned_clients?: string[];
   mentioned_users?: string[];
 }

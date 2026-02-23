@@ -932,6 +932,7 @@ export default function Tasks() {
                       task_type: result.suggested_type || prev.task_type,
                       client_ids: matchedClientIds.length > 0 ? matchedClientIds : prev.client_ids,
                       assigned_users: matchedUserIds.length > 0 ? matchedUserIds : prev.assigned_users,
+                      ...(result.suggested_date ? { due_date: result.suggested_date.split("T")[0] } : {}),
                     }));
                     setCreateStep(2);
                   }
