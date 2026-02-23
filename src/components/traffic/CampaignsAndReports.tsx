@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { RefreshCw, FileText, TrendingUp, DollarSign, Eye, Target, BarChart, Play } from "lucide-react";
+import { RefreshCw, FileText, TrendingUp, DollarSign, Eye, Target, BarChart, Play, Sparkles, Copy, RotateCcw, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
 import { DateRange } from "react-day-picker";
 import { ReportGeneratorModal } from "./ReportGeneratorModal";
+import { useAIAssist } from "@/hooks/useAIAssist";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -81,8 +82,11 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
   const [weeklyAnalysis, setWeeklyAnalysis] = useState<any[]>([]);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<Record<string, string>>({});
+  const [aiAnalysisLoading, setAiAnalysisLoading] = useState<string | null>(null);
   
   const { toast } = useToast();
+  const { analyzeCampaign } = useAIAssist();
   const { currentAgency } = useAgency();
 
   // Selecionar primeira conta automaticamente
@@ -275,6 +279,34 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
 
   const truncateText = (text: string, limit: number = 35) => {
     return text.length > limit ? text.substring(0, limit) + '...' : text;
+  };
+
+  const handleAIAnalysis = async (campaign: Campaign) => {
+    if (!currentAgency?.id || weeklyAnalysis.length === 0) return;
+    
+    setAiAnalysisLoading(campaign.id);
+    try {
+      const weeklyDataText = weeklyAnalysis.map((week) => 
+        `${week.week}: Gasto R$${(week.spend || 0).toFixed(2)}, Conversões: ${week.conversions || 0}, CPC: R$${(week.cpc || 0).toFixed(2)}, CTR: ${(week.ctr || 0).toFixed(2)}%, Impressões: ${week.impressions || 0}, Cliques: ${week.clicks || 0}`
+      ).join('\n');
+      
+      const content = `Campanha: ${campaign.name}\nObjetivo: ${getObjectiveLabel(campaign.objective)}\nStatus: ${campaign.status}\n\nDados semanais:\n${weeklyDataText}`;
+      
+      const result = await analyzeCampaign(content, currentAgency.id);
+      if (result?.analysis) {
+        setAiAnalysis(prev => ({ ...prev, [campaign.id]: result.analysis }));
+      }
+    } catch (error) {
+      console.error('Erro na análise IA:', error);
+      toast({ title: "Erro", description: "Não foi possível gerar a análise.", variant: "destructive" });
+    } finally {
+      setAiAnalysisLoading(null);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copiado!", description: "Análise copiada para a área de transferência." });
   };
 
   const activeCampaigns = campaigns.filter(c => c.status === 'ACTIVE');
@@ -555,6 +587,63 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                                 </div>
                               ) : (
                                 <p className="text-muted-foreground">Nenhum dado semanal disponível.</p>
+                              )}
+
+                              {/* AI Analysis Section */}
+                              {weeklyAnalysis.length > 0 && (
+                                <div className="mt-4 pt-4 border-t">
+                                  {aiAnalysis[campaign.id] ? (
+                                    <div className="space-y-3">
+                                      <div className="flex items-center justify-between">
+                                        <h5 className="font-medium flex items-center gap-2">
+                                          <Sparkles className="h-4 w-4 text-primary" />
+                                          Análise da IA
+                                        </h5>
+                                        <div className="flex gap-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => copyToClipboard(aiAnalysis[campaign.id])}
+                                          >
+                                            <Copy className="h-3 w-3 mr-1" />
+                                            Copiar
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleAIAnalysis(campaign)}
+                                            disabled={aiAnalysisLoading === campaign.id}
+                                          >
+                                            <RotateCcw className="h-3 w-3 mr-1" />
+                                            Regenerar
+                                          </Button>
+                                        </div>
+                                      </div>
+                                      <div className="bg-background rounded-lg p-4 text-sm whitespace-pre-wrap border">
+                                        {aiAnalysis[campaign.id]}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <Button
+                                      onClick={() => handleAIAnalysis(campaign)}
+                                      disabled={aiAnalysisLoading === campaign.id}
+                                      className="w-full"
+                                      variant="outline"
+                                    >
+                                      {aiAnalysisLoading === campaign.id ? (
+                                        <>
+                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                          Analisando com IA...
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Sparkles className="h-4 w-4 mr-2" />
+                                          Analisar com IA
+                                        </>
+                                      )}
+                                    </Button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </TableCell>
