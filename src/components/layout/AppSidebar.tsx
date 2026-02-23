@@ -3,7 +3,7 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGrou
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Gauge, ContactRound, FileText, Instagram, Calendar, Upload, FolderKanban } from "lucide-react";
+import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Gauge, ContactRound, FileText, Instagram, Calendar, Upload } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { isMasterAgencyAdmin } from "@/lib/masterAccess";
@@ -34,11 +34,6 @@ const menuCategories = [
         title: "Clientes",
         url: "/dashboard/clients",
         icon: Users,
-      },
-      {
-        title: "Projetos",
-        url: "/dashboard/projects",
-        icon: FolderKanban,
       },
       {
         title: "Tarefas Gerais",
