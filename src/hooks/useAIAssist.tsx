@@ -19,6 +19,10 @@ export interface PostPrefillResult {
   mentioned_clients?: string[];
 }
 
+export interface ReportPrefillResult {
+  message: string;
+}
+
 export function useAIAssist() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -31,7 +35,6 @@ export function useAIAssist() {
       });
 
       if (error) {
-        // Check for rate limit / payment errors
         const msg = error.message || "";
         if (msg.includes("429") || msg.includes("rate") || msg.includes("limite")) {
           toast({
@@ -86,5 +89,9 @@ export function useAIAssist() {
     return callAI("prefill_post", text, agencyId);
   };
 
-  return { preFillTask, preFillPost, loading };
+  const generateReport = async (content: string, agencyId?: string): Promise<ReportPrefillResult | null> => {
+    return callAI("report_traffic", content, agencyId);
+  };
+
+  return { preFillTask, preFillPost, generateReport, loading };
 }

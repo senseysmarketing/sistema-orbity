@@ -14,6 +14,9 @@ const DEFAULT_TASK_PROMPT =
 const DEFAULT_POST_PROMPT =
   "Você é um social media manager profissional. Gere uma legenda envolvente, profissional e adaptada para a plataforma sugerida. Inclua hashtags relevantes.";
 
+const DEFAULT_REPORT_PROMPT =
+  "Você é um gestor de tráfego pago profissional. Gere uma mensagem direcionada ao cliente com os resultados do período. Inclua um resumo dos dados, uma análise da performance e sugestões de próximo passo. Use tom profissional mas acessível, formate para WhatsApp com emojis e negrito (*texto*).";
+
 interface PromptState {
   value: string;
   saved: string;
@@ -26,6 +29,7 @@ export function AISettingsManager() {
   const { toast } = useToast();
   const [taskPrompt, setTaskPrompt] = useState<PromptState>({ value: "", saved: "", loading: true, dirty: false });
   const [postPrompt, setPostPrompt] = useState<PromptState>({ value: "", saved: "", loading: true, dirty: false });
+  const [reportPrompt, setReportPrompt] = useState<PromptState>({ value: "", saved: "", loading: true, dirty: false });
 
   useEffect(() => {
     if (!currentAgency?.id) return;
@@ -47,15 +51,17 @@ export function AISettingsManager() {
     const prompts = (data as any[]) || [];
     const taskP = prompts.find((p) => p.prompt_type === "task")?.custom_prompt || "";
     const postP = prompts.find((p) => p.prompt_type === "post")?.custom_prompt || "";
+    const reportP = prompts.find((p) => p.prompt_type === "report")?.custom_prompt || "";
 
     setTaskPrompt({ value: taskP, saved: taskP, loading: false, dirty: false });
     setPostPrompt({ value: postP, saved: postP, loading: false, dirty: false });
+    setReportPrompt({ value: reportP, saved: reportP, loading: false, dirty: false });
   };
 
-  const savePrompt = async (type: "task" | "post", value: string) => {
+  const savePrompt = async (type: "task" | "post" | "report", value: string) => {
     if (!currentAgency?.id) return;
 
-    const setter = type === "task" ? setTaskPrompt : setPostPrompt;
+    const setter = type === "task" ? setTaskPrompt : type === "post" ? setPostPrompt : setReportPrompt;
     setter((prev) => ({ ...prev, loading: true }));
 
     try {
@@ -100,13 +106,13 @@ export function AISettingsManager() {
     }
   };
 
-  const restoreDefault = (type: "task" | "post") => {
-    const setter = type === "task" ? setTaskPrompt : setPostPrompt;
+  const restoreDefault = (type: "task" | "post" | "report") => {
+    const setter = type === "task" ? setTaskPrompt : type === "post" ? setPostPrompt : setReportPrompt;
     setter((prev) => ({ ...prev, value: "", dirty: prev.saved !== "" }));
   };
 
   const renderCard = (
-    type: "task" | "post",
+    type: "task" | "post" | "report",
     title: string,
     description: string,
     placeholder: string,
@@ -176,7 +182,7 @@ export function AISettingsManager() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {renderCard(
           "task",
           "Prompt para Tarefas",
@@ -192,6 +198,14 @@ export function AISettingsManager() {
           DEFAULT_POST_PROMPT,
           postPrompt,
           setPostPrompt
+        )}
+        {renderCard(
+          "report",
+          "Prompt para Relatórios de Tráfego",
+          "Personaliza como a IA analisa os dados e gera a mensagem de relatório para o cliente.",
+          DEFAULT_REPORT_PROMPT,
+          reportPrompt,
+          setReportPrompt
         )}
       </div>
     </div>

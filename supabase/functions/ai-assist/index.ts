@@ -52,17 +52,41 @@ const POST_TOOLS = [
   },
 ];
 
+const REPORT_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "extract_report_data",
+      description: "Gere uma mensagem de relatório de tráfego pago formatada para enviar ao cliente via WhatsApp.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: { type: "string", description: "Mensagem completa do relatório, formatada para WhatsApp com emojis e negrito (*texto*). Deve conter resumo dos dados, análise de performance e sugestões de próximo passo." },
+        },
+        required: ["message"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
 const DEFAULT_TASK_PROMPT =
   "Você é um assistente de agência de marketing digital. Extraia os dados estruturados de uma tarefa a partir da descrição do usuário. Gere um título conciso e uma descrição profissional, estruturada e sem erros de gramática.";
 
 const DEFAULT_POST_PROMPT =
   "Você é um social media manager profissional. Extraia os dados de um post para redes sociais a partir da descrição do usuário. Gere uma legenda envolvente, profissional e adaptada para a plataforma sugerida. Inclua hashtags relevantes.";
 
+const DEFAULT_REPORT_PROMPT =
+  "Você é um gestor de tráfego pago profissional. Gere uma mensagem direcionada ao cliente com os resultados do período. Inclua um resumo dos dados, uma análise da performance (pontos positivos e o que pode melhorar) e sugestões de próximo passo. Use tom profissional mas acessível, formate para WhatsApp com emojis e negrito (*texto*).";
+
 const TASK_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Responda sempre em português brasileiro.";
 
 const POST_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: Se o usuário mencionar nomes de clientes, empresas ou pessoas que pareçam ser clientes, extraia esses nomes no campo mentioned_clients. Responda em português brasileiro.";
+
+const REPORT_TECHNICAL_INSTRUCTIONS =
+  " IMPORTANTE: A mensagem deve ser direcionada ao cliente (não ao gestor). Use formatação WhatsApp: *negrito* para destaques, emojis para tornar visual. Inclua os números formatados em reais (R$). Responda em português brasileiro. A mensagem deve ser completa e pronta para enviar.";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -92,7 +116,7 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const sb = createClient(supabaseUrl, supabaseKey);
         
-        const promptType = type === "prefill_task" ? "task" : "post";
+        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : "report";
         const { data } = await sb
           .from("agency_ai_prompts")
           .select("custom_prompt")
@@ -105,7 +129,6 @@ serve(async (req) => {
         }
       } catch (e) {
         console.error("Error fetching custom prompt:", e);
-        // Continue with default prompt
       }
     }
 
@@ -123,8 +146,13 @@ serve(async (req) => {
       systemPrompt = basePrompt + POST_TECHNICAL_INSTRUCTIONS;
       tools = POST_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_post_data" } };
+    } else if (type === "report_traffic") {
+      const basePrompt = customPrompt || DEFAULT_REPORT_PROMPT;
+      systemPrompt = basePrompt + REPORT_TECHNICAL_INSTRUCTIONS;
+      tools = REPORT_TOOLS;
+      toolChoice = { type: "function", function: { name: "extract_report_data" } };
     } else {
-      return new Response(JSON.stringify({ error: "Tipo inválido. Use prefill_task ou prefill_post." }), {
+      return new Response(JSON.stringify({ error: "Tipo inválido. Use prefill_task, prefill_post ou report_traffic." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
