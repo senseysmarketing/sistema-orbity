@@ -7,6 +7,7 @@ import { Image, Plus, Calendar, Instagram, Facebook, Linkedin, Twitter, Youtube 
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
+import { mapTaskStatusToSocial } from "@/hooks/useSocialMediaTasks";
 
 interface ClientPostsProps {
   clientId: string;
@@ -17,16 +18,16 @@ const STATUS_COLORS: Record<string, string> = {
   draft: "bg-slate-500",
   pending_approval: "bg-amber-500",
   approved: "bg-green-500",
-  scheduled: "bg-blue-500",
+  in_creation: "bg-blue-500",
   published: "bg-purple-500",
   rejected: "bg-red-500",
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  draft: "Rascunho",
+  draft: "Briefing",
   pending_approval: "Aguardando Aprovação",
   approved: "Aprovado",
-  scheduled: "Agendado",
+  in_creation: "Em Criação",
   published: "Publicado",
   rejected: "Rejeitado",
 };
@@ -40,50 +41,54 @@ const PLATFORM_ICONS: Record<string, any> = {
   tiktok: Image,
 };
 
-export function ClientPosts({ clientId, clientName }: ClientPostsProps) {
+export function ClientPosts({ clientId, clientName: _clientName }: ClientPostsProps) {
   const navigate = useNavigate();
 
   const { data: posts, isLoading } = useQuery({
     queryKey: ["client-posts", clientId],
     queryFn: async () => {
-      // First get post IDs from junction table
-      const { data: postClients, error: junctionError } = await supabase
-        .from("post_clients")
-        .select("post_id")
+      // Get task IDs from task_clients junction table
+      const { data: taskClients, error: junctionError } = await supabase
+        .from("task_clients")
+        .select("task_id")
         .eq("client_id", clientId);
       
       if (junctionError) throw junctionError;
       
-      if (!postClients || postClients.length === 0) {
-        // Fallback: also check legacy client_id
-        const { data, error } = await supabase
-          .from("social_media_posts")
-          .select("*")
-          .eq("client_id", clientId)
-          .eq("archived", false)
-          .order("scheduled_date", { ascending: false, nullsFirst: false })
-          .limit(20);
-        if (error) throw error;
-        return data;
+      if (!taskClients || taskClients.length === 0) {
+        return [];
       }
       
-      const postIds = postClients.map((pc) => pc.post_id);
+      const taskIds = taskClients.map((tc) => tc.task_id);
       
       const { data, error } = await supabase
-        .from("social_media_posts")
-        .select("*")
-        .in("id", postIds)
+        .from("tasks")
+        .select("id, title, status, priority, due_date, created_at, archived, metadata, task_type")
+        .in("id", taskIds)
+        .eq("task_type", "redes_sociais")
         .eq("archived", false)
-        .order("scheduled_date", { ascending: false, nullsFirst: false })
+        .order("due_date", { ascending: false, nullsFirst: false })
         .limit(20);
       if (error) throw error;
-      return data;
+
+      // Map to display format
+      return (data || []).map((task: any) => {
+        const meta = task.metadata || {};
+        const mappedStatus = mapTaskStatusToSocial(task.status);
+        return {
+          id: task.id,
+          title: task.title,
+          status: mappedStatus,
+          platform: meta.platform || '',
+          scheduled_date: meta.post_date || task.due_date,
+        };
+      });
     },
   });
 
-  const scheduledPosts = posts?.filter((p) => p.status === "approved" || p.status === "scheduled") || [];
+  const scheduledPosts = posts?.filter((p) => p.status === "approved") || [];
   const publishedPosts = posts?.filter((p) => p.status === "published") || [];
-  const pendingPosts = posts?.filter((p) => p.status === "draft" || p.status === "pending_approval") || [];
+  const pendingPosts = posts?.filter((p) => p.status === "draft" || p.status === "pending_approval" || p.status === "in_creation") || [];
 
   const getPlatformIcon = (platform: string) => {
     const Icon = PLATFORM_ICONS[platform.toLowerCase()] || Image;
@@ -101,7 +106,7 @@ export function ClientPosts({ clientId, clientName }: ClientPostsProps) {
             </div>
             <div>
               <p className="text-2xl font-bold">{scheduledPosts.length}</p>
-              <p className="text-sm text-muted-foreground">Agendados</p>
+              <p className="text-sm text-muted-foreground">Aprovados</p>
             </div>
           </CardContent>
         </Card>

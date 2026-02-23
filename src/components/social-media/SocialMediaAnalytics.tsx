@@ -11,6 +11,7 @@ import { TeamPerformanceTable } from "./analytics/TeamPerformanceTable";
 import { WorkloadChart } from "./analytics/WorkloadChart";
 import { SmartInsights } from "./analytics/SmartInsights";
 import { ClientAnalysis } from "./analytics/ClientAnalysis";
+import { mapTaskStatusToSocial } from "@/hooks/useSocialMediaTasks";
 
 export function SocialMediaAnalytics() {
   const { currentAgency } = useAgency();
@@ -20,7 +21,6 @@ export function SocialMediaAnalytics() {
   const [profiles, setProfiles] = useState<ProfileData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Navigate between months
   const handlePreviousMonth = () => {
     const newDate = new Date(selectedMonth);
     newDate.setMonth(newDate.getMonth() - 1);
@@ -33,7 +33,7 @@ export function SocialMediaAnalytics() {
     setSelectedMonth(newDate);
   };
 
-  // Fetch posts with assignments for selected month
+  // Fetch tasks with type 'redes_sociais' for selected month
   useEffect(() => {
     const fetchData = async () => {
       if (!currentAgency?.id) return;
@@ -44,52 +44,76 @@ export function SocialMediaAnalytics() {
       const prevMonthStart = startOfMonth(subMonths(selectedMonth, 1));
       const prevMonthEnd = endOfMonth(subMonths(selectedMonth, 1));
 
-      // Fetch current month posts with assignments
-      const [postsResult, prevPostsResult, agencyUsersResult] = await Promise.all([
+      const [tasksResult, prevTasksResult, agencyUsersResult] = await Promise.all([
         supabase
-          .from('social_media_posts')
+          .from('tasks')
           .select(`
             id,
             title,
             status,
             priority,
-            platform,
-            post_type,
-            client_id,
-            scheduled_date,
-            post_date,
+            due_date,
             created_at,
             archived,
-            clients(name),
-            post_assignments(user_id)
+            metadata,
+            task_clients(client_id, clients(name)),
+            task_assignments(user_id)
           `)
           .eq('agency_id', currentAgency.id)
-          .gte('scheduled_date', monthStart.toISOString())
-          .lte('scheduled_date', monthEnd.toISOString()),
+          .eq('task_type', 'redes_sociais')
+          .gte('due_date', monthStart.toISOString())
+          .lte('due_date', monthEnd.toISOString()),
         supabase
-          .from('social_media_posts')
+          .from('tasks')
           .select(`
             id,
             status,
             archived
           `)
           .eq('agency_id', currentAgency.id)
-          .gte('scheduled_date', prevMonthStart.toISOString())
-          .lte('scheduled_date', prevMonthEnd.toISOString()),
+          .eq('task_type', 'redes_sociais')
+          .gte('due_date', prevMonthStart.toISOString())
+          .lte('due_date', prevMonthEnd.toISOString()),
         supabase
           .from('agency_users')
           .select('user_id')
           .eq('agency_id', currentAgency.id)
       ]);
 
-      if (postsResult.data) {
-        setMonthPosts(postsResult.data as PostWithAssignments[]);
+      if (tasksResult.data) {
+        // Map tasks to PostWithAssignments format for analytics components
+        const mapped: PostWithAssignments[] = tasksResult.data.map((task: any) => {
+          const meta = task.metadata || {};
+          const postDate = meta.post_date || null;
+          const platform = meta.platform || '';
+          const postType = meta.post_type || '';
+          const firstClient = task.task_clients?.[0];
+          const mappedStatus = mapTaskStatusToSocial(task.status);
+
+          return {
+            id: task.id,
+            title: task.title || '',
+            status: mappedStatus,
+            priority: task.priority || 'medium',
+            platform,
+            post_type: postType,
+            client_id: firstClient?.client_id || null,
+            scheduled_date: postDate || task.due_date || task.created_at,
+            post_date: postDate,
+            created_at: task.created_at,
+            archived: task.archived || false,
+            clients: firstClient?.clients || null,
+            post_assignments: (task.task_assignments || []).map((a: any) => ({ user_id: a.user_id })),
+          };
+        });
+        setMonthPosts(mapped);
       }
 
-      if (prevPostsResult.data) {
-        // Cast to minimal type needed
-        setPreviousMonthPosts(prevPostsResult.data.map(p => ({
-          ...p,
+      if (prevTasksResult.data) {
+        setPreviousMonthPosts(prevTasksResult.data.map((p: any) => ({
+          id: p.id,
+          status: mapTaskStatusToSocial(p.status),
+          archived: p.archived || false,
           title: '',
           priority: '',
           platform: '',
@@ -173,34 +197,29 @@ export function SocialMediaAnalytics() {
         </div>
       )}
 
-      {/* Main metrics cards */}
       <MetricsCards 
         posts={monthPosts} 
         teamSize={profiles.length}
         previousMonthCompletionRate={previousMonthCompletionRate}
       />
 
-      {/* Team Performance */}
       <TeamPerformanceTable 
         posts={monthPosts} 
         profiles={profiles}
         teamSize={profiles.length}
       />
 
-      {/* Workload Distribution Chart */}
       <WorkloadChart 
         posts={monthPosts} 
         profiles={profiles}
       />
 
-      {/* Smart Insights */}
       <SmartInsights 
         posts={monthPosts} 
         profiles={profiles}
         previousMonthCompletionRate={previousMonthCompletionRate}
       />
 
-      {/* Client Analysis */}
       <ClientAnalysis posts={monthPosts} />
     </div>
   );

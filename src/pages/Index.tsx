@@ -85,18 +85,10 @@ const Index = () => {
 
       const myTaskIds = assignments?.map((a: any) => a.task_id) || [];
 
-      // 2. My post assignments
-      const { data: postAssignments } = await supabase
-        .from('post_assignments')
-        .select('post_id')
-        .eq('user_id', profile.user_id);
-
-      const myPostIds = postAssignments?.map((a: any) => a.post_id) || [];
-
-      // 3. Meetings (agency, today+)
+      // 2. Meetings (agency, today+)
       const todayStr = new Date().toISOString().split('T')[0];
 
-      const [meetingsRes, postsRes, customStatusesRes] = await Promise.all([
+      const [meetingsRes, customStatusesRes] = await Promise.all([
         supabase
           .from('meetings')
           .select('*, clients(name)')
@@ -105,14 +97,6 @@ const Index = () => {
           .neq('status', 'cancelled')
           .order('start_time', { ascending: true })
           .limit(20),
-        myPostIds.length > 0
-          ? supabase
-              .from('social_media_posts')
-              .select('*, clients(name)')
-              .eq('agency_id', currentAgency.id)
-              .eq('archived', false)
-              .in('id', myPostIds)
-          : Promise.resolve({ data: [] }),
         supabase
           .from('social_media_custom_statuses')
           .select('id, name, color')
@@ -122,46 +106,45 @@ const Index = () => {
       const customStatuses = (customStatusesRes.data || []) as { id: string; name: string; color: string }[];
       setMyPostCustomStatuses(customStatuses);
 
-      // IDs of custom statuses that mean "published" — exclude them from dashboard
-      const publishedCustomIds = customStatuses
-        .filter(s => s.name.toLowerCase().includes('public'))
-        .map(s => s.id);
-
+      // Fetch all my tasks (including redes_sociais)
       if (myTaskIds.length > 0) {
         const tasksRes = await supabase
           .from('tasks')
-          .select('*, clients(name)')
+          .select('*, clients(name), task_type, metadata')
           .eq('agency_id', currentAgency.id)
           .in('id', myTaskIds);
-        setMyTasks(tasksRes.data || []);
+        
+        const allMyTasks = tasksRes.data || [];
+        // Separate regular tasks from social media tasks
+        const regularTasks = allMyTasks.filter((t: any) => t.task_type !== 'redes_sociais');
+        const socialTasks = allMyTasks.filter((t: any) => t.task_type === 'redes_sociais');
+        
+        setMyTasks(regularTasks);
+        
+        // Map social tasks to post format for MyPostsList
+        const { mapTaskStatusToSocial } = await import('@/hooks/useSocialMediaTasks');
+        const activeSocialPosts = socialTasks
+          .filter((t: any) => !t.archived && mapTaskStatusToSocial(t.status) !== 'published')
+          .map((t: any) => {
+            const meta = t.metadata || {};
+            return {
+              ...t,
+              status: mapTaskStatusToSocial(t.status),
+              platform: meta.platform || '',
+              scheduled_date: meta.post_date || t.due_date,
+              client_name: t.clients?.name,
+            };
+          });
+        setMyPosts(activeSocialPosts);
       } else {
         setMyTasks([]);
+        setMyPosts([]);
       }
 
       setMyMeetings(
         (meetingsRes.data || []).map((m: any) => ({
           ...m,
           client_name: m.clients?.name,
-        }))
-      );
-
-      // Filter out native published, custom published, archived, and any orphaned UUID statuses
-      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      const validCustomStatusIds = new Set(customStatuses.map(s => s.id));
-      const rawPosts = ((postsRes as any).data || []) as any[];
-      const activePosts = rawPosts.filter(p => {
-        if (p.status === 'published') return false;
-        if (p.archived) return false;
-        if (publishedCustomIds.includes(p.status)) return false;
-        // Se status é um UUID mas não existe nos custom statuses conhecidos → status órfão → ignorar
-        if (UUID_REGEX.test(p.status) && !validCustomStatusIds.has(p.status)) return false;
-        return true;
-      });
-
-      setMyPosts(
-        activePosts.map((p: any) => ({
-          ...p,
-          client_name: p.clients?.name,
         }))
       );
 
@@ -174,19 +157,9 @@ const Index = () => {
         .eq('archived', false)
         .neq('status', 'done');
 
-      // Posts solicitados (criados pelo usuário mas não auto-atribuídos)
-      const { data: createdPosts } = await supabase
-        .from('social_media_posts')
-        .select('*, clients(name), post_assignments(user_id)')
-        .eq('agency_id', currentAgency.id)
-        .eq('created_by', profile.user_id)
-        .neq('status', 'published')
-        .eq('archived', false);
-
       // Collect all user_ids from assignments to fetch profiles in one query
       const allUserIds = new Set<string>();
       (createdTasks || []).forEach((t: any) => t.task_assignments?.forEach((a: any) => allUserIds.add(a.user_id)));
-      (createdPosts || []).forEach((p: any) => p.post_assignments?.forEach((a: any) => allUserIds.add(a.user_id)));
 
       let profilesMap: Record<string, string> = {};
       if (allUserIds.size > 0) {
@@ -207,14 +180,29 @@ const Index = () => {
           })),
         }));
 
-      const filteredRequestedTasks = enrichAssignments(
-        (createdTasks || []).filter((t: any) => !myTaskIds.includes(t.id)),
-        'task_assignments'
-      );
+      // Split created tasks into regular requested tasks and social media requested posts
+      const createdRegularTasks = (createdTasks || []).filter((t: any) => t.task_type !== 'redes_sociais' && !myTaskIds.includes(t.id));
+      const createdSocialTasks = (createdTasks || []).filter((t: any) => t.task_type === 'redes_sociais' && !myTaskIds.includes(t.id));
+
+      const filteredRequestedTasks = enrichAssignments(createdRegularTasks, 'task_assignments');
       setRequestedTasks(filteredRequestedTasks);
 
+      // Map social tasks to requested posts format
+      const { mapTaskStatusToSocial: mapStatus } = await import('@/hooks/useSocialMediaTasks');
       const filteredRequestedPosts = enrichAssignments(
-        (createdPosts || []).filter((p: any) => !myPostIds.includes(p.id)),
+        createdSocialTasks.map((t: any) => {
+          const meta = t.metadata || {};
+          return {
+            ...t,
+            status: mapStatus(t.status),
+            scheduled_date: meta.post_date || t.due_date,
+            client_name: t.clients?.name,
+            post_assignments: (t.task_assignments || []).map((a: any) => ({
+              user_id: a.user_id,
+              profiles: { name: profilesMap[a.user_id] || null },
+            })),
+          };
+        }),
         'post_assignments'
       );
       setRequestedPosts(filteredRequestedPosts);
@@ -233,12 +221,11 @@ const Index = () => {
   const fetchAgencyMetrics = async () => {
     if (!currentAgency) return;
     try {
-      const [clientsRes, leadsRes, meetingsRes, tasksRes, postsRes, paymentsRes] = await Promise.all([
+      const [clientsRes, leadsRes, meetingsRes, tasksRes, paymentsRes] = await Promise.all([
         supabase.from('clients').select('id,active').eq('agency_id', currentAgency.id),
         supabase.from('leads').select('id,status').eq('agency_id', currentAgency.id),
         supabase.from('meetings').select('id,start_time,status').eq('agency_id', currentAgency.id),
-        supabase.from('tasks').select('id,status,due_date').eq('agency_id', currentAgency.id),
-        supabase.from('social_media_posts').select('id,status').eq('agency_id', currentAgency.id),
+        supabase.from('tasks').select('id,status,due_date,task_type').eq('agency_id', currentAgency.id),
         supabase.from('client_payments').select('amount,due_date,status,client_id').eq('agency_id', currentAgency.id),
       ]);
 
@@ -255,8 +242,9 @@ const Index = () => {
       const leads = leadsRes.data || [];
       const meetings = meetingsRes.data || [];
       const tasks = tasksRes.data || [];
-      const posts = postsRes.data || [];
       const payments = paymentsRes.data || [];
+
+      const socialTasks = tasks.filter((t: any) => t.task_type === 'redes_sociais');
 
       const activeClientIds = clients.filter((c: any) => c.active).map((c: any) => c.id);
       const paymentsThisMonth = payments.filter((p: any) =>
@@ -280,8 +268,8 @@ const Index = () => {
           const d = t.due_date ? new Date(t.due_date) : null;
           return d && d < today && t.status !== 'done';
         }).length,
-        totalSocialPosts: posts.length,
-        publishedPosts: posts.filter((p: any) => p.status === 'published').length,
+        totalSocialPosts: socialTasks.length,
+        publishedPosts: socialTasks.filter((t: any) => t.status === 'done' || t.status === 'completed').length,
         monthlyRevenue,
         adSpend: 0,
       });
