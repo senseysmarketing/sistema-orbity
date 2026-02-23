@@ -66,7 +66,7 @@ export function LeadKanbanColumn({
   });
 
   return (
-    <div className="space-y-3 md:space-y-4 min-w-[280px] md:min-w-[330px] w-[280px] md:w-[330px] flex-shrink-0">
+    <div className="space-y-3 md:space-y-4 min-w-[300px] md:min-w-[360px] w-[300px] md:w-[360px] flex-shrink-0">
       <div className="flex items-center gap-2 px-2 md:px-3 py-2 bg-muted rounded-lg">
         <div className={`w-2.5 md:w-3 h-2.5 md:h-3 ${color} rounded-full`}></div>
         <h3 className="font-semibold text-sm md:text-base">{title}</h3>
