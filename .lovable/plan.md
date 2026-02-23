@@ -1,48 +1,46 @@
 
-# Corrigir Tarefas/Posts Solicitados que nao aparecem
+# Adicionar datas nas semanas da analise de campanhas
 
-## Problema Raiz
+## O que sera feito
 
-As queries de "Tarefas Solicitadas" e "Posts Solicitados" no `Index.tsx` estao retornando **erro 400** do Supabase:
+Cada card de semana (Semana 1, Semana 2, etc.) passara a exibir o periodo de datas correspondente, por exemplo: **"Semana 1 (03/02 a 09/02)"**.
 
-```
-"Could not find a relationship between 'task_assignments' and 'profiles'"
-"Could not find a relationship between 'post_assignments' and 'profiles'"
-```
+## Mudancas tecnicas
 
-A causa e que nao existe foreign key de `task_assignments.user_id` para `profiles`, nem de `post_assignments.user_id` para `profiles`. O Supabase PostgREST nao consegue fazer o join `task_assignments(user_id, profiles(name))`.
+### 1. Edge Function `supabase/functions/facebook-analysis/index.ts`
 
-Como resultado, ambas as queries falham silenciosamente (retornam `null`), e o componente recebe um array vazio.
+A API do Facebook Insights ja retorna `date_start` e `date_stop` em cada registro, mas o codigo atual ignora esses campos. Vou incluir esses campos no objeto `weeklyData`:
 
-## Solucao
-
-Alterar as queries no `Index.tsx` para buscar tarefas/posts **sem o join aninhado de profiles**. Em vez disso, buscar apenas `task_assignments(user_id)` e `post_assignments(user_id)`, e depois fazer uma segunda query para buscar os nomes dos usuarios.
-
-Tambem adicionar na `RequestedTasksList` uma secao "Pendentes" para tarefas sem data ou com data futura (alem desta semana), igual ja existe no `RequestedPostsList`.
-
-## Mudancas Tecnicas
-
-### `src/pages/Index.tsx`
-
-Alterar as duas queries (linhas 169-175 e 181-187):
-
-**Antes:**
-```
-task_assignments(user_id, profiles(name))
+```ts
+weeklyData.push({
+  week: `Semana ${i + 1}`,
+  date_start: insight.date_start,  // novo
+  date_stop: insight.date_stop,    // novo
+  spend: ...,
+  ...
+})
 ```
 
-**Depois:**
+Para os dados mock (fallback), calcular datas sinteticas baseadas no `startDate` + incrementos de 7 dias.
+
+### 2. Frontend `src/components/traffic/CampaignsAndReports.tsx`
+
+No processamento dos dados recebidos (linha 234), preservar `date_start` e `date_stop`.
+
+No card de cada semana (linha 593), alterar o titulo de:
 ```
-task_assignments(user_id)
+Semana 1
+```
+Para:
+```
+Semana 1 (03/02 a 09/02)
 ```
 
-Apos buscar as tarefas/posts, fazer uma query separada para `profiles` usando os `user_id`s encontrados nas assignments, e montar o objeto `profiles: { name }` manualmente antes de passar para os componentes.
+Usando `format(new Date(week.date_start), "dd/MM")` e `format(new Date(week.date_stop), "dd/MM")`.
 
-### `src/components/dashboard/RequestedTasksList.tsx`
-
-Adicionar secao "Pendentes" para tarefas sem `due_date` ou com data alem desta semana (mesma logica que `RequestedPostsList` ja tem com `pendingNoDue`). Atualizar o calculo de `isEmpty` para incluir essa nova secao.
+Tambem incluir as datas no texto enviado para a analise de IA para maior contexto.
 
 | Arquivo | Descricao |
 |---|---|
-| `src/pages/Index.tsx` | Corrigir queries removendo join invalido e buscando profiles separadamente |
-| `src/components/dashboard/RequestedTasksList.tsx` | Adicionar secao "Pendentes" para tarefas sem data |
+| `supabase/functions/facebook-analysis/index.ts` | Incluir `date_start` e `date_stop` da API do Facebook no retorno |
+| `src/components/traffic/CampaignsAndReports.tsx` | Exibir datas no titulo dos cards semanais |
