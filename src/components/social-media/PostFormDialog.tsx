@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useAIAssist, PostPrefillResult } from "@/hooks/useAIAssist";
+import { AIPreFillStep } from "@/components/ui/ai-prefill-step";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +45,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [dueDateManuallyEdited, setDueDateManuallyEdited] = useState(false);
+  const [formStep, setFormStep] = useState<"prefill" | "form">("prefill");
+  const { preFillPost, loading: aiLoading } = useAIAssist();
 
   // Helper para calcular due_date baseado em post_date
   const calculateDueDate = (postDate: string, daysBefore: number): string => {
@@ -550,9 +554,44 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     }
   };
 
+  // Reset form step when dialog opens/closes
+  const isCreating = !editPost;
+  const showPrefill = isCreating && formStep === "prefill";
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => {
+      onOpenChange(o);
+      if (!o) setFormStep("prefill");
+    }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        {showPrefill ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Novo Post</DialogTitle>
+            </DialogHeader>
+            <AIPreFillStep
+              type="post"
+              loading={aiLoading}
+              onResult={() => {}}
+              onSkip={() => setFormStep("form")}
+              onSubmit={async (text) => {
+                const result = await preFillPost(text);
+                if (result) {
+                  setFormData((prev) => ({
+                    ...prev,
+                    title: result.title || prev.title,
+                    description: result.description || prev.description,
+                    platform: result.platform || prev.platform,
+                    post_type: result.post_type || prev.post_type,
+                    hashtags: result.hashtags?.join(", ") || prev.hashtags,
+                  }));
+                  setFormStep("form");
+                }
+              }}
+            />
+          </>
+        ) : (
+          <>
         <DialogHeader>
           <DialogTitle>{editPost ? "Editar Postagem" : "Nova Postagem"}</DialogTitle>
         </DialogHeader>
@@ -768,6 +807,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
             </Button>
           </div>
         </form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
