@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { RefreshCw, FileText, TrendingUp, DollarSign, Eye, Target, BarChart, Play, Sparkles, Copy, RotateCcw, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -216,6 +216,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
       return;
     }
 
+    const campaign = campaigns.find(c => c.id === campaignId);
     setExpandedCampaign(campaignId);
     setLoadingAnalysis(true);
     
@@ -236,6 +237,11 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
       })) || [];
 
       setWeeklyAnalysis(processedData);
+
+      // Auto-trigger AI analysis
+      if (processedData.length > 0 && campaign && !aiAnalysis[campaignId]) {
+        handleAIAnalysisWithData(campaign, processedData);
+      }
     } catch (error) {
       console.error('Erro na análise semanal:', error);
       toast({
@@ -245,6 +251,31 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
       });
     } finally {
       setLoadingAnalysis(false);
+    }
+  };
+
+  const handleAIAnalysisWithData = async (campaign: Campaign, weekData?: any[]) => {
+    if (!currentAgency?.id) return;
+    const data = weekData || weeklyAnalysis;
+    if (data.length === 0) return;
+    
+    setAiAnalysisLoading(campaign.id);
+    try {
+      const weeklyDataText = data.map((week) => 
+        `${week.week}: Gasto R$${(week.spend || 0).toFixed(2)}, Conversões: ${week.conversions || 0}, CPC: R$${(week.cpc || 0).toFixed(2)}, CTR: ${(week.ctr || 0).toFixed(2)}%, Impressões: ${week.impressions || 0}, Cliques: ${week.clicks || 0}`
+      ).join('\n');
+      
+      const content = `Campanha: ${campaign.name}\nObjetivo: ${getObjectiveLabel(campaign.objective)}\nStatus: ${campaign.status}\n\nDados semanais:\n${weeklyDataText}`;
+      
+      const result = await analyzeCampaign(content, currentAgency.id);
+      if (result?.analysis) {
+        setAiAnalysis(prev => ({ ...prev, [campaign.id]: result.analysis }));
+      }
+    } catch (error) {
+      console.error('Erro na análise IA:', error);
+      toast({ title: "Erro", description: "Não foi possível gerar a análise.", variant: "destructive" });
+    } finally {
+      setAiAnalysisLoading(null);
     }
   };
 
@@ -279,29 +310,6 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
 
   const truncateText = (text: string, limit: number = 35) => {
     return text.length > limit ? text.substring(0, limit) + '...' : text;
-  };
-
-  const handleAIAnalysis = async (campaign: Campaign) => {
-    if (!currentAgency?.id || weeklyAnalysis.length === 0) return;
-    
-    setAiAnalysisLoading(campaign.id);
-    try {
-      const weeklyDataText = weeklyAnalysis.map((week) => 
-        `${week.week}: Gasto R$${(week.spend || 0).toFixed(2)}, Conversões: ${week.conversions || 0}, CPC: R$${(week.cpc || 0).toFixed(2)}, CTR: ${(week.ctr || 0).toFixed(2)}%, Impressões: ${week.impressions || 0}, Cliques: ${week.clicks || 0}`
-      ).join('\n');
-      
-      const content = `Campanha: ${campaign.name}\nObjetivo: ${getObjectiveLabel(campaign.objective)}\nStatus: ${campaign.status}\n\nDados semanais:\n${weeklyDataText}`;
-      
-      const result = await analyzeCampaign(content, currentAgency.id);
-      if (result?.analysis) {
-        setAiAnalysis(prev => ({ ...prev, [campaign.id]: result.analysis }));
-      }
-    } catch (error) {
-      console.error('Erro na análise IA:', error);
-      toast({ title: "Erro", description: "Não foi possível gerar a análise.", variant: "destructive" });
-    } finally {
-      setAiAnalysisLoading(null);
-    }
   };
 
   const copyToClipboard = (text: string) => {
@@ -564,41 +572,41 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                         <TableRow>
                           <TableCell colSpan={9} className="p-0">
                             <div className="border-t bg-muted/50 p-4">
-                              <h4 className="font-medium mb-3">Análise das Últimas 4 Semanas</h4>
                               {loadingAnalysis ? (
-                                <div className="text-center py-4">
+                                <div className="text-center py-8">
                                   <RefreshCw className="h-6 w-6 animate-spin mx-auto" />
+                                  <p className="text-sm text-muted-foreground mt-2">Carregando análise...</p>
                                 </div>
                               ) : weeklyAnalysis.length > 0 ? (
-                                <div className="grid grid-cols-4 gap-4">
-                                  {weeklyAnalysis.map((week, index) => (
-                                    <Card key={index}>
-                                      <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm">{week.week}</CardTitle>
-                                      </CardHeader>
-                                      <CardContent className="text-sm space-y-1">
-                                        <p>Gasto: {formatCurrency(week.spend || 0)}</p>
-                                        <p>Conversões: {week.conversions || 0}</p>
-                                        <p>CPC: {formatCurrency(week.cpc || 0)}</p>
-                                        <p>CTR: {(week.ctr || 0).toFixed(2)}%</p>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-muted-foreground">Nenhum dado semanal disponível.</p>
-                              )}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
+                                  {/* Left: Weekly Cards */}
+                                  <div>
+                                    <h4 className="font-medium mb-3">Análise das Últimas 4 Semanas</h4>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {weeklyAnalysis.map((week, index) => (
+                                        <Card key={index}>
+                                          <CardHeader className="pb-2">
+                                            <CardTitle className="text-sm">{week.week}</CardTitle>
+                                          </CardHeader>
+                                          <CardContent className="text-sm space-y-1">
+                                            <p>Gasto: {formatCurrency(week.spend || 0)}</p>
+                                            <p>Conversões: {week.conversions || 0}</p>
+                                            <p>CPC: {formatCurrency(week.cpc || 0)}</p>
+                                            <p>CTR: {(week.ctr || 0).toFixed(2)}%</p>
+                                          </CardContent>
+                                        </Card>
+                                      ))}
+                                    </div>
+                                  </div>
 
-                              {/* AI Analysis Section */}
-                              {weeklyAnalysis.length > 0 && (
-                                <div className="mt-4 pt-4 border-t">
-                                  {aiAnalysis[campaign.id] ? (
-                                    <div className="space-y-3">
-                                      <div className="flex items-center justify-between">
-                                        <h5 className="font-medium flex items-center gap-2">
-                                          <Sparkles className="h-4 w-4 text-primary" />
-                                          Análise da IA
-                                        </h5>
+                                  {/* Right: AI Analysis */}
+                                  <div>
+                                    <div className="flex items-center justify-between mb-3">
+                                      <h4 className="font-medium flex items-center gap-2">
+                                        <Sparkles className="h-4 w-4 text-primary" />
+                                        Análise da IA
+                                      </h4>
+                                      {aiAnalysis[campaign.id] && (
                                         <div className="flex gap-2">
                                           <Button
                                             variant="outline"
@@ -611,39 +619,33 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                                           <Button
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => handleAIAnalysis(campaign)}
+                                            onClick={() => handleAIAnalysisWithData(campaign)}
                                             disabled={aiAnalysisLoading === campaign.id}
                                           >
                                             <RotateCcw className="h-3 w-3 mr-1" />
                                             Regenerar
                                           </Button>
                                         </div>
+                                      )}
+                                    </div>
+                                    {aiAnalysisLoading === campaign.id ? (
+                                      <div className="flex items-center justify-center py-8 border rounded-lg bg-background">
+                                        <Loader2 className="h-5 w-5 animate-spin mr-2 text-primary" />
+                                        <span className="text-sm text-muted-foreground">Analisando com IA...</span>
                                       </div>
-                                      <div className="bg-background rounded-lg p-4 text-sm whitespace-pre-wrap border">
+                                    ) : aiAnalysis[campaign.id] ? (
+                                      <div className="bg-background rounded-lg p-4 text-sm whitespace-pre-wrap border max-h-[400px] overflow-y-auto">
                                         {aiAnalysis[campaign.id]}
                                       </div>
-                                    </div>
-                                  ) : (
-                                    <Button
-                                      onClick={() => handleAIAnalysis(campaign)}
-                                      disabled={aiAnalysisLoading === campaign.id}
-                                      className="w-full"
-                                      variant="outline"
-                                    >
-                                      {aiAnalysisLoading === campaign.id ? (
-                                        <>
-                                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                          Analisando com IA...
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Sparkles className="h-4 w-4 mr-2" />
-                                          Analisar com IA
-                                        </>
-                                      )}
-                                    </Button>
-                                  )}
+                                    ) : (
+                                      <div className="flex items-center justify-center py-8 border rounded-lg bg-background text-sm text-muted-foreground">
+                                        Aguardando análise...
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
+                              ) : (
+                                <p className="text-muted-foreground">Nenhum dado semanal disponível.</p>
                               )}
                             </div>
                           </TableCell>
