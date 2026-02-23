@@ -30,6 +30,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   todo: { label: 'Pendente', className: 'border-gray-200 text-gray-600 bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:bg-gray-800' },
   in_progress: { label: 'Em andamento', className: 'border-blue-200 text-blue-700 bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:bg-blue-900/40' },
   in_review: { label: 'Em revisão', className: 'border-purple-200 text-purple-700 bg-purple-50 dark:border-purple-800 dark:text-purple-300 dark:bg-purple-900/40' },
+  em_revisao: { label: 'Em revisão', className: 'border-purple-200 text-purple-700 bg-purple-50 dark:border-purple-800 dark:text-purple-300 dark:bg-purple-900/40' },
   done: { label: 'Concluída', className: 'border-green-200 text-green-700 bg-green-50 dark:border-green-800 dark:text-green-300 dark:bg-green-900/40' },
 };
 

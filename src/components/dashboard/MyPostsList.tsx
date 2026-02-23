@@ -25,6 +25,7 @@ const nativeStatusConfig: Record<string, { label: string; className: string }> =
   pending_approval: { label: 'Aprovação', className: 'border-amber-200 text-amber-700 bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:bg-amber-900/40' },
   in_creation: { label: 'Em Criação', className: 'border-blue-200 text-blue-700 bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:bg-blue-900/40' },
   revision: { label: 'Revisão', className: 'border-purple-200 text-purple-700 bg-purple-50 dark:border-purple-800 dark:text-purple-300 dark:bg-purple-900/40' },
+  em_revisao: { label: 'Em Revisão', className: 'border-purple-200 text-purple-700 bg-purple-50 dark:border-purple-800 dark:text-purple-300 dark:bg-purple-900/40' },
   approved: { label: 'Aprovado', className: 'border-green-200 text-green-700 bg-green-50 dark:border-green-800 dark:text-green-300 dark:bg-green-900/40' },
   scheduled: { label: 'Agendado', className: 'border-sky-200 text-sky-700 bg-sky-50 dark:border-sky-800 dark:text-sky-300 dark:bg-sky-900/40' },
 };
