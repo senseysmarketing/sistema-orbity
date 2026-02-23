@@ -155,6 +155,8 @@ serve(async (req) => {
 
             weeklyData.push({
               week: `Semana ${i + 1}`,
+              date_start: insight.date_start || null,
+              date_stop: insight.date_stop || null,
               spend: parseFloat(insight.spend || '0'),
               conversions: conversions,
               cpc: parseFloat(insight.cpc || '0'),
@@ -169,8 +171,12 @@ serve(async (req) => {
         // Se não há dados suficientes, preencher com dados mock
         while (weeklyData.length < 4) {
           const weekNum: number = weeklyData.length + 1
+          const mockStart = new Date(startDate.getTime() + (weekNum - 1) * 7 * 24 * 60 * 60 * 1000)
+          const mockStop = new Date(mockStart.getTime() + 6 * 24 * 60 * 60 * 1000)
           weeklyData.push({
             week: `Semana ${weekNum}`,
+            date_start: mockStart.toISOString().split('T')[0],
+            date_stop: mockStop.toISOString().split('T')[0],
             spend: Math.random() * 500 + 200,
             conversions: Math.floor(Math.random() * 20) + 5,
             cpc: Math.random() * 2 + 1,
@@ -194,8 +200,12 @@ serve(async (req) => {
         // Fallback com dados mock
         const mockAnalysis = []
         for (let i = 1; i <= 4; i++) {
+          const mockStart = new Date(startDate.getTime() + (i - 1) * 7 * 24 * 60 * 60 * 1000)
+          const mockStop = new Date(mockStart.getTime() + 6 * 24 * 60 * 60 * 1000)
           mockAnalysis.push({
             week: `Semana ${i}`,
+            date_start: mockStart.toISOString().split('T')[0],
+            date_stop: mockStop.toISOString().split('T')[0],
             spend: Math.random() * 500 + 200,
             conversions: Math.floor(Math.random() * 20) + 5,
             cpc: Math.random() * 2 + 1,
