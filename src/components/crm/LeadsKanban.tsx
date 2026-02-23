@@ -220,7 +220,11 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
   const groupedLeads = Object.keys(statusConfig).reduce((acc, statusKey) => {
     const displayStatus = statusConfig[statusKey].title;
     const dbStatus = mapDisplayStatusToDatabase(displayStatus);
-    acc[statusKey] = leads.filter(lead => normalizeStatusToDb(lead.status) === dbStatus);
+    acc[statusKey] = leads.filter(lead => {
+      const normalized = normalizeStatusToDb(lead.status);
+      // Comparação case-insensitive para suportar status customizados
+      return normalized.toLowerCase() === dbStatus.toLowerCase();
+    });
     return acc;
   }, {} as Record<string, Lead[]>);
 
