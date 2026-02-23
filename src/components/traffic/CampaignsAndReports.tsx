@@ -231,10 +231,18 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
 
       if (error) throw error;
 
-      const processedData = data?.weekly_data?.map((week: any, index: number) => ({
-        ...week,
-        week: `Semana ${index + 1}`,
-      })) || [];
+      const processedData = data?.weekly_data?.map((week: any, index: number) => {
+        let weekLabel = `Semana ${index + 1}`;
+        if (week.date_start && week.date_stop) {
+          const ds = format(new Date(week.date_start + 'T00:00:00'), 'dd/MM');
+          const de = format(new Date(week.date_stop + 'T00:00:00'), 'dd/MM');
+          weekLabel = `Semana ${index + 1} (${ds} a ${de})`;
+        }
+        return {
+          ...week,
+          week: weekLabel,
+        };
+      }) || [];
 
       setWeeklyAnalysis(processedData);
 
@@ -261,9 +269,10 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
     
     setAiAnalysisLoading(campaign.id);
     try {
-      const weeklyDataText = data.map((week) => 
-        `${week.week}: Gasto R$${(week.spend || 0).toFixed(2)}, Conversões: ${week.conversions || 0}, CPC: R$${(week.cpc || 0).toFixed(2)}, CTR: ${(week.ctr || 0).toFixed(2)}%, Impressões: ${week.impressions || 0}, Cliques: ${week.clicks || 0}`
-      ).join('\n');
+      const weeklyDataText = data.map((week) => {
+        const dateInfo = week.date_start && week.date_stop ? ` [${week.date_start} a ${week.date_stop}]` : '';
+        return `${week.week}${dateInfo}: Gasto R$${(week.spend || 0).toFixed(2)}, Conversões: ${week.conversions || 0}, CPC: R$${(week.cpc || 0).toFixed(2)}, CTR: ${(week.ctr || 0).toFixed(2)}%, Impressões: ${week.impressions || 0}, Cliques: ${week.clicks || 0}`;
+      }).join('\n');
       
       const content = `Campanha: ${campaign.name}\nObjetivo: ${getObjectiveLabel(campaign.objective)}\nStatus: ${campaign.status}\n\nDados semanais:\n${weeklyDataText}`;
       
