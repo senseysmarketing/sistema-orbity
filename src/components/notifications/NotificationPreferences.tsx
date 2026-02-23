@@ -32,7 +32,6 @@ interface NotificationPreferencesProps {
 interface NotificationTypes {
   reminders_enabled: boolean;
   tasks_enabled: boolean;
-  posts_enabled: boolean;
   payments_enabled: boolean;
   expenses_enabled: boolean;
   leads_enabled: boolean;
@@ -141,7 +140,6 @@ function PushNotificationSection() {
         )}
       </div>
       
-      {/* iOS Safari warning - Critical for push to work */}
       {showIOSWarning && (
         <div className="ml-6 p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
           <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
@@ -156,7 +154,6 @@ function PushNotificationSection() {
         </div>
       )}
       
-      {/* Android instructions */}
       {isAndroid && !isStandaloneMode && !isEnabled && (
         <div className="ml-6 p-2 rounded-md bg-blue-500/10 border border-blue-500/30">
           <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
@@ -179,7 +176,6 @@ function PushNotificationSection() {
         </p>
       )}
       
-      {/* Diagnostics Panel - Always visible when push is enabled */}
       {isEnabled && (
         <PushDiagnostics
           token={token}
@@ -207,19 +203,11 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
     commentAdded: 'task.comment_added',
   } as const;
 
-  const POST_EVENT_KEYS = {
-    assigned: 'post.assigned',
-    statusChanged: 'post.status_changed',
-    importantUpdated: 'post.updated_important',
-  } as const;
-
   type TaskEventKey = (typeof TASK_EVENT_KEYS)[keyof typeof TASK_EVENT_KEYS];
-  type PostEventKey = (typeof POST_EVENT_KEYS)[keyof typeof POST_EVENT_KEYS];
   
   const [types, setTypes] = useState<NotificationTypes>({
     reminders_enabled: true,
     tasks_enabled: true,
-    posts_enabled: true,
     payments_enabled: true,
     expenses_enabled: true,
     leads_enabled: true,
@@ -250,19 +238,9 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
     [TASK_EVENT_KEYS.commentAdded]: true,
   });
 
-  const [postEvents, setPostEvents] = useState<Record<PostEventKey, boolean>>({
-    [POST_EVENT_KEYS.assigned]: true,
-    [POST_EVENT_KEYS.statusChanged]: true,
-    [POST_EVENT_KEYS.importantUpdated]: true,
-  });
-
   const [agencyTaskRules, setAgencyTaskRules] = useState({
     notifyAdminsOnDone: false,
     notifyCreatorOnAssigned: false,
-  });
-
-  const [agencyPostRules, setAgencyPostRules] = useState({
-    notifyAdminsOnPublished: false,
   });
 
   useEffect(() => {
@@ -277,7 +255,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
     try {
       setLoading(true);
 
-      // Fetch notification preferences
       const { data: prefs } = await supabase
         .from("notification_preferences")
         .select("*")
@@ -289,7 +266,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
         setTypes({
           reminders_enabled: prefs.reminders_enabled,
           tasks_enabled: prefs.tasks_enabled,
-          posts_enabled: prefs.posts_enabled,
           payments_enabled: prefs.payments_enabled,
           expenses_enabled: prefs.expenses_enabled,
           leads_enabled: prefs.leads_enabled,
@@ -312,7 +288,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
         setDndEnabled(!!(prefs.dnd_start_time || prefs.dnd_end_time));
       }
 
-      // Fetch email channel config  
       const { data: emailData } = await supabase
         .from("user_notification_channels")
         .select("email_enabled, email_address, email_digest")
@@ -334,7 +309,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
         }));
       }
 
-      // Fetch per-event task preferences
       const eventKeys = Object.values(TASK_EVENT_KEYS);
       const { data: eventPrefs, error: eventPrefsError } = await supabase
         .from('notification_event_preferences')
@@ -356,35 +330,12 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
         });
       }
 
-      // Fetch per-event post preferences
-      const postEventKeys = Object.values(POST_EVENT_KEYS);
-      const { data: postEventPrefs, error: postEventPrefsError } = await supabase
-        .from('notification_event_preferences')
-        .select('event_key, enabled')
-        .eq('user_id', user.id)
-        .eq('agency_id', currentAgency.id)
-        .in('event_key', postEventKeys);
-
-      if (postEventPrefsError) throw postEventPrefsError;
-
-      if (postEventPrefs) {
-        setPostEvents(prev => {
-          const next = { ...prev };
-          for (const row of postEventPrefs) {
-            const key = row.event_key as PostEventKey;
-            if (key in next) next[key] = !!row.enabled;
-          }
-          return next;
-        });
-      }
-
-      // Fetch agency rules (admin-only)
       if (isAgencyAdmin()) {
         const { data: rules, error: rulesError } = await supabase
           .from('agency_notification_rules')
           .select('event_key, recipients_strategy, enabled, conditions')
           .eq('agency_id', currentAgency.id)
-          .in('event_key', [TASK_EVENT_KEYS.assigned, TASK_EVENT_KEYS.statusChanged, 'post.published']);
+          .in('event_key', [TASK_EVENT_KEYS.assigned, TASK_EVENT_KEYS.statusChanged]);
 
         if (rulesError) throw rulesError;
 
@@ -399,15 +350,7 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
             (r.conditions as any)?.to === 'done'
           )?.enabled;
 
-        const notifyAdminsOnPublished =
-          !!rules?.find(r =>
-            r.event_key === 'post.published' &&
-            r.recipients_strategy === 'admins' &&
-            (r.conditions as any)?.to === 'published'
-          )?.enabled;
-
         setAgencyTaskRules({ notifyAdminsOnDone, notifyCreatorOnAssigned });
-        setAgencyPostRules({ notifyAdminsOnPublished });
       }
     } catch (error) {
       console.error("Error fetching preferences:", error);
@@ -434,11 +377,11 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
     try {
       setLoading(true);
 
-      // Save notification preferences
       const prefsToSave = {
         user_id: user.id,
         agency_id: currentAgency.id,
         ...types,
+        posts_enabled: types.tasks_enabled, // unified with tasks
         sound_enabled: channels.sound_enabled,
         browser_notifications: channels.browser_notifications,
         dnd_start_time: dndEnabled ? dnd.dnd_start_time : null,
@@ -452,7 +395,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
 
       if (prefsError) throw prefsError;
 
-      // Save email channel config
       const emailConfigToSave = {
         user_id: user.id,
         agency_id: currentAgency.id,
@@ -467,7 +409,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
 
       if (emailError) throw emailError;
 
-      // Save per-event preferences for tasks
       const eventPrefsToSave = (Object.values(TASK_EVENT_KEYS) as TaskEventKey[]).map((eventKey) => ({
         user_id: user.id,
         agency_id: currentAgency.id,
@@ -475,21 +416,12 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
         enabled: !!taskEvents[eventKey],
       }));
 
-      // Save per-event preferences for posts
-      const postEventPrefsToSave = (Object.values(POST_EVENT_KEYS) as PostEventKey[]).map((eventKey) => ({
-        user_id: user.id,
-        agency_id: currentAgency.id,
-        event_key: eventKey,
-        enabled: !!postEvents[eventKey],
-      }));
-
       const { error: eventPrefsSaveError } = await supabase
         .from('notification_event_preferences')
-        .upsert([...eventPrefsToSave, ...postEventPrefsToSave], { onConflict: 'user_id,agency_id,event_key' });
+        .upsert(eventPrefsToSave, { onConflict: 'user_id,agency_id,event_key' });
 
       if (eventPrefsSaveError) throw eventPrefsSaveError;
 
-      // Save agency rules (admin-only)
       if (isAgencyAdmin()) {
         const rulesToUpsert: any[] = [
           {
@@ -506,14 +438,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
             recipients_strategy: 'admins',
             enabled: agencyTaskRules.notifyAdminsOnDone,
             conditions: { to: 'done' },
-            created_by: user.id,
-          },
-          {
-            agency_id: currentAgency.id,
-            event_key: 'post.published',
-            recipients_strategy: 'admins',
-            enabled: agencyPostRules.notifyAdminsOnPublished,
-            conditions: { to: 'published' },
             created_by: user.id,
           },
         ];
@@ -538,7 +462,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
   const notificationTypesList = [
     { key: "reminders_enabled", label: "Lembretes", icon: "📝" },
     { key: "tasks_enabled", label: "Tarefas", icon: "✅" },
-    { key: "posts_enabled", label: "Posts de Social Media", labelMobile: "Posts", icon: "📱" },
     { key: "payments_enabled", label: "Pagamentos de Clientes", labelMobile: "Pagamentos", icon: "💰" },
     { key: "expenses_enabled", label: "Despesas", icon: "💸" },
     { key: "leads_enabled", label: "Leads", icon: "👤" },
@@ -565,7 +488,7 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
               <Label htmlFor={key} className="flex items-center gap-2 cursor-pointer text-sm">
                 <span className="text-lg md:text-xl">{icon}</span>
                 <span className="hidden md:inline">{label}</span>
-                <span className="md:hidden">{labelMobile || label}</span>
+                <span className="md:hidden">{(labelMobile as string) || label}</span>
               </Label>
               <Switch
                 id={key}
@@ -654,70 +577,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
         </CardContent>
       </Card>
 
-      {/* Seção 1.55: Posts por evento */}
-      <Card>
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <span className="text-lg">📱</span>
-            <span className="hidden md:inline">Posts (por evento)</span>
-            <span className="md:hidden">Posts</span>
-          </CardTitle>
-          <CardDescription className="text-xs md:text-sm">
-            <span className="hidden sm:inline">Personalize quais eventos de posts disparam notificações.</span>
-            <span className="sm:hidden">Eventos de posts</span>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0 space-y-3 md:space-y-4">
-          <div className="flex items-center justify-between">
-            <Label className="cursor-pointer text-sm">
-              <span className="hidden md:inline">Quando um post for atribuído a mim</span>
-              <span className="md:hidden">Post atribuído</span>
-            </Label>
-            <Switch
-              checked={postEvents[POST_EVENT_KEYS.assigned]}
-              disabled={!types.posts_enabled}
-              onCheckedChange={(checked) =>
-                setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.assigned]: checked }))
-              }
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Label className="cursor-pointer text-sm">
-              <span className="hidden md:inline">Quando o status do post mudar</span>
-              <span className="md:hidden">Status alterado</span>
-            </Label>
-            <Switch
-              checked={postEvents[POST_EVENT_KEYS.statusChanged]}
-              disabled={!types.posts_enabled}
-              onCheckedChange={(checked) =>
-                setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.statusChanged]: checked }))
-              }
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Label className="cursor-pointer text-sm">
-              <span className="hidden md:inline">Quando houver mudanças importantes (data/prioridade/título/notas)</span>
-              <span className="md:hidden">Mudanças importantes</span>
-            </Label>
-            <Switch
-              checked={postEvents[POST_EVENT_KEYS.importantUpdated]}
-              disabled={!types.posts_enabled}
-              onCheckedChange={(checked) =>
-                setPostEvents(prev => ({ ...prev, [POST_EVENT_KEYS.importantUpdated]: checked }))
-              }
-            />
-          </div>
-
-          {!types.posts_enabled && (
-            <p className="text-xs text-muted-foreground">
-              Ative <strong>Posts</strong> acima para habilitar.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Seção 1.6: Regras do time (Admins) */}
       {isAgencyAdmin() && (
         <Card>
@@ -764,25 +623,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
                 className="flex-shrink-0"
               />
             </div>
-
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0 mr-3">
-                <Label className="cursor-pointer text-sm">
-                  <span className="hidden md:inline">Notificar admins quando um post for publicado</span>
-                  <span className="md:hidden">Admins: post publicado</span>
-                </Label>
-                <p className="text-xs text-muted-foreground hidden sm:block">Evento: status → published</p>
-              </div>
-              <Switch
-                checked={agencyPostRules.notifyAdminsOnPublished}
-                onCheckedChange={(checked) =>
-                  setAgencyPostRules({ notifyAdminsOnPublished: checked })
-                }
-                className="flex-shrink-0"
-              />
-            </div>
           </CardContent>
         </Card>
       )}
@@ -799,7 +639,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0 space-y-4 md:space-y-6">
-          {/* Sistema */}
           <div className="flex items-center justify-between opacity-60">
             <Label className="flex items-center gap-2 text-sm">
               <Bell className="h-4 w-4" />
@@ -811,7 +650,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
 
           <Separator />
 
-          {/* Som */}
           <div className="flex items-center justify-between">
             <Label htmlFor="sound" className="flex items-center gap-2 cursor-pointer text-sm">
               <Volume2 className="h-4 w-4" />
@@ -829,7 +667,6 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
 
           <Separator />
 
-          {/* Navegador */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="browser" className="flex items-center gap-2 cursor-pointer text-sm">
@@ -858,12 +695,10 @@ export function NotificationPreferences({ open, onOpenChange }: NotificationPref
 
           <Separator />
 
-          {/* Push Notifications (Celular) */}
           <PushNotificationSection />
 
           <Separator />
 
-          {/* Email */}
           <div className="space-y-3 md:space-y-4">
             <div className="flex items-center justify-between">
               <Label htmlFor="email" className="flex items-center gap-2 cursor-pointer text-sm">

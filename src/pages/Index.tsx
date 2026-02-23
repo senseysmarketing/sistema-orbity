@@ -8,9 +8,7 @@ import { format, isToday, isBefore, startOfDay } from 'date-fns';
 
 import { MyDayHeader } from '@/components/dashboard/MyDayHeader';
 import { MyTasksList } from '@/components/dashboard/MyTasksList';
-import { MyPostsList } from '@/components/dashboard/MyPostsList';
 import { RequestedTasksList } from '@/components/dashboard/RequestedTasksList';
-import { RequestedPostsList } from '@/components/dashboard/RequestedPostsList';
 import { RoutineBlock } from '@/components/dashboard/RoutineBlock';
 import { NotesBlock } from '@/components/dashboard/NotesBlock';
 import { DayTimeline } from '@/components/dashboard/DayTimeline';
@@ -50,10 +48,7 @@ const Index = () => {
   // --- Personal data ---
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [myMeetings, setMyMeetings] = useState<any[]>([]);
-  const [myPosts, setMyPosts] = useState<any[]>([]);
-  const [myPostCustomStatuses, setMyPostCustomStatuses] = useState<{ id: string; name: string; color: string }[]>([]);
   const [requestedTasks, setRequestedTasks] = useState<any[]>([]);
-  const [requestedPosts, setRequestedPosts] = useState<any[]>([]);
 
   // --- Agency-wide metrics (admins only) ---
   const [agencyMetrics, setAgencyMetrics] = useState({
@@ -66,8 +61,6 @@ const Index = () => {
     totalTasks: 0,
     completedTasks: 0,
     overdueTasks: 0,
-    totalSocialPosts: 0,
-    publishedPosts: 0,
     monthlyRevenue: 0,
     adSpend: 0,
   });
@@ -88,57 +81,26 @@ const Index = () => {
       // 2. Meetings (agency, today+)
       const todayStr = new Date().toISOString().split('T')[0];
 
-      const [meetingsRes, customStatusesRes] = await Promise.all([
-        supabase
-          .from('meetings')
-          .select('*, clients(name)')
-          .eq('agency_id', currentAgency.id)
-          .gte('start_time', `${todayStr}T00:00:00`)
-          .neq('status', 'cancelled')
-          .order('start_time', { ascending: true })
-          .limit(20),
-        supabase
-          .from('social_media_custom_statuses')
-          .select('id, name, color')
-          .eq('agency_id', currentAgency.id),
-      ]);
+      const meetingsRes = await supabase
+        .from('meetings')
+        .select('*, clients(name)')
+        .eq('agency_id', currentAgency.id)
+        .gte('start_time', `${todayStr}T00:00:00`)
+        .neq('status', 'cancelled')
+        .order('start_time', { ascending: true })
+        .limit(20);
 
-      const customStatuses = (customStatusesRes.data || []) as { id: string; name: string; color: string }[];
-      setMyPostCustomStatuses(customStatuses);
-
-      // Fetch all my tasks (including redes_sociais)
+      // Fetch all my tasks (all types unified)
       if (myTaskIds.length > 0) {
         const tasksRes = await supabase
           .from('tasks')
-          .select('*, clients(name), task_type, metadata')
+          .select('*, clients(name)')
           .eq('agency_id', currentAgency.id)
           .in('id', myTaskIds);
         
-        const allMyTasks = tasksRes.data || [];
-        // Separate regular tasks from social media tasks
-        const regularTasks = allMyTasks.filter((t: any) => t.task_type !== 'redes_sociais');
-        const socialTasks = allMyTasks.filter((t: any) => t.task_type === 'redes_sociais');
-        
-        setMyTasks(regularTasks);
-        
-        // Map social tasks to post format for MyPostsList
-        const { mapTaskStatusToSocial } = await import('@/hooks/useSocialMediaTasks');
-        const activeSocialPosts = socialTasks
-          .filter((t: any) => !t.archived && mapTaskStatusToSocial(t.status) !== 'published')
-          .map((t: any) => {
-            const meta = t.metadata || {};
-            return {
-              ...t,
-              status: mapTaskStatusToSocial(t.status),
-              platform: meta.platform || '',
-              scheduled_date: meta.post_date || t.due_date,
-              client_name: t.clients?.name,
-            };
-          });
-        setMyPosts(activeSocialPosts);
+        setMyTasks(tasksRes.data || []);
       } else {
         setMyTasks([]);
-        setMyPosts([]);
       }
 
       setMyMeetings(
@@ -171,41 +133,17 @@ const Index = () => {
       }
 
       // Enrich assignments with profile names
-      const enrichAssignments = (items: any[], assignmentKey: string) =>
-        items.map((item: any) => ({
+      const enrichedTasks = (createdTasks || [])
+        .filter((t: any) => !myTaskIds.includes(t.id))
+        .map((item: any) => ({
           ...item,
-          [assignmentKey]: (item[assignmentKey] || []).map((a: any) => ({
+          task_assignments: (item.task_assignments || []).map((a: any) => ({
             ...a,
             profiles: { name: profilesMap[a.user_id] || null },
           })),
         }));
 
-      // Split created tasks into regular requested tasks and social media requested posts
-      const createdRegularTasks = (createdTasks || []).filter((t: any) => t.task_type !== 'redes_sociais' && !myTaskIds.includes(t.id));
-      const createdSocialTasks = (createdTasks || []).filter((t: any) => t.task_type === 'redes_sociais' && !myTaskIds.includes(t.id));
-
-      const filteredRequestedTasks = enrichAssignments(createdRegularTasks, 'task_assignments');
-      setRequestedTasks(filteredRequestedTasks);
-
-      // Map social tasks to requested posts format
-      const { mapTaskStatusToSocial: mapStatus } = await import('@/hooks/useSocialMediaTasks');
-      const filteredRequestedPosts = enrichAssignments(
-        createdSocialTasks.map((t: any) => {
-          const meta = t.metadata || {};
-          return {
-            ...t,
-            status: mapStatus(t.status),
-            scheduled_date: meta.post_date || t.due_date,
-            client_name: t.clients?.name,
-            post_assignments: (t.task_assignments || []).map((a: any) => ({
-              user_id: a.user_id,
-              profiles: { name: profilesMap[a.user_id] || null },
-            })),
-          };
-        }),
-        'post_assignments'
-      );
-      setRequestedPosts(filteredRequestedPosts);
+      setRequestedTasks(enrichedTasks);
 
       // Admin: fetch agency-wide metrics
       if (isAdmin) {
@@ -225,7 +163,7 @@ const Index = () => {
         supabase.from('clients').select('id,active').eq('agency_id', currentAgency.id),
         supabase.from('leads').select('id,status').eq('agency_id', currentAgency.id),
         supabase.from('meetings').select('id,start_time,status').eq('agency_id', currentAgency.id),
-        supabase.from('tasks').select('id,status,due_date,task_type').eq('agency_id', currentAgency.id),
+        supabase.from('tasks').select('id,status,due_date').eq('agency_id', currentAgency.id),
         supabase.from('client_payments').select('amount,due_date,status,client_id').eq('agency_id', currentAgency.id),
       ]);
 
@@ -243,8 +181,6 @@ const Index = () => {
       const meetings = meetingsRes.data || [];
       const tasks = tasksRes.data || [];
       const payments = paymentsRes.data || [];
-
-      const socialTasks = tasks.filter((t: any) => t.task_type === 'redes_sociais');
 
       const activeClientIds = clients.filter((c: any) => c.active).map((c: any) => c.id);
       const paymentsThisMonth = payments.filter((p: any) =>
@@ -268,8 +204,6 @@ const Index = () => {
           const d = t.due_date ? new Date(t.due_date) : null;
           return d && d < today && t.status !== 'done';
         }).length,
-        totalSocialPosts: socialTasks.length,
-        publishedPosts: socialTasks.filter((t: any) => t.status === 'done' || t.status === 'completed').length,
         monthlyRevenue,
         adSpend: 0,
       });
@@ -364,37 +298,23 @@ const Index = () => {
       {/* 3. Rotinas */}
       <RoutineBlock />
 
-      {/* 4. Grid: Tarefas | Posts */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <MyTasksList
-          tasks={visibleTasks}
-          onTasksChange={fetchMyData}
-          onViewAll={() => navigate('/dashboard/tasks')}
-        />
-        <MyPostsList
-          posts={myPosts}
-          customStatuses={myPostCustomStatuses}
-          onViewAll={() => navigate('/dashboard/social-media')}
-        />
-      </div>
+      {/* 4. Minhas Tarefas (full width) */}
+      <MyTasksList
+        tasks={visibleTasks}
+        onTasksChange={fetchMyData}
+        onViewAll={() => navigate('/dashboard/tasks')}
+      />
 
-      {/* 5. Grid: Tarefas Solicitadas | Posts Solicitados */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <RequestedTasksList
-          tasks={requestedTasks}
-          onViewAll={() => navigate('/dashboard/tasks')}
-        />
-        <RequestedPostsList
-          posts={requestedPosts}
-          customStatuses={myPostCustomStatuses}
-          onViewAll={() => navigate('/dashboard/social-media')}
-        />
-      </div>
+      {/* 5. Tarefas Solicitadas (full width) */}
+      <RequestedTasksList
+        tasks={requestedTasks}
+        onViewAll={() => navigate('/dashboard/tasks')}
+      />
 
       {/* 6. Ações Rápidas */}
       <QuickActions />
 
-      {/* 6. Métricas da Agência — colapsável, só admins */}
+      {/* 7. Métricas da Agência — colapsável, só admins */}
       {isAdmin && (
         <Collapsible open={metricsOpen} onOpenChange={setMetricsOpen}>
           <CollapsibleTrigger asChild>

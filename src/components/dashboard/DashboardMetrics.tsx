@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   TrendingUp, TrendingDown, Users, Calendar, CheckCircle, 
-  AlertCircle, DollarSign, Target, MessageSquare, Monitor,
+  AlertCircle, DollarSign, Target, Monitor,
   Eye, EyeOff
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -106,8 +106,6 @@ interface DashboardMetricsProps {
     totalTasks: number;
     completedTasks: number;
     overdueTasks: number;
-    totalSocialPosts: number;
-    publishedPosts: number;
     monthlyRevenue: number;
     adSpend?: number;
   };
@@ -128,10 +126,6 @@ export function DashboardMetrics({
 
   const leadConversionRate = metrics.totalLeads > 0
     ? Math.round((metrics.convertedLeads / metrics.totalLeads) * 100)
-    : 0;
-
-  const postPublishRate = metrics.totalSocialPosts > 0
-    ? Math.round((metrics.publishedPosts / metrics.totalSocialPosts) * 100)
     : 0;
 
   return (
@@ -168,15 +162,6 @@ export function DashboardMetrics({
         icon={<CheckCircle className="h-4 w-4" />}
         progress={taskCompletionRate}
         variant={metrics.overdueTasks > 0 ? "warning" : "success"}
-      />
-
-      <MetricCard
-        title="Posts Publicados"
-        value={metrics.publishedPosts}
-        subtitle={`${postPublishRate}% do planejado`}
-        icon={<MessageSquare className="h-4 w-4" />}
-        progress={postPublishRate}
-        variant="default"
       />
 
       <MetricCard
