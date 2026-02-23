@@ -43,9 +43,10 @@ const POST_TOOLS = [
           platform: { type: "string", enum: ["instagram", "facebook", "linkedin", "twitter", "tiktok", "youtube"], description: "Plataforma sugerida" },
           post_type: { type: "string", enum: ["feed", "stories", "reels", "carrossel", "video"], description: "Tipo de conteúdo" },
           hashtags: { type: "array", items: { type: "string" }, description: "Hashtags relevantes" },
+          creative_instructions: { type: "string", description: "Instruções de arte/criação para o designer ou editor. Para posts de imagem: inclua sugestões de headlines, subtítulos, CTAs e textos de apoio que devem aparecer na arte. Para vídeos/reels: inclua um mini roteiro com os pontos principais, cenas sugeridas e textos em tela. Adapte ao tipo de conteúdo (feed, stories, reels, carrossel, vídeo)." },
           mentioned_clients: { type: "array", items: { type: "string" }, description: "Nomes de clientes ou empresas mencionados pelo usuário no texto. Extraia apenas nomes próprios de pessoas ou empresas que pareçam ser clientes." },
         },
-        required: ["title", "description", "platform", "post_type", "hashtags"],
+        required: ["title", "description", "platform", "post_type", "hashtags", "creative_instructions"],
         additionalProperties: false,
       },
     },
@@ -74,7 +75,7 @@ const DEFAULT_TASK_PROMPT =
   "Você é um assistente de agência de marketing digital. Extraia os dados estruturados de uma tarefa a partir da descrição do usuário. Gere um título conciso e uma descrição profissional, estruturada e sem erros de gramática.";
 
 const DEFAULT_POST_PROMPT =
-  "Você é um social media manager profissional. Extraia os dados de um post para redes sociais a partir da descrição do usuário. Gere uma legenda envolvente, profissional e adaptada para a plataforma sugerida. Inclua hashtags relevantes.";
+  "Você é um social media manager profissional. Extraia os dados de um post para redes sociais a partir da descrição do usuário. Gere uma legenda envolvente, profissional e adaptada para a plataforma sugerida. Inclua hashtags relevantes. Gere também instruções de arte/criação detalhadas para o designer: para posts de imagem inclua headlines, subtítulos, CTAs e textos que devem aparecer na arte; para vídeos/reels inclua um mini roteiro com os pontos principais e textos em tela.";
 
 const DEFAULT_REPORT_PROMPT =
   "Você é um gestor de tráfego pago profissional. Gere uma mensagem direcionada ao cliente com os resultados do período. Inclua um resumo dos dados, uma análise da performance (pontos positivos e o que pode melhorar) e sugestões de próximo passo. Use tom profissional mas acessível, formate para WhatsApp com emojis e negrito (*texto*).";

@@ -16,6 +16,7 @@ export interface PostPrefillResult {
   platform: string;
   post_type: string;
   hashtags: string[];
+  creative_instructions?: string;
   mentioned_clients?: string[];
 }
 
