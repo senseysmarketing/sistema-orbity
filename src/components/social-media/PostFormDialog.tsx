@@ -577,6 +577,23 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
               onSubmit={async (text) => {
                 const result = await preFillPost(text);
                 if (result) {
+                  // Match mentioned clients against agency clients
+                  if (result.mentioned_clients?.length && clients.length > 0) {
+                    const normalize = (s: string) =>
+                      s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                    const matchedIds = clients
+                      .filter((c) =>
+                        result.mentioned_clients!.some((mention) => {
+                          const nMention = normalize(mention);
+                          const nClient = normalize(c.name);
+                          return nClient.includes(nMention) || nMention.includes(nClient);
+                        })
+                      )
+                      .map((c) => c.id);
+                    if (matchedIds.length > 0) {
+                      setSelectedClientIds(matchedIds);
+                    }
+                  }
                   setFormData((prev) => ({
                     ...prev,
                     title: result.title || prev.title,
