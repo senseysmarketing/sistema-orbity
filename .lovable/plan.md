@@ -1,56 +1,67 @@
 
-# Corrigir Status Duplicados no Formulario de Posts
 
-## Problema
+# Auto-vincular Clientes Mencionados via IA
 
-O dropdown de status no formulario de criacao/edicao de posts esta mostrando status duplicados porque:
+## Resumo
 
-1. O codigo em `PostFormDialog.tsx` (linhas 727-732) tem **5 status hardcoded** (Rascunho, Em Criacao, Aguardando Aprovacao, Aprovado, Publicado)
-2. Alem disso, ele adiciona **todos os status do banco** (linhas 733-737) via query em `social_media_custom_statuses`
-3. O banco ja contem esses mesmos status padrao (inseridos pelo `CustomStatusManager`), entao eles aparecem **duas vezes**
-4. O nome hardcoded "Rascunho" nao bate com o nome atualizado "Briefing" no banco
+Quando o usuario mencionar o nome de um cliente no texto de descricao da tarefa ou post, a IA vai identificar e retornar os nomes mencionados. O frontend faz o match contra a lista de clientes da agencia e pre-seleciona automaticamente no campo "Clientes".
 
-O Kanban (`PostKanban.tsx`) ja funciona corretamente porque usa **somente** os status do banco, sem hardcode.
+## Como Funciona
 
-## Solucao
-
-Remover os 5 `SelectItem` hardcoded do dropdown de status e usar exclusivamente os status vindos do banco de dados (a query em `customStatuses` ja busca todos os status ativos, incluindo os padrao).
+```text
+Usuario digita: "Criar criativo para o Juliano do Campeche, 350m²..."
+  -> IA extrai: mentioned_clients: ["Juliano"]
+  -> Frontend busca na lista de clientes: "Juliano Campeche Imoveis" (match parcial)
+  -> Campo "Clientes" pre-selecionado com esse cliente
+```
 
 ## Mudancas
 
-### `src/components/social-media/PostFormDialog.tsx`
+### 1. Edge Function `ai-assist` - Adicionar campo `mentioned_clients`
 
-**Antes** (linhas 727-737):
+Adicionar `mentioned_clients` como campo opcional nos dois tools (task e post):
+
+- **TASK_TOOLS**: adicionar `mentioned_clients` (array of strings) - "Nomes de clientes ou empresas mencionados pelo usuario"
+- **POST_TOOLS**: adicionar `mentioned_clients` (array of strings) - mesmo
+
+Atualizar os system prompts para instruir a IA a extrair nomes de clientes/empresas mencionados no texto.
+
+### 2. Frontend - Passar lista de clientes e fazer match
+
+**`src/pages/Tasks.tsx`** (onSubmit do AIPreFillStep):
+- Apos receber `result.mentioned_clients`, fazer match fuzzy contra `clients[]`
+- Match: normalizar strings (lowercase, remover acentos) e verificar se o nome do cliente contem o termo mencionado ou vice-versa
+- Setar `client_ids` no `newTask` com os IDs encontrados
+
+**`src/components/social-media/PostFormDialog.tsx`** (onSubmit do AIPreFillStep):
+- Mesma logica: match dos `mentioned_clients` contra a lista de clientes
+- Setar `selectedClientIds` com os IDs encontrados
+
+### 3. Hook `useAIAssist` - Atualizar tipos
+
+Adicionar `mentioned_clients?: string[]` nas interfaces `TaskPrefillResult` e `PostPrefillResult`.
+
+## Logica de Match (Frontend)
+
+```text
+Para cada nome em mentioned_clients:
+  1. Normalizar: lowercase, remover acentos
+  2. Para cada cliente da agencia:
+     - Normalizar nome do cliente
+     - Verificar se clienteNorm.includes(mencionadoNorm) OU mencionadoNorm.includes(clienteNorm)
+  3. Se encontrar match, adicionar o client.id ao array de selecionados
+  4. Remover duplicatas
 ```
-<SelectItem value="draft">Rascunho</SelectItem>
-<SelectItem value="in_creation">Em Criacao</SelectItem>
-<SelectItem value="pending_approval">Aguardando Aprovacao</SelectItem>
-<SelectItem value="approved">Aprovado</SelectItem>
-<SelectItem value="published">Publicado</SelectItem>
-{customStatuses.map(status => (
-  <SelectItem key={status.id} value={status.slug}>
-    {status.name}
-  </SelectItem>
-))}
-```
 
-**Depois**:
-```
-{customStatuses.map(status => (
-  <SelectItem key={status.id} value={status.slug}>
-    {status.name}
-  </SelectItem>
-))}
-```
+Essa abordagem simples e suficiente porque os nomes sao curtos e o contexto e limitado (clientes da mesma agencia).
 
-Apenas uma alteracao de 5 linhas removidas. A query que busca `customStatuses` (linhas 300-314) ja retorna todos os status ativos ordenados por `order_position`, incluindo os padrao.
+## Arquivos Modificados
 
-### Renomear variavel (opcional mas recomendado)
-
-A variavel `customStatuses` no `PostFormDialog` nao e so customizados — sao **todos** os status. Renomear para `allStatuses` para clareza (alinhado com o padrao do `CustomStatusManager`).
-
-## Nenhum arquivo novo necessario
-
-| Arquivo | Operacao |
+| Arquivo | Mudanca |
 |---|---|
-| `src/components/social-media/PostFormDialog.tsx` | Editar - remover 5 SelectItem hardcoded |
+| `supabase/functions/ai-assist/index.ts` | Adicionar `mentioned_clients` nos tools + atualizar prompts |
+| `src/hooks/useAIAssist.tsx` | Adicionar `mentioned_clients` nos tipos |
+| `src/pages/Tasks.tsx` | Match de clientes no callback do AI result |
+| `src/components/social-media/PostFormDialog.tsx` | Match de clientes no callback do AI result |
+
+Nenhum arquivo novo. Nenhuma mudanca de banco de dados.
