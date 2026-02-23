@@ -1,6 +1,6 @@
 import { format, isToday, isBefore, startOfDay, isThisWeek } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { AlertCircle, ChevronRight, Clock, SendHorizontal, User } from 'lucide-react';
+import { AlertCircle, ChevronRight, Clock, CircleDot, SendHorizontal, User } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,29 +28,20 @@ interface RequestedPostsListProps {
   onViewAll?: () => void;
 }
 
-const platformIcons: Record<string, string> = {
-  instagram: '📸',
-  facebook: '📘',
-  linkedin: '💼',
-  tiktok: '🎵',
-  twitter: '🐦',
-  youtube: '▶️',
-};
-
 const nativeStatusConfig: Record<string, { label: string; className: string }> = {
-  pending_approval: { label: 'Aprovação', className: 'border-amber-200 text-amber-700 bg-amber-50' },
-  in_creation: { label: 'Em Criação', className: 'border-blue-200 text-blue-700 bg-blue-50' },
-  revision: { label: 'Revisão', className: 'border-purple-200 text-purple-700 bg-purple-50' },
-  approved: { label: 'Aprovado', className: 'border-green-200 text-green-700 bg-green-50' },
-  scheduled: { label: 'Agendado', className: 'border-sky-200 text-sky-700 bg-sky-50' },
+  pending_approval: { label: 'Aprovação', className: 'border-amber-200 text-amber-700 bg-amber-50 dark:border-amber-800 dark:text-amber-300 dark:bg-amber-900/40' },
+  in_creation: { label: 'Em Criação', className: 'border-blue-200 text-blue-700 bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:bg-blue-900/40' },
+  revision: { label: 'Revisão', className: 'border-purple-200 text-purple-700 bg-purple-50 dark:border-purple-800 dark:text-purple-300 dark:bg-purple-900/40' },
+  approved: { label: 'Aprovado', className: 'border-green-200 text-green-700 bg-green-50 dark:border-green-800 dark:text-green-300 dark:bg-green-900/40' },
+  scheduled: { label: 'Agendado', className: 'border-sky-200 text-sky-700 bg-sky-50 dark:border-sky-800 dark:text-sky-300 dark:bg-sky-900/40' },
 };
 
 export function RequestedPostsList({ posts, customStatuses, onViewAll }: RequestedPostsListProps) {
   const getStatusConfig = (status: string) => {
     if (nativeStatusConfig[status]) return nativeStatusConfig[status];
     const custom = customStatuses?.find(s => s.id === status);
-    if (custom) return { label: custom.name, className: 'border-gray-200 text-gray-700 bg-gray-50' };
-    return { label: 'Pendente', className: 'border-gray-200 text-gray-600 bg-gray-50' };
+    if (custom) return { label: custom.name, className: 'border-gray-200 text-gray-600 bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:bg-gray-800' };
+    return { label: 'Pendente', className: 'border-gray-200 text-gray-600 bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:bg-gray-800' };
   };
 
   const today = startOfDay(new Date());
@@ -79,7 +70,6 @@ export function RequestedPostsList({ posts, customStatuses, onViewAll }: Request
 
   const PostRow = ({ post, showDate = false }: { post: RequestedPost; showDate?: boolean }) => {
     const isOverdue = post.scheduled_date && isBefore(startOfDay(new Date(post.scheduled_date)), today);
-    const icon = platformIcons[post.platform?.toLowerCase() || ''] || '📄';
     const cfg = getStatusConfig(post.status);
     const assignees = post.post_assignments || [];
     const assigneeNames = assignees
@@ -92,7 +82,7 @@ export function RequestedPostsList({ posts, customStatuses, onViewAll }: Request
         'flex items-start gap-3 py-2.5 border-b last:border-b-0',
         isOverdue && 'bg-destructive/5 rounded-lg px-2 -mx-2',
       )}>
-        <span className="text-base shrink-0 mt-0.5">{icon}</span>
+        <CircleDot className={cn('h-4 w-4 mt-0.5 shrink-0', isOverdue ? 'text-destructive' : 'text-muted-foreground')} />
         <div className="flex-1 min-w-0">
           <p className={cn(
             'text-sm font-medium leading-snug line-clamp-2',

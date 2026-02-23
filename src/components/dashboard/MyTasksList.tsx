@@ -21,31 +21,16 @@ interface MyTasksListProps {
   onViewAll?: () => void;
 }
 
-const priorityColors: Record<string, string> = {
-  high: 'text-destructive',
-  medium: 'text-amber-500',
-  low: 'text-muted-foreground',
+const statusConfig: Record<string, { label: string; className: string }> = {
+  todo: { label: 'Pendente', className: 'border-gray-200 text-gray-600 bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:bg-gray-800' },
+  in_progress: { label: 'Em andamento', className: 'border-blue-200 text-blue-700 bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:bg-blue-900/40' },
+  in_review: { label: 'Em revisão', className: 'border-purple-200 text-purple-700 bg-purple-50 dark:border-purple-800 dark:text-purple-300 dark:bg-purple-900/40' },
+  done: { label: 'Concluída', className: 'border-green-200 text-green-700 bg-green-50 dark:border-green-800 dark:text-green-300 dark:bg-green-900/40' },
 };
 
-const priorityLabels: Record<string, string> = {
-  high: 'Alta',
-  medium: 'Média',
-  low: 'Baixa',
-};
-
-const statusLabels: Record<string, string> = {
-  todo: 'Pendente',
-  in_progress: 'Em andamento',
-  in_review: 'Em revisão',
-  done: 'Concluída',
-};
-
-const statusVariant: Record<string, 'outline' | 'secondary' | 'warning' | 'success'> = {
-  todo: 'outline',
-  in_progress: 'secondary',
-  in_review: 'warning',
-  done: 'success',
-};
+function getTaskStatusConfig(status: string) {
+  return statusConfig[status] || { label: status, className: 'border-gray-200 text-gray-600 bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:bg-gray-800' };
+}
 
 export function MyTasksList({ tasks, onViewAll }: MyTasksListProps) {
   const today = startOfDay(new Date());
@@ -68,6 +53,8 @@ export function MyTasksList({ tasks, onViewAll }: MyTasksListProps) {
 
   const TaskRow = ({ task, showDate = false }: { task: Task; showDate?: boolean }) => {
     const isOverdue = task.due_date && isBefore(startOfDay(new Date(task.due_date)), today);
+    const cfg = getTaskStatusConfig(task.status);
+
     return (
       <div className={cn(
         'flex items-start gap-3 py-2.5 border-b last:border-b-0',
@@ -77,7 +64,6 @@ export function MyTasksList({ tasks, onViewAll }: MyTasksListProps) {
         <div className="flex-1 min-w-0">
           <p className={cn(
             'text-sm font-medium leading-snug line-clamp-2',
-            task.status === 'done' && 'line-through text-muted-foreground',
             isOverdue && 'text-destructive',
           )}>
             {task.title}
@@ -94,11 +80,8 @@ export function MyTasksList({ tasks, onViewAll }: MyTasksListProps) {
             )}
           </div>
         </div>
-        <Badge
-          variant={statusVariant[task.status] || 'outline'}
-          className="text-xs shrink-0"
-        >
-          {statusLabels[task.status] || task.status}
+        <Badge variant="outline" className={cn('text-[10px] shrink-0 whitespace-nowrap', cfg.className)}>
+          {cfg.label}
         </Badge>
       </div>
     );
