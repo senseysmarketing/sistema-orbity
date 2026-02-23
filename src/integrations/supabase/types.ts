@@ -3458,6 +3458,7 @@ export type Database = {
       routine_completions: {
         Row: {
           completed_at: string | null
+          day_of_week: number | null
           id: string
           month_number: number | null
           routine_id: string
@@ -3467,6 +3468,7 @@ export type Database = {
         }
         Insert: {
           completed_at?: string | null
+          day_of_week?: number | null
           id?: string
           month_number?: number | null
           routine_id: string
@@ -3476,6 +3478,7 @@ export type Database = {
         }
         Update: {
           completed_at?: string | null
+          day_of_week?: number | null
           id?: string
           month_number?: number | null
           routine_id?: string

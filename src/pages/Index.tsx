@@ -171,6 +171,7 @@ const Index = () => {
         .select('*, clients(name), task_assignments(user_id, profiles(name))')
         .eq('agency_id', currentAgency.id)
         .eq('created_by', profile.user_id)
+        .eq('archived', false)
         .neq('status', 'done');
 
       const filteredRequestedTasks = (createdTasks || []).filter((t: any) => !myTaskIds.includes(t.id));

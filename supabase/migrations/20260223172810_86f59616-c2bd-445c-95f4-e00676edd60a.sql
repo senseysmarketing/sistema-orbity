@@ -1,0 +1,1 @@
+ALTER TABLE public.routine_completions ADD COLUMN day_of_week integer;
