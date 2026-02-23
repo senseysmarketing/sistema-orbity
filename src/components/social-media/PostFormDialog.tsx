@@ -114,6 +114,8 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     } else {
       const defaultPostDate = defaultDate?.toISOString() || new Date().toISOString();
       const daysBefore = getDefaultDueDateDaysBefore();
+      // Na criação, forçar o primeiro status da lista (Briefing/draft)
+      const firstStatus = customStatuses.length > 0 ? customStatuses[0].slug : "draft";
       setFormData({
         title: "",
         description: "",
@@ -122,7 +124,7 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
         due_date: calculateDueDate(defaultPostDate, daysBefore),
         post_type: "feed",
         platform: "instagram",
-        status: "draft",
+        status: firstStatus,
         priority: "medium",
         hashtags: "",
         notes: "",
@@ -312,6 +314,13 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
     },
     enabled: !!currentAgency?.id,
   });
+
+  // Na criação, forçar primeiro status quando customStatuses carregar
+  useEffect(() => {
+    if (!editPost && customStatuses.length > 0) {
+      setFormData(prev => ({ ...prev, status: customStatuses[0].slug }));
+    }
+  }, [customStatuses, editPost]);
 
   // Buscar horários padrão quando plataforma ou cliente mudar
   useEffect(() => {
@@ -737,18 +746,24 @@ export function PostFormDialog({ open, onOpenChange, defaultDate, editPost }: Po
           <div className="grid grid-cols-3 gap-4">
             <div>
               <Label htmlFor="status">Status *</Label>
-              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {customStatuses.map(status => (
-                    <SelectItem key={status.id} value={status.slug}>
-                      {status.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {editPost ? (
+                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customStatuses.map(status => (
+                      <SelectItem key={status.id} value={status.slug}>
+                        {status.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  {customStatuses.find(s => s.slug === formData.status)?.name || "Briefing"}
+                </div>
+              )}
             </div>
 
             <div>
