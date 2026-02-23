@@ -1,55 +1,55 @@
 
 
-# Análise de Campanha com IA
+# Auto-Analise IA + Layout Lado a Lado
 
 ## Resumo
 
-Adicionar um botão "Analisar com IA" dentro da seção expandida de análise semanal de cada campanha. A IA receberá os dados das semanas (gasto, conversões, CPC, CTR, impressões, cliques) junto com o nome e objetivo da campanha, e retornará uma análise completa com tendências, pontos de atenção e recomendações de otimização.
+Duas mudancas na secao expandida de analise de campanhas:
 
-## O que muda para o usuário
+1. **Auto-trigger**: Ao clicar em "Analise", a analise da IA sera gerada automaticamente junto com os dados semanais (sem precisar de um segundo clique)
+2. **Layout lado a lado**: Cards semanais a esquerda, analise da IA a direita, ocupando a largura total da secao
 
-- Ao clicar em "Análise" na campanha, além dos cards semanais já existentes, aparecerá um botão "Analisar com IA"
-- Ao clicar, a IA analisa a evolução semana a semana e gera um feedback com:
-  - Tendências identificadas (custo subindo/descendo, conversões melhorando, etc.)
-  - Pontos de atenção (ex: CTR caindo, CPC aumentando)
-  - Recomendações práticas de otimização
-- A mensagem será formatada para WhatsApp (com emojis e negrito) para fácil compartilhamento
-- Botão de copiar para clipboard incluso
-- O prompt pode ser personalizado por agência (usa o mesmo sistema de `agency_ai_prompts` com um novo tipo `campaign_analysis`)
+## Analise do Layout
 
-## Mudanças Técnicas
+O conteudo expandido esta dentro de um `<TableCell colSpan={9}>`, que ja ocupa a largura total da tabela. Nao ha `max-width` limitando - o `AppLayout` usa apenas `flex-1 p-4 md:p-6`. O problema e que os cards semanais e a analise IA estao empilhados verticalmente (`mt-4`). A solucao e coloca-los dentro de um `grid grid-cols-1 lg:grid-cols-2 gap-6`.
 
-### 1. Edge Function `ai-assist/index.ts`
+## Mudancas Tecnicas
 
-Adicionar novo tipo `campaign_analysis`:
-- Novo tool `extract_campaign_analysis` com campo `analysis` (string com a análise completa)
-- Prompt padrão orientando a IA a comparar semanas, identificar tendências e dar recomendações
-- Buscar prompt personalizado com `prompt_type = 'campaign_analysis'`
+### `src/components/traffic/CampaignsAndReports.tsx`
 
-### 2. `src/hooks/useAIAssist.tsx`
+**1. Auto-trigger da analise IA**
 
-- Adicionar função `analyzeCampaign(content: string, agencyId?: string)` que chama a edge function com `type: 'campaign_analysis'`
-- Adicionar interface `CampaignAnalysisResult` com campo `analysis: string`
+Na funcao `handleWeeklyAnalysis`, apos carregar os dados semanais com sucesso, chamar automaticamente `handleAIAnalysis(campaign)`. Para isso, precisamos passar a campanha como parametro e aguardar os dados semanais.
 
-### 3. `src/components/traffic/CampaignsAndReports.tsx`
+**2. Layout lado a lado**
 
-Na seção expandida da campanha (dentro do Collapsible, após os cards semanais):
-- Adicionar estado `aiCampaignAnalysis` e `aiCampaignLoading`
-- Botão "Analisar com IA" que monta o conteúdo com dados semanais + nome/objetivo da campanha
-- Área de exibição da análise gerada (com formatação)
-- Botões de copiar e regenerar
+Reorganizar o conteudo dentro do `<TableCell>`:
 
-### 4. Configurações de IA (opcional, já funciona automaticamente)
+```
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <!-- Esquerda: Cards semanais -->
+  <div>
+    <h4>Analise das Ultimas Semanas</h4>
+    <div class="grid grid-cols-2 gap-3">
+      ...cards...
+    </div>
+  </div>
+  
+  <!-- Direita: Analise IA -->
+  <div>
+    <h5>Analise da IA</h5>
+    ...conteudo ou loading...
+  </div>
+</div>
+```
 
-O sistema de prompts personalizados (`agency_ai_prompts`) já aceita qualquer `prompt_type`. A nova análise usará `prompt_type = 'campaign_analysis'` e será listada automaticamente nas configurações de IA se adicionarmos a opção no componente de configuração.
+Os cards semanais passam de `grid-cols-4` para `grid-cols-2` (ja que agora ocupam metade da largura).
 
-## Arquivos Modificados
+O botao "Analisar com IA" sera removido pois a analise ja sera disparada automaticamente.
 
-| Arquivo | Operacao | Descricao |
-|---|---|---|
-| `supabase/functions/ai-assist/index.ts` | Editar | Adicionar tipo `campaign_analysis` com tool e prompt |
-| `src/hooks/useAIAssist.tsx` | Editar | Adicionar funcao `analyzeCampaign` |
-| `src/components/traffic/CampaignsAndReports.tsx` | Editar | Adicionar botao e area de analise IA na secao semanal |
-| `src/components/settings/AISettingsManager.tsx` | Editar | Adicionar opcao `campaign_analysis` na lista de prompts personalizaveis |
+## Arquivo Modificado
 
-Nenhuma mudanca de banco de dados necessaria.
+| Arquivo | Descricao |
+|---|---|
+| `src/components/traffic/CampaignsAndReports.tsx` | Auto-trigger IA + layout grid lado a lado |
+
