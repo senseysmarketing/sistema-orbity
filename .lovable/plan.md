@@ -1,46 +1,47 @@
 
-# Adicionar datas nas semanas da analise de campanhas
 
-## O que sera feito
+# Reverter posts incorretamente marcados como "Publicado"
 
-Cada card de semana (Semana 1, Semana 2, etc.) passara a exibir o periodo de datas correspondente, por exemplo: **"Semana 1 (03/02 a 09/02)"**.
+## Problema
 
-## Mudancas tecnicas
+17 posts foram incorretamente movidos para o status "published" (Publicado) mesmo tendo datas de publicacao futuras. Isso ocorreu em atualizacoes em massa hoje (23/02) por volta das 14:15 e 15:15.
 
-### 1. Edge Function `supabase/functions/facebook-analysis/index.ts`
+## Solucao
 
-A API do Facebook Insights ja retorna `date_start` e `date_stop` em cada registro, mas o codigo atual ignora esses campos. Vou incluir esses campos no objeto `weeklyData`:
+Executar um UPDATE no banco de dados para reverter esses 17 posts para o status `draft` (Briefing - status inicial do workflow).
 
-```ts
-weeklyData.push({
-  week: `Semana ${i + 1}`,
-  date_start: insight.date_start,  // novo
-  date_stop: insight.date_stop,    // novo
-  spend: ...,
-  ...
-})
+## Posts afetados
+
+| Titulo | Data Publicacao | Cliente |
+|---|---|---|
+| Aprovacao social | 23/02 | T&B |
+| Video imovel | 24/02 | T&B |
+| Carrossel institucional | 24/02 | Outro |
+| Carrossel informativo | 25/02 | T&B |
+| Caixinha de perguntas | 26/02 | T&B |
+| Estatico informativo | 26/02 | Outro |
+| Post estatico | 27/02 | T&B |
+| Reels conforme a demanda | 27/02 | Outro |
+| CTA | 28/02 | T&B |
+| Caixinha de perguntas | 02/03 | T&B |
+| Carrossel imovel | 02/03 | T&B |
+| Video imovel | 03/03 | T&B |
+| Post estatico | 04/03 | T&B |
+| Dicas | 05/03 | T&B |
+| Reels imovel | 06/03 | T&B |
+| CTA | 07/03 | T&B |
+| Carrossel informativo | 10/03 | Outro |
+
+## Mudanca tecnica
+
+Um unico comando SQL via migration:
+
+```sql
+UPDATE social_media_posts
+SET status = 'draft'
+WHERE status = 'published'
+  AND scheduled_date > '2026-02-23';
 ```
 
-Para os dados mock (fallback), calcular datas sinteticas baseadas no `startDate` + incrementos de 7 dias.
+Isso revertera todos os 17 posts para "Briefing" (slug `draft`).
 
-### 2. Frontend `src/components/traffic/CampaignsAndReports.tsx`
-
-No processamento dos dados recebidos (linha 234), preservar `date_start` e `date_stop`.
-
-No card de cada semana (linha 593), alterar o titulo de:
-```
-Semana 1
-```
-Para:
-```
-Semana 1 (03/02 a 09/02)
-```
-
-Usando `format(new Date(week.date_start), "dd/MM")` e `format(new Date(week.date_stop), "dd/MM")`.
-
-Tambem incluir as datas no texto enviado para a analise de IA para maior contexto.
-
-| Arquivo | Descricao |
-|---|---|
-| `supabase/functions/facebook-analysis/index.ts` | Incluir `date_start` e `date_stop` da API do Facebook no retorno |
-| `src/components/traffic/CampaignsAndReports.tsx` | Exibir datas no titulo dos cards semanais |
