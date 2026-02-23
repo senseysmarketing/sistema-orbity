@@ -163,26 +163,40 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
     }
 
     const leadId = active.id as string;
-    const newStatus = over.id as string;
+    let newStatus = over.id as string;
     
-    // Check if it's a valid status
+    // Check if it's a valid status column; if not, resolve via sortable container
     if (!statusConfig[newStatus as keyof typeof statusConfig]) {
+      const containerId = over.data?.current?.sortable?.containerId;
+      if (containerId && statusConfig[containerId as keyof typeof statusConfig]) {
+        newStatus = containerId as string;
+      } else {
+        setActiveId(null);
+        setDraggedLead(null);
+        return;
+      }
+    }
+
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) {
       setActiveId(null);
       setDraggedLead(null);
       return;
     }
 
-    const lead = leads.find(l => l.id === leadId);
-    if (!lead || lead.status === newStatus) {
+    // Convert status key back to database format
+    const displayStatus = statusConfig[newStatus].title;
+    const dbStatus = mapDisplayStatusToDatabase(displayStatus);
+    
+    // Compare normalized current status with target to avoid no-op moves
+    const currentNormalized = normalizeStatusToDb(lead.status);
+    if (currentNormalized.toLowerCase() === dbStatus.toLowerCase()) {
       setActiveId(null);
       setDraggedLead(null);
       return;
     }
 
     try {
-      // Convert status key back to database format
-      const displayStatus = statusConfig[newStatus].title;
-      const dbStatus = mapDisplayStatusToDatabase(displayStatus);
       
       // Calculate new temperature based on status
       const newTemperature = getTemperatureForStatus(dbStatus);
