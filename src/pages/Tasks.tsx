@@ -494,6 +494,7 @@ export default function Tasks() {
 
     try {
       const isSocial = newTask.task_type === "redes_sociais";
+      const hasCreative = ["redes_sociais", "criativos"].includes(newTask.task_type);
       const hashtagsArray = isSocial && newTask.hashtags.trim()
         ? newTask.hashtags.split(",").map(h => h.trim()).filter(Boolean)
         : null;
@@ -517,7 +518,7 @@ export default function Tasks() {
           post_type: isSocial ? (newTask.post_type || null) : null,
           post_date: isSocial && newTask.post_date ? dateOnlyToISO(newTask.post_date) : null,
           hashtags: hashtagsArray,
-          creative_instructions: isSocial ? (newTask.creative_instructions || null) : null,
+          creative_instructions: hasCreative ? (newTask.creative_instructions || null) : null,
         }])
         .select()
         .single();
@@ -686,6 +687,7 @@ export default function Tasks() {
       }
 
       const isSocialEdit = newTask.task_type === "redes_sociais";
+      const hasCreativeEdit = ["redes_sociais", "criativos"].includes(newTask.task_type);
       const hashtagsArrayEdit = isSocialEdit && newTask.hashtags.trim()
         ? newTask.hashtags.split(",").map(h => h.trim()).filter(Boolean)
         : null;
@@ -705,7 +707,7 @@ export default function Tasks() {
         post_type: isSocialEdit ? (newTask.post_type || null) : null,
         post_date: isSocialEdit && newTask.post_date ? dateOnlyToISO(newTask.post_date) : null,
         hashtags: hashtagsArrayEdit,
-        creative_instructions: isSocialEdit ? (newTask.creative_instructions || null) : null,
+        creative_instructions: hasCreativeEdit ? (newTask.creative_instructions || null) : null,
         updated_by: profile?.user_id,
       };
 
@@ -1189,16 +1191,19 @@ export default function Tasks() {
                             placeholder="Ex: #marketing, #design, #social"
                           />
                         </div>
-                        <div className="grid gap-2">
-                          <Label>Instruções Criativas</Label>
-                          <Textarea
-                            value={newTask.creative_instructions}
-                            onChange={(e) => setNewTask({ ...newTask, creative_instructions: e.target.value })}
-                            placeholder="Instruções de arte, roteiro, textos na arte, CTAs..."
-                            rows={3}
-                          />
-                        </div>
                       </>
+                    )}
+                    {/* Instruções Criativas - para Redes Sociais e Criativos */}
+                    {["redes_sociais", "criativos"].includes(newTask.task_type) && (
+                      <div className="grid gap-2">
+                        <Label>Instruções Criativas</Label>
+                        <Textarea
+                          value={newTask.creative_instructions}
+                          onChange={(e) => setNewTask({ ...newTask, creative_instructions: e.target.value })}
+                          placeholder="Instruções de arte, roteiro, textos na arte, CTAs..."
+                          rows={3}
+                        />
+                      </div>
                     )}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-2">
@@ -1254,6 +1259,8 @@ export default function Tasks() {
                           { label: "Tipo de Conteúdo", value: newTask.post_type ? newTask.post_type.charAt(0).toUpperCase() + newTask.post_type.slice(1) : "" },
                           { label: "Data de Publicação", value: newTask.post_date ? formatDateBR(newTask.post_date) : "" },
                           { label: "Hashtags", value: newTask.hashtags },
+                        ] : []),
+                        ...(["redes_sociais", "criativos"].includes(newTask.task_type) ? [
                           { label: "Instruções Criativas", value: newTask.creative_instructions },
                         ] : []),
                       ]}
@@ -1639,16 +1646,19 @@ export default function Tasks() {
                     placeholder="Ex: #marketing, #design, #social"
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label>Instruções Criativas</Label>
-                  <Textarea
-                    value={newTask.creative_instructions}
-                    onChange={(e) => setNewTask({ ...newTask, creative_instructions: e.target.value })}
-                    placeholder="Instruções de arte, roteiro, textos na arte, CTAs..."
-                    rows={3}
-                  />
-                </div>
               </>
+            )}
+            {/* Instruções Criativas - para Redes Sociais e Criativos */}
+            {["redes_sociais", "criativos"].includes(newTask.task_type) && (
+              <div className="grid gap-2">
+                <Label>Instruções Criativas</Label>
+                <Textarea
+                  value={newTask.creative_instructions}
+                  onChange={(e) => setNewTask({ ...newTask, creative_instructions: e.target.value })}
+                  placeholder="Instruções de arte, roteiro, textos na arte, CTAs..."
+                  rows={3}
+                />
+              </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
