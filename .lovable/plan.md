@@ -1,133 +1,135 @@
 
-# Novos Blocos: Tarefas Solicitadas e Posts Solicitados no Dashboard
+# Preenchimento Inteligente para Tarefas e Posts
 
-## Conceito
+## Resumo
 
-Dois novos blocos aparecem logo abaixo de "Minhas Tarefas" e "Meus Posts", formando um segundo grid 2 colunas. Eles mostram o que o usuário delegou para outros membros da equipe — permitindo acompanhar o progresso sem precisar ir até a tela de tarefas ou social media.
+Ao clicar em "Nova Tarefa" ou "Novo Post", em vez de abrir diretamente o formulario, abre uma tela intermediaria de **Preenchimento Inteligente** inspirada no print de referencia. O usuario descreve o que precisa (digitando ou por audio) e a IA pre-preenche todos os campos automaticamente. Ele tambem pode pular e preencher manualmente.
 
-- **Tarefas Solicitadas**: tarefas criadas pelo usuário (`created_by = user_id`) mas atribuídas a outra pessoa
-- **Posts Solicitados**: posts criados pelo usuário (`created_by = user_id`) mas atribuídos a outra pessoa
+## Fluxo do Usuario
 
-## Lógica de Dados
-
-### Tarefas Solicitadas
-```
-tasks WHERE created_by = profile.user_id
-  AND id NOT IN (task_assignments WHERE user_id = profile.user_id)
-  AND status != 'done'
-  AND archived = false
-```
-Ou seja: tarefas que eu criei mas não estou executando eu mesmo. Exibe: título, responsável(eis), prazo, prioridade, status.
-
-### Posts Solicitados
-```
-social_media_posts WHERE created_by = profile.user_id
-  AND id NOT IN (post_assignments WHERE user_id = profile.user_id)
-  AND status != 'published'
-  AND archived = false
-```
-Exibe: título, responsável(eis), data agendada, status, plataforma.
-
-## Novos Componentes
-
-### `src/components/dashboard/RequestedTasksList.tsx`
-Componente espelhado no `MyTasksList` mas com diferenças visuais:
-- Título: **"Tarefas Solicitadas"** com ícone `SendHorizontal`
-- Cada linha mostra: título da tarefa + nome(s) do(s) responsável(eis) atribuído(s) + badge de prioridade + prazo
-- Seções: Atrasadas / Hoje / Esta Semana (mesma lógica)
-- Estado vazio: "Nenhuma tarefa solicitada pendente"
-- Sem checkbox de completar (o usuário não é o executor)
-
-### `src/components/dashboard/RequestedPostsList.tsx`
-Componente espelhado no `MyPostsList` com diferenças visuais:
-- Título: **"Posts Solicitados"** com ícone `SendHorizontal`
-- Cada linha mostra: título do post + nome(s) do(s) responsável(eis) + badge de status + data agendada
-- Seções: Atrasados / Hoje / Esta Semana / Pendentes (mesma lógica)
-- Estado vazio: "Nenhum post solicitado pendente"
-
-## Mudanças em `Index.tsx`
-
-### Novos estados
-```typescript
-const [requestedTasks, setRequestedTasks] = useState<any[]>([]);
-const [requestedPosts, setRequestedPosts] = useState<any[]>([]);
+```text
+Clica "Nova Tarefa"
+  -> Abre Dialog com tela de Preenchimento Inteligente
+     -> Duas abas: "Digitar" | "Gravar Audio"
+     -> Textarea com placeholder contextual
+     -> Botao "Preencher com IA" (primario, com icone Sparkles)
+     -> Link "Pular e preencher manualmente" (texto discreto)
+  
+  Se clica "Preencher com IA":
+     -> Loading com animacao
+     -> IA retorna JSON estruturado (titulo, descricao, prioridade, tipo)
+     -> Pre-preenche o formulario e avanca para a tela de formulario normal
+  
+  Se clica "Pular e preencher manualmente":
+     -> Avanca direto para o formulario vazio (comportamento atual)
 ```
 
-### Dentro de `fetchMyData`
-Buscar tarefas criadas pelo usuário logado que não estão nos seus próprios task_assignments:
-```typescript
-// Tarefas solicitadas pelo usuário (criadas mas não auto-atribuídas)
-const { data: createdTasks } = await supabase
-  .from('tasks')
-  .select('*, clients(name), task_assignments(user_id, profiles(name))')
-  .eq('agency_id', currentAgency.id)
-  .eq('created_by', profile.user_id)
-  .neq('status', 'done')
-  .eq('archived', false);
+O mesmo fluxo se aplica ao PostFormDialog.
 
-// Filtrar fora as que o próprio usuário também executa
-const filteredRequestedTasks = (createdTasks || []).filter(t =>
-  !myTaskIds.includes(t.id)
-);
-setRequestedTasks(filteredRequestedTasks);
+## Arquitetura
 
-// Posts solicitados (criados mas não auto-atribuídos)
-const { data: createdPosts } = await supabase
-  .from('social_media_posts')
-  .select('*, clients(name), post_assignments(user_id, profiles(name))')
-  .eq('agency_id', currentAgency.id)
-  .eq('created_by', profile.user_id)
-  .neq('status', 'published')
-  .eq('archived', false);
+### Edge Function: `ai-assist`
 
-const filteredRequestedPosts = (createdPosts || []).filter(p =>
-  !myPostIds.includes(p.id)
-);
-setRequestedPosts(filteredRequestedPosts);
+Uma unica edge function com modos de operacao via campo `type`:
+
+- **`prefill_task`**: Recebe texto livre, retorna JSON com title, description, priority, task_type (via tool calling)
+- **`prefill_post`**: Recebe texto livre, retorna JSON com title, description, platform, post_type, hashtags
+- **`enhance_description`**: (futuro) Melhora texto existente
+
+Usa Lovable AI Gateway (`google/gemini-3-flash-preview`) com tool calling para extrair dados estruturados.
+
+### Componente: `AIPreFillStep`
+
+Componente reutilizavel que renderiza a tela intermediaria:
+- Props: `type` ("task" | "post"), `onResult` (callback com dados), `onSkip` (pular), `loading`
+- Tabs "Digitar" e "Gravar Audio" usando estado interno
+- Web Speech API (PT-BR) para transcricao por voz no navegador
+- Indicador visual de gravacao (pulso vermelho no botao do microfone)
+- Oculta aba de audio se navegador nao suportar Web Speech API
+
+### Hook: `useAIAssist`
+
+Hook centralizado para chamadas a edge function:
+- `preFillTask(text)` -> retorna `{ title, description, priority, task_type }`
+- `preFillPost(text)` -> retorna `{ title, description, platform, post_type, hashtags }`
+- Estados: `loading`, `error`
+- Tratamento de erros 429 (rate limit) e 402 (creditos) com toast amigavel
+
+## Mudancas por Arquivo
+
+| Arquivo | Operacao | Descricao |
+|---|---|---|
+| `supabase/functions/ai-assist/index.ts` | Criar | Edge function com Lovable AI Gateway e tool calling |
+| `supabase/config.toml` | Editar | Adicionar config da funcao ai-assist + restaurar configs anteriores |
+| `src/hooks/useAIAssist.tsx` | Criar | Hook para chamadas IA |
+| `src/components/ui/ai-prefill-step.tsx` | Criar | Tela de preenchimento inteligente (digitar/audio) |
+| `src/pages/Tasks.tsx` | Editar | Adicionar estado de step (prefill vs form), renderizar AIPreFillStep antes do formulario |
+| `src/components/social-media/PostFormDialog.tsx` | Editar | Mesmo padrao: step intermediario antes do formulario |
+
+## Detalhes Tecnicos
+
+### Edge Function - Tool Calling para Tarefas
+
+```text
+Tool: extract_task_data
+Parameters:
+  - title (string, required)
+  - description (string, required) 
+  - priority (enum: low, medium, high)
+  - suggested_type (string) - sugestao de tipo baseado no contexto
+
+System prompt:
+"Voce e um assistente de agencia de marketing digital. 
+Extraia os dados estruturados de uma tarefa a partir da descricao do usuario.
+Gere um titulo conciso e uma descricao profissional, estruturada e sem erros de gramatica.
+Responda sempre em portugues brasileiro."
 ```
 
-### No JSX — novo grid abaixo do grid de Tarefas/Posts
-```jsx
-{/* 5. Grid: Tarefas Solicitadas | Posts Solicitados */}
-<div className="grid gap-4 md:grid-cols-2">
-  <RequestedTasksList
-    tasks={requestedTasks}
-    onViewAll={() => navigate('/dashboard/tasks')}
-  />
-  <RequestedPostsList
-    posts={requestedPosts}
-    customStatuses={myPostCustomStatuses}
-    onViewAll={() => navigate('/dashboard/social-media')}
-  />
-</div>
+### Edge Function - Tool Calling para Posts
+
+```text
+Tool: extract_post_data  
+Parameters:
+  - title (string, required)
+  - description (string, required) - legenda/caption do post
+  - platform (enum: instagram, facebook, linkedin, twitter, tiktok, youtube)
+  - post_type (enum: feed, stories, reels, carrossel, video)
+  - hashtags (array of strings)
+
+System prompt:
+"Voce e um social media manager profissional.
+Extraia os dados de um post para redes sociais a partir da descricao do usuario.
+Gere uma legenda envolvente, profissional e adaptada para a plataforma sugerida.
+Inclua hashtags relevantes. Responda em portugues brasileiro."
 ```
 
-## Exibição dos Responsáveis
+### Web Speech API
 
-Cada linha nos novos blocos mostra o nome de quem está executando (via join com `task_assignments → profiles`):
-
+```text
+- Usa window.SpeechRecognition ou webkitSpeechRecognition
+- Configuracao: lang="pt-BR", continuous=true, interimResults=true
+- Exibe texto parcial enquanto o usuario fala
+- Ao parar, texto final vai para o textarea
+- Botao alterna entre "iniciar" e "parar" gravacao
+- Fallback: oculta aba de audio se API indisponivel
 ```
-[✉] Reels da Semana                    [Em Criação]
-     Maria Silva • 28 fev
-```
 
-Se não houver ninguém atribuído ainda: exibe "Sem responsável" em cinza.
+### Fluxo no Dialog de Tarefas (Tasks.tsx)
 
-## Arquivos Modificados/Criados
+O dialog de criacao ganha um estado `step`:
+- `step = "prefill"`: mostra AIPreFillStep
+- `step = "form"`: mostra formulario atual
 
-| Arquivo | Operação |
-|---|---|
-| `src/components/dashboard/RequestedTasksList.tsx` | Criar |
-| `src/components/dashboard/RequestedPostsList.tsx` | Criar |
-| `src/pages/Index.tsx` | Editar — novos estados, nova query, novo grid no JSX |
+Quando o usuario clica "Preencher com IA" e recebe resultado, os dados sao aplicados ao `newTask` e `step` muda para `"form"`. Quando clica "Pular", muda direto para `"form"` com campos vazios.
 
-## Ordem Final do Dashboard
+Ao fechar o dialog, `step` reseta para `"prefill"`.
 
-1. Header "Meu Dia"
-2. Banner próxima reunião
-3. Bloco de Notas + Linha do Tempo
-4. Rotinas
-5. Minhas Tarefas + Meus Posts
-6. **Tarefas Solicitadas + Posts Solicitados** (NOVO)
-7. Ações Rápidas
-8. Métricas da Agência (admin)
+Nota: o fluxo de template e quicktemplate continua funcionando como antes (abre direto no form).
+
+### Fluxo no PostFormDialog
+
+Mesmo conceito: quando `editPost` e null (criacao), mostra step de prefill primeiro. Em edicao, vai direto ao formulario.
+
+### Restauracao do config.toml
+
+O config.toml precisa ser restaurado com todas as configuracoes anteriores de funcoes que foram perdidas no ultimo diff, alem de adicionar a nova funcao `ai-assist`.
