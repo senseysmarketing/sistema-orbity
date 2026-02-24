@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
-import { Save, ListChecks, Loader2, Calendar, Sparkles } from "lucide-react";
+import { Save, ListChecks, Loader2, Calendar, Sparkles, Users } from "lucide-react";
 import { AIPlanResult, WizardData } from "@/hooks/useContentPlanning";
 
 interface ContentPlanPreviewProps {
@@ -83,6 +83,15 @@ export function ContentPlanPreview({
           <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
             <p className="text-sm font-medium text-primary mb-1">Estratégia do Período</p>
             <p className="text-sm text-muted-foreground">{planResult.strategy_summary}</p>
+          </div>
+        )}
+
+        {/* Assigned users info */}
+        {wizardData.assignedUserIds && wizardData.assignedUserIds.length > 0 && (
+          <div className="flex items-center gap-2 text-sm">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Responsáveis:</span>
+            <Badge variant="secondary">{wizardData.assignedUserIds.length} usuário(s) atribuído(s)</Badge>
           </div>
         )}
 
