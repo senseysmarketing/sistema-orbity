@@ -1,63 +1,60 @@
 
 
-# Cores nos Badges de Tipo + Destaque no Modal de Detalhes
+# Mensagem Pronta por Semana - Resumo de Conteudos
 
-## Resumo
+## O que sera feito
 
-Duas melhorias visuais para diferenciar melhor os tipos de tarefa, especialmente "Redes Sociais" vs "Criativos":
+Adicionar uma opcao "Copiar resumo semanal" no menu de 3 pontinhos do card de planejamento. Ao clicar, abre um modal (Dialog) com uma mensagem pre-formatada agrupando os conteudos por semana, pronta para copiar e colar (ex: enviar ao cliente via WhatsApp).
 
-1. Badges de tipo coloridos no card (kanban e lista)
-2. Tipo da tarefa explicitamente visivel no modal de detalhes
-
-## 1. Mapa de Cores por Tipo de Tarefa
-
-Cada tipo tera uma cor fixa associada, aplicada como classes Tailwind no badge:
-
-| Tipo | Cor | Classes |
-|------|-----|---------|
-| Redes Sociais | Indigo | `bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300` |
-| Criativos | Rosa | `bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300` |
-| Reuniao | Azul | `bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300` |
-| Conteudo | Amber | `bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300` |
-| Desenvolvimento | Cyan | `bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300` |
-| Suporte | Teal | `bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300` |
-| Administrativo | Slate | `bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300` |
-| Outros | Gray (default) | `bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300` |
-
-## 2. Arquivos Modificados
-
-### `src/components/ui/task-card.tsx`
-
-- Criar funcao `getTypeColor(slug)` que retorna as classes CSS baseado no slug do tipo
-- Substituir `variant="outline"` no badge de tipo por classes coloridas dinamicas
-- Incluir o icone do tipo (emoji) dentro do badge para reforcar visualmente
-
-### `src/components/tasks/TaskDetailsDialog.tsx`
-
-- Aceitar novas props: `taskType?: string`, `getTypeName`, `getTypeIcon`
-- Adicionar badge de tipo proeminente logo abaixo do titulo, junto aos badges de status/prioridade
-- Na secao "Redes Sociais" (linha 290), mudar o titulo dinamicamente: se `taskType` for `criativos`, mostrar "Criativos" em vez de "Redes Sociais", e ajustar o icone para `Palette`
-- Isso torna explicito se a tarefa e de Redes Sociais ou Criativos
-
-### `src/components/ui/sortable-task-card.tsx`
-
-- Verificar se ja passa `getTypeName`/`getTypeIcon` ao `TaskCard` interno e garantir que esta correto
-
-### Paginas que usam `TaskDetailsDialog`
-
-- `src/pages/Tasks.tsx` (principal) - passar `taskType` e helpers de tipo ao dialog
-
-## Detalhes Tecnicos
-
-A funcao de cores ficara no `task-card.tsx` mas sera exportada para reutilizacao:
+## Estrutura da mensagem gerada
 
 ```text
-getTypeColor(slug: string): string
-  "redes_sociais" -> "bg-indigo-100 text-indigo-800 ..."
-  "criativos"     -> "bg-pink-100 text-pink-800 ..."
-  ...
-  default         -> "bg-gray-100 text-gray-800 ..."
+Bom dia! Segue o planejamento de conteudos para as redes sociais. 
+Qualquer alteracao ou sugestao, pode me acionar!
+
+--- Semana 1 (03/02 a 09/02) - 3 Conteudos ---
+
+1. Titulo do Post [Terca-feira, 04/02]
+   Tema: Descricao resumida do conteudo
+   Formato: Carrossel | Plataforma: Instagram
+
+2. Titulo do Post [Quinta-feira, 06/02]
+   Tema: Descricao resumida
+   Formato: Reels | Plataforma: Instagram
+
+--- Semana 2 (10/02 a 16/02) - 2 Conteudos ---
+...
 ```
 
-No modal de detalhes, o badge de tipo aparecera na mesma linha dos badges de status e prioridade, com a cor correspondente e o emoji do tipo, ficando visualmente claro qual e o tipo da tarefa.
+## Arquivos
+
+### Novo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`
+
+- Dialog com o texto gerado formatado
+- Recebe o `ContentPlan` (com seus `content_plan_items`) como prop
+- Agrupa os itens por semana (baseado no `post_date`, calculando segunda a domingo)
+- Itens sem `post_date` vao em uma secao "Sem data definida" ao final
+- Botao "Copiar" que copia todo o texto para a area de transferencia com `navigator.clipboard.writeText()`
+- Textarea read-only mostrando a mensagem para que o usuario tambem possa selecionar manualmente
+- O nome do cliente aparece na saudacao
+
+### Modificado: `src/components/social-media/planning/ContentPlanCard.tsx`
+
+- Adicionar nova prop `onCopyWeeklySummary` ao componente
+- Adicionar item no DropdownMenu: icone `MessageSquareText` + "Resumo semanal"
+- Ao clicar, chama `onCopyWeeklySummary(plan)`
+
+### Modificado: `src/components/social-media/planning/ContentPlanningList.tsx`
+
+- Adicionar estado `summaryPlan` para controlar qual plano esta com o modal de resumo aberto
+- Passar callback `onCopyWeeklySummary` ao `ContentPlanCard`
+- Renderizar o `WeeklySummaryDialog` com o plano selecionado
+
+## Logica de agrupamento por semana
+
+- Ordenar itens por `post_date`
+- Para cada item, calcular o numero da semana do mes (semana 1 = dias 1-7, semana 2 = 8-14, etc.)
+- Agrupar e mostrar o intervalo de datas de cada semana
+- Exibir dia da semana em portugues (Segunda-feira, Terca-feira...)
+- Contar quantos conteudos tem em cada semana
 
