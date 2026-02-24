@@ -1,27 +1,24 @@
 
 
-# Campo de Pesquisa no Select de Tarefas (Gerador de Legendas)
+# Persistir Historico de Legendas no localStorage
 
 ## Resumo
 
-Substituir o `Select` atual de tarefas por um `Popover` + `Command` (cmdk) que permite pesquisar/filtrar tarefas por nome ou cliente digitando no campo de busca.
+O historico de legendas geradas atualmente fica apenas em estado local (useState), sendo perdido ao sair da tela. A solucao e persistir no `localStorage` com limite de 5 itens.
 
 ## Arquivo Modificado
 
 ### `src/components/social-media/CaptionGenerator.tsx`
 
-- Importar `Popover`, `PopoverTrigger`, `PopoverContent` do radix
-- Importar `Command`, `CommandInput`, `CommandList`, `CommandEmpty`, `CommandItem` do cmdk
-- Importar icones `Check` e `ChevronsUpDown` do lucide
-- Adicionar estado `taskSearchOpen` (boolean) para controlar o popover
-- Substituir o bloco `<Select>` de tarefas (linhas 262-276) por um Combobox:
-  - `PopoverTrigger` mostra o titulo da tarefa selecionada ou placeholder
-  - `CommandInput` com placeholder "Pesquisar tarefa..."
-  - `CommandList` renderiza as tarefas filtradas automaticamente pelo cmdk
-  - `CommandEmpty` mostra "Nenhuma tarefa encontrada"
-  - Ao selecionar, seta `selectedTaskId` e fecha o popover
+- Criar uma chave de localStorage baseada no `agency_id`: `caption-history-{agencyId}`
+- Inicializar o estado `history` lendo do localStorage (com `JSON.parse` + fallback para array vazio)
+- Ao adicionar nova legenda ao historico, salvar no localStorage limitando a 5 itens (`.slice(0, 5)`)
+- Usar `useEffect` para sincronizar o estado com o localStorage sempre que `history` mudar
+- Converter as datas (timestamp) corretamente ao carregar do localStorage (pois `JSON.parse` retorna strings)
 
-## Resultado
+## Detalhes
 
-O usuario podera digitar para filtrar tarefas por titulo ou nome do cliente, facilitando a busca em listas longas.
+- Chave no localStorage: `caption-history-{currentAgency.id}` para separar por agencia
+- Limite de 5 legendas no historico (as mais recentes)
+- Ao gerar nova legenda, adiciona no inicio e corta as mais antigas se exceder 5
 
