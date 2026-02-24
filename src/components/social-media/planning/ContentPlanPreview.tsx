@@ -110,7 +110,7 @@ export function ContentPlanPreview({
         </div>
 
         {/* Items list */}
-        <ScrollArea className="flex-1 min-h-0 max-h-[50vh] pr-2">
+        <ScrollArea className="flex-1 min-h-0 pr-2">
           <div className="space-y-3">
             {planResult.items.map((item, index) => (
               <Card
