@@ -1,33 +1,17 @@
 
-# Correcao do Seletor de Usuarios + Obrigatoriedade
+# Correcao de Scroll no Modal de Preview do Planejamento
 
-## Problema Raiz
-A query no `ContentPlanDetailsSheet.tsx` usa `profiles(full_name)` na linha 49, mas a tabela `profiles` nao possui a coluna `full_name` -- o campo correto e `name`. Por isso, a query retorna dados vazios e o seletor mostra "Nenhum usuario encontrado".
+## Problema
+O modal de preview do planejamento gerado pela IA (`ContentPlanPreview.tsx`) nao permite rolar verticalmente para ver todos os conteudos. O `ScrollArea` tem `max-h-[50vh]` que limita o espaco disponivel, especialmente quando a area de estrategia e outros elementos acima ocupam espaco significativo.
 
-No wizard (`ContentPlanWizard.tsx`), a query correta ja esta sendo usada: `profiles:user_id(name)`.
+## Alteracao
 
-## Alteracoes
+### ContentPlanPreview.tsx (linha 113)
+- Remover `max-h-[50vh]` do `ScrollArea`
+- Manter `flex-1 min-h-0` que ja faz o componente ocupar todo o espaco disponivel dentro do dialog flex
+- O dialog pai ja tem `max-h-[90vh]` e `flex flex-col`, entao o ScrollArea vai preencher o espaco restante corretamente
 
-### 1. ContentPlanDetailsSheet.tsx - Corrigir query de usuarios
-- Linha 49: trocar `profiles(full_name)` por `profiles:user_id(name)`
-- Linha 54: trocar `u.profiles?.full_name` por `u.profiles?.name`
-- Adicionar campo `id` na select: `"id, user_id, role, profiles:user_id(name)"`
+**Antes:** `className="flex-1 min-h-0 max-h-[50vh] pr-2"`
+**Depois:** `className="flex-1 min-h-0 pr-2"`
 
-### 2. ContentPlanDetailsSheet.tsx - Tornar selecao de usuario obrigatoria
-- No botao "Criar Tarefas" (linha 188), adicionar `assignedUserIds.length === 0` na condicao de `disabled`
-- Atualizar o texto do botao para indicar que usuario e obrigatorio quando nenhum esta selecionado
-- Adicionar texto de aviso caso tente criar sem usuario selecionado
-
-### Detalhes Tecnicos
-A query corrigida ficara:
-```text
-.from("agency_users")
-.select("id, user_id, role, profiles:user_id(name)")
-.eq("agency_id", currentAgency.id)
-```
-E o mapeamento:
-```text
-name: u.profiles?.name || "Sem nome"
-```
-
-O botao sera desabilitado quando `selectedItems.size === 0 || assignedUserIds.length === 0`.
+Isso permite que a lista de conteudos use todo o espaco vertical disponivel no modal, permitindo scroll completo por todos os itens.
