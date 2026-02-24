@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X } from "lucide-react";
+import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X, Check, ChevronsUpDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { AIPreFillStep } from "@/components/ui/ai-prefill-step";
 import { useAIAssist, TaskPrefillResult } from "@/hooks/useAIAssist";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
@@ -296,6 +299,7 @@ export default function Tasks() {
         .from("clients")
         .select("id, name")
         .eq("agency_id", currentAgency.id)
+        .eq("active", true)
         .order("name", { ascending: true });
 
       if (error) throw error;
@@ -1361,20 +1365,44 @@ export default function Tasks() {
                 </SelectContent>
               </Select>
 
-              <Select value={clientFilter} onValueChange={setClientFilter}>
-                <SelectTrigger className="w-[120px] sm:w-[150px] h-9 text-xs sm:text-sm flex-shrink-0">
-                  <SelectValue placeholder="Cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Clientes</SelectItem>
-                  <SelectItem value="no-client">Sem Cliente</SelectItem>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-[140px] sm:w-[170px] h-9 text-xs sm:text-sm flex-shrink-0 justify-between font-normal">
+                    <span className="truncate">
+                      {clientFilter === "all"
+                        ? "Todos Clientes"
+                        : clientFilter === "no-client"
+                        ? "Sem Cliente"
+                        : clients.find((c) => c.id === clientFilter)?.name || "Cliente"}
+                    </span>
+                    <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[220px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar cliente..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem value="Todos Clientes" onSelect={() => setClientFilter("all")}>
+                          <Check className={cn("mr-2 h-4 w-4", clientFilter === "all" ? "opacity-100" : "opacity-0")} />
+                          Todos Clientes
+                        </CommandItem>
+                        <CommandItem value="Sem Cliente" onSelect={() => setClientFilter("no-client")}>
+                          <Check className={cn("mr-2 h-4 w-4", clientFilter === "no-client" ? "opacity-100" : "opacity-0")} />
+                          Sem Cliente
+                        </CommandItem>
+                        {clients.map((client) => (
+                          <CommandItem key={client.id} value={client.name} onSelect={() => setClientFilter(client.id)}>
+                            <Check className={cn("mr-2 h-4 w-4", clientFilter === client.id ? "opacity-100" : "opacity-0")} />
+                            {client.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
 
               <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger className="w-[110px] sm:w-[140px] h-9 text-xs sm:text-sm flex-shrink-0">
