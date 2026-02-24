@@ -13,6 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
 import { WizardData } from "@/hooks/useContentPlanning";
+import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
 
 interface ContentPlanWizardProps {
   open: boolean;
@@ -92,6 +93,25 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
     targetAudience: "",
     audiencePains: "",
     depthLevel: "detailed",
+    assignedUserIds: [],
+  });
+
+  const { data: agencyUsers = [] } = useQuery({
+    queryKey: ["agency-users-planning", currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data } = await supabase
+        .from("agency_users")
+        .select("id, user_id, role, profiles:user_id(name)")
+        .eq("agency_id", currentAgency.id);
+      return (data || []).map((u: any) => ({
+        id: u.id,
+        user_id: u.user_id,
+        name: u.profiles?.name || "Sem nome",
+        role: u.role,
+      }));
+    },
+    enabled: !!currentAgency?.id && open,
   });
 
   const { data: clients = [] } = useQuery({
@@ -187,6 +207,17 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
                 onChange={(e) => updateField("strategicFocus", e.target.value)}
                 placeholder="Ex: Vamos focar em vender mentoria premium e posicionar como autoridade..."
                 rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Responsáveis pelas tarefas</Label>
+              <p className="text-xs text-muted-foreground">Selecione quem será atribuído às tarefas criadas a partir deste planejamento</p>
+              <MultiUserSelector
+                users={agencyUsers}
+                selectedUserIds={data.assignedUserIds || []}
+                onSelectionChange={(ids) => updateField("assignedUserIds", ids)}
+                placeholder="Selecionar responsáveis..."
               />
             </div>
           </div>

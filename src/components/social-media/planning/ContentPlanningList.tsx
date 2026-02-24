@@ -58,9 +58,6 @@ export function ContentPlanningList() {
     setSaving(true);
     const planId = await savePlan(currentWizardData, currentPlanResult);
     if (planId) {
-      // Fetch the saved items to get their IDs
-      const { useContentPlanning: _ } = await import("@/hooks/useContentPlanning");
-      // We need to get the actual item IDs from the database
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: savedItems } = await supabase
         .from("content_plan_items")
@@ -72,7 +69,7 @@ export function ContentPlanningList() {
         const selectedIds = selectedIndices
           .filter((i) => i < savedItems.length)
           .map((i) => savedItems[i].id);
-        await createTasksFromItems(planId, selectedIds);
+        await createTasksFromItems(planId, selectedIds, currentWizardData.assignedUserIds);
       }
       setPreviewOpen(false);
       setCurrentPlanResult(null);

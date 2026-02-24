@@ -69,6 +69,8 @@ export interface WizardData {
   audiencePains: string;
   // Step 5 - Depth
   depthLevel: "summary" | "detailed";
+  // Assigned users
+  assignedUserIds?: string[];
 }
 
 export interface AIPlanResult {
@@ -217,7 +219,7 @@ export function useContentPlanning() {
     }
   };
 
-  const createTasksFromItems = async (planId: string, selectedItemIds: string[]): Promise<boolean> => {
+  const createTasksFromItems = async (planId: string, selectedItemIds: string[], assignedUserIds?: string[]): Promise<boolean> => {
     if (!currentAgency?.id || !user?.id) return false;
 
     try {
@@ -265,6 +267,21 @@ export function useContentPlanning() {
         if (taskError) {
           console.error("Error creating task:", taskError);
           continue;
+        }
+
+        // Assign users to the task
+        if (assignedUserIds && assignedUserIds.length > 0) {
+          const assignments = assignedUserIds.map((userId) => ({
+            task_id: task.id,
+            user_id: userId,
+            assigned_by: user.id,
+          }));
+          const { error: assignError } = await supabase
+            .from("task_assignments")
+            .insert(assignments);
+          if (assignError) {
+            console.error("Error assigning users:", assignError);
+          }
         }
 
         // Update item with task reference
