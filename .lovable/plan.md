@@ -1,22 +1,33 @@
 
+# Correcao do Seletor de Usuarios + Obrigatoriedade
 
-# Ajuste Visual do Indicador de Etapas no Wizard de Planejamento
+## Problema Raiz
+A query no `ContentPlanDetailsSheet.tsx` usa `profiles(full_name)` na linha 49, mas a tabela `profiles` nao possui a coluna `full_name` -- o campo correto e `name`. Por isso, a query retorna dados vazios e o seletor mostra "Nenhum usuario encontrado".
 
-## Objetivo
-Substituir o indicador de etapas atual (pills com emoji e texto) pelo estilo usado no modal de tarefas: circulos numerados conectados por linhas, com o nome da etapa abaixo.
+No wizard (`ContentPlanWizard.tsx`), a query correta ja esta sendo usada: `profiles:user_id(name)`.
 
-## Alteracao
+## Alteracoes
 
-### ContentPlanWizard.tsx
-- Importar o componente `WizardStepIndicator` de `@/components/ui/wizard-step-indicator`
-- Remover o bloco atual do step indicator (as pills com emojis)
-- Substituir pelo `WizardStepIndicator` passando:
-  - `currentStep={step + 1}` (o componente usa base 1)
-  - `totalSteps={5}`
-  - `stepLabels={["Contexto", "Frequencia", "Estilo", "Direcionamento", "IA"]}`
-- Remover a constante `STEPS` que nao sera mais usada
+### 1. ContentPlanDetailsSheet.tsx - Corrigir query de usuarios
+- Linha 49: trocar `profiles(full_name)` por `profiles:user_id(name)`
+- Linha 54: trocar `u.profiles?.full_name` por `u.profiles?.name`
+- Adicionar campo `id` na select: `"id, user_id, role, profiles:user_id(name)"`
 
-### Resultado Visual
-Antes: pills horizontais com emojis e texto truncado
-Depois: circulos numerados (1-5) com linhas conectoras e labels curtos abaixo, etapas completas em verde com check
+### 2. ContentPlanDetailsSheet.tsx - Tornar selecao de usuario obrigatoria
+- No botao "Criar Tarefas" (linha 188), adicionar `assignedUserIds.length === 0` na condicao de `disabled`
+- Atualizar o texto do botao para indicar que usuario e obrigatorio quando nenhum esta selecionado
+- Adicionar texto de aviso caso tente criar sem usuario selecionado
 
+### Detalhes Tecnicos
+A query corrigida ficara:
+```text
+.from("agency_users")
+.select("id, user_id, role, profiles:user_id(name)")
+.eq("agency_id", currentAgency.id)
+```
+E o mapeamento:
+```text
+name: u.profiles?.name || "Sem nome"
+```
+
+O botao sera desabilitado quando `selectedItems.size === 0 || assignedUserIds.length === 0`.
