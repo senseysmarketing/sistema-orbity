@@ -1,184 +1,61 @@
 
-# Tela de Metas - Programa de Participacao nos Resultados (PPR)
 
-## Resumo
-Nova pagina "Metas & Bonus" acessivel no menu lateral, acima de "Administrativo". Inicialmente implementa o modelo PPR (Pool de Bonus), com estrutura preparada para os outros 2 modelos futuros.
+# Placar Financeiro com Tabela Mensal + Integracao Automatica
 
-## Estrutura do Banco de Dados
+## O que muda
 
-### Tabela `bonus_programs`
-Armazena a configuracao do programa escolhido pela agencia.
+Substituir os 4 cards atuais do "Placar do Trimestre" por uma tabela mensal como no print de referencia, mostrando colunas para cada mes do periodo + coluna de Total/Meta do trimestre. Os dados serao puxados automaticamente das tabelas financeiras existentes (`client_payments`, `expenses`, `salaries`).
 
-| Coluna | Tipo | Descricao |
-|--------|------|-----------|
-| id | uuid PK | |
-| agency_id | uuid FK agencies | |
-| program_type | text | 'ppr', 'salary_multiplier', 'spot_bonus' |
-| name | text | Nome do programa |
-| is_active | boolean | Se esta ativo |
-| config | jsonb | Configuracoes especificas (ex: percentual do lucro, meta NPS, periodo) |
-| created_at / updated_at | timestamptz | |
-
-### Tabela `bonus_periods`
-Cada trimestre/semestre avaliado.
-
-| Coluna | Tipo | Descricao |
-|--------|------|-----------|
-| id | uuid PK | |
-| agency_id | uuid FK | |
-| program_id | uuid FK bonus_programs | |
-| label | text | Ex: "Q1 2026" |
-| start_date / end_date | date | Periodo |
-| revenue_target | numeric | Meta de faturamento |
-| revenue_actual | numeric | Faturamento real (admin insere ou calcula do financeiro) |
-| net_profit | numeric | Lucro liquido apurado |
-| bonus_pool_percent | numeric | % do lucro para o pool |
-| bonus_pool_amount | numeric | Valor calculado do pool |
-| nps_target | numeric | Meta de NPS |
-| nps_actual | numeric | NPS calculado |
-| status | text | 'open', 'closed' |
-| created_at / updated_at | timestamptz | |
-
-### Tabela `nps_responses`
-Respostas de NPS por cliente.
-
-| Coluna | Tipo | Descricao |
-|--------|------|-----------|
-| id | uuid PK | |
-| agency_id | uuid FK | |
-| period_id | uuid FK bonus_periods | |
-| client_name | text | Nome do cliente |
-| score | integer | 0-10 |
-| category | text | Calculado: 'promoter', 'neutral', 'detractor' |
-| comment | text | Feedback |
-| created_at | timestamptz | |
-
-### Tabela `employee_scorecards`
-Avaliacao individual de cada colaborador.
-
-| Coluna | Tipo | Descricao |
-|--------|------|-----------|
-| id | uuid PK | |
-| agency_id | uuid FK | |
-| period_id | uuid FK bonus_periods | |
-| employee_id | uuid FK employees | |
-| user_id | uuid | Referencia auth.users para controle de visibilidade |
-| nps_retention_score | numeric | Nota 0-10 (peso 4) |
-| technical_delivery_score | numeric | Nota 0-10 (peso 4) |
-| process_innovation_score | numeric | Nota 0-10 (peso 2) |
-| weighted_average | numeric | Calculado automaticamente |
-| max_share | numeric | Fatia maxima do pool |
-| final_bonus | numeric | Valor final a receber |
-| created_at / updated_at | timestamptz | |
-
-### Politicas RLS
-- Todas as tabelas: membros da agencia podem SELECT
-- INSERT/UPDATE/DELETE: apenas admins/owners da agencia
-- `employee_scorecards`: usuarios comuns so veem sua propria linha (WHERE user_id = auth.uid() OR is_agency_admin())
-
-## Navegacao
-
-### Menu Lateral (`AppSidebar.tsx`)
-- Novo item "Metas & Bonus" com icone `Trophy` acima de "Administrativo" na categoria "Administracao"
-- URL: `/dashboard/goals`
-
-### Rotas (`App.tsx`)
-- Nova rota: `<Route path="goals" element={<Goals />} />`
-
-## Componentes da Pagina
-
-### `src/pages/Goals.tsx`
-Pagina principal com logica de selecao de programa.
-
-- Se nenhum programa ativo: exibe tela de selecao com 3 cards (PPR, Multiplicador, Spot Bonus)
-- Se programa PPR ativo: renderiza `<PPRDashboard />`
-- Admins podem trocar o programa via botao de configuracao
-
-### `src/components/goals/ProgramSelector.tsx`
-3 cards lado a lado para escolher o tipo de programa. Cada card tem titulo, descricao curta e icone. Apenas PPR estara habilitado, os outros 2 com badge "Em breve".
-
-### `src/components/goals/PPRDashboard.tsx`
-Componente principal do PPR, dividido em 3 blocos:
-
-#### Bloco 1: Placar do Trimestre (visivel por todos)
-4 cards de metricas:
-1. **Faturamento** - valor acumulado + barra de progresso vs meta
-2. **Lucro Liquido** - valor apurado
-3. **Pote de Bonus** - calculado automaticamente (% do lucro)
-4. **NPS da Agencia** - nota atual + indicador visual (verde se >= meta)
-
-Seletor de periodo no topo para navegar entre trimestres.
-
-#### Bloco 2: Calculadora de NPS (visivel para admins)
-- Formulario: Nome do Cliente, Nota (0-10), Comentario
-- Lista de respostas com classificacao automatica (Promotor/Neutro/Detrator com badges coloridos)
-- Grafico de rosca (recharts) mostrando distribuicao Promotores/Neutros/Detratores
-- Calculo automatico do NPS: `(% Promotores - % Detratores)` alimenta Card 4
-
-#### Bloco 3: Scorecard da Equipe (admin ve todos, usuario ve so o seu)
-- Lista/tabela de cards por colaborador (puxa da tabela `employees`)
-- Admin insere notas 0-10 para cada criterio:
-  - NPS e Retencao (peso 4) - pre-preenche do NPS se disponivel
-  - Entrega Tecnica (peso 4)
-  - Processos e Inovacao (peso 2)
-- Media ponderada calculada: `(nps*4 + tecnica*4 + processo*2) / 10`
-- Calculo financeiro: `fatia_maxima = pool / num_colaboradores`, `bonus = fatia_maxima * (media / 10)`
-- Barras de progresso visuais para cada nota
-- **Regra de visibilidade**: usuarios comuns veem sua propria linha normalmente e as demais com dados embacados (blur CSS) mostrando apenas o nome
-
-### `src/components/goals/PPRConfigDialog.tsx`
-Dialog para admin configurar:
-- Percentual do lucro para o pool (default 10%)
-- Meta de NPS (default 60)
-- Meta de faturamento do periodo
-- Periodo (trimestral/semestral)
-
-### `src/components/goals/NPSChart.tsx`
-Grafico de rosca com recharts mostrando Promotores (verde), Neutros (amarelo), Detratores (vermelho).
-
-### `src/components/goals/ScorecardCard.tsx`
-Card individual do colaborador com:
-- Nome e cargo
-- 3 inputs de nota com barras de progresso
-- Media ponderada destacada
-- Valor do bonus calculado
-- Versao "blurred" para usuarios comuns vendo outros
-
-## Fluxo de Dados
+## Layout da Tabela
 
 ```text
-Admin configura programa PPR
-       |
-       v
-Admin cria periodo (Q1 2026) com metas
-       |
-       v
-Admin insere respostas NPS --> calcula NPS automatico --> alimenta Card 4
-       |
-       v
-Admin avalia equipe no Scorecard --> calcula bonus individual
-       |
-       v
-Todos veem o Placar (Bloco 1)
-Admins veem/editam NPS e Scorecard completo
-Usuarios veem apenas seu proprio Scorecard
+| Indicador         | Março      | Abril      | Maio       | Total Trimestre |
+|-------------------|------------|------------|------------|-----------------|
+| Faturamento (R$)  | R$ 35.000  | R$ 42.000  | R$ 50.000  | Meta: R$ 50.000 |
+| Lucro Líquido (R$)| R$ 17.500  | R$ 21.000  | R$ 25.000  | R$ 63.500       |
+| Pote de Bônus     | R$ 1.750   | R$ 2.100   | R$ 2.500   | R$ 6.350        |
+| NPS Geral         | Aguardando | Aguardando | Pesquisa   | Meta: > 60      |
 ```
 
-## Arquivos a Criar/Modificar
+- A coluna "Total Trimestre" mostra a meta de faturamento (configuravel) e os totais acumulados
+- "Faturamento" refere-se ao faturamento recorrente (pagamentos de clientes com status "paid")
+- Meses futuros exibem "Aguardando" ou o valor parcial caso ja tenha dados
+- Barra de progresso abaixo da tabela mostrando o quanto ja atingiu da meta
 
-### Novos arquivos:
-- `src/pages/Goals.tsx`
-- `src/components/goals/ProgramSelector.tsx`
-- `src/components/goals/PPRDashboard.tsx`
-- `src/components/goals/PPRConfigDialog.tsx`
-- `src/components/goals/NPSChart.tsx`
-- `src/components/goals/ScorecardCard.tsx`
-- `src/components/goals/NPSResponseForm.tsx`
+## Integracao com Dados Financeiros
 
-### Arquivos modificados:
-- `src/components/layout/AppSidebar.tsx` - adicionar item "Metas & Bonus"
-- `src/App.tsx` - adicionar rota `/dashboard/goals`
+**Arquivo**: `src/components/goals/PPRDashboard.tsx`
 
-### Migracao SQL:
-- Criar as 4 tabelas com RLS
-- Triggers de updated_at
+### Busca automatica por mes:
+Para cada mes dentro do range `start_date` a `end_date` do periodo selecionado, o sistema buscara:
+
+1. **Faturamento**: `SUM(amount)` de `client_payments` com `status = 'paid'` e `due_date` dentro do mes, filtrado por `agency_id`
+2. **Despesas**: `SUM(amount)` de `expenses` com `status = 'paid'` no mesmo mes
+3. **Salarios**: `SUM(amount)` de `salaries` com `status = 'paid'` no mesmo mes
+4. **Lucro Liquido por mes**: Faturamento - (Despesas + Salarios)
+5. **Pote de Bonus por mes**: Lucro Liquido * (bonus_pool_percent / 100)
+
+### Calculo do Total Trimestre:
+- Soma dos faturamentos mensais
+- Soma dos lucros liquidos
+- Soma dos potes de bonus
+- NPS: valor calculado das respostas NPS do periodo
+
+### Atualizacao automatica do periodo:
+Apos calcular, os valores `revenue_actual`, `net_profit` e `bonus_pool_amount` na tabela `bonus_periods` serao atualizados automaticamente.
+
+## Remocao dos Inputs Manuais
+
+Os inputs manuais de "Faturamento Real" e "Lucro Liquido" que estao no Bloco 3 (Scorecard) serao removidos, ja que agora os dados vem automaticamente do financeiro.
+
+## Meta de Faturamento Recorrente
+
+O label do campo de meta sera ajustado para "Meta de Faturamento Recorrente" no `PPRConfigDialog`, deixando claro que a meta se refere ao faturamento recorrente mensal que a agencia quer atingir (ex: R$ 50.000/mes), nao ao total do trimestre.
+
+A coluna "Total Trimestre" da linha de faturamento mostrara a meta mensal como referencia (ex: "Meta: R$ 50.000"), pois o objetivo e atingir esse valor recorrente ate o final do periodo.
+
+## Arquivos Modificados
+
+- `src/components/goals/PPRDashboard.tsx` - Nova funcao `fetchFinancialData()` que busca dados por mes, nova tabela HTML no Bloco 1, remocao dos inputs manuais do Bloco 3
+- `src/components/goals/PPRConfigDialog.tsx` - Label da meta ajustado para "Meta de Faturamento Recorrente"
+
