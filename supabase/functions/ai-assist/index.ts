@@ -307,7 +307,14 @@ serve(async (req) => {
       tools = CONTENT_PLANNING_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_content_plan" } };
     } else if (type === "improve_task") {
-      systemPrompt = DEFAULT_IMPROVE_TASK_PROMPT + IMPROVE_TASK_TECHNICAL_INSTRUCTIONS + dateContext;
+      let directionAddendum = "";
+      try {
+        const parsed = JSON.parse(content);
+        if (parsed.direction) {
+          directionAddendum = ` DIRECIONAMENTO DO USUÁRIO: ${parsed.direction}. Siga este direcionamento ao melhorar a tarefa.`;
+        }
+      } catch (_) { /* content might not be JSON, ignore */ }
+      systemPrompt = DEFAULT_IMPROVE_TASK_PROMPT + IMPROVE_TASK_TECHNICAL_INSTRUCTIONS + directionAddendum + dateContext;
       tools = TASK_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_task_data" } };
     } else if (type === "generate_caption") {
