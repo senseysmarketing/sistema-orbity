@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock, Copy, Hash, Smartphone, Palette, CalendarClock } from "lucide-react";
+import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock, Copy, Hash, Smartphone, Palette, CalendarClock, Sparkles, Loader2 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
@@ -13,6 +13,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useDeletePermission } from "@/hooks/useDeletePermission";
 import { LinkifyText } from "@/lib/linkify";
 import { AttachmentsDisplay, Attachment } from "@/components/ui/file-attachments";
+import { useAIAssist } from "@/hooks/useAIAssist";
+import { useAgency } from "@/hooks/useAgency";
+import { useToast } from "@/hooks/use-toast";
 
 interface Subtask {
   id: string;
@@ -75,11 +78,17 @@ const priorityConfig: Record<string, { label: string; color: string }> = {
 export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, onDuplicate, getClientName, getAssignedUsers, onTaskUpdate }: TaskDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showNoPermissionAlert, setShowNoPermissionAlert] = useState(false);
+  const [showAIPreview, setShowAIPreview] = useState(false);
+  const [aiSuggestion, setAISuggestion] = useState<any>(null);
+  const [aiApplying, setAIApplying] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [creatorName, setCreatorName] = useState<string>("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   
   const { canDelete, isCreator, isAdmin, creatorName: permissionCreatorName } = useDeletePermission(task?.created_by);
+  const { improveTask, loading: aiLoading } = useAIAssist();
+  const { currentAgency } = useAgency();
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadTaskDetails = async () => {
@@ -411,6 +420,36 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
           </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (!task) return;
+                const taskData = {
+                  title: task.title,
+                  description: task.description,
+                  priority: task.priority,
+                  platform: task.platform,
+                  post_type: task.post_type,
+                  hashtags: task.hashtags,
+                  creative_instructions: task.creative_instructions,
+                };
+                const result = await improveTask(taskData, currentAgency?.id);
+                if (result) {
+                  setAISuggestion(result);
+                  setShowAIPreview(true);
+                }
+              }}
+              disabled={aiLoading}
+              className="w-full sm:w-auto"
+            >
+              {aiLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-2" />
+              )}
+              <span className="hidden sm:inline">Melhorar com IA</span>
+              <span className="sm:hidden">IA</span>
+            </Button>
             {onDuplicate && (
               <Button
                 variant="outline"
@@ -481,6 +520,99 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogAction>Entendi</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog de preview da IA */}
+      <AlertDialog open={showAIPreview} onOpenChange={setShowAIPreview}>
+        <AlertDialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Sugestões da IA
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 mt-2">
+                {aiSuggestion && (
+                  <>
+                    {aiSuggestion.title && aiSuggestion.title !== task?.title && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground">Título</p>
+                        <p className="text-xs text-muted-foreground line-through">{task?.title}</p>
+                        <p className="text-sm text-foreground">{aiSuggestion.title}</p>
+                      </div>
+                    )}
+                    {aiSuggestion.description && aiSuggestion.description !== task?.description && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground">Descrição</p>
+                        {task?.description && <p className="text-xs text-muted-foreground line-through whitespace-pre-wrap">{task.description}</p>}
+                        <p className="text-sm text-foreground whitespace-pre-wrap">{aiSuggestion.description}</p>
+                      </div>
+                    )}
+                    {aiSuggestion.creative_instructions && aiSuggestion.creative_instructions !== task?.creative_instructions && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground">Instruções Criativas</p>
+                        {task?.creative_instructions && <p className="text-xs text-muted-foreground line-through whitespace-pre-wrap">{task.creative_instructions}</p>}
+                        <p className="text-sm text-foreground whitespace-pre-wrap">{aiSuggestion.creative_instructions}</p>
+                      </div>
+                    )}
+                    {aiSuggestion.hashtags?.length > 0 && JSON.stringify(aiSuggestion.hashtags) !== JSON.stringify(task?.hashtags) && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground">Hashtags</p>
+                        <div className="flex flex-wrap gap-1">
+                          {aiSuggestion.hashtags.map((tag: string, i: number) => (
+                            <Badge key={i} variant="secondary" className="text-xs">
+                              {tag.startsWith("#") ? tag : `#${tag}`}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={aiApplying}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!task || !aiSuggestion) return;
+                setAIApplying(true);
+                try {
+                  const updates: Record<string, any> = {};
+                  if (aiSuggestion.title) updates.title = aiSuggestion.title;
+                  if (aiSuggestion.description) updates.description = aiSuggestion.description;
+                  if (aiSuggestion.creative_instructions) updates.creative_instructions = aiSuggestion.creative_instructions;
+                  if (aiSuggestion.hashtags?.length) updates.hashtags = aiSuggestion.hashtags;
+                  if (aiSuggestion.platform) updates.platform = aiSuggestion.platform;
+                  if (aiSuggestion.post_type) updates.post_type = aiSuggestion.post_type;
+
+                  const { error } = await supabase
+                    .from("tasks")
+                    .update(updates)
+                    .eq("id", task.id);
+
+                  if (error) throw error;
+
+                  toast({ title: "Tarefa melhorada com sucesso!" });
+                  setShowAIPreview(false);
+                  setAISuggestion(null);
+                  onTaskUpdate?.();
+                } catch (error) {
+                  console.error("Error applying AI suggestion:", error);
+                  toast({ title: "Erro ao aplicar sugestões", variant: "destructive" });
+                } finally {
+                  setAIApplying(false);
+                }
+              }}
+            >
+              {aiApplying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Aplicar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

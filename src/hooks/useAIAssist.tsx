@@ -125,5 +125,9 @@ export function useAIAssist() {
     return callAI("analytics_review", content, agencyId);
   };
 
-  return { preFillTask, preFillPost, generateReport, analyzeCampaign, analyzeTaskPeriod, loading };
+  const improveTask = async (taskData: Record<string, any>, agencyId?: string): Promise<TaskPrefillResult | null> => {
+    return callAI("improve_task", JSON.stringify(taskData), agencyId);
+  };
+
+  return { preFillTask, preFillPost, generateReport, analyzeCampaign, analyzeTaskPeriod, improveTask, loading };
 }
