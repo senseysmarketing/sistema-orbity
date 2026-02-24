@@ -393,7 +393,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
     </div>;
   }
 
-  if (periods.length === 0) {
+  if (periods.length === 0 && !showConfig) {
     return (
       <div className="text-center py-16 space-y-4">
         <Gift className="h-12 w-12 text-muted-foreground mx-auto" />
@@ -405,6 +405,21 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
             Criar Período
           </Button>
         )}
+      </div>
+    );
+  }
+
+  if (periods.length === 0 && showConfig) {
+    return (
+      <div className="text-center py-16 space-y-4">
+        <Gift className="h-12 w-12 text-muted-foreground mx-auto" />
+        <h3 className="text-lg font-medium text-foreground">Nenhum período criado</h3>
+        <PPRConfigDialog
+          open={showConfig}
+          onOpenChange={setShowConfig}
+          mode="create"
+          onSave={handleCreateFromDialog}
+        />
       </div>
     );
   }
