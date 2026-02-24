@@ -1729,6 +1729,9 @@ export default function Tasks() {
         getClientName={getClientName}
         getAssignedUsers={getAssignedUsers}
         onTaskUpdate={fetchTasks}
+        taskType={selectedTask?.task_type}
+        getTypeName={getTypeName}
+        getTypeIcon={getTypeIcon}
       />
 
       {/* Template Selector Dialog */}

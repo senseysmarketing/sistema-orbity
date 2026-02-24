@@ -3,6 +3,21 @@ import { CheckCircle, Clock, AlertCircle, Target, Users, Circle, Loader, Eye, Ch
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+// Mapa de cores por slug do tipo de tarefa
+export const getTypeColor = (slug: string | null): string => {
+  if (!slug) return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+  const map: Record<string, string> = {
+    redes_sociais: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300",
+    criativos: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300",
+    reuniao: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+    conteudo: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300",
+    desenvolvimento: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300",
+    suporte: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300",
+    administrativo: "bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300",
+  };
+  return map[slug] || "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300";
+};
+
 interface Task {
   id: string;
   title: string;
@@ -107,8 +122,8 @@ export function TaskCard({
         <StatusIcon className="h-5 w-5 flex-shrink-0" />
         <div className="flex gap-1 flex-nowrap overflow-x-auto scrollbar-hide">
           {task.task_type && (getTypeShortName || getTypeName) && (
-            <Badge variant="outline" className="text-xs whitespace-nowrap flex-shrink-0">
-              {(getTypeShortName || getTypeName)?.(task.task_type)}
+            <Badge className={`${getTypeColor(task.task_type)} text-xs whitespace-nowrap flex-shrink-0 border-0`}>
+              {getTypeIcon?.(task.task_type)} {(getTypeShortName || getTypeName)?.(task.task_type)}
             </Badge>
           )}
           <Badge variant="outline" className={`${getPriorityColor(task.priority)} text-white text-xs whitespace-nowrap flex-shrink-0`}>
