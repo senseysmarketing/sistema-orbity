@@ -1,57 +1,51 @@
 
-# Atribuir Usuarios nas Tarefas do Planejamento de Conteudo
+# Seletor de Usuarios no Painel de Detalhes + Correcao de Sincronizacao
 
-## Problema
-Atualmente, quando o planejamento de conteudo e convertido em tarefas, elas sao criadas sem atribuicao a nenhum usuario, ficando "soltas" no sistema.
+## Problemas Identificados
 
-## Solucao
+1. **Sem seletor de usuario no painel lateral (ContentPlanDetailsSheet)**: Quando o usuario abre um planejamento salvo e decide criar tarefas depois, nao ha como atribuir responsaveis.
 
-Adicionar um seletor de usuarios no fluxo de criacao de tarefas a partir do planejamento. A abordagem mais pratica e adicionar o seletor de usuarios na **tela de Preview** (onde o usuario revisa os conteudos gerados pela IA antes de salvar), permitindo definir um ou mais responsaveis que serao atribuidos a **todas as tarefas criadas** de uma vez.
-
-Opcionalmente, tambem sera possivel definir responsaveis diferentes por conteudo individual, mas o padrao sera um responsavel global para simplificar o fluxo.
+2. **Dados desatualizados apos criar tarefas**: O painel lateral usa uma copia estatica do plano (`selectedPlan`). Quando tarefas sao criadas, a query e invalidada e o card no fundo atualiza corretamente, mas o painel lateral continua mostrando os dados antigos (ex: card mostra 2/5, sheet mostra 1/5).
 
 ## Alteracoes
 
-### 1. WizardData (useContentPlanning.tsx)
-- Adicionar campo `assignedUserIds: string[]` ao tipo `WizardData`
+### 1. ContentPlanDetailsSheet.tsx
+- Adicionar `MultiUserSelector` acima do botao "Criar Tarefas", permitindo selecionar responsaveis
+- Buscar usuarios da agencia via `agency_users` + `profiles` (mesmo padrao do Wizard)
+- Passar os `assignedUserIds` selecionados para a funcao `onCreateTasks`
+- Atualizar a interface `onCreateTasks` para aceitar um terceiro parametro `assignedUserIds`
 
-### 2. ContentPlanWizard.tsx
-- No **Passo 1 (Contexto do Cliente)**, apos selecionar o cliente, adicionar o componente `MultiUserSelector` para escolher os responsaveis padrao das tarefas
-- Buscar a lista de usuarios da agencia via `agency_users` + `profiles` (mesmo padrao usado em outros formularios)
-- O campo sera opcional mas recomendado
+### 2. ContentPlanningList.tsx - Correcao de sincronizacao
+- Ao inves de manter `selectedPlan` como snapshot estavel, derivar o plano exibido diretamente do array `plans` usando o ID
+- Guardar apenas `selectedPlanId` (string) em vez de `selectedPlan` (objeto)
+- Criar um `useMemo` que busca o plano atualizado: `plans.find(p => p.id === selectedPlanId)`
+- Isso garante que quando a query `content-plans` e invalidada e os dados novos chegam, o painel lateral reflete automaticamente
 
-### 3. ContentPlanPreview.tsx
-- Exibir os usuarios selecionados no resumo (badge com nomes)
-- Permitir alterar a selecao antes de criar as tarefas
-- Passar os `assignedUserIds` para a funcao `onSaveAndCreateTasks`
-
-### 4. useContentPlanning.tsx - createTasksFromItems
-- Apos criar cada tarefa, inserir registros na tabela `task_assignments` com os `user_ids` selecionados
-- Usar o mesmo padrao de insert em lote: `{ task_id, user_id }` para cada combinacao
-
-### 5. ContentPlanningList.tsx
-- Passar os `assignedUserIds` do wizard para o preview e para a funcao de criacao de tarefas
+### 3. Ajuste no fluxo de onCreateTasks no ContentPlanningList
+- Passar os `assignedUserIds` recebidos do sheet para `createTasksFromItems`
 
 ## Detalhes Tecnicos
 
-- Reutilizar o componente `MultiUserSelector` ja existente em `src/components/tasks/MultiUserSelector.tsx`
-- Query para buscar usuarios: `agency_users` join `profiles` filtrado por `agency_id` (mesmo padrao do wizard de tarefas)
-- Insert de assignments apos criacao da tarefa:
-```text
-for each task created:
-  for each userId in assignedUserIds:
-    insert into task_assignments(task_id, user_id)
-```
-- Nao requer migracoes de banco de dados - a tabela `task_assignments` ja existe
+**ContentPlanDetailsSheet.tsx:**
+- Importar `MultiUserSelector` de `@/components/tasks/MultiUserSelector`
+- Importar `useAgency` para obter o `agency_id`
+- Query local para buscar usuarios: `supabase.from("agency_users").select("user_id, role, profiles(full_name)").eq("agency_id", agencyId)`
+- Estado local `assignedUserIds: string[]` para controlar a selecao
+- Exibir o seletor entre o checkbox "selecionar todos" e a lista de itens
+- Label: "Responsaveis pelas tarefas"
 
-## Fluxo do Usuario
-
+**ContentPlanningList.tsx:**
 ```text
-Wizard Passo 1: Seleciona cliente + responsaveis
-         |
-Wizard Passos 2-5: Configuracao normal
-         |
-Preview: Ve os conteudos + responsaveis selecionados
-         |
-"Salvar e Criar Tarefas": Cria tarefas JA atribuidas aos usuarios
+// Antes (snapshot estatico):
+const [selectedPlan, setSelectedPlan] = useState<ContentPlan | null>(null);
+
+// Depois (derivado dos dados atualizados):
+const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+const selectedPlan = useMemo(() => plans.find(p => p.id === selectedPlanId) || null, [plans, selectedPlanId]);
 ```
+
+**Assinatura atualizada de onCreateTasks:**
+```text
+onCreateTasks: (planId: string, itemIds: string[], assignedUserIds?: string[]) => Promise<boolean>
+```
+Isso ja e compativel com a funcao `createTasksFromItems` existente no hook que ja aceita `assignedUserIds` como terceiro parametro.
