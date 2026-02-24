@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChevronLeft, ChevronRight, Sparkles, Loader2 } from "lucide-react";
+import { WizardStepIndicator } from "@/components/ui/wizard-step-indicator";
 import { useQuery } from "@tanstack/react-query";
 import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,13 +61,7 @@ const VOICE_TONES = [
   { value: "humanizado", label: "Humanizado" },
 ];
 
-const STEPS = [
-  { title: "Contexto do Cliente", icon: "🧩" },
-  { title: "Frequência e Volume", icon: "📊" },
-  { title: "Estilo e Conteúdo", icon: "🎨" },
-  { title: "Direcionamento", icon: "🏆" },
-  { title: "Profundidade da IA", icon: "🤖" },
-];
+const STEP_LABELS = ["Contexto", "Frequência", "Estilo", "Direcionamento", "IA"];
 
 export function ContentPlanWizard({ open, onClose, onGenerate, generating }: ContentPlanWizardProps) {
   const { currentAgency } = useAgency();
@@ -415,22 +410,7 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
           </DialogTitle>
         </DialogHeader>
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-1 px-2">
-          {STEPS.map((s, i) => (
-            <div key={i} className="flex items-center flex-1">
-              <div
-                className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full transition-colors ${
-                  i === step ? "bg-primary text-primary-foreground" : i < step ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-                }`}
-              >
-                <span>{s.icon}</span>
-                <span className="hidden sm:inline truncate">{s.title}</span>
-              </div>
-              {i < STEPS.length - 1 && <div className={`h-px flex-1 mx-1 ${i < step ? "bg-primary" : "bg-border"}`} />}
-            </div>
-          ))}
-        </div>
+        <WizardStepIndicator currentStep={step + 1} totalSteps={5} stepLabels={STEP_LABELS} />
 
         <ScrollArea className="flex-1 px-1">
           <div className="py-4">{renderStep()}</div>
@@ -443,7 +423,7 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
             {step === 0 ? "Cancelar" : "Voltar"}
           </Button>
 
-          {step < STEPS.length - 1 ? (
+          {step < STEP_LABELS.length - 1 ? (
             <Button onClick={() => setStep(step + 1)} disabled={!canProceed()}>
               Próximo
               <ChevronRight className="h-4 w-4 ml-1" />
