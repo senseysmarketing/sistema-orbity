@@ -1,37 +1,41 @@
 
-# Deletar 4 Tarefas Fantasma e Corrigir Filtro
+# Botao "Melhorar com IA" no Dialog de Detalhes da Tarefa
 
-## Problema
-As 4 tarefas migradas de social media possuem status `completed` (vindo da migracao de posts), mas o componente `MyTasksList` so filtra por `status === 'done'`. Por isso elas aparecem como "atrasadas" mesmo estando concluidas.
+## Resumo
+Adicionar um botao com icone de IA (Sparkles) a esquerda do botao "Duplicar" no dialog de detalhes da tarefa. Ao clicar, a IA analisa os dados atuais da tarefa (titulo, descricao, instrucoes criativas, hashtags, etc.) e sugere melhorias que o usuario pode aceitar ou rejeitar.
 
-## Correcoes
+## Fluxo do Usuario
+1. Abre o dialog de detalhes de uma tarefa
+2. Clica no botao "Melhorar com IA"
+3. O botao mostra um loading (spinner)
+4. A IA retorna sugestoes de melhoria (titulo, descricao, instrucoes criativas melhoradas)
+5. Um sub-dialog de preview aparece mostrando as melhorias sugeridas (antes/depois)
+6. O usuario clica "Aplicar" para salvar ou "Cancelar" para descartar
 
-### 1. Deletar as 4 tarefas do banco
-Executar SQL para remover as tarefas e seus registros relacionados:
+## Detalhes Tecnicos
 
-IDs:
-- `0ff8f8c7-32a0-4f76-9db4-0d66c144ddc1` (Produto em Destaque: FINISHER)
-- `0b2421cb-edf3-476f-816d-59c7afbb1a6f` (Reels da Semana: XXXXX)
-- `997a50bc-ff05-4cf2-a49e-8ce76c888c67` (2x Stories - Paragon)
-- `fbe9cf88-0ca3-407e-995b-62aea14153c3` (2x Stories - Horiz)
+### 1. Edge Function `ai-assist` - Novo tipo `improve_task`
+**Arquivo**: `supabase/functions/ai-assist/index.ts`
 
-```sql
-DELETE FROM task_clients WHERE task_id IN (...);
-DELETE FROM task_assignments WHERE task_id IN (...);
-DELETE FROM tasks WHERE id IN (...);
-```
+Adicionar um novo tipo de operacao `improve_task` que recebe os dados atuais da tarefa e retorna versoes melhoradas. Reutilizar a mesma estrutura de tool calling ja existente (TASK_TOOLS) com um prompt diferente focado em melhorar e desenvolver o conteudo existente.
 
-### 2. Corrigir filtro no MyTasksList
-**Arquivo**: `src/components/dashboard/MyTasksList.tsx`
+Novo prompt: instruir a IA a pegar os dados atuais, corrigir gramatica, expandir a descricao, melhorar instrucoes criativas e sugerir hashtags melhores -- sem mudar o sentido original.
 
-Alterar as 3 verificacoes de `t.status === 'done'` para tambem excluir `completed`:
+### 2. Hook `useAIAssist` - Nova funcao `improveTask`
+**Arquivo**: `src/hooks/useAIAssist.tsx`
 
-```
-// De:
-if (!t.due_date || t.status === 'done') return false;
+Adicionar funcao `improveTask(taskData, agencyId)` que chama `callAI("improve_task", JSON.stringify(taskData), agencyId)`.
 
-// Para:
-if (!t.due_date || t.status === 'done' || t.status === 'completed') return false;
-```
+### 3. TaskDetailsDialog - Botao e dialog de preview
+**Arquivo**: `src/components/tasks/TaskDetailsDialog.tsx`
 
-Isso previne que qualquer outra tarefa migrada com status `completed` apareca indevidamente como pendente.
+- Importar `Sparkles` do lucide-react e o hook `useAIAssist`
+- Adicionar botao "Melhorar com IA" antes do botao "Duplicar" no `DialogFooter`
+- Ao clicar, chamar `improveTask` com os dados atuais da tarefa
+- Exibir um AlertDialog de preview com as sugestoes lado a lado
+- Ao confirmar, salvar as melhorias via `supabase.from("tasks").update(...)` e chamar `onTaskUpdate`
+
+### Arquivos modificados
+- `supabase/functions/ai-assist/index.ts` (novo tipo improve_task + prompt)
+- `src/hooks/useAIAssist.tsx` (nova funcao improveTask)
+- `src/components/tasks/TaskDetailsDialog.tsx` (botao + dialog de preview)
