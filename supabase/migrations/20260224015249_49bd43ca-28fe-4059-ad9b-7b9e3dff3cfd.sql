@@ -1,0 +1,3 @@
+DELETE FROM task_clients WHERE task_id IN ('0ff8f8c7-32a0-4f76-9db4-0d66c144ddc1','0b2421cb-edf3-476f-816d-59c7afbb1a6f','997a50bc-ff05-4cf2-a49e-8ce76c888c67','fbe9cf88-0ca3-407e-995b-62aea14153c3');
+DELETE FROM task_assignments WHERE task_id IN ('0ff8f8c7-32a0-4f76-9db4-0d66c144ddc1','0b2421cb-edf3-476f-816d-59c7afbb1a6f','997a50bc-ff05-4cf2-a49e-8ce76c888c67','fbe9cf88-0ca3-407e-995b-62aea14153c3');
+DELETE FROM tasks WHERE id IN ('0ff8f8c7-32a0-4f76-9db4-0d66c144ddc1','0b2421cb-edf3-476f-816d-59c7afbb1a6f','997a50bc-ff05-4cf2-a49e-8ce76c888c67','fbe9cf88-0ca3-407e-995b-62aea14153c3');
