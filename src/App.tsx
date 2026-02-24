@@ -39,6 +39,7 @@ import ClientDetail from "./pages/ClientDetail";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Install from "./pages/Install";
 import NotificationSettings from "./pages/NotificationSettings";
+import Goals from "./pages/Goals";
 
 
 const queryClient = new QueryClient({
@@ -108,6 +109,7 @@ const App = () => (
                           <Route path="crm" element={<CRM />} />
                           <Route path="agenda" element={<Agenda />} />
                           <Route path="traffic" element={<Traffic />} />
+                          <Route path="goals" element={<Goals />} />
                           <Route path="admin" element={<Admin />} />
                           <Route path="contracts" element={<Contracts />} />
                           <Route path="social-media" element={<SocialMedia />} />
