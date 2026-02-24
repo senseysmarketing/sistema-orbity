@@ -197,6 +197,12 @@ const DEFAULT_CONTENT_PLANNING_PROMPT =
 const CONTENT_PLANNING_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: Gere exatamente a quantidade de conteúdos correspondente à frequência semanal multiplicada pelas semanas do período. Distribua as datas de forma equilibrada ao longo do mês, evitando fins de semana quando possível. Cada item deve ter post_date no formato YYYY-MM-DD. As instruções criativas (creative_instructions) devem ser detalhadas o suficiente para um designer executar sem dúvidas. Responda em português brasileiro.";
 
+const DEFAULT_IMPROVE_TASK_PROMPT =
+  "Você é um assistente especialista em gestão de projetos de agências de marketing digital. O usuário já criou uma tarefa com algumas informações básicas. Seu trabalho é MELHORAR e DESENVOLVER essas informações, mantendo o sentido original. Corrija erros de gramática, expanda a descrição com mais detalhes úteis, melhore as instruções criativas tornando-as mais claras e acionáveis, e sugira hashtags mais relevantes se aplicável. NÃO mude o propósito da tarefa, apenas aprimore a qualidade do conteúdo.";
+
+const IMPROVE_TASK_TECHNICAL_INSTRUCTIONS =
+  " IMPORTANTE: Mantenha o sentido original de todos os campos. Se um campo estiver vazio, você pode sugerir conteúdo baseado nos outros campos preenchidos. A descrição deve ser profissional, estruturada e detalhada. Se houver creative_instructions, torne-as mais claras com orientações específicas para o designer. Se houver hashtags, melhore-as mantendo relevância. Responda em português brasileiro.";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -278,6 +284,10 @@ serve(async (req) => {
       systemPrompt = basePrompt + CONTENT_PLANNING_TECHNICAL_INSTRUCTIONS + dateContext;
       tools = CONTENT_PLANNING_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_content_plan" } };
+    } else if (type === "improve_task") {
+      systemPrompt = DEFAULT_IMPROVE_TASK_PROMPT + IMPROVE_TASK_TECHNICAL_INSTRUCTIONS + dateContext;
+      tools = TASK_TOOLS;
+      toolChoice = { type: "function", function: { name: "extract_task_data" } };
     } else {
       return new Response(JSON.stringify({ error: "Tipo inválido." }), {
         status: 400,
