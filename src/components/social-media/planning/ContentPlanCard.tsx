@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Calendar, MoreVertical, Trash2, Eye, ListChecks } from "lucide-react";
+import { Calendar, MoreVertical, Trash2, Eye, ListChecks, MessageSquareText } from "lucide-react";
 import { ContentPlan } from "@/hooks/useContentPlanning";
 
 interface ContentPlanCardProps {
@@ -11,6 +11,7 @@ interface ContentPlanCardProps {
   onView: (plan: ContentPlan) => void;
   onCreateTasks: (plan: ContentPlan) => void;
   onDelete: (planId: string) => void;
+  onCopyWeeklySummary?: (plan: ContentPlan) => void;
 }
 
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
@@ -20,7 +21,7 @@ const STATUS_MAP: Record<string, { label: string; className: string }> = {
   archived: { label: "Arquivado", className: "bg-muted text-muted-foreground" },
 };
 
-export function ContentPlanCard({ plan, onView, onCreateTasks, onDelete }: ContentPlanCardProps) {
+export function ContentPlanCard({ plan, onView, onCreateTasks, onDelete, onCopyWeeklySummary }: ContentPlanCardProps) {
   const items = plan.content_plan_items || [];
   const totalItems = items.length;
   const taskCreated = items.filter((i) => i.status === "task_created" || i.status === "in_progress" || i.status === "published").length;
@@ -58,6 +59,11 @@ export function ContentPlanCard({ plan, onView, onCreateTasks, onDelete }: Conte
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateTasks(plan); }}>
                   <ListChecks className="h-4 w-4 mr-2" />Criar tarefas
                 </DropdownMenuItem>
+                {onCopyWeeklySummary && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCopyWeeklySummary(plan); }}>
+                    <MessageSquareText className="h-4 w-4 mr-2" />Resumo semanal
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(plan.id); }}>
                   <Trash2 className="h-4 w-4 mr-2" />Excluir
                 </DropdownMenuItem>
