@@ -2,8 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
-import { User } from "lucide-react";
+import { User, Wand2 } from "lucide-react";
 
 interface ScorecardCardProps {
   employee: { id: string; name: string; role: string | null };
@@ -19,6 +20,7 @@ interface ScorecardCardProps {
   numEmployees: number;
   isAdmin: boolean;
   isBlurred: boolean;
+  agencyNps?: number;
   onUpdate: (employeeId: string, field: string, value: number) => void;
 }
 
@@ -29,6 +31,7 @@ export function ScorecardCard({
   numEmployees,
   isAdmin,
   isBlurred,
+  agencyNps,
   onUpdate,
 }: ScorecardCardProps) {
   const nps = scorecard?.nps_retention_score || 0;
@@ -37,6 +40,13 @@ export function ScorecardCard({
   const avg = scorecard?.weighted_average || ((nps * 4 + tech * 4 + proc * 2) / 10);
   const maxShare = poolAmount / (numEmployees || 1);
   const finalBonus = maxShare * (avg / 10);
+
+  // Normalize agency NPS (-100 to 100) to 0-10 scale
+  const normalizedNps = agencyNps !== undefined
+    ? Math.round(Math.min(10, Math.max(0, (agencyNps + 100) / 20)) * 10) / 10
+    : null;
+
+  const canSuggestNps = isAdmin && normalizedNps !== null && nps === 0 && normalizedNps > 0;
 
   const criteria = [
     { label: "NPS e Retenção", field: "nps_retention_score", value: nps, weight: 4 },
@@ -74,19 +84,33 @@ export function ScorecardCard({
               <span className="text-xs text-muted-foreground">
                 {c.label} <span className="text-[10px]">(peso {c.weight})</span>
               </span>
-              {isAdmin ? (
-                <Input
-                  type="number"
-                  min={0}
-                  max={10}
-                  step={0.5}
-                  value={c.value}
-                  onChange={(e) => onUpdate(employee.id, c.field, Number(e.target.value))}
-                  className="w-16 h-7 text-xs text-right"
-                />
-              ) : (
-                <span className="text-sm font-medium">{c.value}</span>
-              )}
+              <div className="flex items-center gap-1">
+                {c.field === "nps_retention_score" && canSuggestNps && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-primary"
+                    onClick={() => onUpdate(employee.id, c.field, normalizedNps!)}
+                    title={`Usar NPS da agência (${agencyNps}) → nota ${normalizedNps}`}
+                  >
+                    <Wand2 className="h-3 w-3 mr-1" />
+                    Usar NPS
+                  </Button>
+                )}
+                {isAdmin ? (
+                  <Input
+                    type="number"
+                    min={0}
+                    max={10}
+                    step={0.5}
+                    value={c.value}
+                    onChange={(e) => onUpdate(employee.id, c.field, Number(e.target.value))}
+                    className="w-16 h-7 text-xs text-right"
+                  />
+                ) : (
+                  <span className="text-sm font-medium">{c.value}</span>
+                )}
+              </div>
             </div>
             <Progress value={c.value * 10} className="h-2" />
           </div>

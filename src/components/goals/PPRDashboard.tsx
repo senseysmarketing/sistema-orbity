@@ -43,6 +43,7 @@ interface NpsResponse {
   score: number;
   category: string;
   comment: string | null;
+  response_date: string | null;
 }
 
 interface Employee {
@@ -133,7 +134,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
       .from("nps_responses")
       .select("*")
       .eq("period_id", selectedPeriodId)
-      .order("created_at", { ascending: false });
+      .order("response_date", { ascending: false });
     setNpsResponses((data || []) as unknown as NpsResponse[]);
   };
 
@@ -543,15 +544,32 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
                     {/* NPS */}
                     <tr>
                       <td className="p-3 font-medium text-foreground">⭐ NPS Geral</td>
-                      {monthlyData.map((m) => (
-                        <td key={m.label} className="text-center p-3">
-                          {m.isFuture ? (
-                            <span className="text-muted-foreground text-xs">Aguardando</span>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
-                        </td>
-                      ))}
+                      {monthlyData.map((m) => {
+                        const monthStart = format(startOfMonth(m.month), "yyyy-MM-dd");
+                        const monthEnd = format(endOfMonth(m.month), "yyyy-MM-dd");
+                        const monthResponses = npsResponses.filter((r) => {
+                          const rd = r.response_date || "";
+                          return rd >= monthStart && rd <= monthEnd;
+                        });
+                        const monthTotal = monthResponses.length;
+                        let monthNps: number | null = null;
+                        if (monthTotal > 0) {
+                          const p = monthResponses.filter((r) => r.category === "promoter").length;
+                          const d = monthResponses.filter((r) => r.category === "detractor").length;
+                          monthNps = Math.round(((p - d) / monthTotal) * 100);
+                        }
+                        return (
+                          <td key={m.label} className="text-center p-3">
+                            {m.isFuture ? (
+                              <span className="text-muted-foreground text-xs">Aguardando</span>
+                            ) : monthNps !== null ? (
+                              <span className="font-medium text-foreground">{monthNps}</span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
                       <td className="text-center p-3 bg-muted/30">
                         <div className="flex items-center justify-center gap-2">
                           <span className="font-bold text-foreground">{npsStats.nps}</span>
@@ -660,6 +678,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
                   numEmployees={employees.length}
                   isAdmin={isAdmin}
                   isBlurred={!canView}
+                  agencyNps={npsStats.nps}
                   onUpdate={handleScorecardUpdate}
                 />
               );
