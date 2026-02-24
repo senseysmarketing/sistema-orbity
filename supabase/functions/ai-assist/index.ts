@@ -146,6 +146,31 @@ const CAPTION_TOOLS = [
   },
 ];
 
+const EDIT_PLAN_ITEM_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "extract_plan_item",
+      description: "Gere ou melhore um único item de planejamento de conteúdo para redes sociais.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Título conciso e claro do conteúdo" },
+          description: { type: "string", description: "Legenda/descrição envolvente e profissional para o post" },
+          format: { type: "string", enum: ["carrossel", "feed", "reels", "stories", "vídeo", "artigo"], description: "Formato do conteúdo" },
+          platform: { type: "string", enum: ["Instagram", "Facebook", "TikTok", "LinkedIn", "YouTube", "Twitter/X"], description: "Plataforma de publicação" },
+          content_type: { type: "string", description: "Tipo de conteúdo: educativo, autoridade, conversão, prova social, bastidores, storytelling, promocional, entretenimento" },
+          creative_instructions: { type: "string", description: "Instruções detalhadas de arte/criação para o designer executar. Para imagens: headlines, subtítulos, CTAs, textos na arte. Para vídeos/reels: mini roteiro com pontos principais." },
+          objective: { type: "string", description: "Objetivo principal do conteúdo: engajamento, alcance, conversão, educação, autoridade" },
+          hashtags: { type: "string", description: "Hashtags relevantes separadas por espaço, cada uma começando com #" },
+        },
+        required: ["title", "description", "format", "platform", "content_type", "creative_instructions", "objective", "hashtags"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
 const DEFAULT_TASK_PROMPT =
   "Você é um assistente de agência de marketing digital. Extraia os dados estruturados de uma tarefa a partir da descrição do usuário. Gere um título conciso e uma descrição profissional, estruturada e sem erros de gramática. Se o usuário descrever conteúdo para redes sociais (ex: 'criar um post no Instagram', 'publicar um reels sobre...', 'fazer um carrossel', 'stories para o cliente X'), defina suggested_type como 'redes_sociais' e preencha os campos platform, post_type, hashtags e creative_instructions. Se o usuário descrever arte, banner, criativo, material visual, campanha publicitária, peça gráfica ou qualquer demanda para designer (ex: 'criar um banner', 'arte para campanha', 'criativo para anúncio'), defina suggested_type como 'criativos' e preencha creative_instructions com orientações visuais detalhadas.";
 
@@ -188,6 +213,12 @@ const DEFAULT_IMPROVE_TASK_PROMPT =
 const IMPROVE_TASK_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: Mantenha o sentido original de todos os campos. Se um campo estiver vazio, você pode sugerir conteúdo baseado nos outros campos preenchidos. A descrição deve ser profissional, estruturada e detalhada. Se houver creative_instructions, torne-as mais claras com orientações específicas para o designer. Se houver hashtags, melhore-as mantendo relevância. Responda em português brasileiro.";
 
+const DEFAULT_EDIT_PLAN_ITEM_PROMPT =
+  "Você é um estrategista de conteúdo para redes sociais de uma agência de marketing digital. Gere ou melhore um ÚNICO item de planejamento de conteúdo. Considere o contexto dos demais conteúdos já planejados para manter coerência, variar temas e não repetir assuntos. Se um direcionamento for fornecido, siga-o fielmente. Se não, crie algo criativo e coerente com a estratégia geral.";
+
+const EDIT_PLAN_ITEM_TECHNICAL_INSTRUCTIONS =
+  " IMPORTANTE: Gere apenas UM item. O campo 'platform' deve ser exatamente uma das opções: Instagram, Facebook, TikTok, LinkedIn, YouTube, Twitter/X. O campo 'format' deve ser: carrossel, feed, reels, stories, vídeo ou artigo. As hashtags devem começar com # e ser separadas por espaço. As instruções criativas devem ser detalhadas o suficiente para um designer executar. Responda em português brasileiro.";
+
 const DEFAULT_CAPTION_PROMPT =
   "Você é um social media copywriter profissional de uma agência de marketing digital. Gere uma legenda completa, envolvente e pronta para publicar em redes sociais. Use emojis de forma natural e estratégica. Adapte o tom de voz e estilo à plataforma e ao tom solicitado. Se dados de contato do cliente forem fornecidos e solicitados, inclua-os de forma natural na legenda (ex: 'Entre em contato: (11) 99999-9999'). Se CTA for solicitado, inclua um call-to-action claro e persuasivo. As hashtags devem ser relevantes ao nicho e conteúdo.";
 
@@ -222,7 +253,7 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const sb = createClient(supabaseUrl, supabaseKey);
         
-        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : type === "analytics_review" ? "analytics" : type === "content_planning" ? "content_planning" : type === "generate_caption" ? "caption" : "report";
+        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : type === "analytics_review" ? "analytics" : type === "content_planning" ? "content_planning" : type === "edit_plan_item" ? "content_planning" : type === "generate_caption" ? "caption" : "report";
         const { data } = await sb
           .from("agency_ai_prompts")
           .select("custom_prompt")
@@ -284,6 +315,10 @@ serve(async (req) => {
       systemPrompt = basePrompt + CAPTION_TECHNICAL_INSTRUCTIONS + dateContext;
       tools = CAPTION_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_caption" } };
+    } else if (type === "edit_plan_item") {
+      systemPrompt = DEFAULT_EDIT_PLAN_ITEM_PROMPT + EDIT_PLAN_ITEM_TECHNICAL_INSTRUCTIONS + dateContext;
+      tools = EDIT_PLAN_ITEM_TOOLS;
+      toolChoice = { type: "function", function: { name: "extract_plan_item" } };
     } else {
       return new Response(JSON.stringify({ error: "Tipo inválido." }), {
         status: 400,
