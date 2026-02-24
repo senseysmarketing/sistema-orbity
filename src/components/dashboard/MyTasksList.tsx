@@ -37,17 +37,17 @@ export function MyTasksList({ tasks, onViewAll }: MyTasksListProps) {
   const today = startOfDay(new Date());
 
   const overdueTasks = tasks.filter(t => {
-    if (!t.due_date || t.status === 'done') return false;
+    if (!t.due_date || t.status === 'done' || t.status === 'completed') return false;
     return isBefore(startOfDay(new Date(t.due_date)), today);
   });
 
   const todayTasks = tasks.filter(t => {
-    if (!t.due_date || t.status === 'done') return false;
+    if (!t.due_date || t.status === 'done' || t.status === 'completed') return false;
     return isToday(new Date(t.due_date));
   });
 
   const weekTasks = tasks.filter(t => {
-    if (!t.due_date || t.status === 'done') return false;
+    if (!t.due_date || t.status === 'done' || t.status === 'completed') return false;
     const d = new Date(t.due_date);
     return !isToday(d) && !isBefore(d, today) && isThisWeek(d, { locale: ptBR });
   });
