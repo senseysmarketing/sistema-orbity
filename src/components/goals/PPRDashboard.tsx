@@ -12,7 +12,7 @@ import { PPRConfigDialog } from "./PPRConfigDialog";
 import { NPSResponseForm } from "./NPSResponseForm";
 import { NPSChart } from "./NPSChart";
 import { ScorecardCard } from "./ScorecardCard";
-import { Gift, Plus, Settings2 } from "lucide-react";
+import { Gift, Plus, Settings2, Trash2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { format, eachMonthOfInterval, startOfMonth, endOfMonth, parseISO, isFuture } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -87,6 +87,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [scorecards, setScorecards] = useState<Scorecard[]>([]);
   const [showConfig, setShowConfig] = useState(false);
+  const [configMode, setConfigMode] = useState<"create" | "edit">("edit");
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<MonthlyFinancial[]>([]);
 
@@ -264,24 +265,21 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
     }
   }, [npsStats.nps, selectedPeriodId]);
 
-  const handleCreatePeriod = async () => {
-    const now = new Date();
-    const quarter = Math.ceil((now.getMonth() + 1) / 3);
-    const year = now.getFullYear();
-    const startMonth = (quarter - 1) * 3;
-    const startDate = new Date(year, startMonth, 1).toISOString().split("T")[0];
-    const endDate = new Date(year, startMonth + 3, 0).toISOString().split("T")[0];
+  const handleCreatePeriod = () => {
+    setConfigMode("create");
+    setShowConfig(true);
+  };
 
-    const config = program.config as Record<string, number>;
+  const handleCreateFromDialog = async (data: Record<string, unknown>) => {
     const { error } = await supabase.from("bonus_periods").insert([{
       agency_id: agencyId,
       program_id: program.id,
-      label: `Q${quarter} ${year}`,
-      start_date: startDate,
-      end_date: endDate,
-      revenue_target: config.revenue_target || 50000,
-      bonus_pool_percent: config.bonus_pool_percent || 10,
-      nps_target: config.nps_target || 60,
+      label: data.label as string,
+      start_date: data.start_date as string,
+      end_date: data.end_date as string,
+      revenue_target: data.revenue_target as number,
+      bonus_pool_percent: data.bonus_pool_percent as number,
+      nps_target: data.nps_target as number,
     }]);
 
     if (error) {
@@ -289,6 +287,23 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
     } else {
       toast({ title: "Período criado!" });
       fetchPeriods();
+    }
+  };
+
+  const handleDeletePeriod = async () => {
+    if (!selectedPeriodId) return;
+    const { error } = await supabase
+      .from("bonus_periods")
+      .delete()
+      .eq("id", selectedPeriodId);
+
+    if (error) {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Período excluído!" });
+      const remaining = periods.filter((p) => p.id !== selectedPeriodId);
+      setPeriods(remaining);
+      setSelectedPeriodId(remaining[0]?.id || "");
     }
   };
 
@@ -387,7 +402,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
         {isAdmin && (
           <Button onClick={handleCreatePeriod}>
             <Plus className="h-4 w-4 mr-2" />
-            Criar Período Atual
+            Criar Período
           </Button>
         )}
       </div>
@@ -415,8 +430,11 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
             <Button variant="outline" size="sm" onClick={handleCreatePeriod}>
               <Plus className="h-4 w-4 mr-1" /> Novo Período
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setShowConfig(true)}>
+            <Button variant="ghost" size="sm" onClick={() => { setConfigMode("edit"); setShowConfig(true); }}>
               <Settings2 className="h-4 w-4 mr-1" /> Configurar
+            </Button>
+            <Button variant="ghost" size="icon" className="text-destructive" onClick={handleDeletePeriod}>
+              <Trash2 className="h-4 w-4" />
             </Button>
           </>
         )}
@@ -641,12 +659,14 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
       )}
 
       {/* Config Dialog */}
-      {showConfig && selectedPeriod && (
+      {showConfig && (
         <PPRConfigDialog
           open={showConfig}
           onOpenChange={setShowConfig}
-          period={selectedPeriod}
-          onSave={handlePeriodUpdate}
+          mode={configMode}
+          period={configMode === "edit" && selectedPeriod ? selectedPeriod : undefined}
+          onSave={configMode === "create" ? handleCreateFromDialog : handlePeriodUpdate}
+          onDelete={configMode === "edit" ? handleDeletePeriod : undefined}
         />
       )}
     </div>
