@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Settings, TrendingUp, Sparkles } from "lucide-react";
+import { Calendar, Settings, TrendingUp, Sparkles, Type } from "lucide-react";
 import { SocialMediaCalendar } from "@/components/social-media/SocialMediaCalendar";
 import { SocialMediaSettings } from "@/components/social-media/SocialMediaSettings";
 import { SocialMediaAnalytics } from "@/components/social-media/SocialMediaAnalytics";
 import { ContentPlanningList } from "@/components/social-media/planning/ContentPlanningList";
+import { CaptionGenerator } from "@/components/social-media/CaptionGenerator";
 
 export default function SocialMedia() {
   const [activeTab, setActiveTab] = useState("planning");
@@ -21,7 +22,7 @@ export default function SocialMedia() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto">
           <TabsTrigger value="planning" className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
             <span className="hidden sm:inline">Planejamento</span>
@@ -29,6 +30,10 @@ export default function SocialMedia() {
           <TabsTrigger value="calendar" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             <span className="hidden sm:inline">Calendário</span>
+          </TabsTrigger>
+          <TabsTrigger value="captions" className="flex items-center gap-2">
+            <Type className="h-4 w-4" />
+            <span className="hidden sm:inline">Legendas</span>
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
@@ -46,6 +51,10 @@ export default function SocialMedia() {
 
         <TabsContent value="calendar" className="space-y-4">
           <SocialMediaCalendar />
+        </TabsContent>
+
+        <TabsContent value="captions" className="space-y-4">
+          <CaptionGenerator />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">

@@ -37,6 +37,12 @@ export interface CampaignAnalysisResult {
   analysis: string;
 }
 
+export interface CaptionResult {
+  caption: string;
+  hashtags: string[];
+  cta_text: string;
+}
+
 export interface AnalyticsReviewResult {
   summary: string;
   workload_analysis: string;
@@ -129,5 +135,9 @@ export function useAIAssist() {
     return callAI("improve_task", JSON.stringify(taskData), agencyId);
   };
 
-  return { preFillTask, preFillPost, generateReport, analyzeCampaign, analyzeTaskPeriod, improveTask, loading };
+  const generateCaption = async (content: string, agencyId?: string): Promise<CaptionResult | null> => {
+    return callAI("generate_caption", content, agencyId);
+  };
+
+  return { preFillTask, preFillPost, generateReport, analyzeCampaign, analyzeTaskPeriod, improveTask, generateCaption, loading };
 }

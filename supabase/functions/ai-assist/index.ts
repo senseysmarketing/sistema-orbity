@@ -123,38 +123,23 @@ const ANALYTICS_REVIEW_TOOLS = [
 ];
 
 const CONTENT_PLANNING_TOOLS = [
+  // ... keep existing code
+];
+
+const CAPTION_TOOLS = [
   {
     type: "function" as const,
     function: {
-      name: "extract_content_plan",
-      description: "Gere um planejamento completo de conteúdo para redes sociais baseado no contexto do cliente.",
+      name: "extract_caption",
+      description: "Gere uma legenda profissional para redes sociais.",
       parameters: {
         type: "object",
         properties: {
-          plan_title: { type: "string", description: "Título do planejamento, ex: 'Planejamento Março 2026 - Nome do Cliente'" },
-          strategy_summary: { type: "string", description: "Resumo da estratégia adotada para o período, explicando as escolhas de conteúdo." },
-          items: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                day_number: { type: "number", description: "Número sequencial do conteúdo (1, 2, 3...)" },
-                post_date: { type: "string", description: "Data de publicação no formato YYYY-MM-DD" },
-                title: { type: "string", description: "Título interno do conteúdo" },
-                description: { type: "string", description: "Legenda/caption ou descrição do conteúdo" },
-                content_type: { type: "string", description: "Tipo: educativo, informativo, autoridade, prova_social, bastidores, conversao, trend, objecoes, storytelling, tutorial" },
-                format: { type: "string", description: "Formato: carrossel, feed, reels, stories" },
-                platform: { type: "string", description: "Plataforma: instagram, facebook, linkedin, tiktok, youtube" },
-                creative_instructions: { type: "string", description: "Instruções detalhadas para o designer/editor: headlines, CTAs, roteiro, textos na arte" },
-                objective: { type: "string", description: "Objetivo específico deste conteúdo (ex: 'gerar autoridade', 'converter para vendas')" },
-                hashtags: { type: "string", description: "Hashtags relevantes separadas por vírgula" },
-              },
-              required: ["day_number", "post_date", "title", "description", "content_type", "format", "platform", "objective"],
-              additionalProperties: false,
-            },
-          },
+          caption: { type: "string", description: "Legenda completa com emojis, formatação e quebras de linha. Deve ser envolvente, adaptada ao tom de voz e plataforma escolhidos. Se solicitado, inclua dados de contato do cliente e CTA." },
+          hashtags: { type: "array", items: { type: "string" }, description: "Lista de hashtags relevantes sem o símbolo #" },
+          cta_text: { type: "string", description: "Texto do call-to-action principal usado na legenda" },
         },
-        required: ["plan_title", "strategy_summary", "items"],
+        required: ["caption", "hashtags", "cta_text"],
         additionalProperties: false,
       },
     },
@@ -203,6 +188,12 @@ const DEFAULT_IMPROVE_TASK_PROMPT =
 const IMPROVE_TASK_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: Mantenha o sentido original de todos os campos. Se um campo estiver vazio, você pode sugerir conteúdo baseado nos outros campos preenchidos. A descrição deve ser profissional, estruturada e detalhada. Se houver creative_instructions, torne-as mais claras com orientações específicas para o designer. Se houver hashtags, melhore-as mantendo relevância. Responda em português brasileiro.";
 
+const DEFAULT_CAPTION_PROMPT =
+  "Você é um social media copywriter profissional de uma agência de marketing digital. Gere uma legenda completa, envolvente e pronta para publicar em redes sociais. Use emojis de forma natural e estratégica. Adapte o tom de voz e estilo à plataforma e ao tom solicitado. Se dados de contato do cliente forem fornecidos e solicitados, inclua-os de forma natural na legenda (ex: 'Entre em contato: (11) 99999-9999'). Se CTA for solicitado, inclua um call-to-action claro e persuasivo. As hashtags devem ser relevantes ao nicho e conteúdo.";
+
+const CAPTION_TECHNICAL_INSTRUCTIONS =
+  " IMPORTANTE: O campo 'content' contém um JSON com as preferências do usuário: mode (task/free), tone (profissional/descontraido/inspiracional/educativo), platform (instagram/facebook/linkedin/tiktok), includeHashtags, includeCTA, includeContact, e dados do conteúdo/cliente. Gere a legenda completa no campo 'caption' incluindo emojis, quebras de linha e formatação. Se includeHashtags=true, adicione hashtags no final da legenda E no array 'hashtags'. Se includeCTA=true, inclua um CTA natural no texto. Se includeContact=true e houver clientContact, inclua o contato na legenda. Responda em português brasileiro.";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -231,7 +222,7 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const sb = createClient(supabaseUrl, supabaseKey);
         
-        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : type === "analytics_review" ? "analytics" : type === "content_planning" ? "content_planning" : "report";
+        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : type === "analytics_review" ? "analytics" : type === "content_planning" ? "content_planning" : type === "generate_caption" ? "caption" : "report";
         const { data } = await sb
           .from("agency_ai_prompts")
           .select("custom_prompt")
@@ -288,6 +279,11 @@ serve(async (req) => {
       systemPrompt = DEFAULT_IMPROVE_TASK_PROMPT + IMPROVE_TASK_TECHNICAL_INSTRUCTIONS + dateContext;
       tools = TASK_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_task_data" } };
+    } else if (type === "generate_caption") {
+      const basePrompt = customPrompt || DEFAULT_CAPTION_PROMPT;
+      systemPrompt = basePrompt + CAPTION_TECHNICAL_INSTRUCTIONS + dateContext;
+      tools = CAPTION_TOOLS;
+      toolChoice = { type: "function", function: { name: "extract_caption" } };
     } else {
       return new Response(JSON.stringify({ error: "Tipo inválido." }), {
         status: 400,
