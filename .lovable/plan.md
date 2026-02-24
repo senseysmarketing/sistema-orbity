@@ -1,61 +1,48 @@
 
 
-# Placar Financeiro com Tabela Mensal + Integracao Automatica
+# Controle Completo de Periodos (Criar, Editar, Excluir)
+
+## Resumo
+
+Transformar o gerenciamento de periodos para dar controle total ao admin: criar periodos com label e datas personalizadas, editar periodos existentes (label, datas, metas), e excluir periodos com confirmacao.
 
 ## O que muda
 
-Substituir os 4 cards atuais do "Placar do Trimestre" por uma tabela mensal como no print de referencia, mostrando colunas para cada mes do periodo + coluna de Total/Meta do trimestre. Os dados serao puxados automaticamente das tabelas financeiras existentes (`client_payments`, `expenses`, `salaries`).
+### 1. Criar Periodo via Dialog (nao mais automatico)
 
-## Layout da Tabela
+Atualmente, ao clicar em "Novo Periodo", o sistema cria automaticamente um periodo baseado no trimestre atual. Isso sera substituido por um dialog que permite ao admin definir:
 
-```text
-| Indicador         | Março      | Abril      | Maio       | Total Trimestre |
-|-------------------|------------|------------|------------|-----------------|
-| Faturamento (R$)  | R$ 35.000  | R$ 42.000  | R$ 50.000  | Meta: R$ 50.000 |
-| Lucro Líquido (R$)| R$ 17.500  | R$ 21.000  | R$ 25.000  | R$ 63.500       |
-| Pote de Bônus     | R$ 1.750   | R$ 2.100   | R$ 2.500   | R$ 6.350        |
-| NPS Geral         | Aguardando | Aguardando | Pesquisa   | Meta: > 60      |
-```
+- **Label** (ex: "Mar-Mai 2026", "Q2 2026")
+- **Data inicio** e **Data fim** (inputs tipo `date`)
+- **Meta de faturamento recorrente**
+- **% do lucro para o pool**
+- **Meta de NPS**
 
-- A coluna "Total Trimestre" mostra a meta de faturamento (configuravel) e os totais acumulados
-- "Faturamento" refere-se ao faturamento recorrente (pagamentos de clientes com status "paid")
-- Meses futuros exibem "Aguardando" ou o valor parcial caso ja tenha dados
-- Barra de progresso abaixo da tabela mostrando o quanto ja atingiu da meta
+### 2. Editar Periodo Existente
 
-## Integracao com Dados Financeiros
+O botao "Configurar" (engrenagem) ja abre o `PPRConfigDialog`. Esse dialog sera expandido para incluir tambem:
+- Campo de **label** editavel
+- Campos de **data inicio** e **data fim**
+- Todos os campos ja existentes (meta, %, NPS)
 
-**Arquivo**: `src/components/goals/PPRDashboard.tsx`
+### 3. Excluir Periodo
 
-### Busca automatica por mes:
-Para cada mes dentro do range `start_date` a `end_date` do periodo selecionado, o sistema buscara:
-
-1. **Faturamento**: `SUM(amount)` de `client_payments` com `status = 'paid'` e `due_date` dentro do mes, filtrado por `agency_id`
-2. **Despesas**: `SUM(amount)` de `expenses` com `status = 'paid'` no mesmo mes
-3. **Salarios**: `SUM(amount)` de `salaries` com `status = 'paid'` no mesmo mes
-4. **Lucro Liquido por mes**: Faturamento - (Despesas + Salarios)
-5. **Pote de Bonus por mes**: Lucro Liquido * (bonus_pool_percent / 100)
-
-### Calculo do Total Trimestre:
-- Soma dos faturamentos mensais
-- Soma dos lucros liquidos
-- Soma dos potes de bonus
-- NPS: valor calculado das respostas NPS do periodo
-
-### Atualizacao automatica do periodo:
-Apos calcular, os valores `revenue_actual`, `net_profit` e `bonus_pool_amount` na tabela `bonus_periods` serao atualizados automaticamente.
-
-## Remocao dos Inputs Manuais
-
-Os inputs manuais de "Faturamento Real" e "Lucro Liquido" que estao no Bloco 3 (Scorecard) serao removidos, ja que agora os dados vem automaticamente do financeiro.
-
-## Meta de Faturamento Recorrente
-
-O label do campo de meta sera ajustado para "Meta de Faturamento Recorrente" no `PPRConfigDialog`, deixando claro que a meta se refere ao faturamento recorrente mensal que a agencia quer atingir (ex: R$ 50.000/mes), nao ao total do trimestre.
-
-A coluna "Total Trimestre" da linha de faturamento mostrara a meta mensal como referencia (ex: "Meta: R$ 50.000"), pois o objetivo e atingir esse valor recorrente ate o final do periodo.
+Adicionar um botao "Excluir" (icone Trash2) ao lado do seletor de periodo. Ao clicar, exibe um `AlertDialog` de confirmacao explicando que todas as respostas NPS e scorecards associados serao excluidos (CASCADE ja esta configurado no banco). Apos confirmar, deleta o periodo e seleciona outro disponivel.
 
 ## Arquivos Modificados
 
-- `src/components/goals/PPRDashboard.tsx` - Nova funcao `fetchFinancialData()` que busca dados por mes, nova tabela HTML no Bloco 1, remocao dos inputs manuais do Bloco 3
-- `src/components/goals/PPRConfigDialog.tsx` - Label da meta ajustado para "Meta de Faturamento Recorrente"
+### `src/components/goals/PPRConfigDialog.tsx`
+- Adicionar props `mode: 'create' | 'edit'` e `onDelete`
+- Adicionar campos: `label` (input texto), `start_date` e `end_date` (inputs date)
+- No modo "create", todos os campos comecam vazios/com defaults
+- No modo "edit", pre-preenche com os valores do periodo
+- Botao "Excluir Periodo" (vermelho) visivel apenas no modo edit, abre AlertDialog de confirmacao
+- `onSave` retorna todos os campos incluindo label e datas
+
+### `src/components/goals/PPRDashboard.tsx`
+- `handleCreatePeriod`: em vez de criar direto, abre o PPRConfigDialog em modo `create`
+- Nova funcao `handleDeletePeriod`: deleta o periodo selecionado e seleciona outro
+- Adicionar botao Trash2 ao lado do seletor de periodo
+- Passar `mode`, `onDelete` e dados completos ao PPRConfigDialog
+- No `handlePeriodUpdate` e novo `handleCreateFromDialog`: aceitar label, start_date, end_date alem dos campos atuais
 
