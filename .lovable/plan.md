@@ -1,48 +1,55 @@
 
 
-# Controle Completo de Periodos (Criar, Editar, Excluir)
+# Ajustes no NPS: Grafico, Scorecard Automatico e Filtro por Data
 
-## Resumo
+## 1. Grafico "Distribuicao NPS" - Labels sobrepostos
 
-Transformar o gerenciamento de periodos para dar controle total ao admin: criar periodos com label e datas personalizadas, editar periodos existentes (label, datas, metas), e excluir periodos com confirmacao.
+O problema e que as labels inline do grafico de pizza (`Promotores 100%`, `Detratores 0%`) ficam uma em cima da outra quando os segmentos sao pequenos ou zerados.
 
-## O que muda
+**Arquivo**: `src/components/goals/NPSChart.tsx`
 
-### 1. Criar Periodo via Dialog (nao mais automatico)
+- Remover a prop `label` do componente `Pie` (que renderiza texto diretamente sobre o grafico)
+- Manter `Tooltip` e `Legend` para que o usuario veja os dados ao passar o mouse e na legenda inferior
+- Adicionar uma listagem simples abaixo do score com os percentuais (ex: "Promotores: 1 (100%) | Neutros: 0 | Detratores: 0") para manter a informacao visivel sem sobreposicao
 
-Atualmente, ao clicar em "Novo Periodo", o sistema cria automaticamente um periodo baseado no trimestre atual. Isso sera substituido por um dialog que permite ao admin definir:
+## 2. NPS automatico no Scorecard da Equipe
 
-- **Label** (ex: "Mar-Mai 2026", "Q2 2026")
-- **Data inicio** e **Data fim** (inputs tipo `date`)
-- **Meta de faturamento recorrente**
-- **% do lucro para o pool**
-- **Meta de NPS**
+O campo "NPS e Retencao" nos scorecards atualmente comeca em 0 e precisa ser preenchido manualmente. Sera pre-preenchido automaticamente com o NPS da agencia normalizado para escala 0-10.
 
-### 2. Editar Periodo Existente
+**Arquivo**: `src/components/goals/ScorecardCard.tsx`
 
-O botao "Configurar" (engrenagem) ja abre o `PPRConfigDialog`. Esse dialog sera expandido para incluir tambem:
-- Campo de **label** editavel
-- Campos de **data inicio** e **data fim**
-- Todos os campos ja existentes (meta, %, NPS)
+- Adicionar prop `agencyNps: number` (o NPS calculado, escala -100 a 100)
+- Se o campo `nps_retention_score` do scorecard for 0 e existe um NPS calculado, mostrar um botao "Usar NPS" ao lado do input para auto-preencher
+- Formula de normalizacao: `Math.min(10, Math.max(0, (nps + 100) / 20))` (NPS -100 = nota 0, NPS 0 = nota 5, NPS 100 = nota 10)
 
-### 3. Excluir Periodo
+**Arquivo**: `src/components/goals/PPRDashboard.tsx`
 
-Adicionar um botao "Excluir" (icone Trash2) ao lado do seletor de periodo. Ao clicar, exibe um `AlertDialog` de confirmacao explicando que todas as respostas NPS e scorecards associados serao excluidos (CASCADE ja esta configurado no banco). Apos confirmar, deleta o periodo e seleciona outro disponivel.
+- Passar `agencyNps={npsStats.nps}` como prop ao `ScorecardCard`
+- Quando o admin clicar "Usar NPS", chamar `handleScorecardUpdate` com o valor normalizado
+
+## 3. Data na resposta NPS + filtro no Placar Financeiro
+
+Atualmente a resposta NPS usa `created_at` automatico mas nao tem campo de data editavel. Uma resposta criada hoje (fevereiro) aparece no placar financeiro do periodo, mesmo que o periodo seja Mar-Mai.
+
+**Arquivo**: `src/components/goals/NPSResponseForm.tsx`
+
+- Adicionar campo `Data da Resposta` (input type date) para o admin definir a data real da pesquisa NPS
+- Valor padrao: data de hoje
+- Salvar no campo `created_at` ou, melhor, usar o campo `response_date` (precisara adicionar a coluna)
+
+**Banco de dados**: Adicionar coluna `response_date` (tipo `date`) na tabela `nps_responses` com default `CURRENT_DATE`
+
+**Arquivo**: `src/components/goals/PPRDashboard.tsx`
+
+- No NPS da tabela financeira mensal: filtrar `nps_responses` pela `response_date` dentro do range do mes, em vez de pegar o NPS global do periodo
+- Atualizar `fetchNpsResponses` para tambem buscar `response_date`
+- Na linha de NPS da tabela, mostrar o NPS calculado por mes (baseado nas respostas daquele mes) em vez de "—"
 
 ## Arquivos Modificados
 
-### `src/components/goals/PPRConfigDialog.tsx`
-- Adicionar props `mode: 'create' | 'edit'` e `onDelete`
-- Adicionar campos: `label` (input texto), `start_date` e `end_date` (inputs date)
-- No modo "create", todos os campos comecam vazios/com defaults
-- No modo "edit", pre-preenche com os valores do periodo
-- Botao "Excluir Periodo" (vermelho) visivel apenas no modo edit, abre AlertDialog de confirmacao
-- `onSave` retorna todos os campos incluindo label e datas
-
-### `src/components/goals/PPRDashboard.tsx`
-- `handleCreatePeriod`: em vez de criar direto, abre o PPRConfigDialog em modo `create`
-- Nova funcao `handleDeletePeriod`: deleta o periodo selecionado e seleciona outro
-- Adicionar botao Trash2 ao lado do seletor de periodo
-- Passar `mode`, `onDelete` e dados completos ao PPRConfigDialog
-- No `handlePeriodUpdate` e novo `handleCreateFromDialog`: aceitar label, start_date, end_date alem dos campos atuais
+- `src/components/goals/NPSChart.tsx` - Remover labels inline, adicionar breakdown textual
+- `src/components/goals/ScorecardCard.tsx` - Prop `agencyNps`, botao "Usar NPS" 
+- `src/components/goals/NPSResponseForm.tsx` - Campo de data da resposta
+- `src/components/goals/PPRDashboard.tsx` - Passar agencyNps, filtrar NPS por data, NPS mensal na tabela
+- Nova migration SQL para adicionar `response_date` na tabela `nps_responses`
 
