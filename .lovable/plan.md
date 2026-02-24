@@ -1,41 +1,45 @@
 
-# Botao "Melhorar com IA" no Dialog de Detalhes da Tarefa
+# Historico de IA + Atualizacao Imediata no Dialog
 
-## Resumo
-Adicionar um botao com icone de IA (Sparkles) a esquerda do botao "Duplicar" no dialog de detalhes da tarefa. Ao clicar, a IA analisa os dados atuais da tarefa (titulo, descricao, instrucoes criativas, hashtags, etc.) e sugere melhorias que o usuario pode aceitar ou rejeitar.
+## Problema 1: Sem registro no historico
+Quando o usuario aplica melhorias da IA, nao fica registrado no historico de movimentacoes da tarefa.
 
-## Fluxo do Usuario
-1. Abre o dialog de detalhes de uma tarefa
-2. Clica no botao "Melhorar com IA"
-3. O botao mostra um loading (spinner)
-4. A IA retorna sugestoes de melhoria (titulo, descricao, instrucoes criativas melhoradas)
-5. Um sub-dialog de preview aparece mostrando as melhorias sugeridas (antes/depois)
-6. O usuario clica "Aplicar" para salvar ou "Cancelar" para descartar
+## Problema 2: Tarefa nao atualiza visualmente
+Apos aplicar as sugestoes da IA, o dialog continua mostrando os dados antigos. O usuario precisa fechar e reabrir para ver as mudancas.
 
-## Detalhes Tecnicos
+## Solucao
 
-### 1. Edge Function `ai-assist` - Novo tipo `improve_task`
-**Arquivo**: `supabase/functions/ai-assist/index.ts`
-
-Adicionar um novo tipo de operacao `improve_task` que recebe os dados atuais da tarefa e retorna versoes melhoradas. Reutilizar a mesma estrutura de tool calling ja existente (TASK_TOOLS) com um prompt diferente focado em melhorar e desenvolver o conteudo existente.
-
-Novo prompt: instruir a IA a pegar os dados atuais, corrigir gramatica, expandir a descricao, melhorar instrucoes criativas e sugerir hashtags melhores -- sem mudar o sentido original.
-
-### 2. Hook `useAIAssist` - Nova funcao `improveTask`
-**Arquivo**: `src/hooks/useAIAssist.tsx`
-
-Adicionar funcao `improveTask(taskData, agencyId)` que chama `callAI("improve_task", JSON.stringify(taskData), agencyId)`.
-
-### 3. TaskDetailsDialog - Botao e dialog de preview
 **Arquivo**: `src/components/tasks/TaskDetailsDialog.tsx`
 
-- Importar `Sparkles` do lucide-react e o hook `useAIAssist`
-- Adicionar botao "Melhorar com IA" antes do botao "Duplicar" no `DialogFooter`
-- Ao clicar, chamar `improveTask` com os dados atuais da tarefa
-- Exibir um AlertDialog de preview com as sugestoes lado a lado
-- Ao confirmar, salvar as melhorias via `supabase.from("tasks").update(...)` e chamar `onTaskUpdate`
+### 1. Importar `useAuth` para obter o nome do usuario atual
 
-### Arquivos modificados
-- `supabase/functions/ai-assist/index.ts` (novo tipo improve_task + prompt)
-- `src/hooks/useAIAssist.tsx` (nova funcao improveTask)
-- `src/components/tasks/TaskDetailsDialog.tsx` (botao + dialog de preview)
+### 2. Ao aplicar sugestoes da IA (bloco onClick do botao "Aplicar", ~linha 581-610):
+
+- Montar uma entrada de historico com formato:
+  ```
+  {
+    action: "Tarefa melhorada com IA",
+    timestamp: new Date().toISOString(),
+    user_name: profile?.name
+  }
+  ```
+- Incluir o historico atualizado (history atual + nova entrada) no objeto `updates` enviado ao Supabase
+
+### 3. Atualizar o estado local do dialog imediatamente apos o sucesso:
+
+- Criar um objeto `task` atualizado com os novos valores (titulo, descricao, etc.)
+- Usar `setHistory(...)` para adicionar a nova entrada ao historico local
+- O componente ja tem states locais para `history` -- basta atualiza-los
+
+Como o `task` vem via prop e nao tem state local, a abordagem sera:
+- Adicionar um state local `localTask` que espelha o `task` prop
+- Apos aplicar IA, atualizar `localTask` com os novos valores
+- Usar `localTask` na renderizacao em vez do `task` direto
+
+Isso garante que o dialog reflita as mudancas imediatamente sem precisar fechar e reabrir.
+
+### Resumo das alteracoes no arquivo
+- Importar `useAuth`
+- Adicionar state `localTask` sincronizado com prop `task`
+- No handler de aplicar IA: incluir entrada de historico no update e atualizar states locais
+- Substituir referencias a `task` por `localTask` na renderizacao
