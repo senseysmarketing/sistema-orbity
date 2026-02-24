@@ -1,24 +1,38 @@
 
 
-# Persistir Historico de Legendas no localStorage
+# Corrigir tarefas migradas com status "review" para "em_revisao"
 
-## Resumo
+## Problema
 
-O historico de legendas geradas atualmente fica apenas em estado local (useState), sendo perdido ao sair da tela. A solucao e persistir no `localStorage` com limite de 5 itens.
+Durante a migracao de posts para tarefas, os posts com status "Aguardando Aprovacao" foram mapeados para o status `review`. Porem, o sistema de Kanban de tarefas usa o slug `em_revisao` para a coluna "Em Revisao". Resultado: **27 tarefas ficaram invisiveis** no Kanban porque o status `review` nao corresponde a nenhuma coluna.
 
-## Arquivo Modificado
+## Dados atuais no banco
 
-### `src/components/social-media/CaptionGenerator.tsx`
+| Status | Quantidade |
+|--------|-----------|
+| completed | 407 |
+| review (PROBLEMA) | 27 |
+| todo | 26 |
+| em_revisao (correto) | 18 |
+| aguardando_material | 7 |
+| done | 2 |
+| in_progress | 2 |
 
-- Criar uma chave de localStorage baseada no `agency_id`: `caption-history-{agencyId}`
-- Inicializar o estado `history` lendo do localStorage (com `JSON.parse` + fallback para array vazio)
-- Ao adicionar nova legenda ao historico, salvar no localStorage limitando a 5 itens (`.slice(0, 5)`)
-- Usar `useEffect` para sincronizar o estado com o localStorage sempre que `history` mudar
-- Converter as datas (timestamp) corretamente ao carregar do localStorage (pois `JSON.parse` retorna strings)
+## Solucao
 
-## Detalhes
+Executar um UPDATE simples para corrigir o status das 27 tarefas de `review` para `em_revisao`:
 
-- Chave no localStorage: `caption-history-{currentAgency.id}` para separar por agencia
-- Limite de 5 legendas no historico (as mais recentes)
-- Ao gerar nova legenda, adiciona no inicio e corta as mais antigas se exceder 5
+```sql
+UPDATE tasks
+SET status = 'em_revisao'
+WHERE status = 'review'
+  AND task_type = 'redes_sociais';
+```
 
+Apos isso, as 27 tarefas aparecerao corretamente na coluna "Em Revisao" do Kanban.
+
+## Impacto
+
+- Nenhum arquivo de codigo precisa ser alterado
+- Apenas uma correcao de dados no banco
+- As tarefas voltarao a aparecer imediatamente na tela de Tarefas
