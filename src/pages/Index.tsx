@@ -220,12 +220,12 @@ const Index = () => {
   const today = startOfDay(new Date());
 
   const todayTasks = myTasks.filter(t => {
-    if (!t.due_date || t.status === 'done') return false;
+    if (!t.due_date || t.status === 'done' || t.status === 'completed') return false;
     return isToday(new Date(t.due_date));
   });
 
   const overdueTasks = myTasks.filter(t => {
-    if (!t.due_date || t.status === 'done') return false;
+    if (!t.due_date || t.status === 'done' || t.status === 'completed') return false;
     return isBefore(startOfDay(new Date(t.due_date)), today);
   });
 
