@@ -298,18 +298,18 @@ const Index = () => {
       {/* 3. Rotinas */}
       <RoutineBlock />
 
-      {/* 4. Minhas Tarefas (full width) */}
-      <MyTasksList
-        tasks={visibleTasks}
-        onTasksChange={fetchMyData}
-        onViewAll={() => navigate('/dashboard/tasks')}
-      />
-
-      {/* 5. Tarefas Solicitadas (full width) */}
-      <RequestedTasksList
-        tasks={requestedTasks}
-        onViewAll={() => navigate('/dashboard/tasks')}
-      />
+      {/* 4. Minhas Tarefas + Tarefas Solicitadas lado a lado */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <MyTasksList
+          tasks={visibleTasks}
+          onTasksChange={fetchMyData}
+          onViewAll={() => navigate('/dashboard/tasks')}
+        />
+        <RequestedTasksList
+          tasks={requestedTasks}
+          onViewAll={() => navigate('/dashboard/tasks')}
+        />
+      </div>
 
       {/* 6. Ações Rápidas */}
       <QuickActions />
