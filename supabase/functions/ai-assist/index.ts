@@ -191,6 +191,12 @@ const CAMPAIGN_ANALYSIS_TECHNICAL_INSTRUCTIONS =
 const ANALYTICS_REVIEW_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: A análise é direcionada ao gestor da agência. Seja objetivo e prático. Use dados concretos (nomes, números, percentuais). As sugestões devem ser acionáveis e específicas. A nota de performance deve refletir: taxa de conclusão (peso maior), atrasos, distribuição equilibrada e tarefas sem dono. Responda em português brasileiro.";
 
+const DEFAULT_CONTENT_PLANNING_PROMPT =
+  "Você é um estrategista de conteúdo para redes sociais de uma agência de marketing digital. Gere um planejamento mensal de conteúdo completo e estratégico baseado no contexto do cliente, nicho, objetivos e frequência solicitada. Distribua os conteúdos de forma equilibrada entre tipos (educativo, autoridade, conversão, prova social, bastidores, storytelling) e formatos (carrossel, feed, reels, stories). Cada conteúdo deve ter título, legenda, instruções criativas detalhadas e hashtags relevantes.";
+
+const CONTENT_PLANNING_TECHNICAL_INSTRUCTIONS =
+  " IMPORTANTE: Gere exatamente a quantidade de conteúdos correspondente à frequência semanal multiplicada pelas semanas do período. Distribua as datas de forma equilibrada ao longo do mês, evitando fins de semana quando possível. Cada item deve ter post_date no formato YYYY-MM-DD. As instruções criativas (creative_instructions) devem ser detalhadas o suficiente para um designer executar sem dúvidas. Responda em português brasileiro.";
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
