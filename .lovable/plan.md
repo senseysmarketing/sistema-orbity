@@ -1,56 +1,72 @@
 
-# Renomear tipo "Conteudo" para "Trafego"
+
+# Adicionar Edicao de Itens no Planejamento de Conteudo
 
 ## Resumo
 
-Alterar o tipo de tarefa padrao "Conteudo" (slug: `conteudo`) para "Trafego" (slug: `trafego`), com icone adequado e atualizar a IA para categorizar corretamente tarefas de trafego pago, campanhas, Google Ads, Meta Ads, etc.
+Adicionar a capacidade de editar planejamentos ja salvos: editar itens individuais (titulo, descricao, formato, plataforma, data, instrucoes criativas), adicionar novos itens manualmente e excluir itens indesejados -- tudo antes de criar as tarefas.
 
-## Alteracoes
+## O que muda para o usuario
 
-### 1. Banco de dados (migracao SQL)
+- No menu de 3 pontinhos do card, aparecera uma nova opcao **"Editar planejamento"**
+- Ao clicar, abre o painel lateral (Sheet) em **modo de edicao**, onde cada item tera:
+  - Botao de editar (abre formulario inline ou dialog para alterar titulo, descricao, formato, plataforma, data, instrucoes criativas, objetivo)
+  - Botao de excluir item individual
+- Um botao **"Adicionar conteudo"** no topo permite inserir novos itens manualmente ao planejamento
+- Todas as alteracoes sao salvas diretamente no banco (content_plan_items)
 
-Atualizar as tarefas existentes e o registro do tipo na tabela `task_types`:
+## Alteracoes Tecnicas
 
-```sql
--- Atualizar o tipo na tabela task_types
-UPDATE task_types
-SET slug = 'trafego', name = 'Tráfego', icon = '📈'
-WHERE slug = 'conteudo';
+### 1. Hook `useContentPlanning.tsx` -- novas funcoes
 
--- Atualizar tarefas que usam o slug antigo
-UPDATE tasks
-SET task_type = 'trafego'
-WHERE task_type = 'conteudo';
-```
+Adicionar 3 funcoes ao hook:
 
-### 2. `src/hooks/useTaskTypes.tsx`
+- **`updatePlanItem(itemId, updates)`** -- UPDATE no `content_plan_items` com os campos editados
+- **`deletePlanItem(itemId)`** -- DELETE do item do `content_plan_items`
+- **`addPlanItem(planId, itemData)`** -- INSERT de novo item no `content_plan_items` com status "planned"
 
-- Alterar o tipo padrao de `{ slug: "conteudo", name: "Conteudo", icon: "✍️" }` para `{ slug: "trafego", name: "Trafego", icon: "📈" }`
+### 2. Novo componente `ContentPlanItemEditDialog.tsx`
 
-### 3. `src/components/ui/task-card.tsx`
+Dialog/formulario para editar um item individual com campos:
+- Titulo (input)
+- Descricao (textarea)
+- Data de publicacao (date picker)
+- Formato (select: carrossel, feed, reels, stories)
+- Plataforma (input/select)
+- Tipo de conteudo (select)
+- Instrucoes criativas (textarea)
+- Objetivo (input)
+- Hashtags (input)
 
-- Renomear a chave `conteudo` para `trafego` no mapa de cores (pode usar cor laranja/vermelha para representar trafego)
+### 3. `ContentPlanCard.tsx` -- nova opcao no menu
 
-### 4. `src/components/tasks/analytics/TypeBreakdownChart.tsx`
+Adicionar item "Editar planejamento" no DropdownMenu, com icone de lapis (Pencil), que chama um novo callback `onEdit`.
 
-- Renomear a chave `conteudo` para `trafego` no mapa de cores
+### 4. `ContentPlanDetailsSheet.tsx` -- modo edicao
 
-### 5. `src/components/tasks/TaskAnalytics.tsx`
+Transformar o Sheet para suportar dois modos:
+- **Modo visualizacao** (atual): selecionar itens e criar tarefas
+- **Modo edicao** (novo): cada item mostra botoes de editar/excluir, mais botao de adicionar item
 
-- Alterar o label `conteudo: 'Conteudo'` para `trafego: 'Trafego'`
+Adicionar props: `editMode`, `onUpdateItem`, `onDeleteItem`, `onAddItem`.
 
-### 6. `supabase/functions/ai-assist/index.ts`
+### 5. `ContentPlanningList.tsx` -- orquestrar edicao
 
-- Atualizar a descricao do campo `suggested_type` substituindo `conteudo` por `trafego`
-- Adicionar contexto para a IA: "Se o usuario descrever trafego pago, campanhas de anuncios, Google Ads, Meta Ads, Facebook Ads, otimizacao de campanhas, gestao de midia paga, use 'trafego'"
+- Receber as novas funcoes do hook
+- Adicionar handler `handleEditPlan` que abre o Sheet em modo edicao
+- Passar callbacks de update/delete/add para o Sheet
+
+### 6. Novo componente `AddPlanItemDialog.tsx`
+
+Dialog simples para criar um novo item com os mesmos campos do edit, inicializado vazio, que insere via `addPlanItem`.
 
 ## Arquivos modificados
 
-| Arquivo | Tipo de alteracao |
-|---------|------------------|
-| Nova migracao SQL | slug + nome + icone no banco |
-| `src/hooks/useTaskTypes.tsx` | Tipo padrao fallback |
-| `src/components/ui/task-card.tsx` | Mapa de cores |
-| `src/components/tasks/analytics/TypeBreakdownChart.tsx` | Mapa de cores do grafico |
-| `src/components/tasks/TaskAnalytics.tsx` | Label de exibicao |
-| `supabase/functions/ai-assist/index.ts` | Prompt da IA |
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/hooks/useContentPlanning.tsx` | Adicionar updatePlanItem, deletePlanItem, addPlanItem |
+| `src/components/social-media/planning/ContentPlanCard.tsx` | Nova opcao "Editar" no menu |
+| `src/components/social-media/planning/ContentPlanDetailsSheet.tsx` | Suportar modo edicao com botoes editar/excluir/adicionar |
+| `src/components/social-media/planning/ContentPlanItemEditDialog.tsx` | Novo componente -- formulario de edicao |
+| `src/components/social-media/planning/ContentPlanningList.tsx` | Orquestrar edicao e passar novos callbacks |
+
