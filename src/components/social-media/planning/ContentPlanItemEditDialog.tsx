@@ -236,7 +236,7 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
           </div>
         )}
 
-        <DialogFooter className="flex-row gap-2 sm:justify-between">
+        <DialogFooter className="flex-row gap-2 sm:justify-end">
           <Button
             variant="outline"
             size="sm"
@@ -247,13 +247,11 @@ export function ContentPlanItemEditDialog({ item, open, onClose, onSave, planIte
             <Sparkles className="h-4 w-4" />
             IA
           </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving || !title.trim()}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Salvar
-            </Button>
-          </div>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={handleSave} disabled={saving || !title.trim()}>
+            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Salvar
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
