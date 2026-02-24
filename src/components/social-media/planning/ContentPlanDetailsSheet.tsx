@@ -267,6 +267,8 @@ export function ContentPlanDetailsSheet({ plan, open, onClose, onCreateTasks, ed
         open={!!editingItem}
         onClose={() => setEditingItem(null)}
         onSave={handleSaveItem}
+        planItems={items}
+        planStrategy={plan.ai_response?.strategy_summary}
       />
     </>
   );
