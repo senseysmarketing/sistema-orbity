@@ -1,55 +1,63 @@
 
 
-# Ajustes no NPS: Grafico, Scorecard Automatico e Filtro por Data
+# Cores nos Badges de Tipo + Destaque no Modal de Detalhes
 
-## 1. Grafico "Distribuicao NPS" - Labels sobrepostos
+## Resumo
 
-O problema e que as labels inline do grafico de pizza (`Promotores 100%`, `Detratores 0%`) ficam uma em cima da outra quando os segmentos sao pequenos ou zerados.
+Duas melhorias visuais para diferenciar melhor os tipos de tarefa, especialmente "Redes Sociais" vs "Criativos":
 
-**Arquivo**: `src/components/goals/NPSChart.tsx`
+1. Badges de tipo coloridos no card (kanban e lista)
+2. Tipo da tarefa explicitamente visivel no modal de detalhes
 
-- Remover a prop `label` do componente `Pie` (que renderiza texto diretamente sobre o grafico)
-- Manter `Tooltip` e `Legend` para que o usuario veja os dados ao passar o mouse e na legenda inferior
-- Adicionar uma listagem simples abaixo do score com os percentuais (ex: "Promotores: 1 (100%) | Neutros: 0 | Detratores: 0") para manter a informacao visivel sem sobreposicao
+## 1. Mapa de Cores por Tipo de Tarefa
 
-## 2. NPS automatico no Scorecard da Equipe
+Cada tipo tera uma cor fixa associada, aplicada como classes Tailwind no badge:
 
-O campo "NPS e Retencao" nos scorecards atualmente comeca em 0 e precisa ser preenchido manualmente. Sera pre-preenchido automaticamente com o NPS da agencia normalizado para escala 0-10.
+| Tipo | Cor | Classes |
+|------|-----|---------|
+| Redes Sociais | Indigo | `bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300` |
+| Criativos | Rosa | `bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300` |
+| Reuniao | Azul | `bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300` |
+| Conteudo | Amber | `bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300` |
+| Desenvolvimento | Cyan | `bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300` |
+| Suporte | Teal | `bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300` |
+| Administrativo | Slate | `bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300` |
+| Outros | Gray (default) | `bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300` |
 
-**Arquivo**: `src/components/goals/ScorecardCard.tsx`
+## 2. Arquivos Modificados
 
-- Adicionar prop `agencyNps: number` (o NPS calculado, escala -100 a 100)
-- Se o campo `nps_retention_score` do scorecard for 0 e existe um NPS calculado, mostrar um botao "Usar NPS" ao lado do input para auto-preencher
-- Formula de normalizacao: `Math.min(10, Math.max(0, (nps + 100) / 20))` (NPS -100 = nota 0, NPS 0 = nota 5, NPS 100 = nota 10)
+### `src/components/ui/task-card.tsx`
 
-**Arquivo**: `src/components/goals/PPRDashboard.tsx`
+- Criar funcao `getTypeColor(slug)` que retorna as classes CSS baseado no slug do tipo
+- Substituir `variant="outline"` no badge de tipo por classes coloridas dinamicas
+- Incluir o icone do tipo (emoji) dentro do badge para reforcar visualmente
 
-- Passar `agencyNps={npsStats.nps}` como prop ao `ScorecardCard`
-- Quando o admin clicar "Usar NPS", chamar `handleScorecardUpdate` com o valor normalizado
+### `src/components/tasks/TaskDetailsDialog.tsx`
 
-## 3. Data na resposta NPS + filtro no Placar Financeiro
+- Aceitar novas props: `taskType?: string`, `getTypeName`, `getTypeIcon`
+- Adicionar badge de tipo proeminente logo abaixo do titulo, junto aos badges de status/prioridade
+- Na secao "Redes Sociais" (linha 290), mudar o titulo dinamicamente: se `taskType` for `criativos`, mostrar "Criativos" em vez de "Redes Sociais", e ajustar o icone para `Palette`
+- Isso torna explicito se a tarefa e de Redes Sociais ou Criativos
 
-Atualmente a resposta NPS usa `created_at` automatico mas nao tem campo de data editavel. Uma resposta criada hoje (fevereiro) aparece no placar financeiro do periodo, mesmo que o periodo seja Mar-Mai.
+### `src/components/ui/sortable-task-card.tsx`
 
-**Arquivo**: `src/components/goals/NPSResponseForm.tsx`
+- Verificar se ja passa `getTypeName`/`getTypeIcon` ao `TaskCard` interno e garantir que esta correto
 
-- Adicionar campo `Data da Resposta` (input type date) para o admin definir a data real da pesquisa NPS
-- Valor padrao: data de hoje
-- Salvar no campo `created_at` ou, melhor, usar o campo `response_date` (precisara adicionar a coluna)
+### Paginas que usam `TaskDetailsDialog`
 
-**Banco de dados**: Adicionar coluna `response_date` (tipo `date`) na tabela `nps_responses` com default `CURRENT_DATE`
+- `src/pages/Tasks.tsx` (principal) - passar `taskType` e helpers de tipo ao dialog
 
-**Arquivo**: `src/components/goals/PPRDashboard.tsx`
+## Detalhes Tecnicos
 
-- No NPS da tabela financeira mensal: filtrar `nps_responses` pela `response_date` dentro do range do mes, em vez de pegar o NPS global do periodo
-- Atualizar `fetchNpsResponses` para tambem buscar `response_date`
-- Na linha de NPS da tabela, mostrar o NPS calculado por mes (baseado nas respostas daquele mes) em vez de "—"
+A funcao de cores ficara no `task-card.tsx` mas sera exportada para reutilizacao:
 
-## Arquivos Modificados
+```text
+getTypeColor(slug: string): string
+  "redes_sociais" -> "bg-indigo-100 text-indigo-800 ..."
+  "criativos"     -> "bg-pink-100 text-pink-800 ..."
+  ...
+  default         -> "bg-gray-100 text-gray-800 ..."
+```
 
-- `src/components/goals/NPSChart.tsx` - Remover labels inline, adicionar breakdown textual
-- `src/components/goals/ScorecardCard.tsx` - Prop `agencyNps`, botao "Usar NPS" 
-- `src/components/goals/NPSResponseForm.tsx` - Campo de data da resposta
-- `src/components/goals/PPRDashboard.tsx` - Passar agencyNps, filtrar NPS por data, NPS mensal na tabela
-- Nova migration SQL para adicionar `response_date` na tabela `nps_responses`
+No modal de detalhes, o badge de tipo aparecera na mesma linha dos badges de status e prioridade, com a cor correspondente e o emoji do tipo, ficando visualmente claro qual e o tipo da tarefa.
 
