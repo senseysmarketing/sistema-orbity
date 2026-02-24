@@ -20,7 +20,7 @@ const DEFAULT_TYPES: Omit<TaskType, "id" | "agency_id" | "created_at">[] = [
   { slug: "reuniao", name: "Reunião", icon: "📅", is_default: true, is_active: true },
   { slug: "criativos", name: "Criativos", icon: "🎨", is_default: true, is_active: true },
   { slug: "desenvolvimento", name: "Desenvolvimento", icon: "💻", is_default: true, is_active: true },
-  { slug: "conteudo", name: "Conteúdo", icon: "✍️", is_default: true, is_active: true },
+  { slug: "trafego", name: "Tráfego", icon: "📈", is_default: true, is_active: true },
   { slug: "suporte", name: "Suporte", icon: "🛠️", is_default: true, is_active: true },
   { slug: "administrativo", name: "Administrativo", icon: "📋", is_default: true, is_active: true },
   { slug: "redes_sociais", name: "Redes Sociais", icon: "📱", is_default: true, is_active: true },

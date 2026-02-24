@@ -10,7 +10,7 @@ export const getTypeColor = (slug: string | null): string => {
     redes_sociais: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300",
     criativos: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300",
     reuniao: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-    conteudo: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300",
+    trafego: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
     desenvolvimento: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300",
     suporte: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300",
     administrativo: "bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300",

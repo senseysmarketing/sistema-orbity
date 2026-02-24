@@ -326,7 +326,7 @@ export function TaskAnalytics({ tasks: currentTasks, profiles, clients, getAssig
     const TYPE_LABELS: Record<string, string> = {
       redes_sociais: 'Redes Sociais',
       criativos: 'Criativos',
-      conteudo: 'Conteúdo',
+      trafego: 'Tráfego',
       desenvolvimento: 'Desenvolvimento',
       suporte: 'Suporte',
       administrativo: 'Administrativo',
