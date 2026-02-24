@@ -37,7 +37,7 @@ export function PPRConfigDialog({ open, onOpenChange, period, onSave }: PPRConfi
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label>Meta de Faturamento (R$)</Label>
+            <Label>Meta de Faturamento Recorrente (R$)</Label>
             <Input
               type="number"
               value={revenueTarget}

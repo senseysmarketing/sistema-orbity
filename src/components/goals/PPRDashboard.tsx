@@ -12,8 +12,10 @@ import { PPRConfigDialog } from "./PPRConfigDialog";
 import { NPSResponseForm } from "./NPSResponseForm";
 import { NPSChart } from "./NPSChart";
 import { ScorecardCard } from "./ScorecardCard";
-import { DollarSign, TrendingUp, Gift, Star, Plus, Settings2 } from "lucide-react";
+import { Gift, Plus, Settings2 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { format, eachMonthOfInterval, startOfMonth, endOfMonth, parseISO, isFuture } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface PPRDashboardProps {
   program: { id: string; config: Record<string, unknown> };
@@ -62,6 +64,17 @@ interface Scorecard {
   final_bonus: number;
 }
 
+interface MonthlyFinancial {
+  month: Date;
+  label: string;
+  revenue: number;
+  expenses: number;
+  salaries: number;
+  netProfit: number;
+  bonusPool: number;
+  isFuture: boolean;
+}
+
 export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
   const { currentAgency } = useAgency();
   const { user } = useAuth();
@@ -75,6 +88,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
   const [scorecards, setScorecards] = useState<Scorecard[]>([]);
   const [showConfig, setShowConfig] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [monthlyData, setMonthlyData] = useState<MonthlyFinancial[]>([]);
 
   const selectedPeriod = periods.find((p) => p.id === selectedPeriodId);
 
@@ -92,6 +106,12 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
   useEffect(() => {
     if (agencyId) fetchEmployees();
   }, [agencyId]);
+
+  useEffect(() => {
+    if (selectedPeriod && agencyId) {
+      fetchFinancialData();
+    }
+  }, [selectedPeriod?.id, agencyId]);
 
   const fetchPeriods = async () => {
     setLoading(true);
@@ -131,6 +151,91 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
       .select("*")
       .eq("period_id", selectedPeriodId);
     setScorecards((data || []) as unknown as Scorecard[]);
+  };
+
+  const fetchFinancialData = async () => {
+    if (!selectedPeriod || !agencyId) return;
+
+    const startDate = parseISO(selectedPeriod.start_date);
+    const endDate = parseISO(selectedPeriod.end_date);
+    const months = eachMonthOfInterval({ start: startDate, end: endDate });
+
+    const poolPercent = selectedPeriod.bonus_pool_percent || 10;
+    const results: MonthlyFinancial[] = [];
+
+    for (const month of months) {
+      const monthStart = format(startOfMonth(month), "yyyy-MM-dd");
+      const monthEnd = format(endOfMonth(month), "yyyy-MM-dd");
+      const monthIsFuture = isFuture(endOfMonth(month));
+
+      const [paymentsRes, expensesRes, salariesRes] = await Promise.all([
+        supabase
+          .from("client_payments")
+          .select("amount")
+          .eq("agency_id", agencyId)
+          .eq("status", "paid")
+          .gte("due_date", monthStart)
+          .lte("due_date", monthEnd),
+        supabase
+          .from("expenses")
+          .select("amount")
+          .eq("agency_id", agencyId)
+          .eq("status", "paid")
+          .gte("due_date", monthStart)
+          .lte("due_date", monthEnd),
+        supabase
+          .from("salaries")
+          .select("amount")
+          .eq("agency_id", agencyId)
+          .eq("status", "paid")
+          .gte("due_date", monthStart)
+          .lte("due_date", monthEnd),
+      ]);
+
+      const revenue = (paymentsRes.data || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+      const expensesTotal = (expensesRes.data || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+      const salariesTotal = (salariesRes.data || []).reduce((sum, s) => sum + (s.amount || 0), 0);
+      const netProfit = revenue - expensesTotal - salariesTotal;
+      const bonusPool = Math.max(0, netProfit * (poolPercent / 100));
+
+      results.push({
+        month,
+        label: format(month, "MMMM", { locale: ptBR }),
+        revenue,
+        expenses: expensesTotal,
+        salaries: salariesTotal,
+        netProfit,
+        bonusPool,
+        isFuture: monthIsFuture && revenue === 0,
+      });
+    }
+
+    setMonthlyData(results);
+
+    // Update period totals
+    const totalProfit = results.reduce((s, m) => s + m.netProfit, 0);
+    const totalPool = results.reduce((s, m) => s + m.bonusPool, 0);
+
+    // Get last month's revenue as the "recurring" reference
+    const lastMonthWithData = [...results].reverse().find((m) => m.revenue > 0);
+    const currentRecurringRevenue = lastMonthWithData?.revenue || 0;
+
+    await supabase
+      .from("bonus_periods")
+      .update({
+        revenue_actual: currentRecurringRevenue,
+        net_profit: totalProfit,
+        bonus_pool_amount: totalPool,
+      } as Record<string, unknown>)
+      .eq("id", selectedPeriodId);
+
+    setPeriods((prev) =>
+      prev.map((p) =>
+        p.id === selectedPeriodId
+          ? { ...p, revenue_actual: currentRecurringRevenue, net_profit: totalProfit, bonus_pool_amount: totalPool }
+          : p
+      )
+    );
   };
 
   // NPS calculations
@@ -237,20 +342,35 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
 
   const handlePeriodUpdate = async (updates: Partial<BonusPeriod>) => {
     if (!selectedPeriodId) return;
-    
-    // Calculate pool amount if net_profit or bonus_pool_percent changed
+
     const period = { ...selectedPeriod, ...updates };
     const poolAmount = (period.net_profit || 0) * ((period.bonus_pool_percent || 10) / 100);
-    
+
     await supabase
       .from("bonus_periods")
       .update({ ...updates, bonus_pool_amount: poolAmount } as Record<string, unknown>)
       .eq("id", selectedPeriodId);
-    
+
     fetchPeriods();
-    // Recalculate scorecards with new pool
     fetchScorecards();
+    // Re-fetch financial data if dates or pool percent changed
+    if (updates.start_date || updates.end_date || updates.bonus_pool_percent) {
+      setTimeout(() => fetchFinancialData(), 500);
+    }
   };
+
+  // Totals from monthly data
+  const totals = useMemo(() => {
+    const totalRevenue = monthlyData.reduce((s, m) => s + m.revenue, 0);
+    const totalProfit = monthlyData.reduce((s, m) => s + m.netProfit, 0);
+    const totalPool = monthlyData.reduce((s, m) => s + m.bonusPool, 0);
+    const lastWithData = [...monthlyData].reverse().find((m) => m.revenue > 0);
+    return { totalRevenue, totalProfit, totalPool, currentRecurring: lastWithData?.revenue || 0 };
+  }, [monthlyData]);
+
+  const revenueProgress = selectedPeriod
+    ? Math.min(100, (totals.currentRecurring / (selectedPeriod.revenue_target || 1)) * 100)
+    : 0;
 
   if (loading) {
     return <div className="flex items-center justify-center h-32">
@@ -273,10 +393,6 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
       </div>
     );
   }
-
-  const revenueProgress = selectedPeriod
-    ? Math.min(100, (selectedPeriod.revenue_actual / (selectedPeriod.revenue_target || 1)) * 100)
-    : 0;
 
   return (
     <div className="space-y-8">
@@ -311,92 +427,128 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
         )}
       </div>
 
-      {/* BLOCO 1: Placar do Trimestre */}
-      <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">📊 Placar do Trimestre</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Faturamento */}
+      {/* BLOCO 1: Placar Financeiro - Tabela Mensal */}
+      {selectedPeriod && (
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-4">📊 Placar Financeiro</h2>
           <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Faturamento</CardTitle>
-                <TrendingUp className="h-4 w-4 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-foreground">
-                {formatCurrency(selectedPeriod?.revenue_actual || 0)}
-              </p>
-              <Progress value={revenueProgress} className="mt-2 h-2" />
-              <p className="text-xs text-muted-foreground mt-1">
-                Meta: {formatCurrency(selectedPeriod?.revenue_target || 0)} ({Math.round(revenueProgress)}%)
-              </p>
-            </CardContent>
-          </Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-3 font-medium text-muted-foreground min-w-[180px]">Indicador</th>
+                      {monthlyData.map((m) => (
+                        <th key={m.label} className="text-center p-3 font-medium text-muted-foreground capitalize min-w-[120px]">
+                          {m.label}
+                        </th>
+                      ))}
+                      <th className="text-center p-3 font-medium text-foreground min-w-[150px] bg-muted/80">
+                        Total Período
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Faturamento */}
+                    <tr className="border-b">
+                      <td className="p-3 font-medium text-foreground">💰 Faturamento (R$)</td>
+                      {monthlyData.map((m) => (
+                        <td key={m.label} className="text-center p-3">
+                          {m.isFuture ? (
+                            <span className="text-muted-foreground text-xs">Aguardando</span>
+                          ) : (
+                            <span className="font-medium text-foreground">{formatCurrency(m.revenue)}</span>
+                          )}
+                        </td>
+                      ))}
+                      <td className="text-center p-3 bg-muted/30">
+                        <div className="font-bold text-foreground">{formatCurrency(totals.currentRecurring)}</div>
+                        <div className="text-xs text-muted-foreground">Meta: {formatCurrency(selectedPeriod.revenue_target)}</div>
+                      </td>
+                    </tr>
 
-          {/* Card 2: Lucro Líquido */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Lucro Líquido</CardTitle>
-                <DollarSign className="h-4 w-4 text-emerald-500" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-foreground">
-                {formatCurrency(selectedPeriod?.net_profit || 0)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Apurado no período
-              </p>
-            </CardContent>
-          </Card>
+                    {/* Lucro Líquido */}
+                    <tr className="border-b">
+                      <td className="p-3 font-medium text-foreground">📈 Lucro Líquido (R$)</td>
+                      {monthlyData.map((m) => (
+                        <td key={m.label} className="text-center p-3">
+                          {m.isFuture ? (
+                            <span className="text-muted-foreground text-xs">Aguardando</span>
+                          ) : (
+                            <span className={`font-medium ${m.netProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                              {formatCurrency(m.netProfit)}
+                            </span>
+                          )}
+                        </td>
+                      ))}
+                      <td className="text-center p-3 bg-muted/30">
+                        <span className={`font-bold ${totals.totalProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                          {formatCurrency(totals.totalProfit)}
+                        </span>
+                      </td>
+                    </tr>
 
-          {/* Card 3: Pote de Bônus */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Pote de Bônus</CardTitle>
-                <Gift className="h-4 w-4 text-amber-500" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-foreground">
-                {formatCurrency(selectedPeriod?.bonus_pool_amount || 0)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {selectedPeriod?.bonus_pool_percent || 10}% do lucro líquido
-              </p>
-            </CardContent>
-          </Card>
+                    {/* Pote de Bônus */}
+                    <tr className="border-b">
+                      <td className="p-3 font-medium text-foreground">🎁 Pote de Bônus ({selectedPeriod.bonus_pool_percent}%)</td>
+                      {monthlyData.map((m) => (
+                        <td key={m.label} className="text-center p-3">
+                          {m.isFuture ? (
+                            <span className="text-muted-foreground text-xs">Aguardando</span>
+                          ) : (
+                            <span className="font-medium text-amber-600 dark:text-amber-400">{formatCurrency(m.bonusPool)}</span>
+                          )}
+                        </td>
+                      ))}
+                      <td className="text-center p-3 bg-muted/30">
+                        <span className="font-bold text-amber-600 dark:text-amber-400">
+                          {formatCurrency(totals.totalPool)}
+                        </span>
+                      </td>
+                    </tr>
 
-          {/* Card 4: NPS */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium text-muted-foreground">NPS da Agência</CardTitle>
-                <Star className="h-4 w-4 text-yellow-500" />
+                    {/* NPS */}
+                    <tr>
+                      <td className="p-3 font-medium text-foreground">⭐ NPS Geral</td>
+                      {monthlyData.map((m) => (
+                        <td key={m.label} className="text-center p-3">
+                          {m.isFuture ? (
+                            <span className="text-muted-foreground text-xs">Aguardando</span>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </td>
+                      ))}
+                      <td className="text-center p-3 bg-muted/30">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="font-bold text-foreground">{npsStats.nps}</span>
+                          <Badge
+                            variant={npsStats.nps >= (selectedPeriod.nps_target || 60) ? "default" : "destructive"}
+                            className={`text-xs ${npsStats.nps >= (selectedPeriod.nps_target || 60) ? "bg-emerald-500" : ""}`}
+                          >
+                            Meta: &gt; {selectedPeriod.nps_target}
+                          </Badge>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-baseline gap-2">
-                <p className="text-2xl font-bold text-foreground">{npsStats.nps}</p>
-                {selectedPeriod && (
-                  <Badge
-                    variant={npsStats.nps >= selectedPeriod.nps_target ? "default" : "destructive"}
-                    className={npsStats.nps >= selectedPeriod.nps_target ? "bg-emerald-500" : ""}
-                  >
-                    {npsStats.nps >= selectedPeriod.nps_target ? "✓ Meta atingida" : "Abaixo da meta"}
-                  </Badge>
-                )}
+
+              {/* Progress bar */}
+              <div className="p-4 border-t">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-muted-foreground">
+                    Progresso da meta de faturamento recorrente
+                  </span>
+                  <span className="text-xs font-medium text-foreground">{Math.round(revenueProgress)}%</span>
+                </div>
+                <Progress value={revenueProgress} className="h-2" />
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Meta: {selectedPeriod?.nps_target || 60}
-              </p>
             </CardContent>
           </Card>
         </div>
-      </div>
+      )}
 
       {/* BLOCO 2: NPS (admin only) */}
       {isAdmin && selectedPeriod && (
@@ -409,7 +561,6 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
                 agencyId={agencyId!}
                 onAdded={handleNpsAdded}
               />
-              {/* NPS Responses List */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm">Respostas ({npsResponses.length})</CardTitle>
@@ -462,28 +613,6 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
       {selectedPeriod && (
         <div>
           <h2 className="text-lg font-semibold text-foreground mb-4">🏆 Scorecard da Equipe</h2>
-          {isAdmin && selectedPeriod && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-              <Card className="p-3">
-                <label className="text-xs text-muted-foreground">Faturamento Real</label>
-                <input
-                  type="number"
-                  className="w-full mt-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-                  value={selectedPeriod.revenue_actual}
-                  onChange={(e) => handlePeriodUpdate({ revenue_actual: Number(e.target.value) })}
-                />
-              </Card>
-              <Card className="p-3">
-                <label className="text-xs text-muted-foreground">Lucro Líquido</label>
-                <input
-                  type="number"
-                  className="w-full mt-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-                  value={selectedPeriod.net_profit}
-                  onChange={(e) => handlePeriodUpdate({ net_profit: Number(e.target.value) })}
-                />
-              </Card>
-            </div>
-          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {employees.map((emp) => {
               const sc = scorecards.find((s) => s.employee_id === emp.id);
