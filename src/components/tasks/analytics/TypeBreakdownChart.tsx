@@ -6,7 +6,7 @@ import { TypeDistribution } from "./types";
 const TYPE_COLORS: Record<string, string> = {
   redes_sociais: "#ec4899",
   criativos: "#8b5cf6",
-  conteudo: "#3b82f6",
+  trafego: "#f97316",
   desenvolvimento: "#22c55e",
   suporte: "#f59e0b",
   administrativo: "#6b7280",
