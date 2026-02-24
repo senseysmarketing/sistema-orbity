@@ -16,7 +16,8 @@ export function ContentPlanningList() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<ContentPlan | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const selectedPlan = useMemo(() => plans.find(p => p.id === selectedPlanId) || null, [plans, selectedPlanId]);
   const [currentWizardData, setCurrentWizardData] = useState<WizardData | null>(null);
   const [currentPlanResult, setCurrentPlanResult] = useState<AIPlanResult | null>(null);
   const [saving, setSaving] = useState(false);
@@ -79,12 +80,12 @@ export function ContentPlanningList() {
   };
 
   const handleViewPlan = (plan: ContentPlan) => {
-    setSelectedPlan(plan);
+    setSelectedPlanId(plan.id);
     setDetailsOpen(true);
   };
 
   const handleCreateTasksFromPlan = (plan: ContentPlan) => {
-    setSelectedPlan(plan);
+    setSelectedPlanId(plan.id);
     setDetailsOpen(true);
   };
 
