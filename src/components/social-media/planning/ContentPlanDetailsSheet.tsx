@@ -1,18 +1,23 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ListChecks, Loader2, Calendar, CheckCircle2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { ListChecks, Loader2, Calendar, CheckCircle2, Users } from "lucide-react";
 import { ContentPlan } from "@/hooks/useContentPlanning";
+import { MultiUserSelector } from "@/components/tasks/MultiUserSelector";
+import { useAgency } from "@/hooks/useAgency";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ContentPlanDetailsSheetProps {
   plan: ContentPlan | null;
   open: boolean;
   onClose: () => void;
-  onCreateTasks: (planId: string, itemIds: string[]) => Promise<boolean>;
+  onCreateTasks: (planId: string, itemIds: string[], assignedUserIds?: string[]) => Promise<boolean>;
 }
 
 const FORMAT_COLORS: Record<string, string> = {
@@ -32,6 +37,32 @@ const STATUS_BADGES: Record<string, { label: string; className: string }> = {
 export function ContentPlanDetailsSheet({ plan, open, onClose, onCreateTasks }: ContentPlanDetailsSheetProps) {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
+  const [assignedUserIds, setAssignedUserIds] = useState<string[]>([]);
+  const { currentAgency } = useAgency();
+
+  const { data: agencyUsers = [] } = useQuery({
+    queryKey: ["agency-users-for-plan", currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return [];
+      const { data } = await supabase
+        .from("agency_users")
+        .select("user_id, role, profiles(full_name)")
+        .eq("agency_id", currentAgency.id);
+      return (data || []).map((u: any) => ({
+        id: u.user_id,
+        user_id: u.user_id,
+        name: u.profiles?.full_name || "Sem nome",
+        role: u.role,
+      }));
+    },
+    enabled: !!currentAgency?.id && open,
+  });
+
+  // Reset selections when plan changes
+  useEffect(() => {
+    setSelectedItems(new Set());
+    setAssignedUserIds([]);
+  }, [plan?.id]);
 
   if (!plan) return null;
 
@@ -60,7 +91,7 @@ export function ContentPlanDetailsSheet({ plan, open, onClose, onCreateTasks }: 
   const handleCreateTasks = async () => {
     if (selectedItems.size === 0) return;
     setCreating(true);
-    await onCreateTasks(plan.id, Array.from(selectedItems));
+    await onCreateTasks(plan.id, Array.from(selectedItems), assignedUserIds);
     setSelectedItems(new Set());
     setCreating(false);
   };
@@ -97,6 +128,22 @@ export function ContentPlanDetailsSheet({ plan, open, onClose, onCreateTasks }: 
               <span className="text-xs text-muted-foreground">
                 Selecionar todos pendentes ({plannedItems.length})
               </span>
+            </div>
+          )}
+
+          {/* User selector */}
+          {plannedItems.length > 0 && (
+            <div className="space-y-2 shrink-0">
+              <Label className="flex items-center gap-1.5 text-xs">
+                <Users className="h-3.5 w-3.5" />
+                Responsáveis pelas tarefas
+              </Label>
+              <MultiUserSelector
+                users={agencyUsers}
+                selectedUserIds={assignedUserIds}
+                onSelectionChange={setAssignedUserIds}
+                placeholder="Selecionar responsáveis..."
+              />
             </div>
           )}
 
