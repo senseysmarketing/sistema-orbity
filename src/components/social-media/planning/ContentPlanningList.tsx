@@ -9,6 +9,7 @@ import { ContentPlanCard } from "./ContentPlanCard";
 import { ContentPlanWizard } from "./ContentPlanWizard";
 import { ContentPlanPreview } from "./ContentPlanPreview";
 import { ContentPlanDetailsSheet } from "./ContentPlanDetailsSheet";
+import { WeeklySummaryDialog } from "./WeeklySummaryDialog";
 
 export function ContentPlanningList() {
   const { plans, isLoading, generating, generatePlan, savePlan, createTasksFromItems, deletePlan } = useContentPlanning();
@@ -23,6 +24,7 @@ export function ContentPlanningList() {
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [summaryPlan, setSummaryPlan] = useState<ContentPlan | null>(null);
 
   const filteredPlans = useMemo(() => {
     return plans.filter((p) => {
@@ -149,6 +151,7 @@ export function ContentPlanningList() {
               onView={handleViewPlan}
               onCreateTasks={handleCreateTasksFromPlan}
               onDelete={deletePlan}
+              onCopyWeeklySummary={(p) => setSummaryPlan(p)}
             />
           ))}
         </div>
@@ -181,6 +184,13 @@ export function ContentPlanningList() {
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
         onCreateTasks={createTasksFromItems}
+      />
+
+      {/* Weekly summary */}
+      <WeeklySummaryDialog
+        plan={summaryPlan}
+        open={!!summaryPlan}
+        onClose={() => setSummaryPlan(null)}
       />
     </div>
   );
