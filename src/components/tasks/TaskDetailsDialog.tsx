@@ -16,6 +16,7 @@ import { AttachmentsDisplay, Attachment } from "@/components/ui/file-attachments
 import { useAIAssist } from "@/hooks/useAIAssist";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Subtask {
   id: string;
@@ -89,27 +90,33 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   const { improveTask, loading: aiLoading } = useAIAssist();
   const { currentAgency } = useAgency();
   const { toast } = useToast();
+  const { profile } = useAuth();
+  const [localTask, setLocalTask] = useState<Task | null>(task);
+
+  useEffect(() => {
+    setLocalTask(task);
+  }, [task]);
 
   useEffect(() => {
     const loadTaskDetails = async () => {
-      if (task?.history) {
-        setHistory(Array.isArray(task.history) ? task.history : []);
+      if (localTask?.history) {
+        setHistory(Array.isArray(localTask.history) ? localTask.history : []);
       } else {
         setHistory([]);
       }
 
-      if (task?.subtasks) {
-        setSubtasks(Array.isArray(task.subtasks) ? task.subtasks : []);
+      if (localTask?.subtasks) {
+        setSubtasks(Array.isArray(localTask.subtasks) ? localTask.subtasks : []);
       } else {
         setSubtasks([]);
       }
 
       // Buscar nome do criador
-      if (task?.created_by) {
+      if (localTask?.created_by) {
         const { data: creatorProfile } = await supabase
           .from("profiles")
           .select("name")
-          .eq("user_id", task.created_by)
+          .eq("user_id", localTask.created_by)
           .single();
         
         if (creatorProfile) {
@@ -119,7 +126,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
     };
 
     loadTaskDetails();
-  }, [task]);
+  }, [localTask]);
 
   const handleToggleSubtask = async (subtaskId: string) => {
     if (!task) return;
@@ -145,7 +152,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
     }
   };
 
-  if (!task) return null;
+  if (!task || !localTask) return null;
 
   const handleDelete = () => {
     onDelete(task.id);
@@ -154,14 +161,14 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   };
 
   const handleEdit = () => {
-    onEdit(task);
+    onEdit(localTask);
     onOpenChange(false);
   };
 
-  const assignedUsers = getAssignedUsers(task.id);
+  const assignedUsers = getAssignedUsers(localTask.id);
 
   const getUrgencyBadge = () => {
-    if (task.status === 'done') {
+    if (localTask.status === 'done') {
       return (
         <Badge className="bg-green-500 flex items-center gap-1">
           <CheckCircle className="h-3 w-3" />
@@ -170,10 +177,10 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
       );
     }
 
-    if (task.due_date) {
+    if (localTask.due_date) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const dueDate = new Date(task.due_date);
+      const dueDate = new Date(localTask.due_date);
       dueDate.setHours(0, 0, 0, 0);
 
       if (dueDate < today) {
@@ -195,7 +202,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
       }
     }
 
-    if (task.priority === 'high') {
+    if (localTask.priority === 'high') {
       return (
         <Badge className="bg-orange-500 flex items-center gap-1">
           <AlertCircle className="h-3 w-3" />
@@ -212,16 +219,16 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl max-h-[85vh] md:max-h-[90vh] overflow-y-auto p-4 md:p-6">
           <DialogHeader>
-            <DialogTitle className="text-xl md:text-2xl">{task.title}</DialogTitle>
+            <DialogTitle className="text-xl md:text-2xl">{localTask.title}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
-              <Badge className={statusConfig[task.status]?.color || "bg-gray-500"}>
-                {statusConfig[task.status]?.label || task.status}
+              <Badge className={statusConfig[localTask.status]?.color || "bg-gray-500"}>
+                {statusConfig[localTask.status]?.label || localTask.status}
               </Badge>
-              <Badge className={priorityConfig[task.priority]?.color || "bg-gray-500"}>
-                {priorityConfig[task.priority]?.label || task.priority}
+              <Badge className={priorityConfig[localTask.priority]?.color || "bg-gray-500"}>
+                {priorityConfig[localTask.priority]?.label || localTask.priority}
               </Badge>
               {getUrgencyBadge()}
             </div>
@@ -229,24 +236,24 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
             <Separator />
 
             <div className="space-y-3">
-              {task.due_date && (
+              {localTask.due_date && (
                 <div className="flex items-start gap-2">
                   <Calendar className="h-4 w-4 mt-1 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Data de Vencimento</p>
                     <p className="text-sm text-muted-foreground">
-                      {format(new Date(task.due_date), "PPP", { locale: ptBR })}
+                      {format(new Date(localTask.due_date), "PPP", { locale: ptBR })}
                     </p>
                   </div>
                 </div>
               )}
 
-              {task.client_id && (
+              {localTask.client_id && (
                 <div className="flex items-start gap-2">
                   <Building2 className="h-4 w-4 mt-1 text-muted-foreground" />
                   <div>
                     <p className="text-sm font-medium">Cliente</p>
-                    <p className="text-sm text-muted-foreground">{getClientName(task.client_id)}</p>
+                    <p className="text-sm text-muted-foreground">{getClientName(localTask.client_id)}</p>
                   </div>
                 </div>
               )}
@@ -261,22 +268,22 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                 </div>
               )}
 
-              {task.description && (
+              {localTask.description && (
                 <div>
                   <p className="text-sm font-medium mb-1">Descrição</p>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    <LinkifyText text={task.description} />
+                    <LinkifyText text={localTask.description} />
                   </p>
                 </div>
               )}
 
               {/* Anexos */}
-              {task.attachments && task.attachments.length > 0 && (
-                <AttachmentsDisplay attachments={task.attachments} />
+              {localTask.attachments && localTask.attachments.length > 0 && (
+                <AttachmentsDisplay attachments={localTask.attachments} />
               )}
 
               {/* Campos de Redes Sociais */}
-              {(task.platform || task.post_type || task.post_date || task.hashtags?.length) && (
+              {(localTask.platform || localTask.post_type || localTask.post_date || localTask.hashtags?.length) && (
                 <>
                   <Separator />
                   <div className="space-y-3">
@@ -285,37 +292,37 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                       Redes Sociais
                     </p>
                     <div className="grid grid-cols-2 gap-3">
-                      {task.platform && (
+                      {localTask.platform && (
                         <div>
                           <p className="text-xs text-muted-foreground">Plataforma</p>
-                          <p className="text-sm font-medium capitalize">{task.platform}</p>
+                          <p className="text-sm font-medium capitalize">{localTask.platform}</p>
                         </div>
                       )}
-                      {task.post_type && (
+                      {localTask.post_type && (
                         <div>
                           <p className="text-xs text-muted-foreground">Tipo de Conteúdo</p>
-                          <p className="text-sm font-medium capitalize">{task.post_type}</p>
+                          <p className="text-sm font-medium capitalize">{localTask.post_type}</p>
                         </div>
                       )}
                     </div>
-                    {task.post_date && (
+                    {localTask.post_date && (
                       <div className="flex items-start gap-2">
                         <CalendarClock className="h-4 w-4 mt-0.5 text-muted-foreground" />
                         <div>
                           <p className="text-xs text-muted-foreground">Data de Publicação</p>
                           <p className="text-sm font-medium">
-                            {format(new Date(task.post_date), "PPP", { locale: ptBR })}
+                            {format(new Date(localTask.post_date), "PPP", { locale: ptBR })}
                           </p>
                         </div>
                       </div>
                     )}
-                    {task.hashtags && task.hashtags.length > 0 && (
+                    {localTask.hashtags && localTask.hashtags.length > 0 && (
                       <div className="flex items-start gap-2">
                         <Hash className="h-4 w-4 mt-0.5 text-muted-foreground" />
                         <div>
                           <p className="text-xs text-muted-foreground">Hashtags</p>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {task.hashtags.map((tag, i) => (
+                            {localTask.hashtags.map((tag, i) => (
                               <Badge key={i} variant="secondary" className="text-xs">
                                 {tag.startsWith("#") ? tag : `#${tag}`}
                               </Badge>
@@ -329,7 +336,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
               )}
 
               {/* Instruções Criativas - para Redes Sociais e Criativos */}
-              {task.creative_instructions && (
+              {localTask.creative_instructions && (
                 <>
                   <Separator />
                   <div className="flex items-start gap-2">
@@ -337,7 +344,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                     <div>
                       <p className="text-xs text-muted-foreground">Instruções Criativas</p>
                       <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">
-                        <LinkifyText text={task.creative_instructions} />
+                        <LinkifyText text={localTask.creative_instructions} />
                       </p>
                     </div>
                   </div>
@@ -389,7 +396,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                         <div className="flex-1">
                           <p className="text-sm">Tarefa criada</p>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{format(new Date(task.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
+                            <span>{format(new Date(localTask.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
                             <span>•</span>
                             <span>por {creatorName}</span>
                           </div>
@@ -423,15 +430,15 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
             <Button
               variant="outline"
               onClick={async () => {
-                if (!task) return;
+                if (!localTask) return;
                 const taskData = {
-                  title: task.title,
-                  description: task.description,
-                  priority: task.priority,
-                  platform: task.platform,
-                  post_type: task.post_type,
-                  hashtags: task.hashtags,
-                  creative_instructions: task.creative_instructions,
+                  title: localTask.title,
+                  description: localTask.description,
+                  priority: localTask.priority,
+                  platform: localTask.platform,
+                  post_type: localTask.post_type,
+                  hashtags: localTask.hashtags,
+                  creative_instructions: localTask.creative_instructions,
                 };
                 const result = await improveTask(taskData, currentAgency?.id);
                 if (result) {
@@ -454,7 +461,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
               <Button
                 variant="outline"
                 onClick={() => {
-                  onDuplicate(task);
+                  onDuplicate(localTask);
                   onOpenChange(false);
                 }}
                 className="w-full sm:w-auto"
@@ -486,8 +493,8 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
               {isCreator 
-                ? `Tem certeza que deseja excluir sua tarefa "${task.title}"?`
-                : `Você está excluindo uma tarefa criada por ${permissionCreatorName || creatorName}. Tem certeza que deseja excluir "${task.title}"?`
+                ? `Tem certeza que deseja excluir sua tarefa "${localTask.title}"?`
+                : `Você está excluindo uma tarefa criada por ${permissionCreatorName || creatorName}. Tem certeza que deseja excluir "${localTask.title}"?`
               }
               <br /><br />
               Esta ação não pode ser desfeita.
@@ -536,28 +543,28 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
               <div className="space-y-4 mt-2">
                 {aiSuggestion && (
                   <>
-                    {aiSuggestion.title && aiSuggestion.title !== task?.title && (
+                    {aiSuggestion.title && aiSuggestion.title !== localTask?.title && (
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-muted-foreground">Título</p>
-                        <p className="text-xs text-muted-foreground line-through">{task?.title}</p>
+                        <p className="text-xs text-muted-foreground line-through">{localTask?.title}</p>
                         <p className="text-sm text-foreground">{aiSuggestion.title}</p>
                       </div>
                     )}
-                    {aiSuggestion.description && aiSuggestion.description !== task?.description && (
+                    {aiSuggestion.description && aiSuggestion.description !== localTask?.description && (
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-muted-foreground">Descrição</p>
-                        {task?.description && <p className="text-xs text-muted-foreground line-through whitespace-pre-wrap">{task.description}</p>}
+                        {localTask?.description && <p className="text-xs text-muted-foreground line-through whitespace-pre-wrap">{localTask.description}</p>}
                         <p className="text-sm text-foreground whitespace-pre-wrap">{aiSuggestion.description}</p>
                       </div>
                     )}
-                    {aiSuggestion.creative_instructions && aiSuggestion.creative_instructions !== task?.creative_instructions && (
+                    {aiSuggestion.creative_instructions && aiSuggestion.creative_instructions !== localTask?.creative_instructions && (
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-muted-foreground">Instruções Criativas</p>
-                        {task?.creative_instructions && <p className="text-xs text-muted-foreground line-through whitespace-pre-wrap">{task.creative_instructions}</p>}
+                        {localTask?.creative_instructions && <p className="text-xs text-muted-foreground line-through whitespace-pre-wrap">{localTask.creative_instructions}</p>}
                         <p className="text-sm text-foreground whitespace-pre-wrap">{aiSuggestion.creative_instructions}</p>
                       </div>
                     )}
-                    {aiSuggestion.hashtags?.length > 0 && JSON.stringify(aiSuggestion.hashtags) !== JSON.stringify(task?.hashtags) && (
+                    {aiSuggestion.hashtags?.length > 0 && JSON.stringify(aiSuggestion.hashtags) !== JSON.stringify(localTask?.hashtags) && (
                       <div className="space-y-1">
                         <p className="text-xs font-medium text-muted-foreground">Hashtags</p>
                         <div className="flex flex-wrap gap-1">
@@ -580,7 +587,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
               disabled={aiApplying}
               onClick={async (e) => {
                 e.preventDefault();
-                if (!task || !aiSuggestion) return;
+                if (!localTask || !aiSuggestion) return;
                 setAIApplying(true);
                 try {
                   const updates: Record<string, any> = {};
@@ -591,12 +598,25 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                   if (aiSuggestion.platform) updates.platform = aiSuggestion.platform;
                   if (aiSuggestion.post_type) updates.post_type = aiSuggestion.post_type;
 
+                  // Add history entry
+                  const newHistoryEntry = {
+                    action: "Tarefa melhorada com IA",
+                    timestamp: new Date().toISOString(),
+                    user_name: profile?.name || "Usuário",
+                  };
+                  const updatedHistory = [...history, newHistoryEntry];
+                  updates.history = updatedHistory;
+
                   const { error } = await supabase
                     .from("tasks")
                     .update(updates)
-                    .eq("id", task.id);
+                    .eq("id", localTask.id);
 
                   if (error) throw error;
+
+                  // Update local state immediately
+                  setLocalTask(prev => prev ? { ...prev, ...updates } : prev);
+                  setHistory(updatedHistory);
 
                   toast({ title: "Tarefa melhorada com sucesso!" });
                   setShowAIPreview(false);
