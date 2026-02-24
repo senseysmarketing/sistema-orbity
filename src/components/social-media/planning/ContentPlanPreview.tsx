@@ -70,7 +70,7 @@ export function ContentPlanPreview({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-3xl h-[90vh] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -110,64 +110,66 @@ export function ContentPlanPreview({
         </div>
 
         {/* Items list */}
-        <ScrollArea className="flex-1 min-h-0 pr-2">
-          <div className="space-y-3">
-            {planResult.items.map((item, index) => (
-              <Card
-                key={index}
-                className={`transition-colors ${selectedItems.has(index) ? "border-primary/40 bg-primary/5" : ""}`}
-              >
-                <CardContent className="p-3 space-y-2">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      checked={selectedItems.has(index)}
-                      onCheckedChange={() => toggleItem(index)}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 min-w-0 space-y-1.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {item.post_date && (
-                          <Badge variant="outline" className="text-[10px] gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(item.post_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", weekday: "short" })}
-                          </Badge>
+        <div className="flex-1 min-h-0">
+          <ScrollArea className="h-full pr-2">
+            <div className="space-y-3">
+              {planResult.items.map((item, index) => (
+                <Card
+                  key={index}
+                  className={`transition-colors ${selectedItems.has(index) ? "border-primary/40 bg-primary/5" : ""}`}
+                >
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={selectedItems.has(index)}
+                        onCheckedChange={() => toggleItem(index)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {item.post_date && (
+                            <Badge variant="outline" className="text-[10px] gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(item.post_date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", weekday: "short" })}
+                            </Badge>
+                          )}
+                          {item.format && (
+                            <Badge className={`text-[10px] ${FORMAT_COLORS[item.format] || "bg-muted text-muted-foreground"}`}>
+                              {item.format}
+                            </Badge>
+                          )}
+                          {item.platform && <Badge variant="outline" className="text-[10px]">{item.platform}</Badge>}
+                          {item.content_type && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {TYPE_LABELS[item.content_type] || item.content_type}
+                            </Badge>
+                          )}
+                        </div>
+
+                        <p className="font-medium text-sm">{item.title}</p>
+
+                        {item.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>
                         )}
-                        {item.format && (
-                          <Badge className={`text-[10px] ${FORMAT_COLORS[item.format] || "bg-muted text-muted-foreground"}`}>
-                            {item.format}
-                          </Badge>
+
+                        {item.objective && (
+                          <p className="text-xs text-primary/80">🎯 {item.objective}</p>
                         )}
-                        {item.platform && <Badge variant="outline" className="text-[10px]">{item.platform}</Badge>}
-                        {item.content_type && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            {TYPE_LABELS[item.content_type] || item.content_type}
-                          </Badge>
+
+                        {wizardData.depthLevel === "detailed" && item.creative_instructions && (
+                          <div className="mt-2 p-2 rounded bg-muted/50 text-xs text-muted-foreground">
+                            <span className="font-medium">Instruções criativas: </span>
+                            {item.creative_instructions}
+                          </div>
                         )}
                       </div>
-
-                      <p className="font-medium text-sm">{item.title}</p>
-
-                      {item.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>
-                      )}
-
-                      {item.objective && (
-                        <p className="text-xs text-primary/80">🎯 {item.objective}</p>
-                      )}
-
-                      {wizardData.depthLevel === "detailed" && item.creative_instructions && (
-                        <div className="mt-2 p-2 rounded bg-muted/50 text-xs text-muted-foreground">
-                          <span className="font-medium">Instruções criativas: </span>
-                          {item.creative_instructions}
-                        </div>
-                      )}
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </ScrollArea>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t">
