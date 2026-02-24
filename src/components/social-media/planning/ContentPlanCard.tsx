@@ -3,12 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Calendar, MoreVertical, Trash2, Eye, ListChecks, MessageSquareText } from "lucide-react";
+import { Calendar, MoreVertical, Trash2, Eye, ListChecks, MessageSquareText, Pencil } from "lucide-react";
 import { ContentPlan } from "@/hooks/useContentPlanning";
 
 interface ContentPlanCardProps {
   plan: ContentPlan;
   onView: (plan: ContentPlan) => void;
+  onEdit: (plan: ContentPlan) => void;
   onCreateTasks: (plan: ContentPlan) => void;
   onDelete: (planId: string) => void;
   onCopyWeeklySummary?: (plan: ContentPlan) => void;
@@ -21,7 +22,7 @@ const STATUS_MAP: Record<string, { label: string; className: string }> = {
   archived: { label: "Arquivado", className: "bg-muted text-muted-foreground" },
 };
 
-export function ContentPlanCard({ plan, onView, onCreateTasks, onDelete, onCopyWeeklySummary }: ContentPlanCardProps) {
+export function ContentPlanCard({ plan, onView, onEdit, onCreateTasks, onDelete, onCopyWeeklySummary }: ContentPlanCardProps) {
   const items = plan.content_plan_items || [];
   const totalItems = items.length;
   const taskCreated = items.filter((i) => i.status === "task_created" || i.status === "in_progress" || i.status === "published").length;
@@ -55,6 +56,9 @@ export function ContentPlanCard({ plan, onView, onCreateTasks, onDelete, onCopyW
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onView(plan); }}>
                   <Eye className="h-4 w-4 mr-2" />Ver detalhes
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(plan); }}>
+                  <Pencil className="h-4 w-4 mr-2" />Editar planejamento
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateTasks(plan); }}>
                   <ListChecks className="h-4 w-4 mr-2" />Criar tarefas
