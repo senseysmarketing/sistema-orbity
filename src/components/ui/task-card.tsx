@@ -107,15 +107,15 @@ export function TaskCard({
         <StatusIcon className="h-5 w-5 flex-shrink-0" />
         <div className="flex gap-1 flex-nowrap overflow-x-auto scrollbar-hide">
           {task.task_type && (getTypeShortName || getTypeName) && (
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className="text-xs whitespace-nowrap flex-shrink-0">
               {(getTypeShortName || getTypeName)?.(task.task_type)}
             </Badge>
           )}
-          <Badge variant="outline" className={`${getPriorityColor(task.priority)} text-white text-xs`}>
+          <Badge variant="outline" className={`${getPriorityColor(task.priority)} text-white text-xs whitespace-nowrap flex-shrink-0`}>
             {getPriorityLabel(task.priority)}
           </Badge>
           {urgency.level !== 'normal' && task.status !== 'done' && (
-            <Badge variant="outline" className={`${urgency.color} text-xs flex items-center gap-1`}>
+            <Badge variant="outline" className={`${urgency.color} text-xs flex items-center gap-1 whitespace-nowrap flex-shrink-0`}>
               <UrgencyIcon className="h-3 w-3" />
               {getShortUrgencyLabel(urgency.label)}
             </Badge>
