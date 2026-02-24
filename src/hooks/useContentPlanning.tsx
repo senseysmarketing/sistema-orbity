@@ -269,6 +269,14 @@ export function useContentPlanning() {
           continue;
         }
 
+        // Insert into task_clients join table
+        if (plan.client_id) {
+          const { error: tcError } = await supabase
+            .from("task_clients")
+            .insert({ task_id: task.id, client_id: plan.client_id });
+          if (tcError) console.error("Error inserting task_client:", tcError);
+        }
+
         // Assign users to the task
         if (assignedUserIds && assignedUserIds.length > 0) {
           const assignments = assignedUserIds.map((userId) => ({

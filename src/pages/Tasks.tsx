@@ -237,13 +237,18 @@ export default function Tasks() {
     try {
       const { data, error } = await supabase
         .from("tasks")
-        .select("*")
+        .select("*, task_clients(client_id)")
         .eq("agency_id", currentAgency.id)
         .eq("archived", false)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setTasks((data as any) || []);
+      // Populate client_id from task_clients join table when tasks.client_id is null
+      const enrichedTasks = (data || []).map((task: any) => ({
+        ...task,
+        client_id: task.client_id || task.task_clients?.[0]?.client_id || null,
+      }));
+      setTasks(enrichedTasks);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar tarefas",
