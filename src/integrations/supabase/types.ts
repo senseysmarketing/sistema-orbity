@@ -1324,6 +1324,166 @@ export type Database = {
           },
         ]
       }
+      content_plan_items: {
+        Row: {
+          content_type: string | null
+          created_at: string
+          creative_instructions: string | null
+          day_number: number | null
+          description: string | null
+          format: string | null
+          hashtags: string | null
+          id: string
+          objective: string | null
+          plan_id: string
+          platform: string | null
+          post_date: string | null
+          status: string
+          task_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content_type?: string | null
+          created_at?: string
+          creative_instructions?: string | null
+          day_number?: number | null
+          description?: string | null
+          format?: string | null
+          hashtags?: string | null
+          id?: string
+          objective?: string | null
+          plan_id: string
+          platform?: string | null
+          post_date?: string | null
+          status?: string
+          task_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content_type?: string | null
+          created_at?: string
+          creative_instructions?: string | null
+          day_number?: number | null
+          description?: string | null
+          format?: string | null
+          hashtags?: string | null
+          id?: string
+          objective?: string | null
+          plan_id?: string
+          platform?: string | null
+          post_date?: string | null
+          status?: string
+          task_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_plan_items_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "content_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_plan_items_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_plans: {
+        Row: {
+          agency_id: string
+          ai_response: Json | null
+          client_id: string
+          created_at: string
+          created_by: string
+          depth_level: string
+          id: string
+          month_year: string
+          status: string
+          strategy_context: Json
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          ai_response?: Json | null
+          client_id: string
+          created_at?: string
+          created_by: string
+          depth_level?: string
+          id?: string
+          month_year: string
+          status?: string
+          strategy_context?: Json
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          ai_response?: Json | null
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          depth_level?: string
+          id?: string
+          month_year?: string
+          status?: string
+          strategy_context?: Json
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_plans_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_plans_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "content_plans_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "content_plans_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "master_users"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "content_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       contract_services_templates: {
         Row: {
           agency_id: string

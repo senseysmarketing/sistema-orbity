@@ -122,6 +122,45 @@ const ANALYTICS_REVIEW_TOOLS = [
   },
 ];
 
+const CONTENT_PLANNING_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "extract_content_plan",
+      description: "Gere um planejamento completo de conteúdo para redes sociais baseado no contexto do cliente.",
+      parameters: {
+        type: "object",
+        properties: {
+          plan_title: { type: "string", description: "Título do planejamento, ex: 'Planejamento Março 2026 - Nome do Cliente'" },
+          strategy_summary: { type: "string", description: "Resumo da estratégia adotada para o período, explicando as escolhas de conteúdo." },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                day_number: { type: "number", description: "Número sequencial do conteúdo (1, 2, 3...)" },
+                post_date: { type: "string", description: "Data de publicação no formato YYYY-MM-DD" },
+                title: { type: "string", description: "Título interno do conteúdo" },
+                description: { type: "string", description: "Legenda/caption ou descrição do conteúdo" },
+                content_type: { type: "string", description: "Tipo: educativo, informativo, autoridade, prova_social, bastidores, conversao, trend, objecoes, storytelling, tutorial" },
+                format: { type: "string", description: "Formato: carrossel, feed, reels, stories" },
+                platform: { type: "string", description: "Plataforma: instagram, facebook, linkedin, tiktok, youtube" },
+                creative_instructions: { type: "string", description: "Instruções detalhadas para o designer/editor: headlines, CTAs, roteiro, textos na arte" },
+                objective: { type: "string", description: "Objetivo específico deste conteúdo (ex: 'gerar autoridade', 'converter para vendas')" },
+                hashtags: { type: "string", description: "Hashtags relevantes separadas por vírgula" },
+              },
+              required: ["day_number", "post_date", "title", "description", "content_type", "format", "platform", "objective"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["plan_title", "strategy_summary", "items"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
 const DEFAULT_TASK_PROMPT =
   "Você é um assistente de agência de marketing digital. Extraia os dados estruturados de uma tarefa a partir da descrição do usuário. Gere um título conciso e uma descrição profissional, estruturada e sem erros de gramática. Se o usuário descrever conteúdo para redes sociais (ex: 'criar um post no Instagram', 'publicar um reels sobre...', 'fazer um carrossel', 'stories para o cliente X'), defina suggested_type como 'redes_sociais' e preencha os campos platform, post_type, hashtags e creative_instructions. Se o usuário descrever arte, banner, criativo, material visual, campanha publicitária, peça gráfica ou qualquer demanda para designer (ex: 'criar um banner', 'arte para campanha', 'criativo para anúncio'), defina suggested_type como 'criativos' e preencha creative_instructions com orientações visuais detalhadas.";
 
@@ -180,7 +219,7 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const sb = createClient(supabaseUrl, supabaseKey);
         
-        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : type === "analytics_review" ? "analytics" : "report";
+        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : type === "analytics_review" ? "analytics" : type === "content_planning" ? "content_planning" : "report";
         const { data } = await sb
           .from("agency_ai_prompts")
           .select("custom_prompt")
@@ -228,8 +267,13 @@ serve(async (req) => {
       systemPrompt = basePrompt + ANALYTICS_REVIEW_TECHNICAL_INSTRUCTIONS;
       tools = ANALYTICS_REVIEW_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_analytics_review" } };
+    } else if (type === "content_planning") {
+      const basePrompt = customPrompt || DEFAULT_CONTENT_PLANNING_PROMPT;
+      systemPrompt = basePrompt + CONTENT_PLANNING_TECHNICAL_INSTRUCTIONS + dateContext;
+      tools = CONTENT_PLANNING_TOOLS;
+      toolChoice = { type: "function", function: { name: "extract_content_plan" } };
     } else {
-      return new Response(JSON.stringify({ error: "Tipo inválido. Use prefill_task, prefill_post, report_traffic, campaign_analysis ou analytics_review." }), {
+      return new Response(JSON.stringify({ error: "Tipo inválido." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
