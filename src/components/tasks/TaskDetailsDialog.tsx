@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock, Copy, Hash, Smartphone, Palette, CalendarClock, Sparkles, Loader2 } from "lucide-react";
+import { getTypeColor } from "@/components/ui/task-card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
@@ -61,6 +62,9 @@ interface TaskDetailsDialogProps {
   getClientName: (clientId: string | null) => string;
   getAssignedUsers: (taskId: string) => any[];
   onTaskUpdate?: () => void;
+  taskType?: string | null;
+  getTypeName?: (slug: string | null) => string;
+  getTypeIcon?: (slug: string | null) => string;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -76,7 +80,7 @@ const priorityConfig: Record<string, { label: string; color: string }> = {
   high: { label: "Alta", color: "bg-red-500" },
 };
 
-export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, onDuplicate, getClientName, getAssignedUsers, onTaskUpdate }: TaskDetailsDialogProps) {
+export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, onDuplicate, getClientName, getAssignedUsers, onTaskUpdate, taskType, getTypeName, getTypeIcon }: TaskDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showNoPermissionAlert, setShowNoPermissionAlert] = useState(false);
   const [showAIPreview, setShowAIPreview] = useState(false);
@@ -224,6 +228,11 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
 
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
+              {taskType && getTypeName && (
+                <Badge className={`${getTypeColor(taskType)} border-0 text-sm`}>
+                  {getTypeIcon?.(taskType)} {getTypeName(taskType)}
+                </Badge>
+              )}
               <Badge className={statusConfig[localTask.status]?.color || "bg-gray-500"}>
                 {statusConfig[localTask.status]?.label || localTask.status}
               </Badge>
@@ -288,8 +297,11 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                   <Separator />
                   <div className="space-y-3">
                     <p className="text-sm font-medium flex items-center gap-2">
-                      <Smartphone className="h-4 w-4 text-muted-foreground" />
-                      Redes Sociais
+                      {taskType === 'criativos' ? (
+                        <><Palette className="h-4 w-4 text-muted-foreground" /> Criativos</>
+                      ) : (
+                        <><Smartphone className="h-4 w-4 text-muted-foreground" /> Redes Sociais</>
+                      )}
                     </p>
                     <div className="grid grid-cols-2 gap-3">
                       {localTask.platform && (
