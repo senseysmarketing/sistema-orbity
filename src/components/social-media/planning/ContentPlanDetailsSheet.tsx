@@ -46,12 +46,12 @@ export function ContentPlanDetailsSheet({ plan, open, onClose, onCreateTasks }: 
       if (!currentAgency?.id) return [];
       const { data } = await supabase
         .from("agency_users")
-        .select("user_id, role, profiles(full_name)")
+        .select("id, user_id, role, profiles:user_id(name)")
         .eq("agency_id", currentAgency.id);
       return (data || []).map((u: any) => ({
         id: u.user_id,
         user_id: u.user_id,
-        name: u.profiles?.full_name || "Sem nome",
+        name: u.profiles?.name || "Sem nome",
         role: u.role,
       }));
     },
@@ -185,7 +185,10 @@ export function ContentPlanDetailsSheet({ plan, open, onClose, onCreateTasks }: 
           {/* Footer action */}
           {plannedItems.length > 0 && (
             <div className="shrink-0 pt-4 border-t">
-              <Button className="w-full" onClick={handleCreateTasks} disabled={creating || selectedItems.size === 0}>
+              {assignedUserIds.length === 0 && selectedItems.size > 0 && (
+                <p className="text-xs text-destructive mb-2">Selecione ao menos um responsável para criar as tarefas.</p>
+              )}
+              <Button className="w-full" onClick={handleCreateTasks} disabled={creating || selectedItems.size === 0 || assignedUserIds.length === 0}>
                 {creating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ListChecks className="h-4 w-4 mr-2" />}
                 Criar {selectedItems.size} Tarefas
               </Button>
