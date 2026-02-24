@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
+import { format } from "date-fns";
 
 interface NPSResponseFormProps {
   periodId: string;
@@ -25,6 +26,7 @@ export function NPSResponseForm({ periodId, agencyId, onAdded }: NPSResponseForm
   const [clientName, setClientName] = useState("");
   const [score, setScore] = useState<number>(10);
   const [comment, setComment] = useState("");
+  const [responseDate, setResponseDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,6 +41,7 @@ export function NPSResponseForm({ periodId, agencyId, onAdded }: NPSResponseForm
       score,
       category: getCategory(score),
       comment: comment.trim() || null,
+      response_date: responseDate,
     }]);
 
     setSaving(false);
@@ -48,6 +51,7 @@ export function NPSResponseForm({ periodId, agencyId, onAdded }: NPSResponseForm
       setClientName("");
       setScore(10);
       setComment("");
+      setResponseDate(format(new Date(), "yyyy-MM-dd"));
       onAdded();
     }
   };
@@ -68,15 +72,25 @@ export function NPSResponseForm({ periodId, agencyId, onAdded }: NPSResponseForm
               required
             />
           </div>
-          <div>
-            <Label className="text-xs">Nota (0-10)</Label>
-            <Input
-              type="number"
-              min={0}
-              max={10}
-              value={score}
-              onChange={(e) => setScore(Number(e.target.value))}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Nota (0-10)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={10}
+                value={score}
+                onChange={(e) => setScore(Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Data da Resposta</Label>
+              <Input
+                type="date"
+                value={responseDate}
+                onChange={(e) => setResponseDate(e.target.value)}
+              />
+            </div>
           </div>
           <div>
             <Label className="text-xs">Comentário (opcional)</Label>

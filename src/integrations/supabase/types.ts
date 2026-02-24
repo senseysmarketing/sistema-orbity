@@ -3494,6 +3494,7 @@ export type Database = {
           created_at: string
           id: string
           period_id: string
+          response_date: string
           score: number
         }
         Insert: {
@@ -3504,6 +3505,7 @@ export type Database = {
           created_at?: string
           id?: string
           period_id: string
+          response_date?: string
           score: number
         }
         Update: {
@@ -3514,6 +3516,7 @@ export type Database = {
           created_at?: string
           id?: string
           period_id?: string
+          response_date?: string
           score?: number
         }
         Relationships: [

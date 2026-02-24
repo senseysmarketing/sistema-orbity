@@ -27,13 +27,15 @@ export function NPSChart({ promoters, neutrals, detractors, npsScore }: NPSChart
     );
   }
 
+  const pct = (v: number) => Math.round((v / total) * 100);
+
   return (
     <Card>
       <CardHeader className="pb-0">
         <CardTitle className="text-sm">Distribuição NPS</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[260px]">
+        <div className="h-[220px]">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -44,7 +46,6 @@ export function NPSChart({ promoters, neutrals, detractors, npsScore }: NPSChart
                 outerRadius={90}
                 paddingAngle={4}
                 dataKey="value"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
               >
                 {data.map((_, index) => (
                   <Cell key={index} fill={COLORS[index]} />
@@ -57,7 +58,21 @@ export function NPSChart({ promoters, neutrals, detractors, npsScore }: NPSChart
         </div>
         <div className="text-center mt-2">
           <p className="text-3xl font-bold text-foreground">{npsScore}</p>
-          <p className="text-xs text-muted-foreground">NPS Score</p>
+          <p className="text-xs text-muted-foreground mb-3">NPS Score</p>
+          <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+              Promotores: {promoters} ({pct(promoters)}%)
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+              Neutros: {neutrals} ({pct(neutrals)}%)
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
+              Detratores: {detractors} ({pct(detractors)}%)
+            </span>
+          </div>
         </div>
       </CardContent>
     </Card>

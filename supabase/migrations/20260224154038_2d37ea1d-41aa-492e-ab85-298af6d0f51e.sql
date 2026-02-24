@@ -1,0 +1,1 @@
+ALTER TABLE public.nps_responses ADD COLUMN IF NOT EXISTS response_date date NOT NULL DEFAULT CURRENT_DATE;
