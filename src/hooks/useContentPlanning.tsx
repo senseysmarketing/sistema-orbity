@@ -320,6 +320,66 @@ export function useContentPlanning() {
     }
   };
 
+  const updatePlanItem = async (itemId: string, updates: Partial<Pick<ContentPlanItem, "title" | "description" | "format" | "platform" | "post_date" | "content_type" | "creative_instructions" | "objective" | "hashtags">>) => {
+    try {
+      const { error } = await supabase
+        .from("content_plan_items")
+        .update(updates)
+        .eq("id", itemId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["content-plans"] });
+      toast({ title: "Item atualizado" });
+      return true;
+    } catch {
+      toast({ title: "Erro", description: "Falha ao atualizar item.", variant: "destructive" });
+      return false;
+    }
+  };
+
+  const deletePlanItem = async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from("content_plan_items")
+        .delete()
+        .eq("id", itemId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["content-plans"] });
+      toast({ title: "Item excluído" });
+      return true;
+    } catch {
+      toast({ title: "Erro", description: "Falha ao excluir item.", variant: "destructive" });
+      return false;
+    }
+  };
+
+  const addPlanItem = async (planId: string, itemData: Partial<ContentPlanItem>) => {
+    try {
+      const { error } = await supabase
+        .from("content_plan_items")
+        .insert({
+          plan_id: planId,
+          title: itemData.title || "Novo conteúdo",
+          description: itemData.description || null,
+          format: itemData.format || null,
+          platform: itemData.platform || null,
+          post_date: itemData.post_date || null,
+          content_type: itemData.content_type || null,
+          creative_instructions: itemData.creative_instructions || null,
+          objective: itemData.objective || null,
+          hashtags: itemData.hashtags || null,
+          day_number: itemData.day_number || null,
+          status: "planned",
+        });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["content-plans"] });
+      toast({ title: "Item adicionado" });
+      return true;
+    } catch {
+      toast({ title: "Erro", description: "Falha ao adicionar item.", variant: "destructive" });
+      return false;
+    }
+  };
+
   return {
     plans,
     isLoading,
@@ -328,5 +388,8 @@ export function useContentPlanning() {
     savePlan,
     createTasksFromItems,
     deletePlan,
+    updatePlanItem,
+    deletePlanItem,
+    addPlanItem,
   };
 }

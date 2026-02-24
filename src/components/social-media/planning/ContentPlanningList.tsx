@@ -12,11 +12,12 @@ import { ContentPlanDetailsSheet } from "./ContentPlanDetailsSheet";
 import { WeeklySummaryDialog } from "./WeeklySummaryDialog";
 
 export function ContentPlanningList() {
-  const { plans, isLoading, generating, generatePlan, savePlan, createTasksFromItems, deletePlan } = useContentPlanning();
+  const { plans, isLoading, generating, generatePlan, savePlan, createTasksFromItems, deletePlan, updatePlanItem, deletePlanItem, addPlanItem } = useContentPlanning();
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsEditMode, setDetailsEditMode] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const selectedPlan = useMemo(() => plans.find(p => p.id === selectedPlanId) || null, [plans, selectedPlanId]);
   const [currentWizardData, setCurrentWizardData] = useState<WizardData | null>(null);
@@ -83,11 +84,19 @@ export function ContentPlanningList() {
 
   const handleViewPlan = (plan: ContentPlan) => {
     setSelectedPlanId(plan.id);
+    setDetailsEditMode(false);
+    setDetailsOpen(true);
+  };
+
+  const handleEditPlan = (plan: ContentPlan) => {
+    setSelectedPlanId(plan.id);
+    setDetailsEditMode(true);
     setDetailsOpen(true);
   };
 
   const handleCreateTasksFromPlan = (plan: ContentPlan) => {
     setSelectedPlanId(plan.id);
+    setDetailsEditMode(false);
     setDetailsOpen(true);
   };
 
@@ -149,6 +158,7 @@ export function ContentPlanningList() {
               key={plan.id}
               plan={plan}
               onView={handleViewPlan}
+              onEdit={handleEditPlan}
               onCreateTasks={handleCreateTasksFromPlan}
               onDelete={deletePlan}
               onCopyWeeklySummary={(p) => setSummaryPlan(p)}
@@ -184,6 +194,10 @@ export function ContentPlanningList() {
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
         onCreateTasks={createTasksFromItems}
+        editMode={detailsEditMode}
+        onUpdateItem={updatePlanItem}
+        onDeleteItem={deletePlanItem}
+        onAddItem={addPlanItem}
       />
 
       {/* Weekly summary */}
