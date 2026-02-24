@@ -12,7 +12,7 @@ import { PPRConfigDialog } from "./PPRConfigDialog";
 import { NPSResponseForm } from "./NPSResponseForm";
 import { NPSChart } from "./NPSChart";
 import { ScorecardCard } from "./ScorecardCard";
-import { Gift, Plus, Settings2, Trash2 } from "lucide-react";
+import { Gift, Plus, Settings2, Trash2, Pencil } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { format, eachMonthOfInterval, startOfMonth, endOfMonth, parseISO, isFuture } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -91,6 +91,11 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
   const [configMode, setConfigMode] = useState<"create" | "edit">("edit");
   const [loading, setLoading] = useState(true);
   const [monthlyData, setMonthlyData] = useState<MonthlyFinancial[]>([]);
+  const [editingNps, setEditingNps] = useState<NpsResponse | null>(null);
+  const [editNpsName, setEditNpsName] = useState("");
+  const [editNpsScore, setEditNpsScore] = useState(10);
+  const [editNpsComment, setEditNpsComment] = useState("");
+  const [editNpsDate, setEditNpsDate] = useState("");
 
   const selectedPeriod = periods.find((p) => p.id === selectedPeriodId);
 
@@ -310,6 +315,49 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
 
   const handleNpsAdded = () => {
     fetchNpsResponses();
+  };
+
+  const handleDeleteNpsResponse = async (id: string) => {
+    const { error } = await supabase.from("nps_responses").delete().eq("id", id);
+    if (error) {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    } else {
+      fetchNpsResponses();
+    }
+  };
+
+  const startEditNps = (r: NpsResponse) => {
+    setEditingNps(r);
+    setEditNpsName(r.client_name);
+    setEditNpsScore(r.score);
+    setEditNpsComment(r.comment || "");
+    setEditNpsDate(r.response_date || "");
+  };
+
+  const getCategory = (score: number) => {
+    if (score >= 9) return "promoter";
+    if (score >= 7) return "neutral";
+    return "detractor";
+  };
+
+  const handleSaveEditNps = async () => {
+    if (!editingNps) return;
+    const { error } = await supabase
+      .from("nps_responses")
+      .update({
+        client_name: editNpsName.trim(),
+        score: editNpsScore,
+        category: getCategory(editNpsScore),
+        comment: editNpsComment.trim() || null,
+        response_date: editNpsDate || null,
+      } as Record<string, unknown>)
+      .eq("id", editingNps.id);
+    if (error) {
+      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+    } else {
+      setEditingNps(null);
+      fetchNpsResponses();
+    }
   };
 
   const handleScorecardUpdate = async (
@@ -618,28 +666,75 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
                 </CardHeader>
                 <CardContent className="space-y-2 max-h-64 overflow-y-auto">
                   {npsResponses.map((r) => (
-                    <div key={r.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{r.client_name}</p>
-                        {r.comment && (
-                          <p className="text-xs text-muted-foreground truncate max-w-[200px]">{r.comment}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold">{r.score}</span>
-                        <Badge
-                          variant="outline"
-                          className={
-                            r.category === "promoter"
-                              ? "border-emerald-500 text-emerald-600"
-                              : r.category === "detractor"
-                              ? "border-red-500 text-red-600"
-                              : "border-yellow-500 text-yellow-600"
-                          }
-                        >
-                          {r.category === "promoter" ? "Promotor" : r.category === "detractor" ? "Detrator" : "Neutro"}
-                        </Badge>
-                      </div>
+                    <div key={r.id} className="p-2 rounded-lg bg-muted/50">
+                      {editingNps?.id === r.id ? (
+                        <div className="space-y-2">
+                          <input
+                            className="w-full text-sm border rounded px-2 py-1 bg-background text-foreground"
+                            value={editNpsName}
+                            onChange={(e) => setEditNpsName(e.target.value)}
+                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              min={0}
+                              max={10}
+                              className="w-16 text-sm border rounded px-2 py-1 bg-background text-foreground"
+                              value={editNpsScore}
+                              onChange={(e) => setEditNpsScore(Number(e.target.value))}
+                            />
+                            <input
+                              type="date"
+                              className="flex-1 text-sm border rounded px-2 py-1 bg-background text-foreground"
+                              value={editNpsDate}
+                              onChange={(e) => setEditNpsDate(e.target.value)}
+                            />
+                          </div>
+                          <input
+                            className="w-full text-sm border rounded px-2 py-1 bg-background text-foreground"
+                            value={editNpsComment}
+                            onChange={(e) => setEditNpsComment(e.target.value)}
+                            placeholder="Comentário..."
+                          />
+                          <div className="flex gap-1 justify-end">
+                            <Button size="sm" variant="ghost" onClick={() => setEditingNps(null)}>Cancelar</Button>
+                            <Button size="sm" onClick={handleSaveEditNps}>Salvar</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{r.client_name}</p>
+                            {r.comment && (
+                              <p className="text-xs text-muted-foreground truncate max-w-[200px]">{r.comment}</p>
+                            )}
+                            {r.response_date && (
+                              <p className="text-xs text-muted-foreground">{r.response_date}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold">{r.score}</span>
+                            <Badge
+                              variant="outline"
+                              className={
+                                r.category === "promoter"
+                                  ? "border-emerald-500 text-emerald-600"
+                                  : r.category === "detractor"
+                                  ? "border-red-500 text-red-600"
+                                  : "border-yellow-500 text-yellow-600"
+                              }
+                            >
+                              {r.category === "promoter" ? "Promotor" : r.category === "detractor" ? "Detrator" : "Neutro"}
+                            </Badge>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditNps(r)}>
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteNpsResponse(r.id)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                   {npsResponses.length === 0 && (
