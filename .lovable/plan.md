@@ -1,28 +1,27 @@
 
+# Recuperacao de Clientes nas Tarefas Migradas
 
-# Correcao de Quebra de Linha nos Badges dos Cards de Tarefas
+## Problema Real
+As 488 tarefas migradas **ja possuem** os clientes corretos na tabela `task_clients`. O problema e que a pagina de Tarefas busca `tasks.*` (que retorna `tasks.client_id = null` para tarefas migradas) e usa esse campo para exibir o cliente nos cards e no dialog de detalhes.
 
-## Problema
-Os badges de metadados (tipo, prioridade, urgencia) nos cards do Kanban estao quebrando linha, especialmente quando ha 3 badges simultaneos (ex: "Redes Sociais" + "Media" + "Atrasada"). Isso ocorre apesar do container ter `flex-nowrap`.
+A arquitetura multi-cliente do sistema usa a tabela de juncao `task_clients`, mas o `fetchTasks` em `Tasks.tsx` ignora essa tabela.
 
-## Causa
-Cada `Badge` nao possui `whitespace-nowrap` e `flex-shrink-0`, entao mesmo com `flex-nowrap` no container pai, o texto interno dos badges pode quebrar (ex: "Redes Sociais" vira duas linhas). Alem disso, o badge de tipo pode ter textos longos.
+## Correcoes
 
-## Alteracoes
+### 1. Tasks.tsx - fetchTasks (buscar clientes via task_clients)
+Alterar a query de `select("*")` para incluir `task_clients(client_id)`. Apos buscar, popular `task.client_id` com o primeiro client_id encontrado em `task_clients`:
 
-### 1. `src/components/ui/task-card.tsx`
-- Adicionar `whitespace-nowrap flex-shrink-0` a todos os Badges da linha de metadados para garantir que nenhum badge quebre texto interno
-- Isso se aplica aos 3 badges: tipo, prioridade e urgencia
+```
+select("*, task_clients(client_id)")
+```
 
-### 2. `src/components/ui/kanban-column.tsx`
-- Aumentar a largura minima das colunas de `min-w-[300px] md:min-w-[360px] w-[300px] md:w-[360px]` para `min-w-[320px] md:min-w-[380px] w-[320px] md:w-[380px]`
-- Isso garante espaco suficiente para acomodar 3 badges em uma unica linha
+No mapeamento dos resultados, setar `task.client_id` a partir de `task.task_clients[0]?.client_id` quando `task.client_id` for null.
+
+### 2. useContentPlanning.tsx - createTasksFromItems
+Apos criar cada tarefa, inserir tambem na tabela `task_clients` para que novas tarefas criadas pelo wizard de planejamento tenham o vinculo correto.
 
 ### Detalhes tecnicos
-No `task-card.tsx`, cada Badge recebera classes adicionais:
-- Badge de tipo: `text-xs whitespace-nowrap flex-shrink-0`
-- Badge de prioridade: `... text-white text-xs whitespace-nowrap flex-shrink-0`
-- Badge de urgencia: `... text-xs flex items-center gap-1 whitespace-nowrap flex-shrink-0`
-
-No `kanban-column.tsx`, a div raiz da coluna tera larguras ajustadas de 300/360 para 320/380.
-
+- **Nenhuma alteracao no banco de dados** -- os dados ja estao corretos em `task_clients`
+- Apenas 2 arquivos serao modificados: `Tasks.tsx` e `useContentPlanning.tsx`
+- A exibicao nos cards, no dialog de detalhes e nos filtros funcionara automaticamente pois todos dependem de `task.client_id`
+- As 5 tarefas criadas pelo wizard de planejamento (Feb 24) que tem `tasks.client_id` preenchido mas nao tem `task_clients` tambem serao corrigidas no codigo para futuras criacoes
