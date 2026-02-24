@@ -722,6 +722,147 @@ export type Database = {
           },
         ]
       }
+      bonus_periods: {
+        Row: {
+          agency_id: string
+          bonus_pool_amount: number
+          bonus_pool_percent: number
+          created_at: string
+          end_date: string
+          id: string
+          label: string
+          net_profit: number
+          nps_actual: number
+          nps_target: number
+          program_id: string
+          revenue_actual: number
+          revenue_target: number
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          bonus_pool_amount?: number
+          bonus_pool_percent?: number
+          created_at?: string
+          end_date: string
+          id?: string
+          label: string
+          net_profit?: number
+          nps_actual?: number
+          nps_target?: number
+          program_id: string
+          revenue_actual?: number
+          revenue_target?: number
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          bonus_pool_amount?: number
+          bonus_pool_percent?: number
+          created_at?: string
+          end_date?: string
+          id?: string
+          label?: string
+          net_profit?: number
+          nps_actual?: number
+          nps_target?: number
+          program_id?: string
+          revenue_actual?: number
+          revenue_target?: number
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bonus_periods_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bonus_periods_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "bonus_periods_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "bonus_periods_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "bonus_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bonus_programs: {
+        Row: {
+          agency_id: string
+          config: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          program_type: string
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          config?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          program_type?: string
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          config?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          program_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bonus_programs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bonus_programs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "bonus_programs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
           agency_id: string
@@ -1736,6 +1877,90 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      employee_scorecards: {
+        Row: {
+          agency_id: string
+          created_at: string
+          employee_id: string
+          final_bonus: number
+          id: string
+          max_share: number
+          nps_retention_score: number
+          period_id: string
+          process_innovation_score: number
+          technical_delivery_score: number
+          updated_at: string
+          user_id: string | null
+          weighted_average: number
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string
+          employee_id: string
+          final_bonus?: number
+          id?: string
+          max_share?: number
+          nps_retention_score?: number
+          period_id: string
+          process_innovation_score?: number
+          technical_delivery_score?: number
+          updated_at?: string
+          user_id?: string | null
+          weighted_average?: number
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string
+          employee_id?: string
+          final_bonus?: number
+          id?: string
+          max_share?: number
+          nps_retention_score?: number
+          period_id?: string
+          process_innovation_score?: number
+          technical_delivery_score?: number
+          updated_at?: string
+          user_id?: string | null
+          weighted_average?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_scorecards_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_scorecards_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "employee_scorecards_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "employee_scorecards_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_scorecards_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "bonus_periods"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3257,6 +3482,68 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      nps_responses: {
+        Row: {
+          agency_id: string
+          category: string
+          client_name: string
+          comment: string | null
+          created_at: string
+          id: string
+          period_id: string
+          score: number
+        }
+        Insert: {
+          agency_id: string
+          category: string
+          client_name: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          period_id: string
+          score: number
+        }
+        Update: {
+          agency_id?: string
+          category?: string
+          client_name?: string
+          comment?: string | null
+          created_at?: string
+          id?: string
+          period_id?: string
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nps_responses_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nps_responses_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "nps_responses_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "nps_responses_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "bonus_periods"
+            referencedColumns: ["id"]
           },
         ]
       }
