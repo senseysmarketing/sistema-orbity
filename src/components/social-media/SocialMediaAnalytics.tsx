@@ -1,187 +1,384 @@
-import { useEffect, useState, useMemo } from "react";
-import { useAgency } from "@/hooks/useAgency";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Archive, ChevronLeft, ChevronRight } from "lucide-react";
-import { format, startOfMonth, endOfMonth, isSameMonth, subMonths } from "date-fns";
+import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { format, startOfMonth, endOfMonth, isSameMonth, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { PostWithAssignments, ProfileData } from "./analytics/types";
-import { MetricsCards } from "./analytics/MetricsCards";
-import { TeamPerformanceTable } from "./analytics/TeamPerformanceTable";
-import { WorkloadChart } from "./analytics/WorkloadChart";
-import { SmartInsights } from "./analytics/SmartInsights";
-import { ClientAnalysis } from "./analytics/ClientAnalysis";
-import { mapTaskStatusToSocial } from "@/hooks/useSocialMediaTasks";
+import { supabase } from "@/integrations/supabase/client";
+import { useAgency } from "@/hooks/useAgency";
+
+// Reuse task analytics components
+import { MetricsCards } from "@/components/tasks/analytics/MetricsCards";
+import { TeamPerformanceTable } from "@/components/tasks/analytics/TeamPerformanceTable";
+import { WorkloadChart } from "@/components/tasks/analytics/WorkloadChart";
+import { ClientAnalysis } from "@/components/tasks/analytics/ClientAnalysis";
+import { SmartInsights } from "@/components/tasks/analytics/SmartInsights";
+import { AIAnalysisCard } from "@/components/tasks/analytics/AIAnalysisCard";
+import {
+  UserMetrics,
+  ClientMetrics,
+  TaskWithAssignments,
+  Profile,
+} from "@/components/tasks/analytics/types";
 
 export function SocialMediaAnalytics() {
   const { currentAgency } = useAgency();
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
-  const [monthPosts, setMonthPosts] = useState<PostWithAssignments[]>([]);
-  const [previousMonthPosts, setPreviousMonthPosts] = useState<PostWithAssignments[]>([]);
-  const [profiles, setProfiles] = useState<ProfileData[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const handlePreviousMonth = () => {
-    const newDate = new Date(selectedMonth);
-    newDate.setMonth(newDate.getMonth() - 1);
-    setSelectedMonth(newDate);
-  };
-
-  const handleNextMonth = () => {
-    const newDate = new Date(selectedMonth);
-    newDate.setMonth(newDate.getMonth() + 1);
-    setSelectedMonth(newDate);
-  };
-
-  // Fetch tasks with type 'redes_sociais' for selected month
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!currentAgency?.id) return;
-
-      setLoading(true);
-      const monthStart = startOfMonth(selectedMonth);
-      const monthEnd = endOfMonth(selectedMonth);
-      const prevMonthStart = startOfMonth(subMonths(selectedMonth, 1));
-      const prevMonthEnd = endOfMonth(subMonths(selectedMonth, 1));
-
-      const [tasksResult, prevTasksResult, agencyUsersResult] = await Promise.all([
-        supabase
-          .from('tasks')
-          .select(`
-            id,
-            title,
-            status,
-            priority,
-            due_date,
-            created_at,
-            archived,
-            metadata,
-            task_clients(client_id, clients(name)),
-            task_assignments(user_id)
-          `)
-          .eq('agency_id', currentAgency.id)
-          .eq('task_type', 'redes_sociais')
-          .gte('due_date', monthStart.toISOString())
-          .lte('due_date', monthEnd.toISOString()),
-        supabase
-          .from('tasks')
-          .select(`
-            id,
-            status,
-            archived
-          `)
-          .eq('agency_id', currentAgency.id)
-          .eq('task_type', 'redes_sociais')
-          .gte('due_date', prevMonthStart.toISOString())
-          .lte('due_date', prevMonthEnd.toISOString()),
-        supabase
-          .from('agency_users')
-          .select('user_id')
-          .eq('agency_id', currentAgency.id)
-      ]);
-
-      if (tasksResult.data) {
-        // Map tasks to PostWithAssignments format for analytics components
-        const mapped: PostWithAssignments[] = tasksResult.data.map((task: any) => {
-          const meta = task.metadata || {};
-          const postDate = meta.post_date || null;
-          const platform = meta.platform || '';
-          const postType = meta.post_type || '';
-          const firstClient = task.task_clients?.[0];
-          const mappedStatus = mapTaskStatusToSocial(task.status);
-
-          return {
-            id: task.id,
-            title: task.title || '',
-            status: mappedStatus,
-            priority: task.priority || 'medium',
-            platform,
-            post_type: postType,
-            client_id: firstClient?.client_id || null,
-            scheduled_date: postDate || task.due_date || task.created_at,
-            post_date: postDate,
-            created_at: task.created_at,
-            archived: task.archived || false,
-            clients: firstClient?.clients || null,
-            post_assignments: (task.task_assignments || []).map((a: any) => ({ user_id: a.user_id })),
-          };
-        });
-        setMonthPosts(mapped);
-      }
-
-      if (prevTasksResult.data) {
-        setPreviousMonthPosts(prevTasksResult.data.map((p: any) => ({
-          id: p.id,
-          status: mapTaskStatusToSocial(p.status),
-          archived: p.archived || false,
-          title: '',
-          priority: '',
-          platform: '',
-          post_type: '',
-          client_id: null,
-          scheduled_date: '',
-          post_date: null,
-          created_at: '',
-        })) as PostWithAssignments[]);
-      }
-
-      // Fetch profiles for agency users
-      if (agencyUsersResult.data && agencyUsersResult.data.length > 0) {
-        const userIds = agencyUsersResult.data.map(u => u.user_id);
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('user_id, name, avatar_url')
-          .in('user_id', userIds);
-
-        if (profilesData) {
-          setProfiles(profilesData);
-        }
-      }
-
-      setLoading(false);
-    };
-
-    fetchData();
-  }, [currentAgency?.id, selectedMonth]);
-
-  // Calculate previous month completion rate
-  const previousMonthCompletionRate = useMemo(() => {
-    const activePrev = previousMonthPosts.filter(p => !p.archived);
-    if (activePrev.length === 0) return undefined;
-    const published = activePrev.filter(p => p.status === 'published').length;
-    return Math.round((published / activePrev.length) * 100);
-  }, [previousMonthPosts]);
+  const [monthTasks, setMonthTasks] = useState<TaskWithAssignments[]>([]);
+  const [loadingMonthTasks, setLoadingMonthTasks] = useState(false);
+  const [previousMonthRate, setPreviousMonthRate] = useState(0);
+  const [agencyProfiles, setAgencyProfiles] = useState<Profile[]>([]);
 
   const isCurrentMonth = isSameMonth(selectedMonth, new Date());
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+  // Fetch agency users profiles
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      if (!currentAgency?.id) return;
+
+      const { data: agencyUsers } = await supabase
+        .from("agency_users")
+        .select("user_id")
+        .eq("agency_id", currentAgency.id);
+
+      if (agencyUsers && agencyUsers.length > 0) {
+        const userIds = agencyUsers.map((u) => u.user_id);
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("user_id, name, avatar_url")
+          .in("user_id", userIds);
+
+        if (profilesData) {
+          setAgencyProfiles(profilesData);
+        }
+      }
+    };
+
+    fetchProfiles();
+  }, [currentAgency?.id]);
+
+  // Fetch social media tasks for selected month
+  useEffect(() => {
+    const fetchMonthTasks = async () => {
+      if (!currentAgency?.id) return;
+
+      setLoadingMonthTasks(true);
+
+      const monthStart = startOfMonth(selectedMonth);
+      const monthEnd = endOfMonth(selectedMonth);
+
+      const { data, error } = await supabase
+        .from("tasks")
+        .select(`
+          id, title, status, priority, client_id, due_date,
+          created_at, updated_at, archived, task_type,
+          platform, post_type, post_date,
+          clients(name),
+          task_assignments(user_id)
+        `)
+        .eq("agency_id", currentAgency.id)
+        .eq("task_type", "redes_sociais")
+        .or(
+          `due_date.gte.${monthStart.toISOString()},created_at.gte.${monthStart.toISOString()}`
+        )
+        .or(
+          `due_date.lte.${monthEnd.toISOString()},created_at.lte.${monthEnd.toISOString()}`
+        );
+
+      if (!error && data) {
+        const filteredTasks = data.filter((task) => {
+          const taskDate = task.due_date
+            ? new Date(task.due_date)
+            : new Date(task.created_at);
+          return taskDate >= monthStart && taskDate <= monthEnd;
+        });
+        setMonthTasks(filteredTasks as TaskWithAssignments[]);
+      }
+
+      // Previous month completion rate
+      const prevMonthStart = startOfMonth(
+        new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1)
+      );
+      const prevMonthEnd = endOfMonth(prevMonthStart);
+
+      const { data: prevData } = await supabase
+        .from("tasks")
+        .select("status")
+        .eq("agency_id", currentAgency.id)
+        .eq("task_type", "redes_sociais")
+        .gte("due_date", prevMonthStart.toISOString())
+        .lte("due_date", prevMonthEnd.toISOString());
+
+      if (prevData && prevData.length > 0) {
+        const prevCompleted = prevData.filter(
+          (t) => t.status === "done"
+        ).length;
+        setPreviousMonthRate(
+          Math.round((prevCompleted / prevData.length) * 100)
+        );
+      } else {
+        setPreviousMonthRate(0);
+      }
+
+      setLoadingMonthTasks(false);
+    };
+
+    fetchMonthTasks();
+  }, [currentAgency?.id, selectedMonth]);
+
+  const handlePreviousMonth = () => {
+    setSelectedMonth(
+      (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
     );
-  }
+  };
+
+  const handleNextMonth = () => {
+    const nextMonth = new Date(
+      selectedMonth.getFullYear(),
+      selectedMonth.getMonth() + 1,
+      1
+    );
+    if (nextMonth <= new Date()) {
+      setSelectedMonth(nextMonth);
+    }
+  };
+
+  // Calculate analytics data (same pattern as TaskAnalytics)
+  const analyticsData = useMemo(() => {
+    const tasks = monthTasks;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const total = tasks.length;
+    const completed = tasks.filter((t) => t.status === "done").length;
+    const completionRate =
+      total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    const unassigned = tasks.filter(
+      (t) => !t.task_assignments || t.task_assignments.length === 0
+    ).length;
+
+    const overdue = tasks.filter((t) => {
+      if (!t.due_date || t.status === "done") return false;
+      const dueDate = new Date(t.due_date);
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate < today;
+    }).length;
+
+    const usersWithTasks = new Set<string>();
+    tasks.forEach((t) => {
+      t.task_assignments?.forEach((a) => usersWithTasks.add(a.user_id));
+    });
+    const avgPerUser =
+      usersWithTasks.size > 0 ? total / usersWithTasks.size : 0;
+
+    // User metrics
+    const userMetricsMap: Record<string, UserMetrics> = {};
+
+    agencyProfiles.forEach((profile) => {
+      userMetricsMap[profile.user_id] = {
+        userId: profile.user_id,
+        name: profile.name,
+        avatarUrl: profile.avatar_url || null,
+        tasksAssigned: 0,
+        tasksCompleted: 0,
+        tasksInProgress: 0,
+        tasksInReview: 0,
+        tasksTodo: 0,
+        completionRate: 0,
+        avgTimeToComplete: 0,
+        overdueCount: 0,
+      };
+    });
+
+    const completionTimes: Record<string, number[]> = {};
+
+    tasks.forEach((task) => {
+      task.task_assignments?.forEach((assignment) => {
+        const userId = assignment.user_id;
+        if (!userMetricsMap[userId]) {
+          const profile = agencyProfiles.find((p) => p.user_id === userId);
+          userMetricsMap[userId] = {
+            userId,
+            name: profile?.name || "Usuário",
+            avatarUrl: profile?.avatar_url || null,
+            tasksAssigned: 0,
+            tasksCompleted: 0,
+            tasksInProgress: 0,
+            tasksInReview: 0,
+            tasksTodo: 0,
+            completionRate: 0,
+            avgTimeToComplete: 0,
+            overdueCount: 0,
+          };
+        }
+
+        userMetricsMap[userId].tasksAssigned++;
+
+        switch (task.status) {
+          case "done":
+            userMetricsMap[userId].tasksCompleted++;
+            if (task.updated_at && task.created_at) {
+              const created = new Date(task.created_at);
+              const updated = new Date(task.updated_at);
+              const days = differenceInDays(updated, created);
+              if (!completionTimes[userId]) completionTimes[userId] = [];
+              completionTimes[userId].push(days);
+            }
+            break;
+          case "in_progress":
+            userMetricsMap[userId].tasksInProgress++;
+            break;
+          case "em_revisao":
+            userMetricsMap[userId].tasksInReview++;
+            break;
+          case "todo":
+          default:
+            userMetricsMap[userId].tasksTodo++;
+        }
+
+        if (task.due_date && task.status !== "done") {
+          const dueDate = new Date(task.due_date);
+          dueDate.setHours(0, 0, 0, 0);
+          if (dueDate < today) {
+            userMetricsMap[userId].overdueCount++;
+          }
+        }
+      });
+    });
+
+    Object.keys(userMetricsMap).forEach((userId) => {
+      const user = userMetricsMap[userId];
+      user.completionRate =
+        user.tasksAssigned > 0
+          ? Math.round((user.tasksCompleted / user.tasksAssigned) * 100)
+          : 0;
+
+      if (completionTimes[userId] && completionTimes[userId].length > 0) {
+        user.avgTimeToComplete =
+          completionTimes[userId].reduce((a, b) => a + b, 0) /
+          completionTimes[userId].length;
+      }
+    });
+
+    const userMetrics = Object.values(userMetricsMap).filter(
+      (u) => u.tasksAssigned > 0
+    );
+
+    // Client metrics
+    const clientMetricsMap: Record<string, ClientMetrics> = {};
+
+    tasks.forEach((task) => {
+      if (!task.client_id) return;
+
+      const clientName = task.clients?.name || "Cliente";
+
+      if (!clientMetricsMap[task.client_id]) {
+        clientMetricsMap[task.client_id] = {
+          clientId: task.client_id,
+          name: clientName,
+          totalTasks: 0,
+          completedTasks: 0,
+          inProgressTasks: 0,
+          overdueTasks: 0,
+          completionRate: 0,
+          needsAttention: false,
+        };
+      }
+
+      clientMetricsMap[task.client_id].totalTasks++;
+
+      if (task.status === "done") {
+        clientMetricsMap[task.client_id].completedTasks++;
+      } else if (task.status === "in_progress") {
+        clientMetricsMap[task.client_id].inProgressTasks++;
+      }
+
+      if (task.due_date && task.status !== "done") {
+        const dueDate = new Date(task.due_date);
+        dueDate.setHours(0, 0, 0, 0);
+        if (dueDate < today) {
+          clientMetricsMap[task.client_id].overdueTasks++;
+        }
+      }
+    });
+
+    Object.keys(clientMetricsMap).forEach((clientId) => {
+      const client = clientMetricsMap[clientId];
+      client.completionRate =
+        client.totalTasks > 0
+          ? Math.round((client.completedTasks / client.totalTasks) * 100)
+          : 0;
+      client.needsAttention =
+        client.completionRate < 50 ||
+        (client.overdueTasks > 0 &&
+          client.overdueTasks >= client.totalTasks * 0.3);
+    });
+
+    const clientMetrics = Object.values(clientMetricsMap);
+
+    // Tasks per day for peak detection
+    const tasksPerDay: Record<string, number> = {};
+    tasks.forEach((task) => {
+      if (task.due_date && task.status !== "done") {
+        const dateKey = format(new Date(task.due_date), "dd/MM", {
+          locale: ptBR,
+        });
+        tasksPerDay[dateKey] = (tasksPerDay[dateKey] || 0) + 1;
+      }
+    });
+
+    const usersWithOverdue = userMetrics.filter(
+      (u) => u.overdueCount > 0
+    ).length;
+
+    return {
+      total,
+      completed,
+      completionRate,
+      unassigned,
+      overdue,
+      avgPerUser,
+      userMetrics,
+      clientMetrics,
+      tasksPerDay,
+      usersWithOverdue,
+    };
+  }, [monthTasks, agencyProfiles]);
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-6">
       {/* Header with month selector */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-xl md:text-2xl font-bold">Análises e Insights</h2>
+          <h2 className="text-xl md:text-2xl font-bold">
+            Análises de Social Media
+          </h2>
           <p className="text-sm text-muted-foreground">
-            Dashboard de produtividade da equipe e clientes
+            Dashboard de produtividade da equipe para tarefas de redes sociais
           </p>
         </div>
+
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handlePreviousMonth} className="h-9 w-9">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handlePreviousMonth}
+            className="h-9 w-9"
+          >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="min-w-[120px] sm:min-w-[150px] text-center">
+          <div className="min-w-[130px] sm:min-w-[150px] text-center">
             <span className="text-sm sm:text-lg font-semibold capitalize">
-              {format(selectedMonth, "MMM yyyy", { locale: ptBR })}
+              {format(selectedMonth, "MMMM yyyy", { locale: ptBR })}
             </span>
           </div>
-          <Button variant="outline" size="icon" onClick={handleNextMonth} className="h-9 w-9">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleNextMonth}
+            disabled={isSameMonth(selectedMonth, new Date())}
+            className="h-9 w-9"
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -189,38 +386,74 @@ export function SocialMediaAnalytics() {
 
       {/* Historical month indicator */}
       {!isCurrentMonth && (
-        <div className="flex items-center gap-2 p-2 sm:p-3 rounded-lg bg-muted/50 border">
-          <Archive className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-          <span className="text-xs sm:text-sm text-muted-foreground">
-            Visualizando dados de {format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            Visualizando dados de{" "}
+            {format(selectedMonth, "MMMM 'de' yyyy", { locale: ptBR })}
           </span>
         </div>
       )}
 
-      <MetricsCards 
-        posts={monthPosts} 
-        teamSize={profiles.length}
-        previousMonthCompletionRate={previousMonthCompletionRate}
-      />
+      {/* Loading state */}
+      {loadingMonthTasks && (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      )}
 
-      <TeamPerformanceTable 
-        posts={monthPosts} 
-        profiles={profiles}
-        teamSize={profiles.length}
-      />
+      {!loadingMonthTasks && (
+        <>
+          <MetricsCards
+            total={analyticsData.total}
+            completed={analyticsData.completed}
+            completionRate={analyticsData.completionRate}
+            previousMonthRate={previousMonthRate}
+            unassigned={analyticsData.unassigned}
+            overdue={analyticsData.overdue}
+            avgPerUser={analyticsData.avgPerUser}
+            usersWithOverdue={analyticsData.usersWithOverdue}
+          />
 
-      <WorkloadChart 
-        posts={monthPosts} 
-        profiles={profiles}
-      />
+          <AIAnalysisCard
+            selectedMonth={selectedMonth}
+            total={analyticsData.total}
+            completed={analyticsData.completed}
+            completionRate={analyticsData.completionRate}
+            previousMonthRate={previousMonthRate}
+            overdue={analyticsData.overdue}
+            unassigned={analyticsData.unassigned}
+            userMetrics={analyticsData.userMetrics}
+            clientMetrics={analyticsData.clientMetrics}
+            typeDistribution={[]}
+            tasksPerDay={analyticsData.tasksPerDay}
+            isCurrentMonth={isCurrentMonth}
+          />
 
-      <SmartInsights 
-        posts={monthPosts} 
-        profiles={profiles}
-        previousMonthCompletionRate={previousMonthCompletionRate}
-      />
+          <TeamPerformanceTable
+            userMetrics={analyticsData.userMetrics}
+            isCurrentMonth={isCurrentMonth}
+          />
 
-      <ClientAnalysis posts={monthPosts} />
+          <WorkloadChart userMetrics={analyticsData.userMetrics} />
+
+          <SmartInsights
+            userMetrics={analyticsData.userMetrics}
+            clientMetrics={analyticsData.clientMetrics}
+            completionRate={analyticsData.completionRate}
+            unassignedCount={analyticsData.unassigned}
+            overdueCount={analyticsData.overdue}
+            totalTasks={analyticsData.total}
+            tasksPerDay={analyticsData.tasksPerDay}
+            isCurrentMonth={isCurrentMonth}
+          />
+
+          <ClientAnalysis
+            clientMetrics={analyticsData.clientMetrics}
+            isCurrentMonth={isCurrentMonth}
+          />
+        </>
+      )}
     </div>
   );
 }

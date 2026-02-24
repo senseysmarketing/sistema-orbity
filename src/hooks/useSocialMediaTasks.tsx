@@ -67,7 +67,7 @@ export function useSocialMediaTasks() {
         .select(`
           id, title, description, status, priority,
           due_date, created_at, created_by, agency_id, archived,
-          metadata,
+          platform, post_type, post_date, hashtags, creative_instructions,
           task_clients(client_id, clients(name)),
           task_assignments(user_id)
         `)
@@ -96,12 +96,11 @@ export function useSocialMediaTasks() {
 
       // Map tasks to SocialMediaTask interface
       const mapped: SocialMediaTask[] = (tasksData || []).map((task: any) => {
-        const meta = task.metadata || {};
-        const postDate = meta.post_date || null;
-        const platform = meta.platform || '';
-        const postType = meta.post_type || '';
-        const hashtags = meta.hashtags || null;
-        const creativeInstructions = meta.creative_instructions || null;
+        const postDate = task.post_date || null;
+        const platform = task.platform || '';
+        const postType = task.post_type || '';
+        const hashtags = task.hashtags || null;
+        const creativeInstructions = task.creative_instructions || null;
 
         // Get first client (for grouping compatibility)
         const firstClient = task.task_clients?.[0];
