@@ -10,16 +10,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Copy, Sparkles, Loader2, ClipboardList, PenLine, Clock } from "lucide-react";
+import { Copy, Sparkles, Loader2, ClipboardList, PenLine, Clock, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
 import { useAIAssist } from "@/hooks/useAIAssist";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { ptBR } from "date-fns/locale";
 
 interface TaskOption {
@@ -81,6 +84,7 @@ export function CaptionGenerator() {
   const [includeHashtags, setIncludeHashtags] = useState(true);
   const [includeCTA, setIncludeCTA] = useState(true);
   const [includeContact, setIncludeContact] = useState(false);
+  const [taskSearchOpen, setTaskSearchOpen] = useState(false);
 
   const [generatedCaption, setGeneratedCaption] = useState("");
   const [history, setHistory] = useState<CaptionHistory[]>([]);
@@ -259,18 +263,47 @@ export function CaptionGenerator() {
           {mode === "task" ? (
             <div className="space-y-2">
               <Label>Tarefa</Label>
-              <Select value={selectedTaskId} onValueChange={setSelectedTaskId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma tarefa..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {tasks.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.title} {t.clientName ? `(${t.clientName})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={taskSearchOpen} onOpenChange={setTaskSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={taskSearchOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedTask
+                      ? `${selectedTask.title}${selectedTask.clientName ? ` (${selectedTask.clientName})` : ""}`
+                      : "Selecione uma tarefa..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar tarefa..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhuma tarefa encontrada</CommandEmpty>
+                      {tasks.map((t) => (
+                        <CommandItem
+                          key={t.id}
+                          value={`${t.title} ${t.clientName || ""}`}
+                          onSelect={() => {
+                            setSelectedTaskId(t.id);
+                            setTaskSearchOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedTaskId === t.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {t.title} {t.clientName ? `(${t.clientName})` : ""}
+                        </CommandItem>
+                      ))}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               {selectedTask?.clientName && (
                 <p className="text-xs text-muted-foreground">
                   Cliente: {selectedTask.clientName}
