@@ -87,7 +87,27 @@ export function CaptionGenerator() {
   const [taskSearchOpen, setTaskSearchOpen] = useState(false);
 
   const [generatedCaption, setGeneratedCaption] = useState("");
-  const [history, setHistory] = useState<CaptionHistory[]>([]);
+
+  const storageKey = currentAgency?.id ? `caption-history-${currentAgency.id}` : null;
+
+  const [history, setHistory] = useState<CaptionHistory[]>(() => {
+    if (!storageKey) return [];
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (!stored) return [];
+      const parsed = JSON.parse(stored) as CaptionHistory[];
+      return parsed.map((h) => ({ ...h, timestamp: new Date(h.timestamp) })).slice(0, 5);
+    } catch {
+      return [];
+    }
+  });
+
+  // Sync history to localStorage
+  useEffect(() => {
+    if (!storageKey) return;
+    const limited = history.slice(0, 5);
+    localStorage.setItem(storageKey, JSON.stringify(limited));
+  }, [history, storageKey]);
 
   // Load tasks
   useEffect(() => {
