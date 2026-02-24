@@ -131,8 +131,9 @@ export function useAIAssist() {
     return callAI("analytics_review", content, agencyId);
   };
 
-  const improveTask = async (taskData: Record<string, any>, agencyId?: string): Promise<TaskPrefillResult | null> => {
-    return callAI("improve_task", JSON.stringify(taskData), agencyId);
+  const improveTask = async (taskData: Record<string, any>, agencyId?: string, direction?: string): Promise<TaskPrefillResult | null> => {
+    const payload = direction ? { ...taskData, direction } : taskData;
+    return callAI("improve_task", JSON.stringify(payload), agencyId);
   };
 
   const generateCaption = async (content: string, agencyId?: string): Promise<CaptionResult | null> => {

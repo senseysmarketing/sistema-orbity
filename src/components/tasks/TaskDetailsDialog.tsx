@@ -8,6 +8,8 @@ import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle,
 import { getTypeColor } from "@/components/ui/task-card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { TaskAssignedUsers } from "@/components/tasks/TaskAssignedUsers";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -86,6 +88,8 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   const [showAIPreview, setShowAIPreview] = useState(false);
   const [aiSuggestion, setAISuggestion] = useState<any>(null);
   const [aiApplying, setAIApplying] = useState(false);
+  const [showAIDirection, setShowAIDirection] = useState(false);
+  const [aiDirection, setAiDirection] = useState("");
   const [history, setHistory] = useState<any[]>([]);
   const [creatorName, setCreatorName] = useState<string>("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
@@ -438,25 +442,56 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
             ) : null}
           </div>
 
+          {/* AI direction input */}
+          {showAIDirection && (
+            <div className="space-y-2 p-3 rounded-lg border border-primary/20 bg-primary/5">
+              <Label className="text-xs flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                Direcionamento (opcional)
+              </Label>
+              <Textarea
+                value={aiDirection}
+                onChange={(e) => setAiDirection(e.target.value)}
+                placeholder="Descreva como deseja melhorar esta tarefa ou deixe em branco..."
+                rows={2}
+                className="text-sm"
+              />
+              <Button
+                size="sm"
+                onClick={async () => {
+                  if (!localTask) return;
+                  const taskData = {
+                    title: localTask.title,
+                    description: localTask.description,
+                    priority: localTask.priority,
+                    platform: localTask.platform,
+                    post_type: localTask.post_type,
+                    hashtags: localTask.hashtags,
+                    creative_instructions: localTask.creative_instructions,
+                  };
+                  const result = await improveTask(taskData, currentAgency?.id, aiDirection || undefined);
+                  if (result) {
+                    setAISuggestion(result);
+                    setShowAIPreview(true);
+                    setShowAIDirection(false);
+                    setAiDirection("");
+                  }
+                }}
+                disabled={aiLoading}
+                className="w-full"
+              >
+                {aiLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                Melhorar com IA
+              </Button>
+            </div>
+          )}
+
           <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
-              onClick={async () => {
-                if (!localTask) return;
-                const taskData = {
-                  title: localTask.title,
-                  description: localTask.description,
-                  priority: localTask.priority,
-                  platform: localTask.platform,
-                  post_type: localTask.post_type,
-                  hashtags: localTask.hashtags,
-                  creative_instructions: localTask.creative_instructions,
-                };
-                const result = await improveTask(taskData, currentAgency?.id);
-                if (result) {
-                  setAISuggestion(result);
-                  setShowAIPreview(true);
-                }
+              onClick={() => {
+                setShowAIDirection(!showAIDirection);
+                if (showAIDirection) setAiDirection("");
               }}
               disabled={aiLoading}
               className="w-full sm:w-auto"
