@@ -1,62 +1,65 @@
 
-Objetivo
-Corrigir definitivamente o scroll vertical no modal de preview do planejamento IA (`ContentPlanPreview`) para permitir visualizar todos os conteúdos e as informações abaixo sem corte.
 
-Diagnóstico (com base no código atual)
-- Em `ContentPlanPreview.tsx`, o `DialogContent` está com `max-h-[90vh] flex flex-col`, mas sem altura explícita (`h-[90vh]`), então a área flexível pode não ter um contexto de altura estável.
-- O `ScrollArea` recebe `flex-1 min-h-0` diretamente. Em cenários com Radix + modal, isso pode falhar quando não existe um wrapper intermediário com `min-h-0`.
-- O `ScrollArea` interno usa `overflow-hidden` no Root por design (arquivo `ui/scroll-area.tsx`), então ele depende fortemente de `h-full` e de um pai corretamente dimensionado para ativar viewport rolável.
+# Correcao do Calendario + Limpeza de Configuracoes + Refatoracao de Analises
 
-Implementação proposta
+## 1. Erro do Calendario: "column tasks.metadata does not exist"
 
-1) Ajustar o container do modal para altura explícita
-Arquivo:
-- `src/components/social-media/planning/ContentPlanPreview.tsx`
+### Causa raiz
+A tabela `tasks` possui colunas individuais (`platform`, `post_type`, `post_date`, `hashtags`, `creative_instructions`) e NAO uma coluna JSONB chamada `metadata`. Porem, dois arquivos fazem queries referenciando `metadata`:
 
-Mudança:
-- Em `DialogContent`, manter `max-h-[90vh]` e adicionar `h-[90vh]` (junto com `flex flex-col` já existente).
+- `src/hooks/useSocialMediaTasks.tsx` (linha 63): query seleciona `metadata` e depois acessa `meta.post_date`, `meta.platform`, etc.
+- `src/components/social-media/SocialMediaAnalytics.tsx` (linha 56): mesma abordagem com `metadata`
 
-Resultado esperado:
-- O layout interno passa a ter referência de altura real para distribuição flex.
+### Correcao
+Nos dois arquivos, substituir a selecao de `metadata` pelos campos reais da tabela:
+- Remover `metadata` da query
+- Adicionar `platform, post_type, post_date, hashtags, creative_instructions` na select
+- Ajustar o mapeamento para ler diretamente de `task.platform`, `task.post_date`, etc. em vez de `meta.platform`, `meta.post_date`
 
-2) Mover a responsabilidade de encolhimento para wrapper correto
-Arquivo:
-- `src/components/social-media/planning/ContentPlanPreview.tsx`
+---
 
-Mudança:
-- Substituir a estrutura atual do bloco de itens:
-  - De: `ScrollArea className="flex-1 min-h-0 pr-2"`
-  - Para:
-    - wrapper externo: `div className="flex-1 min-h-0"`
-    - dentro dele: `ScrollArea className="h-full pr-2"`
+## 2. Remocao de abas de Configuracoes obsoletas
 
-Resultado esperado:
-- O wrapper (`flex-1 min-h-0`) permite encolhimento correto no eixo vertical.
-- O `ScrollArea` ocupa 100% da altura disponível e ativa scroll da viewport interna.
+Com a unificacao na tabela `tasks`, as seguintes abas de configuracao do Social Media perderam o sentido (referenciavam tabelas/fluxos depreciados):
 
-3) Preservar header/strategy/ações como áreas fixas
-Arquivo:
-- `src/components/social-media/planning/ContentPlanPreview.tsx`
+**Abas a remover:**
+- **Status** (CustomStatusManager) -- os status agora sao gerenciados pelo fluxo de Tarefas
+- **Tipos** (ContentTypeManager) -- tipos de conteudo agora sao os `task_type` do sistema de Tarefas
+- **Aprovacao** (ApprovalRulesManager) -- regras de aprovacao referenciavam o fluxo antigo de posts
+- **Templates** (PostTemplateManager) -- templates de post referenciavam a tabela depreciada
+- **Horarios** (SchedulePreferencesManager) -- preferencias de horario de publicacao nao se aplicam ao novo fluxo
 
-Mudança:
-- Manter os blocos superiores (header, estratégia, responsáveis, barra de seleção) e rodapé (botões) fora da área rolável.
-- Não introduzir `overflow-hidden` adicional nos pais.
+**Abas a manter:**
+- **Plataformas** (PlatformManager) -- ainda relevante para configurar plataformas disponiveis
+- **Prazos** (DueDateSettingsManager) -- ainda relevante para definir dias de antecedencia do prazo
 
-Resultado esperado:
-- Apenas a lista de conteúdos rola; cabeçalho e ações ficam sempre visíveis.
+O componente `SocialMediaSettings` sera simplificado para exibir apenas essas duas abas.
 
-4) Validação funcional e regressão visual
-Cenários de teste:
-- Abrir preview com muitos itens (>15) e confirmar acesso ao último card.
-- Confirmar visualização completa do rodapé (botões) sem sobreposição/corte.
-- Testar em desktop e viewport menor (mobile/tablet) para garantir comportamento consistente.
-- Verificar que scroll da página de fundo continua bloqueado (comportamento esperado do dialog), mas scroll interno do modal funciona normalmente.
+---
 
-Critério de aceite
-- Usuário consegue rolar até o último conteúdo no preview.
-- Nenhuma seção inferior (cards finais + ações) fica inacessível.
-- Sem regressão no layout do modal.
+## 3. Refatoracao da aba de Analises (modelo de Tarefas + IA)
 
-Fallback técnico (se algum navegador ainda apresentar inconsistência)
-- Trocar somente a área rolável de `ScrollArea` para `div className="flex-1 min-h-0 overflow-y-auto pr-2"` mantendo o mesmo conteúdo interno.
-- Esse fallback será aplicado apenas se o ajuste estrutural com `ScrollArea` não resolver 100% dos cenários.
+A aba de Analises atual (`SocialMediaAnalytics.tsx`) sera completamente refatorada para seguir o mesmo modelo do `TaskAnalytics.tsx`, mas filtrando apenas tarefas do tipo `redes_sociais`.
+
+### Estrutura da nova analise:
+1. **Seletor de mes** -- navegacao por mes com indicador de mes historico
+2. **MetricsCards** -- total, concluidas, taxa de conclusao, atrasadas, sem atribuicao, media por usuario (reutilizando componentes de tasks/analytics)
+3. **AIAnalysisCard** -- analise com IA identica a de Tarefas, usando o mesmo `analyzeTaskPeriod` do `useAIAssist`, mas com dados filtrados para social media
+4. **TeamPerformanceTable** -- ranking de performance da equipe para tarefas de social media
+5. **WorkloadChart** -- grafico de distribuicao de carga
+6. **SmartInsights** -- insights automaticos
+7. **ClientAnalysis** -- analise por cliente
+
+### Abordagem tecnica:
+- Reutilizar os componentes de `src/components/tasks/analytics/` (MetricsCards, AIAnalysisCard, TeamPerformanceTable, WorkloadChart, SmartInsights, ClientAnalysis)
+- A query buscara tarefas com `task_type = 'redes_sociais'` para o mes selecionado
+- Os campos `platform`, `post_type`, `post_date` serao lidos diretamente das colunas da tabela
+- O calculo de metricas seguira o mesmo padrao do TaskAnalytics
+- A analise com IA recebera o mesmo formato de prompt, indicando que se trata de tarefas de Social Media
+
+### Arquivos modificados:
+- `src/hooks/useSocialMediaTasks.tsx` -- correcao da query (metadata -> colunas reais)
+- `src/components/social-media/SocialMediaAnalytics.tsx` -- refatoracao completa seguindo modelo do TaskAnalytics
+- `src/components/social-media/SocialMediaSettings.tsx` -- simplificacao para 2 abas
+- `src/pages/SocialMedia.tsx` -- sem alteracao (ja referencia os componentes corretos)
+
