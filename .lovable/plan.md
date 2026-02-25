@@ -1,74 +1,139 @@
 
+# Modal de Motivo de Perda + Metricas Avancadas no CRM Dashboard
 
-# Corrigir Pesquisa de Tarefas no Gerador de Legendas
+## Resumo
 
-## Problemas identificados
+Tres grandes funcionalidades:
 
-1. **Tarefas faltando**: A query tem `.limit(50)` que pode cortar tarefas, e so exclui status `done` mas nao `completed` (status legado). Alem disso, o carregamento sequencial (1 query por tarefa para buscar cliente) e lento.
+1. **Modal obrigatorio de motivo de perda** ao mover lead para "Perdido" (drag-and-drop ou edicao manual)
+2. **Metricas de No-Show e Sales Velocity** no Dashboard do CRM
+3. **Benchmarks de mercado** integrados ao funil de vendas e metricas
 
-2. **Sem indicador de loading**: Nao existe estado de carregamento para as tarefas. Enquanto busca, o Combobox mostra "Nenhuma tarefa encontrada", dando impressao de que nao ha resultados.
+---
 
-## Solucao
+## 1. Banco de Dados
 
-### Arquivo: `src/components/social-media/CaptionGenerator.tsx`
+### Nova coluna na tabela `leads`
 
-**1. Adicionar estado `tasksLoading`**
-- Novo estado `const [tasksLoading, setTasksLoading] = useState(false)`
-- Setar `true` no inicio do fetch e `false` no final
-
-**2. Otimizar a query de tarefas**
-- Remover `.limit(50)` (ou aumentar para 200)
-- Excluir tambem status `completed`: `.not("status", "in", "(done,completed)")`
-- Substituir o loop N+1 de busca de clientes por um JOIN via `task_clients(client_id, clients(name, contact, service))` -- igual ao padrao ja usado em `useSocialMediaTasks.tsx`
-- Isso elimina as N queries extras e acelera drasticamente o carregamento
-
-**3. Mostrar loading no Combobox**
-- No `CommandList`, antes do `CommandEmpty`, verificar `tasksLoading`
-- Se carregando, mostrar um `Loader2` com texto "Carregando tarefas..."
-- O `CommandEmpty` so aparece quando `!tasksLoading` e nao ha resultados
-
-### Mudanca na query (antes vs depois)
-
-**Antes:**
-```
-supabase.from("tasks").select("id, title, ...")
-  .neq("status", "done")
-  .limit(50)
-// + loop de N queries para buscar cliente de cada tarefa
+```sql
+ALTER TABLE leads ADD COLUMN loss_reason text DEFAULT NULL;
 ```
 
-**Depois:**
-```
-supabase.from("tasks").select(`
-  id, title, description, platform, post_type, hashtags, creative_instructions,
-  task_clients(client_id, clients(name, contact, service))
-`)
-  .not("status", "in", "(done,completed)")
-  .limit(200)
-// Sem loop extra -- cliente vem no JOIN
-```
+Armazena o motivo de desqualificacao quando o lead vai para "lost". Os motivos predefinidos sao:
 
-### Mudanca no CommandList (loading indicator)
+**Problemas de Qualificacao:**
+- `dados_invalidos` - Dados invalidos / Fake
+- `nao_decisor` - Nao e o decisor
+- `fora_icp` - Fora do Perfil (ICP)
 
-```tsx
-<CommandList>
-  {tasksLoading ? (
-    <div className="flex items-center justify-center py-6 gap-2">
-      <Loader2 className="h-4 w-4 animate-spin" />
-      <span className="text-sm text-muted-foreground">Carregando tarefas...</span>
-    </div>
-  ) : (
-    <>
-      <CommandEmpty>Nenhuma tarefa encontrada</CommandEmpty>
-      {tasks.map((t) => (...))}
-    </>
-  )}
-</CommandList>
+**Problemas de Engajamento:**
+- `ghosting` - Ghosting no WhatsApp
+- `no_show` - No-Show (Faltou na Reuniao)
+
+**Problemas Comerciais:**
+- `sem_orcamento` - Sem orcamento (Budget)
+- `concorrencia` - Optou pela concorrencia
+- `sem_valor_percebido` - Nao percebeu valor
+
+**Outro:**
+- `outro` - Outro (campo de texto livre)
+
+### Nova coluna para Sales Velocity
+
+```sql
+ALTER TABLE leads ADD COLUMN status_changed_at timestamptz DEFAULT now();
 ```
 
-## Arquivo modificado
+Registra quando o lead entrou na etapa atual. O trigger `track_lead_changes` ja rastreia mudancas de status no `lead_history`, mas ter `status_changed_at` direto na tabela permite calcular dias na etapa sem JOINs.
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/components/social-media/CaptionGenerator.tsx` | Estado de loading, query otimizada com JOIN, indicador visual no Combobox |
+### Atualizar trigger `set_lead_won_at`
 
+Expandir para tambem setar `status_changed_at = NOW()` quando o status muda.
+
+---
+
+## 2. Modal de Motivo de Perda
+
+### Novo componente: `src/components/crm/LossReasonDialog.tsx`
+
+- Dialog com titulo "Por que este lead esta sendo desqualificado?"
+- RadioGroup com os motivos organizados em 3 categorias (Qualificacao, Engajamento, Comercial)
+- Campo de texto adicional quando "Outro" for selecionado
+- Botoes "Cancelar" e "Confirmar"
+- Ao confirmar: atualiza `status`, `temperature`, `loss_reason` e `status_changed_at` do lead
+
+### Modificacao: `src/components/crm/LeadsKanban.tsx`
+
+- Adicionar estados `showLossDialog`, `pendingLossLeadId`, `pendingLossDbStatus`
+- No `handleDragEnd`, quando o status destino normalizado for `lost`:
+  - Interromper o fluxo normal
+  - Abrir o `LossReasonDialog` em vez de salvar diretamente
+- Callback `onConfirmLoss(reason)`:
+  - Atualiza o lead no banco com status + loss_reason
+  - Fecha o dialog
+
+---
+
+## 3. Dashboard - Metricas Avancadas
+
+### Modificacao: `src/components/crm/CRMDashboard.tsx`
+
+Adicionar tres novos componentes abaixo do funil:
+
+#### A) Card de Motivos de Perda (`CRMLossReasonsChart.tsx`)
+
+- Busca leads com status `lost` no periodo selecionado
+- Grafico de barras horizontal ou donut mostrando distribuicao dos motivos
+- Tabela resumo com contagem e percentual de cada motivo
+- Destaque visual para os 3 motivos mais frequentes
+
+#### B) Card de No-Show / Taxa de Comparecimento
+
+- Integrado no `CRMFunnelChart.tsx`
+- Calcula: leads com `loss_reason = 'no_show'`
+- No funil, entre "Agendamentos" e "Reunioes", mostrar a taxa real de comparecimento
+- Formula: `Reunioes / (Reunioes + No-Shows)` = Taxa de Comparecimento
+- Exibir badge com a taxa ao lado da conversao Agendamento -> Reuniao
+
+#### C) Card de Sales Velocity (`CRMSalesVelocity.tsx`)
+
+- Consulta `lead_history` (campo `status_changed`) para calcular tempo medio em cada etapa
+- Exibe uma tabela/lista: Etapa | Tempo Medio (dias) | Leads Parados
+- Alerta visual para leads com mais de X dias parados (configurable, default 7 dias para Proposta)
+- Destaque em vermelho para etapas com leads "travados"
+
+#### D) Benchmarks de Mercado
+
+- Adicionar ao `CRMFunnelChart.tsx` ou como card separado
+- Comparar as taxas do usuario com benchmarks:
+  - Lead -> Venda: benchmark 1-3%
+  - Lead -> Em Contato: benchmark 40-50%
+  - Proposta -> Venda (Win Rate): benchmark 20-30%
+- Indicador visual (verde/amarelo/vermelho) comparando com o benchmark
+- Tooltip explicando cada benchmark
+
+---
+
+## 4. Funil de Vendas - Integracao No-Show
+
+### Modificacao: `src/components/crm/CRMFunnelChart.tsx`
+
+- Receber prop `lossReasons` (ou buscar internamente)
+- No calculo do funil, contar No-Shows separadamente
+- Adicionar linha entre Agendamentos e Reunioes mostrando:
+  - "X No-Shows" e taxa de comparecimento real
+- Na secao de conversion rates (bottom), destacar a taxa corrigida
+
+---
+
+## Arquivos
+
+| Arquivo | Acao |
+|---------|------|
+| Migration SQL | Adicionar `loss_reason` e `status_changed_at` na tabela leads; atualizar trigger |
+| `src/components/crm/LossReasonDialog.tsx` | **Novo** - Modal de motivo de perda |
+| `src/components/crm/LeadsKanban.tsx` | Interceptar drag para "lost" e abrir dialog |
+| `src/components/crm/CRMLossReasonsChart.tsx` | **Novo** - Grafico de motivos de perda |
+| `src/components/crm/CRMSalesVelocity.tsx` | **Novo** - Card de velocidade de vendas por etapa |
+| `src/components/crm/CRMFunnelChart.tsx` | Adicionar No-Show, benchmarks e taxa de comparecimento |
+| `src/components/crm/CRMDashboard.tsx` | Integrar novos componentes + buscar loss_reasons |
