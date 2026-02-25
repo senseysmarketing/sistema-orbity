@@ -2599,6 +2599,7 @@ export type Database = {
           follow_up_notification_sent_at: string | null
           id: string
           last_contact: string | null
+          loss_reason: string | null
           name: string
           next_contact: string | null
           notes: string | null
@@ -2606,6 +2607,7 @@ export type Database = {
           position: string | null
           source: string | null
           status: string
+          status_changed_at: string | null
           tags: string[] | null
           temperature: string
           updated_at: string
@@ -2623,6 +2625,7 @@ export type Database = {
           follow_up_notification_sent_at?: string | null
           id?: string
           last_contact?: string | null
+          loss_reason?: string | null
           name: string
           next_contact?: string | null
           notes?: string | null
@@ -2630,6 +2633,7 @@ export type Database = {
           position?: string | null
           source?: string | null
           status?: string
+          status_changed_at?: string | null
           tags?: string[] | null
           temperature?: string
           updated_at?: string
@@ -2647,6 +2651,7 @@ export type Database = {
           follow_up_notification_sent_at?: string | null
           id?: string
           last_contact?: string | null
+          loss_reason?: string | null
           name?: string
           next_contact?: string | null
           notes?: string | null
@@ -2654,6 +2659,7 @@ export type Database = {
           position?: string | null
           source?: string | null
           status?: string
+          status_changed_at?: string | null
           tags?: string[] | null
           temperature?: string
           updated_at?: string
