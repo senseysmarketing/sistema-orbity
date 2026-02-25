@@ -11,6 +11,8 @@ import { CalendarIcon, Users, Target, DollarSign, AlertTriangle, TrendingUp, Tre
 import { cn } from "@/lib/utils";
 import { CRMFunnelChart } from "./CRMFunnelChart";
 import { CRMInvestmentMetrics } from "./CRMInvestmentMetrics";
+import { CRMLossReasonsChart } from "./CRMLossReasonsChart";
+import { CRMSalesVelocity } from "./CRMSalesVelocity";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useNavigate } from "react-router-dom";
@@ -18,12 +20,15 @@ import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 
 interface Lead {
   id: string;
+  name: string;
   status: string;
   temperature: string;
   value: number;
   created_at: string;
   next_contact: string | null;
   won_at?: string | null;
+  loss_reason?: string | null;
+  status_changed_at?: string | null;
 }
 
 interface CRMDashboardProps {
@@ -299,6 +304,12 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
 
       {/* Funnel Chart - Full Width */}
       <CRMFunnelChart leads={leads} dateRange={dateRange} />
+
+      {/* Loss Reasons + Sales Velocity */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <CRMLossReasonsChart leads={leads as any} dateRange={dateRange} />
+        <CRMSalesVelocity leads={leads as any} />
+      </div>
 
       {/* Investment Metrics */}
       <CRMInvestmentMetrics 

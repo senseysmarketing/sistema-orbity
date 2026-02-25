@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LeadKanbanColumn } from "./LeadKanbanColumn";
 import { SortableLeadCard } from "./SortableLeadCard";
+import { LossReasonDialog } from "./LossReasonDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
@@ -50,6 +51,8 @@ interface LeadsKanbanProps {
 export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadMove, hiddenColumns, onToggleColumn, onShowAllColumns }: LeadsKanbanProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
+  const [lossDialogOpen, setLossDialogOpen] = useState(false);
+  const [pendingLossLead, setPendingLossLead] = useState<{ id: string; name: string; dbStatus: string; displayStatus: string } | null>(null);
   const { getStatusConfig, getStatusKey, mapDatabaseStatusToDisplay, mapDisplayStatusToDatabase } = useLeadStatuses();
 
   const statusConfig = getStatusConfig();
@@ -197,6 +200,14 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
     }
 
     try {
+      // If moving to "lost", open loss reason dialog instead
+      if (dbStatus === 'lost') {
+        setPendingLossLead({ id: leadId, name: lead.name, dbStatus, displayStatus });
+        setLossDialogOpen(true);
+        setActiveId(null);
+        setDraggedLead(null);
+        return;
+      }
       
       // Calculate new temperature based on status
       const newTemperature = getTemperatureForStatus(dbStatus);
@@ -229,6 +240,47 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
 
     setActiveId(null);
     setDraggedLead(null);
+  };
+
+  const handleLossConfirm = async (reason: string, notes?: string) => {
+    if (!pendingLossLead) return;
+    
+    try {
+      const newTemperature = getTemperatureForStatus('lost');
+      
+      if (onLeadMove) {
+        onLeadMove(pendingLossLead.id, 'lost');
+      }
+
+      const lossReason = reason === 'outro' && notes ? `outro: ${notes}` : reason;
+      
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          status: 'lost',
+          temperature: newTemperature,
+          loss_reason: lossReason,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', pendingLossLead.id);
+
+      if (error) throw error;
+      
+      toast.success(`Lead "${pendingLossLead.name}" marcado como Perdido`);
+    } catch (error) {
+      console.error('Error updating lead to lost:', error);
+      toast.error('Erro ao atualizar status do lead');
+      onUpdate();
+    } finally {
+      setLossDialogOpen(false);
+      setPendingLossLead(null);
+    }
+  };
+
+  const handleLossCancel = () => {
+    setLossDialogOpen(false);
+    setPendingLossLead(null);
+    onUpdate(); // refresh to revert optimistic changes
   };
 
   const groupedLeads = Object.keys(statusConfig).reduce((acc, statusKey) => {
@@ -306,6 +358,13 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
           />
         ) : null}
       </DragOverlay>
+
+      <LossReasonDialog
+        open={lossDialogOpen}
+        leadName={pendingLossLead?.name || ""}
+        onConfirm={handleLossConfirm}
+        onCancel={handleLossCancel}
+      />
     </DndContext>
   );
 }
