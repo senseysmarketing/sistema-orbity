@@ -85,6 +85,7 @@ export function CaptionGenerator() {
   const [includeCTA, setIncludeCTA] = useState(true);
   const [includeContact, setIncludeContact] = useState(false);
   const [taskSearchOpen, setTaskSearchOpen] = useState(false);
+  const [tasksLoading, setTasksLoading] = useState(false);
 
   const [generatedCaption, setGeneratedCaption] = useState("");
 
@@ -113,57 +114,42 @@ export function CaptionGenerator() {
   useEffect(() => {
     if (!currentAgency?.id) return;
     const fetchTasks = async () => {
-      const { data: tasksData } = await supabase
-        .from("tasks")
-        .select("id, title, description, platform, post_type, hashtags, creative_instructions")
-        .eq("agency_id", currentAgency.id)
-        .in("task_type", ["redes_sociais", "criativos"])
-        .neq("status", "done")
-        .order("created_at", { ascending: false })
-        .limit(50);
+      setTasksLoading(true);
+      try {
+        const { data: tasksData } = await supabase
+          .from("tasks")
+          .select(`
+            id, title, description, platform, post_type, hashtags, creative_instructions,
+            task_clients(client_id, clients(name, contact, service))
+          `)
+          .eq("agency_id", currentAgency.id)
+          .in("task_type", ["redes_sociais", "criativos"])
+          .not("status", "in", "(done,completed)")
+          .order("created_at", { ascending: false })
+          .limit(200);
 
-      if (!tasksData) return;
+        if (!tasksData) return;
 
-      const enriched: TaskOption[] = [];
-      for (const t of tasksData) {
-        let clientName: string | null = null;
-        let clientContact: string | null = null;
-        let clientService: string | null = null;
-
-        const { data: tc } = await supabase
-          .from("task_clients")
-          .select("client_id")
-          .eq("task_id", t.id)
-          .limit(1)
-          .maybeSingle();
-
-        if (tc?.client_id) {
-          const { data: c } = await supabase
-            .from("clients")
-            .select("name, contact, service")
-            .eq("id", tc.client_id)
-            .maybeSingle();
-          if (c) {
-            clientName = c.name;
-            clientContact = c.contact;
-            clientService = c.service;
-          }
-        }
-
-        enriched.push({
-          id: t.id,
-          title: t.title,
-          description: t.description,
-          platform: t.platform,
-          post_type: t.post_type,
-          hashtags: t.hashtags as string[] | null,
-          creative_instructions: t.creative_instructions,
-          clientName,
-          clientContact,
-          clientService,
+        const enriched: TaskOption[] = tasksData.map((t: any) => {
+          const tc = t.task_clients?.[0];
+          const client = tc?.clients;
+          return {
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            platform: t.platform,
+            post_type: t.post_type,
+            hashtags: t.hashtags as string[] | null,
+            creative_instructions: t.creative_instructions,
+            clientName: client?.name || null,
+            clientContact: client?.contact || null,
+            clientService: client?.service || null,
+          };
         });
+        setTasks(enriched);
+      } finally {
+        setTasksLoading(false);
       }
-      setTasks(enriched);
     };
     fetchTasks();
   }, [currentAgency?.id]);
@@ -301,6 +287,13 @@ export function CaptionGenerator() {
                   <Command>
                     <CommandInput placeholder="Pesquisar tarefa..." />
                     <CommandList>
+                      {tasksLoading ? (
+                        <div className="flex items-center justify-center py-6 gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm text-muted-foreground">Carregando tarefas...</span>
+                        </div>
+                      ) : (
+                      <>
                       <CommandEmpty>Nenhuma tarefa encontrada</CommandEmpty>
                       {tasks.map((t) => (
                         <CommandItem
@@ -320,6 +313,8 @@ export function CaptionGenerator() {
                           {t.title} {t.clientName ? `(${t.clientName})` : ""}
                         </CommandItem>
                       ))}
+                    </>
+                      )}
                     </CommandList>
                   </Command>
                 </PopoverContent>
