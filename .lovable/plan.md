@@ -1,49 +1,74 @@
 
 
-# Adicionar Direcionamento Opcional ao "Melhorar com IA" nas Tarefas
+# Corrigir Pesquisa de Tarefas no Gerador de Legendas
 
-## Resumo
+## Problemas identificados
 
-Atualmente, o botao "Melhorar com IA" no dialog de detalhes da tarefa chama a IA diretamente sem possibilidade de dar um direcionamento. A ideia e replicar o mesmo padrao que implementamos no planejamento de conteudo: ao clicar no botao, expande um campo de texto opcional para direcionamento, e um botao para confirmar a geracao.
+1. **Tarefas faltando**: A query tem `.limit(50)` que pode cortar tarefas, e so exclui status `done` mas nao `completed` (status legado). Alem disso, o carregamento sequencial (1 query por tarefa para buscar cliente) e lento.
 
-## O que muda para o usuario
+2. **Sem indicador de loading**: Nao existe estado de carregamento para as tarefas. Enquanto busca, o Combobox mostra "Nenhuma tarefa encontrada", dando impressao de que nao ha resultados.
 
-- Ao clicar em "Melhorar com IA", em vez de chamar a IA imediatamente, aparece um campo de texto colapsavel acima do footer
-- O usuario pode digitar um direcionamento (ex: "foque mais no tom institucional", "adicione urgencia") ou deixar em branco
-- Um botao "Melhorar com IA" dentro do campo expandido confirma e chama a IA com o direcionamento
-- Clicar novamente no botao "Melhorar com IA" do footer fecha o campo sem chamar a IA
+## Solucao
 
-## Detalhes Tecnicos
+### Arquivo: `src/components/social-media/CaptionGenerator.tsx`
 
-### Arquivo: `src/components/tasks/TaskDetailsDialog.tsx`
+**1. Adicionar estado `tasksLoading`**
+- Novo estado `const [tasksLoading, setTasksLoading] = useState(false)`
+- Setar `true` no inicio do fetch e `false` no final
 
-**Novos estados:**
-- `showAIDirection` (boolean) -- controla visibilidade do campo de direcionamento
-- `aiDirection` (string) -- texto do direcionamento
+**2. Otimizar a query de tarefas**
+- Remover `.limit(50)` (ou aumentar para 200)
+- Excluir tambem status `completed`: `.not("status", "in", "(done,completed)")`
+- Substituir o loop N+1 de busca de clientes por um JOIN via `task_clients(client_id, clients(name, contact, service))` -- igual ao padrao ja usado em `useSocialMediaTasks.tsx`
+- Isso elimina as N queries extras e acelera drasticamente o carregamento
 
-**Mudanca no botao "Melhorar com IA" (footer):**
-- Em vez de chamar `improveTask` diretamente, alterna `showAIDirection`
-- Reseta `aiDirection` ao fechar
+**3. Mostrar loading no Combobox**
+- No `CommandList`, antes do `CommandEmpty`, verificar `tasksLoading`
+- Se carregando, mostrar um `Loader2` com texto "Carregando tarefas..."
+- O `CommandEmpty` so aparece quando `!tasksLoading` e nao ha resultados
 
-**Novo bloco acima do footer (similar ao ContentPlanItemEditDialog):**
-- Container com borda e fundo `primary/5`
-- Label com icone Sparkles e texto "Direcionamento (opcional)"
-- Textarea com placeholder "Descreva como deseja melhorar esta tarefa ou deixe em branco..."
-- Botao "Melhorar com IA" que chama `improveTask` passando o direcionamento
+### Mudanca na query (antes vs depois)
 
-**Mudanca no hook `useAIAssist.tsx`:**
-- Alterar `improveTask` para aceitar um parametro opcional `direction?: string`
-- Concatenar o direcionamento ao JSON enviado para a IA
+**Antes:**
+```
+supabase.from("tasks").select("id, title, ...")
+  .neq("status", "done")
+  .limit(50)
+// + loop de N queries para buscar cliente de cada tarefa
+```
 
-**Mudanca no edge function `ai-assist/index.ts`:**
-- No handler de `improve_task`, extrair o campo `direction` do conteudo
-- Incluir o direcionamento no prompt do sistema quando presente
+**Depois:**
+```
+supabase.from("tasks").select(`
+  id, title, description, platform, post_type, hashtags, creative_instructions,
+  task_clients(client_id, clients(name, contact, service))
+`)
+  .not("status", "in", "(done,completed)")
+  .limit(200)
+// Sem loop extra -- cliente vem no JOIN
+```
 
-### Arquivos modificados
+### Mudanca no CommandList (loading indicator)
+
+```tsx
+<CommandList>
+  {tasksLoading ? (
+    <div className="flex items-center justify-center py-6 gap-2">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      <span className="text-sm text-muted-foreground">Carregando tarefas...</span>
+    </div>
+  ) : (
+    <>
+      <CommandEmpty>Nenhuma tarefa encontrada</CommandEmpty>
+      {tasks.map((t) => (...))}
+    </>
+  )}
+</CommandList>
+```
+
+## Arquivo modificado
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/components/tasks/TaskDetailsDialog.tsx` | Adicionar campo de direcionamento colapsavel antes do footer |
-| `src/hooks/useAIAssist.tsx` | Aceitar parametro `direction` em `improveTask` |
-| `supabase/functions/ai-assist/index.ts` | Usar direcionamento no prompt de `improve_task` |
+| `src/components/social-media/CaptionGenerator.tsx` | Estado de loading, query otimizada com JOIN, indicador visual no Combobox |
 
