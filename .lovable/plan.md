@@ -1,139 +1,82 @@
 
-# Modal de Motivo de Perda + Metricas Avancadas no CRM Dashboard
+
+# Filtros Multiplos na Tela de Tarefas
 
 ## Resumo
 
-Tres grandes funcionalidades:
+Converter os filtros de tarefas de selecao unica para selecao multipla, permitindo filtrar por varios clientes, usuarios, tipos, prioridades e status ao mesmo tempo.
 
-1. **Modal obrigatorio de motivo de perda** ao mover lead para "Perdido" (drag-and-drop ou edicao manual)
-2. **Metricas de No-Show e Sales Velocity** no Dashboard do CRM
-3. **Benchmarks de mercado** integrados ao funil de vendas e metricas
+## O que muda para o usuario
 
----
+- Cada filtro (Usuario, Cliente, Tipo, Prioridade) passa a aceitar multiplas selecoes simultaneas
+- O botao do filtro mostra quantos itens estao selecionados (ex: "3 clientes", "2 usuarios")
+- Clicar em um item ja selecionado desmarca-o
+- Opcoes especiais como "Sem Cliente" e "Nao atribuido" continuam funcionando junto com as demais selecoes
+- O filtro de Status permanece como esta (ja controlado pelo Kanban visualmente)
+- Botao de limpar filtros continua funcionando
 
-## 1. Banco de Dados
+## Detalhes Tecnicos
 
-### Nova coluna na tabela `leads`
+### Arquivo: `src/pages/Tasks.tsx`
 
-```sql
-ALTER TABLE leads ADD COLUMN loss_reason text DEFAULT NULL;
+**1. Converter estados de filtro de `string` para `string[]`**
+
+Antes:
+```ts
+const [priorityFilter, setPriorityFilter] = useState<string>("all");
+const [assignedFilter, setAssignedFilter] = useState<string>("all");
+const [clientFilter, setClientFilter] = useState<string>("all");
+const [typeFilter, setTypeFilter] = useState<string>("all");
 ```
 
-Armazena o motivo de desqualificacao quando o lead vai para "lost". Os motivos predefinidos sao:
-
-**Problemas de Qualificacao:**
-- `dados_invalidos` - Dados invalidos / Fake
-- `nao_decisor` - Nao e o decisor
-- `fora_icp` - Fora do Perfil (ICP)
-
-**Problemas de Engajamento:**
-- `ghosting` - Ghosting no WhatsApp
-- `no_show` - No-Show (Faltou na Reuniao)
-
-**Problemas Comerciais:**
-- `sem_orcamento` - Sem orcamento (Budget)
-- `concorrencia` - Optou pela concorrencia
-- `sem_valor_percebido` - Nao percebeu valor
-
-**Outro:**
-- `outro` - Outro (campo de texto livre)
-
-### Nova coluna para Sales Velocity
-
-```sql
-ALTER TABLE leads ADD COLUMN status_changed_at timestamptz DEFAULT now();
+Depois:
+```ts
+const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
+const [assignedFilter, setAssignedFilter] = useState<string[]>([]);
+const [clientFilter, setClientFilter] = useState<string[]>([]);
+const [typeFilter, setTypeFilter] = useState<string[]>([]);
 ```
 
-Registra quando o lead entrou na etapa atual. O trigger `track_lead_changes` ja rastreia mudancas de status no `lead_history`, mas ter `status_changed_at` direto na tabela permite calcular dias na etapa sem JOINs.
+Array vazio = "todos" (sem filtro ativo).
 
-### Atualizar trigger `set_lead_won_at`
+**2. Atualizar logica de filtragem no `filteredTasks` useMemo**
 
-Expandir para tambem setar `status_changed_at = NOW()` quando o status muda.
+- `matchesPriority`: `priorityFilter.length === 0 || priorityFilter.includes(task.priority)`
+- `matchesType`: `typeFilter.length === 0 || typeFilter.includes(task.task_type)`
+- `matchesAssigned`: se array vazio = todos; se inclui "unassigned" verifica sem atribuicao; demais verifica se algum dos usuarios atribuidos esta no filtro
+- `matchesClient`: se array vazio = todos; se inclui "no-client" aceita tasks sem cliente; demais verifica se `task.client_id` esta no array
 
----
+**3. Converter UI dos filtros para multi-select com Popover + Command (checkboxes)**
 
-## 2. Modal de Motivo de Perda
+Cada filtro sera um Popover com CommandList onde cada item tem um Checkbox. Padrao similar ao filtro de cliente existente, mas com toggle em vez de selecao unica.
 
-### Novo componente: `src/components/crm/LossReasonDialog.tsx`
+- **Filtro de Usuario**: Popover com lista de usuarios + opcao "Nao atribuido". Label do botao: "Todos Usuarios" quando vazio, "X usuarios" quando selecionados.
+- **Filtro de Cliente**: Manter o Combobox com busca, mas com toggle multi-select. Label: "Todos Clientes" / "X clientes".
+- **Filtro de Prioridade**: Popover com Alta/Media/Baixa como checkboxes. Label: "Prioridade" / "X prioridades".
+- **Filtro de Tipo**: Popover com tipos dinamicos como checkboxes. Label: "Todos os Tipos" / "X tipos".
 
-- Dialog com titulo "Por que este lead esta sendo desqualificado?"
-- RadioGroup com os motivos organizados em 3 categorias (Qualificacao, Engajamento, Comercial)
-- Campo de texto adicional quando "Outro" for selecionado
-- Botoes "Cancelar" e "Confirmar"
-- Ao confirmar: atualiza `status`, `temperature`, `loss_reason` e `status_changed_at` do lead
+**4. Atualizar `clearFilters`**
 
-### Modificacao: `src/components/crm/LeadsKanban.tsx`
+```ts
+const clearFilters = () => {
+  setSearchTerm("");
+  setStatusFilter("all");
+  setPriorityFilter([]);
+  setAssignedFilter([]);
+  setClientFilter([]);
+  setTypeFilter([]);
+  setDueDateRange(undefined);
+  setIncludeNoDueDate(false);
+};
+```
 
-- Adicionar estados `showLossDialog`, `pendingLossLeadId`, `pendingLossDbStatus`
-- No `handleDragEnd`, quando o status destino normalizado for `lost`:
-  - Interromper o fluxo normal
-  - Abrir o `LossReasonDialog` em vez de salvar diretamente
-- Callback `onConfirmLoss(reason)`:
-  - Atualiza o lead no banco com status + loss_reason
-  - Fecha o dialog
+**5. Atualizar condicao de exibicao do botao limpar filtros**
 
----
+Trocar `!== "all"` por `.length > 0` para os filtros convertidos.
 
-## 3. Dashboard - Metricas Avancadas
+### Arquivo modificado
 
-### Modificacao: `src/components/crm/CRMDashboard.tsx`
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/pages/Tasks.tsx` | Converter 4 filtros para multi-select com arrays e UI de checkboxes |
 
-Adicionar tres novos componentes abaixo do funil:
-
-#### A) Card de Motivos de Perda (`CRMLossReasonsChart.tsx`)
-
-- Busca leads com status `lost` no periodo selecionado
-- Grafico de barras horizontal ou donut mostrando distribuicao dos motivos
-- Tabela resumo com contagem e percentual de cada motivo
-- Destaque visual para os 3 motivos mais frequentes
-
-#### B) Card de No-Show / Taxa de Comparecimento
-
-- Integrado no `CRMFunnelChart.tsx`
-- Calcula: leads com `loss_reason = 'no_show'`
-- No funil, entre "Agendamentos" e "Reunioes", mostrar a taxa real de comparecimento
-- Formula: `Reunioes / (Reunioes + No-Shows)` = Taxa de Comparecimento
-- Exibir badge com a taxa ao lado da conversao Agendamento -> Reuniao
-
-#### C) Card de Sales Velocity (`CRMSalesVelocity.tsx`)
-
-- Consulta `lead_history` (campo `status_changed`) para calcular tempo medio em cada etapa
-- Exibe uma tabela/lista: Etapa | Tempo Medio (dias) | Leads Parados
-- Alerta visual para leads com mais de X dias parados (configurable, default 7 dias para Proposta)
-- Destaque em vermelho para etapas com leads "travados"
-
-#### D) Benchmarks de Mercado
-
-- Adicionar ao `CRMFunnelChart.tsx` ou como card separado
-- Comparar as taxas do usuario com benchmarks:
-  - Lead -> Venda: benchmark 1-3%
-  - Lead -> Em Contato: benchmark 40-50%
-  - Proposta -> Venda (Win Rate): benchmark 20-30%
-- Indicador visual (verde/amarelo/vermelho) comparando com o benchmark
-- Tooltip explicando cada benchmark
-
----
-
-## 4. Funil de Vendas - Integracao No-Show
-
-### Modificacao: `src/components/crm/CRMFunnelChart.tsx`
-
-- Receber prop `lossReasons` (ou buscar internamente)
-- No calculo do funil, contar No-Shows separadamente
-- Adicionar linha entre Agendamentos e Reunioes mostrando:
-  - "X No-Shows" e taxa de comparecimento real
-- Na secao de conversion rates (bottom), destacar a taxa corrigida
-
----
-
-## Arquivos
-
-| Arquivo | Acao |
-|---------|------|
-| Migration SQL | Adicionar `loss_reason` e `status_changed_at` na tabela leads; atualizar trigger |
-| `src/components/crm/LossReasonDialog.tsx` | **Novo** - Modal de motivo de perda |
-| `src/components/crm/LeadsKanban.tsx` | Interceptar drag para "lost" e abrir dialog |
-| `src/components/crm/CRMLossReasonsChart.tsx` | **Novo** - Grafico de motivos de perda |
-| `src/components/crm/CRMSalesVelocity.tsx` | **Novo** - Card de velocidade de vendas por etapa |
-| `src/components/crm/CRMFunnelChart.tsx` | Adicionar No-Show, benchmarks e taxa de comparecimento |
-| `src/components/crm/CRMDashboard.tsx` | Integrar novos componentes + buscar loss_reasons |
