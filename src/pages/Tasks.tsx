@@ -109,10 +109,10 @@ export default function Tasks() {
   // Filtros e busca
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [priorityFilter, setPriorityFilter] = useState<string>("all");
-  const [assignedFilter, setAssignedFilter] = useState<string>("all");
-  const [clientFilter, setClientFilter] = useState<string>("all");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
+  const [assignedFilter, setAssignedFilter] = useState<string[]>([]);
+  const [clientFilter, setClientFilter] = useState<string[]>([]);
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [dueDateRange, setDueDateRange] = useState<DateRange | undefined>(undefined);
   const [includeNoDueDate, setIncludeNoDueDate] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -319,21 +319,23 @@ export default function Tasks() {
         task.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesStatus = statusFilter === "all" || task.status === statusFilter;
-      const matchesPriority = priorityFilter === "all" || task.priority === priorityFilter;
-      const matchesType = typeFilter === "all" || task.task_type === typeFilter;
+      const matchesPriority = priorityFilter.length === 0 || priorityFilter.includes(task.priority);
+      const matchesType = typeFilter.length === 0 || (task.task_type ? typeFilter.includes(task.task_type) : false);
 
       let matchesAssigned = true;
-      if (assignedFilter !== "all") {
+      if (assignedFilter.length > 0) {
         const taskAssignedUsers = getAssignedUsers(task.id);
-        if (assignedFilter === "unassigned") {
-          matchesAssigned = taskAssignedUsers.length === 0;
-        } else {
-          matchesAssigned = taskAssignedUsers.some((u) => u.user_id === assignedFilter);
-        }
+        const matchesUnassigned = assignedFilter.includes("unassigned") && taskAssignedUsers.length === 0;
+        const matchesSpecificUser = taskAssignedUsers.some((u) => assignedFilter.includes(u.user_id));
+        matchesAssigned = matchesUnassigned || matchesSpecificUser;
       }
 
-      const matchesClient =
-        clientFilter === "all" || (clientFilter === "no-client" && !task.client_id) || task.client_id === clientFilter;
+      let matchesClient = true;
+      if (clientFilter.length > 0) {
+        const matchesNoClient = clientFilter.includes("no-client") && !task.client_id;
+        const matchesSpecificClient = task.client_id ? clientFilter.includes(task.client_id) : false;
+        matchesClient = matchesNoClient || matchesSpecificClient;
+      }
 
       const from = dueDateRange?.from ? toStartOfDay(dueDateRange.from) : undefined;
       const to = dueDateRange?.to ? toEndOfDay(dueDateRange.to) : undefined;
@@ -886,12 +888,26 @@ export default function Tasks() {
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
-    setPriorityFilter("all");
-    setAssignedFilter("all");
-    setClientFilter("all");
-    setTypeFilter("all");
+    setPriorityFilter([]);
+    setAssignedFilter([]);
+    setClientFilter([]);
+    setTypeFilter([]);
     setDueDateRange(undefined);
     setIncludeNoDueDate(false);
+  };
+
+  const toggleFilter = (
+    current: string[],
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    value: string
+  ) => {
+    setter(current.includes(value) ? current.filter((v) => v !== value) : [...current, value]);
+  };
+
+  const getFilterLabel = (selected: string[], allLabel: string, singular: string, plural: string) => {
+    if (selected.length === 0) return allLabel;
+    if (selected.length === 1) return `1 ${singular}`;
+    return `${selected.length} ${plural}`;
   };
 
   if (loading) {
@@ -1338,43 +1354,69 @@ export default function Tasks() {
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
               <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
 
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-[130px] sm:w-[150px] h-9 text-xs sm:text-sm flex-shrink-0">
-                  <SelectValue placeholder="Prioridade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas Prioridades</SelectItem>
-                  <SelectItem value="high">Alta</SelectItem>
-                  <SelectItem value="medium">Média</SelectItem>
-                  <SelectItem value="low">Baixa</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={assignedFilter} onValueChange={setAssignedFilter}>
-                <SelectTrigger className="w-[120px] sm:w-[150px] h-9 text-xs sm:text-sm flex-shrink-0">
-                  <SelectValue placeholder="Usuário" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos Usuários</SelectItem>
-                  <SelectItem value="unassigned">Não atribuído</SelectItem>
-                  {profiles.map((profile) => (
-                    <SelectItem key={profile.id} value={profile.user_id}>
-                      {profile.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
+              {/* Filtro de Prioridade - Multi-select */}
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" className="w-[140px] sm:w-[170px] h-9 text-xs sm:text-sm flex-shrink-0 justify-between font-normal">
-                    <span className="truncate">
-                      {clientFilter === "all"
-                        ? "Todos Clientes"
-                        : clientFilter === "no-client"
-                        ? "Sem Cliente"
-                        : clients.find((c) => c.id === clientFilter)?.name || "Cliente"}
-                    </span>
+                  <Button variant="outline" className={cn("w-[130px] sm:w-[150px] h-9 text-xs sm:text-sm flex-shrink-0 justify-between font-normal", priorityFilter.length > 0 && "border-primary")}>
+                    <span className="truncate">{getFilterLabel(priorityFilter, "Prioridade", "prioridade", "prioridades")}</span>
+                    <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[200px] p-0" align="start">
+                  <Command>
+                    <CommandList>
+                      <CommandGroup>
+                        {[
+                          { value: "high", label: "Alta" },
+                          { value: "medium", label: "Média" },
+                          { value: "low", label: "Baixa" },
+                        ].map((item) => (
+                          <CommandItem key={item.value} onSelect={() => toggleFilter(priorityFilter, setPriorityFilter, item.value)}>
+                            <Check className={cn("mr-2 h-4 w-4", priorityFilter.includes(item.value) ? "opacity-100" : "opacity-0")} />
+                            {item.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              {/* Filtro de Usuário - Multi-select */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-[130px] sm:w-[150px] h-9 text-xs sm:text-sm flex-shrink-0 justify-between font-normal", assignedFilter.length > 0 && "border-primary")}>
+                    <span className="truncate">{getFilterLabel(assignedFilter, "Usuário", "usuário", "usuários")}</span>
+                    <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[220px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar usuário..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum usuário encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem onSelect={() => toggleFilter(assignedFilter, setAssignedFilter, "unassigned")}>
+                          <Check className={cn("mr-2 h-4 w-4", assignedFilter.includes("unassigned") ? "opacity-100" : "opacity-0")} />
+                          Não atribuído
+                        </CommandItem>
+                        {profiles.map((p) => (
+                          <CommandItem key={p.user_id} value={p.name} onSelect={() => toggleFilter(assignedFilter, setAssignedFilter, p.user_id)}>
+                            <Check className={cn("mr-2 h-4 w-4", assignedFilter.includes(p.user_id) ? "opacity-100" : "opacity-0")} />
+                            {p.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              {/* Filtro de Cliente - Multi-select */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-[140px] sm:w-[170px] h-9 text-xs sm:text-sm flex-shrink-0 justify-between font-normal", clientFilter.length > 0 && "border-primary")}>
+                    <span className="truncate">{getFilterLabel(clientFilter, "Cliente", "cliente", "clientes")}</span>
                     <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -1384,17 +1426,13 @@ export default function Tasks() {
                     <CommandList>
                       <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
                       <CommandGroup>
-                        <CommandItem value="Todos Clientes" onSelect={() => setClientFilter("all")}>
-                          <Check className={cn("mr-2 h-4 w-4", clientFilter === "all" ? "opacity-100" : "opacity-0")} />
-                          Todos Clientes
-                        </CommandItem>
-                        <CommandItem value="Sem Cliente" onSelect={() => setClientFilter("no-client")}>
-                          <Check className={cn("mr-2 h-4 w-4", clientFilter === "no-client" ? "opacity-100" : "opacity-0")} />
+                        <CommandItem value="Sem Cliente" onSelect={() => toggleFilter(clientFilter, setClientFilter, "no-client")}>
+                          <Check className={cn("mr-2 h-4 w-4", clientFilter.includes("no-client") ? "opacity-100" : "opacity-0")} />
                           Sem Cliente
                         </CommandItem>
                         {clients.map((client) => (
-                          <CommandItem key={client.id} value={client.name} onSelect={() => setClientFilter(client.id)}>
-                            <Check className={cn("mr-2 h-4 w-4", clientFilter === client.id ? "opacity-100" : "opacity-0")} />
+                          <CommandItem key={client.id} value={client.name} onSelect={() => toggleFilter(clientFilter, setClientFilter, client.id)}>
+                            <Check className={cn("mr-2 h-4 w-4", clientFilter.includes(client.id) ? "opacity-100" : "opacity-0")} />
                             {client.name}
                           </CommandItem>
                         ))}
@@ -1404,19 +1442,29 @@ export default function Tasks() {
                 </PopoverContent>
               </Popover>
 
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[110px] sm:w-[140px] h-9 text-xs sm:text-sm flex-shrink-0">
-                  <SelectValue placeholder="Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Tipos</SelectItem>
-                  {types.map((type) => (
-                    <SelectItem key={type.slug} value={type.slug}>
-                      {type.icon} {type.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Filtro de Tipo - Multi-select */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className={cn("w-[110px] sm:w-[140px] h-9 text-xs sm:text-sm flex-shrink-0 justify-between font-normal", typeFilter.length > 0 && "border-primary")}>
+                    <span className="truncate">{getFilterLabel(typeFilter, "Tipo", "tipo", "tipos")}</span>
+                    <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[220px] p-0" align="start">
+                  <Command>
+                    <CommandList>
+                      <CommandGroup>
+                        {types.map((type) => (
+                          <CommandItem key={type.slug} onSelect={() => toggleFilter(typeFilter, setTypeFilter, type.slug)}>
+                            <Check className={cn("mr-2 h-4 w-4", typeFilter.includes(type.slug) ? "opacity-100" : "opacity-0")} />
+                            {type.icon} {type.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
 
               <div className="flex-shrink-0">
                 <DateRangeFilterDialog
@@ -1431,10 +1479,10 @@ export default function Tasks() {
               </div>
 
               {(searchTerm ||
-                priorityFilter !== "all" ||
-                assignedFilter !== "all" ||
-                clientFilter !== "all" ||
-                typeFilter !== "all" ||
+                priorityFilter.length > 0 ||
+                assignedFilter.length > 0 ||
+                clientFilter.length > 0 ||
+                typeFilter.length > 0 ||
                 !!dueDateRange?.from ||
                 includeNoDueDate !== false) && (
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 px-2 flex-shrink-0">
