@@ -71,12 +71,19 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
   });
 
   useEffect(() => {
-    if (lead) {
-      // O Select usa "statusKey" (ex.: agendamentos). O banco deve usar "dbStatus" (ex.: scheduled).
-      // Aqui normalizamos o status salvo no banco para o formato esperado pelo Select.
-      const normalizedDbStatus = normalizeLeadStatusToDb(lead.status);
-      const displayStatus = mapDatabaseStatusToDisplay(normalizedDbStatus);
-      const statusKey = getStatusKey(displayStatus);
+    if (lead && statuses.length > 0) {
+      // Tentar match direto primeiro (statusKey já existente nos statuses carregados)
+      const directMatch = statuses.find(s => getStatusKey(s.name) === lead.status);
+      let statusKey: string;
+      
+      if (directMatch) {
+        statusKey = getStatusKey(directMatch.name);
+      } else {
+        // Fallback: normalizar via cadeia dbStatus -> displayName -> statusKey
+        const normalizedDbStatus = normalizeLeadStatusToDb(lead.status);
+        const displayStatus = mapDatabaseStatusToDisplay(normalizedDbStatus);
+        statusKey = getStatusKey(displayStatus);
+      }
       
       setFormData({
         name: lead.name || '',
@@ -95,7 +102,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
         tags: lead.tags ? lead.tags.join(', ') : '',
       });
     }
-  }, [lead]);
+  }, [lead, statuses]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,6 +267,8 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
                   <SelectItem value="referral">Indicação</SelectItem>
                   <SelectItem value="event">Evento</SelectItem>
                   <SelectItem value="advertisement">Anúncio</SelectItem>
+                  <SelectItem value="facebook_leads">Facebook Leads</SelectItem>
+                  <SelectItem value="facebook_ads">Facebook Ads</SelectItem>
                   <SelectItem value="other">Outro</SelectItem>
                 </SelectContent>
               </Select>
