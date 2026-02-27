@@ -1,78 +1,56 @@
 
 
-# Funil de Vendas Estilo 3D com Layout em Dois Blocos
+# Cards de Lead com Fundo Roxo Solido (#4c2882)
 
 ## Resumo
 
-Redesenhar o funil de vendas para ter um visual 3D similar a imagem de referencia (com efeito de profundidade/perspectiva nas barras) e dividir o card em dois blocos lado a lado: funil centralizado a esquerda e metricas de conversao a direita.
+Aplicar o mesmo estilo visual dos cards de tarefas nos cards de lead do CRM: fundo roxo solido `#4c2882`, textos em branco/claro, e borda sutil `#5a35a0`.
 
-## Layout
+## O que muda visualmente
 
-```text
-+----------------------------------+----------------------------------+
-|                                  |                                  |
-|     FUNIL DE VENDAS (3D)         |   CONVERSOES ENTRE ETAPAS        |
-|                                  |                                  |
-|      ____________________        |   Leads -> Em contato    14.0%   |
-|     /                    \       |   Em contato -> Qual.    62.5%   |
-|    /      Leads (57)      \      |   Qual. -> Agend.       100.0%  |
-|   /________________________\     |   Agend. -> Reun.       100.0%  |
-|     /                  \         |   Reun. -> Prop.         80.0%  |
-|    /   Em contato (8)   \        |   Prop. -> Vendas        50.0%  |
-|   /____________________\         |                                  |
-|       ...                        |   --- BENCHMARKS ---             |
-|         ___                      |   Lead->Venda  | Lead->Contato  |
-|        / V \                     |   Prop.->Venda |                 |
-|        \___/                     |                                  |
-|                                  |   --- NO-SHOW ---                |
-+----------------------------------+----------------------------------+
-```
-
-Em mobile, os blocos empilham verticalmente (funil em cima, metricas embaixo).
-
-## Visual 3D do Funil
-
-Inspirado na imagem de referencia, cada etapa tera:
-- Efeito de "borda inferior curva" usando `border-radius` na parte inferior para simular profundidade 3D
-- Sombra interna sutil (`box-shadow: inset`) para dar volume
-- Gap entre as etapas (como na imagem) em vez de coladas
-- A ultima etapa (Vendas) tera formato de triangulo invertido (ponta para baixo)
-- Degrade roxo mantido (do escuro ao claro, com verde no final)
+- Fundo de todos os cards de lead: roxo solido `#4c2882` (igual aos cards de tarefa)
+- Borda: `#5a35a0`
+- Nome do lead: `text-white`
+- Cargo (position): `text-white/60`
+- Informacoes (email, telefone, empresa, source, data): `text-white/70`
+- Icones de informacao: `text-white/50`
+- Hover: sombra roxa sutil (`shadow-purple-900/30`) e `brightness-110`
+- Grip icon (arrastar): `text-white/50` com hover `text-white/80`
+- Badges de status e temperatura: mantidos com suas cores originais (se destacam contra o fundo escuro)
+- Area de valor (verde): mantida com suas cores proprias
+- Badge de WhatsApp: mantido com estilo verde
+- Remove a logica de `getCardBackground()` baseada em urgencia/status (o fundo sera sempre roxo)
 
 ## Detalhes Tecnicos
 
-### Arquivo: `src/components/crm/CRMFunnelChart.tsx`
+### Arquivo: `src/components/crm/SortableLeadCard.tsx`
 
-**1. Layout em grid de 2 colunas**
+**1. Card - fundo roxo solido e borda**
 
-Substituir o layout atual (tudo empilhado) por `grid grid-cols-1 lg:grid-cols-2 gap-6`:
-- Coluna esquerda: funil visual 3D centralizado
-- Coluna direita: taxas de conversao entre etapas, benchmarks e no-show indicator
+Substituir o className dinamico do `Card` para usar fundo fixo e borda roxa:
+- Remover chamada a `getCardBackground()`
+- Adicionar `style={{ backgroundColor: '#4c2882' }}` e `border-[#5a35a0]`
+- Hover: `hover:shadow-lg hover:shadow-purple-900/30 hover:brightness-110`
 
-**2. Funil com efeito 3D**
+**2. Textos em branco/claro**
 
-Cada barra do funil tera:
-- `clip-path` trapezoidal (mantido)
-- Pseudo-elemento inferior com `border-radius: 0 0 50% 50%` para criar a curvatura 3D
-- Implementado via um div extra abaixo de cada barra com cor mais escura e `border-radius` arredondado
-- Gap de 4-6px entre as etapas para dar "respiro" visual como na imagem
-- Ultima etapa com clip-path triangular (ponta para baixo)
+- Nome (`h4`): adicionar `text-white`
+- Cargo: `text-white/60` em vez de `text-muted-foreground`
+- Informacoes de contato e meta-dados: `text-white/70`
+- Icones: `text-white/50` em vez de `text-muted-foreground`
+- Icone de urgencia no calendario: manter vermelho/laranja para urgente/hoje
 
-**3. Coluna direita - Metricas organizadas**
+**3. Grip icon em branco**
 
-- Conversoes entre etapas listadas verticalmente (em vez de horizontal com scroll)
-- Cada linha mostra: "Etapa A -> Etapa B" com a porcentagem e uma barra de progresso sutil
-- Benchmarks abaixo com separador
-- No-show indicator no final
+- Mudar de `text-muted-foreground hover:text-foreground` para `text-white/50 hover:text-white/80`
 
-**4. Responsividade**
+**4. Botao de acoes (3 pontos)**
 
-- Desktop (lg+): 2 colunas lado a lado
-- Mobile: empilha verticalmente, funil primeiro
+- Adicionar `text-white/70 hover:text-white` para manter visibilidade
 
 ### Arquivo modificado
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/components/crm/CRMFunnelChart.tsx` | Funil 3D + layout 2 colunas |
+| `src/components/crm/SortableLeadCard.tsx` | Fundo roxo #4c2882, textos brancos, grip branco |
 
