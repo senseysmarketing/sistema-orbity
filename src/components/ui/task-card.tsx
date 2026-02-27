@@ -113,9 +113,9 @@ export function TaskCard({
 
   return (
     <div 
-      className="p-3 md:p-4 rounded-lg border border-[hsl(266,62%,20%)] cursor-pointer hover:shadow-lg hover:shadow-purple-900/30 hover:brightness-110 transition-all"
+      className="p-3 md:p-4 rounded-lg border border-[#5a35a0] cursor-pointer hover:shadow-lg hover:shadow-purple-900/30 hover:brightness-110 transition-all"
       onClick={(e) => onClick?.(e)}
-      style={{ backgroundColor: 'hsl(266, 62%, 12%)' }}
+      style={{ backgroundColor: '#4c2882' }}
     >
       {/* Linha 1: Ícone Status + Badges */}
       <div className="flex items-center justify-between gap-2 mb-2">
