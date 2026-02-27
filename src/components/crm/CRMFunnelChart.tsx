@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
-import { Info } from "lucide-react";
+import { Info, ArrowRight } from "lucide-react";
 
 interface Lead {
   id: string;
@@ -29,7 +29,17 @@ const FUNNEL_COLORS = [
   "#22c55e",
 ];
 
-const FUNNEL_WIDTHS = [100, 85, 72, 59, 46, 33, 25];
+const FUNNEL_SHADOW_COLORS = [
+  "#4a2870",
+  "#5c3590",
+  "#6e44a0",
+  "#8055b0",
+  "#9068c0",
+  "#a07ad0",
+  "#1a9e4a",
+];
+
+const FUNNEL_WIDTHS = [100, 85, 72, 59, 46, 33, 22];
 
 export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -75,13 +85,13 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
     const wonRate = proposals > 0 ? ((won / proposals) * 100).toFixed(1) : "0";
 
     return [
-      { name: "Leads", value: totalLeads, fill: FUNNEL_COLORS[0], conversionRate: "100%" },
-      { name: "Em contato", value: contacting, fill: FUNNEL_COLORS[1], conversionRate: `${contactingRate}%` },
-      { name: "Qualificados", value: qualified, fill: FUNNEL_COLORS[2], conversionRate: `${qualifiedRate}%` },
-      { name: "Agendamentos", value: scheduled, fill: FUNNEL_COLORS[3], conversionRate: `${scheduledRate}%` },
-      { name: "Reuniões", value: meetings, fill: FUNNEL_COLORS[4], conversionRate: `${meetingsRate}%` },
-      { name: "Propostas", value: proposals, fill: FUNNEL_COLORS[5], conversionRate: `${proposalsRate}%` },
-      { name: "Vendas", value: won, fill: FUNNEL_COLORS[6], conversionRate: `${wonRate}%` },
+      { name: "Leads", value: totalLeads, fill: FUNNEL_COLORS[0], shadow: FUNNEL_SHADOW_COLORS[0], conversionRate: "100%" },
+      { name: "Em contato", value: contacting, fill: FUNNEL_COLORS[1], shadow: FUNNEL_SHADOW_COLORS[1], conversionRate: `${contactingRate}%` },
+      { name: "Qualificados", value: qualified, fill: FUNNEL_COLORS[2], shadow: FUNNEL_SHADOW_COLORS[2], conversionRate: `${qualifiedRate}%` },
+      { name: "Agendamentos", value: scheduled, fill: FUNNEL_COLORS[3], shadow: FUNNEL_SHADOW_COLORS[3], conversionRate: `${scheduledRate}%` },
+      { name: "Reuniões", value: meetings, fill: FUNNEL_COLORS[4], shadow: FUNNEL_SHADOW_COLORS[4], conversionRate: `${meetingsRate}%` },
+      { name: "Propostas", value: proposals, fill: FUNNEL_COLORS[5], shadow: FUNNEL_SHADOW_COLORS[5], conversionRate: `${proposalsRate}%` },
+      { name: "Vendas", value: won, fill: FUNNEL_COLORS[6], shadow: FUNNEL_SHADOW_COLORS[6], conversionRate: `${wonRate}%` },
     ];
   }, [leads, dateRange]);
 
@@ -145,6 +155,22 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
     ];
   }, [generalConversionRate, funnelData]);
 
+  const conversionStages = useMemo(() => {
+    return funnelData.slice(1).map((stage, index) => {
+      const previousStage = funnelData[index];
+      const rate = previousStage.value > 0 
+        ? ((stage.value / previousStage.value) * 100).toFixed(1) 
+        : "0";
+      return {
+        from: previousStage.name,
+        to: stage.name,
+        rate: parseFloat(rate),
+        rateStr: `${rate}%`,
+        color: stage.fill,
+      };
+    });
+  }, [funnelData]);
+
   return (
     <Card className="col-span-full">
       <CardHeader className="pb-2">
@@ -157,138 +183,156 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
         </div>
       </CardHeader>
       <CardContent>
-        {/* Custom CSS Funnel */}
-        <div className="flex flex-col items-center gap-0 py-4">
-          {funnelData.map((stage, index) => {
-            const width = FUNNEL_WIDTHS[index];
-            const nextWidth = FUNNEL_WIDTHS[index + 1] ?? width * 0.7;
-            const isHovered = hoveredIndex === index;
-            const isLast = index === funnelData.length - 1;
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column - 3D Funnel */}
+          <div className="flex flex-col items-center justify-center py-4">
+            <div className="flex flex-col items-center w-full max-w-[320px]">
+              {funnelData.map((stage, index) => {
+                const width = FUNNEL_WIDTHS[index];
+                const isHovered = hoveredIndex === index;
+                const isLast = index === funnelData.length - 1;
 
-            // Trapezoid clip-path: top-left, top-right, bottom-right, bottom-left
-            const inset = ((width - nextWidth) / width) * 50;
-            const clipPath = isLast
-              ? "polygon(2% 0%, 98% 0%, 98% 100%, 2% 100%)"
-              : `polygon(0% 0%, 100% 0%, ${100 - inset}% 100%, ${inset}% 100%)`;
+                return (
+                  <div
+                    key={stage.name}
+                    className="flex flex-col items-center w-full"
+                    style={{ marginTop: index === 0 ? 0 : "6px" }}
+                  >
+                    {/* Main trapezoid bar */}
+                    <div
+                      className="relative cursor-pointer transition-all duration-300"
+                      style={{
+                        width: `${width}%`,
+                        height: isHovered ? "50px" : "44px",
+                        clipPath: isLast
+                          ? "polygon(8% 0%, 92% 0%, 50% 100%)"
+                          : "polygon(0% 0%, 100% 0%, 92% 100%, 8% 100%)",
+                        backgroundColor: stage.fill,
+                        transform: isHovered ? "scale(1.04)" : "scale(1)",
+                        zIndex: isHovered ? 10 : 1,
+                        boxShadow: isHovered
+                          ? `0 4px 20px ${stage.fill}66`
+                          : `inset 0 2px 4px rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.2)`,
+                      }}
+                      onMouseEnter={() => setHoveredIndex(index)}
+                      onMouseLeave={() => setHoveredIndex(null)}
+                    >
+                      {/* Content */}
+                      <div className="absolute inset-0 flex items-center justify-center gap-2 px-2">
+                        <span className="text-white font-semibold text-xs sm:text-sm truncate drop-shadow-sm">
+                          {stage.name}
+                        </span>
+                        <span className="text-white/90 font-bold text-sm sm:text-base drop-shadow-sm">
+                          {stage.value}
+                        </span>
+                      </div>
 
-            return (
-              <div
-                key={stage.name}
-                className="relative transition-all duration-300 ease-out cursor-pointer"
-                style={{
-                  width: `${width}%`,
-                  height: isHovered ? "58px" : "52px",
-                  clipPath,
-                  backgroundColor: stage.fill,
-                  marginTop: index === 0 ? 0 : "-1px",
-                  transform: isHovered ? "scale(1.03)" : "scale(1)",
-                  zIndex: isHovered ? 10 : 1,
-                  filter: isHovered ? "brightness(1.12)" : "brightness(1)",
-                  animationDelay: `${index * 80}ms`,
-                }}
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex(null)}
-              >
-                {/* Content overlay */}
-                <div className="absolute inset-0 flex items-center justify-center gap-2 sm:gap-3 px-2">
-                  <span className="text-white font-semibold text-xs sm:text-sm truncate">
-                    {stage.name}
-                  </span>
-                  <span className="text-white/90 font-bold text-sm sm:text-base">
-                    {stage.value}
-                  </span>
-                  <span className="text-white/70 text-[10px] sm:text-xs font-medium">
-                    {stage.conversionRate}
-                  </span>
-                </div>
+                      {/* Hover tooltip */}
+                      {isHovered && (
+                        <div className="absolute -right-2 top-1/2 -translate-y-1/2 translate-x-full z-20 bg-popover border border-border rounded-lg shadow-lg p-3 whitespace-nowrap pointer-events-none">
+                          <p className="font-semibold text-sm text-foreground">{stage.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Quantidade: <span className="text-foreground font-medium">{stage.value}</span>
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Conversão: <span className="text-foreground font-medium">{stage.conversionRate}</span>
+                          </p>
+                        </div>
+                      )}
+                    </div>
 
-                {/* Hover tooltip */}
-                {isHovered && (
-                  <div className="absolute -right-2 top-1/2 -translate-y-1/2 translate-x-full z-20 bg-popover border border-border rounded-lg shadow-lg p-3 whitespace-nowrap pointer-events-none">
-                    <p className="font-semibold text-sm text-foreground">{stage.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Quantidade: <span className="text-foreground font-medium">{stage.value}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Conversão: <span className="text-foreground font-medium">{stage.conversionRate}</span>
-                    </p>
+                    {/* 3D curved bottom edge */}
+                    {!isLast && (
+                      <div
+                        style={{
+                          width: `${width * 0.92}%`,
+                          height: "8px",
+                          backgroundColor: stage.shadow,
+                          borderRadius: "0 0 50% 50%",
+                          transform: isHovered ? "scale(1.04)" : "scale(1)",
+                          transition: "all 0.3s",
+                        }}
+                      />
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* No-Show indicator */}
-        {noShowData.noShows > 0 && (
-          <div className="flex items-center gap-2 mt-3 p-2 rounded-md bg-destructive/10 border border-destructive/20">
-            <Badge variant="destructive" className="text-xs">
-              {noShowData.noShows} No-Show{noShowData.noShows > 1 ? "s" : ""}
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              Taxa de comparecimento: <span className="font-semibold text-foreground">{noShowData.attendanceRate}%</span>
-            </span>
+                );
+              })}
+            </div>
           </div>
-        )}
 
-        {/* Conversion rates between stages */}
-        <div className="flex gap-2 mt-4 sm:mt-6 pt-3 sm:pt-4 border-t overflow-x-auto scrollbar-hide pb-1">
-          {funnelData.slice(1).map((stage, index) => {
-            const previousStage = funnelData[index];
-            const rate = previousStage.value > 0 
-              ? ((stage.value / previousStage.value) * 100).toFixed(1) 
-              : "0";
-            const getShortName = (name: string) => {
-              const abbr: Record<string, string> = {
-                "Em contato": "Cont.",
-                "Qualificados": "Qual.",
-                "Agendamentos": "Agen.",
-                "Reuniões": "Reun.",
-                "Propostas": "Prop.",
-                "Vendas": "Vend.",
-              };
-              return abbr[name] || name;
-            };
-            return (
-              <div key={stage.name} className="text-center flex-shrink-0 min-w-[60px] sm:min-w-[80px]">
-                <div className="text-[10px] sm:text-xs text-muted-foreground mb-1">
-                  <span className="hidden sm:inline">{previousStage.name} → {stage.name}</span>
-                  <span className="sm:hidden">{getShortName(previousStage.name)} → {getShortName(stage.name)}</span>
-                </div>
-                <div className="text-sm sm:text-base font-bold" style={{ color: stage.fill }}>
-                  {rate}%
+          {/* Right Column - Metrics */}
+          <div className="flex flex-col gap-4">
+            {/* Conversion rates between stages */}
+            <div>
+              <h4 className="text-sm font-semibold text-foreground mb-3">Conversões entre Etapas</h4>
+              <div className="space-y-2.5">
+                {conversionStages.map((stage) => (
+                  <div key={`${stage.from}-${stage.to}`} className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-[140px] shrink-0">
+                      <span className="truncate">{stage.from}</span>
+                      <ArrowRight className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{stage.to}</span>
+                    </div>
+                    <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(stage.rate, 100)}%`,
+                          backgroundColor: stage.color,
+                        }}
+                      />
+                    </div>
+                    <span className="text-sm font-bold min-w-[48px] text-right" style={{ color: stage.color }}>
+                      {stage.rateStr}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Benchmarks */}
+            <TooltipProvider>
+              <div className="pt-3 border-t">
+                <h4 className="text-sm font-semibold text-foreground mb-3">Benchmarks</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  {benchmarks.map((b) => (
+                    <div key={b.label} className="text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <span className="text-[10px] sm:text-xs text-muted-foreground">{b.label}</span>
+                        <UITooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[200px] text-xs">
+                            {b.tip}
+                          </TooltipContent>
+                        </UITooltip>
+                      </div>
+                      <div className={`text-sm sm:text-base font-bold ${b.color}`}>
+                        {b.value}%
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        Benchmark: {b.benchmark}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </TooltipProvider>
 
-        {/* Benchmarks */}
-        <TooltipProvider>
-          <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t">
-            {benchmarks.map((b) => (
-              <div key={b.label} className="text-center">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  <span className="text-[10px] sm:text-xs text-muted-foreground">{b.label}</span>
-                  <UITooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[200px] text-xs">
-                      {b.tip}
-                    </TooltipContent>
-                  </UITooltip>
-                </div>
-                <div className={`text-sm sm:text-base font-bold ${b.color}`}>
-                  {b.value}%
-                </div>
-                <div className="text-[10px] text-muted-foreground">
-                  Benchmark: {b.benchmark}
-                </div>
+            {/* No-Show indicator */}
+            {noShowData.noShows > 0 && (
+              <div className="flex items-center gap-2 p-2 rounded-md bg-destructive/10 border border-destructive/20">
+                <Badge variant="destructive" className="text-xs">
+                  {noShowData.noShows} No-Show{noShowData.noShows > 1 ? "s" : ""}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  Taxa de comparecimento: <span className="font-semibold text-foreground">{noShowData.attendanceRate}%</span>
+                </span>
               </div>
-            ))}
+            )}
           </div>
-        </TooltipProvider>
+        </div>
       </CardContent>
     </Card>
   );
