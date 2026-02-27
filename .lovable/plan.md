@@ -1,56 +1,77 @@
 
 
-# Cards de Lead com Fundo Roxo Solido (#4c2882)
+# Corrigir Troca de Programa sem Perder Dados
 
-## Resumo
+## Problema
 
-Aplicar o mesmo estilo visual dos cards de tarefas nos cards de lead do CRM: fundo roxo solido `#4c2882`, textos em branco/claro, e borda sutil `#5a35a0`.
+Ao clicar em "Trocar Programa" e selecionar o mesmo programa (ou qualquer outro), o sistema:
+1. Desativa o programa atual (`is_active = false`)
+2. Cria um novo registro do zero com config padrao
+3. Os periodos, scorecards e dados financeiros ficam orfaos (vinculados ao programa antigo)
 
-## O que muda visualmente
+Ou seja, o usuario perde tudo ao "trocar" para o mesmo programa.
 
-- Fundo de todos os cards de lead: roxo solido `#4c2882` (igual aos cards de tarefa)
-- Borda: `#5a35a0`
-- Nome do lead: `text-white`
-- Cargo (position): `text-white/60`
-- Informacoes (email, telefone, empresa, source, data): `text-white/70`
-- Icones de informacao: `text-white/50`
-- Hover: sombra roxa sutil (`shadow-purple-900/30`) e `brightness-110`
-- Grip icon (arrastar): `text-white/50` com hover `text-white/80`
-- Badges de status e temperatura: mantidos com suas cores originais (se destacam contra o fundo escuro)
-- Area de valor (verde): mantida com suas cores proprias
-- Badge de WhatsApp: mantido com estilo verde
-- Remove a logica de `getCardBackground()` baseada em urgencia/status (o fundo sera sempre roxo)
+## Solucao
+
+Alterar a logica de `handleSelectProgram` para:
+
+1. **Se o usuario selecionar o mesmo tipo de programa que ja esta ativo**: simplesmente fechar o seletor e voltar ao dashboard (nao faz nada no banco)
+2. **Se o usuario selecionar um tipo diferente**: verificar se ja existe um programa daquele tipo (mesmo que inativo) para a agencia. Se existir, reativa-lo em vez de criar um novo. Apenas criar um novo se nunca existiu aquele tipo.
 
 ## Detalhes Tecnicos
 
-### Arquivo: `src/components/crm/SortableLeadCard.tsx`
+### Arquivo: `src/pages/Goals.tsx`
 
-**1. Card - fundo roxo solido e borda**
+**Alterar `handleSelectProgram`:**
 
-Substituir o className dinamico do `Card` para usar fundo fixo e borda roxa:
-- Remover chamada a `getCardBackground()`
-- Adicionar `style={{ backgroundColor: '#4c2882' }}` e `border-[#5a35a0]`
-- Hover: `hover:shadow-lg hover:shadow-purple-900/30 hover:brightness-110`
+```
+const handleSelectProgram = async (type: string) => {
+  // Se o tipo selecionado e o mesmo do programa ativo, apenas voltar
+  if (activeProgram && activeProgram.program_type === type) {
+    setShowSelector(false);
+    return;
+  }
 
-**2. Textos em branco/claro**
+  // Tipos indisponiveis
+  if (type !== "ppr") {
+    toast({ title: "Em breve", description: "..." });
+    return;
+  }
 
-- Nome (`h4`): adicionar `text-white`
-- Cargo: `text-white/60` em vez de `text-muted-foreground`
-- Informacoes de contato e meta-dados: `text-white/70`
-- Icones: `text-white/50` em vez de `text-muted-foreground`
-- Icone de urgencia no calendario: manter vermelho/laranja para urgente/hoje
+  // Verificar se ja existe um programa deste tipo (inativo) para a agencia
+  const { data: existing } = await supabase
+    .from("bonus_programs")
+    .select("*")
+    .eq("agency_id", currentAgency.id)
+    .eq("program_type", type)
+    .maybeSingle();
 
-**3. Grip icon em branco**
+  // Desativar o programa atual
+  if (activeProgram) {
+    await supabase
+      .from("bonus_programs")
+      .update({ is_active: false })
+      .eq("id", activeProgram.id);
+  }
 
-- Mudar de `text-muted-foreground hover:text-foreground` para `text-white/50 hover:text-white/80`
+  if (existing) {
+    // Reativar o programa existente (preserva periodos e dados)
+    await supabase
+      .from("bonus_programs")
+      .update({ is_active: true })
+      .eq("id", existing.id);
+  } else {
+    // Criar novo apenas se nunca existiu
+    await supabase.from("bonus_programs").insert([...]);
+  }
 
-**4. Botao de acoes (3 pontos)**
+  setShowSelector(false);
+  fetchProgram();
+};
+```
 
-- Adicionar `text-white/70 hover:text-white` para manter visibilidade
-
-### Arquivo modificado
-
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/components/crm/SortableLeadCard.tsx` | Fundo roxo #4c2882, textos brancos, grip branco |
+Esta abordagem garante que:
+- Selecionar o mesmo programa ativo nao faz nada (dados intactos)
+- Trocar para um programa que ja foi usado antes reativa o registro original (periodos e scorecards preservados)
+- Criar novo so acontece quando o tipo nunca foi configurado
 
