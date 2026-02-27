@@ -112,24 +112,7 @@ export function SortableLeadCard({
 
   const urgency = getUrgencyLevel(lead);
 
-  // Get card background based on urgency/status
-  const getCardBackground = () => {
-    if (urgency.level === 'urgent') {
-      return 'bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-900';
-    }
-    if (urgency.level === 'today') {
-      return 'bg-orange-50/50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900';
-    }
-    if (normalizedDbStatus === 'won') {
-      return 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900';
-    }
-    if (normalizedDbStatus === 'lost') {
-      return 'bg-gray-50/50 dark:bg-gray-950/20 border-gray-200 dark:border-gray-900';
-    }
-    return 'bg-card';
-  };
 
-  const isMetaAdsLead = lead.source === 'facebook_leads';
 
   const handleClick = (e: React.MouseEvent) => {
     if (!isDragging) {
@@ -156,7 +139,7 @@ export function SortableLeadCard({
       <button
         type="button"
         aria-label="Arrastar"
-        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded p-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded p-1 text-white/50 hover:text-white/80 cursor-grab active:cursor-grabbing"
         {...attributes}
         {...listeners}
         onClick={(e) => e.stopPropagation()}
@@ -164,13 +147,12 @@ export function SortableLeadCard({
         <GripVertical className="h-4 w-4" />
       </button>
       <Card
-        className={`transition-all duration-200 cursor-pointer select-none ${
-          getCardBackground()
-        } ${
+        className={`transition-all duration-200 cursor-pointer select-none border-[#5a35a0] ${
           isDragging 
-            ? 'shadow-2xl border-primary/50 bg-background/95' 
-            : 'hover:shadow-lg hover:scale-[1.02] hover:border-border/50'
+            ? 'shadow-2xl border-primary/50' 
+            : 'hover:shadow-lg hover:shadow-purple-900/30 hover:scale-[1.02] hover:brightness-110'
         }`}
+        style={{ backgroundColor: '#4c2882' }}
         onClick={handleClick}
       >
       <CardContent className="p-3">
@@ -178,14 +160,14 @@ export function SortableLeadCard({
           {/* Header with Name and Actions */}
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <h4 className="font-medium text-sm leading-tight truncate">{lead.name}</h4>
+              <h4 className="font-medium text-sm leading-tight truncate text-white">{lead.name}</h4>
               {lead.position && (
-                <p className="text-xs text-muted-foreground truncate">{lead.position}</p>
+                <p className="text-xs text-white/60 truncate">{lead.position}</p>
               )}
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0">
+                <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 text-white/70 hover:text-white">
                   <MoreHorizontal className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
@@ -225,22 +207,22 @@ export function SortableLeadCard({
           </div>
           
           {/* Lead Information */}
-          <div className="text-xs space-y-1.5">
+          <div className="text-xs space-y-1.5 text-white/70">
             {lead.company && (
               <div className="flex items-center gap-1.5">
-                <Building className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                <Building className="h-3.5 w-3.5 flex-shrink-0 text-white/50" />
                 <span className="truncate">{lead.company}</span>
               </div>
             )}
             {lead.email && (
               <div className="flex items-center gap-1.5">
-                <Mail className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                <Mail className="h-3.5 w-3.5 flex-shrink-0 text-white/50" />
                 <span className="truncate">{lead.email}</span>
               </div>
             )}
             {lead.phone && (
               <div className="flex items-center gap-1.5">
-                <Phone className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                <Phone className="h-3.5 w-3.5 flex-shrink-0 text-white/50" />
                 <span className="truncate">{lead.phone}</span>
               </div>
             )}
@@ -248,18 +230,18 @@ export function SortableLeadCard({
               <div className="flex items-center gap-1.5">
                 <Calendar className={`h-3.5 w-3.5 flex-shrink-0 ${
                   urgency.level === 'urgent' ? 'text-red-500' : 
-                  urgency.level === 'today' ? 'text-orange-500' : 'text-muted-foreground'
+                  urgency.level === 'today' ? 'text-orange-500' : 'text-white/50'
                 }`} />
                 <span className={urgency.level !== 'normal' ? 'font-medium' : ''}>
                   {formatDate(lead.next_contact)}
                 </span>
               </div>
             )}
-            <div className="flex items-center gap-1.5 text-muted-foreground/70">
+            <div className="flex items-center gap-1.5 text-white/50">
               <Target className="h-3.5 w-3.5 flex-shrink-0" />
               <span className="capitalize">{translateSource(lead.source)}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-muted-foreground/70">
+            <div className="flex items-center gap-1.5 text-white/50">
               <Clock className="h-3.5 w-3.5 flex-shrink-0" />
               <span>
                 {formatDistanceToNow(new Date(lead.created_at), { 
