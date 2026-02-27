@@ -1,8 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { FunnelChart, Funnel, LabelList, ResponsiveContainer, Tooltip } from "recharts";
 import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 import { Info } from "lucide-react";
 
@@ -21,18 +20,21 @@ interface CRMFunnelChartProps {
 }
 
 const FUNNEL_COLORS = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
-  "hsl(var(--primary))", // Em contato (estágio novo)
-  "#22c55e", // Verde para Vendas
+  "#6C3FA0",
+  "#7E4DB8",
+  "#9061C9",
+  "#A478D8",
+  "#B88FE3",
+  "#CBA6ED",
+  "#22c55e",
 ];
 
+const FUNNEL_WIDTHS = [100, 85, 72, 59, 46, 33, 25];
+
 export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
   const funnelData = useMemo(() => {
-    // Filter by date range if provided
     let filteredLeads = leads;
     if (dateRange?.from && dateRange?.to) {
       filteredLeads = leads.filter(lead => {
@@ -41,7 +43,6 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
       });
     }
 
-    // Contagem por estágio do funil (acumulativo - considera que passou pelo estágio anterior)
     const totalLeads = filteredLeads.length;
 
     const contacting = filteredLeads.filter(l =>
@@ -66,7 +67,6 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
     
     const won = filteredLeads.filter(l => normalizeLeadStatusToDb(l.status) === 'won').length;
 
-    // Calculate conversion rates between stages
     const contactingRate = totalLeads > 0 ? ((contacting / totalLeads) * 100).toFixed(1) : "0";
     const qualifiedRate = contacting > 0 ? ((qualified / contacting) * 100).toFixed(1) : "0";
     const scheduledRate = qualified > 0 ? ((scheduled / qualified) * 100).toFixed(1) : "0";
@@ -75,48 +75,13 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
     const wonRate = proposals > 0 ? ((won / proposals) * 100).toFixed(1) : "0";
 
     return [
-      { 
-        name: "Leads", 
-        value: totalLeads, 
-        fill: FUNNEL_COLORS[0],
-        conversionRate: "100%"
-      },
-      {
-        name: "Em contato",
-        value: contacting,
-        fill: FUNNEL_COLORS[1],
-        conversionRate: `${contactingRate}%`
-      },
-      { 
-        name: "Qualificados", 
-        value: qualified, 
-        fill: FUNNEL_COLORS[2],
-        conversionRate: `${qualifiedRate}%`
-      },
-      { 
-        name: "Agendamentos", 
-        value: scheduled, 
-        fill: FUNNEL_COLORS[3],
-        conversionRate: `${scheduledRate}%`
-      },
-      { 
-        name: "Reuniões", 
-        value: meetings, 
-        fill: FUNNEL_COLORS[4],
-        conversionRate: `${meetingsRate}%`
-      },
-      { 
-        name: "Propostas", 
-        value: proposals, 
-        fill: FUNNEL_COLORS[5],
-        conversionRate: `${proposalsRate}%`
-      },
-      { 
-        name: "Vendas", 
-        value: won, 
-        fill: FUNNEL_COLORS[6],
-        conversionRate: `${wonRate}%`
-      },
+      { name: "Leads", value: totalLeads, fill: FUNNEL_COLORS[0], conversionRate: "100%" },
+      { name: "Em contato", value: contacting, fill: FUNNEL_COLORS[1], conversionRate: `${contactingRate}%` },
+      { name: "Qualificados", value: qualified, fill: FUNNEL_COLORS[2], conversionRate: `${qualifiedRate}%` },
+      { name: "Agendamentos", value: scheduled, fill: FUNNEL_COLORS[3], conversionRate: `${scheduledRate}%` },
+      { name: "Reuniões", value: meetings, fill: FUNNEL_COLORS[4], conversionRate: `${meetingsRate}%` },
+      { name: "Propostas", value: proposals, fill: FUNNEL_COLORS[5], conversionRate: `${proposalsRate}%` },
+      { name: "Vendas", value: won, fill: FUNNEL_COLORS[6], conversionRate: `${wonRate}%` },
     ];
   }, [leads, dateRange]);
 
@@ -126,7 +91,6 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
     return total > 0 ? ((won / total) * 100).toFixed(1) : "0";
   }, [funnelData]);
 
-  // No-show calculation
   const noShowData = useMemo(() => {
     let filtered = leads;
     if (dateRange?.from && dateRange?.to) {
@@ -136,13 +100,11 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
       });
     }
     const noShows = filtered.filter(l => normalizeLeadStatusToDb(l.status) === 'lost' && l.loss_reason === 'no_show').length;
-    const meetings = funnelData[4]?.value || 0; // Reuniões
-    const _scheduled = funnelData[3]?.value || 0; // Agendamentos
+    const meetings = funnelData[4]?.value || 0;
     const attendanceRate = (meetings + noShows) > 0 ? ((meetings / (meetings + noShows)) * 100).toFixed(1) : "100";
     return { noShows, attendanceRate };
   }, [leads, dateRange, funnelData]);
 
-  // Benchmarks
   const benchmarks = useMemo(() => {
     const convRate = parseFloat(generalConversionRate);
     const connectionRate = funnelData[0]?.value > 0
@@ -195,55 +157,66 @@ export function CRMFunnelChart({ leads, dateRange }: CRMFunnelChartProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <FunnelChart>
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    const data = payload[0].payload;
-                    return (
-                      <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
-                        <p className="font-semibold">{data.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Quantidade: <span className="text-foreground font-medium">{data.value}</span>
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Conversão: <span className="text-foreground font-medium">{data.conversionRate}</span>
-                        </p>
-                      </div>
-                    );
-                  }
-                  return null;
+        {/* Custom CSS Funnel */}
+        <div className="flex flex-col items-center gap-0 py-4">
+          {funnelData.map((stage, index) => {
+            const width = FUNNEL_WIDTHS[index];
+            const nextWidth = FUNNEL_WIDTHS[index + 1] ?? width * 0.7;
+            const isHovered = hoveredIndex === index;
+            const isLast = index === funnelData.length - 1;
+
+            // Trapezoid clip-path: top-left, top-right, bottom-right, bottom-left
+            const inset = ((width - nextWidth) / width) * 50;
+            const clipPath = isLast
+              ? "polygon(2% 0%, 98% 0%, 98% 100%, 2% 100%)"
+              : `polygon(0% 0%, 100% 0%, ${100 - inset}% 100%, ${inset}% 100%)`;
+
+            return (
+              <div
+                key={stage.name}
+                className="relative transition-all duration-300 ease-out cursor-pointer"
+                style={{
+                  width: `${width}%`,
+                  height: isHovered ? "58px" : "52px",
+                  clipPath,
+                  backgroundColor: stage.fill,
+                  marginTop: index === 0 ? 0 : "-1px",
+                  transform: isHovered ? "scale(1.03)" : "scale(1)",
+                  zIndex: isHovered ? 10 : 1,
+                  filter: isHovered ? "brightness(1.12)" : "brightness(1)",
+                  animationDelay: `${index * 80}ms`,
                 }}
-              />
-              <Funnel
-                dataKey="value"
-                data={funnelData}
-                isAnimationActive
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
               >
-                <LabelList
-                  position="right"
-                  fill="hsl(var(--foreground))"
-                  stroke="none"
-                  dataKey="name"
-                  fontSize={14}
-                  formatter={(value: string, _entry: any) => {
-                    const item = funnelData.find(d => d.name === value);
-                    return `${value} (${item?.value || 0})`;
-                  }}
-                />
-                <LabelList
-                  position="center"
-                  fill="white"
-                  stroke="none"
-                  dataKey="conversionRate"
-                  fontSize={12}
-                  fontWeight={600}
-                />
-              </Funnel>
-            </FunnelChart>
-          </ResponsiveContainer>
+                {/* Content overlay */}
+                <div className="absolute inset-0 flex items-center justify-center gap-2 sm:gap-3 px-2">
+                  <span className="text-white font-semibold text-xs sm:text-sm truncate">
+                    {stage.name}
+                  </span>
+                  <span className="text-white/90 font-bold text-sm sm:text-base">
+                    {stage.value}
+                  </span>
+                  <span className="text-white/70 text-[10px] sm:text-xs font-medium">
+                    {stage.conversionRate}
+                  </span>
+                </div>
+
+                {/* Hover tooltip */}
+                {isHovered && (
+                  <div className="absolute -right-2 top-1/2 -translate-y-1/2 translate-x-full z-20 bg-popover border border-border rounded-lg shadow-lg p-3 whitespace-nowrap pointer-events-none">
+                    <p className="font-semibold text-sm text-foreground">{stage.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Quantidade: <span className="text-foreground font-medium">{stage.value}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Conversão: <span className="text-foreground font-medium">{stage.conversionRate}</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* No-Show indicator */}
