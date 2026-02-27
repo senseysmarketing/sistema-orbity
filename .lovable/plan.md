@@ -1,82 +1,34 @@
 
 
-# Filtros Multiplos na Tela de Tarefas
+# Corrigir Dados Pre-populados no Modal de Edicao de Lead
 
-## Resumo
+## Problemas Identificados
 
-Converter os filtros de tarefas de selecao unica para selecao multipla, permitindo filtrar por varios clientes, usuarios, tipos, prioridades e status ao mesmo tempo.
+### 1. Campo "Origem" fica em branco
+O Select de Origem tem apenas 9 opcoes fixas (manual, website, social_media, etc.), mas leads capturados pelo Facebook tem `source = "facebook_leads"` ou `"facebook_ads"` -- valores que nao existem nas opcoes do Select. Como o Radix Select nao encontra um item com esse value, fica em branco.
 
-## O que muda para o usuario
+**Solucao**: Adicionar as opcoes `facebook_leads` (Facebook Leads) e `facebook_ads` (Facebook Ads) ao Select de Origem.
 
-- Cada filtro (Usuario, Cliente, Tipo, Prioridade) passa a aceitar multiplas selecoes simultaneas
-- O botao do filtro mostra quantos itens estao selecionados (ex: "3 clientes", "2 usuarios")
-- Clicar em um item ja selecionado desmarca-o
-- Opcoes especiais como "Sem Cliente" e "Nao atribuido" continuam funcionando junto com as demais selecoes
-- O filtro de Status permanece como esta (ja controlado pelo Kanban visualmente)
-- Botao de limpar filtros continua funcionando
+### 2. Campo "Etapa do Funil" fica em branco
+O `useEffect` que popula o formulario depende apenas de `[lead]`, mas as funcoes de mapeamento de status (`getStatusKey`, `mapDatabaseStatusToDisplay`) dependem do array `statuses` que carrega de forma assincrona do Supabase. Quando o efeito roda antes dos statuses carregarem, o mapeamento falha e o valor fica vazio. Alem disso, status customizados como "Desqualificados" passam por uma cadeia de normalizacao que pode nao resolver corretamente.
 
-## Detalhes Tecnicos
+**Solucao**: Adicionar `statuses` e `statusesLoading` as dependencias do `useEffect`, para que o formulario seja re-populado quando os status terminarem de carregar.
 
-### Arquivo: `src/pages/Tasks.tsx`
+## Alteracoes
 
-**1. Converter estados de filtro de `string` para `string[]`**
+### Arquivo: `src/components/crm/LeadForm.tsx`
 
-Antes:
-```ts
-const [priorityFilter, setPriorityFilter] = useState<string>("all");
-const [assignedFilter, setAssignedFilter] = useState<string>("all");
-const [clientFilter, setClientFilter] = useState<string>("all");
-const [typeFilter, setTypeFilter] = useState<string>("all");
-```
+**1. Adicionar opcoes de Facebook ao Select de Origem**
 
-Depois:
-```ts
-const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
-const [assignedFilter, setAssignedFilter] = useState<string[]>([]);
-const [clientFilter, setClientFilter] = useState<string[]>([]);
-const [typeFilter, setTypeFilter] = useState<string[]>([]);
-```
+Adicionar dois novos `SelectItem`:
+- `facebook_leads` -> "Facebook Leads"
+- `facebook_ads` -> "Facebook Ads"
 
-Array vazio = "todos" (sem filtro ativo).
+**2. Corrigir dependencias do useEffect**
 
-**2. Atualizar logica de filtragem no `filteredTasks` useMemo**
+Mudar de `[lead]` para `[lead, statuses]`, garantindo que quando os statuses carregarem, o formulario re-popula com o valor correto.
 
-- `matchesPriority`: `priorityFilter.length === 0 || priorityFilter.includes(task.priority)`
-- `matchesType`: `typeFilter.length === 0 || typeFilter.includes(task.task_type)`
-- `matchesAssigned`: se array vazio = todos; se inclui "unassigned" verifica sem atribuicao; demais verifica se algum dos usuarios atribuidos esta no filtro
-- `matchesClient`: se array vazio = todos; se inclui "no-client" aceita tasks sem cliente; demais verifica se `task.client_id` esta no array
+**3. Melhorar logica de mapeamento de status para edicao**
 
-**3. Converter UI dos filtros para multi-select com Popover + Command (checkboxes)**
-
-Cada filtro sera um Popover com CommandList onde cada item tem um Checkbox. Padrao similar ao filtro de cliente existente, mas com toggle em vez de selecao unica.
-
-- **Filtro de Usuario**: Popover com lista de usuarios + opcao "Nao atribuido". Label do botao: "Todos Usuarios" quando vazio, "X usuarios" quando selecionados.
-- **Filtro de Cliente**: Manter o Combobox com busca, mas com toggle multi-select. Label: "Todos Clientes" / "X clientes".
-- **Filtro de Prioridade**: Popover com Alta/Media/Baixa como checkboxes. Label: "Prioridade" / "X prioridades".
-- **Filtro de Tipo**: Popover com tipos dinamicos como checkboxes. Label: "Todos os Tipos" / "X tipos".
-
-**4. Atualizar `clearFilters`**
-
-```ts
-const clearFilters = () => {
-  setSearchTerm("");
-  setStatusFilter("all");
-  setPriorityFilter([]);
-  setAssignedFilter([]);
-  setClientFilter([]);
-  setTypeFilter([]);
-  setDueDateRange(undefined);
-  setIncludeNoDueDate(false);
-};
-```
-
-**5. Atualizar condicao de exibicao do botao limpar filtros**
-
-Trocar `!== "all"` por `.length > 0` para os filtros convertidos.
-
-### Arquivo modificado
-
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/pages/Tasks.tsx` | Converter 4 filtros para multi-select com arrays e UI de checkboxes |
+Tornar o mapeamento mais robusto: se o status do lead ja corresponde diretamente a um `statusKey` existente (comparacao direta com `getStatusKey(status.name)`), usar esse valor. Caso contrario, passar pela cadeia de normalizacao. Isso cobre tanto status canonicos quanto customizados.
 
