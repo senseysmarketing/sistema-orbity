@@ -113,13 +113,13 @@ export function TaskCard({
 
   return (
     <div 
-      className="p-3 md:p-4 rounded-lg border cursor-pointer hover:shadow-md hover:brightness-95 transition-all"
+      className="p-3 md:p-4 rounded-lg border border-[hsl(266,62%,20%)] cursor-pointer hover:shadow-lg hover:shadow-purple-900/30 hover:brightness-110 transition-all"
       onClick={(e) => onClick?.(e)}
-      style={{ backgroundColor: clientColor.replace(')', ' / 0.1)').replace('hsl(', 'hsl(') }}
+      style={{ backgroundColor: 'hsl(266, 62%, 12%)' }}
     >
       {/* Linha 1: Ícone Status + Badges */}
       <div className="flex items-center justify-between gap-2 mb-2">
-        <StatusIcon className="h-5 w-5 flex-shrink-0" />
+        <StatusIcon className="h-5 w-5 flex-shrink-0 text-white" />
         <div className="flex gap-1 flex-nowrap overflow-x-auto scrollbar-hide">
           {task.task_type && (getTypeShortName || getTypeName) && (
             <Badge className={`${getTypeColor(task.task_type)} text-xs whitespace-nowrap flex-shrink-0 border-0`}>
@@ -139,16 +139,16 @@ export function TaskCard({
       </div>
 
       {/* Linha 2: Título */}
-      <h3 className="font-semibold text-sm md:text-base line-clamp-2 break-words mb-2 md:mb-3">{task.title}</h3>
+      <h3 className="font-semibold text-sm md:text-base line-clamp-2 break-words mb-2 md:mb-3 text-white">{task.title}</h3>
       
       {task.description && (
-        <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+        <p className="text-sm text-white/70 mb-2 line-clamp-2">
           {task.description}
         </p>
       )}
       
       {/* Linha 3: Data + Badge Cliente */}
-      <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+      <div className="flex items-center justify-between text-xs text-white/60 mb-2">
         {task.due_date && (
           <span>
             {formatDateBR(task.due_date)}
@@ -163,7 +163,7 @@ export function TaskCard({
       </div>
 
       {assignedUsers.length > 0 && (
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-xs text-white/60">
           <Users className="h-3 w-3" />
           <div className="flex flex-wrap gap-1">
             {assignedUsers.slice(0, 2).map((assignment, i) => (
