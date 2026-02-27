@@ -1,34 +1,92 @@
 
+# Funil de Vendas com Design Custom em CSS (Degrade Roxo)
 
-# Corrigir Dados Pre-populados no Modal de Edicao de Lead
+## Resumo
 
-## Problemas Identificados
+Substituir o componente `FunnelChart` do Recharts (que tem visual limitado e dificil de estilizar) por um **funil custom feito com HTML/CSS puro**. O novo funil tera:
 
-### 1. Campo "Origem" fica em branco
-O Select de Origem tem apenas 9 opcoes fixas (manual, website, social_media, etc.), mas leads capturados pelo Facebook tem `source = "facebook_leads"` ou `"facebook_ads"` -- valores que nao existem nas opcoes do Select. Como o Radix Select nao encontra um item com esse value, fica em branco.
+- Formato trapezoidal classico de funil, com cada etapa mais estreita que a anterior
+- Degrade roxo do sistema (do roxo escuro `#1c102f` da sidebar ate tons mais claros)
+- Labels com nome da etapa, quantidade e taxa de conversao integrados
+- Hover interativo com tooltip
+- Animacao suave de entrada
+- Totalmente responsivo
 
-**Solucao**: Adicionar as opcoes `facebook_leads` (Facebook Leads) e `facebook_ads` (Facebook Ads) ao Select de Origem.
+## O que muda visualmente
 
-### 2. Campo "Etapa do Funil" fica em branco
-O `useEffect` que popula o formulario depende apenas de `[lead]`, mas as funcoes de mapeamento de status (`getStatusKey`, `mapDatabaseStatusToDisplay`) dependem do array `statuses` que carrega de forma assincrona do Supabase. Quando o efeito roda antes dos statuses carregarem, o mapeamento falha e o valor fica vazio. Alem disso, status customizados como "Desqualificados" passam por uma cadeia de normalizacao que pode nao resolver corretamente.
+- Em vez do grafico Recharts (que renderiza um SVG generico meio "achatado"), teremos barras trapezoidais empilhadas verticalmente com `clip-path` para criar o efeito de funil
+- Cada barra tem uma cor em degrade roxo: topo mais escuro, base (Vendas) em verde esmeralda
+- A largura de cada barra diminui proporcionalmente (100% no topo, menor na base)
+- Informacoes (nome, quantidade, taxa) ficam diretamente sobre cada barra
+- O visual fica moderno, limpo e alinhado com a identidade visual roxa do sistema
 
-**Solucao**: Adicionar `statuses` e `statusesLoading` as dependencias do `useEffect`, para que o formulario seja re-populado quando os status terminarem de carregar.
+## Paleta de cores do funil
 
-## Alteracoes
+```text
+Leads         -> #6C3FA0  (roxo vibrante)
+Em contato    -> #7E4DB8  (roxo medio)
+Qualificados  -> #9061C9  (roxo claro)
+Agendamentos  -> #A478D8  (lavanda)
+Reunioes      -> #B88FE3  (lavanda claro)
+Propostas     -> #CBA6ED  (lilas)
+Vendas        -> #22c55e  (verde - destaque de sucesso)
+```
 
-### Arquivo: `src/components/crm/LeadForm.tsx`
+## Detalhes Tecnicos
 
-**1. Adicionar opcoes de Facebook ao Select de Origem**
+### Arquivo: `src/components/crm/CRMFunnelChart.tsx`
 
-Adicionar dois novos `SelectItem`:
-- `facebook_leads` -> "Facebook Leads"
-- `facebook_ads` -> "Facebook Ads"
+**1. Remover dependencia do Recharts FunnelChart**
 
-**2. Corrigir dependencias do useEffect**
+Remover imports de `FunnelChart`, `Funnel`, `LabelList`, `ResponsiveContainer`, `Tooltip` do recharts.
 
-Mudar de `[lead]` para `[lead, statuses]`, garantindo que quando os statuses carregarem, o formulario re-popula com o valor correto.
+**2. Substituir o bloco SVG por funil CSS custom**
 
-**3. Melhorar logica de mapeamento de status para edicao**
+Cada etapa do funil sera um `div` com:
+- Largura proporcional (ex: primeiro = 100%, ultimo = ~30%)
+- `clip-path: polygon(...)` para criar formato trapezoidal
+- Background com a cor correspondente do degrade roxo
+- Transicao suave no hover (leve expansao e sombra)
+- Label centralizado com nome + quantidade + taxa de conversao
 
-Tornar o mapeamento mais robusto: se o status do lead ja corresponde diretamente a um `statusKey` existente (comparacao direta com `getStatusKey(status.name)`), usar esse valor. Caso contrario, passar pela cadeia de normalizacao. Isso cobre tanto status canonicos quanto customizados.
+**3. Manter toda a logica de calculo existente**
 
+Os `useMemo` de `funnelData`, `generalConversionRate`, `noShowData` e `benchmarks` permanecem identicos. Apenas a renderizacao visual muda.
+
+**4. Manter secoes inferiores intactas**
+
+As secoes de No-Show indicator, conversion rates entre etapas e benchmarks continuam exatamente como estao.
+
+### Estrutura do funil custom
+
+```text
++--------------------------------------------------+
+|              Leads (57) - 100%                    |   <- largura 100%
++--------------------------------------------------+
+    +------------------------------------------+
+    |        Em contato (8) - 14.0%            |       <- largura ~85%
+    +------------------------------------------+
+        +----------------------------------+
+        |     Qualificados (5) - 62.5%     |           <- largura ~72%
+        +----------------------------------+
+            +--------------------------+
+            |  Agendamentos (5) - 100% |               <- largura ~59%
+            +--------------------------+
+                +--------------------+
+                | Reunioes (5) - 100%|                  <- largura ~46%
+                +--------------------+
+                    +--------------+
+                    |Propostas (4) |                    <- largura ~33%
+                    +--------------+
+                        +--------+
+                        |Vendas 2|                      <- largura ~25%
+                        +--------+
+```
+
+Cada barra tem um `margin: 0 auto` para centralizar e `border-radius` sutil nas bordas.
+
+### Arquivo modificado
+
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/components/crm/CRMFunnelChart.tsx` | Substituir Recharts FunnelChart por funil CSS custom com degrade roxo |
