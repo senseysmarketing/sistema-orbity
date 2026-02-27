@@ -42,12 +42,26 @@ export default function Goals() {
   };
 
   const handleSelectProgram = async (type: string) => {
+    // Se o tipo selecionado é o mesmo do programa ativo, apenas voltar
+    if (activeProgram && activeProgram.program_type === type) {
+      setShowSelector(false);
+      return;
+    }
+
     if (type !== "ppr") {
       toast({ title: "Em breve", description: "Este modelo estará disponível em breve." });
       return;
     }
 
-    // Deactivate existing
+    // Verificar se já existe um programa deste tipo (mesmo inativo) para a agência
+    const { data: existing } = await supabase
+      .from("bonus_programs")
+      .select("*")
+      .eq("agency_id", currentAgency!.id)
+      .eq("program_type", type)
+      .maybeSingle();
+
+    // Desativar o programa atual
     if (activeProgram) {
       await supabase
         .from("bonus_programs")
@@ -55,23 +69,37 @@ export default function Goals() {
         .eq("id", activeProgram.id);
     }
 
-    const names: Record<string, string> = {
-      ppr: "Participação nos Resultados (PPR)",
-      salary_multiplier: "Multiplicador de Salário",
-      spot_bonus: "Bônus Fixo por Meta",
-    };
+    if (existing) {
+      // Reativar o programa existente (preserva períodos e dados)
+      const { error } = await supabase
+        .from("bonus_programs")
+        .update({ is_active: true } as Record<string, unknown>)
+        .eq("id", existing.id);
 
-    const { error } = await supabase.from("bonus_programs").insert([{
-      agency_id: currentAgency!.id,
-      program_type: type,
-      name: names[type],
-      is_active: true,
-      config: { bonus_pool_percent: 10, nps_target: 60, period_type: "quarterly" },
-    }]);
+      if (error) {
+        toast({ title: "Erro", description: error.message, variant: "destructive" });
+        return;
+      }
+    } else {
+      // Criar novo apenas se nunca existiu
+      const names: Record<string, string> = {
+        ppr: "Participação nos Resultados (PPR)",
+        salary_multiplier: "Multiplicador de Salário",
+        spot_bonus: "Bônus Fixo por Meta",
+      };
 
-    if (error) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-      return;
+      const { error } = await supabase.from("bonus_programs").insert([{
+        agency_id: currentAgency!.id,
+        program_type: type,
+        name: names[type],
+        is_active: true,
+        config: { bonus_pool_percent: 10, nps_target: 60, period_type: "quarterly" },
+      }]);
+
+      if (error) {
+        toast({ title: "Erro", description: error.message, variant: "destructive" });
+        return;
+      }
     }
 
     setShowSelector(false);
