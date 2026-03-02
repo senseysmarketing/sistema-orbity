@@ -74,6 +74,7 @@ interface MonthlyFinancial {
   netProfit: number;
   bonusPool: number;
   isFuture: boolean;
+  isCurrentMonth: boolean;
 }
 
 export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
@@ -173,7 +174,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
     for (const month of months) {
       const monthStart = format(startOfMonth(month), "yyyy-MM-dd");
       const monthEnd = format(endOfMonth(month), "yyyy-MM-dd");
-      const monthIsFuture = isFuture(endOfMonth(month));
+      
 
       const [paymentsRes, expensesRes, salariesRes] = await Promise.all([
         supabase
@@ -205,6 +206,11 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
       const netProfit = revenue - expensesTotal - salariesTotal;
       const bonusPool = Math.max(0, netProfit * (poolPercent / 100));
 
+      const monthStartDate = startOfMonth(month);
+      const monthEndDate = endOfMonth(month);
+      const isStrictlyFuture = isFuture(monthStartDate);
+      const isCurrentMo = !isStrictlyFuture && isFuture(monthEndDate);
+
       results.push({
         month,
         label: format(month, "MMMM", { locale: ptBR }),
@@ -213,7 +219,8 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
         salaries: salariesTotal,
         netProfit,
         bonusPool,
-        isFuture: monthIsFuture && revenue === 0,
+        isFuture: isStrictlyFuture,
+        isCurrentMonth: isCurrentMo,
       });
     }
 
@@ -559,7 +566,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
                       <td className="p-3 font-medium text-foreground">📈 Lucro Líquido (R$)</td>
                       {monthlyData.map((m) => (
                         <td key={m.label} className="text-center p-3">
-                          {m.isFuture ? (
+                          {m.isFuture || m.isCurrentMonth ? (
                             <span className="text-muted-foreground text-xs">Aguardando</span>
                           ) : (
                             <span className={`font-medium ${m.netProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
@@ -580,7 +587,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
                       <td className="p-3 font-medium text-foreground">🎁 Pote de Bônus ({selectedPeriod.bonus_pool_percent}%)</td>
                       {monthlyData.map((m) => (
                         <td key={m.label} className="text-center p-3">
-                          {m.isFuture ? (
+                          {m.isFuture || m.isCurrentMonth ? (
                             <span className="text-muted-foreground text-xs">Aguardando</span>
                           ) : (
                             <span className="font-medium text-amber-600 dark:text-amber-400">{formatCurrency(m.bonusPool)}</span>
