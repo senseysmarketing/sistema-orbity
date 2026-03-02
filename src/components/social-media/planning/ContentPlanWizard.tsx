@@ -61,6 +61,16 @@ const VOICE_TONES = [
   { value: "humanizado", label: "Humanizado" },
 ];
 
+const WEEKDAYS = [
+  { value: "seg", label: "Seg" },
+  { value: "ter", label: "Ter" },
+  { value: "qua", label: "Qua" },
+  { value: "qui", label: "Qui" },
+  { value: "sex", label: "Sex" },
+  { value: "sab", label: "Sáb" },
+  { value: "dom", label: "Dom" },
+];
+
 const STEP_LABELS = ["Contexto", "Frequência", "Estilo", "Direcionamento", "IA"];
 
 export function ContentPlanWizard({ open, onClose, onGenerate, generating }: ContentPlanWizardProps) {
@@ -74,10 +84,13 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
     strategicFocus: "",
     postsPerWeek: 3,
     storiesPerWeek: 5,
-    includeReels: true,
     includeInteractive: false,
     includeHolidays: true,
     period: "next_month",
+    preferredDays: [],
+    dayDistribution: "",
+    preferredTimes: "",
+    frequencyNotes: "",
     contentTypes: ["educativo", "autoridade", "conversao"],
     formats: ["carrossel", "feed", "reels"],
     voiceTone: "profissional",
@@ -128,9 +141,9 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
     setData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const toggleArrayItem = (key: "objectives" | "contentTypes" | "formats", value: string) => {
+  const toggleArrayItem = (key: "objectives" | "contentTypes" | "formats" | "preferredDays", value: string) => {
     setData((prev) => {
-      const arr = prev[key];
+      const arr = prev[key] as string[];
       return { ...prev, [key]: arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value] };
     });
   };
@@ -234,10 +247,6 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Incluir Reels?</Label>
-                <Switch checked={data.includeReels} onCheckedChange={(v) => updateField("includeReels", v)} />
-              </div>
-              <div className="flex items-center justify-between">
                 <Label>Incluir conteúdo interativo?</Label>
                 <Switch checked={data.includeInteractive} onCheckedChange={(v) => updateField("includeInteractive", v)} />
               </div>
@@ -245,6 +254,52 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
                 <Label>Incluir datas comemorativas?</Label>
                 <Switch checked={data.includeHolidays} onCheckedChange={(v) => updateField("includeHolidays", v)} />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Dias de postagem preferidos</Label>
+              <p className="text-xs text-muted-foreground">Selecione os dias em que prefere publicar</p>
+              <div className="flex flex-wrap gap-2">
+                {WEEKDAYS.map((day) => (
+                  <Badge
+                    key={day.value}
+                    variant={data.preferredDays.includes(day.value) ? "default" : "outline"}
+                    className="cursor-pointer text-sm py-1.5 px-3"
+                    onClick={() => toggleArrayItem("preferredDays", day.value)}
+                  >
+                    {day.label}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Distribuição por dia</Label>
+              <Textarea
+                value={data.dayDistribution}
+                onChange={(e) => updateField("dayDistribution", e.target.value)}
+                placeholder="Ex: Segunda: educativo, Quarta: conversão, Sexta: bastidores..."
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Horários preferidos</Label>
+              <Input
+                value={data.preferredTimes}
+                onChange={(e) => updateField("preferredTimes", e.target.value)}
+                placeholder="Ex: 9h, 12h e 18h"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Observações de frequência</Label>
+              <Textarea
+                value={data.frequencyNotes}
+                onChange={(e) => updateField("frequencyNotes", e.target.value)}
+                placeholder="Ex: Nunca postar no domingo, intensificar na última semana do mês..."
+                rows={3}
+              />
             </div>
 
             <div className="space-y-2">
@@ -386,7 +441,6 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
               <p className="text-sm font-medium">Resumo do planejamento:</p>
               <p className="text-sm text-muted-foreground">
                 <strong>{data.clientName}</strong> — {data.postsPerWeek} posts/sem + {data.storiesPerWeek} stories/sem
-                {data.includeReels && " + Reels"}
               </p>
               <p className="text-sm text-muted-foreground">
                 Objetivos: {data.objectives.map((o) => OBJECTIVES.find((obj) => obj.value === o)?.label).join(", ")}
@@ -394,6 +448,14 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
               <p className="text-sm text-muted-foreground">
                 Tom: {VOICE_TONES.find((t) => t.value === data.voiceTone)?.label}
               </p>
+              {data.preferredDays.length > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Dias: {data.preferredDays.map((d) => WEEKDAYS.find((w) => w.value === d)?.label).join(", ")}
+                </p>
+              )}
+              {data.preferredTimes && (
+                <p className="text-sm text-muted-foreground">Horários: {data.preferredTimes}</p>
+              )}
             </div>
           </div>
         );
