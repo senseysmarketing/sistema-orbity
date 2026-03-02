@@ -71,7 +71,12 @@ export function ContentPlanDetailsSheet({ plan, open, onClose, onCreateTasks, ed
 
   if (!plan) return null;
 
-  const items = plan.content_plan_items || [];
+  const items = [...(plan.content_plan_items || [])].sort((a, b) => {
+    if (!a.post_date && !b.post_date) return 0;
+    if (!a.post_date) return 1;
+    if (!b.post_date) return -1;
+    return a.post_date.localeCompare(b.post_date);
+  });
   const plannedItems = items.filter((i) => i.status === "planned");
   const taskCreated = items.filter((i) => i.status !== "planned").length;
   const progress = items.length > 0 ? Math.round((taskCreated / items.length) * 100) : 0;
