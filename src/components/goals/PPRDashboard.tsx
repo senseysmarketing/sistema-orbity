@@ -272,11 +272,13 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
   }, [npsStats.nps, selectedPeriodId]);
 
   const handleCreatePeriod = () => {
+    if (!isAdmin) return;
     setConfigMode("create");
     setShowConfig(true);
   };
 
   const handleCreateFromDialog = async (data: Record<string, unknown>) => {
+    if (!isAdmin) return;
     const { error } = await supabase.from("bonus_periods").insert([{
       agency_id: agencyId,
       program_id: program.id,
@@ -297,7 +299,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
   };
 
   const handleDeletePeriod = async () => {
-    if (!selectedPeriodId) return;
+    if (!isAdmin || !selectedPeriodId) return;
     const { error } = await supabase
       .from("bonus_periods")
       .delete()
@@ -318,6 +320,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
   };
 
   const handleDeleteNpsResponse = async (id: string) => {
+    if (!isAdmin) return;
     const { error } = await supabase.from("nps_responses").delete().eq("id", id);
     if (error) {
       toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
@@ -327,6 +330,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
   };
 
   const startEditNps = (r: NpsResponse) => {
+    if (!isAdmin) return;
     setEditingNps(r);
     setEditNpsName(r.client_name);
     setEditNpsScore(r.score);
@@ -341,7 +345,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
   };
 
   const handleSaveEditNps = async () => {
-    if (!editingNps) return;
+    if (!isAdmin || !editingNps) return;
     const { error } = await supabase
       .from("nps_responses")
       .update({
@@ -365,6 +369,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
     field: string,
     value: number
   ) => {
+    if (!isAdmin) return;
     const existing = scorecards.find((s) => s.employee_id === employeeId);
     const poolAmount = selectedPeriod?.bonus_pool_amount || 0;
     const numEmployees = employees.length || 1;
@@ -405,7 +410,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
   };
 
   const handlePeriodUpdate = async (updates: Partial<BonusPeriod>) => {
-    if (!selectedPeriodId) return;
+    if (!isAdmin || !selectedPeriodId) return;
 
     const period = { ...selectedPeriod, ...updates };
     const poolAmount = (period.net_profit || 0) * ((period.bonus_pool_percent || 10) / 100);

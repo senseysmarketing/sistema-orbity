@@ -42,6 +42,7 @@ export default function Goals() {
   };
 
   const handleSelectProgram = async (type: string) => {
+    if (!isAdmin) return;
     // Se o tipo selecionado é o mesmo do programa ativo, apenas voltar
     if (activeProgram && activeProgram.program_type === type) {
       setShowSelector(false);
@@ -128,10 +129,20 @@ export default function Goals() {
             </Button>
           )}
         </div>
-        <p className="text-muted-foreground">
-          Escolha o modelo de bonificação que melhor se encaixa na sua agência.
-        </p>
-        <ProgramSelector onSelect={handleSelectProgram} />
+        {isAdmin ? (
+          <>
+            <p className="text-muted-foreground">
+              Escolha o modelo de bonificação que melhor se encaixa na sua agência.
+            </p>
+            <ProgramSelector onSelect={handleSelectProgram} />
+          </>
+        ) : (
+          <div className="text-center py-16 space-y-2">
+            <Trophy className="h-12 w-12 text-muted-foreground mx-auto" />
+            <h3 className="text-lg font-medium text-foreground">Nenhum programa configurado</h3>
+            <p className="text-muted-foreground">Solicite ao administrador da agência para configurar um programa de bônus.</p>
+          </div>
+        )}
       </div>
     );
   }
