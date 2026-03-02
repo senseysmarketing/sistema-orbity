@@ -13,6 +13,25 @@ interface WeeklySummaryDialogProps {
   onClose: () => void;
 }
 
+const FORMAT_EMOJI: Record<string, string> = {
+  carrossel: "🎠",
+  reels: "🎬",
+  feed: "📸",
+  stories: "📱",
+  video: "🎥",
+};
+
+function getFormatEmoji(format?: string | null): string {
+  if (!format) return "📌";
+  const key = format.toLowerCase().trim();
+  return FORMAT_EMOJI[key] || "📌";
+}
+
+function getDayAbbr(date: Date): string {
+  const name = format(date, "EEE", { locale: ptBR });
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 function generateSummaryText(plan: ContentPlan): string {
   const items = plan.content_plan_items || [];
   const clientName = plan.clients?.name || "Cliente";
@@ -37,50 +56,36 @@ function generateSummaryText(plan: ContentPlan): string {
 
   const sortedWeeks = [...weeks.entries()].sort(([a], [b]) => a.localeCompare(b));
 
-  let text = `Bom dia! Aproveitando o início da semana, abaixo segue os conteúdos que vamos produzir para as redes sociais de ${clientName}! Qualquer alteração ou sugestão de conteúdo pode me acionar! 🌤️\n`;
+  let text = `Olá! Segue o planejamento de conteúdo da semana para *${clientName}* 📱\n`;
 
   sortedWeeks.forEach(([, week], idx) => {
     const startStr = format(week.start, "dd/MM", { locale: ptBR });
     const endStr = format(week.end, "dd/MM", { locale: ptBR });
     const count = week.items.length;
-    const plural = count === 1 ? "Conteúdo" : "Conteúdos";
 
-    text += `\n--- Semana ${idx + 1} (${startStr} a ${endStr}) – ${count} ${plural} ---\n\n`;
+    text += `\n*Semana ${idx + 1} (${startStr} a ${endStr}) – ${count} post${count !== 1 ? "s" : ""}*\n\n`;
 
-    week.items.forEach((item, i) => {
+    week.items.forEach((item) => {
       const date = new Date(item.post_date! + "T12:00:00");
-      const dayName = format(date, "EEEE", { locale: ptBR });
+      const dayAbbr = getDayAbbr(date);
       const dayFormatted = format(date, "dd/MM", { locale: ptBR });
-      const capitalDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      const emoji = getFormatEmoji(item.format);
 
-      text += `${i + 1}. ${item.title} [${capitalDay}, ${dayFormatted}]\n`;
-      if (item.description) {
-        text += `   🎯 Tema: ${item.description}\n`;
-      }
-      const parts: string[] = [];
-      if (item.format) parts.push(`🎥 Formato: ${item.format}`);
-      if (item.platform) parts.push(`📱 Plataforma: ${item.platform}`);
-      if (parts.length > 0) {
-        text += `   ${parts.join(" | ")}\n`;
-      }
-      text += "\n";
+      text += `📅 ${dayAbbr} ${dayFormatted} — ${emoji} ${item.title}\n`;
     });
   });
 
   if (withoutDate.length > 0) {
-    text += `\n--- Sem data definida – ${withoutDate.length} Conteúdo${withoutDate.length > 1 ? "s" : ""} ---\n\n`;
-    withoutDate.forEach((item, i) => {
-      text += `${i + 1}. ${item.title}\n`;
-      if (item.description) text += `   🎯 Tema: ${item.description}\n`;
-      const parts: string[] = [];
-      if (item.format) parts.push(`🎥 Formato: ${item.format}`);
-      if (item.platform) parts.push(`📱 Plataforma: ${item.platform}`);
-      if (parts.length > 0) text += `   ${parts.join(" | ")}\n`;
-      text += "\n";
+    text += `\n*Sem data definida – ${withoutDate.length} post${withoutDate.length !== 1 ? "s" : ""}*\n\n`;
+    withoutDate.forEach((item) => {
+      const emoji = getFormatEmoji(item.format);
+      text += `📌 ${emoji} ${item.title}\n`;
     });
   }
 
-  return text.trimEnd();
+  text += `\nQualquer ajuste é só me chamar! ✅`;
+
+  return text;
 }
 
 export function WeeklySummaryDialog({ plan, open, onClose }: WeeklySummaryDialogProps) {
