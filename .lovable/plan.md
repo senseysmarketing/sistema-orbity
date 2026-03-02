@@ -1,44 +1,64 @@
 
-
-# Melhorar Step de Frequencia e Remover Redundancia de Reels
+# Corrigir CONTENT_PLANNING_TOOLS vazio na Edge Function
 
 ## Problema
 
-1. O toggle "Incluir Reels?" no step 2 (Frequencia) e redundante com a selecao de "Reels" nos formatos preferidos do step 3 (Estilo)
-2. O step de Frequencia nao oferece campos para direcionar dias especificos de postagem, prioridades por dia ou outras instrucoes de distribuicao
+O array `CONTENT_PLANNING_TOOLS` no arquivo `supabase/functions/ai-assist/index.ts` (linhas 125-127) esta vazio -- contendo apenas um comentario placeholder `// ... keep existing code` de uma edicao anterior. Isso faz com que a chamada ao AI gateway falhe porque o `toolChoice` referencia a funcao `extract_content_plan` que nao existe no array de tools enviado.
 
 ## Solucao
 
-### 1. Remover toggle "Incluir Reels?"
+Reconstruir o `CONTENT_PLANNING_TOOLS` com a definicao completa da funcao `extract_content_plan`, que deve gerar um plano de conteudo mensal estruturado.
 
-- Remover o toggle `includeReels` do step 2
-- Remover a propriedade `includeReels` da interface `WizardData` em `useContentPlanning.tsx`
-- Remover a referencia a `includeReels` no resumo do step 5
-- A definicao de Reels fica exclusivamente no step 3 via selecao de formatos
+### Arquivo: `supabase/functions/ai-assist/index.ts`
 
-### 2. Adicionar novos campos ao step de Frequencia
+Substituir as linhas 125-127 pela definicao completa do tool:
 
-Novos campos no step 2:
+```typescript
+const CONTENT_PLANNING_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "extract_content_plan",
+      description: "Gere um planejamento mensal de conteudo para redes sociais.",
+      parameters: {
+        type: "object",
+        properties: {
+          plan_title: { type: "string", description: "Titulo do planejamento" },
+          strategy_summary: { type: "string", description: "Resumo da estrategia do mes" },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                day_number: { type: "number" },
+                post_date: { type: "string", description: "Data no formato YYYY-MM-DD" },
+                title: { type: "string" },
+                description: { type: "string", description: "Legenda completa do post" },
+                content_type: { type: "string" },
+                format: { type: "string", enum: ["carrossel", "feed", "reels", "stories", "video"] },
+                platform: { type: "string" },
+                creative_instructions: { type: "string", description: "Instrucoes detalhadas para o designer" },
+                objective: { type: "string" },
+                hashtags: { type: "string", description: "Hashtags separadas por espaco, cada uma com #" },
+              },
+              required: ["day_number", "post_date", "title", "description", "content_type", "format", "platform", "creative_instructions", "objective", "hashtags"],
+            },
+          },
+        },
+        required: ["plan_title", "strategy_summary", "items"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+```
 
-- **Dias de postagem preferidos**: Selecao multipla dos dias da semana (seg-dom) via badges clicaveis para o usuario indicar em quais dias prefere publicar
-- **Distribuicao por dia**: Campo textarea para o usuario dar direcoes sobre que tipo de conteudo priorizar em cada dia (ex: "Segunda: educativo, Quarta: conversao, Sexta: bastidores")
-- **Horarios preferidos**: Campo texto para indicar faixa de horarios ideais (ex: "9h, 12h e 18h")
-- **Observacoes de frequencia**: Textarea livre para instrucoes adicionais sobre ritmo e distribuicao (ex: "Nunca postar no domingo", "Intensificar na ultima semana do mes")
+### Deploy
 
-### Detalhes Tecnicos
+Apos a alteracao, a edge function precisa ser redeployada para que a correcao tenha efeito.
 
-**Arquivo: `src/hooks/useContentPlanning.tsx`**
-- Remover `includeReels` da interface `WizardData`
-- Adicionar novos campos:
-  - `preferredDays: string[]` (dias da semana selecionados)
-  - `dayDistribution: string` (direcao de conteudo por dia)
-  - `preferredTimes: string` (horarios preferidos)
-  - `frequencyNotes: string` (observacoes adicionais)
+## Resumo
 
-**Arquivo: `src/components/social-media/planning/ContentPlanWizard.tsx`**
-- Remover o toggle de Reels do step 2
-- Adicionar os 4 novos campos ao step 2
-- Remover referencia a `includeReels` no resumo do step 5
-- Adicionar constante `WEEKDAYS` para selecao de dias
-- Atualizar estado inicial com os novos campos
-
+| Arquivo | Alteracao |
+|---------|-----------|
+| `supabase/functions/ai-assist/index.ts` | Reconstruir CONTENT_PLANNING_TOOLS com a definicao completa do tool extract_content_plan |
