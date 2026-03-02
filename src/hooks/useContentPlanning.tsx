@@ -50,12 +50,15 @@ export interface WizardData {
   // Step 2 - Frequency
   postsPerWeek: number;
   storiesPerWeek: number;
-  includeReels: boolean;
   includeInteractive: boolean;
   includeHolidays: boolean;
   period: "this_month" | "next_month" | "custom";
   customStartDate?: string;
   customEndDate?: string;
+  preferredDays: string[];
+  dayDistribution: string;
+  preferredTimes: string;
+  frequencyNotes: string;
   // Step 3 - Style
   contentTypes: string[];
   formats: string[];
