@@ -123,7 +123,41 @@ const ANALYTICS_REVIEW_TOOLS = [
 ];
 
 const CONTENT_PLANNING_TOOLS = [
-  // ... keep existing code
+  {
+    type: "function" as const,
+    function: {
+      name: "extract_content_plan",
+      description: "Gere um planejamento mensal de conteudo para redes sociais.",
+      parameters: {
+        type: "object",
+        properties: {
+          plan_title: { type: "string", description: "Titulo do planejamento" },
+          strategy_summary: { type: "string", description: "Resumo da estrategia do mes" },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                day_number: { type: "number" },
+                post_date: { type: "string", description: "Data no formato YYYY-MM-DD" },
+                title: { type: "string" },
+                description: { type: "string", description: "Legenda completa do post" },
+                content_type: { type: "string" },
+                format: { type: "string", enum: ["carrossel", "feed", "reels", "stories", "video"] },
+                platform: { type: "string" },
+                creative_instructions: { type: "string", description: "Instrucoes detalhadas para o designer" },
+                objective: { type: "string" },
+                hashtags: { type: "string", description: "Hashtags separadas por espaco, cada uma com #" },
+              },
+              required: ["day_number", "post_date", "title", "description", "content_type", "format", "platform", "creative_instructions", "objective", "hashtags"],
+            },
+          },
+        },
+        required: ["plan_title", "strategy_summary", "items"],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 const CAPTION_TOOLS = [
