@@ -1,50 +1,44 @@
 
 
-# Mostrar Faturamento do Mes Vigente no Placar Financeiro
+# Melhorar Step de Frequencia e Remover Redundancia de Reels
 
 ## Problema
 
-Atualmente, o placar financeiro usa uma unica flag `isFuture` para todas as linhas (Faturamento, Lucro, Bonus, NPS). Se o mes ainda nao acabou e nao tem receita paga, tudo mostra "Aguardando". Mas o usuario quer ver o faturamento em tempo real conforme os pagamentos sao registrados, mesmo no mes corrente.
+1. O toggle "Incluir Reels?" no step 2 (Frequencia) e redundante com a selecao de "Reels" nos formatos preferidos do step 3 (Estilo)
+2. O step de Frequencia nao oferece campos para direcionar dias especificos de postagem, prioridades por dia ou outras instrucoes de distribuicao
 
 ## Solucao
 
-Separar a logica de exibicao por indicador:
+### 1. Remover toggle "Incluir Reels?"
 
-- **Faturamento**: mostrar o valor real sempre, mesmo que o mes esteja em andamento. Só mostrar "Aguardando" se o mes for estritamente futuro (nem comecou ainda)
-- **Lucro Liquido, Pote de Bonus**: manter "Aguardando" para o mes corrente (incompleto), pois custos avulsos podem surgir
-- **NPS**: manter a logica atual
+- Remover o toggle `includeReels` do step 2
+- Remover a propriedade `includeReels` da interface `WizardData` em `useContentPlanning.tsx`
+- Remover a referencia a `includeReels` no resumo do step 5
+- A definicao de Reels fica exclusivamente no step 3 via selecao de formatos
 
-## Detalhes Tecnicos
+### 2. Adicionar novos campos ao step de Frequencia
 
-### Arquivo: `src/components/goals/PPRDashboard.tsx`
+Novos campos no step 2:
 
-**1. Alterar o calculo de `isFuture` no `fetchFinancialData` (linha 208-217)**
+- **Dias de postagem preferidos**: Selecao multipla dos dias da semana (seg-dom) via badges clicaveis para o usuario indicar em quais dias prefere publicar
+- **Distribuicao por dia**: Campo textarea para o usuario dar direcoes sobre que tipo de conteudo priorizar em cada dia (ex: "Segunda: educativo, Quarta: conversao, Sexta: bastidores")
+- **Horarios preferidos**: Campo texto para indicar faixa de horarios ideais (ex: "9h, 12h e 18h")
+- **Observacoes de frequencia**: Textarea livre para instrucoes adicionais sobre ritmo e distribuicao (ex: "Nunca postar no domingo", "Intensificar na ultima semana do mes")
 
-Adicionar um novo campo `isCurrentMonth` ao objeto `MonthlyFinancial` e ajustar `isFuture` para ser apenas meses que ainda nao comecaram:
+### Detalhes Tecnicos
 
-```typescript
-interface MonthlyFinancial {
-  // ... campos existentes
-  isFuture: boolean;       // mes que ainda NAO comecou (estritamente futuro)
-  isCurrentMonth: boolean; // mes em andamento
-}
-```
+**Arquivo: `src/hooks/useContentPlanning.tsx`**
+- Remover `includeReels` da interface `WizardData`
+- Adicionar novos campos:
+  - `preferredDays: string[]` (dias da semana selecionados)
+  - `dayDistribution: string` (direcao de conteudo por dia)
+  - `preferredTimes: string` (horarios preferidos)
+  - `frequencyNotes: string` (observacoes adicionais)
 
-Na construcao dos resultados:
-- `isFuture`: `isFuture(startOfMonth(month))` -- o mes nem comecou
-- `isCurrentMonth`: o inicio do mes ja passou mas o fim ainda e futuro
+**Arquivo: `src/components/social-media/planning/ContentPlanWizard.tsx`**
+- Remover o toggle de Reels do step 2
+- Adicionar os 4 novos campos ao step 2
+- Remover referencia a `includeReels` no resumo do step 5
+- Adicionar constante `WEEKDAYS` para selecao de dias
+- Atualizar estado inicial com os novos campos
 
-**2. Alterar a renderizacao na tabela (linhas 540-595)**
-
-- **Faturamento**: mostrar "Aguardando" apenas se `isFuture` (mes nem comecou). Se for o mes corrente, mostrar o valor real
-- **Lucro Liquido e Pote de Bonus**: mostrar "Aguardando" se `isFuture` OU `isCurrentMonth` (mes incompleto)
-- **NPS**: manter logica atual com `isFuture`
-
-### Resumo
-
-| Indicador | Mes Futuro | Mes Corrente | Mes Passado |
-|-----------|-----------|-------------|-------------|
-| Faturamento | Aguardando | Mostra valor real | Mostra valor real |
-| Lucro Liquido | Aguardando | Aguardando | Mostra valor real |
-| Pote de Bonus | Aguardando | Aguardando | Mostra valor real |
-| NPS | Aguardando | Mostra valor real | Mostra valor real |
