@@ -474,9 +474,11 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
 
         <WizardStepIndicator currentStep={step + 1} totalSteps={5} stepLabels={STEP_LABELS} />
 
-        <ScrollArea className="flex-1 px-1">
-          <div className="py-4">{renderStep()}</div>
-        </ScrollArea>
+        <div className="flex-1 min-h-0">
+          <ScrollArea className="h-full px-1">
+            <div className="py-4">{renderStep()}</div>
+          </ScrollArea>
+        </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-4 border-t">
