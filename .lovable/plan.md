@@ -1,59 +1,19 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Corrigir Scroll Vertical no Modal de Planejamento
 
 ## Problema
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+Em monitores menores, o step 2 (Frequencia) do wizard corta campos porque o `ScrollArea` nao tem a restricao `min-h-0` necessaria para o flexbox ativar o scroll corretamente.
 
 ## Solucao
 
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+Aplicar o padrao flexbox correto: envolver o `ScrollArea` com `div className="flex-1 min-h-0"` para que o conteudo encolha e o scroll ative automaticamente.
 
-### Exemplo do novo formato
+### Arquivo: `src/components/social-media/planning/ContentPlanWizard.tsx`
 
-```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+- Linha 477: Envolver o `ScrollArea` com um wrapper `<div className="flex-1 min-h-0">` e remover `flex-1` do proprio ScrollArea
+- Isso segue o padrao ja documentado do projeto para modais com scroll
 
-*Semana 1 (03/03 a 09/03) - 5 posts*
-
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
-
-Qualquer ajuste e so me chamar! ✅
-```
-
-### Detalhes tecnicos
-
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
-
-Reescrever a funcao `generateSummaryText` com formato compacto:
-
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
-
-### Mapeamento de emojis por formato
-
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
-
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+Alteracao minima -- apenas 2 linhas afetadas.
 
