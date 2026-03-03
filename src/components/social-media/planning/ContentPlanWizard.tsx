@@ -464,7 +464,7 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-2xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -481,7 +481,7 @@ export function ContentPlanWizard({ open, onClose, onGenerate, generating }: Con
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-4 border-t">
+        <div className="flex items-center justify-between pt-4 border-t shrink-0">
           <Button variant="outline" onClick={() => (step > 0 ? setStep(step - 1) : onClose())} disabled={generating}>
             <ChevronLeft className="h-4 w-4 mr-1" />
             {step === 0 ? "Cancelar" : "Voltar"}

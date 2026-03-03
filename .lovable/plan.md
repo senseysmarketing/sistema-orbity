@@ -1,17 +1,59 @@
 
 
-# Corrigir Layout do Modal de Planejamento
+# Resumo Semanal Compacto para WhatsApp
 
 ## Problema
 
-O `DialogContent` usa `max-h-[90vh]` mas nao tem `h-[90vh]`, entao o flex container nao tem altura fixa para distribuir. O `flex-1` do wrapper do ScrollArea nao consegue calcular quanto espaco ocupar, fazendo o conteudo e os botoes se sobreporem.
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
 ## Solucao
 
-Duas alteracoes no `ContentPlanWizard.tsx`:
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-1. **Linha 467**: Trocar `max-h-[90vh]` por `h-[90vh]` no `DialogContent` para dar altura fixa ao flex container
-2. **Linha 484**: Adicionar `shrink-0` ao footer para garantir que os botoes nunca sejam comprimidos
+### Exemplo do novo formato
 
-Isso segue o padrao flexbox documentado do projeto: container com altura definida + `min-h-0` no wrapper + `shrink-0` no footer.
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+
+*Semana 1 (03/03 a 09/03) - 5 posts*
+
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
+```
+
+### Detalhes tecnicos
+
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 
