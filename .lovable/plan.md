@@ -1,59 +1,37 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Limpar Formulário ao Abrir Modal de Nova Tarefa
 
 ## Problema
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+Ao criar uma tarefa e abrir o modal novamente para criar outra, os campos mantêm os dados da tarefa anterior. O reset do `newTask` só acontece após o `handleCreateTask` com sucesso (linha 553), mas se o usuário simplesmente abre o dialog novamente via o botão "Nova Tarefa", o estado antigo permanece.
 
-## Solucao
+## Solução
 
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+No `onOpenChange` do Dialog (linha 940), quando `open === true` e não há `selectedTask` (não é edição), resetar o `newTask` para o estado inicial e o `createStep` para 1.
 
-### Exemplo do novo formato
+### Arquivo: `src/pages/Tasks.tsx`
 
+**Linha 940-942**: Alterar o `onOpenChange` para resetar o formulário ao abrir:
+
+```tsx
+<Dialog open={isDialogOpen} onOpenChange={(open) => {
+  setIsDialogOpen(open);
+  if (!open) {
+    setCreateStep(1);
+  } else if (!selectedTask) {
+    // Reset form when opening for new task (not edit)
+    setNewTask({
+      title: "", description: "", status: "todo", priority: "medium",
+      assigned_to: "unassigned", assigned_users: [], client_ids: [],
+      due_date: "", subtasks: [], attachments: [], task_type: "",
+      platform: "", post_type: "", post_date: "", hashtags: "",
+      creative_instructions: "",
+    });
+    setCreateStep(1);
+  }
+}}>
 ```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
 
-*Semana 1 (03/03 a 09/03) - 5 posts*
-
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
-
-Qualquer ajuste e so me chamar! ✅
-```
-
-### Detalhes tecnicos
-
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
-
-Reescrever a funcao `generateSummaryText` com formato compacto:
-
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
-
-### Mapeamento de emojis por formato
-
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
-
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+Alteração mínima -- apenas no handler `onOpenChange` do Dialog.
 
