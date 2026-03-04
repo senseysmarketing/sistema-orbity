@@ -939,7 +939,18 @@ export default function Tasks() {
           )}
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
               setIsDialogOpen(open);
-              if (!open) setCreateStep(1);
+              if (!open) {
+                setCreateStep(1);
+              } else if (!selectedTask) {
+                setNewTask({
+                  title: "", description: "", status: "todo", priority: "medium",
+                  assigned_to: "unassigned", assigned_users: [], client_ids: [],
+                  due_date: "", subtasks: [], attachments: [], task_type: "",
+                  platform: "", post_type: "", post_date: "", hashtags: "",
+                  creative_instructions: "",
+                });
+                setCreateStep(1);
+              }
             }}>
             <DialogTrigger asChild>
               <Button className="flex items-center gap-2 h-9">
