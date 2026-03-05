@@ -49,27 +49,33 @@ function useFormFieldKeys(agencyId?: string) {
   return useQuery({
     queryKey: ['whatsapp-form-fields', agencyId],
     queryFn: async () => {
-      if (!agencyId) return [];
+      if (!agencyId) return {} as Record<string, string[]>;
       const { data, error } = await supabase
         .from('leads')
         .select('custom_fields')
         .eq('agency_id', agencyId)
         .not('custom_fields', 'is', null)
-        .limit(100);
+        .limit(200);
       if (error) throw error;
 
-      const keysSet = new Set<string>();
+      const grouped: Record<string, Set<string>> = {};
       for (const row of data || []) {
         const cf = row.custom_fields as Record<string, unknown> | null;
-        if (cf) {
-          for (const key of Object.keys(cf)) {
-            if (!STANDARD_FIELDS.includes(key)) {
-              keysSet.add(key);
-            }
+        if (!cf) continue;
+        const formName = (cf.form_name as string) || 'Outros';
+        if (!grouped[formName]) grouped[formName] = new Set();
+        for (const key of Object.keys(cf)) {
+          if (!STANDARD_FIELDS.includes(key) && key !== 'form_name') {
+            grouped[formName].add(key);
           }
         }
       }
-      return Array.from(keysSet).sort();
+
+      const result: Record<string, string[]> = {};
+      for (const [name, keys] of Object.entries(grouped)) {
+        result[name] = Array.from(keys).sort();
+      }
+      return result;
     },
     enabled: !!agencyId,
     staleTime: 60_000,
@@ -97,7 +103,7 @@ export function WhatsAppTemplateManager() {
     enabled: !!currentAgency?.id,
   });
 
-  const { data: formFields = [] } = useFormFieldKeys(currentAgency?.id);
+  const { data: formFields = {} } = useFormFieldKeys(currentAgency?.id);
 
   const greetingTemplates = templates.filter(t => t.phase === 'greeting');
   const followupTemplates = templates.filter(t => t.phase === 'followup');
@@ -249,7 +255,7 @@ function TemplatePhaseSection({
   onDelete: (id: string) => void;
   onAdd: () => void;
   isSaving: boolean;
-  formFields: string[];
+  formFields: Record<string, string[]>;
 }) {
   return (
     <div className="space-y-3">
@@ -294,10 +300,11 @@ function VariableInserter({
   formFields,
   onInsert,
 }: {
-  formFields: string[];
+  formFields: Record<string, string[]>;
   onInsert: (variable: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const formNames = Object.keys(formFields).sort();
 
   const handleInsert = (variable: string) => {
     onInsert(variable);
@@ -311,7 +318,7 @@ function VariableInserter({
           <Variable className="h-3.5 w-3.5" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-2" align="start">
+      <PopoverContent className="w-72 p-2 max-h-80 overflow-y-auto" align="start">
         <div className="space-y-2">
           <p className="text-xs font-semibold text-muted-foreground px-1">Variáveis fixas</p>
           <div className="flex flex-wrap gap-1">
@@ -327,14 +334,16 @@ function VariableInserter({
             ))}
           </div>
 
-          {formFields.length > 0 && (
-            <>
+          {formNames.map((formName) => (
+            <div key={formName}>
               <Separator className="my-1" />
-              <p className="text-xs font-semibold text-muted-foreground px-1">Campos do formulário</p>
-              <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
-                {formFields.map((field) => (
+              <p className="text-xs font-semibold text-muted-foreground px-1 flex items-center gap-1">
+                📋 {formName}
+              </p>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {formFields[formName].map((field) => (
                   <Badge
-                    key={field}
+                    key={`${formName}-${field}`}
                     variant="outline"
                     className="cursor-pointer text-xs hover:bg-accent"
                     onClick={() => handleInsert(`{{formulario:${field}}}`)}
@@ -343,8 +352,8 @@ function VariableInserter({
                   </Badge>
                 ))}
               </div>
-            </>
-          )}
+            </div>
+          ))}
         </div>
       </PopoverContent>
     </Popover>
@@ -362,7 +371,7 @@ function TemplateEditor({
   onSave: (t: Template) => void;
   onDelete: (id: string) => void;
   isSaving: boolean;
-  formFields: string[];
+  formFields: Record<string, string[]>;
 }) {
   const [message, setMessage] = useState(template.message_template);
   const [delay, setDelay] = useState(template.delay_minutes.toString());
