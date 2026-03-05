@@ -3,7 +3,8 @@ import { CustomStatusManager } from "./CustomStatusManager";
 import { MetaIntegrationConfig } from "./MetaIntegrationConfig";
 import { WebhooksManager } from "./WebhooksManager";
 import { ManualInvestmentManager } from "./ManualInvestmentManager";
-import { Link2, DollarSign, Layers, Webhook } from "lucide-react";
+import { WhatsAppTemplateManager } from "./WhatsAppTemplateManager";
+import { Link2, DollarSign, Layers, Webhook, MessageSquare } from "lucide-react";
 
 export function CRMSettings() {
   return (
@@ -33,6 +34,10 @@ export function CRMSettings() {
             <Webhook className="h-4 w-4" />
             <span className="hidden sm:inline">Webhooks</span>
           </TabsTrigger>
+          <TabsTrigger value="whatsapp" className="flex-shrink-0 gap-1 md:gap-2">
+            <MessageSquare className="h-4 w-4" />
+            <span className="hidden sm:inline">WhatsApp</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="integration">
@@ -49,6 +54,10 @@ export function CRMSettings() {
 
         <TabsContent value="webhooks">
           <WebhooksManager />
+        </TabsContent>
+
+        <TabsContent value="whatsapp">
+          <WhatsAppTemplateManager />
         </TabsContent>
       </Tabs>
     </div>
