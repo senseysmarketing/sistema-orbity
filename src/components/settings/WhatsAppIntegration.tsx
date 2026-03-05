@@ -34,7 +34,7 @@ export const WhatsAppIntegration = () => {
         if (result?.qr_code) {
           setQrCode(result.qr_code);
         }
-      }).catch(() => {});
+      }).catch(() => { setConnectionError(true); });
     }
   }, [account, autoChecked]);
 
@@ -49,8 +49,9 @@ export const WhatsAppIntegration = () => {
           } else if (result?.qr_code) {
             setQrCode(result.qr_code);
           }
-        } catch {}
-      }, 5000);
+          } catch {
+            setConnectionError(true);
+          }
       return () => clearInterval(interval);
     }
   }, [account?.status, qrCode]);
