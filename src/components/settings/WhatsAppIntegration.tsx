@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle } from "lucide-react";
+import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle, AlertTriangle, Settings } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 
 export const WhatsAppIntegration = () => {
@@ -13,6 +14,7 @@ export const WhatsAppIntegration = () => {
   const [apiKey, setApiKey] = useState("");
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [autoChecked, setAutoChecked] = useState(false);
+  const [connectionError, setConnectionError] = useState(false);
 
   const {
     account,
@@ -32,7 +34,7 @@ export const WhatsAppIntegration = () => {
         if (result?.qr_code) {
           setQrCode(result.qr_code);
         }
-      }).catch(() => {});
+      }).catch(() => { setConnectionError(true); });
     }
   }, [account, autoChecked]);
 
@@ -44,10 +46,13 @@ export const WhatsAppIntegration = () => {
           const result = await checkStatus.mutateAsync();
           if (result?.status === 'connected') {
             setQrCode(null);
+            setConnectionError(false);
           } else if (result?.qr_code) {
             setQrCode(result.qr_code);
           }
-        } catch {}
+        } catch {
+          setConnectionError(true);
+        }
       }, 5000);
       return () => clearInterval(interval);
     }
@@ -181,15 +186,27 @@ export const WhatsAppIntegration = () => {
             {/* QR Code Display */}
             {showQrCode && (
               <div className="flex flex-col items-center gap-3 p-4 border rounded-lg bg-muted/30">
-                <p className="text-sm font-medium flex items-center gap-2">
-                  <QrCode className="h-4 w-4" />
-                  Escaneie o QR Code no WhatsApp
-                </p>
-                <img
-                  src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`}
-                  alt="WhatsApp QR Code"
-                  className="w-48 h-48 sm:w-64 sm:h-64 rounded-lg"
-                />
+                {connectionError && (
+                  <Alert variant="destructive" className="w-full">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      A instância pode ter sido removida ou está inacessível. Reconfigure a conexão.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {!connectionError && (
+                  <>
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      <QrCode className="h-4 w-4" />
+                      Escaneie o QR Code no WhatsApp
+                    </p>
+                    <img
+                      src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`}
+                      alt="WhatsApp QR Code"
+                      className="w-48 h-48 sm:w-64 sm:h-64 rounded-lg"
+                    />
+                  </>
+                )}
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={handleRefreshQR} disabled={refreshQR.isPending}>
                     {refreshQR.isPending ? (
@@ -199,10 +216,23 @@ export const WhatsAppIntegration = () => {
                     )}
                     Atualizar QR
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setQrCode(null);
+                      setConnectionError(false);
+                    }}
+                  >
+                    <Settings className="mr-1 h-4 w-4" />
+                    Reconfigurar
+                  </Button>
                 </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  Abra o WhatsApp {'>'} Configurações {'>'} Dispositivos conectados {'>'} Conectar dispositivo
-                </p>
+                {!connectionError && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    Abra o WhatsApp {'>'} Configurações {'>'} Dispositivos conectados {'>'} Conectar dispositivo
+                  </p>
+                )}
               </div>
             )}
 

@@ -1,26 +1,59 @@
 
 
-# Botão "Reconfigurar" na tela de QR Code do WhatsApp
+# Resumo Semanal Compacto para WhatsApp
 
 ## Problema
 
-Quando a instância do Evolution API é excluída externamente, o sistema continua mostrando o QR Code e tentando polling, gerando erros silenciosos. Não há como voltar ao formulário de configuração sem desconectar.
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-## Solução
+## Solucao
 
-1. **Detectar erros no polling/check** — quando `checkStatus` ou `refreshQR` falham repetidamente, exibir um alerta amarelo/vermelho avisando que a instância pode ter sido removida.
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-2. **Botão "Reconfigurar"** na tela do QR Code — ao lado do "Atualizar QR", adicionar um botão que:
-   - Limpa o QR code local (`setQrCode(null)`)
-   - Volta para o formulário de conexão com os campos preenchidos para edição
+### Exemplo do novo formato
 
-3. **Estado de erro visível** — adicionar um state `connectionError` que é setado quando o polling falha, mostrando uma mensagem como "A instância pode ter sido removida. Reconfigure a conexão."
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
 
-### Alterações em `src/components/settings/WhatsAppIntegration.tsx`
+*Semana 1 (03/03 a 09/03) - 5 posts*
 
-- Novo state `connectionError: boolean`
-- Nos `catch` do polling e auto-check, setar `connectionError = true`
-- Na área do QR Code, se `connectionError`, mostrar alerta com ícone `AlertTriangle`
-- Novo botão "Reconfigurar" que faz `setQrCode(null)` para voltar ao formulário
-- Adicionar import `AlertTriangle, Settings` do lucide
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
+```
+
+### Detalhes tecnicos
+
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 
