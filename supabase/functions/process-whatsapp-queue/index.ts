@@ -7,65 +7,72 @@ const corsHeaders = {
 };
 
 const MIN_INTERVAL_MS = 120_000;
+const MAX_RETRIES = 3;
+const RETRY_DELAYS_MS = [30_000, 120_000, 300_000]; // 30s, 2min, 5min
+const RATE_LIMIT_DELAY_MS = 1_000; // 1s between sends
 
 interface SendingSchedule {
   enabled: boolean;
   start_hour: number;
   end_hour: number;
-  allowed_days: number[]; // 0=Sun..6=Sat
+  allowed_days: number[];
 }
 
-/**
- * Convert a UTC Date to São Paulo local components
- */
 function toSaoPaulo(date: Date): { hour: number; dayOfWeek: number; dateObj: Date } {
   const spStr = date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' });
   const sp = new Date(spStr);
   return { hour: sp.getHours(), dayOfWeek: sp.getDay(), dateObj: sp };
 }
 
-/**
- * Get the next allowed time based on the sending schedule.
- * Returns the original baseTime if within the allowed window, or the next valid start_hour.
- */
 function getNextAllowedTime(schedule: SendingSchedule, baseTime: Date): Date {
   if (!schedule.enabled || schedule.allowed_days.length === 0) return baseTime;
 
   const { hour, dayOfWeek, dateObj } = toSaoPaulo(baseTime);
-
-  // Check if current time is within allowed window
   const isDayAllowed = schedule.allowed_days.includes(dayOfWeek);
   const isHourAllowed = hour >= schedule.start_hour && hour < schedule.end_hour;
 
-  if (isDayAllowed && isHourAllowed) {
-    return baseTime;
-  }
+  if (isDayAllowed && isHourAllowed) return baseTime;
 
-  // Calculate offset from UTC to SP in ms
   const utcNow = baseTime.getTime();
   const spNow = dateObj.getTime();
-  // We need to find the next allowed slot
-  // Start from current SP time and advance
   let candidate = new Date(dateObj);
 
-  // If today is allowed but we're before start_hour
   if (isDayAllowed && hour < schedule.start_hour) {
     candidate.setHours(schedule.start_hour, 0, 0, 0);
   } else {
-    // Move to next day and find allowed day
     candidate.setDate(candidate.getDate() + 1);
     candidate.setHours(schedule.start_hour, 0, 0, 0);
-
-    // Find next allowed day (up to 7 days ahead)
     for (let i = 0; i < 7; i++) {
       if (schedule.allowed_days.includes(candidate.getDay())) break;
       candidate.setDate(candidate.getDate() + 1);
     }
   }
 
-  // Convert back: calculate the difference in SP time and apply to UTC
   const spDiffMs = candidate.getTime() - spNow;
   return new Date(utcNow + spDiffMs);
+}
+
+async function logAutomationEvent(
+  supabase: any,
+  automationId: string | null,
+  accountId: string | null,
+  event: string,
+  details: Record<string, any> = {}
+) {
+  try {
+    await supabase.from('whatsapp_automation_logs').insert({
+      automation_id: automationId,
+      account_id: accountId,
+      event,
+      details,
+    });
+  } catch (e) {
+    console.error('[process-queue] Failed to write log:', e);
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 serve(async (req) => {
@@ -101,6 +108,21 @@ serve(async (req) => {
 
     for (const record of pendingAutomations) {
       try {
+        // --- MAX RETRIES CHECK ---
+        if ((record.retry_count || 0) >= MAX_RETRIES) {
+          await supabase.from('whatsapp_automation_control').update({
+            status: 'finished',
+            conversation_state: 'max_retries_exceeded',
+            last_error: `Exceeded max retries (${MAX_RETRIES})`,
+          }).eq('id', record.id);
+
+          await logAutomationEvent(supabase, record.id, record.whatsapp_accounts?.id, 'max_retries_exceeded', {
+            retry_count: record.retry_count,
+            lead_id: record.lead_id,
+          });
+          continue;
+        }
+
         // Optimistic lock
         const { data: locked } = await supabase
           .from('whatsapp_automation_control')
@@ -133,6 +155,10 @@ serve(async (req) => {
             await supabase.from('whatsapp_automation_control').update({
               status: 'responded', conversation_state: 'customer_replied',
             }).eq('id', record.id);
+
+            await logAutomationEvent(supabase, record.id, record.whatsapp_accounts?.id, 'customer_replied', {
+              lead_id: record.lead_id,
+            });
             continue;
           }
         }
@@ -149,7 +175,6 @@ serve(async (req) => {
           const now = new Date();
           const nextAllowed = getNextAllowedTime(schedule, now);
           if (nextAllowed.getTime() > now.getTime() + 60_000) {
-            // Outside allowed window — reschedule
             await supabase.from('whatsapp_automation_control').update({
               status: 'active',
               next_execution_at: nextAllowed.toISOString(),
@@ -173,7 +198,10 @@ serve(async (req) => {
               status: 'finished',
               conversation_state: 'source_not_allowed',
             }).eq('id', record.id);
-            console.log('[process-queue] Source not allowed:', leadData.source, record.id);
+
+            await logAutomationEvent(supabase, record.id, account.id, 'source_not_allowed', {
+              source: leadData.source, lead_id: record.lead_id,
+            });
             continue;
           }
         }
@@ -189,10 +217,15 @@ serve(async (req) => {
           .maybeSingle();
 
         if (!template) {
+          const finishState = record.current_phase === 'followup' ? 'closed_no_reply' : 'automation_finished';
           await supabase.from('whatsapp_automation_control').update({
             status: 'finished',
-            conversation_state: record.current_phase === 'followup' ? 'closed_no_reply' : 'automation_finished',
+            conversation_state: finishState,
           }).eq('id', record.id);
+
+          await logAutomationEvent(supabase, record.id, account.id, 'automation_finished', {
+            reason: 'no_template', phase: record.current_phase, step: record.current_step_position,
+          });
           continue;
         }
 
@@ -211,14 +244,12 @@ serve(async (req) => {
             .replace(/\{\{telefone\}\}/gi, lead.phone || '')
             .replace(/\{\{empresa\}\}/gi, lead.company || '');
 
-          // Replace dynamic form variables {{formulario:field_name}}
           const customFields = (lead.custom_fields as Record<string, string> | null) || {};
           message = message.replace(/\{\{formulario:([^}]+)\}\}/gi, (_match, fieldKey: string) => {
             const key = fieldKey.trim();
             if (customFields[key] !== undefined && customFields[key] !== null) {
               return String(customFields[key]);
             }
-            // Try formatted key (replace spaces/special chars with underscores)
             const normalizedKey = key.toLowerCase().replace(/\s+/g, '_');
             for (const [k, v] of Object.entries(customFields)) {
               if (k.toLowerCase().replace(/\s+/g, '_') === normalizedKey && v !== undefined && v !== null) {
@@ -235,6 +266,9 @@ serve(async (req) => {
           continue;
         }
 
+        // --- RATE LIMIT: 1s delay between sends ---
+        await sleep(RATE_LIMIT_DELAY_MS);
+
         const sendRes = await fetch(`${supabaseUrl}/functions/v1/whatsapp-send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}` },
@@ -246,10 +280,29 @@ serve(async (req) => {
 
         const sendResult = await sendRes.json();
         if (!sendResult.success) {
-          await supabase.from('whatsapp_automation_control').update({ status: 'active' }).eq('id', record.id);
+          // --- RETRY LOGIC WITH BACKOFF ---
+          const newRetryCount = (record.retry_count || 0) + 1;
+          const backoffMs = RETRY_DELAYS_MS[Math.min(newRetryCount - 1, RETRY_DELAYS_MS.length - 1)];
+          const nextRetryAt = new Date(Date.now() + backoffMs).toISOString();
+
+          await supabase.from('whatsapp_automation_control').update({
+            status: newRetryCount >= MAX_RETRIES ? 'finished' : 'active',
+            retry_count: newRetryCount,
+            last_error: sendResult.error || 'Send failed',
+            next_execution_at: newRetryCount >= MAX_RETRIES ? null : nextRetryAt,
+            conversation_state: newRetryCount >= MAX_RETRIES ? 'max_retries_exceeded' : record.conversation_state,
+          }).eq('id', record.id);
+
+          await logAutomationEvent(supabase, record.id, account.id, 'send_failed', {
+            retry_count: newRetryCount, error: sendResult.error, next_retry_at: nextRetryAt,
+            lead_id: record.lead_id, phase: record.current_phase, step: record.current_step_position,
+          });
+
+          console.error('[process-queue] Send failed, retry', newRetryCount, '/', MAX_RETRIES, record.id);
           continue;
         }
 
+        // --- SUCCESS: Reset retry counter ---
         // Determine next step
         const nextStepPosition = record.current_step_position + 1;
         const { data: nextTemplate } = await supabase
@@ -303,7 +356,15 @@ serve(async (req) => {
           last_followup_sent_at: new Date().toISOString(),
           conversation_state: newState,
           conversation_id: sendResult.conversation_id || conv?.id,
+          retry_count: 0, // Reset on success
+          last_error: null,
         }).eq('id', record.id);
+
+        await logAutomationEvent(supabase, record.id, account.id, 'step_executed', {
+          lead_id: record.lead_id, phase: record.current_phase, step: record.current_step_position,
+          next_phase: newPhase, next_step: newStep, next_execution_at: nextExecution,
+          conversation_state: newState,
+        });
 
         console.log('[process-queue] STEP_EXECUTED', {
           automation_id: record.id, lead_id: record.lead_id,
@@ -315,7 +376,19 @@ serve(async (req) => {
         processed++;
       } catch (recordError) {
         console.error('[process-queue] Error processing record:', record.id, recordError);
-        await supabase.from('whatsapp_automation_control').update({ status: 'active' }).eq('id', record.id);
+        
+        // Increment retry on unexpected errors too
+        const newRetryCount = (record.retry_count || 0) + 1;
+        await supabase.from('whatsapp_automation_control').update({
+          status: newRetryCount >= MAX_RETRIES ? 'finished' : 'active',
+          retry_count: newRetryCount,
+          last_error: recordError?.message || 'Unexpected error',
+          conversation_state: newRetryCount >= MAX_RETRIES ? 'max_retries_exceeded' : undefined,
+        }).eq('id', record.id);
+
+        await logAutomationEvent(supabase, record.id, record.whatsapp_accounts?.id, 'processing_error', {
+          error: recordError?.message, retry_count: newRetryCount,
+        });
       }
     }
 
