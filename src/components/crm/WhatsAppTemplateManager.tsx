@@ -50,19 +50,49 @@ function useFormFieldKeys(agencyId?: string) {
     queryKey: ['whatsapp-form-fields', agencyId],
     queryFn: async () => {
       if (!agencyId) return {} as Record<string, string[]>;
-      const { data, error } = await supabase
+
+      // 1. Get all integrations (form_name by integration id)
+      const { data: integrations, error: intError } = await supabase
+        .from('facebook_lead_integrations')
+        .select('id, form_name')
+        .eq('agency_id', agencyId);
+      if (intError) throw intError;
+
+      const integrationMap: Record<string, string> = {};
+      for (const i of integrations || []) {
+        integrationMap[i.id] = i.form_name;
+      }
+
+      // 2. Get sync logs to map lead_id → integration_id
+      const { data: syncLogs, error: syncError } = await supabase
+        .from('facebook_lead_sync_log')
+        .select('lead_id, integration_id')
+        .eq('agency_id', agencyId)
+        .not('lead_id', 'is', null);
+      if (syncError) throw syncError;
+
+      const leadFormMap: Record<string, string> = {};
+      for (const log of syncLogs || []) {
+        if (log.lead_id && integrationMap[log.integration_id]) {
+          leadFormMap[log.lead_id] = integrationMap[log.integration_id];
+        }
+      }
+
+      // 3. Get leads with custom_fields
+      const { data: leads, error: leadsError } = await supabase
         .from('leads')
-        .select('custom_fields')
+        .select('id, custom_fields')
         .eq('agency_id', agencyId)
         .not('custom_fields', 'is', null)
         .limit(200);
-      if (error) throw error;
+      if (leadsError) throw leadsError;
 
+      // 4. Group fields by form name
       const grouped: Record<string, Set<string>> = {};
-      for (const row of data || []) {
+      for (const row of leads || []) {
         const cf = row.custom_fields as Record<string, unknown> | null;
         if (!cf) continue;
-        const formName = (cf.form_name as string) || 'Outros';
+        const formName = leadFormMap[row.id] || 'Outros';
         if (!grouped[formName]) grouped[formName] = new Set();
         for (const key of Object.keys(cf)) {
           if (!STANDARD_FIELDS.includes(key) && key !== 'form_name') {
