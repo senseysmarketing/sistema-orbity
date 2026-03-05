@@ -341,7 +341,7 @@ function VariableInserter({
                 📋 {formName}
               </p>
               <div className="flex flex-wrap gap-1 mt-1">
-                {formFields[formName].map((field) => (
+                {(Array.isArray(formFields[formName]) ? formFields[formName] : Array.from(formFields[formName] || [])).map((field: string) => (
                   <Badge
                     key={`${formName}-${field}`}
                     variant="outline"
