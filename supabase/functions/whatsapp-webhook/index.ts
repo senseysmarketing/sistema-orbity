@@ -3,12 +3,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -103,7 +103,6 @@ serve(async (req) => {
         .maybeSingle();
 
       if (!conversation) {
-        // Try to match with a lead by phone
         const { data: lead } = await supabase
           .from('leads')
           .select('id')
@@ -130,7 +129,6 @@ serve(async (req) => {
 
       const timestamp = new Date().toISOString();
 
-      // Idempotent insert via upsert
       await supabase
         .from('whatsapp_messages')
         .upsert({
@@ -144,7 +142,6 @@ serve(async (req) => {
           status: event === 'messages.update' ? (data.status || 'delivered') : 'received',
         }, { onConflict: 'account_id,message_id' });
 
-      // Update conversation timestamps
       const updateData: Record<string, any> = {
         last_message_at: timestamp,
         last_message_is_from_me: isFromMe,
@@ -153,7 +150,6 @@ serve(async (req) => {
       if (!isFromMe) {
         updateData.last_customer_message_at = timestamp;
 
-        // Customer replied - check automation and pause it
         const { data: automation } = await supabase
           .from('whatsapp_automation_control')
           .select('id, status')
@@ -198,7 +194,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('[whatsapp-webhook] Error:', error);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
-      status: 200, // Return 200 to prevent Evolution API retries
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

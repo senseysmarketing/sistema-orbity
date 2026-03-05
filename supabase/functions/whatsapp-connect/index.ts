@@ -3,12 +3,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -73,11 +73,9 @@ serve(async (req) => {
           const createData = await createRes.json();
 
           if (!createRes.ok && createRes.status !== 409) {
-            // 409 = instance already exists, which is fine
             throw new Error(`Evolution API error: ${JSON.stringify(createData)}`);
           }
         } catch (e) {
-          // Instance might already exist, try to connect
           console.log('Instance create result:', e.message);
         }
 
@@ -145,15 +143,39 @@ serve(async (req) => {
               .eq('id', account.id);
           }
 
+          // If disconnected, auto-fetch new QR code
+          let qr_code = null;
+          if (!isConnected) {
+            try {
+              const qrRes = await fetch(
+                `${account.api_url}/instance/connect/${account.instance_name}`,
+                { headers: { 'apikey': account.api_key } }
+              );
+              const qrData = await qrRes.json();
+              if (qrData.base64) {
+                qr_code = qrData.base64;
+                await supabase
+                  .from('whatsapp_accounts')
+                  .update({ qr_code: qrData.base64, status: 'connecting' })
+                  .eq('id', account.id);
+              }
+            } catch (qrErr) {
+              console.log('QR fetch error (non-critical):', qrErr.message);
+            }
+          }
+
           return new Response(JSON.stringify({
             success: true,
-            status: newStatus,
+            status: isConnected ? 'connected' : 'connecting',
             phone_number: account.phone_number,
+            qr_code,
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-        } catch {
+        } catch (apiErr) {
+          console.log('Evolution API status check failed:', apiErr.message);
           return new Response(JSON.stringify({
             success: true,
             status: account.status,
+            error_detail: 'Não foi possível verificar o status na Evolution API. Verifique a URL e API Key.',
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
       }

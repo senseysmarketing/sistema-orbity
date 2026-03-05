@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi } from "lucide-react";
+import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle } from "lucide-react";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 
 export const WhatsAppIntegration = () => {
@@ -12,6 +12,7 @@ export const WhatsAppIntegration = () => {
   const [apiUrl, setApiUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [autoChecked, setAutoChecked] = useState(false);
 
   const {
     account,
@@ -23,15 +24,34 @@ export const WhatsAppIntegration = () => {
     refreshQR,
   } = useWhatsApp();
 
+  // Auto-check status when account exists but not connected
+  useEffect(() => {
+    if (account && !autoChecked && account.status !== 'connected') {
+      setAutoChecked(true);
+      checkStatus.mutateAsync().then((result) => {
+        if (result?.qr_code) {
+          setQrCode(result.qr_code);
+        }
+      }).catch(() => {});
+    }
+  }, [account, autoChecked]);
+
   // Poll status when connecting
   useEffect(() => {
-    if (account?.status === 'connecting') {
-      const interval = setInterval(() => {
-        checkStatus.mutate();
+    if (account?.status === 'connecting' || qrCode) {
+      const interval = setInterval(async () => {
+        try {
+          const result = await checkStatus.mutateAsync();
+          if (result?.status === 'connected') {
+            setQrCode(null);
+          } else if (result?.qr_code) {
+            setQrCode(result.qr_code);
+          }
+        } catch {}
       }, 5000);
       return () => clearInterval(interval);
     }
-  }, [account?.status]);
+  }, [account?.status, qrCode]);
 
   // Populate fields from existing account
   useEffect(() => {
@@ -47,19 +67,23 @@ export const WhatsAppIntegration = () => {
 
   const handleConnect = async () => {
     if (!instanceName || !apiUrl || !apiKey) return;
-    const result = await connect.mutateAsync({ instance_name: instanceName, api_url: apiUrl, api_key: apiKey });
-    if (result?.qr_code) {
-      setQrCode(result.qr_code);
-    }
+    try {
+      const result = await connect.mutateAsync({ instance_name: instanceName, api_url: apiUrl, api_key: apiKey });
+      if (result?.qr_code) {
+        setQrCode(result.qr_code);
+      }
+    } catch {}
   };
 
   const handleRefreshQR = async () => {
-    const result = await refreshQR.mutateAsync();
-    if (result?.qr_code) {
-      setQrCode(result.qr_code);
-    } else if (result?.status === 'connected') {
-      setQrCode(null);
-    }
+    try {
+      const result = await refreshQR.mutateAsync();
+      if (result?.qr_code) {
+        setQrCode(result.qr_code);
+      } else if (result?.status === 'connected') {
+        setQrCode(null);
+      }
+    } catch {}
   };
 
   if (isLoadingAccount) {
@@ -71,6 +95,9 @@ export const WhatsAppIntegration = () => {
       </Card>
     );
   }
+
+  const showQrCode = qrCode && !isConnected;
+  const showForm = !isConnected && !showQrCode;
 
   return (
     <Card>
@@ -89,10 +116,10 @@ export const WhatsAppIntegration = () => {
                     Conectado
                   </Badge>
                 )}
-                {account?.status === 'connecting' && (
+                {!isConnected && account && (
                   <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800 flex-shrink-0">
-                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    Conectando
+                    <AlertCircle className="mr-1 h-3 w-3" />
+                    Desconectado
                   </Badge>
                 )}
               </div>
@@ -152,7 +179,7 @@ export const WhatsAppIntegration = () => {
         ) : (
           <div className="space-y-4">
             {/* QR Code Display */}
-            {qrCode && account?.status === 'connecting' && (
+            {showQrCode && (
               <div className="flex flex-col items-center gap-3 p-4 border rounded-lg bg-muted/30">
                 <p className="text-sm font-medium flex items-center gap-2">
                   <QrCode className="h-4 w-4" />
@@ -180,7 +207,7 @@ export const WhatsAppIntegration = () => {
             )}
 
             {/* Connection Form */}
-            {(!qrCode || account?.status !== 'connecting') && (
+            {showForm && (
               <>
                 <div className="p-3 sm:p-4 border rounded-lg bg-muted/30 space-y-2">
                   <p className="text-sm font-medium">Recursos disponíveis:</p>
