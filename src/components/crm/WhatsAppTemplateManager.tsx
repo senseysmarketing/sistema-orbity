@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { SendingScheduleManager } from "./SendingScheduleManager";
 import { AllowedSourcesManager } from "./AllowedSourcesManager";
@@ -10,7 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { MessageSquare, Plus, Trash2, Save, Clock, Loader2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { MessageSquare, Plus, Trash2, Save, Clock, Loader2, Variable } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,57 @@ interface Template {
   message_template: string;
   delay_minutes: number;
   is_active: boolean;
+}
+
+const STANDARD_FIELDS = [
+  'full_name', 'email', 'phone_number', 'city', 'state',
+  'country', 'zip_code', 'street_address', 'job_title',
+  'company_name', 'date_of_birth', 'gender', 'marital_status',
+  'military_status', 'work_email', 'work_phone_number',
+];
+
+const FIXED_VARIABLES = [
+  { key: '{{nome}}', label: 'Nome' },
+  { key: '{{empresa}}', label: 'Empresa' },
+  { key: '{{email}}', label: 'Email' },
+  { key: '{{telefone}}', label: 'Telefone' },
+];
+
+function formatFieldName(key: string): string {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function useFormFieldKeys(agencyId?: string) {
+  return useQuery({
+    queryKey: ['whatsapp-form-fields', agencyId],
+    queryFn: async () => {
+      if (!agencyId) return [];
+      const { data, error } = await supabase
+        .from('leads')
+        .select('custom_fields')
+        .eq('agency_id', agencyId)
+        .not('custom_fields', 'is', null)
+        .limit(100);
+      if (error) throw error;
+
+      const keysSet = new Set<string>();
+      for (const row of data || []) {
+        const cf = row.custom_fields as Record<string, unknown> | null;
+        if (cf) {
+          for (const key of Object.keys(cf)) {
+            if (!STANDARD_FIELDS.includes(key)) {
+              keysSet.add(key);
+            }
+          }
+        }
+      }
+      return Array.from(keysSet).sort();
+    },
+    enabled: !!agencyId,
+    staleTime: 60_000,
+  });
 }
 
 export function WhatsAppTemplateManager() {
@@ -44,6 +96,8 @@ export function WhatsAppTemplateManager() {
     },
     enabled: !!currentAgency?.id,
   });
+
+  const { data: formFields = [] } = useFormFieldKeys(currentAgency?.id);
 
   const greetingTemplates = templates.filter(t => t.phase === 'greeting');
   const followupTemplates = templates.filter(t => t.phase === 'followup');
@@ -139,10 +193,7 @@ export function WhatsAppTemplateManager() {
         </h3>
         <p className="text-sm text-muted-foreground mt-1">
           Configure as mensagens enviadas automaticamente para novos leads.
-          Use <code className="text-xs bg-muted px-1 py-0.5 rounded">{"{{nome}}"}</code>,
-          <code className="text-xs bg-muted px-1 py-0.5 rounded ml-1">{"{{empresa}}"}</code>,
-          <code className="text-xs bg-muted px-1 py-0.5 rounded ml-1">{"{{email}}"}</code>,
-          <code className="text-xs bg-muted px-1 py-0.5 rounded ml-1">{"{{telefone}}"}</code> como variáveis.
+          Use o botão <Variable className="inline h-3.5 w-3.5" /> no editor para inserir variáveis disponíveis.
         </p>
       </div>
 
@@ -157,6 +208,7 @@ export function WhatsAppTemplateManager() {
             onDelete={(id) => deleteMutation.mutate(id)}
             onAdd={() => addTemplate('greeting')}
             isSaving={saveMutation.isPending}
+            formFields={formFields}
           />
         </Card>
 
@@ -170,6 +222,7 @@ export function WhatsAppTemplateManager() {
             onDelete={(id) => deleteMutation.mutate(id)}
             onAdd={() => addTemplate('followup')}
             isSaving={saveMutation.isPending}
+            formFields={formFields}
           />
         </Card>
       </div>
@@ -186,6 +239,7 @@ function TemplatePhaseSection({
   onDelete,
   onAdd,
   isSaving,
+  formFields,
 }: {
   title: string;
   description: string;
@@ -195,6 +249,7 @@ function TemplatePhaseSection({
   onDelete: (id: string) => void;
   onAdd: () => void;
   isSaving: boolean;
+  formFields: string[];
 }) {
   return (
     <div className="space-y-3">
@@ -226,6 +281,7 @@ function TemplatePhaseSection({
               onSave={onSave}
               onDelete={onDelete}
               isSaving={isSaving}
+              formFields={formFields}
             />
           ))}
         </div>
@@ -234,24 +290,105 @@ function TemplatePhaseSection({
   );
 }
 
+function VariableInserter({
+  formFields,
+  onInsert,
+}: {
+  formFields: string[];
+  onInsert: (variable: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const handleInsert = (variable: string) => {
+    onInsert(variable);
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-7 w-7" title="Inserir variável">
+          <Variable className="h-3.5 w-3.5" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2" align="start">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground px-1">Variáveis fixas</p>
+          <div className="flex flex-wrap gap-1">
+            {FIXED_VARIABLES.map((v) => (
+              <Badge
+                key={v.key}
+                variant="secondary"
+                className="cursor-pointer text-xs hover:bg-accent"
+                onClick={() => handleInsert(v.key)}
+              >
+                {v.label}
+              </Badge>
+            ))}
+          </div>
+
+          {formFields.length > 0 && (
+            <>
+              <Separator className="my-1" />
+              <p className="text-xs font-semibold text-muted-foreground px-1">Campos do formulário</p>
+              <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                {formFields.map((field) => (
+                  <Badge
+                    key={field}
+                    variant="outline"
+                    className="cursor-pointer text-xs hover:bg-accent"
+                    onClick={() => handleInsert(`{{formulario:${field}}}`)}
+                  >
+                    {formatFieldName(field)}
+                  </Badge>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function TemplateEditor({
   template,
   onSave,
   onDelete,
   isSaving,
+  formFields,
 }: {
   template: Template;
   onSave: (t: Template) => void;
   onDelete: (id: string) => void;
   isSaving: boolean;
+  formFields: string[];
 }) {
   const [message, setMessage] = useState(template.message_template);
   const [delay, setDelay] = useState(template.delay_minutes.toString());
   const [active, setActive] = useState(template.is_active);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const hasChanges = message !== template.message_template ||
     parseInt(delay) !== template.delay_minutes ||
     active !== template.is_active;
+
+  const handleInsertVariable = (variable: string) => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newMessage = message.slice(0, start) + variable + message.slice(end);
+      setMessage(newMessage);
+      // Set cursor after inserted variable
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + variable.length, start + variable.length);
+      }, 0);
+    } else {
+      setMessage(message + variable);
+    }
+  };
 
   return (
     <Card>
@@ -261,6 +398,7 @@ function TemplateEditor({
             Etapa {template.step_position}
           </Badge>
           <div className="flex items-center gap-2">
+            <VariableInserter formFields={formFields} onInsert={handleInsertVariable} />
             <Switch
               checked={active}
               onCheckedChange={setActive}
@@ -280,6 +418,7 @@ function TemplateEditor({
         </div>
 
         <Textarea
+          ref={textareaRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder={`Mensagem da etapa ${template.step_position}...`}

@@ -199,7 +199,7 @@ serve(async (req) => {
         // Get lead data
         const { data: lead } = await supabase
           .from('leads')
-          .select('name, email, phone, company')
+          .select('name, email, phone, company, custom_fields')
           .eq('id', record.lead_id)
           .maybeSingle();
 
@@ -210,6 +210,23 @@ serve(async (req) => {
             .replace(/\{\{email\}\}/gi, lead.email || '')
             .replace(/\{\{telefone\}\}/gi, lead.phone || '')
             .replace(/\{\{empresa\}\}/gi, lead.company || '');
+
+          // Replace dynamic form variables {{formulario:field_name}}
+          const customFields = (lead.custom_fields as Record<string, string> | null) || {};
+          message = message.replace(/\{\{formulario:([^}]+)\}\}/gi, (_match, fieldKey: string) => {
+            const key = fieldKey.trim();
+            if (customFields[key] !== undefined && customFields[key] !== null) {
+              return String(customFields[key]);
+            }
+            // Try formatted key (replace spaces/special chars with underscores)
+            const normalizedKey = key.toLowerCase().replace(/\s+/g, '_');
+            for (const [k, v] of Object.entries(customFields)) {
+              if (k.toLowerCase().replace(/\s+/g, '_') === normalizedKey && v !== undefined && v !== null) {
+                return String(v);
+              }
+            }
+            return '';
+          });
         }
 
         const phoneNumber = conv?.phone_number || lead?.phone;
