@@ -146,31 +146,33 @@ export function WhatsAppTemplateManager() {
         </p>
       </div>
 
-      {/* Greeting Templates */}
-      <TemplatePhaseSection
-        title="Saudação"
-        description="Mensagens enviadas imediatamente quando o lead entra no CRM"
-        phase="greeting"
-        templates={greetingTemplates}
-        onSave={(t) => saveMutation.mutate(t)}
-        onDelete={(id) => deleteMutation.mutate(id)}
-        onAdd={() => addTemplate('greeting')}
-        isSaving={saveMutation.isPending}
-      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="p-4">
+          <TemplatePhaseSection
+            title="Saudação"
+            description="Mensagens enviadas imediatamente quando o lead entra no CRM"
+            phase="greeting"
+            templates={greetingTemplates}
+            onSave={(t) => saveMutation.mutate(t)}
+            onDelete={(id) => deleteMutation.mutate(id)}
+            onAdd={() => addTemplate('greeting')}
+            isSaving={saveMutation.isPending}
+          />
+        </Card>
 
-      <Separator />
-
-      {/* Follow-up Templates */}
-      <TemplatePhaseSection
-        title="Follow-up"
-        description="Mensagens enviadas se o lead não responder"
-        phase="followup"
-        templates={followupTemplates}
-        onSave={(t) => saveMutation.mutate(t)}
-        onDelete={(id) => deleteMutation.mutate(id)}
-        onAdd={() => addTemplate('followup')}
-        isSaving={saveMutation.isPending}
-      />
+        <Card className="p-4">
+          <TemplatePhaseSection
+            title="Follow-up"
+            description="Mensagens enviadas se o lead não responder"
+            phase="followup"
+            templates={followupTemplates}
+            onSave={(t) => saveMutation.mutate(t)}
+            onDelete={(id) => deleteMutation.mutate(id)}
+            onAdd={() => addTemplate('followup')}
+            isSaving={saveMutation.isPending}
+          />
+        </Card>
+      </div>
     </div>
   );
 }
