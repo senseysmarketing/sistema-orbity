@@ -1,29 +1,59 @@
 
 
-# Unir Integração e Webhooks em Layout Side-by-Side
+# Resumo Semanal Compacto para WhatsApp
 
-## O que será feito
+## Problema
 
-Remover as abas separadas "Integração" e "Webhooks" do CRM Settings e unificá-las em uma única aba chamada "Integrações", exibindo os dois componentes lado a lado em grid de 2 colunas.
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-## Alteração
+## Solucao
 
-### `src/components/crm/CRMSettings.tsx`
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-- Remover a tab "webhooks" separada
-- Renomear a tab "integration" para "Integrações"
-- No `TabsContent` de integrações, usar grid 2 colunas:
+### Exemplo do novo formato
 
-```tsx
-<TabsContent value="integration">
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <MetaIntegrationConfig />
-    <WebhooksManager />
-  </div>
-</TabsContent>
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+
+*Semana 1 (03/03 a 09/03) - 5 posts*
+
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
 ```
 
-- Remover o `TabsTrigger` de webhooks e o import do ícone `Webhook`
+### Detalhes tecnicos
 
-Arquivo único: `src/components/crm/CRMSettings.tsx`
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 

@@ -4,7 +4,7 @@ import { MetaIntegrationConfig } from "./MetaIntegrationConfig";
 import { WebhooksManager } from "./WebhooksManager";
 import { ManualInvestmentManager } from "./ManualInvestmentManager";
 import { WhatsAppTemplateManager } from "./WhatsAppTemplateManager";
-import { Link2, DollarSign, Layers, Webhook, MessageSquare } from "lucide-react";
+import { Link2, DollarSign, Layers, MessageSquare } from "lucide-react";
 
 export function CRMSettings() {
   return (
@@ -20,7 +20,7 @@ export function CRMSettings() {
         <TabsList className="flex w-full overflow-x-auto scrollbar-hide">
           <TabsTrigger value="integration" className="flex-shrink-0 gap-1 md:gap-2">
             <Link2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Integração</span>
+            <span className="hidden sm:inline">Integrações</span>
           </TabsTrigger>
           <TabsTrigger value="investments" className="flex-shrink-0 gap-1 md:gap-2">
             <DollarSign className="h-4 w-4" />
@@ -30,10 +30,6 @@ export function CRMSettings() {
             <Layers className="h-4 w-4" />
             <span className="hidden sm:inline">Status</span>
           </TabsTrigger>
-          <TabsTrigger value="webhooks" className="flex-shrink-0 gap-1 md:gap-2">
-            <Webhook className="h-4 w-4" />
-            <span className="hidden sm:inline">Webhooks</span>
-          </TabsTrigger>
           <TabsTrigger value="whatsapp" className="flex-shrink-0 gap-1 md:gap-2">
             <MessageSquare className="h-4 w-4" />
             <span className="hidden sm:inline">WhatsApp</span>
@@ -41,7 +37,10 @@ export function CRMSettings() {
         </TabsList>
 
         <TabsContent value="integration">
-          <MetaIntegrationConfig />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <MetaIntegrationConfig />
+            <WebhooksManager />
+          </div>
         </TabsContent>
 
         <TabsContent value="investments">
@@ -50,10 +49,6 @@ export function CRMSettings() {
 
         <TabsContent value="status">
           <CustomStatusManager />
-        </TabsContent>
-
-        <TabsContent value="webhooks">
-          <WebhooksManager />
         </TabsContent>
 
         <TabsContent value="whatsapp">
