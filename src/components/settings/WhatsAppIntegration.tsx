@@ -14,6 +14,7 @@ export const WhatsAppIntegration = () => {
   const [apiKey, setApiKey] = useState("");
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [autoChecked, setAutoChecked] = useState(false);
+  const [connectionError, setConnectionError] = useState(false);
 
   const {
     account,
