@@ -1,41 +1,59 @@
 
 
-# Correção da Conexão WhatsApp + Detecção Automática de Status
+# Resumo Semanal Compacto para WhatsApp
 
-## Diagnóstico
+## Problema
 
-O erro "Failed to send a request to the Edge Function" ocorre por dois motivos:
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-1. **CORS incompleto**: Os headers CORS na edge function estão faltando os headers obrigatórios do Supabase client (`x-supabase-client-platform`, `x-supabase-client-platform-version`, `x-supabase-client-runtime`, `x-supabase-client-runtime-version`). O preflight OPTIONS falha e o browser bloqueia a request.
+## Solucao
 
-2. **Possível timeout**: A edge function faz chamadas externas à Evolution API que podem demorar, mas o CORS é o problema principal.
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-## Correções
+### Exemplo do novo formato
 
-### 1. Edge Function `whatsapp-connect/index.ts`
-- Corrigir os CORS headers para incluir todos os headers necessários do Supabase client
-- Adicionar tratamento melhorado de erros nas chamadas à Evolution API
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
 
-### 2. Edge Functions `whatsapp-send`, `whatsapp-webhook`, `process-whatsapp-queue`
-- Mesma correção de CORS em todas as edge functions
+*Semana 1 (03/03 a 09/03) - 5 posts*
 
-### 3. Componente `WhatsAppIntegration.tsx`
-- Ao carregar, se já existe uma conta salva mas status não é "connected", automaticamente verificar status via Evolution API
-- Se status for "disconnected", automaticamente buscar novo QR code para conectar
-- Se status for "connected", mostrar as informações de conexão
-- Melhorar tratamento de erro na UI com mensagens mais descritivas
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
 
-### 4. Hook `useWhatsApp.tsx`
-- Adicionar auto-check de status ao carregar a conta (quando account existe mas não está connected)
+Qualquer ajuste e so me chamar! ✅
+```
 
-## Arquivos a Modificar
+### Detalhes tecnicos
 
-| Arquivo | Mudança |
-|---------|---------|
-| `supabase/functions/whatsapp-connect/index.ts` | Corrigir CORS headers |
-| `supabase/functions/whatsapp-send/index.ts` | Corrigir CORS headers |
-| `supabase/functions/whatsapp-webhook/index.ts` | Corrigir CORS headers |
-| `supabase/functions/process-whatsapp-queue/index.ts` | Corrigir CORS headers |
-| `src/components/settings/WhatsAppIntegration.tsx` | Auto-detecção de status + auto QR code |
-| `src/hooks/useWhatsApp.tsx` | Auto-check status ao carregar |
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 
