@@ -1,59 +1,25 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Saudação e Follow-up em Blocos Side-by-Side
 
-## Problema
+## O que será feito
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+Reorganizar as seções "Saudação" e "Follow-up" em um grid de 2 colunas (lado a lado), similar ao layout já existente de Horários de Envio + Origens Permitidas.
 
-## Solucao
+## Alteração
 
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+### `src/components/crm/WhatsAppTemplateManager.tsx`
 
-### Exemplo do novo formato
+Substituir o layout vertical atual (Saudação → Separator → Follow-up) por um grid 2 colunas:
 
-```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
-
-*Semana 1 (03/03 a 09/03) - 5 posts*
-
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
-
-Qualquer ajuste e so me chamar! ✅
+```tsx
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <TemplatePhaseSection ... greeting />
+  <TemplatePhaseSection ... followup />
+</div>
 ```
 
-### Detalhes tecnicos
+Remover o `<Separator />` entre eles. Cada `TemplatePhaseSection` será envolvida em um `Card` para criar o visual de bloco consistente com os blocos acima.
 
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
-
-Reescrever a funcao `generateSummaryText` com formato compacto:
-
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
-
-### Mapeamento de emojis por formato
-
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
-
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+Arquivo único a modificar: `WhatsAppTemplateManager.tsx` (linhas 149-173).
 
