@@ -1,50 +1,59 @@
 
 
-# Layout Side-by-Side: Horários de Envio + Origens Permitidas
+# Resumo Semanal Compacto para WhatsApp
 
-## O que será feito
+## Problema
 
-Reorganizar a seção acima dos templates em dois blocos lado a lado:
-- **Esquerda**: Horários de Envio (componente existente)
-- **Direita**: Novo bloco "Origens Permitidas" — checkboxes para selecionar quais origens de lead disparam a automação WhatsApp
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-As origens disponíveis (baseadas no `LeadForm.tsx`): Manual, Website, Redes Sociais, Email, Telefone, Indicação, Evento, Anúncio, Facebook Leads, Facebook Ads, Outro.
+## Solucao
 
-A configuração de origens será salva como JSONB na `whatsapp_accounts` (nova coluna `allowed_sources`).
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-## Alterações
+### Exemplo do novo formato
 
-### 1. Migração SQL
-Adicionar coluna `allowed_sources jsonb default '[]'` na tabela `whatsapp_accounts`.
-
-### 2. Novo componente `AllowedSourcesManager.tsx`
-- Card com checkboxes para cada origem de lead
-- Toggle "Todas as origens" para selecionar/desselecionar todas
-- Salva no campo `allowed_sources` da `whatsapp_accounts`
-- Mesma estrutura visual do `SendingScheduleManager`
-
-### 3. `WhatsAppTemplateManager.tsx`
-Substituir `<SendingScheduleManager />` por um grid de 2 colunas:
 ```
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-  <SendingScheduleManager />
-  <AllowedSourcesManager />
-</div>
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+
+*Semana 1 (03/03 a 09/03) - 5 posts*
+
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
 ```
 
-### 4. `process-whatsapp-queue/index.ts`
-Antes de enviar, verificar se a origem do lead está na lista `allowed_sources`. Se a lista estiver vazia, permite todas (backward compatible).
+### Detalhes tecnicos
 
-### 5. Tipos Supabase
-Atualizar `types.ts` para incluir `allowed_sources`.
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
 
-## Arquivos
+Reescrever a funcao `generateSummaryText` com formato compacto:
 
-| Arquivo | Ação |
-|---------|------|
-| Nova migração SQL | Adicionar coluna `allowed_sources` |
-| `src/components/crm/AllowedSourcesManager.tsx` | Criar |
-| `src/components/crm/WhatsAppTemplateManager.tsx` | Grid layout |
-| `supabase/functions/process-whatsapp-queue/index.ts` | Filtro por origem |
-| `src/integrations/supabase/types.ts` | Atualizar tipo |
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 

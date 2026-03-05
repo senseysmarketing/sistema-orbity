@@ -5909,6 +5909,7 @@ export type Database = {
       whatsapp_accounts: {
         Row: {
           agency_id: string
+          allowed_sources: Json | null
           api_key: string
           api_url: string
           created_at: string | null
@@ -5922,6 +5923,7 @@ export type Database = {
         }
         Insert: {
           agency_id: string
+          allowed_sources?: Json | null
           api_key: string
           api_url: string
           created_at?: string | null
@@ -5935,6 +5937,7 @@ export type Database = {
         }
         Update: {
           agency_id?: string
+          allowed_sources?: Json | null
           api_key?: string
           api_url?: string
           created_at?: string | null

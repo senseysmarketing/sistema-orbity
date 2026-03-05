@@ -82,7 +82,7 @@ serve(async (req) => {
       .from('whatsapp_automation_control')
       .select(`
         *,
-        whatsapp_accounts!inner(id, agency_id, api_url, api_key, instance_name, status, sending_schedule),
+        whatsapp_accounts!inner(id, agency_id, api_url, api_key, instance_name, status, sending_schedule, allowed_sources),
         whatsapp_conversations(id, phone_number, last_customer_message_at)
       `)
       .eq('status', 'active')
@@ -155,6 +155,25 @@ serve(async (req) => {
               next_execution_at: nextAllowed.toISOString(),
             }).eq('id', record.id);
             console.log('[process-queue] Outside schedule, rescheduled to:', nextAllowed.toISOString(), record.id);
+            continue;
+          }
+        }
+
+        // --- ALLOWED SOURCES CHECK ---
+        const allowedSources = (account.allowed_sources as string[] | null) || [];
+        if (allowedSources.length > 0 && record.lead_id) {
+          const { data: leadData } = await supabase
+            .from('leads')
+            .select('source')
+            .eq('id', record.lead_id)
+            .maybeSingle();
+          
+          if (leadData?.source && !allowedSources.includes(leadData.source)) {
+            await supabase.from('whatsapp_automation_control').update({
+              status: 'finished',
+              conversation_state: 'source_not_allowed',
+            }).eq('id', record.id);
+            console.log('[process-queue] Source not allowed:', leadData.source, record.id);
             continue;
           }
         }
