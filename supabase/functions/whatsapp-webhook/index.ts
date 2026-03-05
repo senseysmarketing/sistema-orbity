@@ -6,6 +6,41 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+/**
+ * Optional HMAC signature validation.
+ * If WEBHOOK_SECRET is set in Supabase secrets, validates the x-webhook-signature header.
+ */
+async function validateSignature(req: Request, body: string): Promise<boolean> {
+  const webhookSecret = Deno.env.get('WEBHOOK_SECRET');
+  if (!webhookSecret) return true; // No secret configured, skip validation
+
+  const signature = req.headers.get('x-webhook-signature') || req.headers.get('x-signature');
+  if (!signature) {
+    console.warn('[whatsapp-webhook] Missing signature header, rejecting request');
+    return false;
+  }
+
+  try {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(webhookSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
+    const expectedSignature = Array.from(new Uint8Array(sig))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    return signature === expectedSignature;
+  } catch (e) {
+    console.error('[whatsapp-webhook] Signature validation error:', e);
+    return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -16,7 +51,19 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const body = await req.json();
+    const bodyText = await req.text();
+
+    // --- SIGNATURE VALIDATION ---
+    const isValid = await validateSignature(req, bodyText);
+    if (!isValid) {
+      console.error('[whatsapp-webhook] Invalid webhook signature');
+      return new Response(JSON.stringify({ success: false, error: 'Invalid signature' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const body = JSON.parse(bodyText);
     const { event, instance, data } = body;
 
     console.log('[whatsapp-webhook] Event received:', event, 'instance:', instance);
@@ -94,7 +141,7 @@ serve(async (req) => {
         messageData.message?.documentMessage ? 'document' :
         'text';
 
-      // Find or create conversation
+      // Find or create conversation (upsert to handle unique constraint)
       let { data: conversation } = await supabase
         .from('whatsapp_conversations')
         .select('id, lead_id')
@@ -110,17 +157,28 @@ serve(async (req) => {
           .eq('phone', phoneNumber)
           .maybeSingle();
 
-        const { data: newConv } = await supabase
+        const { data: newConv, error: convError } = await supabase
           .from('whatsapp_conversations')
-          .insert({
+          .upsert({
             account_id: account.id,
             phone_number: phoneNumber,
             lead_id: lead?.id || null,
-          })
+          }, { onConflict: 'account_id,phone_number' })
           .select()
           .single();
 
-        conversation = newConv;
+        if (convError) {
+          // Race condition: another request created it, fetch again
+          const { data: existingConv } = await supabase
+            .from('whatsapp_conversations')
+            .select('id, lead_id')
+            .eq('account_id', account.id)
+            .eq('phone_number', phoneNumber)
+            .maybeSingle();
+          conversation = existingConv;
+        } else {
+          conversation = newConv;
+        }
       }
 
       if (!conversation) {
@@ -150,25 +208,36 @@ serve(async (req) => {
       if (!isFromMe) {
         updateData.last_customer_message_at = timestamp;
 
-        const { data: automation } = await supabase
+        // Cancel active automations when customer replies
+        const { data: automations } = await supabase
           .from('whatsapp_automation_control')
           .select('id, status')
           .eq('account_id', account.id)
           .eq('conversation_id', conversation.id)
           .in('status', ['active', 'processing'])
-          .maybeSingle();
+          .limit(10);
 
-        if (automation) {
-          await supabase
-            .from('whatsapp_automation_control')
-            .update({
-              status: 'responded',
-              conversation_state: 'customer_replied',
-            })
-            .eq('id', automation.id);
+        if (automations && automations.length > 0) {
+          for (const automation of automations) {
+            await supabase
+              .from('whatsapp_automation_control')
+              .update({
+                status: 'responded',
+                conversation_state: 'customer_replied',
+              })
+              .eq('id', automation.id);
 
-          console.log('[whatsapp-webhook] Automation paused - customer replied', {
-            automation_id: automation.id,
+            // Log the event
+            await supabase.from('whatsapp_automation_logs').insert({
+              automation_id: automation.id,
+              account_id: account.id,
+              event: 'customer_replied_webhook',
+              details: { conversation_id: conversation.id, phone_number: phoneNumber },
+            });
+          }
+
+          console.log('[whatsapp-webhook] Automation(s) paused - customer replied', {
+            count: automations.length,
             conversation_id: conversation.id,
           });
         }

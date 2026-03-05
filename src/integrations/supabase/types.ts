@@ -5981,9 +5981,11 @@ export type Database = {
           current_phase: string | null
           current_step_position: number | null
           id: string
+          last_error: string | null
           last_followup_sent_at: string | null
           lead_id: string
           next_execution_at: string | null
+          retry_count: number
           started_at: string | null
           status: string | null
           updated_at: string | null
@@ -5995,9 +5997,11 @@ export type Database = {
           current_phase?: string | null
           current_step_position?: number | null
           id?: string
+          last_error?: string | null
           last_followup_sent_at?: string | null
           lead_id: string
           next_execution_at?: string | null
+          retry_count?: number
           started_at?: string | null
           status?: string | null
           updated_at?: string | null
@@ -6009,9 +6013,11 @@ export type Database = {
           current_phase?: string | null
           current_step_position?: number | null
           id?: string
+          last_error?: string | null
           last_followup_sent_at?: string | null
           lead_id?: string
           next_execution_at?: string | null
+          retry_count?: number
           started_at?: string | null
           status?: string | null
           updated_at?: string | null
@@ -6036,6 +6042,48 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_automation_logs: {
+        Row: {
+          account_id: string | null
+          automation_id: string | null
+          created_at: string
+          details: Json | null
+          event: string
+          id: string
+        }
+        Insert: {
+          account_id?: string | null
+          automation_id?: string | null
+          created_at?: string
+          details?: Json | null
+          event: string
+          id?: string
+        }
+        Update: {
+          account_id?: string | null
+          automation_id?: string | null
+          created_at?: string
+          details?: Json | null
+          event?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_automation_logs_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_automation_logs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_automation_control"
             referencedColumns: ["id"]
           },
         ]
