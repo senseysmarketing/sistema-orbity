@@ -159,6 +159,25 @@ serve(async (req) => {
           }
         }
 
+        // --- ALLOWED SOURCES CHECK ---
+        const allowedSources = (account.allowed_sources as string[] | null) || [];
+        if (allowedSources.length > 0 && record.lead_id) {
+          const { data: leadData } = await supabase
+            .from('leads')
+            .select('source')
+            .eq('id', record.lead_id)
+            .maybeSingle();
+          
+          if (leadData?.source && !allowedSources.includes(leadData.source)) {
+            await supabase.from('whatsapp_automation_control').update({
+              status: 'finished',
+              conversation_state: 'source_not_allowed',
+            }).eq('id', record.id);
+            console.log('[process-queue] Source not allowed:', leadData.source, record.id);
+            continue;
+          }
+        }
+
         // Get current step template
         const { data: template } = await supabase
           .from('whatsapp_message_templates')
