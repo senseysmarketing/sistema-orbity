@@ -1,37 +1,59 @@
 
 
-# Ajustar Prompt da IA para Planejamento de Conteudo
+# Resumo Semanal Compacto para WhatsApp
 
 ## Problema
 
-A IA esta gerando "legendas" no campo `description` dos itens de planejamento, sendo que este campo deveria conter a descricao do conteudo/tarefa (o que deve ser feito, contexto, objetivo). A legenda ja tem uma aba dedicada no sistema.
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-O campo `creative_instructions` tambem precisa ser reforçado para focar em elementos visuais e textuais da arte (headlines, CTAs, subtitulos, roteiros).
+## Solucao
 
-## Alteracoes
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-### Arquivo: `supabase/functions/ai-assist/index.ts`
-
-**1. Prompt do sistema (linha 239)** — Remover menção a "legenda" e reforcar que `description` e a descricao da tarefa/conteudo:
+### Exemplo do novo formato
 
 ```
-"...Cada conteúdo deve ter título, descrição clara do que deve ser produzido, instruções criativas detalhadas (headlines, subtítulos, CTAs, textos para a arte, roteiros) e hashtags relevantes. NÃO gere legendas — a legenda é criada separadamente em outra etapa."
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+
+*Semana 1 (03/03 a 09/03) - 5 posts*
+
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
 ```
 
-**2. Tool `extract_content_plan` (linha 144)** — Alterar description do campo `description`:
+### Detalhes tecnicos
 
-De: `"Legenda completa do post"`
-Para: `"Descrição clara e objetiva do conteúdo a ser produzido: tema, abordagem, pontos principais e contexto da postagem. NÃO inclua legenda."`
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
 
-**3. Tool `extract_content_plan` (linha 148)** — Melhorar description do campo `creative_instructions`:
+Reescrever a funcao `generateSummaryText` com formato compacto:
 
-De: `"Instrucoes detalhadas para o designer"`
-Para: `"Instruções detalhadas de criação: sugestões de headline, subtítulo, CTA, textos na arte, elementos visuais. Para vídeos/reels: roteiro com pontos principais."`
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
 
-**4. Tool `extract_plan_item` (linha 193)** — Mesma correção para edição de itens:
+### Mapeamento de emojis por formato
 
-De: `"Legenda/descrição envolvente e profissional para o post"`
-Para: `"Descrição clara do conteúdo a ser produzido: tema, abordagem e pontos principais. NÃO gere legenda."`
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
 
-Total: 4 alterações pontuais no edge function, sem mudanças no frontend.
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 
