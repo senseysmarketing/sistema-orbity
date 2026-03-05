@@ -5916,6 +5916,7 @@ export type Database = {
           instance_name: string
           phone_number: string | null
           qr_code: string | null
+          sending_schedule: Json | null
           status: string | null
           updated_at: string | null
         }
@@ -5928,6 +5929,7 @@ export type Database = {
           instance_name: string
           phone_number?: string | null
           qr_code?: string | null
+          sending_schedule?: Json | null
           status?: string | null
           updated_at?: string | null
         }
@@ -5940,6 +5942,7 @@ export type Database = {
           instance_name?: string
           phone_number?: string | null
           qr_code?: string | null
+          sending_schedule?: Json | null
           status?: string | null
           updated_at?: string | null
         }

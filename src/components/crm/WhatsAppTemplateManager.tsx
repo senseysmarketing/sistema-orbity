@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { SendingScheduleManager } from "./SendingScheduleManager";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,6 +124,10 @@ export function WhatsAppTemplateManager() {
 
   return (
     <div className="space-y-6">
+      <SendingScheduleManager />
+
+      <Separator />
+
       <div>
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <MessageSquare className="h-5 w-5" />
