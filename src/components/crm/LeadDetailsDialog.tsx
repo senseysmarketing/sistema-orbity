@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { 
   Mail, Phone, Building, Calendar, DollarSign, Clock, 
@@ -13,6 +14,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
+import { WhatsAppChat } from "./WhatsAppChat";
 
 interface Lead {
   id: string;
@@ -219,7 +221,16 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-4 py-4 min-h-0">
+        <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col min-h-0">
+          <TabsList className="flex-shrink-0 w-full justify-start">
+            <TabsTrigger value="details" className="text-xs">Detalhes</TabsTrigger>
+            <TabsTrigger value="whatsapp" className="text-xs gap-1">
+              <MessageSquare className="h-3 w-3" />
+              WhatsApp
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="details" className="flex-1 overflow-y-auto space-y-4 py-4 min-h-0 mt-0">
           {/* Metrics Cards */}
           <div className="grid gap-4 grid-cols-2">
             <Card>
@@ -451,7 +462,15 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-        </div>
+          </TabsContent>
+
+          <TabsContent value="whatsapp" className="flex-1 overflow-hidden min-h-0 mt-0">
+            <WhatsAppChat
+              leadId={lead.id}
+              leadPhone={lead.phone}
+            />
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter className="flex-shrink-0 pt-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
