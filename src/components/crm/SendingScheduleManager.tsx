@@ -57,7 +57,7 @@ export function SendingScheduleManager() {
     enabled: !!currentAgency?.id,
   });
 
-  const savedSchedule = (account?.sending_schedule as SendingSchedule) || DEFAULT_SCHEDULE;
+  const savedSchedule = (account?.sending_schedule as unknown as SendingSchedule) || DEFAULT_SCHEDULE;
 
   const [enabled, setEnabled] = useState(savedSchedule.enabled);
   const [startHour, setStartHour] = useState(savedSchedule.start_hour);
@@ -66,7 +66,7 @@ export function SendingScheduleManager() {
 
   useEffect(() => {
     if (account?.sending_schedule) {
-      const s = account.sending_schedule as SendingSchedule;
+      const s = account.sending_schedule as unknown as SendingSchedule;
       setEnabled(s.enabled);
       setStartHour(s.start_hour);
       setEndHour(s.end_hour);
