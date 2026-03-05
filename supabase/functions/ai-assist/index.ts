@@ -141,11 +141,11 @@ const CONTENT_PLANNING_TOOLS = [
                 day_number: { type: "number" },
                 post_date: { type: "string", description: "Data no formato YYYY-MM-DD" },
                 title: { type: "string" },
-                description: { type: "string", description: "Legenda completa do post" },
+                description: { type: "string", description: "Descrição clara e objetiva do conteúdo a ser produzido: tema, abordagem, pontos principais e contexto da postagem. NÃO inclua legenda." },
                 content_type: { type: "string" },
                 format: { type: "string", enum: ["carrossel", "feed", "reels", "stories", "video"] },
                 platform: { type: "string" },
-                creative_instructions: { type: "string", description: "Instrucoes detalhadas para o designer" },
+                creative_instructions: { type: "string", description: "Instruções detalhadas de criação: sugestões de headline, subtítulo, CTA, textos na arte, elementos visuais. Para vídeos/reels: roteiro com pontos principais." },
                 objective: { type: "string" },
                 hashtags: { type: "string", description: "Hashtags separadas por espaco, cada uma com #" },
               },
@@ -190,7 +190,7 @@ const EDIT_PLAN_ITEM_TOOLS = [
         type: "object",
         properties: {
           title: { type: "string", description: "Título conciso e claro do conteúdo" },
-          description: { type: "string", description: "Legenda/descrição envolvente e profissional para o post" },
+          description: { type: "string", description: "Descrição clara do conteúdo a ser produzido: tema, abordagem e pontos principais. NÃO gere legenda." },
           format: { type: "string", enum: ["carrossel", "feed", "reels", "stories", "vídeo", "artigo"], description: "Formato do conteúdo" },
           platform: { type: "string", enum: ["Instagram", "Facebook", "TikTok", "LinkedIn", "YouTube", "Twitter/X"], description: "Plataforma de publicação" },
           content_type: { type: "string", description: "Tipo de conteúdo: educativo, autoridade, conversão, prova social, bastidores, storytelling, promocional, entretenimento" },
@@ -236,7 +236,7 @@ const ANALYTICS_REVIEW_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: A análise é direcionada ao gestor da agência. Seja objetivo e prático. Use dados concretos (nomes, números, percentuais). As sugestões devem ser acionáveis e específicas. A nota de performance deve refletir: taxa de conclusão (peso maior), atrasos, distribuição equilibrada e tarefas sem dono. Responda em português brasileiro.";
 
 const DEFAULT_CONTENT_PLANNING_PROMPT =
-  "Você é um estrategista de conteúdo para redes sociais de uma agência de marketing digital. Gere um planejamento mensal de conteúdo completo e estratégico baseado no contexto do cliente, nicho, objetivos e frequência solicitada. Distribua os conteúdos de forma equilibrada entre tipos (educativo, autoridade, conversão, prova social, bastidores, storytelling) e formatos (carrossel, feed, reels, stories). Cada conteúdo deve ter título, legenda, instruções criativas detalhadas e hashtags relevantes.";
+  "Você é um estrategista de conteúdo para redes sociais de uma agência de marketing digital. Gere um planejamento mensal de conteúdo completo e estratégico baseado no contexto do cliente, nicho, objetivos e frequência solicitada. Distribua os conteúdos de forma equilibrada entre tipos (educativo, autoridade, conversão, prova social, bastidores, storytelling) e formatos (carrossel, feed, reels, stories). Cada conteúdo deve ter título, descrição clara do que deve ser produzido, instruções criativas detalhadas (headlines, subtítulos, CTAs, textos para a arte, roteiros) e hashtags relevantes. NÃO gere legendas — a legenda é criada separadamente em outra etapa.";
 
 const CONTENT_PLANNING_TECHNICAL_INSTRUCTIONS =
   " IMPORTANTE: Gere exatamente a quantidade de conteúdos correspondente à frequência semanal multiplicada pelas semanas do período. Distribua as datas de forma equilibrada ao longo do mês, evitando fins de semana quando possível. Cada item deve ter post_date no formato YYYY-MM-DD. As instruções criativas (creative_instructions) devem ser detalhadas o suficiente para um designer executar sem dúvidas. Responda em português brasileiro.";
