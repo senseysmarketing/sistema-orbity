@@ -32,6 +32,12 @@ const STANDARD_FIELDS = [
   'military_status', 'work_email', 'work_phone_number',
 ];
 
+const META_SYSTEM_FIELDS = [
+  'form_name', 'form_id', 'page_name', 'page_id',
+  'ad_id', 'adset_id', 'campaign_id', 'platform',
+  'leadgen_id', 'sync_method', 'REF', 'ref',
+];
+
 const FIXED_VARIABLES = [
   { key: '{{nome}}', label: 'Nome' },
   { key: '{{empresa}}', label: 'Empresa' },
@@ -51,7 +57,7 @@ function useFormFieldKeys(agencyId?: string) {
     queryFn: async () => {
       if (!agencyId) return {} as Record<string, string[]>;
 
-      // 1. Get all integrations (form_name by integration id)
+      // 1) Integrations map: integration_id -> form_name
       const { data: integrations, error: intError } = await supabase
         .from('facebook_lead_integrations')
         .select('id, form_name')
@@ -59,44 +65,70 @@ function useFormFieldKeys(agencyId?: string) {
       if (intError) throw intError;
 
       const integrationMap: Record<string, string> = {};
-      for (const i of integrations || []) {
-        integrationMap[i.id] = i.form_name;
+      for (const integration of integrations || []) {
+        integrationMap[integration.id] = integration.form_name;
       }
 
-      // 2. Get sync logs to map lead_id → integration_id
+      // 2) Sync log maps (when available)
       const { data: syncLogs, error: syncError } = await supabase
         .from('facebook_lead_sync_log')
-        .select('lead_id, integration_id')
-        .eq('agency_id', agencyId)
-        .not('lead_id', 'is', null);
+        .select('lead_id, integration_id, facebook_lead_id')
+        .eq('agency_id', agencyId);
       if (syncError) throw syncError;
 
-      const leadFormMap: Record<string, string> = {};
+      const leadIdToFormMap: Record<string, string> = {};
+      const facebookLeadIdToFormMap: Record<string, string> = {};
+
       for (const log of syncLogs || []) {
-        if (log.lead_id && integrationMap[log.integration_id]) {
-          leadFormMap[log.lead_id] = integrationMap[log.integration_id];
+        const mappedFormName = integrationMap[log.integration_id];
+        if (!mappedFormName) continue;
+
+        if (log.lead_id) {
+          leadIdToFormMap[log.lead_id] = mappedFormName;
+        }
+
+        if (log.facebook_lead_id) {
+          facebookLeadIdToFormMap[log.facebook_lead_id] = mappedFormName;
         }
       }
 
-      // 3. Get leads with custom_fields
+      // 3) Leads with custom fields from Facebook source
       const { data: leads, error: leadsError } = await supabase
         .from('leads')
         .select('id, custom_fields')
         .eq('agency_id', agencyId)
+        .eq('source', 'facebook_leads')
         .not('custom_fields', 'is', null)
-        .limit(200);
+        .limit(300);
       if (leadsError) throw leadsError;
 
-      // 4. Group fields by form name
+      // 4) Group variable keys by resolved form name
       const grouped: Record<string, Set<string>> = {};
+
       for (const row of leads || []) {
         const cf = row.custom_fields as Record<string, unknown> | null;
-        if (!cf) continue;
-        const formName = leadFormMap[row.id] || 'Outros';
-        if (!grouped[formName]) grouped[formName] = new Set();
+        if (!cf || typeof cf !== 'object') continue;
+
+        const cfFormName = typeof cf.form_name === 'string' ? cf.form_name.trim() : '';
+        const cfLeadgenId = typeof cf.leadgen_id === 'string' ? cf.leadgen_id.trim() : '';
+        const cfRef = typeof cf.REF === 'string'
+          ? cf.REF.trim()
+          : typeof cf.ref === 'string'
+            ? cf.ref.trim()
+            : '';
+
+        const resolvedFormName =
+          leadIdToFormMap[row.id] ||
+          (cfLeadgenId ? facebookLeadIdToFormMap[cfLeadgenId] : undefined) ||
+          (cfFormName || undefined) ||
+          (cfRef || undefined) ||
+          'Outros';
+
+        if (!grouped[resolvedFormName]) grouped[resolvedFormName] = new Set();
+
         for (const key of Object.keys(cf)) {
-          if (!STANDARD_FIELDS.includes(key) && key !== 'form_name') {
-            grouped[formName].add(key);
+          if (!STANDARD_FIELDS.includes(key) && !META_SYSTEM_FIELDS.includes(key)) {
+            grouped[resolvedFormName].add(key);
           }
         }
       }
@@ -105,6 +137,7 @@ function useFormFieldKeys(agencyId?: string) {
       for (const [name, keys] of Object.entries(grouped)) {
         result[name] = Array.from(keys).sort();
       }
+
       return result;
     },
     enabled: !!agencyId,
