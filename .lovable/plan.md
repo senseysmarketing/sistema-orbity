@@ -1,59 +1,29 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Agrupar Variáveis de Formulário por Nome Real do Formulário
 
 ## Problema
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+O `form_name` não está dentro de `custom_fields` do lead — ele está na tabela `facebook_lead_integrations`. Por isso, todos os campos caem em "Outros".
 
-## Solucao
+## Solução
 
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+Mudar a estratégia do `useFormFieldKeys`: em vez de tentar extrair `form_name` de `custom_fields`, fazer um JOIN via `facebook_lead_sync_log` para associar cada lead ao seu formulário real.
 
-### Exemplo do novo formato
+## Alterações em `src/components/crm/WhatsAppTemplateManager.tsx`
 
-```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+### Reescrever `useFormFieldKeys`
 
-*Semana 1 (03/03 a 09/03) - 5 posts*
+1. Buscar todas as integrações da agência: `facebook_lead_integrations` → pegar `id`, `form_name`
+2. Buscar os sync logs com leads: `facebook_lead_sync_log` → pegar `integration_id`, `lead_id`
+3. Buscar os leads com `custom_fields` correspondentes
+4. Agrupar os campos por `form_name` da integração
 
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
+Fluxo simplificado:
+- Query 1: `facebook_lead_integrations` da agência → mapa `integration_id → form_name`
+- Query 2: `facebook_lead_sync_log` da agência → mapa `lead_id → integration_id`
+- Query 3: `leads` com `custom_fields` não nulos da agência (já existe)
+- Cruzar: para cada lead, pegar o `form_name` via sync_log → integration, agrupar campos por esse nome
 
-Qualquer ajuste e so me chamar! ✅
-```
-
-### Detalhes tecnicos
-
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
-
-Reescrever a funcao `generateSummaryText` com formato compacto:
-
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
-
-### Mapeamento de emojis por formato
-
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
-
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+Campos que são `STANDARD_FIELDS` continuam filtrados. Formulários sem nome caem em "Outros".
 
