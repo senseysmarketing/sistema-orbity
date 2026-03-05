@@ -46,12 +46,14 @@ export const WhatsAppIntegration = () => {
           const result = await checkStatus.mutateAsync();
           if (result?.status === 'connected') {
             setQrCode(null);
+            setConnectionError(false);
           } else if (result?.qr_code) {
             setQrCode(result.qr_code);
           }
-          } catch {
-            setConnectionError(true);
-          }
+        } catch {
+          setConnectionError(true);
+        }
+      }, 5000);
       return () => clearInterval(interval);
     }
   }, [account?.status, qrCode]);
