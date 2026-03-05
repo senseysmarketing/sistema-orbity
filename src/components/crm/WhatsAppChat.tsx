@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 
 interface WhatsAppChatProps {
   leadId: string;
-  leadName: string;
   leadPhone: string | null;
 }
 
