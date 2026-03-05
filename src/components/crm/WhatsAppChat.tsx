@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   MessageSquare, Send, Loader2, Play, Pause, Bot, 
-  User, WifiOff, Zap 
+  WifiOff, Zap 
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -19,7 +18,7 @@ interface WhatsAppChatProps {
   leadPhone: string | null;
 }
 
-export function WhatsAppChat({ leadId, leadName, leadPhone }: WhatsAppChatProps) {
+export function WhatsAppChat({ leadId, leadPhone }: WhatsAppChatProps) {
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +35,7 @@ export function WhatsAppChat({ leadId, leadName, leadPhone }: WhatsAppChatProps)
 
   const { data: conversation, isLoading: loadingConv } = useLeadConversation(leadId);
   const { data: messages = [], isLoading: loadingMessages } = useConversationMessages(conversation?.id || null);
-  const { data: automation, isLoading: loadingAutomation } = useLeadAutomation(leadId);
+  const { data: automation } = useLeadAutomation(leadId);
 
   // Scroll to bottom on new messages
   useEffect(() => {

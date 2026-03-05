@@ -22,6 +22,7 @@ import { UsersManagement } from "@/components/admin/UsersManagement";
 import { NotificationSummaryCard } from "@/components/notifications/NotificationSummaryCard";
 import { NotificationChannelsConfig } from "@/components/notifications/NotificationChannelsConfig";
 import { GoogleCalendarIntegration } from "@/components/settings/GoogleCalendarIntegration";
+import { WhatsAppIntegration } from "@/components/settings/WhatsAppIntegration";
 import { AISettingsManager } from "@/components/settings/AISettingsManager";
 
 export default function Settings() {
@@ -411,6 +412,7 @@ export default function Settings() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <GoogleCalendarIntegration />
+            <WhatsAppIntegration />
           </div>
         </TabsContent>
 
