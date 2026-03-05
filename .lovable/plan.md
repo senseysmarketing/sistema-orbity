@@ -1,59 +1,41 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Agrupar Campos de Formulário por Nome do Formulário
 
 ## Problema
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+Atualmente, o seletor de variáveis lista todos os campos de `custom_fields` de todos os leads misturados, incluindo campos de formulários antigos que não são mais usados. Isso causa confusão e risco de puxar variáveis vazias.
 
-## Solucao
+## Solução
 
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+Agrupar os campos por `form_name` (que já existe dentro de `custom_fields` de cada lead). O seletor mostrará seções separadas por formulário, ex:
 
-### Exemplo do novo formato
+```text
+Variáveis fixas
+  [Nome] [Empresa] [Email] [Telefone]
 
-```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+📋 Formulário: "Captação Imóveis 2025"
+  [O Custo Do Nosso Trabalho...] [Qual O Seu VGV Mensal?]
 
-*Semana 1 (03/03 a 09/03) - 5 posts*
-
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
-
-Qualquer ajuste e so me chamar! ✅
+📋 Formulário: "Lead Magnet Antigo"
+  [Qual Seu Instagram?] [Principal Gargalo...]
 ```
 
-### Detalhes tecnicos
+## Alterações
 
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+### `src/components/crm/WhatsAppTemplateManager.tsx`
 
-Reescrever a funcao `generateSummaryText` com formato compacto:
+1. **Modificar `useFormFieldKeys`** — em vez de retornar `string[]`, retornar `Record<string, string[]>` (mapa de `form_name → campos[]`):
+   - Ao iterar os `custom_fields`, extrair `form_name` de cada lead
+   - Agrupar os campos não-padrão por esse `form_name`
+   - Leads sem `form_name` vão para um grupo "Outros"
 
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+2. **Atualizar `VariableInserter`** — receber o mapa agrupado e renderizar uma seção por formulário com:
+   - Título do formulário como header
+   - Badges dos campos abaixo
+   - Scroll vertical para acomodar múltiplos formulários
 
-### Mapeamento de emojis por formato
+3. **Propagar tipo atualizado** — ajustar props de `TemplatePhaseSection` e `TemplateEditor` para o novo tipo `Record<string, string[]>`.
 
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
-
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+Arquivo único: `src/components/crm/WhatsAppTemplateManager.tsx`
 
