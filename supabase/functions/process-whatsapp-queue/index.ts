@@ -82,7 +82,7 @@ serve(async (req) => {
       .from('whatsapp_automation_control')
       .select(`
         *,
-        whatsapp_accounts!inner(id, agency_id, api_url, api_key, instance_name, status, sending_schedule),
+        whatsapp_accounts!inner(id, agency_id, api_url, api_key, instance_name, status, sending_schedule, allowed_sources),
         whatsapp_conversations(id, phone_number, last_customer_message_at)
       `)
       .eq('status', 'active')
