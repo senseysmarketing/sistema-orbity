@@ -1,59 +1,50 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Variáveis de Formulário Meta nos Templates WhatsApp
 
-## Problema
+## Contexto
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+Os leads do Facebook já têm as respostas do formulário salvas em `custom_fields` (JSONB) na tabela `leads`. Campos padrão (full_name, email, phone_number, etc.) são separados dos campos personalizados (perguntas do formulário). Precisamos disponibilizar essas respostas como variáveis nos templates de WhatsApp.
 
-## Solucao
+## O que será feito
 
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+1. **Nova variável dinâmica `{{formulario:campo}}`** — permitir referenciar qualquer campo do `custom_fields` do lead nos templates de mensagem. Exemplo: `{{formulario:qual_o_seu_vgv_mensal}}` será substituído pela resposta do lead.
 
-### Exemplo do novo formato
+2. **Seletor visual de variáveis no editor de template** — ao editar um template, mostrar um dropdown/lista de variáveis disponíveis (fixas + dinâmicas do formulário) para inserir no texto com um clique.
 
-```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+3. **Buscar campos disponíveis dos formulários** — consultar os `custom_fields` dos leads existentes da agência para listar as perguntas de formulário disponíveis como variáveis.
 
-*Semana 1 (03/03 a 09/03) - 5 posts*
+## Alterações
 
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
+### 1. `supabase/functions/process-whatsapp-queue/index.ts`
+- Na linha 202, expandir o `select` para incluir `custom_fields`
+- Após substituir as variáveis fixas (nome, email, etc.), adicionar loop que substitui `{{formulario:CAMPO}}` pelo valor correspondente em `custom_fields`
+- Aplicar `formatAnswer` (limpeza de underscores) no valor
 
-Qualquer ajuste e so me chamar! ✅
-```
+### 2. `src/components/crm/WhatsAppTemplateManager.tsx`
+- Atualizar a descrição de variáveis disponíveis para incluir a sintaxe `{{formulario:campo}}`
+- Adicionar um componente `VariableInserter` no `TemplateEditor` — um botão/popover que lista:
+  - **Variáveis fixas**: `{{nome}}`, `{{empresa}}`, `{{email}}`, `{{telefone}}`
+  - **Variáveis de formulário**: buscadas dinamicamente dos `custom_fields` dos leads da agência
+- Ao clicar numa variável, ela é inserida no textarea
 
-### Detalhes tecnicos
+### 3. Novo hook/query para buscar campos disponíveis
+- Query que faz `SELECT DISTINCT jsonb_object_keys(custom_fields)` dos leads da agência com `source = 'facebook_leads'`
+- Filtra os `STANDARD_FIELDS` (full_name, email, etc.) para mostrar apenas perguntas do formulário
+- Formata os nomes para exibição amigável (reutilizando lógica de `formatQuestion`)
 
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+## Arquivos
 
-Reescrever a funcao `generateSummaryText` com formato compacto:
+| Arquivo | Ação |
+|---------|------|
+| `supabase/functions/process-whatsapp-queue/index.ts` | Substituir variáveis `{{formulario:X}}` |
+| `src/components/crm/WhatsAppTemplateManager.tsx` | Adicionar seletor de variáveis e docs |
 
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+## Exemplo de uso
 
-### Mapeamento de emojis por formato
+Template configurado:
+> Olá {{nome}}! Vi que você tem interesse em {{formulario:qual_o_seu_vgv_mensal}}. Podemos conversar?
 
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
-
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+Resultado enviado:
+> Olá João! Vi que você tem interesse em Menos de R$ 500.000. Podemos conversar?
 
