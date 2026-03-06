@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS lead_scoring_results_lead_id_unique ON public.lead_scoring_results (lead_id);

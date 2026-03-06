@@ -13,6 +13,17 @@ const PIPELINE_EVENT_MAP: Record<string, string> = {
   won: 'Purchase',
 };
 
+// Normalize strings for matching: lowercase, remove accents, replace _ with space, compact spaces
+function normalize(val: string): string {
+  return val
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")  // remove accents
+    .replace(/_/g, " ")               // underscores to spaces
+    .replace(/\s+/g, " ")             // compact spaces
+    .trim();
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -48,10 +59,8 @@ serve(async (req) => {
 
       if (!lead) throw new Error(`Lead ${lead_id} not found`);
 
-      // Find pixel_id from integration
       const pixelId = await findPixelId(supabase, lead, agency_id);
       if (!pixelId) {
-        console.log('[PIPELINE EVENT] No pixel_id found, skipping');
         return new Response(
           JSON.stringify({ message: 'No pixel configured' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -71,25 +80,140 @@ serve(async (req) => {
 
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select('*, facebook_lead_sync_log!inner(integration_id)')
+      .select('*')
       .eq('id', lead_id)
-      .maybeSingle();
+      .single();
 
     if (leadError || !lead) {
-      const { data: leadOnly } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('id', lead_id)
-        .single();
-
-      if (!leadOnly) throw new Error(`Lead ${lead_id} not found`);
-
-      console.log('[QUALIFICATION] Lead has no sync log, checking custom_fields directly');
-      return await processLeadScoring(supabase, leadOnly, agency_id, null);
+      throw new Error(`Lead ${lead_id} not found`);
     }
 
-    const integrationId = lead.facebook_lead_sync_log?.[0]?.integration_id;
-    return await processLeadScoring(supabase, lead, agency_id, integrationId);
+    const customFields = lead.custom_fields || {};
+    if (Object.keys(customFields).length === 0) {
+      console.log('[QUALIFICATION] No custom_fields to score');
+      // Mark as unconfigured
+      await supabase.from('leads').update({
+        temperature: 'cold',
+        qualification_score: 0,
+        qualification_source: 'unconfigured',
+      }).eq('id', lead.id);
+
+      return new Response(
+        JSON.stringify({ score: 0, qualification: 'cold', message: 'No fields to score' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Find form_id by inferring from rules: match custom_fields keys against agency rules
+    const formId = await inferFormId(supabase, agency_id, customFields);
+
+    let rules: any[] = [];
+    if (formId) {
+      const { data } = await supabase
+        .from('lead_scoring_rules')
+        .select('*')
+        .eq('agency_id', agency_id)
+        .eq('form_id', formId);
+      rules = data || [];
+    }
+
+    if (rules.length === 0) {
+      console.log('[QUALIFICATION] No scoring rules found, marking unconfigured');
+      await supabase.from('leads').update({
+        temperature: 'cold',
+        qualification_score: 0,
+        qualification_source: 'unconfigured',
+      }).eq('id', lead.id);
+
+      return new Response(
+        JSON.stringify({ score: 0, qualification: 'cold', message: 'No rules configured' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Calculate score with normalized matching
+    let totalScore = 0;
+    let isBlocked = false;
+    const answersDetail: any[] = [];
+
+    for (const [question, answer] of Object.entries(customFields)) {
+      const answerStr = String(answer);
+      const normalizedAnswer = normalize(answerStr);
+
+      // Find matching rule with normalized comparison
+      const matchingRule = rules.find(
+        (r: any) => r.question === question && normalize(r.answer) === normalizedAnswer
+      );
+
+      if (matchingRule) {
+        if (matchingRule.is_blocker) {
+          isBlocked = true;
+          answersDetail.push({ question, answer: answerStr, score: matchingRule.score, blocker: true });
+          console.log(`[QUALIFICATION] BLOCKER: ${question} = ${answerStr}`);
+          break;
+        }
+        totalScore += matchingRule.score;
+        answersDetail.push({ question, answer: answerStr, score: matchingRule.score });
+        console.log(`[QUALIFICATION] MATCH: ${question} = "${answerStr}" → ${matchingRule.score} pts`);
+      }
+    }
+
+    // Classify
+    let qualification = 'cold';
+    if (isBlocked) {
+      totalScore = -10;
+      qualification = 'cold';
+    } else if (totalScore >= 5) {
+      qualification = 'hot';
+    } else if (totalScore >= 2) {
+      qualification = 'warm';
+    }
+
+    console.log(`[QUALIFICATION] Score: ${totalScore}, Qualification: ${qualification}`);
+
+    // Save result (unique on lead_id)
+    await supabase
+      .from('lead_scoring_results')
+      .upsert({
+        lead_id: lead.id,
+        agency_id: agency_id,
+        score_total: totalScore,
+        qualification,
+        answers_detail: answersDetail,
+        scored_at: new Date().toISOString(),
+      }, { onConflict: 'lead_id' })
+      .select();
+
+    // Update lead temperature and score
+    await supabase
+      .from('leads')
+      .update({
+        temperature: qualification,
+        qualification_score: totalScore,
+        qualification_source: 'auto',
+      })
+      .eq('id', lead.id);
+
+    // Fire Meta events based on qualification
+    const pixelId = await findPixelId(supabase, lead, agency_id);
+    if (pixelId) {
+      const leadValue = lead.value || 0;
+
+      if (qualification === 'hot') {
+        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'Lead', totalScore, qualification, leadValue);
+        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'QualifiedLead', totalScore, qualification, leadValue);
+      } else if (qualification === 'cold') {
+        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'Lead', totalScore, qualification, leadValue);
+        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'ColdLead', totalScore, qualification, leadValue);
+      } else {
+        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'Lead', totalScore, qualification, leadValue);
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ score: totalScore, qualification, answers: answersDetail }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
     console.error('[QUALIFICATION] Error:', error);
@@ -100,8 +224,48 @@ serve(async (req) => {
   }
 });
 
+// Infer form_id by matching custom_fields keys against lead_scoring_rules questions
+async function inferFormId(supabase: any, agencyId: string, customFields: Record<string, any>): Promise<string | null> {
+  // Get all distinct form_ids with their questions for this agency
+  const { data: allRules } = await supabase
+    .from('lead_scoring_rules')
+    .select('form_id, question')
+    .eq('agency_id', agencyId);
+
+  if (!allRules || allRules.length === 0) return null;
+
+  // Group questions by form_id
+  const formQuestions: Record<string, Set<string>> = {};
+  for (const rule of allRules) {
+    if (!formQuestions[rule.form_id]) formQuestions[rule.form_id] = new Set();
+    formQuestions[rule.form_id].add(rule.question);
+  }
+
+  const leadKeys = new Set(Object.keys(customFields));
+
+  // Find form with best overlap
+  let bestFormId: string | null = null;
+  let bestScore = 0;
+
+  for (const [formId, questions] of Object.entries(formQuestions)) {
+    let matches = 0;
+    for (const q of questions) {
+      if (leadKeys.has(q)) matches++;
+    }
+    if (matches > bestScore) {
+      bestScore = matches;
+      bestFormId = formId;
+    }
+  }
+
+  if (bestFormId) {
+    console.log(`[QUALIFICATION] Inferred form_id: ${bestFormId} (${bestScore} matching questions)`);
+  }
+
+  return bestFormId;
+}
+
 async function findPixelId(supabase: any, lead: any, agencyId: string): Promise<string | null> {
-  // Try from sync log integration first
   const { data: syncLog } = await supabase
     .from('facebook_lead_sync_log')
     .select('integration_id')
@@ -118,7 +282,6 @@ async function findPixelId(supabase: any, lead: any, agencyId: string): Promise<
     if (integration?.pixel_id) return integration.pixel_id;
   }
 
-  // Fallback: find any integration with pixel_id for this agency
   const { data: anyIntegration } = await supabase
     .from('facebook_lead_integrations')
     .select('pixel_id')
@@ -128,137 +291,6 @@ async function findPixelId(supabase: any, lead: any, agencyId: string): Promise<
     .maybeSingle();
 
   return anyIntegration?.pixel_id || null;
-}
-
-async function processLeadScoring(supabase: any, lead: any, agencyId: string, integrationId: string | null) {
-  const customFields = lead.custom_fields || {};
-
-  if (Object.keys(customFields).length === 0) {
-    console.log('[QUALIFICATION] No custom_fields to score');
-    return new Response(
-      JSON.stringify({ score: 0, qualification: 'cold', message: 'No fields to score' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  let formId: string | null = null;
-  let pixelId: string | null = null;
-
-  if (integrationId) {
-    const { data: integration } = await supabase
-      .from('facebook_lead_integrations')
-      .select('form_id, pixel_id')
-      .eq('id', integrationId)
-      .single();
-
-    if (integration) {
-      formId = integration.form_id;
-      pixelId = integration.pixel_id;
-    }
-  }
-
-  // Fallback pixel_id
-  if (!pixelId) {
-    pixelId = await findPixelId(supabase, lead, agencyId);
-  }
-
-  let rules: any[] = [];
-  if (formId) {
-    const { data } = await supabase
-      .from('lead_scoring_rules')
-      .select('*')
-      .eq('agency_id', agencyId)
-      .eq('form_id', formId);
-    rules = data || [];
-  }
-
-  if (rules.length === 0) {
-    console.log('[QUALIFICATION] No scoring rules found, skipping');
-    return new Response(
-      JSON.stringify({ score: 0, qualification: 'cold', message: 'No rules configured' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // Calculate score
-  let totalScore = 0;
-  let isBlocked = false;
-  const answersDetail: any[] = [];
-
-  for (const [question, answer] of Object.entries(customFields)) {
-    const answerStr = String(answer);
-    const matchingRule = rules.find(
-      (r: any) => r.question === question && r.answer === answerStr
-    );
-
-    if (matchingRule) {
-      if (matchingRule.is_blocker) {
-        isBlocked = true;
-        answersDetail.push({ question, answer: answerStr, score: matchingRule.score, blocker: true });
-        console.log(`[QUALIFICATION] BLOCKER: ${question} = ${answerStr}`);
-        break;
-      }
-      totalScore += matchingRule.score;
-      answersDetail.push({ question, answer: answerStr, score: matchingRule.score });
-    }
-  }
-
-  // Classify
-  let qualification = 'cold';
-  if (isBlocked) {
-    totalScore = -10;
-    qualification = 'cold';
-  } else if (totalScore >= 5) {
-    qualification = 'hot';
-  } else if (totalScore >= 2) {
-    qualification = 'warm';
-  }
-
-  console.log(`[QUALIFICATION] Score: ${totalScore}, Qualification: ${qualification}`);
-
-  // Save result
-  await supabase
-    .from('lead_scoring_results')
-    .upsert({
-      lead_id: lead.id,
-      agency_id: agencyId,
-      score_total: totalScore,
-      qualification,
-      answers_detail: answersDetail,
-      scored_at: new Date().toISOString(),
-    }, { onConflict: 'lead_id' })
-    .select();
-
-  // Update lead temperature and score
-  await supabase
-    .from('leads')
-    .update({
-      temperature: qualification,
-      qualification_score: totalScore,
-      qualification_source: 'auto',
-    })
-    .eq('id', lead.id);
-
-  // Fire Meta events based on qualification
-  if (pixelId) {
-    const leadValue = lead.value || 0;
-
-    if (qualification === 'hot') {
-      await sendMetaEvent(supabase, lead, agencyId, pixelId, 'Lead', totalScore, qualification, leadValue);
-      await sendMetaEvent(supabase, lead, agencyId, pixelId, 'QualifiedLead', totalScore, qualification, leadValue);
-    } else if (qualification === 'cold') {
-      await sendMetaEvent(supabase, lead, agencyId, pixelId, 'Lead', totalScore, qualification, leadValue);
-      await sendMetaEvent(supabase, lead, agencyId, pixelId, 'ColdLead', totalScore, qualification, leadValue);
-    } else {
-      // warm
-      await sendMetaEvent(supabase, lead, agencyId, pixelId, 'Lead', totalScore, qualification, leadValue);
-    }
-  }
-
-  return new Response(
-    JSON.stringify({ score: totalScore, qualification, answers: answersDetail }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
 }
 
 async function sendMetaEvent(
@@ -273,7 +305,6 @@ async function sendMetaEvent(
 ) {
   const eventId = `${lead.id}_${eventName}`;
 
-  // Idempotency check
   const { data: existing } = await supabase
     .from('meta_conversion_events')
     .select('id')
@@ -301,7 +332,6 @@ async function sendMetaEvent(
     return;
   }
 
-  // Hash user data — enhanced with first_name, last_name
   const encoder = new TextEncoder();
   const hashData = async (val: string) => {
     const data = encoder.encode(val.toLowerCase().trim());
@@ -312,16 +342,10 @@ async function sendMetaEvent(
   const userData: any = {};
   if (lead.phone) userData.ph = [await hashData(lead.phone)];
   if (lead.email) userData.em = [await hashData(lead.email)];
-
-  // Extract first_name and last_name from lead.name
   if (lead.name) {
     const nameParts = lead.name.trim().split(/\s+/);
-    if (nameParts.length > 0) {
-      userData.fn = [await hashData(nameParts[0])];
-    }
-    if (nameParts.length > 1) {
-      userData.ln = [await hashData(nameParts.slice(1).join(' '))];
-    }
+    if (nameParts.length > 0) userData.fn = [await hashData(nameParts[0])];
+    if (nameParts.length > 1) userData.ln = [await hashData(nameParts.slice(1).join(' '))];
   }
 
   const customData: any = {
@@ -330,7 +354,6 @@ async function sendMetaEvent(
     lead_id: lead.id,
   };
 
-  // Value-based optimization
   if (value && value > 0) {
     customData.value = value;
     customData.currency = 'BRL';

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, Users, DollarSign, Target, Calendar, Grid, List, AlertTriangle, TrendingUp, Settings, Download, Filter } from "lucide-react";
+import { Plus, Search, Users, DollarSign, Target, Calendar, Grid, List, AlertTriangle, TrendingUp, Settings, Download, Filter, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,25 @@ import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 import { toast } from "sonner";
 import { getTemperatureLabel } from "@/lib/leadTemperature";
 import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+function UnqualifiedLeadsWarning({ leads }: { leads: Lead[] }) {
+  const unqualifiedCount = leads.filter(
+    l => l.source === 'facebook_leads' && (!l.qualification_source || l.qualification_source === 'unconfigured')
+  ).length;
+
+  if (unqualifiedCount === 0) return null;
+
+  return (
+    <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800">
+      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+      <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+        <strong>{unqualifiedCount} lead{unqualifiedCount > 1 ? 's' : ''}</strong> do Facebook sem qualificação configurada.
+        Vá em <strong>Configurações → Qualificação</strong> e configure as regras do formulário.
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 interface Lead {
   id: string;
@@ -38,6 +57,7 @@ interface Lead {
   next_contact: string | null;
   tags: string[] | null;
   custom_fields: any;
+  qualification_source?: string | null;
   created_at: string;
   updated_at: string;
   created_by: string;
@@ -373,6 +393,7 @@ export default function CRM() {
 
         {/* Pipeline Tab */}
         <TabsContent value="pipeline" className="space-y-4">
+          <UnqualifiedLeadsWarning leads={leads} />
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">

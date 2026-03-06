@@ -1,76 +1,59 @@
 
-Objetivo: fazer a temperatura depender da qualificação (não do status), corrigir o recálculo dos leads existentes e exibir aviso quando chegam leads sem qualificação configurada.
 
-1) Diagnóstico confirmado (raiz do problema)
-- `process-lead-qualification` hoje depende de `facebook_lead_sync_log` para descobrir `form_id`.
-- No banco atual, `facebook_lead_sync_log` está vazio, então a função cai em “No rules configured” para todos os leads.
-- As respostas no lead vêm normalizadas (ex.: `corretor_autônomo`, `de_r$1...`) e as regras foram salvas em formato “humano” (ex.: `Corretor Autônomo`), então match exato falha.
-- Em `LeadsKanban`, mover estágio recalcula temperatura por status (`getTemperatureForStatus`), sobrescrevendo a lógica de qualificação.
+# Resumo Semanal Compacto para WhatsApp
 
-2) Correções de backend (qualificação confiável)
-Arquivos:
-- `supabase/functions/process-lead-qualification/index.ts`
-- nova migration em `supabase/migrations/*`
+## Problema
 
-Implementar:
-- Resolver formulário sem depender de sync log:
-  - tentar por `integrationId` (quando existir),
-  - senão inferir por melhor aderência de perguntas entre `custom_fields` do lead e regras da agência.
-- Fazer match de respostas com normalização:
-  - lowercase, remover acento, trocar `_` por espaço, compactar espaços.
-- Sempre persistir estado no lead:
-  - se não houver regra aplicável: `temperature='cold'`, `qualification_score=0`, `qualification_source='unconfigured'`.
-  - se houver regra: manter `qualification_source='auto'`.
-- Garantir persistência de resultado:
-  - adicionar constraint/index único em `lead_scoring_results(lead_id)` (ou ajustar para `lead_id, agency_id` e alinhar `onConflict`).
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-3) Correções do fluxo “Atualizar leads existentes” (rápido e correto)
-Arquivo:
-- `src/components/crm/LeadScoringConfig.tsx`
+## Solucao
 
-Implementar:
-- No salvar com “Atualizar leads existentes”, não recalcular “todos facebook_leads” sem critério.
-- Filtrar candidatos por compatibilidade com perguntas ativas do formulário (chaves presentes em `custom_fields`).
-- Processar em lote com concorrência controlada (ex.: 10–20 por vez) para reduzir tempo total.
-- Exibir feedback de progresso (processados/sucesso/falha) no toast.
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-4) Remover temperatura por status e manter só qualificação
-Arquivos:
-- `src/components/crm/LeadsKanban.tsx`
-- `src/lib/leadTemperature.ts`
-- (ajuste complementar) `supabase/functions/facebook-leads/index.ts`
+### Exemplo do novo formato
 
-Implementar:
-- Em `LeadsKanban`, ao mover estágio:
-  - atualizar apenas `status` (e timestamps/motivo de perda),
-  - não atualizar `temperature`.
-- Remover uso de `getTemperatureForStatus` (e limpar função/mapeamento legado no utilitário).
-- Na entrada de leads Facebook (`syncLeads` + `webhook`):
-  - inicializar `temperature='cold'` por padrão,
-  - disparar qualificação automática após criação (também no fluxo `syncLeads`, não só webhook).
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
 
-5) Badge/aviso para agência sem qualificação configurada
-Arquivo:
-- `src/pages/CRM.tsx` (aba Pipeline)
+*Semana 1 (03/03 a 09/03) - 5 posts*
 
-Implementar:
-- Mostrar alerta/badge quando existir lead Facebook sem qualificação aplicada:
-  - critério sugerido: `source='facebook_leads'` e `qualification_source in (null, 'unconfigured')`.
-- Mensagem orientativa:
-  - “Leads sem qualificação configurada. Vá em Configurações > Qualificação e configure o formulário.”
-- Manter comportamento seguro: sem configuração, leads ficam “Frio”.
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
 
-Seção técnica (resumo de garantias)
-- Temperatura vira “derivada da qualificação” (e não do estágio do funil).
-- Requalificação passa a funcionar mesmo sem `facebook_lead_sync_log`.
-- Matching de respostas fica robusto contra diferenças de formatação.
-- Persistência de scoring fica estável com `onConflict` válido.
-- UX terá visibilidade imediata quando faltarem regras de qualificação.
+Qualquer ajuste e so me chamar! ✅
+```
 
-Validação após implementação
-1. Configurar regras do formulário e salvar com “Atualizar leads existentes”.
-2. Confirmar que o lead “Henry Lowe Junior” muda para:
-   - `qualification_score=4`
-   - `temperature='warm'` (Morno).
-3. Mover lead entre estágios e confirmar que a temperatura não muda por status.
-4. Em agência sem regras, confirmar novos leads entram como Frio + alerta aparece no Pipeline.
+### Detalhes tecnicos
+
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
+

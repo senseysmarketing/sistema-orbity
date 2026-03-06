@@ -10,7 +10,7 @@ import { LossReasonDialog } from "./LossReasonDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
-import { getTemperatureForStatus, getTemperatureLabel, LEAD_TEMPERATURES } from "@/lib/leadTemperature";
+import { getTemperatureLabel } from "@/lib/leadTemperature";
 import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 import { firePipelineMetaEvent } from "@/lib/metaPipelineEvents";
 import { useAgency } from "@/hooks/useAgency";
@@ -212,21 +212,16 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
         return;
       }
       
-      // Calculate new temperature based on status
-      const newTemperature = getTemperatureForStatus(dbStatus);
-      const tempConfig = LEAD_TEMPERATURES[newTemperature];
-      
       // Update local cache immediately (optimistic update)
       if (onLeadMove) {
         onLeadMove(leadId, dbStatus);
       }
       
-      // Update in background without blocking UI
+      // Update in background - only status, NOT temperature
       const { error } = await supabase
         .from('leads')
         .update({ 
           status: dbStatus,
-          temperature: newTemperature,
           updated_at: new Date().toISOString()
         })
         .eq('id', leadId);
@@ -238,7 +233,7 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
         firePipelineMetaEvent(leadId, currentAgency.id, dbStatus, lead.value);
       }
       
-      toast.success(`Lead movido para ${displayStatus} • ${tempConfig.emoji} ${tempConfig.label}`);
+      toast.success(`Lead movido para ${displayStatus}`);
     } catch (error) {
       console.error('Error updating lead status:', error);
       toast.error('Erro ao atualizar status do lead');
@@ -254,8 +249,6 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
     if (!pendingLossLead) return;
     
     try {
-      const newTemperature = getTemperatureForStatus('lost');
-      
       if (onLeadMove) {
         onLeadMove(pendingLossLead.id, 'lost');
       }
@@ -266,7 +259,6 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
         .from('leads')
         .update({
           status: 'lost',
-          temperature: newTemperature,
           loss_reason: lossReason,
           updated_at: new Date().toISOString(),
         })

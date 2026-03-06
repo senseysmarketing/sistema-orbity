@@ -29,17 +29,6 @@ export const LEAD_TEMPERATURES = {
   },
 } as const;
 
-// Mapping status to automatic temperature
-export const STATUS_TO_TEMPERATURE: Record<string, LeadTemperature> = {
-  'leads': 'cold',
-  'qualified': 'warm',
-  'scheduled': 'warm',
-  'meeting': 'hot',
-  'proposal': 'hot',
-  'won': 'hot',
-  'lost': 'cold',
-};
-
 export function getTemperatureLabel(temperature: string): string {
   return LEAD_TEMPERATURES[temperature as LeadTemperature]?.label || temperature;
 }
@@ -50,8 +39,4 @@ export function getTemperatureColor(temperature: string): string {
 
 export function getTemperatureIcon(temperature: string) {
   return LEAD_TEMPERATURES[temperature as LeadTemperature]?.icon || Thermometer;
-}
-
-export function getTemperatureForStatus(status: string): LeadTemperature {
-  return STATUS_TO_TEMPERATURE[status] || 'cold';
 }
