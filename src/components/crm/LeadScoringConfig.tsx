@@ -399,10 +399,14 @@ function FormAccordionItem({
   integration,
   agencyId,
   onDeleted,
+  isConfiguredFromParent,
+  ruleCountFromParent,
 }: {
   integration: Integration;
   agencyId: string;
   onDeleted: () => void;
+  isConfiguredFromParent: boolean;
+  ruleCountFromParent: number;
 }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState<FormData>({
