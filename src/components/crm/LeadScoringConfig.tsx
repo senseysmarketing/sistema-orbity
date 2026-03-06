@@ -1058,11 +1058,13 @@ export function LeadScoringConfig() {
       ) : (
         <Accordion type="single" collapsible className="space-y-2">
           {filteredIntegrations.map((integration) => (
-            <FormAccordionItem
+             <FormAccordionItem
               key={integration.id}
               integration={integration}
               agencyId={currentAgency!.id}
               onDeleted={loadIntegrations}
+              isConfiguredFromParent={configuredFormIds.has(integration.form_id)}
+              ruleCountFromParent={ruleCounts[integration.form_id] || 0}
             />
           ))}
         </Accordion>
