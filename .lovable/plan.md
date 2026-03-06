@@ -1,59 +1,70 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Ajustes no Plano: Meta Conversions API
 
-## Problema
+Três refinamentos técnicos no plano aprovado anteriormente.
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+## 1. `external_id` como array
 
-## Solucao
+No `sendMetaEvent`, garantir que `external_id` é array (como `em` e `ph` já são):
 
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
-
-### Exemplo do novo formato
-
-```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
-
-*Semana 1 (03/03 a 09/03) - 5 posts*
-
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
-
-Qualquer ajuste e so me chamar! ✅
+```typescript
+userData.external_id = [await hashData(lead.id)];
 ```
 
-### Detalhes tecnicos
+A Meta espera arrays para todos os campos de `user_data`. O plano já previa isso corretamente — apenas confirmar que a implementação segue o padrão.
 
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+## 2. Adicionar `event_source_url`
 
-Reescrever a funcao `generateSummaryText` com formato compacto:
+Incluir `event_source_url` no payload do evento. Melhora match quality e atribuição:
 
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+```typescript
+{
+  event_name: eventName,
+  event_time: Math.floor(Date.now() / 1000),
+  event_id: eventId,
+  action_source: 'system_generated',
+  event_source_url: 'https://sistema-orbity.lovable.app',
+  user_data: { ... },
+  custom_data: { ... }
+}
+```
 
-### Mapeamento de emojis por formato
+Valor fixo usando a URL pública do sistema. Arquivo afetado: `supabase/functions/process-lead-qualification/index.ts`.
 
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
+## 3. Query única para pixel + token
 
-### Resultado esperado
+Criar uma database function que retorna pixel e token numa só query, reduzindo latência:
 
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+```sql
+CREATE OR REPLACE FUNCTION public.get_meta_pixel_config(p_agency_id uuid)
+RETURNS TABLE(pixel_id text, test_event_code text, access_token text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT p.pixel_id, p.test_event_code, c.access_token
+  FROM facebook_pixels p
+  JOIN facebook_connections c ON p.agency_id = c.agency_id
+  WHERE p.agency_id = p_agency_id
+    AND p.is_selected = true
+    AND c.is_active = true
+  LIMIT 1;
+$$;
+```
+
+Na edge function, substituir duas queries por uma:
+
+```typescript
+const { data: config } = await supabase.rpc('get_meta_pixel_config', { p_agency_id: agencyId });
+if (!config?.length) { /* no pixel/token */ }
+const { pixel_id, test_event_code, access_token } = config[0];
+```
+
+## Resumo de mudanças adicionais
+
+| Arquivo | Mudança |
+|---------|---------|
+| Migration (nova) | Função `get_meta_pixel_config` |
+| `process-lead-qualification/index.ts` | `event_source_url`, `external_id` como array, usar `rpc('get_meta_pixel_config')` |
+
+Estes ajustes se somam ao plano principal já aprovado. Nenhuma mudança de arquitetura — apenas refinamentos no payload e otimização de query.
 
