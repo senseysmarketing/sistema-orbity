@@ -1,59 +1,48 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Fix: Fluxo oficial Meta para listForms
 
-## Problema
+## Problemas atuais
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+1. **`listForms` filtra por `user_id`** — outro membro da agência não encontra a conexão
+2. **Usa `GET /{page_id}?fields=access_token` para obter page token** — instável, pode falhar dependendo do escopo
+3. **Não filtra formulários por `status: ACTIVE`** — retorna arquivados/deletados
+4. **Sem proteção contra duplicação** na tabela de integrações
 
-## Solucao
+## Solução
 
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+### 1. Edge Function `listForms` — fluxo oficial Meta
 
-### Exemplo do novo formato
+Arquivo: `supabase/functions/facebook-leads/index.ts`, função `listForms` (~linhas 164-211)
+
+Substituir a lógica atual por:
 
 ```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
-
-*Semana 1 (03/03 a 09/03) - 5 posts*
-
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
-
-Qualquer ajuste e so me chamar! ✅
+1. Buscar conexão por agency_id (sem user_id)
+2. Usar access_token → GET /me/accounts (com paginação)
+3. Encontrar a página pelo pageId → extrair page_access_token
+4. GET /{page_id}/leadgen_forms?fields=id,name,status&access_token=PAGE_TOKEN
+5. Filtrar apenas status === "ACTIVE"
+6. Retornar formulários
 ```
 
-### Detalhes tecnicos
+Também corrigir `listPages` da mesma forma (remover `user_id`).
 
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+### 2. Frontend — passar `fields=id,name,status` e filtrar ACTIVE
 
-Reescrever a funcao `generateSummaryText` com formato compacto:
+No `SyncMetaDialog`, os formulários já vêm filtrados do backend. Apenas exibir.
 
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+### 3. Constraint UNIQUE para evitar duplicação
 
-### Mapeamento de emojis por formato
+Migration SQL:
 
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
+```sql
+ALTER TABLE facebook_lead_integrations 
+ADD CONSTRAINT unique_agency_form 
+UNIQUE (agency_id, form_id);
+```
 
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+### Arquivos afetados
+- `supabase/functions/facebook-leads/index.ts` — funções `listForms` e `listPages`
+- Migration para constraint UNIQUE
 
