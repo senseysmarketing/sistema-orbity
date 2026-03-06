@@ -891,7 +891,7 @@ export function LeadScoringConfig() {
     if (!currentAgency?.id) return;
     const { data } = await supabase
       .from("facebook_lead_integrations")
-      .select("id, page_id, page_name, form_name, form_id, pixel_id")
+      .select("id, page_id, page_name, form_name, form_id, pixel_id, form_questions")
       .eq("agency_id", currentAgency.id)
       .eq("is_active", true);
 
