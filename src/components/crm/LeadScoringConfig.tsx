@@ -3,16 +3,30 @@ import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Plus, Trash2, Target, Flame, Thermometer, Snowflake, Save, Info } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Loader2, Target, Flame, Thermometer, Snowflake, Save, Info,
+  RefreshCw, Facebook, CheckCircle2, Clock, Trash2, Settings2
+} from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 
+// ── Types ──────────────────────────────────────────────
 interface Integration {
   id: string;
   page_name: string;
@@ -34,24 +48,642 @@ interface DetectedQuestion {
   answers: string[];
 }
 
-export function LeadScoringConfig() {
-  const { currentAgency } = useAgency();
-  const { toast } = useToast();
+interface FormData {
+  rules: ScoringRule[];
+  detectedQuestions: DetectedQuestion[];
+  pixelId: string;
+  loading: boolean;
+}
 
-  const [integrations, setIntegrations] = useState<Integration[]>([]);
-  const [selectedIntegration, setSelectedIntegration] = useState<string>("");
-  const [pixelId, setPixelId] = useState("");
-  const [rules, setRules] = useState<ScoringRule[]>([]);
-  const [detectedQuestions, setDetectedQuestions] = useState<DetectedQuestion[]>([]);
-  const [loading, setLoading] = useState(true);
+const TECHNICAL_FIELDS = new Set([
+  "ad_id", "ad_name", "adset_id", "adset_name", "campaign_id",
+  "campaign_name", "form_id", "platform", "leadgen_id", "created_time",
+  "page_id", "page_name", "is_organic"
+]);
+
+const SCORE_OPTIONS = [
+  { value: "-2", label: "Muito negativo (-2)", color: "text-destructive" },
+  { value: "-1", label: "Negativo (-1)", color: "text-orange-600" },
+  { value: "0", label: "Neutro (0)", color: "text-muted-foreground" },
+  { value: "1", label: "Positivo (+1)", color: "text-emerald-600" },
+  { value: "2", label: "Muito positivo (+2)", color: "text-green-600" },
+];
+
+// ── Temperature Legend ─────────────────────────────────
+function TemperatureLegend() {
+  return (
+    <div className="flex flex-wrap items-center gap-4 text-sm">
+      <span className="font-medium text-foreground">Classificação:</span>
+      <span className="inline-flex items-center gap-1">
+        <Flame className="h-4 w-4 text-red-500" /> Quente: ≥ 5 pts
+      </span>
+      <span className="inline-flex items-center gap-1">
+        <Thermometer className="h-4 w-4 text-orange-500" /> Morno: 2–4 pts
+      </span>
+      <span className="inline-flex items-center gap-1">
+        <Snowflake className="h-4 w-4 text-blue-500" /> Frio: ≤ 1 pt
+      </span>
+    </div>
+  );
+}
+
+// ── Question Scoring Block ─────────────────────────────
+function QuestionScoringBlock({
+  question,
+  answers,
+  rules,
+  onRuleChange,
+}: {
+  question: string;
+  answers: string[];
+  rules: ScoringRule[];
+  onRuleChange: (question: string, answer: string, score: number, is_blocker: boolean) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-foreground">{question}</p>
+      <div className="space-y-1.5 pl-3 border-l-2 border-muted">
+        {answers.map((answer) => {
+          const existingRule = rules.find(
+            (r) => r.question === question && r.answer === answer
+          );
+          const currentScore = existingRule?.score ?? 0;
+          const isBlocker = existingRule?.is_blocker ?? false;
+
+          return (
+            <div
+              key={answer}
+              className="flex items-center gap-3 py-1.5"
+            >
+              <span className="text-sm text-muted-foreground flex-1 min-w-0 truncate">
+                "{answer}"
+              </span>
+              <Select
+                value={String(currentScore)}
+                onValueChange={(v) => onRuleChange(question, answer, Number(v), isBlocker)}
+              >
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SCORE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <span className={opt.color}>{opt.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-1.5">
+                <Switch
+                  checked={isBlocker}
+                  onCheckedChange={(b) => onRuleChange(question, answer, currentScore, b)}
+                  className="scale-75"
+                />
+                <span className="text-[10px] text-muted-foreground w-14">Bloqueador</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Sync Meta Dialog ───────────────────────────────────
+function SyncMetaDialog({
+  open,
+  onOpenChange,
+  agencyId,
+  existingFormIds,
+  onSynced,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  agencyId: string;
+  existingFormIds: Set<string>;
+  onSynced: () => void;
+}) {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [_pages, setPages] = useState<Array<{ id: string; name: string; access_token: string }>>([]);
+  const [allForms, setAllForms] = useState<
+    Array<{ pageId: string; pageName: string; pageToken: string; formId: string; formName: string; exists: boolean }>
+  >([]);
+
+  const fetchFormsFromMeta = async () => {
+    setLoading(true);
+    setAllForms([]);
+    try {
+      // 1. List pages
+      const { data: pagesData, error: pErr } = await supabase.functions.invoke("facebook-leads", {
+        body: { action: "list_pages", agencyId },
+      });
+      if (pErr) throw pErr;
+      const pgs = pagesData?.pages || [];
+      setPages(pgs);
+
+      // 2. For each page, list forms
+      const formsAccum: typeof allForms = [];
+      for (const page of pgs) {
+        try {
+          const { data: formsData } = await supabase.functions.invoke("facebook-leads", {
+            body: { action: "list_forms", agencyId, pageId: page.id, pageAccessToken: page.access_token },
+          });
+          for (const f of formsData?.forms || []) {
+            formsAccum.push({
+              pageId: page.id,
+              pageName: page.name,
+              pageToken: page.access_token,
+              formId: f.id,
+              formName: f.name,
+              exists: existingFormIds.has(f.id),
+            });
+          }
+        } catch {
+          // skip page errors
+        }
+      }
+      setAllForms(formsAccum);
+    } catch (err: any) {
+      toast({ title: "Erro ao buscar formulários", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (open) fetchFormsFromMeta();
+  }, [open]);
+
+  const connectionId = async () => {
+    const { data } = await supabase
+      .from("facebook_connections")
+      .select("id")
+      .eq("agency_id", agencyId)
+      .eq("is_active", true)
+      .limit(1)
+      .single();
+    return data?.id;
+  };
+
+  const importForm = async (form: (typeof allForms)[0]) => {
+    setSaving(true);
+    try {
+      const connId = await connectionId();
+      if (!connId) throw new Error("Nenhuma conexão Facebook ativa");
+
+      await supabase.functions.invoke("facebook-leads", {
+        body: {
+          action: "save_integration",
+          agencyId,
+          connectionId: connId,
+          pageId: form.pageId,
+          pageName: form.pageName,
+          pageAccessToken: form.pageToken,
+          formId: form.formId,
+          formName: form.formName,
+          defaultStatus: "new",
+          defaultPriority: "cold",
+        },
+      });
+
+      toast({ title: `Formulário "${form.formName}" importado!` });
+      setAllForms((prev) =>
+        prev.map((f) => (f.formId === form.formId ? { ...f, exists: true } : f))
+      );
+      onSynced();
+    } catch (err: any) {
+      toast({ title: "Erro ao importar", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const importAll = async () => {
+    const newForms = allForms.filter((f) => !f.exists);
+    for (const f of newForms) {
+      await importForm(f);
+    }
+  };
+
+  const newCount = allForms.filter((f) => !f.exists).length;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Facebook className="h-5 w-5" />
+            Sincronizar Formulários Meta
+          </DialogTitle>
+          <DialogDescription>
+            Importar formulários do Facebook Lead Ads para configurar qualificação
+          </DialogDescription>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-2">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Buscando formulários...</p>
+          </div>
+        ) : allForms.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">
+            Nenhum formulário encontrado nas páginas conectadas.
+          </p>
+        ) : (
+          <div className="space-y-3 max-h-[400px] overflow-y-auto">
+            {allForms.map((form) => (
+              <div
+                key={form.formId}
+                className="flex items-center justify-between p-3 rounded-lg border bg-card"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{form.formName}</p>
+                  <p className="text-xs text-muted-foreground truncate">{form.pageName}</p>
+                </div>
+                {form.exists ? (
+                  <Badge variant="outline" className="text-green-600 border-green-200 shrink-0">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Importado
+                  </Badge>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => importForm(form)}
+                    disabled={saving}
+                    className="shrink-0"
+                  >
+                    Importar
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {newCount > 0 && (
+          <Button onClick={importAll} disabled={saving} className="w-full">
+            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Importar todos ({newCount})
+          </Button>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Form Accordion Item ────────────────────────────────
+function FormAccordionItem({
+  integration,
+  agencyId,
+  onDeleted,
+}: {
+  integration: Integration;
+  agencyId: string;
+  onDeleted: () => void;
+}) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState<FormData>({
+    rules: [],
+    detectedQuestions: [],
+    pixelId: integration.pixel_id || "",
+    loading: true,
+  });
   const [saving, setSaving] = useState(false);
   const [savingPixel, setSavingPixel] = useState(false);
+  const [updateExisting, setUpdateExisting] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<Map<string, ScoringRule>>(new Map());
+  const [loaded, setLoaded] = useState(false);
 
-  // New rule form
-  const [newQuestion, setNewQuestion] = useState("");
-  const [newAnswer, setNewAnswer] = useState("");
-  const [newScore, setNewScore] = useState(0);
-  const [newIsBlocker, setNewIsBlocker] = useState(false);
+  const loadFormData = useCallback(async () => {
+    if (loaded) return;
+
+    // Load rules and detect questions in parallel
+    const [rulesRes, leadsRes] = await Promise.all([
+      supabase
+        .from("lead_scoring_rules")
+        .select("*")
+        .eq("agency_id", agencyId)
+        .eq("form_id", integration.form_id),
+      supabase
+        .from("leads")
+        .select("custom_fields")
+        .eq("agency_id", agencyId)
+        .eq("source", "facebook_leads")
+        .not("custom_fields", "is", null)
+        .limit(100),
+    ]);
+
+    const rules: ScoringRule[] = (rulesRes.data || []).map((r: any) => ({
+      id: r.id,
+      question: r.question,
+      answer: r.answer,
+      score: r.score,
+      is_blocker: r.is_blocker,
+    }));
+
+    // Detect questions from leads
+    const questionsMap: Record<string, Set<string>> = {};
+    (leadsRes.data || []).forEach((lead: any) => {
+      if (lead.custom_fields && typeof lead.custom_fields === "object") {
+        Object.entries(lead.custom_fields).forEach(([key, value]) => {
+          if (TECHNICAL_FIELDS.has(key)) return;
+          if (!questionsMap[key]) questionsMap[key] = new Set();
+          if (value && typeof value === "string") questionsMap[key].add(value);
+        });
+      }
+    });
+
+    const detectedQuestions = Object.entries(questionsMap)
+      .map(([question, answersSet]) => ({
+        question,
+        answers: Array.from(answersSet).slice(0, 20),
+      }))
+      .filter((q) => q.answers.length > 0);
+
+    // Initialize pending changes from existing rules
+    const changes = new Map<string, ScoringRule>();
+    rules.forEach((r) => {
+      changes.set(`${r.question}|||${r.answer}`, r);
+    });
+
+    setPendingChanges(changes);
+    setFormData({ rules, detectedQuestions, pixelId: integration.pixel_id || "", loading: false });
+    setLoaded(true);
+  }, [agencyId, integration.form_id, integration.pixel_id, loaded]);
+
+  const handleRuleChange = (question: string, answer: string, score: number, is_blocker: boolean) => {
+    const key = `${question}|||${answer}`;
+    const existing = formData.rules.find((r) => r.question === question && r.answer === answer);
+    setPendingChanges((prev) => {
+      const next = new Map(prev);
+      next.set(key, {
+        id: existing?.id,
+        question,
+        answer,
+        score,
+        is_blocker,
+      });
+      return next;
+    });
+  };
+
+  const saveConfig = async () => {
+    setSaving(true);
+    try {
+      // Delete existing rules for this form
+      await supabase
+        .from("lead_scoring_rules")
+        .delete()
+        .eq("agency_id", agencyId)
+        .eq("form_id", integration.form_id);
+
+      // Insert all pending changes that have non-zero scores or are blockers
+      const rulesToInsert = Array.from(pendingChanges.values())
+        .filter((r) => r.score !== 0 || r.is_blocker)
+        .map((r) => ({
+          agency_id: agencyId,
+          form_id: integration.form_id,
+          form_name: integration.form_name,
+          question: r.question,
+          answer: r.answer,
+          score: r.score,
+          is_blocker: r.is_blocker,
+        }));
+
+      if (rulesToInsert.length > 0) {
+        const { error } = await supabase.from("lead_scoring_rules").insert(rulesToInsert);
+        if (error) throw error;
+      }
+
+      // Optionally re-qualify existing leads
+      if (updateExisting) {
+        // Get leads from this form's source
+        const { data: leads } = await supabase
+          .from("leads")
+          .select("id")
+          .eq("agency_id", agencyId)
+          .eq("source", "facebook_leads")
+          .limit(500);
+
+        if (leads && leads.length > 0) {
+          for (const lead of leads) {
+            try {
+              await supabase.functions.invoke("process-lead-qualification", {
+                body: { leadId: lead.id, agencyId },
+              });
+            } catch {
+              // continue with other leads
+            }
+          }
+        }
+      }
+
+      toast({ title: "Configuração salva com sucesso!" });
+      setLoaded(false); // force reload
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const savePixelId = async () => {
+    setSavingPixel(true);
+    const { error } = await supabase
+      .from("facebook_lead_integrations")
+      .update({ pixel_id: formData.pixelId || null })
+      .eq("id", integration.id);
+    setSavingPixel(false);
+    if (error) {
+      toast({ title: "Erro ao salvar Pixel ID", variant: "destructive" });
+    } else {
+      toast({ title: "Pixel ID salvo" });
+    }
+  };
+
+  const deleteIntegration = async () => {
+    await supabase.from("lead_scoring_rules").delete().eq("form_id", integration.form_id).eq("agency_id", agencyId);
+    const { error } = await supabase.from("facebook_lead_integrations").delete().eq("id", integration.id);
+    if (!error) {
+      toast({ title: "Formulário removido" });
+      onDeleted();
+    }
+  };
+
+  const configuredCount = formData.rules.length;
+  const isConfigured = configuredCount > 0;
+  const questionsCount = formData.detectedQuestions.length;
+
+  // Check if there are actual pending changes vs saved rules
+  const hasChanges = (() => {
+    const savedKeys = new Set(formData.rules.map((r) => `${r.question}|||${r.answer}|||${r.score}|||${r.is_blocker}`));
+    const pendingKeys = new Set(
+      Array.from(pendingChanges.values())
+        .filter((r) => r.score !== 0 || r.is_blocker)
+        .map((r) => `${r.question}|||${r.answer}|||${r.score}|||${r.is_blocker}`)
+    );
+    if (savedKeys.size !== pendingKeys.size) return true;
+    for (const k of savedKeys) {
+      if (!pendingKeys.has(k)) return true;
+    }
+    return false;
+  })();
+
+  return (
+    <AccordionItem value={integration.id} className="border rounded-lg px-1">
+      <AccordionTrigger className="hover:no-underline py-3 px-3" onClick={loadFormData}>
+        <div className="flex items-center gap-3 flex-1 min-w-0 text-left">
+          <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-sm truncate">
+                [{integration.page_name}] {integration.form_name}
+              </span>
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                <Facebook className="h-3 w-3 mr-0.5" /> Meta
+              </Badge>
+              {isConfigured ? (
+                <Badge variant="outline" className="text-green-600 border-green-200 text-[10px] px-1.5 py-0">
+                  <CheckCircle2 className="h-3 w-3 mr-0.5" /> Configurado
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-yellow-600 border-yellow-200 text-[10px] px-1.5 py-0">
+                  <Clock className="h-3 w-3 mr-0.5" /> Pendente
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {questionsCount > 0
+                ? `${questionsCount} pergunta${questionsCount > 1 ? "s" : ""} detectada${questionsCount > 1 ? "s" : ""}`
+                : "Nenhuma pergunta detectada"}
+              {configuredCount > 0 && ` · ${configuredCount} regra${configuredCount > 1 ? "s" : ""}`}
+            </p>
+          </div>
+        </div>
+      </AccordionTrigger>
+
+      <AccordionContent className="px-3 pb-4">
+        {formData.loading ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {/* Pixel ID */}
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Label className="text-xs">Pixel ID (Meta Conversions API)</Label>
+                <Input
+                  value={formData.pixelId}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, pixelId: e.target.value }))}
+                  placeholder="Ex: 123456789012345"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <Button onClick={savePixelId} disabled={savingPixel} size="sm" variant="outline" className="h-8">
+                {savingPixel ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                <span className="ml-1">Salvar</span>
+              </Button>
+            </div>
+
+            <Separator />
+
+            {/* Questions & Scoring */}
+            {formData.detectedQuestions.length > 0 ? (
+              <div className="space-y-4">
+                <p className="text-sm font-medium text-foreground">Pontuação por resposta</p>
+                {formData.detectedQuestions.map((q) => (
+                  <QuestionScoringBlock
+                    key={q.question}
+                    question={q.question}
+                    answers={q.answers}
+                    rules={Array.from(pendingChanges.values())}
+                    onRuleChange={handleRuleChange}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Nenhuma pergunta detectada. As perguntas aparecem automaticamente quando leads chegam, ou sincronize os formulários da Meta.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Separator />
+
+            {/* Temperature Legend */}
+            <TemperatureLegend />
+
+            {/* Pipeline Events */}
+            {formData.pixelId && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                {[
+                  { event: "Lead", desc: "Novo lead" },
+                  { event: "QualifiedLead", desc: "Lead quente" },
+                  { event: "Schedule", desc: "Visita agendada" },
+                  { event: "Purchase", desc: "Venda fechada" },
+                ].map((e) => (
+                  <div key={e.event} className="p-2 rounded border text-center bg-muted/30">
+                    <p className="font-medium">{e.event}</p>
+                    <p className="text-muted-foreground">{e.desc}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={`update-${integration.id}`}
+                  checked={updateExisting}
+                  onCheckedChange={(c) => setUpdateExisting(!!c)}
+                />
+                <Label htmlFor={`update-${integration.id}`} className="text-xs cursor-pointer">
+                  Atualizar leads existentes
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={deleteIntegration}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Excluir
+                </Button>
+                <Button
+                  onClick={saveConfig}
+                  disabled={saving || (!hasChanges && !updateExisting)}
+                  size="sm"
+                >
+                  {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                  Salvar Configuração
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AccordionContent>
+    </AccordionItem>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────
+export function LeadScoringConfig() {
+  const { currentAgency } = useAgency();
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [filter, setFilter] = useState<"all" | "meta" | "configured" | "pending">("all");
 
   const loadIntegrations = useCallback(async () => {
     if (!currentAgency?.id) return;
@@ -68,125 +700,28 @@ export function LeadScoringConfig() {
     loadIntegrations();
   }, [loadIntegrations]);
 
-  // When integration is selected, load its pixel_id, rules, and detected questions
+  // We need to know which forms have rules to show configured badge
+  const [configuredFormIds, setConfiguredFormIds] = useState<Set<string>>(new Set());
   useEffect(() => {
-    if (!selectedIntegration || !currentAgency?.id) return;
-
-    const integration = integrations.find((i) => i.id === selectedIntegration);
-    setPixelId(integration?.pixel_id || "");
-
-    // Load rules
+    if (!currentAgency?.id || integrations.length === 0) return;
     supabase
       .from("lead_scoring_rules")
-      .select("*")
+      .select("form_id")
       .eq("agency_id", currentAgency.id)
-      .eq("form_id", integration?.form_id || "")
       .then(({ data }) => {
-        setRules(
-          (data || []).map((r: any) => ({
-            id: r.id,
-            question: r.question,
-            answer: r.answer,
-            score: r.score,
-            is_blocker: r.is_blocker,
-          }))
-        );
+        setConfiguredFormIds(new Set((data || []).map((r: any) => r.form_id)));
       });
+  }, [currentAgency?.id, integrations]);
 
-    // Detect questions from existing leads' custom_fields
-    supabase
-      .from("leads")
-      .select("custom_fields")
-      .eq("agency_id", currentAgency.id)
-      .eq("source", "facebook_leads")
-      .not("custom_fields", "is", null)
-      .limit(50)
-      .then(({ data }) => {
-        const questionsMap: Record<string, Set<string>> = {};
-        (data || []).forEach((lead: any) => {
-          if (lead.custom_fields && typeof lead.custom_fields === "object") {
-            Object.entries(lead.custom_fields).forEach(([key, value]) => {
-              if (!questionsMap[key]) questionsMap[key] = new Set();
-              if (value && typeof value === "string") questionsMap[key].add(value);
-            });
-          }
-        });
-        setDetectedQuestions(
-          Object.entries(questionsMap).map(([question, answersSet]) => ({
-            question,
-            answers: Array.from(answersSet).slice(0, 20),
-          }))
-        );
-      });
-  }, [selectedIntegration, currentAgency?.id, integrations]);
+  const configuredCount = integrations.filter((i) => configuredFormIds.has(i.form_id)).length;
+  const totalCount = integrations.length;
+  const progressPercent = totalCount > 0 ? (configuredCount / totalCount) * 100 : 0;
 
-  const savePixelId = async () => {
-    if (!selectedIntegration) return;
-    setSavingPixel(true);
-    const { error } = await supabase
-      .from("facebook_lead_integrations")
-      .update({ pixel_id: pixelId || null })
-      .eq("id", selectedIntegration);
-    setSavingPixel(false);
-    if (error) {
-      toast({ title: "Erro ao salvar Pixel ID", variant: "destructive" });
-    } else {
-      toast({ title: "Pixel ID salvo com sucesso" });
-      loadIntegrations();
-    }
-  };
-
-  const addRule = async () => {
-    if (!currentAgency?.id || !newQuestion || !newAnswer) return;
-    const integration = integrations.find((i) => i.id === selectedIntegration);
-    if (!integration) return;
-
-    setSaving(true);
-    const { data, error } = await supabase
-      .from("lead_scoring_rules")
-      .insert({
-        agency_id: currentAgency.id,
-        form_id: integration.form_id,
-        form_name: integration.form_name,
-        question: newQuestion,
-        answer: newAnswer,
-        score: newScore,
-        is_blocker: newIsBlocker,
-      })
-      .select()
-      .single();
-    setSaving(false);
-
-    if (error) {
-      toast({ title: "Erro ao adicionar regra", variant: "destructive" });
-    } else {
-      setRules((prev) => [
-        ...prev,
-        { id: data.id, question: newQuestion, answer: newAnswer, score: newScore, is_blocker: newIsBlocker },
-      ]);
-      setNewQuestion("");
-      setNewAnswer("");
-      setNewScore(0);
-      setNewIsBlocker(false);
-      toast({ title: "Regra adicionada" });
-    }
-  };
-
-  const deleteRule = async (ruleId: string) => {
-    const { error } = await supabase.from("lead_scoring_rules").delete().eq("id", ruleId);
-    if (!error) {
-      setRules((prev) => prev.filter((r) => r.id !== ruleId));
-      toast({ title: "Regra removida" });
-    }
-  };
-
-  const getScoreBadge = (score: number) => {
-    if (score >= 2) return <Badge className="bg-green-500/20 text-green-700">+{score}</Badge>;
-    if (score === 1) return <Badge className="bg-emerald-500/20 text-emerald-700">+{score}</Badge>;
-    if (score === 0) return <Badge variant="outline">0</Badge>;
-    if (score === -1) return <Badge className="bg-orange-500/20 text-orange-700">{score}</Badge>;
-    return <Badge className="bg-red-500/20 text-red-700">{score}</Badge>;
-  };
+  const filteredIntegrations = integrations.filter((i) => {
+    if (filter === "configured") return configuredFormIds.has(i.form_id);
+    if (filter === "pending") return !configuredFormIds.has(i.form_id);
+    return true; // "all" and "meta" (all are meta for now)
+  });
 
   if (loading) {
     return (
@@ -197,244 +732,95 @@ export function LeadScoringConfig() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Classification Thresholds Info */}
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription className="flex flex-wrap items-center gap-3">
-          <span className="font-medium">Classificação automática:</span>
-          <span className="inline-flex items-center gap-1">
-            <Flame className="h-4 w-4 text-red-500" /> Quente: ≥ 5 pontos
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Thermometer className="h-4 w-4 text-orange-500" /> Morno: 2 a 4 pontos
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Snowflake className="h-4 w-4 text-blue-500" /> Frio: ≤ 1 ponto
-          </span>
-        </AlertDescription>
-      </Alert>
-
-      {/* Form Selector */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+    <div className="space-y-5">
+      {/* Header with legend */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
             <Target className="h-5 w-5" />
-            Configurar Qualificação
-          </CardTitle>
-          <CardDescription>
-            Selecione um formulário para configurar as regras de pontuação e o Pixel Meta
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {integrations.length === 0 ? (
-            <Alert>
-              <AlertDescription>
-                Nenhuma integração de formulário ativa encontrada. Configure uma integração de leads do Facebook primeiro.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <Label>Formulário</Label>
-                <Select value={selectedIntegration} onValueChange={setSelectedIntegration}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um formulário..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {integrations.map((int) => (
-                      <SelectItem key={int.id} value={int.id}>
-                        {int.page_name} — {int.form_name}
-                      </SelectItem>
-                    ))}</SelectContent>
-                </Select>
-              </div>
+            Qualificação Automática
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            Defina regras de pontuação por formulário para qualificar leads automaticamente
+          </p>
+        </div>
+        <TemperatureLegend />
+      </div>
 
-              {selectedIntegration && (
-                <>
-                  {/* Pixel ID */}
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <Label>Pixel ID (Meta Conversions API)</Label>
-                      <Input
-                        value={pixelId}
-                        onChange={(e) => setPixelId(e.target.value)}
-                        placeholder="Ex: 123456789012345"
-                      />
-                    </div>
-                    <Button onClick={savePixelId} disabled={savingPixel} size="sm">
-                      {savingPixel ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      <span className="ml-1">Salvar</span>
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Eventos como QualifiedLead serão disparados para este pixel quando leads quentes forem detectados.
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Scoring Rules */}
-      {selectedIntegration && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Regras de Pontuação</CardTitle>
-            <CardDescription>
-              Defina a pontuação para cada resposta do formulário. Use bloqueador para desqualificar leads automaticamente.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Existing Rules */}
-            {rules.length > 0 && (
-              <div className="space-y-2">
-                {rules.map((rule) => (
-                  <div
-                    key={rule.id}
-                    className="flex items-center justify-between p-3 rounded-lg border bg-card"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{rule.question}</p>
-                      <p className="text-xs text-muted-foreground truncate">{rule.answer}</p>
-                    </div>
-                    <div className="flex items-center gap-2 ml-2 shrink-0">
-                      {rule.is_blocker && (
-                        <Badge variant="destructive" className="text-xs">
-                          Bloqueador
-                        </Badge>
-                      )}
-                      {getScoreBadge(rule.score)}
-                      <Button variant="ghost" size="icon" onClick={() => rule.id && deleteRule(rule.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <Separator />
-
-            {/* Add New Rule */}
-            <div className="space-y-3">
-              <p className="text-sm font-medium">Adicionar regra</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <Label>Pergunta</Label>
-                  {detectedQuestions.length > 0 ? (
-                    <Select value={newQuestion} onValueChange={(v) => { setNewQuestion(v); setNewAnswer(""); }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma pergunta..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {detectedQuestions.map((q) => (
-                          <SelectItem key={q.question} value={q.question}>
-                            {q.question}
-                          </SelectItem>
-                        ))}</SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      value={newQuestion}
-                      onChange={(e) => setNewQuestion(e.target.value)}
-                      placeholder="Ex: Quando pretende comprar?"
-                    />
-                  )}
-                </div>
-                <div>
-                  <Label>Resposta</Label>
-                  {newQuestion && detectedQuestions.find((q) => q.question === newQuestion)?.answers.length ? (
-                    <Select value={newAnswer} onValueChange={setNewAnswer}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma resposta..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {detectedQuestions
-                          .find((q) => q.question === newQuestion)
-                          ?.answers.map((a) => (
-                            <SelectItem key={a} value={a}>
-                              {a}
-                            </SelectItem>
-                          ))}</SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      value={newAnswer}
-                      onChange={(e) => setNewAnswer(e.target.value)}
-                      placeholder="Ex: Imediato"
-                    />
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="w-32">
-                  <Label>Pontuação</Label>
-                  <Select value={String(newScore)} onValueChange={(v) => setNewScore(Number(v))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="-2">-2 (Desqualifica)</SelectItem>
-                      <SelectItem value="-1">-1 (Baixa)</SelectItem>
-                      <SelectItem value="0">0 (Neutro)</SelectItem>
-                      <SelectItem value="1">+1 (Boa)</SelectItem>
-                      <SelectItem value="2">+2 (Forte)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch checked={newIsBlocker} onCheckedChange={setNewIsBlocker} />
-                  <Label className="text-sm">Bloqueador</Label>
-                </div>
-                <Button onClick={addRule} disabled={saving || !newQuestion || !newAnswer} size="sm">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                  <span className="ml-1">Adicionar</span>
-                </Button>
-              </div>
-              {newIsBlocker && (
-                <p className="text-xs text-destructive">
-                  Se a resposta do lead corresponder a esta regra, ele será automaticamente classificado como FRIO independente das outras pontuações.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Progress bar */}
+      {totalCount > 0 && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              {configuredCount}/{totalCount} formulário{totalCount > 1 ? "s" : ""} configurado{configuredCount > 1 ? "s" : ""}
+            </span>
+            <span className="text-muted-foreground">{Math.round(progressPercent)}%</span>
+          </div>
+          <Progress value={progressPercent} className="h-2" />
+        </div>
       )}
 
-      {/* Pipeline Events Info */}
-      {selectedIntegration && pixelId && (
+      {/* Filters + Sync */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          {(["all", "configured", "pending"] as const).map((f) => (
+            <Button
+              key={f}
+              variant={filter === f ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setFilter(f)}
+              className="h-7 text-xs px-3"
+            >
+              {f === "all" ? "Todos" : f === "configured" ? "Configurados" : "Pendentes"}
+            </Button>
+          ))}
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setSyncDialogOpen(true)} className="h-7">
+          <RefreshCw className="h-3 w-3 mr-1" />
+          Sincronizar Meta
+        </Button>
+      </div>
+
+      {/* Forms Accordion */}
+      {filteredIntegrations.length === 0 ? (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Eventos do Funil → Pixel Meta</CardTitle>
-            <CardDescription>
-              Eventos disparados automaticamente para o Pixel quando o lead muda de status no funil
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-              <div className="p-2 rounded border text-center">
-                <p className="font-medium">Lead</p>
-                <p className="text-xs text-muted-foreground">Novo lead</p>
-              </div>
-              <div className="p-2 rounded border text-center">
-                <p className="font-medium">QualifiedLead</p>
-                <p className="text-xs text-muted-foreground">Lead quente</p>
-              </div>
-              <div className="p-2 rounded border text-center">
-                <p className="font-medium">Schedule</p>
-                <p className="text-xs text-muted-foreground">Visita agendada</p>
-              </div>
-              <div className="p-2 rounded border text-center">
-                <p className="font-medium">Purchase</p>
-                <p className="text-xs text-muted-foreground">Venda fechada</p>
-              </div>
-            </div>
+          <CardContent className="py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              {totalCount === 0
+                ? "Nenhum formulário encontrado. Clique em \"Sincronizar Meta\" para importar formulários."
+                : "Nenhum formulário corresponde ao filtro selecionado."}
+            </p>
+            {totalCount === 0 && (
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => setSyncDialogOpen(true)}>
+                <Facebook className="h-4 w-4 mr-1" />
+                Sincronizar Formulários
+              </Button>
+            )}
           </CardContent>
         </Card>
+      ) : (
+        <Accordion type="single" collapsible className="space-y-2">
+          {filteredIntegrations.map((integration) => (
+            <FormAccordionItem
+              key={integration.id}
+              integration={integration}
+              agencyId={currentAgency!.id}
+              onDeleted={loadIntegrations}
+            />
+          ))}
+        </Accordion>
+      )}
+
+      {/* Sync Dialog */}
+      {currentAgency && (
+        <SyncMetaDialog
+          open={syncDialogOpen}
+          onOpenChange={setSyncDialogOpen}
+          agencyId={currentAgency.id}
+          existingFormIds={new Set(integrations.map((i) => i.form_id))}
+          onSynced={loadIntegrations}
+        />
       )}
     </div>
   );
 }
-
