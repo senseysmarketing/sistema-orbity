@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X, Check, ChevronsUpDown, Building2 } from "lucide-react";
+import { getVirtualAgencyClient, isVirtualAgencyClient, separateVirtualClients, resolveClientName } from "@/lib/virtualAgencyClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -79,6 +80,7 @@ interface Task {
   post_date?: string | null;
   hashtags?: string[] | null;
   creative_instructions?: string | null;
+  is_internal?: boolean;
 }
 
 interface Profile {
@@ -303,7 +305,14 @@ export default function Tasks() {
         .order("name", { ascending: true });
 
       if (error) throw error;
-      setClients(data || []);
+      const realClients = data || [];
+      // Prepend virtual agency client
+      if (currentAgency) {
+        const virtualAgency = getVirtualAgencyClient(currentAgency);
+        setClients([virtualAgency, ...realClients]);
+      } else {
+        setClients(realClients);
+      }
     } catch (error: any) {
       console.error("Erro ao carregar clientes:", error);
     } finally {
@@ -382,7 +391,12 @@ export default function Tasks() {
     return colors[priority] || "bg-gray-500";
   };
 
-  const getClientName = (clientId: string | null) => {
+  const getClientName = (clientId: string | null, task?: Task) => {
+    if (task?.is_internal && currentAgency) {
+      const clientName = clientId ? clients.find((c) => c.id === clientId)?.name : null;
+      if (clientName) return `${currentAgency.name} (Interno) / ${clientName}`;
+      return `${currentAgency.name} (Interno)`;
+    }
     if (!clientId) return "Sem cliente";
     const client = clients.find((c) => c.id === clientId);
     return client?.name || "Cliente desconhecido";
@@ -518,7 +532,8 @@ export default function Tasks() {
           status: newTask.status as any,
           priority: newTask.priority,
           assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
-          client_id: newTask.client_ids[0] || null,
+          client_id: separateVirtualClients(newTask.client_ids).realClientIds[0] || null,
+          is_internal: separateVirtualClients(newTask.client_ids).isInternal,
           due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
           created_by: profile?.user_id,
           agency_id: currentAgency?.id,
@@ -540,9 +555,10 @@ export default function Tasks() {
         await assignUsersToTask(taskData.id, newTask.assigned_users);
       }
 
-      // Create client relations
-      if (taskData && newTask.client_ids.length > 0) {
-        await updateClientRelations("task", taskData.id, newTask.client_ids);
+      // Create client relations (only real clients)
+      const { realClientIds: createRealIds } = separateVirtualClients(newTask.client_ids);
+      if (taskData && createRealIds.length > 0) {
+        await updateClientRelations("task", taskData.id, createRealIds);
       }
 
       toast({
@@ -637,7 +653,10 @@ export default function Tasks() {
       priority: task.priority as any,
       assigned_to: task.assigned_to || "unassigned",
       assigned_users: getAssignedUsers(task.id).map((u) => u.user_id),
-      client_ids: task.client_id ? [task.client_id] : [],
+      client_ids: [
+        ...(task.is_internal && currentAgency ? [getVirtualAgencyClient(currentAgency).id] : []),
+        ...(task.client_id ? [task.client_id] : []),
+      ],
       due_date: task.due_date ? task.due_date.split("T")[0] : "",
       subtasks: task.subtasks || [],
       attachments: task.attachments || [],
@@ -709,7 +728,8 @@ export default function Tasks() {
         status: newTask.status,
         priority: newTask.priority,
         assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
-        client_id: newTask.client_ids[0] || null,
+        client_id: separateVirtualClients(newTask.client_ids).realClientIds[0] || null,
+        is_internal: separateVirtualClients(newTask.client_ids).isInternal,
         due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
         subtasks: newTask.subtasks as any,
         attachments: newTask.attachments as any,

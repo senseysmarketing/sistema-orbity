@@ -27,6 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { MultiClientSelector } from "@/components/clients/MultiClientSelector";
 import { useClientRelations } from "@/hooks/useClientRelations";
+import { getVirtualAgencyClient, separateVirtualClients } from "@/lib/virtualAgencyClient";
 
 const TIMEZONE = "America/Sao_Paulo";
 
@@ -143,7 +144,10 @@ export const MeetingFormDialog = ({
         .select("id, name")
         .eq("agency_id", currentAgency.id)
         .eq("active", true);
-      return data || [];
+      const realClients = data || [];
+      // Prepend virtual agency client
+      const virtualAgency = getVirtualAgencyClient(currentAgency);
+      return [virtualAgency, ...realClients];
     },
     enabled: !!currentAgency?.id,
   });
@@ -328,7 +332,8 @@ export const MeetingFormDialog = ({
       end_time: endDate.toISOString(),
       external_participants: externalParticipants.filter(p => p.name && p.email),
       participants: selectedParticipants,
-      client_id: selectedClientIds[0] || null, // Keep first client for backward compatibility
+      client_id: separateVirtualClients(selectedClientIds).realClientIds[0] || null,
+      is_internal: separateVirtualClients(selectedClientIds).isInternal,
       lead_id: formData.lead_id || null,
       sync_to_google_calendar: syncToGoogleCalendar,
     };
@@ -338,7 +343,7 @@ export const MeetingFormDialog = ({
         const updatedMeeting = await updateMeeting.mutateAsync({ id: meeting.id, ...meetingData });
         
         // Update client relations
-        await updateClientRelations("meeting", meeting.id, selectedClientIds);
+        await updateClientRelations("meeting", meeting.id, separateVirtualClients(selectedClientIds).realClientIds);
         
         // Sync update to Google Calendar
         if (syncToGoogleCalendar && meeting.google_calendar_event_id) {
@@ -355,7 +360,7 @@ export const MeetingFormDialog = ({
         
         // Save client relations for new meeting
         if (createdMeeting?.id) {
-          await updateClientRelations("meeting", createdMeeting.id, selectedClientIds);
+          await updateClientRelations("meeting", createdMeeting.id, separateVirtualClients(selectedClientIds).realClientIds);
         }
         
         // Sync to Google Calendar after creation

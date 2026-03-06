@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { Check, ChevronsUpDown, X, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { isVirtualAgencyClient } from "@/lib/virtualAgencyClient";
 
 interface Client {
   id: string;
@@ -57,25 +58,29 @@ export function MultiClientSelector({
             {selectedClients.length === 0 ? (
               <span className="text-muted-foreground">{placeholder}</span>
             ) : (
-              selectedClients.map((client) => (
-                <Badge
-                  key={client.id}
-                  variant="secondary"
-                  className="mr-1 mb-1"
-                >
-                  {client.name}
-                  <button
-                    className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    onClick={(e) => removeClient(client.id, e)}
+              selectedClients.map((client) => {
+                const isAgency = isVirtualAgencyClient(client.id);
+                return (
+                  <Badge
+                    key={client.id}
+                    variant={isAgency ? "default" : "secondary"}
+                    className={cn("mr-1 mb-1", isAgency && "bg-primary/20 text-primary border-primary/30")}
                   >
-                    <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                  </button>
-                </Badge>
-              ))
+                    {isAgency && <Building2 className="h-3 w-3 mr-1" />}
+                    {client.name}
+                    <button
+                      className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onClick={(e) => removeClient(client.id, e)}
+                    >
+                      <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  </Badge>
+                );
+              })
             )}
           </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -87,21 +92,25 @@ export function MultiClientSelector({
           <CommandList>
             <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
             <CommandGroup>
-              {clients.map((client) => (
-                <CommandItem
-                  key={client.id}
-                  value={client.name}
-                  onSelect={() => toggleClient(client.id)}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      selectedClientIds.includes(client.id) ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {client.name}
-                </CommandItem>
-              ))}
+              {clients.map((client) => {
+                const isAgency = isVirtualAgencyClient(client.id);
+                return (
+                  <CommandItem
+                    key={client.id}
+                    value={client.name}
+                    onSelect={() => toggleClient(client.id)}
+                  >
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4",
+                        selectedClientIds.includes(client.id) ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    {isAgency && <Building2 className="h-3.5 w-3.5 mr-1.5 text-primary" />}
+                    {client.name}
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           </CommandList>
         </Command>
