@@ -46,6 +46,23 @@ const FIXED_VARIABLES = [
   { key: '{{telefone}}', label: 'Telefone' },
 ];
 
+const GREETING_DELAY_OPTIONS = [
+  { value: '0', label: 'Imediato' },
+  { value: '1', label: '1 minuto' },
+  { value: '5', label: '5 minutos' },
+  { value: '10', label: '10 minutos' },
+];
+
+const FOLLOWUP_DELAY_OPTIONS = [
+  { value: '60', label: '1 hora' },
+  { value: '120', label: '2 horas' },
+  { value: '360', label: '6 horas' },
+  { value: '720', label: '12 horas' },
+  { value: '1440', label: '24 horas' },
+  { value: '2880', label: '48 horas' },
+  { value: '4320', label: '72 horas' },
+];
+
 function formatFieldName(key: string): string {
   return key
     .replace(/_/g, ' ')
