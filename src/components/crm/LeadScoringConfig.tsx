@@ -951,6 +951,7 @@ export function LeadScoringConfig() {
 
   // We need to know which forms have rules to show configured badge
   const [configuredFormIds, setConfiguredFormIds] = useState<Set<string>>(new Set());
+  const [ruleCounts, setRuleCounts] = useState<Record<string, number>>({});
   useEffect(() => {
     if (!currentAgency?.id || integrations.length === 0) return;
     supabase
@@ -958,7 +959,14 @@ export function LeadScoringConfig() {
       .select("form_id")
       .eq("agency_id", currentAgency.id)
       .then(({ data }) => {
-        setConfiguredFormIds(new Set((data || []).map((r: any) => r.form_id)));
+        const formIds = new Set<string>();
+        const counts: Record<string, number> = {};
+        for (const r of data || []) {
+          formIds.add((r as any).form_id);
+          counts[(r as any).form_id] = (counts[(r as any).form_id] || 0) + 1;
+        }
+        setConfiguredFormIds(formIds);
+        setRuleCounts(counts);
       });
   }, [currentAgency?.id, integrations]);
 
