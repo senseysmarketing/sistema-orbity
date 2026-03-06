@@ -228,7 +228,10 @@ function SyncMetaDialog({
         body: { action: "list_pages", agencyId },
       });
       if (pErr) throw pErr;
-      const pgs = pagesData?.pages || [];
+      const allPgs = pagesData?.pages || [];
+      // Filter to only pages configured in integrations
+      const configuredPageIds = new Set(configuredPages.map((p) => p.page_id));
+      const pgs = allPgs.filter((p: any) => configuredPageIds.has(p.id));
       setPages(pgs);
       setProgress({ done: 0, total: pgs.length });
 
@@ -975,6 +978,9 @@ export function LeadScoringConfig() {
           agencyId={currentAgency.id}
           existingFormIds={new Set(integrations.map((i) => i.form_id))}
           onSynced={loadIntegrations}
+          configuredPages={
+            [...new Map(integrations.map((i) => [i.page_id, { page_id: i.page_id, page_name: i.page_name }])).values()]
+          }
         />
       )}
     </div>
