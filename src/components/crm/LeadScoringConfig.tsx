@@ -842,10 +842,8 @@ export function LeadScoringConfig() {
               _isVirtual: true,
             });
           }
-        } else {
-          // No leads received yet — show original with note
-          expanded.push(int);
         }
+        // If no leads yet, skip — don't show "all" in qualification
       } else {
         expanded.push(int);
       }
