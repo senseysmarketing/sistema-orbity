@@ -12,6 +12,7 @@ import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 import { toast } from "sonner";
 import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
 import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
+import { firePipelineMetaEvent } from "@/lib/metaPipelineEvents";
 
 interface Lead {
   id: string;
@@ -163,6 +164,12 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
           .eq('id', lead.id);
 
         if (error) throw error;
+        
+        // Fire Meta pipeline event if status changed
+        const oldDbStatus = normalizeLeadStatusToDb(lead.status);
+        if (oldDbStatus !== dbStatus && currentAgency?.id) {
+          firePipelineMetaEvent(lead.id, currentAgency.id, dbStatus, formData.value);
+        }
         
         toast.success('Lead atualizado com sucesso');
         

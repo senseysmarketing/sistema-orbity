@@ -3019,6 +3019,7 @@ export type Database = {
       meta_conversion_events: {
         Row: {
           agency_id: string
+          event_id: string | null
           event_name: string
           id: string
           lead_id: string
@@ -3029,6 +3030,7 @@ export type Database = {
         }
         Insert: {
           agency_id: string
+          event_id?: string | null
           event_name: string
           id?: string
           lead_id: string
@@ -3039,6 +3041,7 @@ export type Database = {
         }
         Update: {
           agency_id?: string
+          event_id?: string | null
           event_name?: string
           id?: string
           lead_id?: string
