@@ -341,9 +341,10 @@ export default function Tasks() {
 
       let matchesClient = true;
       if (clientFilter.length > 0) {
-        const matchesNoClient = clientFilter.includes("no-client") && !task.client_id;
+        const matchesInternalAgency = clientFilter.some(id => isVirtualAgencyClient(id)) && task.is_internal;
+        const matchesNoClient = clientFilter.includes("no-client") && !task.client_id && !task.is_internal;
         const matchesSpecificClient = task.client_id ? clientFilter.includes(task.client_id) : false;
-        matchesClient = matchesNoClient || matchesSpecificClient;
+        matchesClient = matchesInternalAgency || matchesNoClient || matchesSpecificClient;
       }
 
       const from = dueDateRange?.from ? toStartOfDay(dueDateRange.from) : undefined;
@@ -1261,7 +1262,7 @@ export default function Tasks() {
                         />
                       </div>
                     )}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-4">
                       <div className="grid gap-2">
                         <Label>Clientes</Label>
                         <MultiClientSelector

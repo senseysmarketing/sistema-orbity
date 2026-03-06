@@ -26,7 +26,7 @@ interface SortableTaskCardProps {
   getPriorityLabel: (priority: string) => string;
   getUrgencyLevel: (task: Task) => { level: string; label: string; color: string };
   getAssignedUserName: (userId: string | null) => string;
-  getClientName: (clientId: string | null) => string;
+  getClientName: (clientId: string | null, task?: any) => string;
   formatDateBR: (date: string | null) => string;
   assignedUsers?: any[];
   getTypeName?: (slug: string | null) => string;
