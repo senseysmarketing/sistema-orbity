@@ -210,6 +210,8 @@ export function MetaIntegrationConfig() {
         .select('*')
         .eq('agency_id', currentAgency.id)
         .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
@@ -386,11 +388,12 @@ export function MetaIntegrationConfig() {
   };
 
   const syncAccountData = async (adAccountId: string) => {
+    if (!currentAgency) return false;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
       await supabase.functions.invoke('facebook-account-summary', {
-        body: { accountIds: [adAccountId] },
+        body: { accountIds: [adAccountId], agencyId: currentAgency.id },
         headers: {
           Authorization: `Bearer ${session?.access_token}`,
         },
