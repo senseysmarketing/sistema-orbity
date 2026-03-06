@@ -119,26 +119,27 @@ serve(async (req) => {
   }
 });
 
-// List Facebook Pages
+// List Facebook Pages — busca por agency_id (sem user_id)
 async function listPages(supabase: any, userId: string, params: any) {
   const { agencyId } = params;
 
-  // Get active Facebook connection
+  // Get active Facebook connection by agency (not user)
   const { data: connection, error: connError } = await supabase
     .from('facebook_connections')
     .select('*')
-    .eq('user_id', userId)
     .eq('agency_id', agencyId)
     .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
     .single();
 
   if (connError || !connection) {
-    throw new Error('No active Facebook connection found');
+    throw new Error('No active Facebook connection found for this agency');
   }
 
   // Fetch all pages with pagination from Facebook Graph API
   let allPages: any[] = [];
-  let nextUrl = `https://graph.facebook.com/v18.0/me/accounts?access_token=${connection.access_token}&limit=100`;
+  let nextUrl = `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token&access_token=${connection.access_token}&limit=100`;
 
   while (nextUrl) {
     const pagesResponse = await fetch(nextUrl);
@@ -160,43 +161,56 @@ async function listPages(supabase: any, userId: string, params: any) {
   );
 }
 
-// List Lead Forms for a Page
+// List Lead Forms for a Page — fluxo oficial Meta: /me/accounts → page_token → leadgen_forms
 async function listForms(supabase: any, userId: string, params: any) {
-  const { agencyId, pageId, pageAccessToken } = params;
+  const { agencyId, pageId } = params;
 
-  // Use the page access token directly if provided
-  let accessToken = pageAccessToken;
+  // 1. Buscar conexão por agency_id (sem user_id)
+  const { data: connection, error: connError } = await supabase
+    .from('facebook_connections')
+    .select('*')
+    .eq('agency_id', agencyId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
 
-  // If no page token provided, get it from the Graph API using user token
-  if (!accessToken) {
-    const { data: connection, error: connError } = await supabase
-      .from('facebook_connections')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('agency_id', agencyId)
-      .eq('is_active', true)
-      .single();
-
-    if (connError || !connection) {
-      throw new Error('No active Facebook connection found');
-    }
-
-    // Fetch the page-specific access token from Graph API
-    const pageTokenUrl = `https://graph.facebook.com/v18.0/${pageId}?fields=access_token,name&access_token=${connection.access_token}`;
-    const pageTokenResp = await fetch(pageTokenUrl);
-    const pageTokenData = await pageTokenResp.json();
-
-    if (pageTokenData.error) {
-      console.error(`Failed to get page token for ${pageId}:`, pageTokenData.error);
-      throw new Error(`Facebook API error: ${pageTokenData.error.message}`);
-    }
-
-    accessToken = pageTokenData.access_token;
-    console.log(`Got page token for page ${pageId} (${pageTokenData.name})`);
+  if (connError || !connection) {
+    throw new Error('No active Facebook connection found for this agency');
   }
 
-  // Fetch lead forms from Facebook Graph API using page access token
-  const formsUrl = `https://graph.facebook.com/v18.0/${pageId}/leadgen_forms?access_token=${accessToken}`;
+  const userToken = connection.access_token;
+
+  // 2. Chamar /me/accounts para obter page_access_token (com paginação)
+  let pageAccessToken: string | null = null;
+  let nextUrl: string | null = `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token&access_token=${userToken}&limit=100`;
+
+  while (nextUrl && !pageAccessToken) {
+    const pagesResponse = await fetch(nextUrl);
+    const pagesData = await pagesResponse.json();
+
+    if (pagesData.error) {
+      console.error('[listForms] Error fetching /me/accounts:', pagesData.error);
+      throw new Error(`Facebook API error: ${pagesData.error.message}`);
+    }
+
+    // 3. Encontrar a página pelo pageId
+    const matchedPage = (pagesData.data || []).find((p: any) => p.id === pageId);
+    if (matchedPage) {
+      pageAccessToken = matchedPage.access_token;
+      console.log(`[listForms] ✅ Found page ${pageId} (${matchedPage.name}) via /me/accounts`);
+    }
+
+    nextUrl = pagesData.paging?.next || null;
+  }
+
+  if (!pageAccessToken) {
+    console.error(`[listForms] ❌ Page ${pageId} not found in /me/accounts for agency ${agencyId}`);
+    throw new Error(`Page ${pageId} not found in connected Facebook accounts. The user who connected Facebook may not have admin access to this page.`);
+  }
+
+  // 4. Chamar /{page_id}/leadgen_forms com PAGE TOKEN
+  const formsUrl = `https://graph.facebook.com/v18.0/${pageId}/leadgen_forms?fields=id,name,status&access_token=${pageAccessToken}`;
   const formsResponse = await fetch(formsUrl);
   const formsData = await formsResponse.json();
 
@@ -204,8 +218,14 @@ async function listForms(supabase: any, userId: string, params: any) {
     throw new Error(`Facebook API error: ${formsData.error.message}`);
   }
 
+  // 5. Filtrar apenas formulários ACTIVE
+  const allForms = formsData.data || [];
+  const activeForms = allForms.filter((form: any) => form.status === 'ACTIVE');
+  
+  console.log(`[listForms] Found ${allForms.length} forms, ${activeForms.length} active for page ${pageId}`);
+
   return new Response(
-    JSON.stringify({ forms: formsData.data || [] }),
+    JSON.stringify({ forms: activeForms }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
 }
