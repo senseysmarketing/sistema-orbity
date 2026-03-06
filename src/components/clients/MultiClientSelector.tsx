@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronsUpDown, X, Building2 } from "lucide-react";
+import { Check, ChevronsUpDown, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -66,7 +66,7 @@ export function MultiClientSelector({
                     variant={isAgency ? "default" : "secondary"}
                     className={cn("mr-1 mb-1", isAgency && "bg-primary/20 text-primary border-primary/30")}
                   >
-                    {isAgency && <Building2 className="h-3 w-3 mr-1" />}
+                    
                     {client.name}
                     <button
                       className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
@@ -106,7 +106,7 @@ export function MultiClientSelector({
                         selectedClientIds.includes(client.id) ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    {isAgency && <Building2 className="h-3.5 w-3.5 mr-1.5 text-primary" />}
+                    
                     {client.name}
                   </CommandItem>
                 );
