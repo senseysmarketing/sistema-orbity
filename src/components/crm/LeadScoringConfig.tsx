@@ -895,7 +895,7 @@ export function LeadScoringConfig() {
       .eq("agency_id", currentAgency.id)
       .eq("is_active", true);
 
-    const rawIntegrations = (data || []) as Integration[];
+    const rawIntegrations = (data || []) as unknown as Integration[];
 
     // Extract unique pages BEFORE filtering, so configuredPages is always populated
     const uniquePages = [...new Map(
