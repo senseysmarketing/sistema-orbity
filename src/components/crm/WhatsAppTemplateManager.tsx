@@ -365,6 +365,7 @@ function TemplatePhaseSection({
             <TemplateEditor
               key={template.id}
               template={template}
+              phase={phase}
               onSave={onSave}
               onDelete={onDelete}
               isSaving={isSaving}
@@ -443,12 +444,14 @@ function VariableInserter({
 
 function TemplateEditor({
   template,
+  phase,
   onSave,
   onDelete,
   isSaving,
   formFields,
 }: {
   template: Template;
+  phase: string;
   onSave: (t: Template) => void;
   onDelete: (id: string) => void;
   isSaving: boolean;
@@ -519,14 +522,19 @@ function TemplateEditor({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-xs text-muted-foreground">Delay (min):</Label>
-            <Input
-              type="number"
-              value={delay}
-              onChange={(e) => setDelay(e.target.value)}
-              className="w-20 h-7 text-xs"
-              min={0}
-            />
+            <Label className="text-xs text-muted-foreground">Delay:</Label>
+            <Select value={delay} onValueChange={setDelay}>
+              <SelectTrigger className="w-36 h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(phase === 'greeting' ? GREETING_DELAY_OPTIONS : FOLLOWUP_DELAY_OPTIONS).map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {hasChanges && (
