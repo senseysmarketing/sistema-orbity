@@ -1,40 +1,59 @@
 
 
-# Qualificação Individual por Formulário (Resolver "Todos os formulários")
+# Resumo Semanal Compacto para WhatsApp
 
 ## Problema
 
-Quando a integração Meta está configurada com `form_id = "all"`, a tela de qualificação mostra um único accordion "Todos os formulários" que mistura perguntas de todos os formulários — impossibilitando qualificação individualizada. O usuário precisa ver cada formulário real separadamente.
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-## Solução
+## Solucao
 
-### 1. Detectar formulários reais a partir dos leads existentes
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-Quando uma integração tem `form_id = "all"`, buscar os `form_id` reais dos leads via `facebook_lead_sync_log.lead_data` (que contém o JSON bruto do Meta com o `form_id` real). Agrupar por form_id real e exibir cada um como um accordion separado.
+### Exemplo do novo formato
 
-### 2. Filtrar perguntas por formulário real
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
 
-Ao detectar perguntas de um formulário específico, cruzar `facebook_lead_sync_log` (que tem `lead_id` e `lead_data.form_id`) com a tabela `leads` para buscar apenas os `custom_fields` dos leads daquele formulário específico.
+*Semana 1 (03/03 a 09/03) - 5 posts*
 
-### Fluxo no `FormAccordionItem`:
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
 
-```text
-integration.form_id === "all"?
-  ├─ SIM → Buscar sync_log → Extrair form_ids reais do lead_data
-  │         → Para cada form_id real, criar um sub-accordion
-  │         → Cada sub-accordion filtra leads por form_id via sync_log
-  └─ NÃO → Comportamento atual (formulário individual)
+Qualquer ajuste e so me chamar! ✅
 ```
 
-### Alterações em `src/components/crm/LeadScoringConfig.tsx`:
+### Detalhes tecnicos
 
-1. **No componente principal (`LeadScoringConfig`)**: Ao carregar integrações, expandir as que têm `form_id = "all"` — buscar formulários reais via query no `facebook_lead_sync_log` (extrair `lead_data->form_id` distintos) e criar entradas "virtuais" para cada formulário real encontrado. Se nenhum lead chegou ainda, usar `list_forms` da Meta API como fallback.
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
 
-2. **No `FormAccordionItem`**: Alterar a query de detecção de perguntas (linhas 411-417) para filtrar leads pelo `form_id` real. Em vez de buscar todos os leads com `source = 'facebook_leads'`, fazer join com `facebook_lead_sync_log` para pegar apenas os `lead_id`s que vieram daquele form_id específico, e então buscar seus `custom_fields`.
+Reescrever a funcao `generateSummaryText` com formato compacto:
 
-3. **Exibição**: Substituir o título "Todos os formulários" pelos nomes reais de cada formulário. Cada formulário real terá seu próprio pixel ID, regras de scoring e ações independentes.
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
 
-### Arquivo afetado
+### Mapeamento de emojis por formato
 
-- `src/components/crm/LeadScoringConfig.tsx` — Única alteração
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 

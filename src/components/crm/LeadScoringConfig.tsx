@@ -33,6 +33,8 @@ interface Integration {
   form_name: string;
   form_id: string;
   pixel_id: string | null;
+  _parentId?: string;
+  _isVirtual?: boolean;
 }
 
 interface ScoringRule {
@@ -401,21 +403,42 @@ function FormAccordionItem({
   const loadFormData = useCallback(async () => {
     if (loaded) return;
 
-    // Load rules and detect questions in parallel
-    const [rulesRes, leadsRes] = await Promise.all([
-      supabase
-        .from("lead_scoring_rules")
-        .select("*")
-        .eq("agency_id", agencyId)
-        .eq("form_id", integration.form_id),
-      supabase
+    const parentId = integration._parentId || integration.id;
+    const targetFormId = integration.form_id;
+
+    // Load rules
+    const rulesRes = await supabase
+      .from("lead_scoring_rules")
+      .select("*")
+      .eq("agency_id", agencyId)
+      .eq("form_id", targetFormId);
+
+    // Get lead_ids from sync_log filtered by form
+    const { data: syncData } = await supabase
+      .from("facebook_lead_sync_log")
+      .select("lead_id, lead_data")
+      .eq("integration_id", parentId)
+      .limit(500);
+
+    // Filter by real form_id if this is a virtual entry from "all"
+    const leadIds = (syncData || [])
+      .filter((row: any) => {
+        if (!integration._isVirtual) return true;
+        return String(row.lead_data?.form_id) === targetFormId;
+      })
+      .map((row: any) => row.lead_id)
+      .filter(Boolean);
+
+    // Fetch leads by IDs to get custom_fields
+    let leadsData: any[] = [];
+    if (leadIds.length > 0) {
+      const { data } = await supabase
         .from("leads")
         .select("custom_fields")
-        .eq("agency_id", agencyId)
-        .eq("source", "facebook_leads")
-        .not("custom_fields", "is", null)
-        .limit(100),
-    ]);
+        .in("id", leadIds.slice(0, 100))
+        .not("custom_fields", "is", null);
+      leadsData = data || [];
+    }
 
     const rules: ScoringRule[] = (rulesRes.data || []).map((r: any) => ({
       id: r.id,
@@ -427,7 +450,7 @@ function FormAccordionItem({
 
     // Detect questions from leads
     const questionsMap: Record<string, Set<string>> = {};
-    (leadsRes.data || []).forEach((lead: any) => {
+    leadsData.forEach((lead: any) => {
       if (lead.custom_fields && typeof lead.custom_fields === "object") {
         Object.entries(lead.custom_fields).forEach(([key, value]) => {
           if (TECHNICAL_FIELDS.has(key)) return;
@@ -456,7 +479,7 @@ function FormAccordionItem({
     setEnabledQuestions(activeQuestions);
     setFormData({ rules, detectedQuestions, pixelId: integration.pixel_id || "", loading: false });
     setLoaded(true);
-  }, [agencyId, integration.form_id, integration.pixel_id, loaded]);
+  }, [agencyId, integration.form_id, integration.pixel_id, integration._parentId, integration._isVirtual, loaded]);
 
   const handleRuleChange = (question: string, answer: string, score: number, is_blocker: boolean) => {
     const key = `${question}|||${answer}`;
@@ -535,6 +558,10 @@ function FormAccordionItem({
   };
 
   const savePixelId = async () => {
+    if (integration._isVirtual) {
+      toast({ title: "Pixel ID deve ser configurado na integração principal", variant: "destructive" });
+      return;
+    }
     setSavingPixel(true);
     const { error } = await supabase
       .from("facebook_lead_integrations")
@@ -550,6 +577,12 @@ function FormAccordionItem({
 
   const deleteIntegration = async () => {
     await supabase.from("lead_scoring_rules").delete().eq("form_id", integration.form_id).eq("agency_id", agencyId);
+    if (integration._isVirtual) {
+      // Virtual entry: only delete rules, not the parent integration
+      toast({ title: "Regras do formulário removidas" });
+      onDeleted();
+      return;
+    }
     const { error } = await supabase.from("facebook_lead_integrations").delete().eq("id", integration.id);
     if (!error) {
       toast({ title: "Formulário removido" });
@@ -752,7 +785,49 @@ export function LeadScoringConfig() {
       .select("id, page_name, form_name, form_id, pixel_id")
       .eq("agency_id", currentAgency.id)
       .eq("is_active", true);
-    setIntegrations((data as Integration[]) || []);
+
+    const rawIntegrations = (data || []) as Integration[];
+    const expanded: Integration[] = [];
+
+    for (const int of rawIntegrations) {
+      if (int.form_id === "all") {
+        // Expand "all" into individual real forms from sync_log
+        const { data: syncData } = await supabase
+          .from("facebook_lead_sync_log")
+          .select("lead_data")
+          .eq("integration_id", int.id)
+          .limit(500);
+
+        const formMap = new Map<string, string>();
+        (syncData || []).forEach((row: any) => {
+          const fid = row.lead_data?.form_id;
+          const fname = row.lead_data?.form_name;
+          if (fid && !formMap.has(String(fid))) {
+            formMap.set(String(fid), fname || `Formulário ${fid}`);
+          }
+        });
+
+        if (formMap.size > 0) {
+          for (const [realFormId, realFormName] of formMap) {
+            expanded.push({
+              ...int,
+              id: `${int.id}__${realFormId}`,
+              form_id: realFormId,
+              form_name: realFormName,
+              _parentId: int.id,
+              _isVirtual: true,
+            });
+          }
+        } else {
+          // No leads received yet — show original with note
+          expanded.push(int);
+        }
+      } else {
+        expanded.push(int);
+      }
+    }
+
+    setIntegrations(expanded);
     setLoading(false);
   }, [currentAgency?.id]);
 
