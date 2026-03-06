@@ -1,59 +1,100 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Redesign da Tela de Qualificação — Layout por Formulário com Importação Meta
 
-## Problema
+## Problema Atual
+A tela atual usa um dropdown para selecionar formulário e adiciona regras uma a uma. Precisa ser reorganizada para:
+1. Listar todos os formulários como cards accordion (como nos prints de referência)
+2. Mostrar perguntas/respostas detectadas inline com select de pontuação ao lado
+3. Importar formulários diretamente da Meta API (sem depender de lead chegar)
+4. Opção de re-qualificar leads existentes ao salvar configuração
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+## Design (baseado nos prints de referência)
 
-## Solucao
-
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
-
-### Exemplo do novo formato
-
+### Estrutura da tela
+```text
+┌─────────────────────────────────────────┐
+│ Qualificação Automática                 │
+│ Defina regras para qualificar leads     │
+│                                         │
+│ [Legenda: 🔴 Quente ≥5  🟡 Morno 2-4  │
+│           🔵 Frio ≤1 ]                  │
+│                                         │
+│ X/Y formulários  ████░░░               │
+│ [Todos] [Meta] [Webhook]  [Sincronizar] │
+│                                         │
+│ ┌─────────────────────────────────────┐ │
+│ │ ⚙ [Senseys] ADN507 v3  Meta  ✅    ▼│ │
+│ │   3 perguntas detectadas            │ │
+│ ├─────────────────────────────────────┤ │
+│ │ (expandido):                        │ │
+│ │  Pixel ID: [___________] [Salvar]   │ │
+│ │                                     │ │
+│ │  Qual seu objetivo?                 │ │
+│ │   "Alugar"        [Neutro (0)    ▼] │ │
+│ │   "Comprar"       [Positivo (+1) ▼] │ │
+│ │   "Investir"      [Positivo (+1) ▼] │ │
+│ │                                     │ │
+│ │  Quando pretende comprar?           │ │
+│ │   "Imediato"      [Muito pos (+2)▼] │ │
+│ │   "3 meses"       [Positivo (+1) ▼] │ │
+│ │                                     │ │
+│ │  Legenda de Temperatura:            │ │
+│ │  🔴 Score ≥ 5  🟡 ≥ 2 e < 5  🔵 <2│ │
+│ │                                     │ │
+│ │  [☑ Atualizar leads existentes]     │ │
+│ │  [Excluir]        [Salvar Config]   │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│ ┌─────────────────────────────────────┐ │
+│ │ ⚙ Formulário 924321...  Meta  ⏳   ▼│ │
+│ │   0 perguntas detectadas            │ │
+│ └─────────────────────────────────────┘ │
+└─────────────────────────────────────────┘
 ```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
 
-*Semana 1 (03/03 a 09/03) - 5 posts*
+### Diálogo de Sincronização Meta
+Botão "Sincronizar Meta" abre dialog que:
+1. Chama `facebook-leads` com `action: 'list_pages'` → para cada página chama `list_forms`
+2. Lista formulários disponíveis com status (Importado/Novo)
+3. Botão "Sincronizar Todos" importa formulários novos como integrações
 
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
+## Alterações Técnicas
 
-Qualquer ajuste e so me chamar! ✅
-```
+### 1. `src/components/crm/LeadScoringConfig.tsx` — Rewrite completo
 
-### Detalhes tecnicos
+**Estrutura principal:**
+- Lista todos formulários (integrations) como accordion items
+- Cada item expandido mostra: Pixel ID, perguntas com respostas inline, legenda, ações
+- Perguntas detectadas via `custom_fields` dos leads existentes OU da Meta API
+- Cada resposta tem um `<Select>` inline com opções: Muito negativo (-2), Negativo (-1), Neutro (0), Positivo (+1), Muito positivo (+2)
+- Badge de status: "Configurado" (verde) se tem regras, "Pendente" (amarelo) se não
+- Contagem de perguntas detectadas
+- Barra de progresso: formulários configurados / total
 
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+**Botão "Sincronizar Meta":**
+- Abre dialog
+- Usa as actions `list_pages` e `list_forms` da edge function `facebook-leads` (já existem)
+- Para cada formulário encontrado, verifica se já existe em `facebook_lead_integrations`
+- Permite importar novos formulários (cria integração com `save_integration`)
 
-Reescrever a funcao `generateSummaryText` com formato compacto:
+**Salvar configuração:**
+- Salva todas as regras do formulário de uma vez (upsert batch)
+- Se "Atualizar leads existentes" ativo, chama `process-lead-qualification` para cada lead daquele form
 
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+**Detecção de perguntas:**
+- Busca `custom_fields` dos leads com source `facebook_leads` filtrado por form_id (via `facebook_lead_sync_log`)
+- Agrupa por chave → lista respostas únicas
+- Filtra campos técnicos (ad_id, platform, etc.)
 
-### Mapeamento de emojis por formato
+### 2. Nenhuma alteração de backend necessária
+- As actions `list_pages`, `list_forms`, `save_integration` já existem na edge function `facebook-leads`
+- A qualificação já funciona via `process-lead-qualification`
+- Apenas o frontend muda
 
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
-
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+### Componentes internos do novo arquivo:
+- `FormAccordionItem` — card expandível por formulário
+- `QuestionScoring` — bloco de pergunta com respostas inline
+- `SyncMetaDialog` — dialog de importação de formulários
+- `TemperatureLegend` — legenda de classificação
 
