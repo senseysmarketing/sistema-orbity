@@ -1,59 +1,20 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Fix Client Badge in Task Card
 
-## Problema
+## Problems
+1. **White text on white/light badge** — the `clientColor` function returns a color, but for internal tasks (`is_internal`) the `clientId` is null, so `getClientColor` returns `hsl(var(--muted))` which is light/white, and text is also white.
+2. **Badge too large** — long client names push the badge to wrap or overlap the date.
+3. **Too close to the date** — needs spacing between date and client badge.
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+## Changes — `src/components/ui/task-card.tsx`
 
-## Solucao
+### 1. Truncate client name
+Limit displayed text to ~12 characters with ellipsis using `truncate` and `max-w-[120px]`.
 
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+### 2. Add gap between date and badge
+Add `gap-3` to the flex container instead of relying solely on `ml-auto`.
 
-### Exemplo do novo formato
-
-```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
-
-*Semana 1 (03/03 a 09/03) - 5 posts*
-
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
-
-Qualquer ajuste e so me chamar! ✅
-```
-
-### Detalhes tecnicos
-
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
-
-Reescrever a funcao `generateSummaryText` com formato compacto:
-
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
-
-### Mapeamento de emojis por formato
-
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
-
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+### 3. Fix color for internal tasks
+Pass `task` to `getClientColor` or use a distinct color when `is_internal` is true. The simplest fix: check `is_internal` in the component and assign a specific color (e.g., a purple/indigo) instead of the muted fallback.
 
