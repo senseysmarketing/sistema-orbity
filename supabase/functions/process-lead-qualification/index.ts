@@ -265,7 +265,18 @@ async function inferFormId(supabase: any, agencyId: string, customFields: Record
   return bestFormId;
 }
 
-async function findPixelId(supabase: any, lead: any, agencyId: string): Promise<string | null> {
+// Returns pixel config + OAuth token in a single query via RPC
+async function getMetaPixelConfig(supabase: any, agencyId: string): Promise<{ pixel_id: string; test_event_code: string | null; access_token: string } | null> {
+  const { data, error } = await supabase.rpc('get_meta_pixel_config', { p_agency_id: agencyId });
+  if (error || !data || data.length === 0) {
+    console.log('[META] No pixel config found via RPC, trying legacy fallback');
+    return null;
+  }
+  return data[0];
+}
+
+// Legacy fallback: find pixel from facebook_lead_integrations
+async function findPixelIdLegacy(supabase: any, lead: any, agencyId: string): Promise<string | null> {
   const { data: syncLog } = await supabase
     .from('facebook_lead_sync_log')
     .select('integration_id')
