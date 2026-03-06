@@ -205,16 +205,17 @@ export function MetaIntegrationConfig() {
     if (!currentAgency?.id) return;
 
     try {
-      const { data, error } = await supabase
+      // Fetch all integrations for this agency, prefer form_id='all' (catch-all)
+      const { data: rows, error } = await supabase
         .from('facebook_lead_integrations')
         .select('*')
         .eq('agency_id', currentAgency.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      // Prefer the catch-all integration, fallback to most recent
+      const data = rows?.find(r => r.form_id === 'all') || rows?.[0] || null;
 
       if (data) {
         setCurrentIntegration({
@@ -373,7 +374,10 @@ export function MetaIntegrationConfig() {
       setSelectedPage(currentIntegration.page_id);
       setSelectedForm(currentIntegration.form_id || "all");
       setIsActive(currentIntegration.is_active);
-      setDefaultStatus(currentIntegration.default_status);
+      // Defensive fallback: if stored status doesn't match known values, use "leads"
+      const knownStatuses = ["leads", "new", "em_contato", "qualified", "scheduled", "meeting", "proposal", "won"];
+      const storedStatus = currentIntegration.default_status;
+      setDefaultStatus(knownStatuses.includes(storedStatus) ? storedStatus : "leads");
       setDefaultTemperature(currentIntegration.default_priority);
 
       // Find page in loaded list and fetch forms
@@ -813,12 +817,17 @@ export function MetaIntegrationConfig() {
                 <Label>Status Padrão</Label>
                 <Select value={defaultStatus} onValueChange={setDefaultStatus}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione um status" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="leads">Leads</SelectItem>
+                    <SelectItem value="new">Novo</SelectItem>
+                    <SelectItem value="em_contato">Em contato</SelectItem>
                     <SelectItem value="qualified">Qualificados</SelectItem>
                     <SelectItem value="scheduled">Agendamentos</SelectItem>
+                    <SelectItem value="meeting">Reuniões</SelectItem>
+                    <SelectItem value="proposal">Propostas</SelectItem>
+                    <SelectItem value="won">Vendas</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
