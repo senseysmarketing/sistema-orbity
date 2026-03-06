@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X, Check, ChevronsUpDown } from "lucide-react";
-import { getVirtualAgencyClient, separateVirtualClients } from "@/lib/virtualAgencyClient";
+import { getVirtualAgencyClient, separateVirtualClients, isVirtualAgencyClient } from "@/lib/virtualAgencyClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";

@@ -158,7 +158,7 @@ export function TaskCard({
           className="font-medium px-2 py-0.5 rounded ml-auto"
           style={{ backgroundColor: clientColor, color: 'white' }}
         >
-          {getClientName(task.client_id)}
+          {getClientName(task.client_id, task)}
         </span>
       </div>
 
