@@ -10,7 +10,7 @@ import { LossReasonDialog } from "./LossReasonDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
-import { getTemperatureForStatus, getTemperatureLabel, LEAD_TEMPERATURES } from "@/lib/leadTemperature";
+import { getTemperatureLabel } from "@/lib/leadTemperature";
 import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 import { firePipelineMetaEvent } from "@/lib/metaPipelineEvents";
 import { useAgency } from "@/hooks/useAgency";
