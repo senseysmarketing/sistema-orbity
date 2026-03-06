@@ -167,7 +167,7 @@ async function listForms(supabase: any, userId: string, params: any) {
   // Use the page access token directly if provided
   let accessToken = pageAccessToken;
 
-  // If no page token provided, try to get from connection (fallback)
+  // If no page token provided, get it from the Graph API using user token
   if (!accessToken) {
     const { data: connection, error: connError } = await supabase
       .from('facebook_connections')
@@ -181,7 +181,18 @@ async function listForms(supabase: any, userId: string, params: any) {
       throw new Error('No active Facebook connection found');
     }
 
-    accessToken = connection.access_token;
+    // Fetch the page-specific access token from Graph API
+    const pageTokenUrl = `https://graph.facebook.com/v18.0/${pageId}?fields=access_token,name&access_token=${connection.access_token}`;
+    const pageTokenResp = await fetch(pageTokenUrl);
+    const pageTokenData = await pageTokenResp.json();
+
+    if (pageTokenData.error) {
+      console.error(`Failed to get page token for ${pageId}:`, pageTokenData.error);
+      throw new Error(`Facebook API error: ${pageTokenData.error.message}`);
+    }
+
+    accessToken = pageTokenData.access_token;
+    console.log(`Got page token for page ${pageId} (${pageTokenData.name})`);
   }
 
   // Fetch lead forms from Facebook Graph API using page access token

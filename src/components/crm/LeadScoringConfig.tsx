@@ -221,49 +221,42 @@ function SyncMetaDialog({
   const fetchFormsFromMeta = async () => {
     setLoading(true);
     setAllForms([]);
-    setProgress({ done: 0, total: 0 });
+    setProgress({ done: 0, total: configuredPages.length });
     try {
-      // 1. List pages
-      const { data: pagesData, error: pErr } = await supabase.functions.invoke("facebook-leads", {
-        body: { action: "list_pages", agencyId },
-      });
-      if (pErr) throw pErr;
-      const allPgs = pagesData?.pages || [];
-      // Filter to only pages configured in integrations
-      const configuredPageIds = new Set(configuredPages.map((p) => p.page_id));
-      const pgs = allPgs.filter((p: any) => configuredPageIds.has(p.id));
-      setPages(pgs);
-      setProgress({ done: 0, total: pgs.length });
+      if (configuredPages.length === 0) {
+        setLoading(false);
+        return;
+      }
 
-      // 2. Fetch forms from all pages in parallel (batches of 5)
+      // Call list_forms directly for each configured page (edge function auto-fetches page token)
       const formsAccum: typeof allForms = [];
-      const BATCH_SIZE = 5;
-      for (let i = 0; i < pgs.length; i += BATCH_SIZE) {
-        const batch = pgs.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(
-          batch.map((page) =>
-            supabase.functions.invoke("facebook-leads", {
-              body: { action: "list_forms", agencyId, pageId: page.id, pageAccessToken: page.access_token },
-            }).then(({ data }) => ({ page, forms: data?.forms || [] }))
-          )
-        );
-        for (const result of results) {
-          if (result.status === "fulfilled") {
-            for (const f of result.value.forms) {
-              formsAccum.push({
-                pageId: result.value.page.id,
-                pageName: result.value.page.name,
-                pageToken: result.value.page.access_token,
-                formId: f.id,
-                formName: f.name,
-                exists: existingFormIds.has(f.id),
-              });
-            }
+      const results = await Promise.allSettled(
+        configuredPages.map((page) =>
+          supabase.functions.invoke("facebook-leads", {
+            body: { action: "list_forms", agencyId, pageId: page.page_id },
+          }).then(({ data, error }) => {
+            if (error) throw error;
+            return { page, forms: data?.forms || [] };
+          })
+        )
+      );
+
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          for (const f of result.value.forms) {
+            formsAccum.push({
+              pageId: result.value.page.page_id,
+              pageName: result.value.page.page_name,
+              pageToken: "",
+              formId: f.id,
+              formName: f.name,
+              exists: existingFormIds.has(f.id),
+            });
           }
         }
-        setProgress((prev) => ({ ...prev, done: Math.min(i + BATCH_SIZE, pgs.length) }));
-        setAllForms([...formsAccum]);
       }
+      setProgress({ done: configuredPages.length, total: configuredPages.length });
+      setAllForms(formsAccum);
     } catch (err: any) {
       toast({ title: "Erro ao buscar formulários", description: err.message, variant: "destructive" });
     } finally {
