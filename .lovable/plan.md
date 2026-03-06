@@ -1,43 +1,59 @@
 
 
-# Fix: Sincronizar apenas formulários da página configurada na integração
+# Resumo Semanal Compacto para WhatsApp
 
 ## Problema
 
-O botão "Sincronizar Meta" busca formulários de **todas as páginas** da conta Facebook (`list_pages` → loop em todas). Deveria buscar apenas da página que o usuário selecionou na aba de Integrações do CRM.
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-## Solução
+## Solucao
 
-### Alteração em `src/components/crm/LeadScoringConfig.tsx`
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-**1. Passar informação da página para o `SyncMetaDialog`**
+### Exemplo do novo formato
 
-Extrair `page_id` e `page_name` das integrações existentes (tabela `facebook_lead_integrations` já tem esses campos). Ao abrir o dialog, passar a lista de páginas já configuradas.
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
 
-- Alterar a query em `loadIntegrations` para incluir `page_id` na select
-- Adicionar `page_id` à interface `Integration`
-- Extrair as páginas únicas das integrações carregadas
-- Passar essas páginas como prop ao `SyncMetaDialog`
+*Semana 1 (03/03 a 09/03) - 5 posts*
 
-**2. No `SyncMetaDialog`, buscar formulários apenas das páginas configuradas**
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
 
-Em vez de chamar `list_pages` (que retorna todas as páginas do Facebook), usar as páginas já conhecidas das integrações:
-
-- Receber prop `configuredPages: Array<{ page_id: string; page_name: string }>`
-- Chamar `list_forms` apenas para essas páginas (usando o `page_access_token` obtido via `list_pages` filtrando pelo `page_id`)
-- Alternativa mais simples: ainda chamar `list_pages` uma vez, mas filtrar `pgs` para incluir apenas páginas cujo `id` está em `configuredPages` antes do loop de `list_forms`
-
-**Fluxo corrigido:**
-```text
-list_pages → filtrar só páginas com page_id presente nas integrações → list_forms para cada
+Qualquer ajuste e so me chamar! ✅
 ```
 
-Isso reduz de 83 páginas para apenas 1-2 páginas configuradas, tornando a busca quase instantânea.
+### Detalhes tecnicos
 
-**3. Atualizar a query de integrations para incluir `page_id`**
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
 
-Linha ~803: adicionar `page_id` ao select:
-```
-.select("id, page_name, form_name, form_id, pixel_id, page_id")
-```
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 

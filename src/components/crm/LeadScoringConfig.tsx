@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 // ── Types ──────────────────────────────────────────────
 interface Integration {
   id: string;
+  page_id: string;
   page_name: string;
   form_name: string;
   form_id: string;
@@ -198,12 +199,14 @@ function SyncMetaDialog({
   agencyId,
   existingFormIds,
   onSynced,
+  configuredPages,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agencyId: string;
   existingFormIds: Set<string>;
   onSynced: () => void;
+  configuredPages: Array<{ page_id: string; page_name: string }>;
 }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -225,7 +228,10 @@ function SyncMetaDialog({
         body: { action: "list_pages", agencyId },
       });
       if (pErr) throw pErr;
-      const pgs = pagesData?.pages || [];
+      const allPgs = pagesData?.pages || [];
+      // Filter to only pages configured in integrations
+      const configuredPageIds = new Set(configuredPages.map((p) => p.page_id));
+      const pgs = allPgs.filter((p: any) => configuredPageIds.has(p.id));
       setPages(pgs);
       setProgress({ done: 0, total: pgs.length });
 
@@ -800,7 +806,7 @@ export function LeadScoringConfig() {
     if (!currentAgency?.id) return;
     const { data } = await supabase
       .from("facebook_lead_integrations")
-      .select("id, page_name, form_name, form_id, pixel_id")
+      .select("id, page_id, page_name, form_name, form_id, pixel_id")
       .eq("agency_id", currentAgency.id)
       .eq("is_active", true);
 
@@ -972,6 +978,9 @@ export function LeadScoringConfig() {
           agencyId={currentAgency.id}
           existingFormIds={new Set(integrations.map((i) => i.form_id))}
           onSynced={loadIntegrations}
+          configuredPages={
+            [...new Map(integrations.map((i) => [i.page_id, { page_id: i.page_id, page_name: i.page_name }])).values()]
+          }
         />
       )}
     </div>
