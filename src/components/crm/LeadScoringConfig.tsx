@@ -757,24 +757,7 @@ function FormAccordionItem({
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Pixel ID */}
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <Label className="text-xs">Pixel ID (Meta Conversions API)</Label>
-                <Input
-                  value={formData.pixelId}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, pixelId: e.target.value }))}
-                  placeholder="Ex: 123456789012345"
-                  className="h-8 text-sm"
-                />
-              </div>
-              <Button onClick={savePixelId} disabled={savingPixel} size="sm" variant="outline" className="h-8">
-                {savingPixel ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                <span className="ml-1">Salvar</span>
-              </Button>
-            </div>
-
-            <Separator />
+            {/* Scoring rules below */}
 
             {/* Questions & Scoring */}
             {formData.detectedQuestions.length > 0 ? (
