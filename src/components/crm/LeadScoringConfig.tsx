@@ -56,10 +56,25 @@ interface FormData {
 }
 
 const TECHNICAL_FIELDS = new Set([
+  // Meta/technical metadata
   "ad_id", "ad_name", "adset_id", "adset_name", "campaign_id",
   "campaign_name", "form_id", "platform", "leadgen_id", "created_time",
-  "page_id", "page_name", "is_organic"
+  "page_id", "page_name", "is_organic",
+  // Personal/contact fields (not qualifying)
+  "email", "e-mail", "e_mail", "email_address",
+  "full_name", "first_name", "last_name", "nome", "nome_completo",
+  "sobrenome", "name", "primeiro_nome",
+  "phone", "phone_number", "telefone", "celular", "whatsapp",
+  "numero_de_telefone", "tel", "mobile",
+  // Address/location fields
+  "city", "cidade", "state", "estado", "zip", "cep", "zip_code",
+  "country", "pais", "street_address", "endereco", "endereço",
+  "bairro", "neighborhood", "address",
+  // Document fields
+  "cpf", "cnpj", "rg", "document",
 ]);
+
+const OPEN_ENDED_THRESHOLD = 15;
 
 const SCORE_OPTIONS = [
   { value: "-2", label: "Muito negativo (-2)", color: "text-destructive" },
@@ -93,58 +108,83 @@ function QuestionScoringBlock({
   answers,
   rules,
   onRuleChange,
+  enabled,
+  onToggle,
+  isOpenEnded,
 }: {
   question: string;
   answers: string[];
   rules: ScoringRule[];
   onRuleChange: (question: string, answer: string, score: number, is_blocker: boolean) => void;
+  enabled: boolean;
+  onToggle: (enabled: boolean) => void;
+  isOpenEnded: boolean;
 }) {
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium text-foreground">{question}</p>
-      <div className="space-y-1.5 pl-3 border-l-2 border-muted">
-        {answers.map((answer) => {
-          const existingRule = rules.find(
-            (r) => r.question === question && r.answer === answer
-          );
-          const currentScore = existingRule?.score ?? 0;
-          const isBlocker = existingRule?.is_blocker ?? false;
-
-          return (
-            <div
-              key={answer}
-              className="flex items-center gap-3 py-1.5"
-            >
-              <span className="text-sm text-muted-foreground flex-1 min-w-0 truncate">
-                "{answer}"
-              </span>
-              <Select
-                value={String(currentScore)}
-                onValueChange={(v) => onRuleChange(question, answer, Number(v), isBlocker)}
-              >
-                <SelectTrigger className="w-[180px] h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SCORE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      <span className={opt.color}>{opt.label}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex items-center gap-1.5">
-                <Switch
-                  checked={isBlocker}
-                  onCheckedChange={(b) => onRuleChange(question, answer, currentScore, b)}
-                  className="scale-75"
-                />
-                <span className="text-[10px] text-muted-foreground w-14">Bloqueador</span>
-              </div>
-            </div>
-          );
-        })}
+      <div className="flex items-center gap-3">
+        <Switch
+          checked={enabled}
+          onCheckedChange={onToggle}
+          className="shrink-0"
+        />
+        <p className={`text-sm font-medium flex-1 min-w-0 truncate ${enabled ? "text-foreground" : "text-muted-foreground"}`}>
+          {question}
+        </p>
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+          {answers.length} resposta{answers.length > 1 ? "s" : ""}
+        </Badge>
+        {isOpenEnded && (
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 text-yellow-600 border-yellow-200">
+            Pergunta aberta
+          </Badge>
+        )}
       </div>
+      {enabled && (
+        <div className="space-y-1.5 pl-3 ml-5 border-l-2 border-muted">
+          {answers.map((answer) => {
+            const existingRule = rules.find(
+              (r) => r.question === question && r.answer === answer
+            );
+            const currentScore = existingRule?.score ?? 0;
+            const isBlocker = existingRule?.is_blocker ?? false;
+
+            return (
+              <div
+                key={answer}
+                className="flex items-center gap-3 py-1.5"
+              >
+                <span className="text-sm text-muted-foreground flex-1 min-w-0 truncate">
+                  "{answer}"
+                </span>
+                <Select
+                  value={String(currentScore)}
+                  onValueChange={(v) => onRuleChange(question, answer, Number(v), isBlocker)}
+                >
+                  <SelectTrigger className="w-[180px] h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SCORE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <span className={opt.color}>{opt.label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-1.5">
+                  <Switch
+                    checked={isBlocker}
+                    onCheckedChange={(b) => onRuleChange(question, answer, currentScore, b)}
+                    className="scale-75"
+                  />
+                  <span className="text-[10px] text-muted-foreground w-14">Bloqueador</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -355,6 +395,7 @@ function FormAccordionItem({
   const [savingPixel, setSavingPixel] = useState(false);
   const [updateExisting, setUpdateExisting] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<Map<string, ScoringRule>>(new Map());
+  const [enabledQuestions, setEnabledQuestions] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
 
   const loadFormData = useCallback(async () => {
@@ -405,11 +446,14 @@ function FormAccordionItem({
 
     // Initialize pending changes from existing rules
     const changes = new Map<string, ScoringRule>();
+    const activeQuestions = new Set<string>();
     rules.forEach((r) => {
       changes.set(`${r.question}|||${r.answer}`, r);
+      activeQuestions.add(r.question);
     });
 
     setPendingChanges(changes);
+    setEnabledQuestions(activeQuestions);
     setFormData({ rules, detectedQuestions, pixelId: integration.pixel_id || "", loading: false });
     setLoaded(true);
   }, [agencyId, integration.form_id, integration.pixel_id, loaded]);
@@ -440,9 +484,9 @@ function FormAccordionItem({
         .eq("agency_id", agencyId)
         .eq("form_id", integration.form_id);
 
-      // Insert all pending changes that have non-zero scores or are blockers
+      // Insert only rules for enabled questions with non-zero scores or blockers
       const rulesToInsert = Array.from(pendingChanges.values())
-        .filter((r) => r.score !== 0 || r.is_blocker)
+        .filter((r) => enabledQuestions.has(r.question) && (r.score !== 0 || r.is_blocker))
         .map((r) => ({
           agency_id: agencyId,
           form_id: integration.form_id,
@@ -594,16 +638,32 @@ function FormAccordionItem({
             {/* Questions & Scoring */}
             {formData.detectedQuestions.length > 0 ? (
               <div className="space-y-4">
-                <p className="text-sm font-medium text-foreground">Pontuação por resposta</p>
-                {formData.detectedQuestions.map((q) => (
-                  <QuestionScoringBlock
-                    key={q.question}
-                    question={q.question}
-                    answers={q.answers}
-                    rules={Array.from(pendingChanges.values())}
-                    onRuleChange={handleRuleChange}
-                  />
-                ))}
+                <p className="text-sm font-medium text-foreground">Selecione as perguntas qualificatórias</p>
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Ative apenas as perguntas que deseja usar para qualificação de leads
+                </p>
+                {formData.detectedQuestions.map((q) => {
+                  const isOpenEnded = q.answers.length > OPEN_ENDED_THRESHOLD;
+                  return (
+                    <QuestionScoringBlock
+                      key={q.question}
+                      question={q.question}
+                      answers={q.answers}
+                      rules={Array.from(pendingChanges.values())}
+                      onRuleChange={handleRuleChange}
+                      enabled={enabledQuestions.has(q.question)}
+                      onToggle={(on) => {
+                        setEnabledQuestions((prev) => {
+                          const next = new Set(prev);
+                          if (on) next.add(q.question);
+                          else next.delete(q.question);
+                          return next;
+                        });
+                      }}
+                      isOpenEnded={isOpenEnded}
+                    />
+                  );
+                })}
               </div>
             ) : (
               <Alert>
