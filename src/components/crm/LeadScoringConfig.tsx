@@ -697,12 +697,13 @@ function FormAccordionItem({
     }
   };
 
-  const configuredCount = formData.rules.length;
-  const isConfigured = configuredCount > 0;
-  const questionsCount = formData.detectedQuestions.length;
+  const configuredCount = loaded ? formData.rules.length : ruleCountFromParent;
+  const isConfigured = loaded ? configuredCount > 0 : isConfiguredFromParent;
+  const questionsCount = loaded ? formData.detectedQuestions.length : (integration.form_questions?.length || 0);
 
   // Check if there are actual pending changes vs saved rules
   const hasChanges = (() => {
+    if (!loaded) return false;
     const savedKeys = new Set(formData.rules.map((r) => `${r.question}|||${r.answer}|||${r.score}|||${r.is_blocker}`));
     const pendingKeys = new Set(
       Array.from(pendingChanges.values())
@@ -742,7 +743,7 @@ function FormAccordionItem({
             <p className="text-xs text-muted-foreground mt-0.5">
               {questionsCount > 0
                 ? `${questionsCount} pergunta${questionsCount > 1 ? "s" : ""} detectada${questionsCount > 1 ? "s" : ""}`
-                : "Nenhuma pergunta detectada"}
+                : loaded ? "Nenhuma pergunta detectada" : "Clique para carregar"}
               {configuredCount > 0 && ` · ${configuredCount} regra${configuredCount > 1 ? "s" : ""}`}
             </p>
           </div>
