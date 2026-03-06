@@ -205,17 +205,13 @@ export function MetaIntegrationConfig() {
     if (!currentAgency?.id) return;
 
     try {
-      // Fetch all integrations for this agency, prefer form_id='all' (catch-all)
-      const { data: rows, error } = await supabase
+      // Only fetch the catch-all integration row (form_id='all') — qualification rows have specific form_ids
+      const { data, error } = await supabase
         .from('facebook_lead_integrations')
         .select('*')
         .eq('agency_id', currentAgency.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Prefer the catch-all integration, fallback to most recent
-      const data = rows?.find(r => r.form_id === 'all') || rows?.[0] || null;
+        .eq('form_id', 'all')
+        .maybeSingle();
 
       if (data) {
         setCurrentIntegration({
@@ -440,21 +436,12 @@ export function MetaIntegrationConfig() {
         }
       }
 
-      // Delete existing integrations for this agency to avoid unique constraint violation
-      if (currentIntegration) {
-        await supabase
-          .from('facebook_lead_integrations')
-          .delete()
-          .eq('agency_id', currentAgency.id)
-          .eq('form_id', currentIntegration.form_id);
-      }
-      // Also delete if we're changing the form_id
-      const targetFormId = selectedForm === 'all' ? 'all' : selectedForm;
+      // Delete only the catch-all integration row (form_id='all') to avoid touching qualification rows
       await supabase
         .from('facebook_lead_integrations')
         .delete()
         .eq('agency_id', currentAgency.id)
-        .eq('form_id', targetFormId);
+        .eq('form_id', 'all');
 
       // Save new integration
       const { error } = await supabase.functions.invoke('facebook-leads', {
