@@ -210,6 +210,8 @@ export function MetaIntegrationConfig() {
         .select('*')
         .eq('agency_id', currentAgency.id)
         .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) throw error;
@@ -386,11 +388,12 @@ export function MetaIntegrationConfig() {
   };
 
   const syncAccountData = async (adAccountId: string) => {
+    if (!currentAgency) return false;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
       await supabase.functions.invoke('facebook-account-summary', {
-        body: { accountIds: [adAccountId] },
+        body: { accountIds: [adAccountId], agencyId: currentAgency.id },
         headers: {
           Authorization: `Bearer ${session?.access_token}`,
         },
@@ -433,13 +436,21 @@ export function MetaIntegrationConfig() {
         }
       }
 
-      // Delete existing integration if exists
+      // Delete existing integrations for this agency to avoid unique constraint violation
       if (currentIntegration) {
         await supabase
           .from('facebook_lead_integrations')
           .delete()
-          .eq('id', currentIntegration.id);
+          .eq('agency_id', currentAgency.id)
+          .eq('form_id', currentIntegration.form_id);
       }
+      // Also delete if we're changing the form_id
+      const targetFormId = selectedForm === 'all' ? 'all' : selectedForm;
+      await supabase
+        .from('facebook_lead_integrations')
+        .delete()
+        .eq('agency_id', currentAgency.id)
+        .eq('form_id', targetFormId);
 
       // Save new integration
       const { error } = await supabase.functions.invoke('facebook-leads', {
