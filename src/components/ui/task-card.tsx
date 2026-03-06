@@ -148,15 +148,19 @@ export function TaskCard({
       )}
       
       {/* Linha 3: Data + Badge Cliente */}
-      <div className="flex items-center justify-between text-xs text-white/60 mb-2">
+      <div className="flex items-center justify-between gap-3 text-xs text-white/60 mb-2">
         {task.due_date && (
-          <span>
+          <span className="flex-shrink-0">
             {formatDateBR(task.due_date)}
           </span>
         )}
         <span 
-          className="font-medium px-2 py-0.5 rounded ml-auto"
-          style={{ backgroundColor: clientColor, color: 'white' }}
+          className="font-medium px-2 py-0.5 rounded ml-auto max-w-[120px] truncate text-xs"
+          style={{ 
+            backgroundColor: (task as any).is_internal ? 'hsl(260, 60%, 50%)' : clientColor, 
+            color: 'white' 
+          }}
+          title={getClientName(task.client_id, task)}
         >
           {getClientName(task.client_id, task)}
         </span>
