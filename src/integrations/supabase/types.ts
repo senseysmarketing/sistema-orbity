@@ -2944,6 +2944,7 @@ export type Database = {
           google_calendar_event_id: string | null
           google_meet_link: string | null
           id: string
+          is_internal: boolean
           lead_id: string | null
           location: string | null
           meeting_notes: string | null
@@ -2972,6 +2973,7 @@ export type Database = {
           google_calendar_event_id?: string | null
           google_meet_link?: string | null
           id?: string
+          is_internal?: boolean
           lead_id?: string | null
           location?: string | null
           meeting_notes?: string | null
@@ -3000,6 +3002,7 @@ export type Database = {
           google_calendar_event_id?: string | null
           google_meet_link?: string | null
           id?: string
+          is_internal?: boolean
           lead_id?: string | null
           location?: string | null
           meeting_notes?: string | null
@@ -5693,6 +5696,7 @@ export type Database = {
           hashtags: string[] | null
           history: Json | null
           id: string
+          is_internal: boolean
           notification_sent_at: string | null
           platform: string | null
           post_date: string | null
@@ -5719,6 +5723,7 @@ export type Database = {
           hashtags?: string[] | null
           history?: Json | null
           id?: string
+          is_internal?: boolean
           notification_sent_at?: string | null
           platform?: string | null
           post_date?: string | null
@@ -5745,6 +5750,7 @@ export type Database = {
           hashtags?: string[] | null
           history?: Json | null
           id?: string
+          is_internal?: boolean
           notification_sent_at?: string | null
           platform?: string | null
           post_date?: string | null
