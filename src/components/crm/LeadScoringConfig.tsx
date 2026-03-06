@@ -661,24 +661,6 @@ function FormAccordionItem({
     }
   };
 
-  const savePixelId = async () => {
-    if (integration._isVirtual) {
-      toast({ title: "Pixel ID deve ser configurado na integração principal", variant: "destructive" });
-      return;
-    }
-    setSavingPixel(true);
-    const { error } = await supabase
-      .from("facebook_lead_integrations")
-      .update({ pixel_id: formData.pixelId || null })
-      .eq("id", integration.id);
-    setSavingPixel(false);
-    if (error) {
-      toast({ title: "Erro ao salvar Pixel ID", variant: "destructive" });
-    } else {
-      toast({ title: "Pixel ID salvo" });
-    }
-  };
-
   const deleteIntegration = async () => {
     await supabase.from("lead_scoring_rules").delete().eq("form_id", integration.form_id).eq("agency_id", agencyId);
     if (integration._isVirtual) {
