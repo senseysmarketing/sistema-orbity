@@ -92,6 +92,9 @@ serve(async (req) => {
           case 'subscribe_webhook':
             return await subscribeWebhook(supabase, user.id, params);
           
+          case 'list_form_questions':
+            return await listFormQuestions(supabase, user.id, params);
+          
           default:
             return new Response(
               JSON.stringify({ error: 'Invalid action' }),
