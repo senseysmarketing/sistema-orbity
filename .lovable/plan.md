@@ -1,39 +1,59 @@
 
 
-# Fix: Dialog Pre-fill Loading Wrong Integration Data
+# Resumo Semanal Compacto para WhatsApp
 
-## Root Cause
+## Problema
 
-There are **two duplicate rows** in `facebook_lead_integrations`:
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-| form_id | form_name | default_status | 
-|---------|-----------|----------------|
-| `all` | Todos os formulários | `leads` |
-| `2159046854900521` | [Senseys] 2026 V6 | `new` |
+## Solucao
 
-`fetchIntegration` picks the **most recent** row (the specific form one with `default_status: "new"`), which causes:
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-1. **Form shows "[Senseys] 2026 V6"** instead of "Todos Formulários" — wrong row selected
-2. **Status is blank** — `"new"` doesn't match any `<SelectItem>` value (`leads`, `qualified`, `scheduled`)
+### Exemplo do novo formato
 
-## Fix
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
 
-### 1. Clean up duplicate integration row (migration)
-Delete the stale specific-form row that shouldn't exist, keeping only the `form_id = 'all'` one.
+*Semana 1 (03/03 a 09/03) - 5 posts*
 
-### 2. Fix `fetchIntegration` to be resilient
-Remove the `is_active` filter (it might miss valid rows) and just get the latest for the agency. Also, if there are multiple rows, prefer the one with `form_id = 'all'` since that's the "catch-all" config.
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
 
-### 3. Add `"new"` as a valid status option in the Select
-The status `"new"` is a legitimate CRM status. Add it as `<SelectItem value="new">Novo</SelectItem>`. Also add a placeholder so blank values are visible.
+Qualquer ajuste e so me chamar! ✅
+```
 
-### 4. Defensive default in `handleOpenDialog`
-If `currentIntegration.default_status` doesn't match known values, fall back to `"leads"`.
+### Detalhes tecnicos
 
-## Files
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
 
-| File | Change |
-|------|--------|
-| Migration (new) | Delete duplicate row with `form_id != 'all'` for this agency |
-| `MetaIntegrationConfig.tsx` | Add "Novo" status option; make `fetchIntegration` prefer `form_id='all'`; add fallback for unknown status |
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 
