@@ -34,6 +34,7 @@ interface Integration {
   form_name: string;
   form_id: string;
   pixel_id: string | null;
+  form_questions: DetectedQuestion[] | null;
   _parentId?: string;
   _isVirtual?: boolean;
 }
