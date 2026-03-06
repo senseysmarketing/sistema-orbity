@@ -59,7 +59,18 @@ serve(async (req) => {
 
       if (!lead) throw new Error(`Lead ${lead_id} not found`);
 
-      const pixelId = await findPixelId(supabase, lead, agency_id);
+      // Use RPC for pixel + token in single query, fallback to legacy
+      const metaConfig = await getMetaPixelConfig(supabase, agency_id);
+      let pixelId: string | null = metaConfig?.pixel_id || null;
+      let accessToken: string | null = metaConfig?.access_token || null;
+      let testEventCode: string | null = metaConfig?.test_event_code || null;
+
+      if (!pixelId) {
+        pixelId = await findPixelIdLegacy(supabase, lead, agency_id);
+        // Legacy path: no OAuth token available
+        accessToken = null;
+      }
+
       if (!pixelId) {
         return new Response(
           JSON.stringify({ message: 'No pixel configured' }),
@@ -67,7 +78,7 @@ serve(async (req) => {
         );
       }
 
-      await sendMetaEvent(supabase, lead, agency_id, pixelId, metaEventName, lead.qualification_score || 0, lead.temperature || 'cold', eventValue || lead.value);
+      await sendMetaEvent(supabase, lead, agency_id, pixelId, metaEventName, lead.qualification_score || 0, lead.temperature || 'cold', accessToken, testEventCode, eventValue || lead.value);
 
       return new Response(
         JSON.stringify({ event: metaEventName, status: 'dispatched' }),
@@ -195,18 +206,27 @@ serve(async (req) => {
       .eq('id', lead.id);
 
     // Fire Meta events based on qualification
-    const pixelId = await findPixelId(supabase, lead, agency_id);
+    const metaConfig = await getMetaPixelConfig(supabase, agency_id);
+    let pixelId: string | null = metaConfig?.pixel_id || null;
+    let accessToken: string | null = metaConfig?.access_token || null;
+    let testEventCode: string | null = metaConfig?.test_event_code || null;
+
+    if (!pixelId) {
+      pixelId = await findPixelIdLegacy(supabase, lead, agency_id);
+      accessToken = null;
+    }
+
     if (pixelId) {
       const leadValue = lead.value || 0;
 
       if (qualification === 'hot') {
-        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'Lead', totalScore, qualification, leadValue);
-        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'QualifiedLead', totalScore, qualification, leadValue);
+        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'Lead', totalScore, qualification, accessToken, testEventCode, leadValue);
+        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'QualifiedLead', totalScore, qualification, accessToken, testEventCode, leadValue);
       } else if (qualification === 'cold') {
-        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'Lead', totalScore, qualification, leadValue);
-        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'ColdLead', totalScore, qualification, leadValue);
+        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'Lead', totalScore, qualification, accessToken, testEventCode, leadValue);
+        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'ColdLead', totalScore, qualification, accessToken, testEventCode, leadValue);
       } else {
-        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'Lead', totalScore, qualification, leadValue);
+        await sendMetaEvent(supabase, lead, agency_id, pixelId, 'Lead', totalScore, qualification, accessToken, testEventCode, leadValue);
       }
     }
 
@@ -265,7 +285,18 @@ async function inferFormId(supabase: any, agencyId: string, customFields: Record
   return bestFormId;
 }
 
-async function findPixelId(supabase: any, lead: any, agencyId: string): Promise<string | null> {
+// Returns pixel config + OAuth token in a single query via RPC
+async function getMetaPixelConfig(supabase: any, agencyId: string): Promise<{ pixel_id: string; test_event_code: string | null; access_token: string } | null> {
+  const { data, error } = await supabase.rpc('get_meta_pixel_config', { p_agency_id: agencyId });
+  if (error || !data || data.length === 0) {
+    console.log('[META] No pixel config found via RPC, trying legacy fallback');
+    return null;
+  }
+  return data[0];
+}
+
+// Legacy fallback: find pixel from facebook_lead_integrations
+async function findPixelIdLegacy(supabase: any, lead: any, agencyId: string): Promise<string | null> {
   const { data: syncLog } = await supabase
     .from('facebook_lead_sync_log')
     .select('integration_id')
@@ -301,6 +332,8 @@ async function sendMetaEvent(
   eventName: string,
   score: number,
   qualification: string,
+  accessToken: string | null,
+  testEventCode: string | null,
   value?: number
 ) {
   const eventId = `${lead.id}_${eventName}`;
@@ -317,9 +350,10 @@ async function sendMetaEvent(
     return;
   }
 
-  const accessToken = Deno.env.get('FACEBOOK_ACCESS_TOKEN');
-  if (!accessToken) {
-    console.log('[META EVENT] No FACEBOOK_ACCESS_TOKEN configured, logging event only');
+  // If no OAuth token from DB, try legacy env var as last resort
+  const resolvedToken = accessToken || Deno.env.get('FACEBOOK_ACCESS_TOKEN');
+  if (!resolvedToken) {
+    console.log('[META EVENT] No access token available (DB or env), logging event only');
     await supabase.from('meta_conversion_events').insert({
       lead_id: lead.id,
       agency_id: agencyId,
@@ -347,6 +381,8 @@ async function sendMetaEvent(
     if (nameParts.length > 0) userData.fn = [await hashData(nameParts[0])];
     if (nameParts.length > 1) userData.ln = [await hashData(nameParts.slice(1).join(' '))];
   }
+  // external_id como array para melhor Match Quality
+  userData.external_id = [await hashData(lead.id)];
 
   const customData: any = {
     lead_score: score,
@@ -359,26 +395,29 @@ async function sendMetaEvent(
     customData.currency = 'BRL';
   }
 
-  const payload = {
-    data: [{
-      event_name: eventName,
-      event_time: Math.floor(Date.now() / 1000),
-      event_id: eventId,
-      action_source: 'system_generated',
-      user_data: userData,
-      custom_data: customData,
-    }],
+  const eventPayload: any = {
+    event_name: eventName,
+    event_time: Math.floor(Date.now() / 1000),
+    event_id: eventId,
+    action_source: 'system_generated',
+    event_source_url: 'https://sistema-orbity.lovable.app',
+    user_data: userData,
+    custom_data: customData,
   };
 
+  const payload: any = { data: [eventPayload] };
+
+  // Incluir test_event_code se configurado (para debugging no Events Manager)
+  const apiUrl = testEventCode
+    ? `https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${resolvedToken}&test_event_code=${testEventCode}`
+    : `https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${resolvedToken}`;
+
   try {
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/${pixelId}/events?access_token=${accessToken}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }
-    );
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
     const responseData = await response.json();
     const status = response.ok ? 'sent' : 'failed';
