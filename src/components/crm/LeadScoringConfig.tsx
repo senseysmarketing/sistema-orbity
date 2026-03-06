@@ -338,7 +338,14 @@ function SyncMetaDialog({
         {loading ? (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Buscando formulários...</p>
+            <p className="text-sm text-muted-foreground">
+              {progress.total > 0
+                ? `Buscando formulários... (${progress.done}/${progress.total} páginas)`
+                : "Buscando páginas..."}
+            </p>
+            {allForms.length > 0 && (
+              <p className="text-xs text-muted-foreground">{allForms.length} formulário(s) encontrado(s)</p>
+            )}
           </div>
         ) : allForms.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
