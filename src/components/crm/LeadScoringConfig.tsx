@@ -791,6 +791,7 @@ function FormAccordionItem({
 export function LeadScoringConfig() {
   const { currentAgency } = useAgency();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [configuredPages, setConfiguredPages] = useState<Array<{ page_id: string; page_name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "meta" | "configured" | "pending">("all");
@@ -804,6 +805,13 @@ export function LeadScoringConfig() {
       .eq("is_active", true);
 
     const rawIntegrations = (data || []) as Integration[];
+
+    // Extract unique pages BEFORE filtering, so configuredPages is always populated
+    const uniquePages = [...new Map(
+      rawIntegrations.map((i) => [i.page_id, { page_id: i.page_id, page_name: i.page_name }])
+    ).values()];
+    setConfiguredPages(uniquePages);
+
     const expanded: Integration[] = [];
 
     for (const int of rawIntegrations) {
@@ -969,9 +977,7 @@ export function LeadScoringConfig() {
           agencyId={currentAgency.id}
           existingFormIds={new Set(integrations.map((i) => i.form_id))}
           onSynced={loadIntegrations}
-          configuredPages={
-            [...new Map(integrations.map((i) => [i.page_id, { page_id: i.page_id, page_name: i.page_name }])).values()]
-          }
+          configuredPages={configuredPages}
         />
       )}
     </div>
