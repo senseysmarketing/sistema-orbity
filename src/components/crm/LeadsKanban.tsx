@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 import { getTemperatureForStatus, getTemperatureLabel, LEAD_TEMPERATURES } from "@/lib/leadTemperature";
 import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
+import { firePipelineMetaEvent } from "@/lib/metaPipelineEvents";
+import { useAgency } from "@/hooks/useAgency";
 
 interface Lead {
   id: string;
@@ -54,6 +56,7 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
   const [lossDialogOpen, setLossDialogOpen] = useState(false);
   const [pendingLossLead, setPendingLossLead] = useState<{ id: string; name: string; dbStatus: string; displayStatus: string } | null>(null);
   const { getStatusConfig, getStatusKey, mapDatabaseStatusToDisplay, mapDisplayStatusToDatabase } = useLeadStatuses();
+  const { currentAgency } = useAgency();
 
   const statusConfig = getStatusConfig();
 
@@ -229,6 +232,11 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
         .eq('id', leadId);
 
       if (error) throw error;
+      
+      // Fire Meta pipeline event in background
+      if (currentAgency?.id) {
+        firePipelineMetaEvent(leadId, currentAgency.id, dbStatus, lead.value);
+      }
       
       toast.success(`Lead movido para ${displayStatus} • ${tempConfig.emoji} ${tempConfig.label}`);
     } catch (error) {
