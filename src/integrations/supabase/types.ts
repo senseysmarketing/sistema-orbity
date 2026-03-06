@@ -2548,6 +2548,123 @@ export type Database = {
           },
         ]
       }
+      lead_scoring_results: {
+        Row: {
+          agency_id: string
+          answers_detail: Json | null
+          id: string
+          lead_id: string
+          qualification: string
+          score_total: number
+          scored_at: string
+        }
+        Insert: {
+          agency_id: string
+          answers_detail?: Json | null
+          id?: string
+          lead_id: string
+          qualification?: string
+          score_total?: number
+          scored_at?: string
+        }
+        Update: {
+          agency_id?: string
+          answers_detail?: Json | null
+          id?: string
+          lead_id?: string
+          qualification?: string
+          score_total?: number
+          scored_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_scoring_results_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_scoring_results_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "lead_scoring_results_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "lead_scoring_results_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_scoring_rules: {
+        Row: {
+          agency_id: string
+          answer: string
+          created_at: string
+          form_id: string
+          form_name: string | null
+          id: string
+          is_blocker: boolean
+          question: string
+          score: number
+        }
+        Insert: {
+          agency_id: string
+          answer: string
+          created_at?: string
+          form_id: string
+          form_name?: string | null
+          id?: string
+          is_blocker?: boolean
+          question: string
+          score?: number
+        }
+        Update: {
+          agency_id?: string
+          answer?: string
+          created_at?: string
+          form_id?: string
+          form_name?: string | null
+          id?: string
+          is_blocker?: boolean
+          question?: string
+          score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_scoring_rules_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_scoring_rules_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "lead_scoring_rules_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       lead_statuses: {
         Row: {
           agency_id: string
@@ -2605,6 +2722,8 @@ export type Database = {
           notes: string | null
           phone: string | null
           position: string | null
+          qualification_score: number | null
+          qualification_source: string | null
           source: string | null
           status: string
           status_changed_at: string | null
@@ -2631,6 +2750,8 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           position?: string | null
+          qualification_score?: number | null
+          qualification_source?: string | null
           source?: string | null
           status?: string
           status_changed_at?: string | null
@@ -2657,6 +2778,8 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           position?: string | null
+          qualification_score?: number | null
+          qualification_source?: string | null
           source?: string | null
           status?: string
           status_changed_at?: string | null
@@ -2890,6 +3013,68 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      meta_conversion_events: {
+        Row: {
+          agency_id: string
+          event_name: string
+          id: string
+          lead_id: string
+          pixel_id: string
+          response_data: Json | null
+          sent_at: string
+          status: string
+        }
+        Insert: {
+          agency_id: string
+          event_name: string
+          id?: string
+          lead_id: string
+          pixel_id: string
+          response_data?: Json | null
+          sent_at?: string
+          status?: string
+        }
+        Update: {
+          agency_id?: string
+          event_name?: string
+          id?: string
+          lead_id?: string
+          pixel_id?: string
+          response_data?: Json | null
+          sent_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_conversion_events_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meta_conversion_events_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "meta_conversion_events_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "meta_conversion_events_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
           },
         ]
       }

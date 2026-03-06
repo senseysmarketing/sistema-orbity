@@ -633,6 +633,20 @@ async function handleWebhook(supabase: any, body: any) {
         });
 
       console.log(`✅ Lead ${leadgenId} successfully created in CRM as ${newLead.id}`);
+
+      // Trigger lead qualification scoring
+      try {
+        const qualificationUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-lead-qualification`;
+        const qualResponse = await fetch(qualificationUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lead_id: newLead.id, agency_id: integration.agency_id }),
+        });
+        const qualResult = await qualResponse.json();
+        console.log(`[QUALIFICATION] Result for ${newLead.id}:`, qualResult);
+      } catch (qualError) {
+        console.error('[QUALIFICATION] Error triggering qualification:', qualError);
+      }
     }
   }
 

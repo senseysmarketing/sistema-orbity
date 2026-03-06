@@ -4,7 +4,8 @@ import { MetaIntegrationConfig } from "./MetaIntegrationConfig";
 import { WebhooksManager } from "./WebhooksManager";
 import { ManualInvestmentManager } from "./ManualInvestmentManager";
 import { WhatsAppTemplateManager } from "./WhatsAppTemplateManager";
-import { Link2, DollarSign, Layers, MessageSquare } from "lucide-react";
+import { LeadScoringConfig } from "./LeadScoringConfig";
+import { Link2, DollarSign, Layers, MessageSquare, Target } from "lucide-react";
 
 export function CRMSettings() {
   return (
@@ -34,6 +35,10 @@ export function CRMSettings() {
             <MessageSquare className="h-4 w-4" />
             <span className="hidden sm:inline">WhatsApp</span>
           </TabsTrigger>
+          <TabsTrigger value="qualification" className="flex-shrink-0 gap-1 md:gap-2">
+            <Target className="h-4 w-4" />
+            <span className="hidden sm:inline">Qualificação</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="integration">
@@ -53,6 +58,10 @@ export function CRMSettings() {
 
         <TabsContent value="whatsapp">
           <WhatsAppTemplateManager />
+        </TabsContent>
+
+        <TabsContent value="qualification">
+          <LeadScoringConfig />
         </TabsContent>
       </Tabs>
     </div>
