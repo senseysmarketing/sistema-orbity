@@ -1,0 +1,1 @@
+ALTER TABLE facebook_lead_integrations ADD COLUMN IF NOT EXISTS form_questions jsonb DEFAULT NULL;

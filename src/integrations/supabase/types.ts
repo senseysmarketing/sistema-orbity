@@ -2246,6 +2246,7 @@ export type Database = {
           field_mapping: Json | null
           form_id: string
           form_name: string
+          form_questions: Json | null
           id: string
           is_active: boolean
           last_sync_at: string | null
@@ -2267,6 +2268,7 @@ export type Database = {
           field_mapping?: Json | null
           form_id: string
           form_name: string
+          form_questions?: Json | null
           id?: string
           is_active?: boolean
           last_sync_at?: string | null
@@ -2288,6 +2290,7 @@ export type Database = {
           field_mapping?: Json | null
           form_id?: string
           form_name?: string
+          form_questions?: Json | null
           id?: string
           is_active?: boolean
           last_sync_at?: string | null
