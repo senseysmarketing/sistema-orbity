@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 // ── Types ──────────────────────────────────────────────
 interface Integration {
   id: string;
+  page_id: string;
   page_name: string;
   form_name: string;
   form_id: string;
