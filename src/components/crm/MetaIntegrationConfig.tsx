@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Loader2, Facebook, Settings, Trash2, Check, AlertCircle, ExternalLink, RefreshCw, Search } from "lucide-react";
+import { Loader2, Facebook, Settings, Trash2, Check, AlertCircle, ExternalLink, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
