@@ -57,6 +57,7 @@ interface Lead {
   next_contact: string | null;
   tags: string[] | null;
   custom_fields: any;
+  qualification_source?: string | null;
   created_at: string;
   updated_at: string;
   created_by: string;
