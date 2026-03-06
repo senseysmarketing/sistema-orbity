@@ -1,0 +1,1 @@
+ALTER TABLE meta_conversion_events ADD COLUMN IF NOT EXISTS event_id text;
