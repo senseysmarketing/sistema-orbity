@@ -37,7 +37,7 @@ interface TaskCardProps {
   getPriorityColor: (priority: string) => string;
   getPriorityLabel: (priority: string) => string;
   getUrgencyLevel: (task: Task) => { level: string; label: string; color: string };
-  getClientName: (clientId: string | null) => string;
+  getClientName: (clientId: string | null, task?: any) => string;
   formatDateBR: (date: string | null) => string;
   assignedUsers?: any[];
   onClick?: (e?: React.MouseEvent) => void;
@@ -158,7 +158,7 @@ export function TaskCard({
           className="font-medium px-2 py-0.5 rounded ml-auto"
           style={{ backgroundColor: clientColor, color: 'white' }}
         >
-          {getClientName(task.client_id)}
+          {getClientName(task.client_id, task)}
         </span>
       </div>
 
