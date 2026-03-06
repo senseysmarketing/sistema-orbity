@@ -373,6 +373,7 @@ export default function CRM() {
 
         {/* Pipeline Tab */}
         <TabsContent value="pipeline" className="space-y-4">
+          <UnqualifiedLeadsWarning leads={leads} />
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
