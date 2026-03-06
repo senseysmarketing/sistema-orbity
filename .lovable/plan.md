@@ -1,59 +1,60 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Plan: Fetch Form Questions from Meta Graph API
 
-## Problema
+## Problem
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+Currently, `detectedQuestions` are built by scanning `custom_fields` from existing leads in the database. If a form was just imported and no leads have arrived yet, there are no leads to scan → "Nenhuma pergunta detectada."
 
-## Solucao
+## Solution
 
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
-
-### Exemplo do novo formato
+Add a new action `list_form_questions` to the `facebook-leads` edge function that calls the Meta Graph API endpoint:
 
 ```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
-
-*Semana 1 (03/03 a 09/03) - 5 posts*
-
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
-
-Qualquer ajuste e so me chamar! ✅
+GET /{form_id}?fields=questions&access_token={page_token}
 ```
 
-### Detalhes tecnicos
+This returns the form's structure with all questions and their predefined options (for multiple choice) directly from Meta, without needing any existing leads.
 
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+### 1. Edge Function — new action `list_form_questions`
 
-Reescrever a funcao `generateSummaryText` com formato compacto:
+In `supabase/functions/facebook-leads/index.ts`:
 
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+- Add a new handler for `action: "list_form_questions"`
+- Takes `agencyId`, `pageId`, `formId`
+- Uses same connection lookup pattern (agency_id → /me/accounts → page_token)
+- Calls `GET /{form_id}?fields=questions&access_token={pageToken}`
+- Returns questions with their `key`, `label`, `type`, and `options` (predefined answers)
 
-### Mapeamento de emojis por formato
+Meta returns:
+```json
+{
+  "questions": [
+    {
+      "key": "qual_o_seu_interesse",
+      "label": "Qual o seu interesse?",
+      "type": "CUSTOM",
+      "options": [
+        { "key": "casa", "value": "Casa" },
+        { "key": "terreno", "value": "Terreno" }
+      ]
+    }
+  ]
+}
+```
 
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
+### 2. Frontend — `loadFormData` in `LeadScoringConfig.tsx`
 
-### Resultado esperado
+Update `loadFormData` to:
 
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+1. Keep existing logic (scan leads' `custom_fields` for detected questions)
+2. **Additionally** call the new `list_form_questions` action to fetch questions directly from Meta
+3. **Merge** both sources: Meta questions provide the base structure (all possible answers), lead-based detection adds any extra answers seen in practice
+4. Filter out technical/PII fields from Meta questions using existing `TECHNICAL_FIELDS` set
+
+This ensures questions appear immediately after import, even with zero leads.
+
+### Files to edit
+- `supabase/functions/facebook-leads/index.ts` — add `list_form_questions` action
+- `src/components/crm/LeadScoringConfig.tsx` — call new action in `loadFormData` and merge results
 
