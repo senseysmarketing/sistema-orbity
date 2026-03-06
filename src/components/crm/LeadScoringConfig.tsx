@@ -213,9 +213,12 @@ function SyncMetaDialog({
     Array<{ pageId: string; pageName: string; pageToken: string; formId: string; formName: string; exists: boolean }>
   >([]);
 
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+
   const fetchFormsFromMeta = async () => {
     setLoading(true);
     setAllForms([]);
+    setProgress({ done: 0, total: 0 });
     try {
       // 1. List pages
       const { data: pagesData, error: pErr } = await supabase.functions.invoke("facebook-leads", {
@@ -224,29 +227,37 @@ function SyncMetaDialog({
       if (pErr) throw pErr;
       const pgs = pagesData?.pages || [];
       setPages(pgs);
+      setProgress({ done: 0, total: pgs.length });
 
-      // 2. For each page, list forms
+      // 2. Fetch forms from all pages in parallel (batches of 5)
       const formsAccum: typeof allForms = [];
-      for (const page of pgs) {
-        try {
-          const { data: formsData } = await supabase.functions.invoke("facebook-leads", {
-            body: { action: "list_forms", agencyId, pageId: page.id, pageAccessToken: page.access_token },
-          });
-          for (const f of formsData?.forms || []) {
-            formsAccum.push({
-              pageId: page.id,
-              pageName: page.name,
-              pageToken: page.access_token,
-              formId: f.id,
-              formName: f.name,
-              exists: existingFormIds.has(f.id),
-            });
+      const BATCH_SIZE = 5;
+      for (let i = 0; i < pgs.length; i += BATCH_SIZE) {
+        const batch = pgs.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map((page) =>
+            supabase.functions.invoke("facebook-leads", {
+              body: { action: "list_forms", agencyId, pageId: page.id, pageAccessToken: page.access_token },
+            }).then(({ data }) => ({ page, forms: data?.forms || [] }))
+          )
+        );
+        for (const result of results) {
+          if (result.status === "fulfilled") {
+            for (const f of result.value.forms) {
+              formsAccum.push({
+                pageId: result.value.page.id,
+                pageName: result.value.page.name,
+                pageToken: result.value.page.access_token,
+                formId: f.id,
+                formName: f.name,
+                exists: existingFormIds.has(f.id),
+              });
+            }
           }
-        } catch {
-          // skip page errors
         }
+        setProgress((prev) => ({ ...prev, done: Math.min(i + BATCH_SIZE, pgs.length) }));
+        setAllForms([...formsAccum]);
       }
-      setAllForms(formsAccum);
     } catch (err: any) {
       toast({ title: "Erro ao buscar formulários", description: err.message, variant: "destructive" });
     } finally {
@@ -327,7 +338,14 @@ function SyncMetaDialog({
         {loading ? (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Buscando formulários...</p>
+            <p className="text-sm text-muted-foreground">
+              {progress.total > 0
+                ? `Buscando formulários... (${progress.done}/${progress.total} páginas)`
+                : "Buscando páginas..."}
+            </p>
+            {allForms.length > 0 && (
+              <p className="text-xs text-muted-foreground">{allForms.length} formulário(s) encontrado(s)</p>
+            )}
           </div>
         ) : allForms.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
