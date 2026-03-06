@@ -2356,6 +2356,67 @@ export type Database = {
           },
         ]
       }
+      facebook_pixels: {
+        Row: {
+          ad_account_id: string
+          agency_id: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          is_selected: boolean | null
+          pixel_id: string
+          pixel_name: string
+          test_event_code: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ad_account_id: string
+          agency_id: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_selected?: boolean | null
+          pixel_id: string
+          pixel_name: string
+          test_event_code?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ad_account_id?: string
+          agency_id?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_selected?: boolean | null
+          pixel_id?: string
+          pixel_name?: string
+          test_event_code?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facebook_pixels_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facebook_pixels_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "facebook_pixels_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       google_calendar_connections: {
         Row: {
           access_token: string
@@ -6609,6 +6670,14 @@ export type Database = {
       get_event_pref_enabled: {
         Args: { p_agency_id: string; p_event_key: string; p_user_id: string }
         Returns: boolean
+      }
+      get_meta_pixel_config: {
+        Args: { p_agency_id: string }
+        Returns: {
+          access_token: string
+          pixel_id: string
+          test_event_code: string
+        }[]
       }
       get_user_agency_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
