@@ -62,9 +62,9 @@ export const useMeetings = () => {
       // Cast the data properly, handling JSONB types
       return (data || []).map(m => ({
         ...m,
-        external_participants: m.external_participants as Meeting['external_participants'],
-        action_items: m.action_items as Meeting['action_items'],
-        participants: m.participants as string[],
+        external_participants: m.external_participants as unknown as Meeting['external_participants'],
+        action_items: m.action_items as unknown as Meeting['action_items'],
+        participants: m.participants as unknown as string[],
       })) as Meeting[];
     },
     enabled: !!currentAgency?.id,
@@ -97,7 +97,7 @@ export const useMeetings = () => {
         .single();
 
       if (error) throw error;
-      return data as Meeting;
+      return data as unknown as Meeting;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meetings"] });
