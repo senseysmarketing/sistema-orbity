@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Loader2, Facebook, Settings, Trash2, Check, AlertCircle, ExternalLink, RefreshCw, Search } from "lucide-react";
+import { Loader2, Facebook, Settings, Trash2, Check, AlertCircle, ExternalLink, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
@@ -840,38 +840,43 @@ export function MetaIntegrationConfig() {
             {/* Pixel de Conversão */}
             <div className="space-y-2">
               <Label>Pixel de Conversão (CAPI)</Label>
-              <div className="flex gap-2">
-                <Select value={selectedPixelId} onValueChange={setSelectedPixelId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Selecione um pixel" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {discoveredPixels.map((pixel) => (
-                      <SelectItem key={pixel.pixel_id} value={pixel.pixel_id}>
-                        <div className="flex flex-col">
-                          <span>{pixel.pixel_name}</span>
-                          <span className="text-xs text-muted-foreground font-mono">{pixel.pixel_id}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={fetchPixels}
-                  disabled={loadingPixels || !selectedAdAccount}
-                  title="Buscar pixels da conta de anúncios"
-                >
+              <Select
+                value={selectedPixelId}
+                onValueChange={setSelectedPixelId}
+                onOpenChange={(open) => {
+                  if (open && selectedAdAccount && discoveredPixels.length === 0 && !loadingPixels) {
+                    fetchPixels();
+                  }
+                }}
+              >
+                <SelectTrigger>
                   {loadingPixels ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-muted-foreground">Buscando pixels...</span>
+                    </div>
                   ) : (
-                    <Search className="h-4 w-4" />
+                    <SelectValue placeholder="Selecione um pixel" />
                   )}
-                </Button>
-              </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {discoveredPixels.map((pixel) => (
+                    <SelectItem key={pixel.pixel_id} value={pixel.pixel_id}>
+                      <div className="flex flex-col">
+                        <span>{pixel.pixel_name}</span>
+                        <span className="text-xs text-muted-foreground font-mono">{pixel.pixel_id}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                  {discoveredPixels.length === 0 && !loadingPixels && (
+                    <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                      Nenhum pixel encontrado
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
               <p className="text-xs text-muted-foreground">
-                Selecione a conta de anúncios primeiro e clique na lupa para descobrir pixels
+                Os pixels serão carregados automaticamente ao abrir a lista
               </p>
             </div>
 
