@@ -572,24 +572,52 @@ function FormAccordionItem({
 
       // Optionally re-qualify existing leads
       if (updateExisting) {
-        // Get leads from this form's source
-        const { data: leads } = await supabase
+        // Get active question keys from this form's rules
+        const activeQuestionKeys = new Set(rulesToInsert.map(r => r.question));
+        
+        // Get leads that have custom_fields with matching question keys
+        const { data: allLeads } = await supabase
           .from("leads")
-          .select("id")
+          .select("id, custom_fields")
           .eq("agency_id", agencyId)
           .eq("source", "facebook_leads")
+          .not("custom_fields", "is", null)
           .limit(500);
 
-        if (leads && leads.length > 0) {
-          for (const lead of leads) {
-            try {
-              await supabase.functions.invoke("process-lead-qualification", {
-                body: { lead_id: lead.id, agency_id: agencyId },
-              });
-            } catch {
-              // continue with other leads
+        // Filter to leads whose custom_fields contain at least one active question
+        const candidateLeads = (allLeads || []).filter((lead: any) => {
+          if (!lead.custom_fields || typeof lead.custom_fields !== 'object') return false;
+          const keys = Object.keys(lead.custom_fields);
+          return keys.some(k => activeQuestionKeys.has(k));
+        });
+
+        if (candidateLeads.length > 0) {
+          const batchSize = 10;
+          let processed = 0;
+          let successes = 0;
+          let failures = 0;
+
+          for (let i = 0; i < candidateLeads.length; i += batchSize) {
+            const batch = candidateLeads.slice(i, i + batchSize);
+            const results = await Promise.allSettled(
+              batch.map((lead: any) =>
+                supabase.functions.invoke("process-lead-qualification", {
+                  body: { lead_id: lead.id, agency_id: agencyId },
+                })
+              )
+            );
+            
+            for (const r of results) {
+              processed++;
+              if (r.status === 'fulfilled') successes++;
+              else failures++;
             }
           }
+
+          toast({
+            title: `Leads atualizados: ${successes}/${processed}`,
+            description: failures > 0 ? `${failures} falha(s)` : undefined,
+          });
         }
       }
 
