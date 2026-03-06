@@ -1,59 +1,34 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Fix: Internal Agency Tasks — Layout, Display, and Filter Issues
 
-## Problema
+## Problems Identified
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+1. **Modal layout**: The "Clientes" and "Atribuir usuários" fields use `grid-cols-2` (line 1264), causing them to stack/overlap on narrower screens. Should stack vertically.
 
-## Solucao
+2. **Task card shows "Sem cliente"**: When a task is created with `is_internal = true`, `client_id` is stored as `null`. The `getClientName` function does accept a `task` parameter to check `is_internal`, but the type signature through the component chain (`KanbanColumn` → `SortableTaskCard` → `TaskCard`) only passes `(clientId: string | null) => string` — the task object is never forwarded, so the internal check never runs.
 
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+3. **Client badge blank**: Same root cause — `getClientName` returns "Sem cliente" with the default muted color since `client_id` is null and `is_internal` is not checked.
 
-### Exemplo do novo formato
+4. **Filter doesn't match internal tasks**: The client filter (line 342-347) checks `task.client_id` against selected filter values. Internal tasks have `client_id = null`, so filtering by the virtual agency ID (`agency:xxx`) never matches. Also, internal tasks fall into "no-client" bucket incorrectly.
 
-```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+## Changes
 
-*Semana 1 (03/03 a 09/03) - 5 posts*
+### 1. Fix modal layout (`Tasks.tsx` ~line 1264)
+Change `grid grid-cols-2 gap-4` to `grid gap-4` so Clientes and Atribuir usuários stack vertically, avoiding overlap.
 
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
+### 2. Thread `task` object through card chain
+Update the `getClientName` type signature in `KanbanColumn`, `SortableTaskCard`, and `TaskCard` interfaces from `(clientId: string | null) => string` to `(clientId: string | null, task?: any) => string`. Pass the task object when calling `getClientName` in `TaskCard`.
 
-Qualquer ajuste e so me chamar! ✅
-```
+### 3. Fix client filter for internal tasks (`Tasks.tsx` ~line 342-347)
+Add logic: if filtering by the virtual agency ID, match tasks where `is_internal === true`. This ensures internal tasks appear when the agency is selected in the filter.
 
-### Detalhes tecnicos
+## Files
 
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
-
-Reescrever a funcao `generateSummaryText` com formato compacto:
-
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
-
-### Mapeamento de emojis por formato
-
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
-
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+| File | Change |
+|------|--------|
+| `src/pages/Tasks.tsx` | Fix grid layout (line 1264); fix filter logic (line 342-347) |
+| `src/components/ui/kanban-column.tsx` | Update `getClientName` signature; pass task to call |
+| `src/components/ui/sortable-task-card.tsx` | Update `getClientName` signature; pass task to call |
+| `src/components/ui/task-card.tsx` | Update `getClientName` signature; pass task in render |
 
