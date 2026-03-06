@@ -477,6 +477,34 @@ function FormAccordionItem({
       }
     });
 
+    // Also fetch questions directly from Meta Graph API
+    try {
+      const { data: metaData, error: metaError } = await supabase.functions.invoke("facebook-leads", {
+        body: {
+          action: "list_form_questions",
+          agencyId,
+          pageId: integration.page_id,
+          formId: targetFormId,
+        },
+      });
+
+      if (!metaError && metaData?.questions) {
+        for (const q of metaData.questions) {
+          const key = q.key;
+          if (!key || TECHNICAL_FIELDS.has(key)) continue;
+          if (!questionsMap[key]) questionsMap[key] = new Set();
+          // Add predefined options from Meta
+          if (q.options && Array.isArray(q.options)) {
+            for (const opt of q.options) {
+              if (opt.value) questionsMap[key].add(opt.value);
+            }
+          }
+        }
+      }
+    } catch (metaErr) {
+      console.warn("Could not fetch Meta form questions:", metaErr);
+    }
+
     const detectedQuestions = Object.entries(questionsMap)
       .map(([question, answersSet]) => ({
         question,

@@ -92,6 +92,9 @@ serve(async (req) => {
           case 'subscribe_webhook':
             return await subscribeWebhook(supabase, user.id, params);
           
+          case 'list_form_questions':
+            return await listFormQuestions(supabase, user.id, params);
+          
           default:
             return new Response(
               JSON.stringify({ error: 'Invalid action' }),
@@ -496,6 +499,64 @@ async function syncLeads(supabase: any, userId: string, params: any) {
       skipped: skippedCount,
       total: leads.length
     }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+// List form questions directly from Meta Graph API
+async function listFormQuestions(supabase: any, userId: string, params: any) {
+  const { agencyId, pageId, formId } = params;
+
+  if (!formId || !pageId) {
+    throw new Error('pageId and formId are required');
+  }
+
+  // Get connection by agency
+  const { data: connection, error: connError } = await supabase
+    .from('facebook_connections')
+    .select('*')
+    .eq('agency_id', agencyId)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (connError || !connection) {
+    throw new Error('No active Facebook connection found for this agency');
+  }
+
+  // Get page access token via /me/accounts
+  let pageAccessToken: string | null = null;
+  let nextUrl: string | null = `https://graph.facebook.com/v18.0/me/accounts?fields=id,access_token&access_token=${connection.access_token}&limit=100`;
+
+  while (nextUrl && !pageAccessToken) {
+    const resp = await fetch(nextUrl);
+    const data = await resp.json();
+    if (data.error) throw new Error(`Facebook API error: ${data.error.message}`);
+    const match = (data.data || []).find((p: any) => p.id === pageId);
+    if (match) pageAccessToken = match.access_token;
+    nextUrl = data.paging?.next || null;
+  }
+
+  if (!pageAccessToken) {
+    throw new Error(`Page ${pageId} not found in connected Facebook accounts`);
+  }
+
+  // Fetch form questions
+  const formUrl = `https://graph.facebook.com/v18.0/${formId}?fields=questions&access_token=${pageAccessToken}`;
+  const formResp = await fetch(formUrl);
+  const formData = await formResp.json();
+
+  if (formData.error) {
+    console.error('[listFormQuestions] Error:', formData.error);
+    throw new Error(`Facebook API error: ${formData.error.message}`);
+  }
+
+  const questions = formData.questions || [];
+  console.log(`[listFormQuestions] Found ${questions.length} questions for form ${formId}`);
+
+  return new Response(
+    JSON.stringify({ questions }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
 }
