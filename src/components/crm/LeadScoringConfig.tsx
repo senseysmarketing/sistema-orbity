@@ -470,8 +470,21 @@ function FormAccordionItem({
       is_blocker: r.is_blocker,
     }));
 
-    // Detect questions from leads
+    // Build questions map - start with cached form_questions if available
     const questionsMap: Record<string, Set<string>> = {};
+    let usedCache = false;
+
+    if (integration.form_questions && Array.isArray(integration.form_questions) && integration.form_questions.length > 0) {
+      // Use cached questions from DB
+      for (const q of integration.form_questions) {
+        if (q.question && q.answers) {
+          questionsMap[q.question] = new Set(q.answers);
+        }
+      }
+      usedCache = true;
+    }
+
+    // Also add questions detected from lead data
     leadsData.forEach((lead: any) => {
       if (lead.custom_fields && typeof lead.custom_fields === "object") {
         Object.entries(lead.custom_fields).forEach(([key, value]) => {
@@ -482,32 +495,48 @@ function FormAccordionItem({
       }
     });
 
-    // Also fetch questions directly from Meta Graph API
-    try {
-      const { data: metaData, error: metaError } = await supabase.functions.invoke("facebook-leads", {
-        body: {
-          action: "list_form_questions",
-          agencyId,
-          pageId: integration.page_id,
-          formId: targetFormId,
-        },
-      });
+    // If no cached questions, fetch from Meta API and persist
+    if (!usedCache) {
+      try {
+        const { data: metaData, error: metaError } = await supabase.functions.invoke("facebook-leads", {
+          body: {
+            action: "list_form_questions",
+            agencyId,
+            pageId: integration.page_id,
+            formId: targetFormId,
+          },
+        });
 
-      if (!metaError && metaData?.questions) {
-        for (const q of metaData.questions) {
-          const key = q.key;
-          if (!key || TECHNICAL_FIELDS.has(key)) continue;
-          if (!questionsMap[key]) questionsMap[key] = new Set();
-          // Add predefined options from Meta
-          if (q.options && Array.isArray(q.options)) {
-            for (const opt of q.options) {
-              if (opt.value) questionsMap[key].add(opt.value);
+        if (!metaError && metaData?.questions) {
+          for (const q of metaData.questions) {
+            const key = q.key;
+            if (!key || TECHNICAL_FIELDS.has(key)) continue;
+            if (!questionsMap[key]) questionsMap[key] = new Set();
+            if (q.options && Array.isArray(q.options)) {
+              for (const opt of q.options) {
+                if (opt.value) questionsMap[key].add(opt.value);
+              }
             }
           }
+
+          // Persist questions to DB for caching (only for non-virtual integrations)
+          const questionsToCache = Object.entries(questionsMap)
+            .map(([question, answersSet]) => ({
+              question,
+              answers: Array.from(answersSet).slice(0, 20),
+            }))
+            .filter((q) => q.answers.length > 0);
+
+          if (questionsToCache.length > 0 && !integration._isVirtual) {
+            await supabase
+              .from("facebook_lead_integrations")
+              .update({ form_questions: questionsToCache } as any)
+              .eq("id", integration.id);
+          }
         }
+      } catch (metaErr) {
+        console.warn("Could not fetch Meta form questions:", metaErr);
       }
-    } catch (metaErr) {
-      console.warn("Could not fetch Meta form questions:", metaErr);
     }
 
     const detectedQuestions = Object.entries(questionsMap)
@@ -529,7 +558,7 @@ function FormAccordionItem({
     setEnabledQuestions(activeQuestions);
     setFormData({ rules, detectedQuestions, pixelId: integration.pixel_id || "", loading: false });
     setLoaded(true);
-  }, [agencyId, integration.form_id, integration.pixel_id, integration._parentId, integration._isVirtual, loaded]);
+  }, [agencyId, integration.form_id, integration.pixel_id, integration._parentId, integration._isVirtual, integration.form_questions, loaded]);
 
   const handleRuleChange = (question: string, answer: string, score: number, is_blocker: boolean) => {
     const key = `${question}|||${answer}`;
