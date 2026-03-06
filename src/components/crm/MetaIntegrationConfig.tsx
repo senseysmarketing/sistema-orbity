@@ -536,7 +536,7 @@ export function MetaIntegrationConfig() {
   };
 
   const selectedAccountData = adAccounts.find(a => a.id === selectedAdAccount);
-  const selectedPixelData = discoveredPixels.find(p => p.pixel_id === selectedPixelId);
+  
 
   if (loading) {
     return (

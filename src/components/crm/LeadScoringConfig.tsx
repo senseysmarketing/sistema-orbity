@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -55,7 +55,6 @@ interface DetectedQuestion {
 interface FormData {
   rules: ScoringRule[];
   detectedQuestions: DetectedQuestion[];
-  pixelId: string;
   loading: boolean;
 }
 
@@ -412,11 +411,9 @@ function FormAccordionItem({
   const [formData, setFormData] = useState<FormData>({
     rules: [],
     detectedQuestions: [],
-    pixelId: integration.pixel_id || "",
     loading: true,
   });
   const [saving, setSaving] = useState(false);
-  const [savingPixel, setSavingPixel] = useState(false);
   const [updateExisting, setUpdateExisting] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<Map<string, ScoringRule>>(new Map());
   const [enabledQuestions, setEnabledQuestions] = useState<Set<string>>(new Set());
@@ -556,7 +553,7 @@ function FormAccordionItem({
 
     setPendingChanges(changes);
     setEnabledQuestions(activeQuestions);
-    setFormData({ rules, detectedQuestions, pixelId: integration.pixel_id || "", loading: false });
+    setFormData({ rules, detectedQuestions, loading: false });
     setLoaded(true);
   }, [agencyId, integration.form_id, integration.pixel_id, integration._parentId, integration._isVirtual, integration.form_questions, loaded]);
 
