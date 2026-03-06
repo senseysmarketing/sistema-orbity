@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MessageSquare, Plus, Trash2, Save, Clock, Loader2, Variable } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
@@ -43,6 +44,23 @@ const FIXED_VARIABLES = [
   { key: '{{empresa}}', label: 'Empresa' },
   { key: '{{email}}', label: 'Email' },
   { key: '{{telefone}}', label: 'Telefone' },
+];
+
+const GREETING_DELAY_OPTIONS = [
+  { value: '0', label: 'Imediato' },
+  { value: '1', label: '1 minuto' },
+  { value: '5', label: '5 minutos' },
+  { value: '10', label: '10 minutos' },
+];
+
+const FOLLOWUP_DELAY_OPTIONS = [
+  { value: '60', label: '1 hora' },
+  { value: '120', label: '2 horas' },
+  { value: '360', label: '6 horas' },
+  { value: '720', label: '12 horas' },
+  { value: '1440', label: '24 horas' },
+  { value: '2880', label: '48 horas' },
+  { value: '4320', label: '72 horas' },
 ];
 
 function formatFieldName(key: string): string {
@@ -347,6 +365,7 @@ function TemplatePhaseSection({
             <TemplateEditor
               key={template.id}
               template={template}
+              phase={phase}
               onSave={onSave}
               onDelete={onDelete}
               isSaving={isSaving}
@@ -425,12 +444,14 @@ function VariableInserter({
 
 function TemplateEditor({
   template,
+  phase,
   onSave,
   onDelete,
   isSaving,
   formFields,
 }: {
   template: Template;
+  phase: string;
   onSave: (t: Template) => void;
   onDelete: (id: string) => void;
   isSaving: boolean;
@@ -501,14 +522,19 @@ function TemplateEditor({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-            <Label className="text-xs text-muted-foreground">Delay (min):</Label>
-            <Input
-              type="number"
-              value={delay}
-              onChange={(e) => setDelay(e.target.value)}
-              className="w-20 h-7 text-xs"
-              min={0}
-            />
+            <Label className="text-xs text-muted-foreground">Delay:</Label>
+            <Select value={delay} onValueChange={setDelay}>
+              <SelectTrigger className="w-36 h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(phase === 'greeting' ? GREETING_DELAY_OPTIONS : FOLLOWUP_DELAY_OPTIONS).map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {hasChanges && (
