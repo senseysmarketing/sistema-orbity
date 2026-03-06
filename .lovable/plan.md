@@ -1,29 +1,59 @@
 
 
-# Fix: Separate Integration vs Qualification Data
+# Resumo Semanal Compacto para WhatsApp
 
-## Root Cause
-The migration `20260306190104` incorrectly deleted the row with `form_id = '2159046854900521'` — this was actually the **qualification config** for that form, not a duplicate of the integration config (`form_id = 'all'`).
+## Problema
 
-Additionally, `fetchIntegration` in MetaIntegrationConfig fetches ALL rows and picks one, when it should **only** look at `form_id = 'all'` rows (the integration config).
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-## Changes
+## Solucao
 
-### 1. Restore deleted qualification row
-Use the insert tool (not migration) to re-insert the deleted record for `agency_id = '7bef1258-af3d-48cc-b3a7-f79fac29c7c0'` and `form_id = '2159046854900521'`.
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-### 2. Fix `fetchIntegration` in MetaIntegrationConfig.tsx
-Add `.eq('form_id', 'all')` filter so it **only** fetches the catch-all integration row, never picking up qualification-specific rows. This eliminates the entire class of conflict between the two features.
+### Exemplo do novo formato
 
-Remove the "prefer form_id=all" workaround logic since the query itself will now be scoped correctly.
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
 
-### 3. Fix `handleSave` in MetaIntegrationConfig.tsx
-When saving, scope the duplicate-prevention delete to `form_id = 'all'` only, so it never accidentally deletes qualification rows.
+*Semana 1 (03/03 a 09/03) - 5 posts*
 
-## Files
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
 
-| File | Change |
-|------|--------|
-| `MetaIntegrationConfig.tsx` | Scope `fetchIntegration` and `handleSave` to `form_id = 'all'` only |
-| Database (insert tool) | Restore deleted qualification row |
+Qualquer ajuste e so me chamar! ✅
+```
+
+### Detalhes tecnicos
+
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 
