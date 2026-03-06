@@ -199,12 +199,14 @@ function SyncMetaDialog({
   agencyId,
   existingFormIds,
   onSynced,
+  configuredPages,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agencyId: string;
   existingFormIds: Set<string>;
   onSynced: () => void;
+  configuredPages: Array<{ page_id: string; page_name: string }>;
 }) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -801,7 +803,7 @@ export function LeadScoringConfig() {
     if (!currentAgency?.id) return;
     const { data } = await supabase
       .from("facebook_lead_integrations")
-      .select("id, page_name, form_name, form_id, pixel_id")
+      .select("id, page_id, page_name, form_name, form_id, pixel_id")
       .eq("agency_id", currentAgency.id)
       .eq("is_active", true);
 
