@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Loader2, Facebook, Settings, Trash2, Check, AlertCircle, ExternalLink, RefreshCw } from "lucide-react";
+import { Loader2, Facebook, Settings, Trash2, Check, AlertCircle, ExternalLink, RefreshCw, Search } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
@@ -63,6 +63,11 @@ interface Integration {
   last_sync_at: string | null;
 }
 
+interface DiscoveredPixel {
+  pixel_id: string;
+  pixel_name: string;
+}
+
 export function MetaIntegrationConfig() {
   const { currentAgency } = useAgency();
   const { toast } = useToast();
@@ -88,10 +93,15 @@ export function MetaIntegrationConfig() {
   const [selectedPage, setSelectedPage] = useState<string>("");
   const [selectedPageToken, setSelectedPageToken] = useState<string>("");
   const [selectedForm, setSelectedForm] = useState<string>("all");
-  const [pixelId, setPixelId] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [defaultStatus, setDefaultStatus] = useState("leads");
   const [defaultTemperature, setDefaultTemperature] = useState("cold");
+
+  // Pixel state
+  const [discoveredPixels, setDiscoveredPixels] = useState<DiscoveredPixel[]>([]);
+  const [selectedPixelId, setSelectedPixelId] = useState<string>("");
+  const [testEventCode, setTestEventCode] = useState<string>("");
+  const [loadingPixels, setLoadingPixels] = useState(false);
 
   const [loadingPages, setLoadingPages] = useState(false);
   const [loadingForms, setLoadingForms] = useState(false);
@@ -143,7 +153,6 @@ export function MetaIntegrationConfig() {
       if (error) throw error;
       setAdAccounts(data || []);
 
-      // Get current selection from agency
       const { data: agency } = await supabase
         .from('agencies')
         .select('crm_ad_account_id')
@@ -153,7 +162,6 @@ export function MetaIntegrationConfig() {
       if (agency?.crm_ad_account_id) {
         setSelectedAdAccount(agency.crm_ad_account_id);
         
-        // Get last sync time
         const selectedAcc = (data || []).find((a: AdAccount) => a.id === agency.crm_ad_account_id);
         if (selectedAcc && (selectedAcc as any).last_sync) {
           setLastSync((selectedAcc as any).last_sync);
@@ -225,8 +233,8 @@ export function MetaIntegrationConfig() {
     }
   };
 
-  const fetchPages = async () => {
-    if (!currentAgency) return;
+  const fetchPages = async (): Promise<FacebookPage[]> => {
+    if (!currentAgency) return [];
 
     setLoadingPages(true);
     try {
@@ -238,13 +246,16 @@ export function MetaIntegrationConfig() {
       });
 
       if (error) throw error;
-      setPages(data.pages || []);
+      const loadedPages = data.pages || [];
+      setPages(loadedPages);
+      return loadedPages;
     } catch (error: any) {
       toast({
         title: "Erro ao buscar páginas",
         description: error.message,
         variant: "destructive"
       });
+      return [];
     } finally {
       setLoadingPages(false);
     }
@@ -277,6 +288,64 @@ export function MetaIntegrationConfig() {
     }
   };
 
+  const fetchPixels = async () => {
+    if (!currentAgency || !selectedAdAccount) return;
+
+    const account = adAccounts.find(a => a.id === selectedAdAccount);
+    if (!account) return;
+
+    setLoadingPixels(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data, error } = await supabase.functions.invoke('facebook-accounts', {
+        body: {
+          action: 'list_pixels',
+          agencyId: currentAgency.id,
+          adAccountId: account.ad_account_id,
+        },
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      setDiscoveredPixels(data.pixels || []);
+      
+      if ((data.pixels || []).length === 0) {
+        toast({
+          title: "Nenhum pixel encontrado",
+          description: "Esta conta de anúncios não possui pixels configurados.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro ao buscar pixels",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingPixels(false);
+    }
+  };
+
+  const loadExistingPixels = async () => {
+    if (!currentAgency) return;
+    const { data } = await supabase
+      .from('facebook_pixels')
+      .select('pixel_id, pixel_name, is_selected, test_event_code')
+      .eq('agency_id', currentAgency.id)
+      .eq('is_active', true);
+
+    if (data && data.length > 0) {
+      setDiscoveredPixels(data.map((p: any) => ({ pixel_id: p.pixel_id, pixel_name: p.pixel_name })));
+      const selected = data.find((p: any) => p.is_selected);
+      if (selected) {
+        setSelectedPixelId(selected.pixel_id);
+        setTestEventCode(selected.test_event_code || "");
+      }
+    }
+  };
+
   const handlePageSelect = async (pageId: string) => {
     const page = pages.find(p => p.id === pageId);
     if (!page) return;
@@ -290,16 +359,29 @@ export function MetaIntegrationConfig() {
 
   const handleOpenDialog = async () => {
     setDialogOpen(true);
-    await fetchPages();
+    
+    // Load existing pixels from DB
+    await loadExistingPixels();
+    
+    // Fetch pages and wait for them to load
+    const loadedPages = await fetchPages();
 
     // Pre-fill form if editing
     if (currentIntegration) {
       setSelectedPage(currentIntegration.page_id);
       setSelectedForm(currentIntegration.form_id || "all");
-      setPixelId(currentIntegration.pixel_id || "");
       setIsActive(currentIntegration.is_active);
       setDefaultStatus(currentIntegration.default_status);
       setDefaultTemperature(currentIntegration.default_priority);
+
+      // Find page in loaded list and fetch forms
+      const page = loadedPages.find(p => p.id === currentIntegration.page_id);
+      if (page) {
+        setSelectedPageToken(page.access_token);
+        await fetchForms(page.id, page.access_token);
+        // Re-set form after forms are loaded
+        setSelectedForm(currentIntegration.form_id || "all");
+      }
     }
   };
 
@@ -345,7 +427,6 @@ export function MetaIntegrationConfig() {
           .update({ crm_ad_account_id: selectedAdAccount })
           .eq('id', currentAgency.id);
 
-        // Sync account data
         const account = adAccounts.find(a => a.id === selectedAdAccount);
         if (account) {
           await syncAccountData(account.ad_account_id);
@@ -373,17 +454,33 @@ export function MetaIntegrationConfig() {
           formName: selectedForm === 'all' ? 'Todos os formulários' : (form?.name || ''),
           defaultStatus,
           defaultPriority: defaultTemperature,
-          pixelId: pixelId || null
+          pixelId: selectedPixelId || null
         }
       });
 
       if (error) throw error;
 
-      // Update pixel_id directly since edge function might not handle it
-      if (pixelId) {
+      // Save pixel selection in facebook_pixels table
+      if (selectedPixelId && currentAgency) {
+        // Deselect all pixels for this agency first
+        await supabase
+          .from('facebook_pixels')
+          .update({ is_selected: false, test_event_code: null })
+          .eq('agency_id', currentAgency.id);
+
+        // Select the chosen pixel
+        await supabase
+          .from('facebook_pixels')
+          .update({ is_selected: true, test_event_code: testEventCode || null })
+          .eq('agency_id', currentAgency.id)
+          .eq('pixel_id', selectedPixelId);
+      }
+
+      // Update pixel_id on integration
+      if (selectedPixelId) {
         await supabase
           .from('facebook_lead_integrations')
-          .update({ pixel_id: pixelId, is_active: isActive })
+          .update({ pixel_id: selectedPixelId, is_active: isActive })
           .eq('agency_id', currentAgency.id)
           .eq('page_id', selectedPage);
       }
@@ -439,6 +536,7 @@ export function MetaIntegrationConfig() {
   };
 
   const selectedAccountData = adAccounts.find(a => a.id === selectedAdAccount);
+  
 
   if (loading) {
     return (
@@ -548,7 +646,6 @@ export function MetaIntegrationConfig() {
                   </>
                 )}
 
-                {/* Last Sync Info */}
                 {lastSync && (
                   <div className="flex items-center justify-between pt-2 border-t">
                     <span className="text-xs text-muted-foreground">Última sincronização</span>
@@ -608,7 +705,7 @@ export function MetaIntegrationConfig() {
 
       {/* Configuration Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Facebook className="h-5 w-5 text-blue-600" />
@@ -653,7 +750,7 @@ export function MetaIntegrationConfig() {
                   disabled={loadingPages}
                 >
                   <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Selecione uma página" />
+                    <SelectValue placeholder={loadingPages ? "Carregando páginas..." : "Selecione uma página"} />
                   </SelectTrigger>
                   <SelectContent>
                     {pages.map((page) => (
@@ -666,7 +763,7 @@ export function MetaIntegrationConfig() {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={fetchPages}
+                  onClick={() => fetchPages()}
                   disabled={loadingPages}
                 >
                   <RefreshCw className={`h-4 w-4 ${loadingPages ? 'animate-spin' : ''}`} />
@@ -686,7 +783,7 @@ export function MetaIntegrationConfig() {
                 disabled={!selectedPage || loadingForms}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione um formulário" />
+                  <SelectValue placeholder={loadingForms ? "Carregando formulários..." : "Selecione um formulário"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os formulários</SelectItem>
@@ -729,18 +826,58 @@ export function MetaIntegrationConfig() {
               </div>
             </div>
 
-            {/* Pixel ID */}
+            {/* Pixel de Conversão */}
             <div className="space-y-2">
-              <Label>Pixel ID (para CAPI)</Label>
-              <Input
-                placeholder="Ex: 141984582644620"
-                value={pixelId}
-                onChange={(e) => setPixelId(e.target.value)}
-              />
+              <Label>Pixel de Conversão (CAPI)</Label>
+              <div className="flex gap-2">
+                <Select value={selectedPixelId} onValueChange={setSelectedPixelId}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Selecione um pixel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {discoveredPixels.map((pixel) => (
+                      <SelectItem key={pixel.pixel_id} value={pixel.pixel_id}>
+                        <div className="flex flex-col">
+                          <span>{pixel.pixel_name}</span>
+                          <span className="text-xs text-muted-foreground font-mono">{pixel.pixel_id}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={fetchPixels}
+                  disabled={loadingPixels || !selectedAdAccount}
+                  title="Buscar pixels da conta de anúncios"
+                >
+                  {loadingPixels ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">
-                ID do Pixel para envio de eventos de conversão (opcional)
+                Selecione a conta de anúncios primeiro e clique na lupa para descobrir pixels
               </p>
             </div>
+
+            {/* Test Event Code */}
+            {selectedPixelId && (
+              <div className="space-y-2">
+                <Label>Test Event Code (opcional)</Label>
+                <Input
+                  placeholder="Ex: TEST12345"
+                  value={testEventCode}
+                  onChange={(e) => setTestEventCode(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Código para testar eventos no Meta Events Manager (remover em produção)
+                </p>
+              </div>
+            )}
 
             {/* Active Switch */}
             <div className="flex items-center justify-between py-2">

@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -55,7 +55,6 @@ interface DetectedQuestion {
 interface FormData {
   rules: ScoringRule[];
   detectedQuestions: DetectedQuestion[];
-  pixelId: string;
   loading: boolean;
 }
 
@@ -412,11 +411,9 @@ function FormAccordionItem({
   const [formData, setFormData] = useState<FormData>({
     rules: [],
     detectedQuestions: [],
-    pixelId: integration.pixel_id || "",
     loading: true,
   });
   const [saving, setSaving] = useState(false);
-  const [savingPixel, setSavingPixel] = useState(false);
   const [updateExisting, setUpdateExisting] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<Map<string, ScoringRule>>(new Map());
   const [enabledQuestions, setEnabledQuestions] = useState<Set<string>>(new Set());
@@ -556,7 +553,7 @@ function FormAccordionItem({
 
     setPendingChanges(changes);
     setEnabledQuestions(activeQuestions);
-    setFormData({ rules, detectedQuestions, pixelId: integration.pixel_id || "", loading: false });
+    setFormData({ rules, detectedQuestions, loading: false });
     setLoaded(true);
   }, [agencyId, integration.form_id, integration.pixel_id, integration._parentId, integration._isVirtual, integration.form_questions, loaded]);
 
@@ -664,24 +661,6 @@ function FormAccordionItem({
     }
   };
 
-  const savePixelId = async () => {
-    if (integration._isVirtual) {
-      toast({ title: "Pixel ID deve ser configurado na integração principal", variant: "destructive" });
-      return;
-    }
-    setSavingPixel(true);
-    const { error } = await supabase
-      .from("facebook_lead_integrations")
-      .update({ pixel_id: formData.pixelId || null })
-      .eq("id", integration.id);
-    setSavingPixel(false);
-    if (error) {
-      toast({ title: "Erro ao salvar Pixel ID", variant: "destructive" });
-    } else {
-      toast({ title: "Pixel ID salvo" });
-    }
-  };
-
   const deleteIntegration = async () => {
     await supabase.from("lead_scoring_rules").delete().eq("form_id", integration.form_id).eq("agency_id", agencyId);
     if (integration._isVirtual) {
@@ -757,24 +736,7 @@ function FormAccordionItem({
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Pixel ID */}
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <Label className="text-xs">Pixel ID (Meta Conversions API)</Label>
-                <Input
-                  value={formData.pixelId}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, pixelId: e.target.value }))}
-                  placeholder="Ex: 123456789012345"
-                  className="h-8 text-sm"
-                />
-              </div>
-              <Button onClick={savePixelId} disabled={savingPixel} size="sm" variant="outline" className="h-8">
-                {savingPixel ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                <span className="ml-1">Salvar</span>
-              </Button>
-            </div>
-
-            <Separator />
+            {/* Scoring rules below */}
 
             {/* Questions & Scoring */}
             {formData.detectedQuestions.length > 0 ? (
@@ -820,24 +782,7 @@ function FormAccordionItem({
             {/* Temperature Legend */}
             <TemperatureLegend />
 
-            {/* Pipeline Events */}
-            {formData.pixelId && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                {[
-                  { event: "Lead", desc: "Novo lead" },
-                  { event: "QualifiedLead", desc: "Lead quente" },
-                  { event: "Schedule", desc: "Visita agendada" },
-                  { event: "Purchase", desc: "Venda fechada" },
-                ].map((e) => (
-                  <div key={e.event} className="p-2 rounded border text-center bg-muted/30">
-                    <p className="font-medium">{e.event}</p>
-                    <p className="text-muted-foreground">{e.desc}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <Separator />
+            {/* Pipeline Events info removed - Pixel is now configured in Integrações tab */}
 
             {/* Actions */}
             <div className="flex flex-wrap items-center justify-between gap-3">
