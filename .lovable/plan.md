@@ -1,44 +1,59 @@
 
 
-# Fix: Form badge "Pendente" and questions not persisted
+# Resumo Semanal Compacto para WhatsApp
 
-## Root cause
+## Problema
 
-1. **Badge always shows "Pendente" on page load**: `FormAccordionItem` determines `isConfigured` from `formData.rules.length`, but `formData` is only loaded lazily on click. The parent has `configuredFormIds` from the DB, but doesn't pass it down.
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-2. **"Nenhuma pergunta detectada" on every load**: Questions are fetched from Meta API on each click but never persisted. Since Meta forms can't be edited, they should be cached after the first fetch.
+## Solucao
 
-## Solution
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-### 1. Database: Add `form_questions` column to `facebook_lead_integrations`
+### Exemplo do novo formato
 
-```sql
-ALTER TABLE facebook_lead_integrations 
-ADD COLUMN IF NOT EXISTS form_questions jsonb DEFAULT NULL;
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+
+*Semana 1 (03/03 a 09/03) - 5 posts*
+
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
 ```
 
-This stores the detected questions array so they don't need to be re-fetched from Meta.
+### Detalhes tecnicos
 
-### 2. `FormAccordionItem` — receive and use `configuredFormIds` prop
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
 
-- Accept `configuredFormIds: Set<string>` as a prop
-- Use it for the badge display instead of relying on lazy-loaded `formData.rules`
-- Also pre-load the rules count from the parent query for the subtitle line
+Reescrever a funcao `generateSummaryText` com formato compacto:
 
-### 3. `loadFormData` — cache questions in DB
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
 
-- On first load: check `integration.form_questions` (from the DB row, passed as prop)
-- If cached, use them directly (merge with any lead-based questions)
-- If not cached, fetch from Meta API, then save to `facebook_lead_integrations.form_questions`
-- This means questions appear immediately on subsequent visits without an API call
+### Mapeamento de emojis por formato
 
-### 4. Pass richer data from parent to children
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
 
-- In `loadIntegrations`, also fetch `form_questions` column
-- In the `configuredFormIds` effect, also fetch rule counts per form
-- Pass both `configuredFormIds` and `ruleCounts` to each `FormAccordionItem`
+### Resultado esperado
 
-### Files to edit
-- New migration (add `form_questions` column)
-- `src/components/crm/LeadScoringConfig.tsx` (all changes above)
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 

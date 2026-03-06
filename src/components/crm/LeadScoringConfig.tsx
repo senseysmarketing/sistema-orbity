@@ -34,6 +34,7 @@ interface Integration {
   form_name: string;
   form_id: string;
   pixel_id: string | null;
+  form_questions: DetectedQuestion[] | null;
   _parentId?: string;
   _isVirtual?: boolean;
 }
@@ -398,10 +399,14 @@ function FormAccordionItem({
   integration,
   agencyId,
   onDeleted,
+  isConfiguredFromParent,
+  ruleCountFromParent,
 }: {
   integration: Integration;
   agencyId: string;
   onDeleted: () => void;
+  isConfiguredFromParent: boolean;
+  ruleCountFromParent: number;
 }) {
   const { toast } = useToast();
   const [formData, setFormData] = useState<FormData>({
@@ -465,8 +470,21 @@ function FormAccordionItem({
       is_blocker: r.is_blocker,
     }));
 
-    // Detect questions from leads
+    // Build questions map - start with cached form_questions if available
     const questionsMap: Record<string, Set<string>> = {};
+    let usedCache = false;
+
+    if (integration.form_questions && Array.isArray(integration.form_questions) && integration.form_questions.length > 0) {
+      // Use cached questions from DB
+      for (const q of integration.form_questions) {
+        if (q.question && q.answers) {
+          questionsMap[q.question] = new Set(q.answers);
+        }
+      }
+      usedCache = true;
+    }
+
+    // Also add questions detected from lead data
     leadsData.forEach((lead: any) => {
       if (lead.custom_fields && typeof lead.custom_fields === "object") {
         Object.entries(lead.custom_fields).forEach(([key, value]) => {
@@ -477,32 +495,48 @@ function FormAccordionItem({
       }
     });
 
-    // Also fetch questions directly from Meta Graph API
-    try {
-      const { data: metaData, error: metaError } = await supabase.functions.invoke("facebook-leads", {
-        body: {
-          action: "list_form_questions",
-          agencyId,
-          pageId: integration.page_id,
-          formId: targetFormId,
-        },
-      });
+    // If no cached questions, fetch from Meta API and persist
+    if (!usedCache) {
+      try {
+        const { data: metaData, error: metaError } = await supabase.functions.invoke("facebook-leads", {
+          body: {
+            action: "list_form_questions",
+            agencyId,
+            pageId: integration.page_id,
+            formId: targetFormId,
+          },
+        });
 
-      if (!metaError && metaData?.questions) {
-        for (const q of metaData.questions) {
-          const key = q.key;
-          if (!key || TECHNICAL_FIELDS.has(key)) continue;
-          if (!questionsMap[key]) questionsMap[key] = new Set();
-          // Add predefined options from Meta
-          if (q.options && Array.isArray(q.options)) {
-            for (const opt of q.options) {
-              if (opt.value) questionsMap[key].add(opt.value);
+        if (!metaError && metaData?.questions) {
+          for (const q of metaData.questions) {
+            const key = q.key;
+            if (!key || TECHNICAL_FIELDS.has(key)) continue;
+            if (!questionsMap[key]) questionsMap[key] = new Set();
+            if (q.options && Array.isArray(q.options)) {
+              for (const opt of q.options) {
+                if (opt.value) questionsMap[key].add(opt.value);
+              }
             }
           }
+
+          // Persist questions to DB for caching (only for non-virtual integrations)
+          const questionsToCache = Object.entries(questionsMap)
+            .map(([question, answersSet]) => ({
+              question,
+              answers: Array.from(answersSet).slice(0, 20),
+            }))
+            .filter((q) => q.answers.length > 0);
+
+          if (questionsToCache.length > 0 && !integration._isVirtual) {
+            await supabase
+              .from("facebook_lead_integrations")
+              .update({ form_questions: questionsToCache } as any)
+              .eq("id", integration.id);
+          }
         }
+      } catch (metaErr) {
+        console.warn("Could not fetch Meta form questions:", metaErr);
       }
-    } catch (metaErr) {
-      console.warn("Could not fetch Meta form questions:", metaErr);
     }
 
     const detectedQuestions = Object.entries(questionsMap)
@@ -524,7 +558,7 @@ function FormAccordionItem({
     setEnabledQuestions(activeQuestions);
     setFormData({ rules, detectedQuestions, pixelId: integration.pixel_id || "", loading: false });
     setLoaded(true);
-  }, [agencyId, integration.form_id, integration.pixel_id, integration._parentId, integration._isVirtual, loaded]);
+  }, [agencyId, integration.form_id, integration.pixel_id, integration._parentId, integration._isVirtual, integration.form_questions, loaded]);
 
   const handleRuleChange = (question: string, answer: string, score: number, is_blocker: boolean) => {
     const key = `${question}|||${answer}`;
@@ -663,12 +697,13 @@ function FormAccordionItem({
     }
   };
 
-  const configuredCount = formData.rules.length;
-  const isConfigured = configuredCount > 0;
-  const questionsCount = formData.detectedQuestions.length;
+  const configuredCount = loaded ? formData.rules.length : ruleCountFromParent;
+  const isConfigured = loaded ? configuredCount > 0 : isConfiguredFromParent;
+  const questionsCount = loaded ? formData.detectedQuestions.length : (integration.form_questions?.length || 0);
 
   // Check if there are actual pending changes vs saved rules
   const hasChanges = (() => {
+    if (!loaded) return false;
     const savedKeys = new Set(formData.rules.map((r) => `${r.question}|||${r.answer}|||${r.score}|||${r.is_blocker}`));
     const pendingKeys = new Set(
       Array.from(pendingChanges.values())
@@ -708,7 +743,7 @@ function FormAccordionItem({
             <p className="text-xs text-muted-foreground mt-0.5">
               {questionsCount > 0
                 ? `${questionsCount} pergunta${questionsCount > 1 ? "s" : ""} detectada${questionsCount > 1 ? "s" : ""}`
-                : "Nenhuma pergunta detectada"}
+                : loaded ? "Nenhuma pergunta detectada" : "Clique para carregar"}
               {configuredCount > 0 && ` · ${configuredCount} regra${configuredCount > 1 ? "s" : ""}`}
             </p>
           </div>
@@ -856,11 +891,11 @@ export function LeadScoringConfig() {
     if (!currentAgency?.id) return;
     const { data } = await supabase
       .from("facebook_lead_integrations")
-      .select("id, page_id, page_name, form_name, form_id, pixel_id")
+      .select("id, page_id, page_name, form_name, form_id, pixel_id, form_questions")
       .eq("agency_id", currentAgency.id)
       .eq("is_active", true);
 
-    const rawIntegrations = (data || []) as Integration[];
+    const rawIntegrations = (data || []) as unknown as Integration[];
 
     // Extract unique pages BEFORE filtering, so configuredPages is always populated
     const uniquePages = [...new Map(
@@ -916,6 +951,7 @@ export function LeadScoringConfig() {
 
   // We need to know which forms have rules to show configured badge
   const [configuredFormIds, setConfiguredFormIds] = useState<Set<string>>(new Set());
+  const [ruleCounts, setRuleCounts] = useState<Record<string, number>>({});
   useEffect(() => {
     if (!currentAgency?.id || integrations.length === 0) return;
     supabase
@@ -923,7 +959,14 @@ export function LeadScoringConfig() {
       .select("form_id")
       .eq("agency_id", currentAgency.id)
       .then(({ data }) => {
-        setConfiguredFormIds(new Set((data || []).map((r: any) => r.form_id)));
+        const formIds = new Set<string>();
+        const counts: Record<string, number> = {};
+        for (const r of data || []) {
+          formIds.add((r as any).form_id);
+          counts[(r as any).form_id] = (counts[(r as any).form_id] || 0) + 1;
+        }
+        setConfiguredFormIds(formIds);
+        setRuleCounts(counts);
       });
   }, [currentAgency?.id, integrations]);
 
@@ -1015,11 +1058,13 @@ export function LeadScoringConfig() {
       ) : (
         <Accordion type="single" collapsible className="space-y-2">
           {filteredIntegrations.map((integration) => (
-            <FormAccordionItem
+             <FormAccordionItem
               key={integration.id}
               integration={integration}
               agencyId={currentAgency!.id}
               onDeleted={loadIntegrations}
+              isConfiguredFromParent={configuredFormIds.has(integration.form_id)}
+              ruleCountFromParent={ruleCounts[integration.form_id] || 0}
             />
           ))}
         </Accordion>
