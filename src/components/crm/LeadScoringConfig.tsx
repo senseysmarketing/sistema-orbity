@@ -782,24 +782,7 @@ function FormAccordionItem({
             {/* Temperature Legend */}
             <TemperatureLegend />
 
-            {/* Pipeline Events */}
-            {formData.pixelId && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                {[
-                  { event: "Lead", desc: "Novo lead" },
-                  { event: "QualifiedLead", desc: "Lead quente" },
-                  { event: "Schedule", desc: "Visita agendada" },
-                  { event: "Purchase", desc: "Venda fechada" },
-                ].map((e) => (
-                  <div key={e.event} className="p-2 rounded border text-center bg-muted/30">
-                    <p className="font-medium">{e.event}</p>
-                    <p className="text-muted-foreground">{e.desc}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <Separator />
+            {/* Pipeline Events info removed - Pixel is now configured in Integrações tab */}
 
             {/* Actions */}
             <div className="flex flex-wrap items-center justify-between gap-3">
