@@ -584,7 +584,7 @@ function FormAccordionItem({
           for (const lead of leads) {
             try {
               await supabase.functions.invoke("process-lead-qualification", {
-                body: { leadId: lead.id, agencyId },
+                body: { lead_id: lead.id, agency_id: agencyId },
               });
             } catch {
               // continue with other leads
