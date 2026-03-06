@@ -213,6 +213,8 @@ export function MetaIntegrationConfig() {
         .eq('form_id', 'all')
         .maybeSingle();
 
+      if (error) throw error;
+
       if (data) {
         setCurrentIntegration({
           id: data.id,
