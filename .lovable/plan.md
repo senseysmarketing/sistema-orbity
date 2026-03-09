@@ -1,42 +1,59 @@
 
 
-# Disparar automação WhatsApp para os 7 leads recentes
+# Resumo Semanal Compacto para WhatsApp
 
-## Situação atual
-- 7 leads capturados entre 07/03 e 09/03 (Wellington Santos → Paulo Nascimento)
-- Conta WhatsApp conectada: `de9c5180-369e-4287-922b-821a197fd367` (Senseys)
-- Template de saudação configurado com delay de 5 minutos
-- Nenhuma conversa ou registro de automação existe para esses leads
-- O cron job `process-whatsapp-queue` já foi criado na migração anterior
+## Problema
 
-## Plano
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-Criar uma **migração SQL** que:
+## Solucao
 
-1. **Insira 7 conversas** na tabela `whatsapp_conversations` (uma por lead)
-2. **Insira 7 registros de automação** na tabela `whatsapp_automation_control` com:
-   - `status = 'active'`
-   - `current_phase = 'greeting'`
-   - `current_step_position = 1`
-   - `next_execution_at = NOW()` (para serem processados imediatamente pelo cron)
-   - `conversation_state = 'new_lead'`
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-Os 7 leads:
+### Exemplo do novo formato
 
-| Nome | Telefone | Lead ID |
-|------|----------|---------|
-| Wellington Santos | +5513996317120 | c546a4f1-... |
-| Diego Silva | +5551998778423 | 13050b67-... |
-| Andre Fernandes | +5521981566001 | c2904576-... |
-| Roberto Seguro | +5513988149272 | 295bb68e-... |
-| Grupo Palomo | +5515997644369 | 8ddaaf76-... |
-| Anderson Rentes | +5519991946424 | cb9b08fb-... |
-| Paulo Nascimento | +5514991227150 | cfee87ba-... |
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
 
-O cron job que roda a cada minuto vai detectar esses registros com `next_execution_at <= NOW()` e disparar as mensagens respeitando o horário permitido (seg-sex 08h-18h).
+*Semana 1 (03/03 a 09/03) - 5 posts*
 
-### Arquivo
-| Arquivo | Ação |
-|---------|------|
-| `supabase/migrations/[timestamp].sql` | Inserir conversas + registros de automação |
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
+```
+
+### Detalhes tecnicos
+
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 
