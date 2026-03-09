@@ -561,6 +561,103 @@ async function listFormQuestions(supabase: any, userId: string, params: any) {
   );
 }
 
+// Auto-enroll a new lead in WhatsApp automation
+async function autoEnrollWhatsAppAutomation(supabase: any, agencyId: string, leadId: string, phone: string) {
+  // Check if agency has a connected WhatsApp account
+  const { data: waAccount } = await supabase
+    .from('whatsapp_accounts')
+    .select('id, sending_schedule')
+    .eq('agency_id', agencyId)
+    .eq('status', 'connected')
+    .maybeSingle();
+
+  if (!waAccount) {
+    console.log('[WHATSAPP-AUTO] No connected WhatsApp account for agency', agencyId);
+    return;
+  }
+
+  // Check if agency has active greeting templates
+  const { data: firstTemplate } = await supabase
+    .from('whatsapp_message_templates')
+    .select('delay_minutes')
+    .eq('agency_id', agencyId)
+    .eq('phase', 'greeting')
+    .eq('step_position', 1)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (!firstTemplate) {
+    console.log('[WHATSAPP-AUTO] No active greeting template for agency', agencyId);
+    return;
+  }
+
+  // Check if automation already exists for this lead
+  const { data: existingAutomation } = await supabase
+    .from('whatsapp_automation_control')
+    .select('id')
+    .eq('account_id', waAccount.id)
+    .eq('lead_id', leadId)
+    .maybeSingle();
+
+  if (existingAutomation) {
+    console.log('[WHATSAPP-AUTO] Automation already exists for lead', leadId);
+    return;
+  }
+
+  // Create or get conversation
+  let conversationId: string | null = null;
+  const { data: existingConv } = await supabase
+    .from('whatsapp_conversations')
+    .select('id')
+    .eq('account_id', waAccount.id)
+    .eq('lead_id', leadId)
+    .maybeSingle();
+
+  if (existingConv) {
+    conversationId = existingConv.id;
+  } else {
+    const { data: newConv, error: convError } = await supabase
+      .from('whatsapp_conversations')
+      .insert({
+        account_id: waAccount.id,
+        phone_number: phone,
+        lead_id: leadId,
+      })
+      .select('id')
+      .single();
+
+    if (convError) {
+      console.error('[WHATSAPP-AUTO] Error creating conversation:', convError);
+      return;
+    }
+    conversationId = newConv.id;
+  }
+
+  // Calculate next execution time, respecting sending schedule
+  let nextExecution = new Date(Date.now() + firstTemplate.delay_minutes * 60 * 1000);
+
+  // Create automation control record
+  const { error: automError } = await supabase
+    .from('whatsapp_automation_control')
+    .insert({
+      account_id: waAccount.id,
+      lead_id: leadId,
+      conversation_id: conversationId,
+      status: 'active',
+      current_phase: 'greeting',
+      current_step_position: 1,
+      next_execution_at: nextExecution.toISOString(),
+      conversation_state: 'new_lead',
+    });
+
+  if (automError) {
+    console.error('[WHATSAPP-AUTO] Error creating automation:', automError);
+    return;
+  }
+
+  console.log(`[WHATSAPP-AUTO] ✅ Auto-enrolled lead ${leadId} in WhatsApp automation, next execution: ${nextExecution.toISOString()}`);
+}
+
 // Handle Webhook from Facebook
 async function handleWebhook(supabase: any, body: any) {
   console.log('[WEBHOOK] 🔄 Processing webhook:', JSON.stringify(body, null, 2));
