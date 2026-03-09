@@ -739,6 +739,15 @@ async function handleWebhook(supabase: any, body: any) {
       } catch (qualError) {
         console.error('[QUALIFICATION] Error triggering qualification:', qualError);
       }
+
+      // Auto-enroll in WhatsApp automation if phone is available
+      if (newLead.phone) {
+        try {
+          await autoEnrollWhatsAppAutomation(supabase, integration.agency_id, newLead.id, newLead.phone);
+        } catch (waError) {
+          console.error('[WHATSAPP-AUTO] Error auto-enrolling lead:', waError);
+        }
+      }
     }
   }
 
