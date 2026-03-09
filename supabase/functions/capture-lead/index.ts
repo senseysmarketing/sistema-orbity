@@ -11,6 +11,77 @@ interface WebhookConfig {
   default_values: Record<string, any>;
 }
 
+// Auto-enroll a new lead in WhatsApp automation
+async function autoEnrollWhatsAppAutomation(supabase: any, agencyId: string, leadId: string, phone: string) {
+  const { data: waAccount } = await supabase
+    .from('whatsapp_accounts')
+    .select('id')
+    .eq('agency_id', agencyId)
+    .eq('status', 'connected')
+    .maybeSingle();
+
+  if (!waAccount) return;
+
+  const { data: firstTemplate } = await supabase
+    .from('whatsapp_message_templates')
+    .select('delay_minutes')
+    .eq('agency_id', agencyId)
+    .eq('phase', 'greeting')
+    .eq('step_position', 1)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (!firstTemplate) return;
+
+  const { data: existing } = await supabase
+    .from('whatsapp_automation_control')
+    .select('id')
+    .eq('account_id', waAccount.id)
+    .eq('lead_id', leadId)
+    .maybeSingle();
+
+  if (existing) return;
+
+  // Create conversation
+  let conversationId: string | null = null;
+  const { data: existingConv } = await supabase
+    .from('whatsapp_conversations')
+    .select('id')
+    .eq('account_id', waAccount.id)
+    .eq('lead_id', leadId)
+    .maybeSingle();
+
+  if (existingConv) {
+    conversationId = existingConv.id;
+  } else {
+    const { data: newConv, error: convError } = await supabase
+      .from('whatsapp_conversations')
+      .insert({ account_id: waAccount.id, phone_number: phone, lead_id: leadId })
+      .select('id')
+      .single();
+    if (convError) { console.error('[CAPTURE-LEAD] WA conv error:', convError); return; }
+    conversationId = newConv.id;
+  }
+
+  const nextExecution = new Date(Date.now() + firstTemplate.delay_minutes * 60 * 1000);
+
+  const { error } = await supabase
+    .from('whatsapp_automation_control')
+    .insert({
+      account_id: waAccount.id,
+      lead_id: leadId,
+      conversation_id: conversationId,
+      status: 'active',
+      current_phase: 'greeting',
+      current_step_position: 1,
+      next_execution_at: nextExecution.toISOString(),
+      conversation_state: 'new_lead',
+    });
+
+  if (error) { console.error('[CAPTURE-LEAD] WA automation error:', error); return; }
+  console.log(`[CAPTURE-LEAD] ✅ Auto-enrolled lead ${leadId} in WhatsApp automation`);
+}
+
 Deno.serve(async (req) => {
   console.log(`[CAPTURE-LEAD] New request: ${req.method} ${req.url}`);
   
