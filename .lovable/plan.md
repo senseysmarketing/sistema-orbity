@@ -1,51 +1,59 @@
 
 
-# Diagnóstico: Automação WhatsApp não está processando mensagens
+# Resumo Semanal Compacto para WhatsApp
 
-## Problemas encontrados
+## Problema
 
-### 1. Nenhum cron job para `process-whatsapp-queue` (CAUSA RAIZ)
-A edge function `process-whatsapp-queue` existe e está correta, mas **não há nenhum cron job configurado** para chamá-la periodicamente. Os cron jobs existentes são:
-- `archive-old-social-media-posts`
-- `process-notifications` (a cada 15 e 30 min)
-- `daily-summary-notification`
-- `monthly-closure-automation`
-- `facebook-api-heartbeat`
-- `facebook-heartbeat-job`
-- `facebook-investment-sync`
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-**Nenhum deles chama `process-whatsapp-queue`.** Ou seja, a função nunca é executada automaticamente — ela só rodaria se alguém a chamasse manualmente via HTTP.
+## Solucao
 
-### 2. Tabela `whatsapp_automation_control` está vazia
-Não há nenhum registro na tabela. Isso significa que, quando os leads chegam via Facebook Leads, **nenhuma automação está sendo iniciada automaticamente**. O `startAutomation` no hook `useWhatsApp` só é chamado manualmente pelo usuário via interface.
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-Para que a automação funcione de forma automática com leads do Facebook, seria necessário um trigger ou lógica no fluxo de captura de leads (`capture-lead` ou `facebook-leads`) que crie automaticamente os registros em `whatsapp_automation_control`.
+### Exemplo do novo formato
 
-## Solução proposta
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
 
-### Passo 1: Criar cron job para `process-whatsapp-queue`
-Agendar a função para rodar **a cada 1 minuto** (ou a cada 2 minutos para economia):
+*Semana 1 (03/03 a 09/03) - 5 posts*
 
-```sql
-SELECT cron.schedule(
-  'process-whatsapp-queue',
-  '* * * * *',
-  $$
-  SELECT net.http_post(
-    url:='https://ovookkywclrqfmtumelw.supabase.co/functions/v1/process-whatsapp-queue',
-    headers:='{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}'::jsonb,
-    body:='{}'::jsonb
-  ) as request_id;
-  $$
-);
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
 ```
 
-### Passo 2: Auto-iniciar automação para novos leads
-Modificar a edge function `facebook-leads` (ou `capture-lead`) para que, ao receber um novo lead com telefone, crie automaticamente um registro em `whatsapp_automation_control` — desde que a agência tenha uma conta WhatsApp conectada e templates configurados. Isso eliminará a necessidade de iniciar manualmente cada automação.
+### Detalhes tecnicos
 
-### Resumo
-| Problema | Causa | Solução |
-|----------|-------|---------|
-| Mensagens não enviadas | Nenhum cron job executa `process-whatsapp-queue` | Criar cron job a cada 1 min |
-| Leads não entram na automação | `whatsapp_automation_control` vazio — automação só inicia manualmente | Auto-criar automação ao capturar lead com telefone |
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 
