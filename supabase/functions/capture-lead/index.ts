@@ -286,6 +286,15 @@ Deno.serve(async (req) => {
 
     console.log('[CAPTURE-LEAD] Lead created successfully:', lead.id);
 
+    // Auto-enroll in WhatsApp automation if phone is available
+    if (lead.phone) {
+      try {
+        await autoEnrollWhatsAppAutomation(supabase, agency_id, lead.id, lead.phone);
+      } catch (waError) {
+        console.error('[CAPTURE-LEAD] Error auto-enrolling in WhatsApp:', waError);
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
