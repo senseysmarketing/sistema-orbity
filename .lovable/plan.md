@@ -1,37 +1,59 @@
 
 
-# Correção: Formato do payload do webhook na Evolution API
+# Resumo Semanal Compacto para WhatsApp
 
 ## Problema
-A Evolution API retorna erro `400 Bad Request` com mensagem `"instance requires property \"webhook\""`. O payload está sendo enviado com campos no nível raiz, mas a API espera tudo aninhado dentro de `{ webhook: { ... } }`.
 
-## Correção
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-**Arquivo:** `supabase/functions/whatsapp-connect/index.ts`
+## Solucao
 
-Alterar a função `configureWebhook` (linha 16) de:
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-```json
-{
-  "enabled": true,
-  "url": "...",
-  "events": [...]
-}
+### Exemplo do novo formato
+
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+
+*Semana 1 (03/03 a 09/03) - 5 posts*
+
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
 ```
 
-Para:
+### Detalhes tecnicos
 
-```json
-{
-  "webhook": {
-    "enabled": true,
-    "url": "...",
-    "webhookByEvents": false,
-    "webhookBase64": false,
-    "events": ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE"]
-  }
-}
-```
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
 
-Isso é a única mudança necessária. Após o deploy, o webhook será configurado automaticamente na próxima verificação de status ou reconexão.
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 
