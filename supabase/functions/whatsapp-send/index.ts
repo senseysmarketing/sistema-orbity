@@ -32,6 +32,14 @@ serve(async (req) => {
     if (accError || !account) throw new Error('WhatsApp account not found');
     if (account.status !== 'connected') throw new Error('WhatsApp not connected');
 
+    // Use centralized secrets as fallback
+    const effectiveUrl = (account.api_url || Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '');
+    const effectiveKey = account.api_key || Deno.env.get('EVOLUTION_API_KEY') || '';
+
+    if (!effectiveUrl || !effectiveKey) {
+      throw new Error('Evolution API not configured');
+    }
+
     // Ensure conversation exists
     let convId = conversation_id;
     if (!convId) {
@@ -62,11 +70,11 @@ serve(async (req) => {
 
     // Send via Evolution API
     const formattedPhone = phone_number.replace(/\D/g, '');
-    const sendRes = await fetch(`${account.api_url}/message/sendText/${account.instance_name}`, {
+    const sendRes = await fetch(`${effectiveUrl}/message/sendText/${account.instance_name}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': account.api_key,
+        'apikey': effectiveKey,
       },
       body: JSON.stringify({
         number: formattedPhone,

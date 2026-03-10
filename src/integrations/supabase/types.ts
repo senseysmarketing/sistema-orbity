@@ -6182,8 +6182,8 @@ export type Database = {
         Insert: {
           agency_id: string
           allowed_sources?: Json | null
-          api_key: string
-          api_url: string
+          api_key?: string
+          api_url?: string
           created_at?: string | null
           id?: string
           instance_name: string
