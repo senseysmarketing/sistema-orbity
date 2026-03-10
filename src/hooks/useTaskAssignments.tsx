@@ -100,11 +100,10 @@ export function useTaskAssignments() {
   }, [toast]);
 
   const assignUsersToTask = async (taskId: string, userIds: string[]) => {
-    // Salvar estado anterior para rollback
     const previousAssignments = [...assignments];
+    isOperatingRef.current = true;
     
     try {
-      // Atualização otimista: atualizar UI imediatamente
       const newAssignments = userIds.map(userId => ({
         id: `temp-${userId}`,
         task_id: taskId,
@@ -123,13 +122,11 @@ export function useTaskAssignments() {
         ...newAssignments
       ]);
 
-      // Remover atribuições existentes
       await supabase
         .from('task_assignments')
         .delete()
         .eq('task_id', taskId);
 
-      // Adicionar novas atribuições
       if (userIds.length > 0) {
         const assignmentsToInsert = userIds.map(userId => ({
           task_id: taskId,
@@ -143,10 +140,8 @@ export function useTaskAssignments() {
         if (error) throw error;
       }
 
-      // Buscar dados completos
       await fetchAssignments(taskId);
       
-      // Emitir evento para outros componentes
       window.dispatchEvent(new CustomEvent(ASSIGNMENTS_UPDATED_EVENT, { 
         detail: { taskId, userIds } 
       }));
@@ -156,7 +151,6 @@ export function useTaskAssignments() {
         description: "Usuários atribuídos à tarefa com sucesso!",
       });
     } catch (error: any) {
-      // Rollback em caso de erro
       setAssignments(previousAssignments);
       
       toast({
@@ -164,6 +158,8 @@ export function useTaskAssignments() {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      isOperatingRef.current = false;
     }
   };
 
