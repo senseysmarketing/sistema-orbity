@@ -53,6 +53,12 @@ serve(async (req) => {
 
     const bodyText = await req.text();
 
+    // --- EMPTY BODY GUARD ---
+    if (!bodyText || bodyText.trim() === '') {
+      console.log('[whatsapp-webhook] Empty body received');
+      return new Response('ok', { status: 200 });
+    }
+
     // --- SIGNATURE VALIDATION ---
     const isValid = await validateSignature(req, bodyText);
     if (!isValid) {
@@ -63,10 +69,30 @@ serve(async (req) => {
       });
     }
 
-    const body = JSON.parse(bodyText);
-    const { event, instance, data } = body;
+    // --- SAFE JSON PARSING ---
+    let body: any;
+    try {
+      body = JSON.parse(bodyText);
+    } catch {
+      console.log('[whatsapp-webhook] Non-JSON payload received:', bodyText.substring(0, 200));
+      return new Response(JSON.stringify({ success: true, skipped: 'non-json payload' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    console.log('[whatsapp-webhook] Event received:', event, 'instance:', instance);
+    const { event, instance, data } = body || {};
+
+    // --- EARLY RETURN ON MISSING EVENT ---
+    if (!event) {
+      console.log('[whatsapp-webhook] Ping/empty event received');
+      return new Response(JSON.stringify({ success: true, skipped: 'no event' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('[whatsapp-webhook] Event:', event, 'Instance:', instance);
 
     if (!instance) {
       return new Response(JSON.stringify({ success: true, skipped: 'no instance' }), {
