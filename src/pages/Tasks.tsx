@@ -59,6 +59,13 @@ import { useTaskTypes } from "@/hooks/useTaskTypes";
 import { useClientRelations } from "@/hooks/useClientRelations";
 import { replaceTemplateVariables, calculateDueDate } from "@/lib/templateVariables";
 
+interface AssignedUser {
+  user_id: string;
+  name: string;
+  role: string;
+  id: string;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -81,6 +88,7 @@ interface Task {
   hashtags?: string[] | null;
   creative_instructions?: string | null;
   is_internal?: boolean;
+  _assignedUsers?: AssignedUser[];
 }
 
 interface Profile {
