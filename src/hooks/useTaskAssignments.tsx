@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,6 +26,8 @@ export function useTaskAssignments() {
   const [assignments, setAssignments] = useState<TaskAssignmentWithProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const isOperatingRef = useRef(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const fetchAssignments = useCallback(async (taskId?: string) => {
     setLoading(true);
@@ -98,11 +100,10 @@ export function useTaskAssignments() {
   }, [toast]);
 
   const assignUsersToTask = async (taskId: string, userIds: string[]) => {
-    // Salvar estado anterior para rollback
     const previousAssignments = [...assignments];
+    isOperatingRef.current = true;
     
     try {
-      // Atualização otimista: atualizar UI imediatamente
       const newAssignments = userIds.map(userId => ({
         id: `temp-${userId}`,
         task_id: taskId,
@@ -121,13 +122,11 @@ export function useTaskAssignments() {
         ...newAssignments
       ]);
 
-      // Remover atribuições existentes
       await supabase
         .from('task_assignments')
         .delete()
         .eq('task_id', taskId);
 
-      // Adicionar novas atribuições
       if (userIds.length > 0) {
         const assignmentsToInsert = userIds.map(userId => ({
           task_id: taskId,
@@ -141,10 +140,8 @@ export function useTaskAssignments() {
         if (error) throw error;
       }
 
-      // Buscar dados completos
       await fetchAssignments(taskId);
       
-      // Emitir evento para outros componentes
       window.dispatchEvent(new CustomEvent(ASSIGNMENTS_UPDATED_EVENT, { 
         detail: { taskId, userIds } 
       }));
@@ -154,7 +151,6 @@ export function useTaskAssignments() {
         description: "Usuários atribuídos à tarefa com sucesso!",
       });
     } catch (error: any) {
-      // Rollback em caso de erro
       setAssignments(previousAssignments);
       
       toast({
@@ -162,6 +158,8 @@ export function useTaskAssignments() {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      isOperatingRef.current = false;
     }
   };
 
@@ -178,6 +176,7 @@ export function useTaskAssignments() {
   };
 
   const removeUserFromTask = async (taskId: string, userId: string) => {
+    isOperatingRef.current = true;
     try {
       const { error } = await supabase
         .from('task_assignments')
@@ -199,6 +198,8 @@ export function useTaskAssignments() {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      isOperatingRef.current = false;
     }
   };
 
@@ -213,15 +214,23 @@ export function useTaskAssignments() {
           schema: 'public',
           table: 'task_assignments'
         },
-        (payload) => {
-          console.log('Task assignment change detected:', payload);
-          // Recarregar atribuições quando houver mudanças
-          fetchAssignments();
+        (payload: any) => {
+          // Skip realtime refetch during active write operations
+          if (isOperatingRef.current) return;
+          
+          const taskId = payload.new?.task_id || payload.old?.task_id;
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = setTimeout(() => {
+            if (taskId) {
+              fetchAssignments(taskId);
+            } else {
+              fetchAssignments();
+            }
+          }, 500);
         }
       )
       .subscribe();
 
-    // Listener para eventos customizados
     const handleAssignmentUpdate = (event: any) => {
       fetchAssignments(event.detail?.taskId);
     };
@@ -229,6 +238,7 @@ export function useTaskAssignments() {
     window.addEventListener(ASSIGNMENTS_UPDATED_EVENT, handleAssignmentUpdate);
 
     return () => {
+      clearTimeout(debounceTimerRef.current);
       supabase.removeChannel(channel);
       window.removeEventListener(ASSIGNMENTS_UPDATED_EVENT, handleAssignmentUpdate);
     };
