@@ -1,30 +1,59 @@
 
 
-# Fix: WhatsApp Webhook Resilience
+# Resumo Semanal Compacto para WhatsApp
 
-## Changes to `supabase/functions/whatsapp-webhook/index.ts`
+## Problema
 
-### 1. Empty body guard (before signature validation)
-Add check right after `req.text()` — before HMAC or JSON parsing:
-```typescript
-if (!bodyText || bodyText.trim() === '') {
-  console.log('[whatsapp-webhook] Empty body received');
-  return new Response('ok', { status: 200 });
-}
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+
+## Solucao
+
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+
+### Exemplo do novo formato
+
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+
+*Semana 1 (03/03 a 09/03) - 5 posts*
+
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
 ```
 
-### 2. Safe JSON parsing with try/catch
-Replace the raw `JSON.parse(bodyText)` (line 66) with a try/catch that returns 200 on non-JSON payloads.
+### Detalhes tecnicos
 
-### 3. Early return on missing event
-After parsing, check `if (!event)` and return 200 (handles Evolution pings).
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
 
-### 4. Event logging
-Add `console.log('[whatsapp-webhook] Event:', event, 'Instance:', instance)` after validation passes.
+Reescrever a funcao `generateSummaryText` com formato compacto:
 
-### 5. Anti-duplication
-Already handled — the existing code uses `upsert` with `onConflict: 'account_id,message_id'` on `whatsapp_messages`, so duplicate webhook deliveries are safely ignored at the DB level.
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
 
-### File changed
-- `supabase/functions/whatsapp-webhook/index.ts` — restructure lines 58-80 (the body parsing section)
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 
