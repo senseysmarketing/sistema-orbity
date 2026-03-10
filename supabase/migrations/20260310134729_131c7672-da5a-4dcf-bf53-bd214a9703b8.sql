@@ -1,0 +1,1 @@
+DELETE FROM whatsapp_accounts WHERE agency_id = '7bef1258-af3d-48cc-b3a7-f79fac29c7c0';
