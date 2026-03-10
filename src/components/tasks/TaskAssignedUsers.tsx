@@ -43,7 +43,10 @@ export function TaskAssignedUsers({
     }
   };
 
-  if (!users || users.length === 0) {
+  // Filter out any undefined/null entries that may come from unresolved profiles
+  const validUsers = (users || []).filter((u): u is User => !!u && !!u.name);
+
+  if (validUsers.length === 0) {
     return (
       <div className="flex items-center gap-1 text-muted-foreground">
         <Users className="h-4 w-4" />
