@@ -1,59 +1,51 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Refatoracao Completa: Sistema de Atribuicoes de Tarefas
 
-## Problema
+## Diagnostico Real
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+**Banco de dados**: Correto. A tarefa "Criacao de Criativos de Alto Padrao - Empreendimento Ilha Pura (ABRIL)" tem Carol atribuida no banco. Giovanna nao esta atribuida a essa tarefa no banco (a atribuicao nunca persiste). As 6 tarefas sem atribuicao no banco tambem nao tem `assigned_to` legado preenchido.
 
-## Solucao
+**Problema confirmado**: O `useTaskAssignments` hook mantem cache global de ~1050 atribuicoes. Quando `assignUsersToTask` faz DELETE+INSERT, o realtime listener e o custom event `task-assignments-updated` no `Tasks.tsx` (linha 207-215) disparam refetches simultaneos que competem com a UI otimista, causando flickering e perda de dados visuais.
 
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+**Evidencia**: Dashboard (`Index.tsx`) e Social Media (`useSocialMediaTasks.tsx`) fazem join inline `task_assignments(user_id)` e funcionam perfeitamente. So o modulo Tasks usa o hook quebrado.
 
-### Exemplo do novo formato
+## Plano de Implementacao
 
-```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+### 1. Reescrever `src/hooks/useTaskAssignments.tsx` (mutation-only)
 
-*Semana 1 (03/03 a 09/03) - 5 posts*
+Remover completamente: estado global `assignments`, realtime listener, custom event, `fetchAssignments`, `getAssignedUsers`, `getTasksForUser`.
 
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
+Manter apenas:
+- `assignUsersToTask(taskId, userIds)` → DELETE + INSERT, retorna `Promise<boolean>`
+- `removeUserFromTask(taskId, userId)` → DELETE, retorna `Promise<boolean>`
 
-Qualquer ajuste e so me chamar! ✅
-```
+Sem estado local, sem realtime, sem cache.
 
-### Detalhes tecnicos
+### 2. Refatorar `src/pages/Tasks.tsx`
 
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+- `fetchTasks`: mudar query para `select('*, task_clients(client_id), task_assignments(user_id)')` 
+- Apos fetch, extrair todos `user_id` unicos, buscar profiles em batch
+- Enriquecer cada task com propriedade `_assignedUsers: [{user_id, name, role}]`
+- Criar funcao local `getAssignedUsers(taskId)` que le de `tasks.find(t => t.id === taskId)?._assignedUsers`
+- `handleCreateTask` / `handleUpdateTask`: apos `assignUsersToTask`, chamar `fetchTasks()` para refresh unico
+- `handleEditTask`: ler `_assignedUsers` da task em vez de chamar `getAssignedUsers` do hook
+- Remover: import `useTaskAssignments` (manter so `assignUsersToTask`), event listener `task-assignments-updated`, `fetchAssignments()` do useEffect
 
-Reescrever a funcao `generateSummaryText` com formato compacto:
+### 3. Ajustar componentes que recebem `getAssignedUsers`
 
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+- `KanbanColumn` (linha 98): ja recebe `getAssignedUsers` como prop — nenhuma mudanca na interface, so a funcao passada muda
+- `TaskDetailsDialog` (linha 176): ja recebe `getAssignedUsers` como prop — mesma coisa
+- `TaskAnalytics` (linha 1588): ja busca dados via join proprio — nenhuma mudanca
 
-### Mapeamento de emojis por formato
+### 4. Nenhuma mudanca em outros modulos
 
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
+- `Index.tsx`: ja usa join inline — OK
+- `useSocialMediaTasks.tsx`: ja usa join inline — OK
+- `SocialMediaAnalytics.tsx`: ja usa join inline — OK
+- `TaskAnalytics.tsx`: ja usa join inline — OK
 
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+### Arquivos alterados
+1. `src/hooks/useTaskAssignments.tsx` — reescrita (~40 linhas vs ~256)
+2. `src/pages/Tasks.tsx` — refatorar fetchTasks + remover dependencia do cache
 
