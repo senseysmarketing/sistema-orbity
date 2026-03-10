@@ -32,7 +32,8 @@ export function useTaskAssignments() {
     try {
       let query = supabase
         .from('task_assignments')
-        .select('*');
+        .select('*')
+        .range(0, 4999);
 
       if (taskId) {
         query = query.eq('task_id', taskId);
@@ -70,9 +71,20 @@ export function useTaskAssignments() {
           };
         });
 
-        setAssignments(combinedData);
+        if (taskId) {
+          setAssignments(prev => [
+            ...prev.filter(a => a.task_id !== taskId),
+            ...combinedData
+          ]);
+        } else {
+          setAssignments(combinedData);
+        }
       } else {
-        setAssignments([]);
+        if (taskId) {
+          setAssignments(prev => prev.filter(a => a.task_id !== taskId));
+        } else {
+          setAssignments([]);
+        }
       }
     } catch (error: any) {
       toast({
@@ -104,7 +116,10 @@ export function useTaskAssignments() {
           role: 'agency_user'
         }
       }));
-      setAssignments(newAssignments);
+      setAssignments(prev => [
+        ...prev.filter(a => a.task_id !== taskId),
+        ...newAssignments
+      ]);
 
       // Remover atribuições existentes
       await supabase
