@@ -1,59 +1,78 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Refatoração: WhatsApp Evolution API Centralizada
 
-## Problema
+## Contexto
+Atualmente cada agência precisa fornecer URL, API Key e nome da instância manualmente. O novo modelo centraliza tudo em um único servidor Evolution (`https://senseys-evolution.cloudfy.cloud`) com API Key global (`3R4MZIGtr4A8tCIDguMsxFU3JURk3B6r`), simplificando o fluxo para: **clique em "Conectar" → QR Code aparece → escaneie → pronto**.
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
+## Arquitetura
 
-## Solucao
-
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
-
-### Exemplo do novo formato
-
+```text
+Usuário Orbity (clica "Conectar WhatsApp")
+      │
+      ▼
+Edge Function whatsapp-connect
+      │ POST /instance/create  (orbity_{agency_id})
+      │ POST /webhook/set       (webhook → Supabase)
+      │ GET  /instance/connect  (QR Code)
+      ▼
+Evolution API Central (senseys-evolution.cloudfy.cloud)
+      │
+      │ webhook events
+      ▼
+Edge Function whatsapp-webhook
+      │
+      ▼
+whatsapp_messages / automation engine
 ```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
 
-*Semana 1 (03/03 a 09/03) - 5 posts*
+## Mudanças
 
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
+### 1. Adicionar Supabase Secrets
+- `EVOLUTION_API_URL` = `https://senseys-evolution.cloudfy.cloud`
+- `EVOLUTION_API_KEY` = `3R4MZIGtr4A8tCIDguMsxFU3JURk3B6r`
 
-Qualquer ajuste e so me chamar! ✅
+### 2. Migration: Tornar `api_url` e `api_key` opcionais na tabela `whatsapp_accounts`
+As colunas `api_url` e `api_key` deixam de ser obrigatórias (a URL/Key agora são secrets globais). Adicionar defaults vazios para retrocompatibilidade.
+
+```sql
+ALTER TABLE whatsapp_accounts 
+  ALTER COLUMN api_url SET DEFAULT '',
+  ALTER COLUMN api_key SET DEFAULT '';
 ```
 
-### Detalhes tecnicos
+### 3. Refatorar `whatsapp-connect/index.ts`
+- Ler `EVOLUTION_API_URL` e `EVOLUTION_API_KEY` dos secrets (não mais do body/DB)
+- Gerar `instance_name` automaticamente: `orbity_{agency_id_short}` (primeiros 8 chars do UUID)
+- **action: connect** → Não pede mais URL/Key/nome. Apenas cria instância, configura webhook, retorna QR
+- **action: status/disconnect/refresh_qr** → Usa secrets em vez de `account.api_url`/`account.api_key`
+- Salvar a URL/Key centrais no DB por retrocompatibilidade (para `whatsapp-send` e `process-queue`)
 
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+### 4. Refatorar `whatsapp-send/index.ts`
+- Ler `EVOLUTION_API_URL` e `EVOLUTION_API_KEY` dos secrets como fallback quando `account.api_url` está vazio
 
-Reescrever a funcao `generateSummaryText` com formato compacto:
+### 5. Refatorar `process-whatsapp-queue/index.ts`
+- Mesma lógica: usar secrets como fallback para URL/Key da Evolution
 
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+### 6. Refatorar `whatsapp-webhook/index.ts`
+- Lookup de instância: já busca por `instance_name`, funciona automaticamente com o novo padrão `orbity_*`
+- Sem mudanças necessárias no webhook
 
-### Mapeamento de emojis por formato
+### 7. Refatorar UI: `WhatsAppIntegration.tsx`
+- Remover os 3 campos de formulário (URL, API Key, Nome da Instância)
+- Botão único: **"Conectar WhatsApp"** → chama `connect.mutate({})` sem parâmetros
+- QR Code aparece automaticamente
+- Manter: status, desconectar, verificar status
 
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
+### 8. Refatorar hook: `useWhatsApp.tsx`
+- `connect` mutation: não recebe mais parâmetros (URL/Key/instance)
+- O body enviado é apenas `{ action: 'connect', agency_id }`
 
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+## Arquivos alterados
+1. `supabase/functions/whatsapp-connect/index.ts` — usar secrets, auto-gerar instance name
+2. `supabase/functions/whatsapp-send/index.ts` — fallback para secrets
+3. `supabase/functions/process-whatsapp-queue/index.ts` — fallback para secrets
+4. `src/components/settings/WhatsAppIntegration.tsx` — UI simplificada (1 botão)
+5. `src/hooks/useWhatsApp.tsx` — remover parâmetros do connect
+6. Migration SQL — defaults para api_url/api_key
 
