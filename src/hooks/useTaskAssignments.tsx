@@ -71,9 +71,20 @@ export function useTaskAssignments() {
           };
         });
 
-        setAssignments(combinedData);
+        if (taskId) {
+          setAssignments(prev => [
+            ...prev.filter(a => a.task_id !== taskId),
+            ...combinedData
+          ]);
+        } else {
+          setAssignments(combinedData);
+        }
       } else {
-        setAssignments([]);
+        if (taskId) {
+          setAssignments(prev => prev.filter(a => a.task_id !== taskId));
+        } else {
+          setAssignments([]);
+        }
       }
     } catch (error: any) {
       toast({
