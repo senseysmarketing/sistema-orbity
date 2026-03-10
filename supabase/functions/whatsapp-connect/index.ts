@@ -6,6 +6,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+async function configureWebhook(apiUrl: string, apiKey: string, instanceName: string) {
+  const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-webhook`;
+
+  try {
+    const res = await fetch(`${apiUrl}/webhook/set/${instanceName}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
+      body: JSON.stringify({
+        enabled: true,
+        url: webhookUrl,
+        webhookByEvents: false,
+        webhookBase64: false,
+        events: [
+          'MESSAGES_UPSERT',
+          'MESSAGES_UPDATE',
+          'CONNECTION_UPDATE',
+        ],
+      }),
+    });
+
+    const data = await res.json();
+    console.log('[whatsapp-connect] Webhook configured:', JSON.stringify(data));
+    return { success: res.ok, data };
+  } catch (e) {
+    console.error('[whatsapp-connect] Webhook configuration failed:', e.message);
+    return { success: false, error: e.message };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -40,13 +69,15 @@ serve(async (req) => {
 
     switch (action) {
       case 'connect': {
+        const cleanApiUrl = api_url.replace(/\/$/, '');
+
         // Save account info
         const { data: account, error: upsertError } = await supabase
           .from('whatsapp_accounts')
           .upsert({
             agency_id,
             instance_name,
-            api_url: api_url.replace(/\/$/, ''),
+            api_url: cleanApiUrl,
             api_key,
             status: 'connecting',
           }, { onConflict: 'agency_id' })
@@ -57,7 +88,7 @@ serve(async (req) => {
 
         // Create instance on Evolution API
         try {
-          const createRes = await fetch(`${api_url.replace(/\/$/, '')}/instance/create`, {
+          const createRes = await fetch(`${cleanApiUrl}/instance/create`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -79,8 +110,11 @@ serve(async (req) => {
           console.log('Instance create result:', e.message);
         }
 
+        // Configure webhook automatically after instance creation
+        await configureWebhook(cleanApiUrl, api_key, instance_name);
+
         // Get QR code
-        const qrRes = await fetch(`${api_url.replace(/\/$/, '')}/instance/connect/${instance_name}`, {
+        const qrRes = await fetch(`${cleanApiUrl}/instance/connect/${instance_name}`, {
           method: 'GET',
           headers: { 'apikey': api_key },
         });
@@ -141,6 +175,11 @@ serve(async (req) => {
               .from('whatsapp_accounts')
               .update({ status: newStatus, qr_code: isConnected ? null : account.qr_code })
               .eq('id', account.id);
+          }
+
+          // Re-configure webhook when connected (auto-healing)
+          if (isConnected) {
+            await configureWebhook(account.api_url, account.api_key, account.instance_name);
           }
 
           // If disconnected, auto-fetch new QR code
@@ -245,6 +284,57 @@ serve(async (req) => {
           success: true,
           status: 'connected',
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      case 'check_webhook': {
+        const { data: account } = await supabase
+          .from('whatsapp_accounts')
+          .select('*')
+          .eq('agency_id', agency_id)
+          .single();
+
+        if (!account) throw new Error('No WhatsApp account found');
+
+        const expectedUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-webhook`;
+
+        // Check current webhook config
+        try {
+          const findRes = await fetch(
+            `${account.api_url}/webhook/find/${account.instance_name}`,
+            { headers: { 'apikey': account.api_key } }
+          );
+          const findData = await findRes.json();
+
+          const currentUrl = findData?.url || findData?.webhook?.url || null;
+          const isEnabled = findData?.enabled ?? findData?.webhook?.enabled ?? false;
+          const needsReconfigure = !currentUrl || currentUrl !== expectedUrl || !isEnabled;
+
+          if (needsReconfigure) {
+            console.log('[whatsapp-connect] Webhook needs reconfiguration. Current:', currentUrl, 'Expected:', expectedUrl);
+            const result = await configureWebhook(account.api_url, account.api_key, account.instance_name);
+
+            return new Response(JSON.stringify({
+              success: true,
+              action: 'reconfigured',
+              webhook_result: result,
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+
+          return new Response(JSON.stringify({
+            success: true,
+            action: 'already_configured',
+            webhook_url: currentUrl,
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        } catch (e) {
+          console.error('[whatsapp-connect] Webhook check failed:', e.message);
+          // Try to configure anyway
+          const result = await configureWebhook(account.api_url, account.api_key, account.instance_name);
+          return new Response(JSON.stringify({
+            success: true,
+            action: 'force_reconfigured',
+            webhook_result: result,
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
       }
 
       default:
