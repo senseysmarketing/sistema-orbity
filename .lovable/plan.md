@@ -1,27 +1,59 @@
 
 
-# Fix: WhatsApp Connection Error
+# Resumo Semanal Compacto para WhatsApp
 
-## Problem
-1. The deployed edge function is still running the **old version** (line 82 tries `.replace()` on `api_url` from request body, which is no longer sent). The new code in the repo is correct but hasn't been deployed.
-2. The existing `whatsapp_accounts` record has `instance_name: "Senseys"` (old name). Since you deleted the old instance from Evolution, we need to reset this record to use the new pattern `orbity_7bef1258`.
+## Problema
 
-## Plan
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-### 1. Reset the whatsapp_accounts record
-Run SQL to delete the old record so the connect flow starts fresh:
-```sql
-DELETE FROM whatsapp_accounts WHERE agency_id = '7bef1258-af3d-48cc-b3a7-f79fac29c7c0';
+## Solucao
+
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+
+### Exemplo do novo formato
+
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+
+*Semana 1 (03/03 a 09/03) - 5 posts*
+
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
 ```
 
-### 2. Force redeploy the edge function
-Deploy `whatsapp-connect` to push the new centralized code that's already in the repo.
+### Detalhes tecnicos
 
-### 3. Test the flow
-After deploy, clicking "Conectar WhatsApp" will:
-- Create instance `orbity_7bef1258` on Evolution API
-- Configure webhook automatically
-- Return QR code for scanning
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
 
-No code changes needed — the file is already correct, it just needs to be deployed and the old DB record cleared.
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 
