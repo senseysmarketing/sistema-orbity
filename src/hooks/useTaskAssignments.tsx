@@ -214,15 +214,23 @@ export function useTaskAssignments() {
           schema: 'public',
           table: 'task_assignments'
         },
-        (payload) => {
-          console.log('Task assignment change detected:', payload);
-          // Recarregar atribuições quando houver mudanças
-          fetchAssignments();
+        (payload: any) => {
+          // Skip realtime refetch during active write operations
+          if (isOperatingRef.current) return;
+          
+          const taskId = payload.new?.task_id || payload.old?.task_id;
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = setTimeout(() => {
+            if (taskId) {
+              fetchAssignments(taskId);
+            } else {
+              fetchAssignments();
+            }
+          }, 500);
         }
       )
       .subscribe();
 
-    // Listener para eventos customizados
     const handleAssignmentUpdate = (event: any) => {
       fetchAssignments(event.detail?.taskId);
     };
@@ -230,6 +238,7 @@ export function useTaskAssignments() {
     window.addEventListener(ASSIGNMENTS_UPDATED_EVENT, handleAssignmentUpdate);
 
     return () => {
+      clearTimeout(debounceTimerRef.current);
       supabase.removeChannel(channel);
       window.removeEventListener(ASSIGNMENTS_UPDATED_EVENT, handleAssignmentUpdate);
     };
