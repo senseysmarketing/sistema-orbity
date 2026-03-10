@@ -172,7 +172,7 @@ export function TaskCard({
           <div className="flex flex-wrap gap-1">
             {assignedUsers.slice(0, 2).map((assignment, i) => (
               <span key={i} className="font-medium">
-                {assignment.profiles?.name || 'Usuário'}
+                {assignment.name || assignment.profiles?.name || 'Usuário'}
               </span>
             ))}
             {assignedUsers.length > 2 && (
