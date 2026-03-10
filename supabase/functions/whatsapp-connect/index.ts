@@ -14,15 +14,17 @@ async function configureWebhook(apiUrl: string, apiKey: string, instanceName: st
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
       body: JSON.stringify({
-        enabled: true,
-        url: webhookUrl,
-        webhookByEvents: false,
-        webhookBase64: false,
-        events: [
-          'MESSAGES_UPSERT',
-          'MESSAGES_UPDATE',
-          'CONNECTION_UPDATE',
-        ],
+        webhook: {
+          enabled: true,
+          url: webhookUrl,
+          webhookByEvents: false,
+          webhookBase64: false,
+          events: [
+            'MESSAGES_UPSERT',
+            'MESSAGES_UPDATE',
+            'CONNECTION_UPDATE',
+          ],
+        },
       }),
     });
 
