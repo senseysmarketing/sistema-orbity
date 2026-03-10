@@ -1,21 +1,59 @@
 
 
-# Fix: Webhook não recebe mensagens + Pausar automação do Roberto
+# Resumo Semanal Compacto para WhatsApp
 
 ## Problema
-A Evolution API não está enviando eventos para a edge function `whatsapp-webhook`. As respostas do Roberto Seguro nunca foram detectadas, e a automação continua ativa — vai enviar follow-up 2 amanhã.
 
-## Ações
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-### 1. Pausar automação do Roberto (imediato via SQL)
-Atualizar o `whatsapp_automation_control` para `status: 'responded'` e `conversation_state: 'customer_replied'`, evitando que mais follow-ups sejam enviados.
+## Solucao
 
-### 2. Reconfigurar webhook na Evolution API
-Invocar a edge function `whatsapp-connect` com `action: 'status'` para a instância Senseys. Essa action já chama `configureWebhook()` automaticamente (auto-cura), reconfigurando o endpoint `POST /webhook/set/Senseys` na Evolution.
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
 
-### 3. Validar que o webhook foi configurado
-Após a reconfiguração, testar enviando uma mensagem de teste ao WhatsApp e verificar se os logs do `whatsapp-webhook` registram o evento.
+### Exemplo do novo formato
 
-### Arquivos alterados
-Nenhum arquivo de código precisa ser alterado. São ações operacionais via queries SQL e invocação de edge function.
+```
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+
+*Semana 1 (03/03 a 09/03) - 5 posts*
+
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
+```
+
+### Detalhes tecnicos
+
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 
