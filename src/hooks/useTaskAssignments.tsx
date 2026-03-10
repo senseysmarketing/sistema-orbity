@@ -116,7 +116,10 @@ export function useTaskAssignments() {
           role: 'agency_user'
         }
       }));
-      setAssignments(newAssignments);
+      setAssignments(prev => [
+        ...prev.filter(a => a.task_id !== taskId),
+        ...newAssignments
+      ]);
 
       // Remover atribuições existentes
       await supabase
