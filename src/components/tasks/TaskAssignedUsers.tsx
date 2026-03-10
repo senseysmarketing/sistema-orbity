@@ -55,16 +55,16 @@ export function TaskAssignedUsers({
     );
   }
 
-  const visibleUsers = users.slice(0, maxDisplay);
-  const remainingCount = users.length - maxDisplay;
+  const visibleUsers = validUsers.slice(0, maxDisplay);
+  const remainingCount = validUsers.length - maxDisplay;
 
-  if (showNames && users.length === 1) {
+  if (showNames && validUsers.length === 1) {
     return (
       <div className="flex items-center gap-2">
         <Avatar className={getSizeClasses()}>
-          <AvatarFallback>{getUserInitials(users[0].name)}</AvatarFallback>
+          <AvatarFallback>{getUserInitials(validUsers[0].name)}</AvatarFallback>
         </Avatar>
-        <span className="text-sm font-medium">{users[0].name}</span>
+        <span className="text-sm font-medium">{validUsers[0].name}</span>
       </div>
     );
   }
@@ -92,12 +92,12 @@ export function TaskAssignedUsers({
         )}
       </div>
 
-      {showNames && users.length > 1 && (
+      {showNames && validUsers.length > 1 && (
         <div className="flex flex-col">
-          <span className="text-sm font-medium">{users.length} usuários</span>
+          <span className="text-sm font-medium">{validUsers.length} usuários</span>
           <span className="text-xs text-muted-foreground">
-            {users.slice(0, 2).map(u => u.name.split(' ')[0]).join(', ')}
-            {users.length > 2 && ` e mais ${users.length - 2}`}
+            {validUsers.slice(0, 2).map(u => u.name.split(' ')[0]).join(', ')}
+            {validUsers.length > 2 && ` e mais ${validUsers.length - 2}`}
           </span>
         </div>
       )}
