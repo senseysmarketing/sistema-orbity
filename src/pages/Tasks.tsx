@@ -173,13 +173,7 @@ export default function Tasks() {
   const { currentAgency } = useAgency();
   const { toast } = useToast();
 
-  const {
-    assignments,
-    loading: assignmentsLoading,
-    fetchAssignments,
-    assignUsersToTask,
-    getAssignedUsers,
-  } = useTaskAssignments();
+  const { assignUsersToTask } = useTaskAssignments();
 
   const { templates, incrementUsageCount } = useTaskTemplates();
   const { statuses, getStatusName, isValidStatus } = useTaskStatuses();
