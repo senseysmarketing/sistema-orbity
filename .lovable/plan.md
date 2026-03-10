@@ -1,27 +1,59 @@
 
 
-# Fix: Evolution API Webhook Configuration
+# Resumo Semanal Compacto para WhatsApp
 
-## Root Cause
-From the [Evolution API GitHub issue #1657](https://github.com/EvolutionAPI/evolution-api/issues/1657), the exact same error `"instance requires property \"webhook\""` occurs when using wrong property names inside the webhook object. The Evolution API v2.2+ uses **`byEvents`** and **`base64`** (not `webhookByEvents` / `webhookBase64`). The strict validation rejects unknown properties, causing the entire `webhook` object to fail validation.
+## Problema
 
-## Fix
+O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
 
-**File:** `supabase/functions/whatsapp-connect/index.ts`
+## Solucao
 
-Change the `configureWebhook` function payload from:
-```json
-{ "webhook": { "webhookByEvents": false, "webhookBase64": false, ... } }
+Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
+
+### Exemplo do novo formato
+
 ```
-To:
-```json
-{ "webhook": { "enabled": true, "url": "...", "byEvents": false, "base64": false, "events": [...] } }
+Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
+
+*Semana 1 (03/03 a 09/03) - 5 posts*
+
+📅 Seg 03/03 — 🎠 Dicas de produtividade
+📅 Ter 04/03 — 🎬 Bastidores do escritorio
+📅 Qua 05/03 — 📸 Case de sucesso cliente Y
+📅 Sex 07/03 — 🎠 5 erros no marketing digital
+📅 Dom 09/03 — 🎬 Trend da semana
+
+Qualquer ajuste e so me chamar! ✅
 ```
 
-Also add detailed logging of the URL and payload being sent for easier future debugging.
+### Detalhes tecnicos
 
-## Changes Summary
-- Fix property names: `webhookByEvents` → `byEvents`, `webhookBase64` → `base64`
-- Add logging of endpoint URL and payload before the request
-- Single file change: `supabase/functions/whatsapp-connect/index.ts`
+**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+
+Reescrever a funcao `generateSummaryText` com formato compacto:
+
+1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
+2. Header de semana em negrito, uma linha, com contagem
+3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
+4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
+5. Fechamento padrao curto
+6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+
+### Mapeamento de emojis por formato
+
+| Formato | Emoji |
+|---------|-------|
+| carrossel | 🎠 |
+| reels | 🎬 |
+| feed | 📸 |
+| stories | 📱 |
+| video | 🎥 |
+| (outro/sem) | 📌 |
+
+### Resultado esperado
+
+- Mensagem ~60-70% menor que o formato atual
+- Visualmente escaneavel no WhatsApp
+- Formato padrao e consistente sem depender de IA
+- Mantém todas as informacoes essenciais (dia, formato, titulo)
 

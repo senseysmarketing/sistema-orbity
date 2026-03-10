@@ -8,29 +8,41 @@ const corsHeaders = {
 
 async function configureWebhook(apiUrl: string, apiKey: string, instanceName: string) {
   const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-webhook`;
+  const endpoint = `${apiUrl}/webhook/set/${instanceName}`;
+
+  const payload = {
+    webhook: {
+      enabled: true,
+      url: webhookUrl,
+      byEvents: false,
+      base64: false,
+      events: [
+        'MESSAGES_UPSERT',
+        'MESSAGES_UPDATE',
+        'CONNECTION_UPDATE',
+      ],
+    },
+  };
+
+  console.log('[whatsapp-connect] Webhook endpoint:', endpoint);
+  console.log('[whatsapp-connect] Webhook payload:', JSON.stringify(payload));
 
   try {
-    const res = await fetch(`${apiUrl}/webhook/set/${instanceName}`, {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
-      body: JSON.stringify({
-        webhook: {
-          enabled: true,
-          url: webhookUrl,
-          webhookByEvents: false,
-          webhookBase64: false,
-          events: [
-            'MESSAGES_UPSERT',
-            'MESSAGES_UPDATE',
-            'CONNECTION_UPDATE',
-          ],
-        },
-      }),
+      body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
-    console.log('[whatsapp-connect] Webhook configured:', JSON.stringify(data));
-    return { success: res.ok, data };
+    const data = await res.text();
+    console.log('[whatsapp-connect] Webhook response status:', res.status);
+    console.log('[whatsapp-connect] Webhook response body:', data);
+
+    try {
+      return { success: res.ok, data: JSON.parse(data) };
+    } catch {
+      return { success: res.ok, data };
+    }
   } catch (e) {
     console.error('[whatsapp-connect] Webhook configuration failed:', e.message);
     return { success: false, error: e.message };
