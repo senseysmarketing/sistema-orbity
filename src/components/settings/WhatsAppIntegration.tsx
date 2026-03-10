@@ -1,17 +1,12 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle, AlertTriangle, Settings } from "lucide-react";
+import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 
 export const WhatsAppIntegration = () => {
-  const [instanceName, setInstanceName] = useState("");
-  const [apiUrl, setApiUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [autoChecked, setAutoChecked] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
@@ -58,26 +53,23 @@ export const WhatsAppIntegration = () => {
     }
   }, [account?.status, qrCode]);
 
-  // Populate fields from existing account
+  // Load QR from account
   useEffect(() => {
-    if (account) {
-      setInstanceName(account.instance_name);
-      setApiUrl(account.api_url);
-      setApiKey(account.api_key);
-      if (account.qr_code) {
-        setQrCode(account.qr_code);
-      }
+    if (account?.qr_code && !isConnected) {
+      setQrCode(account.qr_code);
     }
   }, [account]);
 
   const handleConnect = async () => {
-    if (!instanceName || !apiUrl || !apiKey) return;
     try {
-      const result = await connect.mutateAsync({ instance_name: instanceName, api_url: apiUrl, api_key: apiKey });
+      setConnectionError(false);
+      const result = await connect.mutateAsync();
       if (result?.qr_code) {
         setQrCode(result.qr_code);
       }
-    } catch {}
+    } catch {
+      setConnectionError(true);
+    }
   };
 
   const handleRefreshQR = async () => {
@@ -102,7 +94,7 @@ export const WhatsAppIntegration = () => {
   }
 
   const showQrCode = qrCode && !isConnected;
-  const showForm = !isConnected && !showQrCode;
+  const showConnectButton = !isConnected && !showQrCode;
 
   return (
     <Card>
@@ -129,8 +121,8 @@ export const WhatsAppIntegration = () => {
                 )}
               </div>
               <CardDescription className="text-xs sm:text-sm">
-                <span className="hidden sm:inline">Conecte via Evolution API para automação de mensagens no CRM</span>
-                <span className="sm:hidden">Automação WhatsApp via Evolution API</span>
+                <span className="hidden sm:inline">Conecte seu WhatsApp para automação de mensagens no CRM</span>
+                <span className="sm:hidden">Automação WhatsApp no CRM</span>
               </CardDescription>
             </div>
           </div>
@@ -190,7 +182,7 @@ export const WhatsAppIntegration = () => {
                   <Alert variant="destructive" className="w-full">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      A instância pode ter sido removida ou está inacessível. Reconfigure a conexão.
+                      Erro ao conectar. Tente novamente ou entre em contato com o suporte.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -207,27 +199,14 @@ export const WhatsAppIntegration = () => {
                     />
                   </>
                 )}
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={handleRefreshQR} disabled={refreshQR.isPending}>
-                    {refreshQR.isPending ? (
-                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="mr-1 h-4 w-4" />
-                    )}
-                    Atualizar QR
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setQrCode(null);
-                      setConnectionError(false);
-                    }}
-                  >
-                    <Settings className="mr-1 h-4 w-4" />
-                    Reconfigurar
-                  </Button>
-                </div>
+                <Button variant="outline" size="sm" onClick={handleRefreshQR} disabled={refreshQR.isPending}>
+                  {refreshQR.isPending ? (
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-1 h-4 w-4" />
+                  )}
+                  Atualizar QR
+                </Button>
                 {!connectionError && (
                   <p className="text-xs text-muted-foreground text-center">
                     Abra o WhatsApp {'>'} Configurações {'>'} Dispositivos conectados {'>'} Conectar dispositivo
@@ -236,8 +215,8 @@ export const WhatsAppIntegration = () => {
               </div>
             )}
 
-            {/* Connection Form */}
-            {showForm && (
+            {/* Connect Button */}
+            {showConnectButton && (
               <>
                 <div className="p-3 sm:p-4 border rounded-lg bg-muted/30 space-y-2">
                   <p className="text-sm font-medium">Recursos disponíveis:</p>
@@ -249,40 +228,18 @@ export const WhatsAppIntegration = () => {
                   </ul>
                 </div>
 
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="wa-api-url" className="text-sm">URL da Evolution API</Label>
-                    <Input
-                      id="wa-api-url"
-                      placeholder="https://sua-api.com"
-                      value={apiUrl}
-                      onChange={(e) => setApiUrl(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="wa-api-key" className="text-sm">API Key</Label>
-                    <Input
-                      id="wa-api-key"
-                      type="password"
-                      placeholder="Sua chave de API"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="wa-instance" className="text-sm">Nome da Instância</Label>
-                    <Input
-                      id="wa-instance"
-                      placeholder="orbity-whatsapp"
-                      value={instanceName}
-                      onChange={(e) => setInstanceName(e.target.value)}
-                    />
-                  </div>
-                </div>
+                {connectionError && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Erro ao conectar. Tente novamente.
+                    </AlertDescription>
+                  </Alert>
+                )}
 
                 <Button
                   onClick={handleConnect}
-                  disabled={connect.isPending || !instanceName || !apiUrl || !apiKey}
+                  disabled={connect.isPending}
                   className="w-full"
                 >
                   {connect.isPending ? (

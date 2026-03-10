@@ -68,12 +68,11 @@ export function useWhatsApp() {
 
   // Connect WhatsApp
   const connect = useMutation({
-    mutationFn: async (params: { instance_name: string; api_url: string; api_key: string }) => {
+    mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('whatsapp-connect', {
         body: {
           action: 'connect',
           agency_id: currentAgency?.id,
-          ...params,
         },
       });
       if (error) throw error;
