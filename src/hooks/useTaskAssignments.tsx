@@ -176,6 +176,7 @@ export function useTaskAssignments() {
   };
 
   const removeUserFromTask = async (taskId: string, userId: string) => {
+    isOperatingRef.current = true;
     try {
       const { error } = await supabase
         .from('task_assignments')
@@ -197,6 +198,8 @@ export function useTaskAssignments() {
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      isOperatingRef.current = false;
     }
   };
 
