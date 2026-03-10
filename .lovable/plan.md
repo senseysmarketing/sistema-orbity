@@ -1,59 +1,35 @@
 
 
-# Resumo Semanal Compacto para WhatsApp
+# Fix: Task cards showing "Usuário" instead of real names
 
-## Problema
+## Root Cause
 
-O formato atual do resumo semanal e muito extenso para WhatsApp -- inclui tema, formato, plataforma em linhas separadas por post, tornando a mensagem longa demais para comunicacao rapida com o cliente.
-
-## Solucao
-
-Substituir o formato atual por um formato compacto e padronizado, otimizado para WhatsApp. Cada post ocupa uma unica linha com emojis indicando formato e dia. Sem necessidade de IA -- o formato e deterministico e consistente.
-
-### Exemplo do novo formato
-
-```
-Ola! Segue o planejamento de conteudo da semana para *ClienteX* 📱
-
-*Semana 1 (03/03 a 09/03) - 5 posts*
-
-📅 Seg 03/03 — 🎠 Dicas de produtividade
-📅 Ter 04/03 — 🎬 Bastidores do escritorio
-📅 Qua 05/03 — 📸 Case de sucesso cliente Y
-📅 Sex 07/03 — 🎠 5 erros no marketing digital
-📅 Dom 09/03 — 🎬 Trend da semana
-
-Qualquer ajuste e so me chamar! ✅
+In `src/components/ui/task-card.tsx` line 175, the template reads:
+```tsx
+{assignment.profiles?.name || 'Usuário'}
 ```
 
-### Detalhes tecnicos
+But after the refactor, `fetchTasks` in `Tasks.tsx` enriches assignments as flat objects:
+```ts
+{ id: '...', user_id: '...', name: 'Carol', role: 'designer' }
+```
 
-**Arquivo: `src/components/social-media/planning/WeeklySummaryDialog.tsx`**
+The `name` is directly on the object, not nested under `profiles`. So `assignment.profiles?.name` is always `undefined`, falling back to `'Usuário'`.
 
-Reescrever a funcao `generateSummaryText` com formato compacto:
+## Fix
 
-1. Nome do cliente em negrito com asteriscos (formatacao WhatsApp)
-2. Header de semana em negrito, uma linha, com contagem
-3. Cada post em uma unica linha: emoji do dia + data curta + emoji do formato + titulo
-4. Emojis por formato: carrossel = 🎠, reels = 🎬, feed = 📸, stories = 📱, video = 🎥
-5. Fechamento padrao curto
-6. Remover linhas de "Tema", "Formato", "Plataforma" separadas -- tudo condensado
+**File: `src/components/ui/task-card.tsx`** (line 175)
 
-### Mapeamento de emojis por formato
+Change:
+```tsx
+{assignment.profiles?.name || 'Usuário'}
+```
+To:
+```tsx
+{assignment.name || assignment.profiles?.name || 'Usuário'}
+```
 
-| Formato | Emoji |
-|---------|-------|
-| carrossel | 🎠 |
-| reels | 🎬 |
-| feed | 📸 |
-| stories | 📱 |
-| video | 🎥 |
-| (outro/sem) | 📌 |
+This handles both the new flat format from Tasks.tsx and preserves backward compatibility with any other caller that still uses the nested `profiles` shape.
 
-### Resultado esperado
-
-- Mensagem ~60-70% menor que o formato atual
-- Visualmente escaneavel no WhatsApp
-- Formato padrao e consistente sem depender de IA
-- Mantém todas as informacoes essenciais (dia, formato, titulo)
+One line change. No other files affected.
 
