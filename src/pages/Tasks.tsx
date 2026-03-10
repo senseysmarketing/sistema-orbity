@@ -59,6 +59,13 @@ import { useTaskTypes } from "@/hooks/useTaskTypes";
 import { useClientRelations } from "@/hooks/useClientRelations";
 import { replaceTemplateVariables, calculateDueDate } from "@/lib/templateVariables";
 
+interface AssignedUser {
+  user_id: string;
+  name: string;
+  role: string;
+  id: string;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -81,6 +88,7 @@ interface Task {
   hashtags?: string[] | null;
   creative_instructions?: string | null;
   is_internal?: boolean;
+  _assignedUsers?: AssignedUser[];
 }
 
 interface Profile {
@@ -173,13 +181,7 @@ export default function Tasks() {
   const { currentAgency } = useAgency();
   const { toast } = useToast();
 
-  const {
-    assignments,
-    loading: assignmentsLoading,
-    fetchAssignments,
-    assignUsersToTask,
-    getAssignedUsers,
-  } = useTaskAssignments();
+  const { assignUsersToTask } = useTaskAssignments();
 
   const { templates, incrementUsageCount } = useTaskTemplates();
   const { statuses, getStatusName, isValidStatus } = useTaskStatuses();
@@ -198,21 +200,9 @@ export default function Tasks() {
     fetchTasks();
     fetchProfiles();
     fetchClients();
-    fetchAssignments();
 
     // Arquivar tarefas concluídas há mais de 7 dias
     archiveOldCompletedTasks();
-
-    // Listener para mudanças nas atribuições
-    const handleAssignmentsUpdate = () => {
-      fetchTasks();
-      fetchAssignments();
-    };
-
-    window.addEventListener('task-assignments-updated', handleAssignmentsUpdate);
-    return () => {
-      window.removeEventListener('task-assignments-updated', handleAssignmentsUpdate);
-    };
   }, [currentAgency?.id]);
 
   const archiveOldCompletedTasks = async () => {
@@ -242,17 +232,48 @@ export default function Tasks() {
     try {
       const { data, error } = await supabase
         .from("tasks")
-        .select("*, task_clients(client_id)")
+        .select("*, task_clients(client_id), task_assignments(user_id)")
         .eq("agency_id", currentAgency.id)
         .eq("archived", false)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      // Populate client_id from task_clients join table when tasks.client_id is null
-      const enrichedTasks = (data || []).map((task: any) => ({
-        ...task,
-        client_id: task.client_id || task.task_clients?.[0]?.client_id || null,
-      }));
+
+      const rawTasks = data || [];
+
+      // Extract unique user_ids from assignments
+      const allUserIds = new Set<string>();
+      rawTasks.forEach((task: any) => {
+        (task.task_assignments || []).forEach((a: any) => allUserIds.add(a.user_id));
+      });
+
+      // Batch fetch profiles for assigned users
+      let profilesMap: Record<string, { user_id: string; name: string; role: string; id: string }> = {};
+      if (allUserIds.size > 0) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, user_id, name, role')
+          .in('user_id', Array.from(allUserIds));
+
+        (profileData || []).forEach(p => {
+          profilesMap[p.user_id] = p;
+        });
+      }
+
+      // Enrich tasks with _assignedUsers
+      const enrichedTasks = rawTasks.map((task: any) => {
+        const assignedUsers = (task.task_assignments || []).map((a: any) => {
+          const prof = profilesMap[a.user_id];
+          return prof || { id: '', user_id: a.user_id, name: 'Usuário desconhecido', role: 'unknown' };
+        });
+
+        return {
+          ...task,
+          client_id: task.client_id || task.task_clients?.[0]?.client_id || null,
+          _assignedUsers: assignedUsers,
+        };
+      });
+
       setTasks(enrichedTasks);
     } catch (error: any) {
       toast({
@@ -261,6 +282,11 @@ export default function Tasks() {
         variant: "destructive",
       });
     }
+  };
+
+  const getAssignedUsers = (taskId: string): AssignedUser[] => {
+    const task = tasks.find(t => t.id === taskId);
+    return task?._assignedUsers || [];
   };
 
   const fetchProfiles = async () => {
