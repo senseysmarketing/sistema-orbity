@@ -26,6 +26,8 @@ export function useTaskAssignments() {
   const [assignments, setAssignments] = useState<TaskAssignmentWithProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const isOperatingRef = useRef(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const fetchAssignments = useCallback(async (taskId?: string) => {
     setLoading(true);
