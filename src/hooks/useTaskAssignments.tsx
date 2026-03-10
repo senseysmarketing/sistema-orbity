@@ -32,7 +32,8 @@ export function useTaskAssignments() {
     try {
       let query = supabase
         .from('task_assignments')
-        .select('*');
+        .select('*')
+        .range(0, 4999);
 
       if (taskId) {
         query = query.eq('task_id', taskId);
