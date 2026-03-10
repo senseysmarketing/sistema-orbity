@@ -14,7 +14,7 @@ async function configureWebhook(apiUrl: string, apiKey: string, instanceName: st
     webhook: {
       enabled: true,
       url: webhookUrl,
-      byEvents: false,
+      byEvents: true,
       base64: false,
       events: [
         'MESSAGES_UPSERT',
