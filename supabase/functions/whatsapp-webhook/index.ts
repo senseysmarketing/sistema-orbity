@@ -7,6 +7,36 @@ const corsHeaders = {
 };
 
 /**
+ * Normalizes a phone number to digits-only format for consistent lookups.
+ * Handles formats like "+5527992661416", "55 27 99266-1416", "27992661416".
+ */
+function normalizePhone(phone: string): string {
+  return phone.replace(/\D/g, '');
+}
+
+/**
+ * Returns all common phone format variants to try when matching numbers.
+ * Evolution API sends digits-only (e.g. "5527992661416"), but leads may be
+ * stored with different formatting ("+5527992661416", "27992661416", etc.).
+ */
+function phoneVariants(phone: string): string[] {
+  const digits = normalizePhone(phone);
+  const variants = new Set<string>([digits, '+' + digits]);
+  // Brazilian number with country code 55: also try without country code
+  if (digits.startsWith('55') && digits.length === 13) {
+    const local = digits.slice(2); // e.g. "27992661416"
+    variants.add(local);
+    variants.add('+55' + local);
+  }
+  // Number without country code: also try with 55 prefix
+  if (!digits.startsWith('55') && digits.length === 11) {
+    variants.add('55' + digits);
+    variants.add('+55' + digits);
+  }
+  return [...variants];
+}
+
+/**
  * Optional HMAC signature validation.
  * If WEBHOOK_SECRET is set in Supabase secrets, validates the x-webhook-signature header.
  */
@@ -146,7 +176,8 @@ serve(async (req) => {
       const messageId = key?.id || crypto.randomUUID();
       const isFromMe = key?.fromMe || false;
       const remoteJid = key?.remoteJid || '';
-      const phoneNumber = remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', '');
+      // Normalize to digits-only so lookups match regardless of lead phone formatting
+      const phoneNumber = normalizePhone(remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', ''));
 
       // Skip group messages and status updates
       if (remoteJid.includes('@g.us') || remoteJid === 'status@broadcast') {
@@ -167,43 +198,86 @@ serve(async (req) => {
         messageData.message?.documentMessage ? 'document' :
         'text';
 
-      // Find or create conversation (upsert to handle unique constraint)
+      // Find or create conversation.
+      // Phone numbers may be stored in different formats ("+5527...", "5527...", "27..."),
+      // so we try all common variants in a single query to avoid duplicate conversations.
+      const variants = phoneVariants(phoneNumber);
+
       let { data: conversation } = await supabase
         .from('whatsapp_conversations')
         .select('id, lead_id')
         .eq('account_id', account.id)
-        .eq('phone_number', phoneNumber)
+        .in('phone_number', variants)
         .maybeSingle();
 
       if (!conversation) {
+        // Try to find the lead using all phone variants
         const { data: lead } = await supabase
           .from('leads')
           .select('id')
           .eq('agency_id', account.agency_id)
-          .eq('phone', phoneNumber)
+          .in('phone', variants)
           .maybeSingle();
 
-        const { data: newConv, error: convError } = await supabase
-          .from('whatsapp_conversations')
-          .upsert({
-            account_id: account.id,
-            phone_number: phoneNumber,
-            lead_id: lead?.id || null,
-          }, { onConflict: 'account_id,phone_number' })
-          .select()
-          .single();
-
-        if (convError) {
-          // Race condition: another request created it, fetch again
-          const { data: existingConv } = await supabase
+        // If we found the lead, check if there's already a conversation linked to it
+        // (e.g. created by startAutomation with a different phone format)
+        if (lead?.id) {
+          const { data: leadConv } = await supabase
             .from('whatsapp_conversations')
             .select('id, lead_id')
             .eq('account_id', account.id)
-            .eq('phone_number', phoneNumber)
+            .eq('lead_id', lead.id)
             .maybeSingle();
-          conversation = existingConv;
-        } else {
-          conversation = newConv;
+
+          if (leadConv) {
+            // Update phone_number to the normalized format so future lookups match
+            await supabase
+              .from('whatsapp_conversations')
+              .update({ phone_number: phoneNumber })
+              .eq('id', leadConv.id);
+            conversation = leadConv;
+          }
+        }
+
+        if (!conversation) {
+          const { data: newConv, error: convError } = await supabase
+            .from('whatsapp_conversations')
+            .upsert({
+              account_id: account.id,
+              phone_number: phoneNumber,
+              lead_id: lead?.id || null,
+            }, { onConflict: 'account_id,phone_number' })
+            .select()
+            .single();
+
+          if (convError) {
+            // Race condition: another request created it, fetch again
+            const { data: existingConv } = await supabase
+              .from('whatsapp_conversations')
+              .select('id, lead_id')
+              .eq('account_id', account.id)
+              .in('phone_number', variants)
+              .maybeSingle();
+            conversation = existingConv;
+          } else {
+            conversation = newConv;
+          }
+        }
+      } else if (!conversation.lead_id) {
+        // Conversation exists but has no lead_id — try to link it now
+        const { data: lead } = await supabase
+          .from('leads')
+          .select('id')
+          .eq('agency_id', account.agency_id)
+          .in('phone', variants)
+          .maybeSingle();
+
+        if (lead?.id) {
+          await supabase
+            .from('whatsapp_conversations')
+            .update({ lead_id: lead.id })
+            .eq('id', conversation.id);
+          conversation = { ...conversation, lead_id: lead.id };
         }
       }
 

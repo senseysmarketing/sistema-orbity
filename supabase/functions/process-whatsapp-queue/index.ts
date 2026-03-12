@@ -148,10 +148,14 @@ serve(async (req) => {
           ? record.whatsapp_conversations[0]
           : record.whatsapp_conversations;
 
-        if (conv?.last_customer_message_at && record.last_followup_sent_at) {
+        if (conv?.last_customer_message_at) {
           const customerReplyTime = new Date(conv.last_customer_message_at).getTime();
-          const lastFollowup = new Date(record.last_followup_sent_at).getTime();
-          if (customerReplyTime > lastFollowup) {
+          // Use last_followup_sent_at as reference if available, otherwise use started_at/created_at.
+          // This ensures replies during the greeting phase (before any follow-up is sent) are also detected.
+          const referenceTime = record.last_followup_sent_at
+            ? new Date(record.last_followup_sent_at).getTime()
+            : new Date(record.started_at || record.created_at).getTime();
+          if (customerReplyTime > referenceTime) {
             await supabase.from('whatsapp_automation_control').update({
               status: 'responded', conversation_state: 'customer_replied',
             }).eq('id', record.id);
