@@ -116,6 +116,27 @@ export function useWhatsApp() {
     },
   });
 
+  // Check and reconfigure Evolution API webhook URL
+  const checkWebhook = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('whatsapp-connect', {
+        body: { action: 'check_webhook', agency_id: currentAgency?.id },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data?.action === 'reconfigured') {
+        toast({ title: 'Webhook reconfigurado', description: 'O Evolution API foi atualizado com a URL correta.' });
+      } else {
+        toast({ title: 'Webhook OK', description: 'A URL do webhook já está configurada corretamente.' });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao verificar webhook', description: error.message, variant: 'destructive' });
+    },
+  });
+
   // Refresh QR
   const refreshQR = useMutation({
     mutationFn: async () => {
@@ -312,6 +333,7 @@ export function useWhatsApp() {
     connect,
     disconnect,
     checkStatus,
+    checkWebhook,
     refreshQR,
     sendMessage,
     startAutomation,

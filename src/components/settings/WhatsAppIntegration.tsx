@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle, AlertTriangle } from "lucide-react";
+import { Check, Link2, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 
@@ -18,6 +18,7 @@ export const WhatsAppIntegration = () => {
     connect,
     disconnect,
     checkStatus,
+    checkWebhook,
     refreshQR,
   } = useWhatsApp();
 
@@ -160,6 +161,20 @@ export const WhatsAppIntegration = () => {
                   <RefreshCw className="mr-2 h-4 w-4" />
                 )}
                 Verificar Status
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => checkWebhook.mutate()}
+                disabled={checkWebhook.isPending}
+                className="w-full sm:w-auto"
+              >
+                {checkWebhook.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Link2 className="mr-2 h-4 w-4" />
+                )}
+                Reconfigurar Webhook
               </Button>
               <Button
                 variant="destructive"
