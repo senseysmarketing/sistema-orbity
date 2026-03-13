@@ -92,7 +92,7 @@ serve(async (req) => {
     // --- SIGNATURE VALIDATION ---
     const isValid = await validateSignature(req, bodyText);
     if (!isValid) {
-      console.error('[whatsapp-webhook] Invalid webhook signature');
+      console.error('[whatsapp-webhook] Invalid webhook signature — check that WEBHOOK_SECRET env var matches Evolution API webhook secret configuration, or remove WEBHOOK_SECRET to disable signature validation');
       return new Response(JSON.stringify({ success: false, error: 'Invalid signature' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -165,14 +165,15 @@ serve(async (req) => {
 
     // Handle messages
     if (event === 'messages.upsert' || event === 'messages.update') {
-      const messageData = data?.message || data;
-      if (!messageData) {
+      if (!data) {
         return new Response(JSON.stringify({ success: true, skipped: 'no message data' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      const key = messageData.key || data.key;
+      // Support both flat format (Evolution v2: data.key + data.message)
+      // and wrapped format (Evolution v1: data.message.key + data.message.message)
+      const key = data?.key || data?.message?.key;
       const messageId = key?.id || crypto.randomUUID();
       const isFromMe = key?.fromMe || false;
       const remoteJid = key?.remoteJid || '';
@@ -186,16 +187,19 @@ serve(async (req) => {
         });
       }
 
-      const content = messageData.message?.conversation ||
-        messageData.message?.extendedTextMessage?.text ||
-        messageData.message?.imageMessage?.caption ||
-        messageData.message?.videoMessage?.caption ||
+      // Extract message content: flat format has data.message = { conversation: ... }
+      // wrapped format has data.message = { key: ..., message: { conversation: ... } }
+      const msgContent = data?.message?.message ? data.message.message : data?.message;
+      const content = msgContent?.conversation ||
+        msgContent?.extendedTextMessage?.text ||
+        msgContent?.imageMessage?.caption ||
+        msgContent?.videoMessage?.caption ||
         '';
 
-      const messageType = messageData.message?.imageMessage ? 'image' :
-        messageData.message?.videoMessage ? 'video' :
-        messageData.message?.audioMessage ? 'audio' :
-        messageData.message?.documentMessage ? 'document' :
+      const messageType = msgContent?.imageMessage ? 'image' :
+        msgContent?.videoMessage ? 'video' :
+        msgContent?.audioMessage ? 'audio' :
+        msgContent?.documentMessage ? 'document' :
         'text';
 
       // Find or create conversation.
