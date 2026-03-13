@@ -208,6 +208,9 @@ export function useWhatsApp() {
     mutationFn: async (params: { lead_id: string; phone_number: string }) => {
       if (!account?.id) throw new Error('WhatsApp not configured');
 
+      // Normalize phone to digits-only so it matches what Evolution API sends in webhooks
+      const normalizedPhone = params.phone_number.replace(/\D/g, '');
+
       // Get first greeting template
       const { data: firstTemplate } = await supabase
         .from('whatsapp_message_templates')
@@ -220,7 +223,7 @@ export function useWhatsApp() {
 
       if (!firstTemplate) throw new Error('Nenhum template de saudação configurado');
 
-      // Create or get conversation
+      // Create or get conversation (search by lead_id first, then by phone)
       let { data: conv } = await supabase
         .from('whatsapp_conversations')
         .select('id')
@@ -229,17 +232,34 @@ export function useWhatsApp() {
         .maybeSingle();
 
       if (!conv) {
-        const { data: newConv, error } = await supabase
+        // Try finding by phone (normalized) in case webhook already created the conversation
+        const { data: convByPhone } = await supabase
           .from('whatsapp_conversations')
-          .insert({
-            account_id: account.id,
-            phone_number: params.phone_number,
-            lead_id: params.lead_id,
-          })
-          .select()
-          .single();
-        if (error) throw error;
-        conv = newConv;
+          .select('id')
+          .eq('account_id', account.id)
+          .eq('phone_number', normalizedPhone)
+          .maybeSingle();
+
+        if (convByPhone) {
+          // Link existing conversation to this lead
+          await supabase
+            .from('whatsapp_conversations')
+            .update({ lead_id: params.lead_id })
+            .eq('id', convByPhone.id);
+          conv = convByPhone;
+        } else {
+          const { data: newConv, error } = await supabase
+            .from('whatsapp_conversations')
+            .insert({
+              account_id: account.id,
+              phone_number: normalizedPhone,
+              lead_id: params.lead_id,
+            })
+            .select()
+            .single();
+          if (error) throw error;
+          conv = newConv;
+        }
       }
 
       // Create automation control
