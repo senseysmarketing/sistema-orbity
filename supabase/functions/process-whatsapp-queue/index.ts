@@ -143,25 +143,60 @@ serve(async (req) => {
           }
         }
 
-        // Check if customer replied
+        // Check if customer replied.
+        // Primary check: the conversation linked to this automation.
+        // Fallback check: any OTHER conversation for this lead that has a reply
+        //   (handles the case where conversations were duplicated due to phone format mismatch).
         const conv = Array.isArray(record.whatsapp_conversations)
           ? record.whatsapp_conversations[0]
           : record.whatsapp_conversations;
 
+        let replyConv: { id: string; last_customer_message_at: string } | null = null;
+
         if (conv?.last_customer_message_at) {
-          const customerReplyTime = new Date(conv.last_customer_message_at).getTime();
-          // Use last_followup_sent_at as reference if available, otherwise use started_at/created_at.
-          // This ensures replies during the greeting phase (before any follow-up is sent) are also detected.
+          replyConv = conv as { id: string; last_customer_message_at: string };
+        } else if (record.lead_id) {
+          // Fallback: check any conversation for this lead with a customer reply.
+          // This catches the case where the webhook created a separate conversation
+          // (due to phone format mismatch) and stored the reply there instead.
+          const { data: altConv } = await supabase
+            .from('whatsapp_conversations')
+            .select('id, last_customer_message_at')
+            .eq('account_id', record.whatsapp_accounts?.id)
+            .eq('lead_id', record.lead_id)
+            .not('last_customer_message_at', 'is', null)
+            .order('last_customer_message_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (altConv?.last_customer_message_at) {
+            replyConv = altConv as { id: string; last_customer_message_at: string };
+          }
+        }
+
+        if (replyConv) {
+          const customerReplyTime = new Date(replyConv.last_customer_message_at).getTime();
+          // Use last_followup_sent_at as reference if available, otherwise use started_at/updated_at.
+          // This ensures replies during the greeting phase (before any follow-up is sent) are detected.
           const referenceTime = record.last_followup_sent_at
             ? new Date(record.last_followup_sent_at).getTime()
-            : new Date(record.started_at || record.created_at).getTime();
+            : new Date(record.started_at || record.updated_at).getTime();
+
           if (customerReplyTime > referenceTime) {
-            await supabase.from('whatsapp_automation_control').update({
-              status: 'responded', conversation_state: 'customer_replied',
-            }).eq('id', record.id);
+            // Also fix conversation_id if it was pointing to the wrong conversation
+            const updates: Record<string, any> = {
+              status: 'responded',
+              conversation_state: 'customer_replied',
+            };
+            if (replyConv.id !== conv?.id) {
+              updates.conversation_id = replyConv.id;
+            }
+
+            await supabase.from('whatsapp_automation_control').update(updates).eq('id', record.id);
 
             await logAutomationEvent(supabase, record.id, record.whatsapp_accounts?.id, 'customer_replied', {
               lead_id: record.lead_id,
+              via_fallback: replyConv.id !== conv?.id,
             });
             continue;
           }

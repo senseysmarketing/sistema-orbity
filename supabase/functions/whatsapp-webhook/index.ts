@@ -200,15 +200,20 @@ serve(async (req) => {
 
       // Find or create conversation.
       // Phone numbers may be stored in different formats ("+5527...", "5527...", "27..."),
-      // so we try all common variants in a single query to avoid duplicate conversations.
+      // so we try all common variants. We fetch ALL matches (not .maybeSingle()) because
+      // duplicate conversations may exist from before this fix was deployed, and we must
+      // prefer the one that is already linked to a lead.
       const variants = phoneVariants(phoneNumber);
 
-      let { data: conversation } = await supabase
+      const { data: matchingConvs } = await supabase
         .from('whatsapp_conversations')
         .select('id, lead_id')
         .eq('account_id', account.id)
-        .in('phone_number', variants)
-        .maybeSingle();
+        .in('phone_number', variants);
+
+      // Prefer the conversation with lead_id set (the canonical one)
+      let conversation: { id: string; lead_id: string | null } | null =
+        matchingConvs?.find(c => c.lead_id) ?? matchingConvs?.[0] ?? null;
 
       if (!conversation) {
         // Try to find the lead using all phone variants
@@ -252,13 +257,12 @@ serve(async (req) => {
 
           if (convError) {
             // Race condition: another request created it, fetch again
-            const { data: existingConv } = await supabase
+            const { data: raceConvs } = await supabase
               .from('whatsapp_conversations')
               .select('id, lead_id')
               .eq('account_id', account.id)
-              .in('phone_number', variants)
-              .maybeSingle();
-            conversation = existingConv;
+              .in('phone_number', variants);
+            conversation = raceConvs?.find(c => c.lead_id) ?? raceConvs?.[0] ?? null;
           } else {
             conversation = newConv;
           }
