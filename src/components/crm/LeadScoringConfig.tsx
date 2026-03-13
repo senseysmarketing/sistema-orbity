@@ -601,26 +601,39 @@ function FormAccordionItem({
         if (error) throw error;
       }
 
-      // Optionally re-qualify existing leads
+      // Optionally re-qualify existing leads from this specific form
       if (updateExisting) {
-        // Get active question keys from this form's rules
+        // Only re-qualify leads that match THIS form's questions.
+        // We paginate to avoid the previous 500-lead hard limit.
         const activeQuestionKeys = new Set(rulesToInsert.map(r => r.question));
-        
-        // Get leads that have custom_fields with matching question keys
-        const { data: allLeads } = await supabase
-          .from("leads")
-          .select("id, custom_fields")
-          .eq("agency_id", agencyId)
-          .eq("source", "facebook_leads")
-          .not("custom_fields", "is", null)
-          .limit(500);
 
-        // Filter to leads whose custom_fields contain at least one active question
-        const candidateLeads = (allLeads || []).filter((lead: any) => {
-          if (!lead.custom_fields || typeof lead.custom_fields !== 'object') return false;
-          const keys = Object.keys(lead.custom_fields);
-          return keys.some(k => activeQuestionKeys.has(k));
-        });
+        const PAGE_SIZE = 200;
+        const candidateLeads: Array<{ id: string }> = [];
+        let page = 0;
+
+        while (true) {
+          const { data: pageLeads } = await supabase
+            .from("leads")
+            .select("id, custom_fields")
+            .eq("agency_id", agencyId)
+            .eq("source", "facebook_leads")
+            .not("custom_fields", "is", null)
+            .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+          if (!pageLeads || pageLeads.length === 0) break;
+
+          // Keep only leads that have at least one question key from this form
+          for (const lead of pageLeads) {
+            if (!lead.custom_fields || typeof lead.custom_fields !== 'object') continue;
+            const keys = Object.keys(lead.custom_fields);
+            if (keys.some(k => activeQuestionKeys.has(k))) {
+              candidateLeads.push({ id: lead.id });
+            }
+          }
+
+          if (pageLeads.length < PAGE_SIZE) break;
+          page++;
+        }
 
         if (candidateLeads.length > 0) {
           const batchSize = 10;
@@ -631,13 +644,13 @@ function FormAccordionItem({
           for (let i = 0; i < candidateLeads.length; i += batchSize) {
             const batch = candidateLeads.slice(i, i + batchSize);
             const results = await Promise.allSettled(
-              batch.map((lead: any) =>
+              batch.map((lead) =>
                 supabase.functions.invoke("process-lead-qualification", {
                   body: { lead_id: lead.id, agency_id: agencyId },
                 })
               )
             );
-            
+
             for (const r of results) {
               processed++;
               if (r.status === 'fulfilled') successes++;

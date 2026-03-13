@@ -115,8 +115,11 @@ serve(async (req) => {
       );
     }
 
-    // Find form_id by inferring from rules: match custom_fields keys against agency rules
-    const formId = await inferFormId(supabase, agency_id, customFields);
+    // Find form_id using a priority chain:
+    // 1. custom_fields.form_id (Meta always includes this in lead data)
+    // 2. facebook_lead_sync_log → lead_data.form_id
+    // 3. Fallback: infer by matching question keys against scoring rules
+    const formId = await resolveFormId(supabase, agency_id, lead_id, customFields);
 
     let rules: any[] = [];
     if (formId) {
@@ -150,10 +153,12 @@ serve(async (req) => {
     for (const [question, answer] of Object.entries(customFields)) {
       const answerStr = String(answer);
       const normalizedAnswer = normalize(answerStr);
+      // Normalize question key too: Meta may send "full_name" while rules store "full name"
+      const normalizedQuestion = normalize(question);
 
-      // Find matching rule with normalized comparison
+      // Find matching rule with fully-normalized comparison on both question and answer
       const matchingRule = rules.find(
-        (r: any) => r.question === question && normalize(r.answer) === normalizedAnswer
+        (r: any) => normalize(r.question) === normalizedQuestion && normalize(r.answer) === normalizedAnswer
       );
 
       if (matchingRule) {
@@ -243,6 +248,53 @@ serve(async (req) => {
     );
   }
 });
+
+// Resolve form_id using a priority chain to find the correct scoring rules form:
+// 1. custom_fields.form_id — Meta always includes the form ID in lead data
+// 2. facebook_lead_sync_log → lead_data.form_id — reliable for both webhook and synced leads
+// 3. Fallback to inferFormId (question overlap matching)
+async function resolveFormId(
+  supabase: any,
+  agencyId: string,
+  leadId: string,
+  customFields: Record<string, any>
+): Promise<string | null> {
+  // Helper: check if a given form_id has scoring rules configured
+  const hasRules = async (formId: string): Promise<boolean> => {
+    const { data } = await supabase
+      .from('lead_scoring_rules')
+      .select('form_id')
+      .eq('agency_id', agencyId)
+      .eq('form_id', formId)
+      .limit(1)
+      .maybeSingle();
+    return !!data;
+  };
+
+  // 1. Direct: form_id stored in custom_fields by Meta
+  const directId = customFields.form_id ? String(customFields.form_id) : null;
+  if (directId && await hasRules(directId)) {
+    console.log(`[QUALIFICATION] Resolved form_id from custom_fields: ${directId}`);
+    return directId;
+  }
+
+  // 2. Via facebook_lead_sync_log: the lead_data payload from Meta contains form_id
+  const { data: syncLog } = await supabase
+    .from('facebook_lead_sync_log')
+    .select('lead_data')
+    .eq('lead_id', leadId)
+    .limit(1)
+    .maybeSingle();
+
+  const syncFormId = syncLog?.lead_data?.form_id ? String(syncLog.lead_data.form_id) : null;
+  if (syncFormId && syncFormId !== directId && await hasRules(syncFormId)) {
+    console.log(`[QUALIFICATION] Resolved form_id from sync_log: ${syncFormId}`);
+    return syncFormId;
+  }
+
+  // 3. Fallback: infer by question overlap (original algorithm)
+  return await inferFormId(supabase, agencyId, customFields);
+}
 
 // Infer form_id by matching custom_fields keys against lead_scoring_rules questions
 async function inferFormId(supabase: any, agencyId: string, customFields: Record<string, any>): Promise<string | null> {

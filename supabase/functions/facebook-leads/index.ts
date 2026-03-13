@@ -483,6 +483,21 @@ async function syncLeads(supabase: any, userId: string, params: any) {
         lead_data: fbLead
       });
 
+    // Trigger lead qualification scoring (same as webhook path)
+    try {
+      const qualUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-lead-qualification`;
+      await fetch(qualUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({ lead_id: newLead.id, agency_id: integration.agency_id }),
+      });
+    } catch (qualError) {
+      console.error('[QUALIFICATION] Sync qualification error for lead', newLead.id, qualError);
+    }
+
     syncedCount++;
   }
 
