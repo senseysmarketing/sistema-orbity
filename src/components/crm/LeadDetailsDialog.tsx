@@ -322,14 +322,16 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
             </CardContent>
           </Card>
 
-          {/* Meta Ads Form Questions */}
-          {isMetaAdsLead && formQuestions.length > 0 && (
+          {/* Form Responses - shown for ANY lead with custom field questions */}
+          {formQuestions.length > 0 && (
             <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 font-medium">
                   <ClipboardList className="h-4 w-4 text-blue-600" />
                   Respostas do Formulário
-                  <Badge variant="secondary" className="ml-auto text-xs">Meta Ads</Badge>
+                  <Badge variant="secondary" className={`ml-auto text-xs ${sourceBadge.className}`}>
+                    {sourceBadge.label}
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -343,8 +345,8 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
             </Card>
           )}
 
-          {/* Meta Ads Source Info (when no form questions) */}
-          {isMetaAdsLead && formQuestions.length === 0 && (
+          {/* Meta Ads Source Info (when no form questions but is Meta lead) */}
+          {lead.source === 'facebook_leads' && formQuestions.length === 0 && (
             <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 font-medium">

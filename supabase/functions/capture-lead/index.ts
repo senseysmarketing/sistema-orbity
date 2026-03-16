@@ -236,6 +236,7 @@ Deno.serve(async (req) => {
       source: leadData.source || defaultSource,
       custom_fields: {
         ...customFields,
+        form_id: 'webhook_default',
         webhook_source: true,
         received_at: new Date().toISOString(),
       },

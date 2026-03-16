@@ -283,7 +283,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   };
 
   // Ref para debounce de visibilidade
-  const visibilityDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const visibilityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check if user has been away for too long when page becomes visible
   // Using refs and debounce to avoid re-renders on every visibility change
