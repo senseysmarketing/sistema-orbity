@@ -1,5 +1,17 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
+// Normalize a Brazilian phone number to digits-only with country code 55.
+// Handles inputs like "16994213312" (no CC), "+55 16 99421-3312" (formatted),
+// "011987654321" (old local format with leading 0).
+function normalizeBrazilPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  // Remove leading 0 (old local dialing format like "011...")
+  const clean = digits.startsWith('0') ? digits.slice(1) : digits;
+  // If ≤11 digits, country code is missing — prepend Brazil's code
+  if (clean.length <= 11) return '55' + clean;
+  return clean;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -196,7 +208,8 @@ Deno.serve(async (req) => {
             if (!isNaN(num)) value = num;
             break;
           case 'phone':
-            if (typeof value === 'string') value = value.replace(/[^\d+\-\s()]/g, '');
+            // Normalize to digits-only with Brazil country code (55)
+            if (typeof value === 'string') value = normalizeBrazilPhone(value);
             break;
         }
         leadData[key] = value;
