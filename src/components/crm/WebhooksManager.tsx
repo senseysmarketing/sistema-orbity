@@ -400,29 +400,70 @@ Gerado em ${new Date().toLocaleString('pt-BR')}
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    name: 'João Silva',
+    // ── Campos padrão (mapeados automaticamente) ──
+    name: 'João Silva',           // obrigatório
     email: 'joao@email.com',
     phone: '11999999999',
-    company: 'Empresa ABC'
+    company: 'Empresa ABC',
+    position: 'Diretor',
+    value: 5000,                  // valor estimado do lead
+    notes: 'Interessado no plano Pro',
+
+    // ── Campos customizados (usados na qualificação) ──
+    // Qualquer campo extra vira pergunta de qualificação
+    qual_seu_faturamento: 'Acima de R$50.000',
+    quantos_funcionarios: '11 a 50',
+    segmento: 'Tecnologia',
+    como_conheceu: 'Google',
+    tem_site: 'Sim'
   })
 });`}</code>
                   </pre>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    💡 Campos extras além de name/email/phone/company/position/value/notes são salvos como <strong>campos customizados</strong> e aparecem na aba de Qualificação.
+                  </p>
                 </TabsContent>
 
                 <TabsContent value="curl">
                   <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto">
                     <code>{`curl -X POST '${webhookUrl}' \\
   -H 'Content-Type: application/json' \\
-  -d '{"name":"João Silva","email":"joao@email.com","phone":"11999999999"}'`}</code>
+  -d '{
+    "name": "João Silva",
+    "email": "joao@email.com",
+    "phone": "11999999999",
+    "company": "Empresa ABC",
+    "qual_seu_faturamento": "Acima de R$50.000",
+    "quantos_funcionarios": "11 a 50",
+    "segmento": "Tecnologia"
+  }'`}</code>
                   </pre>
                 </TabsContent>
 
                 <TabsContent value="html">
                   <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto">
                     <code>{`<form action="${webhookUrl}" method="GET">
+  <!-- Campos padrão -->
   <input type="text" name="name" placeholder="Nome" required>
   <input type="email" name="email" placeholder="Email">
   <input type="tel" name="phone" placeholder="Telefone">
+  <input type="text" name="company" placeholder="Empresa">
+
+  <!-- Campos de qualificação (customize!) -->
+  <select name="qual_seu_faturamento">
+    <option value="">Qual seu faturamento?</option>
+    <option value="Até R$10.000">Até R$10.000</option>
+    <option value="R$10.000 a R$50.000">R$10.000 a R$50.000</option>
+    <option value="Acima de R$50.000">Acima de R$50.000</option>
+  </select>
+
+  <select name="segmento">
+    <option value="">Segmento</option>
+    <option value="Tecnologia">Tecnologia</option>
+    <option value="Saúde">Saúde</option>
+    <option value="Educação">Educação</option>
+  </select>
+
   <button type="submit">Enviar</button>
 </form>`}</code>
                   </pre>

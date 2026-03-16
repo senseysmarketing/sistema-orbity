@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Loader2, Target, Flame, Thermometer, Snowflake, Save, Info,
-  RefreshCw, Facebook, CheckCircle2, Clock, Trash2, Settings2
+  RefreshCw, Facebook, CheckCircle2, Clock, Trash2, Settings2, Globe
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
@@ -37,6 +37,7 @@ interface Integration {
   form_questions: DetectedQuestion[] | null;
   _parentId?: string;
   _isVirtual?: boolean;
+  _isWebhook?: boolean;
 }
 
 interface ScoringRule {
@@ -432,31 +433,44 @@ function FormAccordionItem({
       .eq("agency_id", agencyId)
       .eq("form_id", targetFormId);
 
-    // Get lead_ids from sync_log filtered by form
-    const { data: syncData } = await supabase
-      .from("facebook_lead_sync_log")
-      .select("lead_id, lead_data")
-      .eq("integration_id", parentId)
-      .limit(500);
-
-    // Filter by real form_id if this is a virtual entry from "all"
-    const leadIds = (syncData || [])
-      .filter((row: any) => {
-        if (!integration._isVirtual) return true;
-        return String(row.lead_data?.form_id) === targetFormId;
-      })
-      .map((row: any) => row.lead_id)
-      .filter(Boolean);
-
-    // Fetch leads by IDs to get custom_fields
     let leadsData: any[] = [];
-    if (leadIds.length > 0) {
+
+    if (integration._isWebhook) {
+      // For webhook forms, scan leads directly
       const { data } = await supabase
         .from("leads")
         .select("custom_fields")
-        .in("id", leadIds.slice(0, 100))
-        .not("custom_fields", "is", null);
+        .eq("agency_id", agencyId)
+        .or("source.eq.webhook,custom_fields->>webhook_source.eq.true")
+        .not("custom_fields", "is", null)
+        .limit(200);
       leadsData = data || [];
+    } else {
+      // Get lead_ids from sync_log filtered by form
+      const { data: syncData } = await supabase
+        .from("facebook_lead_sync_log")
+        .select("lead_id, lead_data")
+        .eq("integration_id", parentId)
+        .limit(500);
+
+      // Filter by real form_id if this is a virtual entry from "all"
+      const leadIds = (syncData || [])
+        .filter((row: any) => {
+          if (!integration._isVirtual) return true;
+          return String(row.lead_data?.form_id) === targetFormId;
+        })
+        .map((row: any) => row.lead_id)
+        .filter(Boolean);
+
+      // Fetch leads by IDs to get custom_fields
+      if (leadIds.length > 0) {
+        const { data } = await supabase
+          .from("leads")
+          .select("custom_fields")
+          .in("id", leadIds.slice(0, 100))
+          .not("custom_fields", "is", null);
+        leadsData = data || [];
+      }
     }
 
     const rules: ScoringRule[] = (rulesRes.data || []).map((r: any) => ({
@@ -492,8 +506,8 @@ function FormAccordionItem({
       }
     });
 
-    // If no cached questions, fetch from Meta API and persist
-    if (!usedCache) {
+    // If no cached questions and not a webhook, fetch from Meta API and persist
+    if (!usedCache && !integration._isWebhook) {
       try {
         const { data: metaData, error: metaError } = await supabase.functions.invoke("facebook-leads", {
           body: {
@@ -611,14 +625,21 @@ function FormAccordionItem({
         const candidateLeads: Array<{ id: string }> = [];
         let page = 0;
 
+        // Determine source filter based on integration type
+        const sourceFilter = integration._isWebhook
+          ? "source.eq.webhook,custom_fields->>webhook_source.eq.true"
+          : "source.eq.facebook_leads";
+
         while (true) {
-          const { data: pageLeads } = await supabase
+          let query = supabase
             .from("leads")
             .select("id, custom_fields")
             .eq("agency_id", agencyId)
-            .eq("source", "facebook_leads")
+            .or(sourceFilter)
             .not("custom_fields", "is", null)
             .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+          const { data: pageLeads } = await query;
 
           if (!pageLeads || pageLeads.length === 0) break;
 
@@ -676,8 +697,8 @@ function FormAccordionItem({
 
   const deleteIntegration = async () => {
     await supabase.from("lead_scoring_rules").delete().eq("form_id", integration.form_id).eq("agency_id", agencyId);
-    if (integration._isVirtual) {
-      // Virtual entry: only delete rules, not the parent integration
+    if (integration._isVirtual || integration._isWebhook) {
+      // Virtual/webhook entry: only delete rules, not the parent integration
       toast({ title: "Regras do formulário removidas" });
       onDeleted();
       return;
@@ -717,10 +738,14 @@ function FormAccordionItem({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium text-sm truncate">
-                [{integration.page_name}] {integration.form_name}
+                {integration._isWebhook ? integration.form_name : `[${integration.page_name}] ${integration.form_name}`}
               </span>
               <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                <Facebook className="h-3 w-3 mr-0.5" /> Meta
+                {integration._isWebhook ? (
+                  <><Globe className="h-3 w-3 mr-0.5" /> Webhook</>
+                ) : (
+                  <><Facebook className="h-3 w-3 mr-0.5" /> Meta</>
+                )}
               </Badge>
               {isConfigured ? (
                 <Badge variant="outline" className="text-green-600 border-green-200 text-[10px] px-1.5 py-0">
@@ -896,6 +921,46 @@ export function LeadScoringConfig() {
         // If no leads yet, skip — don't show "all" in qualification
       } else {
         expanded.push(int);
+      }
+    }
+
+    // ── Detect Webhook leads and create virtual "Webhook" form entry ──
+    const { data: webhookLeads } = await supabase
+      .from("leads")
+      .select("custom_fields")
+      .eq("agency_id", currentAgency.id)
+      .or("source.eq.webhook,custom_fields->>webhook_source.eq.true")
+      .not("custom_fields", "is", null)
+      .limit(100);
+
+    if (webhookLeads && webhookLeads.length > 0) {
+      // Aggregate questions/answers from webhook leads
+      const questionsMap: Record<string, Set<string>> = {};
+      for (const lead of webhookLeads) {
+        if (lead.custom_fields && typeof lead.custom_fields === 'object') {
+          for (const [key, value] of Object.entries(lead.custom_fields as Record<string, any>)) {
+            if (TECHNICAL_FIELDS.has(key)) continue;
+            if (!questionsMap[key]) questionsMap[key] = new Set();
+            if (value && typeof value === 'string') questionsMap[key].add(value);
+          }
+        }
+      }
+
+      const detectedQuestions = Object.entries(questionsMap)
+        .map(([question, answersSet]) => ({ question, answers: Array.from(answersSet).slice(0, 20) }))
+        .filter((q) => q.answers.length > 0);
+
+      if (detectedQuestions.length > 0) {
+        expanded.push({
+          id: 'webhook_default',
+          page_id: 'webhook',
+          page_name: 'Webhook',
+          form_name: 'Formulário Webhook',
+          form_id: 'webhook_default',
+          pixel_id: null,
+          form_questions: detectedQuestions,
+          _isWebhook: true,
+        });
       }
     }
 

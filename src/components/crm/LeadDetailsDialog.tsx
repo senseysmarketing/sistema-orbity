@@ -54,8 +54,13 @@ interface LeadDetailsDialogProps {
   onEdit: (lead: Lead) => void;
 }
 
-// Campos padrão do Facebook que não são perguntas do formulário
-const STANDARD_FIELDS = ['full_name', 'email', 'phone_number', 'company_name', 'form_name', 'page_name', 'ad_id', 'adset_id', 'campaign_id', 'form_id', 'page_id', 'platform', 'leadgen_id'];
+// Campos internos/técnicos que não são perguntas do formulário
+const STANDARD_FIELDS = [
+  'full_name', 'email', 'phone_number', 'company_name', 'form_name', 'page_name',
+  'ad_id', 'adset_id', 'campaign_id', 'form_id', 'page_id', 'platform', 'leadgen_id',
+  // Webhook internal fields
+  'webhook_source', 'received_at',
+];
 
 // Formatar pergunta: "qual_o_seu_vgv_mensal?" → "Qual o seu VGV mensal?"
 const formatQuestion = (key: string) => {
@@ -185,9 +190,16 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
     return temp ? `${temp.emoji} ${temp.label}` : temperature;
   };
 
-  const isMetaAdsLead = lead.source === 'facebook_leads';
   const formQuestions = getFormQuestions(lead.custom_fields);
   const daysInFunnel = Math.floor((new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24));
+
+  // Dynamic source badge
+  const getSourceBadge = () => {
+    if (lead.source === 'facebook_leads') return { label: 'Meta Ads', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' };
+    if (lead.source === 'webhook' || lead.custom_fields?.webhook_source) return { label: 'Webhook', className: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' };
+    return { label: 'Formulário', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' };
+  };
+  const sourceBadge = getSourceBadge();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -310,14 +322,16 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
             </CardContent>
           </Card>
 
-          {/* Meta Ads Form Questions */}
-          {isMetaAdsLead && formQuestions.length > 0 && (
+          {/* Form Responses - shown for ANY lead with custom field questions */}
+          {formQuestions.length > 0 && (
             <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 font-medium">
                   <ClipboardList className="h-4 w-4 text-blue-600" />
                   Respostas do Formulário
-                  <Badge variant="secondary" className="ml-auto text-xs">Meta Ads</Badge>
+                  <Badge variant="secondary" className={`ml-auto text-xs ${sourceBadge.className}`}>
+                    {sourceBadge.label}
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -331,8 +345,8 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
             </Card>
           )}
 
-          {/* Meta Ads Source Info (when no form questions) */}
-          {isMetaAdsLead && formQuestions.length === 0 && (
+          {/* Meta Ads Source Info (when no form questions but is Meta lead) */}
+          {lead.source === 'facebook_leads' && formQuestions.length === 0 && (
             <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2 font-medium">

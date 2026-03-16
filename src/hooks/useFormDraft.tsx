@@ -14,7 +14,7 @@ export function useFormDraft<T>(
   debounceMs: number = 500
 ): [T, (value: T | ((prev: T) => T)) => void, () => void, boolean] {
   const storageKey = `draft_${key}`;
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
 
   // Carregar valor inicial do localStorage ou usar initialValue

@@ -42,7 +42,7 @@ export const MeetingNotesTab = ({ meeting, onTabChange }: MeetingNotesTabProps) 
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch agency members for responsible assignment
   const { data: agencyMembers = [] } = useQuery({
