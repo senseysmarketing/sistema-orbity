@@ -255,13 +255,14 @@ serve(async (req) => {
         matchingConvs?.find(c => c.lead_id) ?? matchingConvs?.[0] ?? null;
 
       if (!conversation) {
-        // Try to find the lead using all phone variants
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('id')
-          .eq('agency_id', account.agency_id)
-          .in('phone', variants)
-          .maybeSingle();
+        // Try to find the lead by normalizing stored phone to digits-only.
+        // leads.phone may be formatted ("+55 19 98930-3111") so exact-match
+        // variants fail; the RPC uses regexp_replace on the DB side.
+        const { data: leadRows } = await supabase.rpc('find_lead_by_normalized_phone', {
+          p_agency_id: account.agency_id,
+          p_phone_digits: phoneNumber,
+        });
+        const lead = leadRows?.[0] || null;
 
         // If we found the lead, check if there's already a conversation linked to it
         // (e.g. created by startAutomation with a different phone format)
@@ -308,12 +309,11 @@ serve(async (req) => {
         }
       } else if (!conversation.lead_id) {
         // Conversation exists but has no lead_id — try to link it now
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('id')
-          .eq('agency_id', account.agency_id)
-          .in('phone', variants)
-          .maybeSingle();
+        const { data: leadRows2 } = await supabase.rpc('find_lead_by_normalized_phone', {
+          p_agency_id: account.agency_id,
+          p_phone_digits: phoneNumber,
+        });
+        const lead = leadRows2?.[0] || null;
 
         if (lead?.id) {
           await supabase
