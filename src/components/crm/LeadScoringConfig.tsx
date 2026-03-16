@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Loader2, Target, Flame, Thermometer, Snowflake, Save, Info,
-  RefreshCw, Facebook, CheckCircle2, Clock, Trash2, Settings2
+  RefreshCw, Facebook, CheckCircle2, Clock, Trash2, Settings2, Globe
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
