@@ -924,6 +924,46 @@ export function LeadScoringConfig() {
       }
     }
 
+    // ── Detect Webhook leads and create virtual "Webhook" form entry ──
+    const { data: webhookLeads } = await supabase
+      .from("leads")
+      .select("custom_fields")
+      .eq("agency_id", currentAgency.id)
+      .or("source.eq.webhook,custom_fields->>webhook_source.eq.true")
+      .not("custom_fields", "is", null)
+      .limit(100);
+
+    if (webhookLeads && webhookLeads.length > 0) {
+      // Aggregate questions/answers from webhook leads
+      const questionsMap: Record<string, Set<string>> = {};
+      for (const lead of webhookLeads) {
+        if (lead.custom_fields && typeof lead.custom_fields === 'object') {
+          for (const [key, value] of Object.entries(lead.custom_fields as Record<string, any>)) {
+            if (TECHNICAL_FIELDS.has(key)) continue;
+            if (!questionsMap[key]) questionsMap[key] = new Set();
+            if (value && typeof value === 'string') questionsMap[key].add(value);
+          }
+        }
+      }
+
+      const detectedQuestions = Object.entries(questionsMap)
+        .map(([question, answersSet]) => ({ question, answers: Array.from(answersSet).slice(0, 20) }))
+        .filter((q) => q.answers.length > 0);
+
+      if (detectedQuestions.length > 0) {
+        expanded.push({
+          id: 'webhook_default',
+          page_id: 'webhook',
+          page_name: 'Webhook',
+          form_name: 'Formulário Webhook',
+          form_id: 'webhook_default',
+          pixel_id: null,
+          form_questions: detectedQuestions,
+          _isWebhook: true,
+        });
+      }
+    }
+
     setIntegrations(expanded);
     setLoading(false);
   }, [currentAgency?.id]);
