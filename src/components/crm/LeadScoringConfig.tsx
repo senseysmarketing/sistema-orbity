@@ -738,10 +738,14 @@ function FormAccordionItem({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium text-sm truncate">
-                [{integration.page_name}] {integration.form_name}
+                {integration._isWebhook ? integration.form_name : `[${integration.page_name}] ${integration.form_name}`}
               </span>
               <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                <Facebook className="h-3 w-3 mr-0.5" /> Meta
+                {integration._isWebhook ? (
+                  <><Globe className="h-3 w-3 mr-0.5" /> Webhook</>
+                ) : (
+                  <><Facebook className="h-3 w-3 mr-0.5" /> Meta</>
+                )}
               </Badge>
               {isConfigured ? (
                 <Badge variant="outline" className="text-green-600 border-green-200 text-[10px] px-1.5 py-0">
