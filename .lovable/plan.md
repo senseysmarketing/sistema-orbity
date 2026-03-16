@@ -1,83 +1,45 @@
 
 
-# Check-up Completo: Sistema WhatsApp Automation
+# Webhook Form Responses: Display + Qualification + Examples
 
-## Status Geral: ✅ Saudável
+## Current State
 
-Todos os componentes estão corretamente implementados e interligados. O log `"Message processed"` confirma que o webhook está funcionando com a instância `orbity_7bef1258`.
+1. **LeadDetailsDialog**: Only shows "Respostas do Formulário" when `lead.source === 'facebook_leads'` (line 188). Webhook leads (`source: 'webhook'`) are completely ignored — their custom_fields are never displayed.
 
----
+2. **LeadScoringConfig**: Only loads forms from `facebook_lead_integrations` table. There's no concept of "webhook forms" — so even though `capture-lead` now saves flat custom_fields and triggers qualification, there are no scoring rules to match against (the `resolveFormId` function won't find anything for webhook leads).
 
-## 1. Fluxo de Saudação (Greeting) ✅
+3. **Code Examples**: The current examples only show basic fields (name, email, phone). They don't demonstrate sending custom/form fields that would be used for qualification.
 
-**Como funciona:**
-- Lead é capturado via `capture-lead` ou `facebook-leads`
-- Auto-enrollment verifica: conta WhatsApp conectada + template `greeting` step 1 ativo
-- Cria registro em `whatsapp_automation_control` com `current_phase: 'greeting'`, `current_step_position: 1`
-- `next_execution_at` = agora + `delay_minutes` do template
-- O cron (`process-whatsapp-queue`, a cada minuto) busca registros com `status: 'active'` e `next_execution_at <= now()`
+## Plan
 
-**Sequência de etapas:**
-1. Envia greeting step 1 → busca template greeting step 2
-2. Se existe step 2 → agenda `next_execution_at` = agora + delay do step 2
-3. Quando não há mais steps de greeting → transiciona para `phase: 'followup'`, `step_position: 1`
+### 1. Update LeadDetailsDialog to show webhook form responses
+- Remove the `isMetaAdsLead` gate — show form responses for ANY lead that has custom_fields with qualifying questions
+- Change badge dynamically: "Meta Ads" for facebook_leads source, "Webhook" for webhook source, "Formulário" for others
+- Filter out internal fields (`webhook_source`, `received_at`, `form_id`, etc.) same way we filter Meta technical fields
 
-## 2. Fluxo de Follow-up ✅
+### 2. Add Webhook Form support to LeadScoringConfig
+- After loading Meta integrations, also scan `leads` table for distinct webhook custom_field keys (leads where `source = 'webhook'` or `custom_fields->>'webhook_source' = 'true'`)
+- Create a virtual "Webhook" integration entry with a synthetic form_id (e.g., `webhook_default`) that aggregates detected questions and answers from webhook leads
+- This allows users to configure scoring rules for webhook questions the same way they do for Meta forms
+- The `resolveFormId` fallback (step 3 — `inferFormId`) already matches by question overlap, so webhook leads will automatically find their rules
 
-- Após última etapa de greeting, busca template `followup` step 1
-- Se existe → `newPhase = 'followup'`, `newStep = 1`, agenda delay
-- Cada step de followup segue a mesma lógica sequencial
-- Quando não há mais steps → `conversation_state: 'closed_no_reply'`, `status: 'finished'`
+### 3. Update capture-lead to set a form_id for webhook leads
+- Add `form_id: 'webhook_default'` (or a configurable value from the webhook config) to `custom_fields` so the qualification engine can directly resolve it
 
-**Delays:** Cada step usa o `delay_minutes` do **próximo** template (não do atual), calculado a partir do momento do envio. Correto.
+### 4. Improve code examples in WebhooksManager
+- Show a complete example with custom fields (form questions) alongside standard fields
+- Add comments explaining which fields are standard vs custom (used for qualification)
+- Include a realistic example with form-style questions like the user's screenshot
 
-## 3. Detecção de Resposta do Cliente ✅ (Dupla proteção)
+### 5. Fix NodeJS namespace build errors
+- Add `/// <reference types="node" />` or replace `NodeJS.Timeout` with `ReturnType<typeof setTimeout>` in the 3 affected files
 
-**Proteção 1 - Webhook (tempo real):**
-- `whatsapp-webhook` recebe mensagem com `is_from_me: false`
-- Atualiza `last_customer_message_at` na conversa
-- Busca automações ativas (`status IN ('active', 'processing')`) para aquela conversa
-- Muda status para `'responded'`, state para `'customer_replied'`
-- Registra log `'customer_replied_webhook'`
-
-**Proteção 2 - Queue processor (redundância):**
-- Antes de enviar, `process-whatsapp-queue` compara `last_customer_message_at > last_followup_sent_at`
-- Se cliente respondeu após último follow-up → marca como `'responded'`
-
-## 4. Mecanismos de Segurança ✅
-
-| Mecanismo | Valor | Status |
-|---|---|---|
-| Anti-loop (MIN_INTERVAL) | 120s entre envios | ✅ |
-| Rate limit | 1s entre envios na fila | ✅ |
-| Max retries | 3 tentativas | ✅ |
-| Backoff exponencial | 30s, 2min, 5min | ✅ |
-| Optimistic lock | `status: 'processing'` durante envio | ✅ |
-| Janela de horário (São Paulo) | Reagenda se fora do horário | ✅ |
-| Filtro por fonte | `allowed_sources` check | ✅ |
-| State machine | Trigger `validate_automation_status_transition` | ✅ |
-| Idempotência mensagens | `upsert` com `(account_id, message_id)` | ✅ |
-
-## 5. Envio (`whatsapp-send`) ✅
-
-- Usa secrets centralizados como fallback (`EVOLUTION_API_URL` / `EVOLUTION_API_KEY`)
-- Endpoint: `POST /message/sendText/{instance_name}`
-- Salva mensagem no DB antes do webhook retornar (idempotência)
-- Atualiza `last_message_at` e `last_message_is_from_me` na conversa
-
-## 6. Variáveis Dinâmicas nos Templates ✅
-
-Suporte a: `{{nome}}`, `{{email}}`, `{{telefone}}`, `{{empresa}}`, `{{formulario:campo}}`
-Lookup normalizado com case-insensitive e underscore matching.
-
-## Conclusão
-
-O sistema está completo e funcional. Nenhuma correção necessária. O fluxo end-to-end é:
-
-```text
-Lead capturado → Auto-enroll → Greeting Step 1 (após delay) → ... → Greeting Step N
-  → Follow-up Step 1 (após delay) → ... → Follow-up Step N → Finalizado
-
-  ↕ A QUALQUER MOMENTO: cliente responde → webhook cancela automação
-```
+### Files Modified
+- `src/components/crm/LeadDetailsDialog.tsx` — Show form responses for all sources
+- `src/components/crm/LeadScoringConfig.tsx` — Add webhook form detection
+- `src/components/crm/WebhooksManager.tsx` — Complete code examples with custom fields
+- `supabase/functions/capture-lead/index.ts` — Add `form_id` to custom_fields
+- `src/components/agenda/MeetingNotesTab.tsx` — Fix NodeJS type
+- `src/hooks/useFormDraft.tsx` — Fix NodeJS type
+- `src/hooks/useSubscription.tsx` — Fix NodeJS type
 
