@@ -625,14 +625,21 @@ function FormAccordionItem({
         const candidateLeads: Array<{ id: string }> = [];
         let page = 0;
 
+        // Determine source filter based on integration type
+        const sourceFilter = integration._isWebhook
+          ? "source.eq.webhook,custom_fields->>webhook_source.eq.true"
+          : "source.eq.facebook_leads";
+
         while (true) {
-          const { data: pageLeads } = await supabase
+          let query = supabase
             .from("leads")
             .select("id, custom_fields")
             .eq("agency_id", agencyId)
-            .eq("source", "facebook_leads")
+            .or(sourceFilter)
             .not("custom_fields", "is", null)
             .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+          const { data: pageLeads } = await query;
 
           if (!pageLeads || pageLeads.length === 0) break;
 
