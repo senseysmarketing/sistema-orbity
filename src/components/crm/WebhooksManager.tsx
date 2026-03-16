@@ -3,16 +3,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Copy, ExternalLink, Settings, CheckCircle2, AlertCircle, BarChart3, Download } from "lucide-react";
+import { Copy, ExternalLink, CheckCircle2, AlertCircle, Download, ChevronDown, Code2, TestTube } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LEAD_TEMPERATURES } from "@/lib/leadTemperature";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useLeadStatuses } from "@/hooks/useLeadStatuses";
+import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 
 interface WebhookConfig {
   id: string;
@@ -26,23 +27,25 @@ interface WebhookConfig {
   last_triggered: string | null;
 }
 
+// Map display names to db status slugs
+const STATUS_SLUG_MAP: Record<string, string> = {
+  'Leads': 'leads',
+  'Em contato': 'em_contato',
+  'Qualificados': 'qualified',
+  'Agendamentos': 'scheduled',
+  'Reuniões': 'meeting',
+  'Propostas': 'proposal',
+  'Vendas': 'won',
+};
+
 export function WebhooksManager() {
   const { currentAgency } = useAgency();
+  const { statuses: pipelineStatuses } = useLeadStatuses();
   const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
   const [loading, setLoading] = useState(true);
-  const [fieldMapping, setFieldMapping] = useState({
-    name: 'name',
-    email: 'email',
-    phone: 'phone',
-    company: 'company',
-    position: 'position',
-    source: 'source',
-    notes: 'notes',
-    value: 'value'
-  });
+  const [examplesOpen, setExamplesOpen] = useState(false);
   const [defaultValues, setDefaultValues] = useState({
     status: 'leads',
-    temperature: 'cold',
     source: 'webhook'
   });
 
@@ -65,29 +68,14 @@ export function WebhooksManager() {
       if (error) throw error;
       setWebhooks(data || []);
 
-      // Load configuration for lead capture webhook
       const leadWebhook = data?.find(w => w.events.includes('lead_capture'));
       if (leadWebhook?.headers) {
         const config = leadWebhook.headers as any;
-        if (config.field_mapping) {
-          setFieldMapping(prev => ({ ...prev, ...config.field_mapping }));
-        }
         if (config.default_values) {
-          const loadedDefaults = { ...config.default_values };
-          // Garantir que temperature existe (converter de priority legado se necessário)
-          if (!loadedDefaults.temperature && loadedDefaults.priority) {
-            loadedDefaults.temperature = loadedDefaults.priority;
-          }
-          // Garantir valor válido para temperature
-          const validTemps = ['cold', 'warm', 'hot'];
-          if (!validTemps.includes(loadedDefaults.temperature)) {
-            loadedDefaults.temperature = 'cold';
-          }
-          setDefaultValues(prev => ({ 
-            ...prev, 
-            status: loadedDefaults.status || 'leads',
-            temperature: loadedDefaults.temperature || 'cold',
-            source: loadedDefaults.source || 'webhook'
+          setDefaultValues(prev => ({
+            ...prev,
+            status: config.default_values.status || 'leads',
+            source: config.default_values.source || 'webhook'
           }));
         }
       }
@@ -101,32 +89,22 @@ export function WebhooksManager() {
 
   const saveConfiguration = async () => {
     try {
-      // Salvar temperature como temperature (a edge function vai converter para priority)
       const config = {
-        field_mapping: fieldMapping,
         default_values: {
           status: defaultValues.status,
-          temperature: defaultValues.temperature,
           source: defaultValues.source
         }
       };
 
-      // Check if lead capture webhook exists
       let leadWebhook = webhooks.find(w => w.events.includes('lead_capture'));
 
       if (leadWebhook) {
-        // Update existing webhook
         const { error } = await supabase
           .from('agency_webhooks')
-          .update({
-            headers: config,
-            is_active: true
-          })
+          .update({ headers: config, is_active: true })
           .eq('id', leadWebhook.id);
-
         if (error) throw error;
       } else {
-        // Create new webhook for lead capture
         const { error } = await supabase
           .from('agency_webhooks')
           .insert({
@@ -138,7 +116,6 @@ export function WebhooksManager() {
             is_active: true,
             created_by: currentAgency?.id
           });
-
         if (error) throw error;
       }
 
@@ -152,7 +129,7 @@ export function WebhooksManager() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success('URL copiada para área de transferência');
+    toast.success('Copiado!');
   };
 
   const toggleWebhook = async (webhookId: string, isActive: boolean) => {
@@ -161,9 +138,7 @@ export function WebhooksManager() {
         .from('agency_webhooks')
         .update({ is_active: !isActive })
         .eq('id', webhookId);
-
       if (error) throw error;
-      
       toast.success(isActive ? 'Webhook desativado' : 'Webhook ativado');
       fetchWebhooks();
     } catch (error) {
@@ -173,32 +148,22 @@ export function WebhooksManager() {
   };
 
   const testWebhook = async () => {
-    if (!currentAgency?.id) {
-      toast.error('Agência não encontrada');
-      return;
-    }
-
+    if (!currentAgency?.id) return;
     try {
-      // Dados de teste simples
-      const testData = {
-        name: 'João Silva - Teste Webhook',
-        email: 'joao.teste@email.com',
-        phone: '(11) 99999-9999',
-        company: 'Empresa Teste Ltda',
-        position: 'Diretor',
-        notes: 'Lead de teste criado via botão de teste do CRM',
-        value: '1500',
-        source: 'teste_webhook'
-      };
-
       toast.info('Enviando lead de teste...');
-
       const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(testData)
+        body: JSON.stringify({
+          name: 'João Silva - Teste Webhook',
+          email: 'joao.teste@email.com',
+          phone: '(11) 99999-9999',
+          company: 'Empresa Teste Ltda',
+          notes: 'Lead de teste criado via botão de teste do CRM',
+          value: '1500',
+          source: 'teste_webhook'
+        })
       });
-
       if (response.ok) {
         const result = await response.json();
         toast.success(`✅ Lead de teste criado! ID: ${result.lead_id}`);
@@ -208,7 +173,6 @@ export function WebhooksManager() {
         toast.error(`❌ Erro: ${error.error || error.details || 'Falha ao criar lead'}`);
       }
     } catch (error: any) {
-      console.error('Erro no teste:', error);
       toast.error(`❌ Erro de conexão: ${error.message}`);
     }
   };
@@ -220,86 +184,53 @@ export function WebhooksManager() {
 ${webhookUrl}
 
 ## Métodos Suportados
-- **POST**: Enviar dados via JSON no body da requisição
-- **GET**: Enviar dados via query parameters na URL
+- **POST**: JSON no body da requisição
+- **GET**: Query parameters na URL
 
-## Campos Suportados
-${Object.entries(fieldMapping).map(([field, mapping]) => `- **${field}**: ${mapping}`).join('\n')}
+## Campos Aceitos
+- **name** (obrigatório): Nome do lead
+- **email**: Email
+- **phone**: Telefone
+- **company**: Empresa
+- **position**: Cargo
+- **source**: Origem
+- **notes**: Observações
+- **value**: Valor estimado
 
-## Exemplos de Integração
+> Campos adicionais serão salvos automaticamente como campos customizados e usados na qualificação automática.
+
+## Exemplos
 
 ### JavaScript (POST)
 \`\`\`javascript
 fetch('${webhookUrl}', {
   method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     name: 'Nome do Lead',
     email: 'email@exemplo.com',
     phone: '11999999999',
-    company: 'Empresa ABC',
-    message: 'Mensagem do lead'
+    company: 'Empresa ABC'
   })
 });
 \`\`\`
 
-### cURL (POST)
+### cURL
 \`\`\`bash
 curl -X POST '${webhookUrl}' \\
   -H 'Content-Type: application/json' \\
-  -d '{
-    "name": "Nome do Lead",
-    "email": "email@exemplo.com",
-    "phone": "11999999999",
-    "company": "Empresa ABC"
-  }'
+  -d '{"name":"Nome do Lead","email":"email@exemplo.com","phone":"11999999999"}'
 \`\`\`
 
-### HTML Form (GET)
-\`\`\`html
-<form action="${webhookUrl}" method="GET">
-  <input type="text" name="name" placeholder="Nome" required>
-  <input type="email" name="email" placeholder="Email">
-  <input type="tel" name="phone" placeholder="Telefone">
-  <input type="text" name="company" placeholder="Empresa">
-  <textarea name="notes" placeholder="Mensagem"></textarea>
-  <button type="submit">Enviar</button>
-</form>
-\`\`\`
-
-## Validações
-- **Nome** é obrigatório
-- **Email** deve ter formato válido (se fornecido)
-- **Telefone** será automaticamente limpo (somente números e símbolos válidos)
-- **Valor** será convertido para número (se fornecido)
-
-## Resposta da API
+## Resposta
 ### Sucesso (200)
 \`\`\`json
-{
-  "success": true,
-  "lead_id": "uuid-do-lead",
-  "message": "Lead captured successfully"
-}
+{ "success": true, "lead_id": "uuid", "message": "Lead captured successfully" }
 \`\`\`
-
-### Erro (400/500)
-\`\`\`json
-{
-  "error": "Mensagem de erro"
-}
-\`\`\`
-
-## Valores Padrão Aplicados
-${Object.entries(defaultValues).map(([field, value]) => `- **${field}**: ${value}`).join('\n')}
 
 ---
-Gerado automaticamente pelo sistema CRM
-Data: ${new Date().toLocaleString('pt-BR')}
+Gerado em ${new Date().toLocaleString('pt-BR')}
 `;
-
     const blob = new Blob([guide], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -309,282 +240,198 @@ Data: ${new Date().toLocaleString('pt-BR')}
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
-    toast.success('Guia de integração baixado com sucesso');
+    toast.success('Guia baixado');
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
 
   const leadWebhook = webhooks.find(w => w.events.includes('lead_capture'));
 
+  // Build status options from pipeline statuses
+  const statusOptions = pipelineStatuses
+    .filter(s => s.name !== 'Perdido' && s.name !== 'Lost')
+    .map(s => ({
+      label: s.name,
+      value: STATUS_SLUG_MAP[s.name] || normalizeLeadStatusToDb(s.name),
+    }));
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <ExternalLink className="h-5 w-5" />
             Webhook de Captura de Leads
           </CardTitle>
           <CardDescription>
-            URL única para receber leads automaticamente de formulários externos, landing pages ou integrações
+            Receba leads automaticamente de formulários externos, landing pages ou integrações
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* URL do Webhook */}
-          <div className="space-y-2">
-            <Label>URL do Webhook</Label>
+        <CardContent className="space-y-5">
+          {/* URL */}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">URL do Webhook</Label>
             <div className="flex gap-2">
-              <Input
-                value={webhookUrl}
-                readOnly
-                className="font-mono text-sm"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => copyToClipboard(webhookUrl)}
-              >
+              <Input value={webhookUrl} readOnly className="font-mono text-xs" />
+              <Button variant="outline" size="icon" onClick={() => copyToClipboard(webhookUrl)}>
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Use esta URL para enviar dados via POST (JSON) ou GET (query parameters)
+            <p className="text-xs text-muted-foreground">
+              Aceita POST (JSON, form-urlencoded) e GET (query params). Campos extras são salvos e usados na qualificação automática.
             </p>
           </div>
 
-          <Separator />
-
-          {/* Status e Estatísticas */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <div className="flex items-center gap-2">
-                {leadWebhook?.is_active ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    <span className="text-sm text-green-600">Ativo</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-4 w-4 text-orange-500" />
-                    <span className="text-sm text-orange-600">Inativo</span>
-                  </>
-                )}
-              </div>
+          {/* Stats row */}
+          <div className="flex items-center gap-6 text-sm">
+            <div className="flex items-center gap-1.5">
+              {leadWebhook?.is_active ? (
+                <><CheckCircle2 className="h-4 w-4 text-green-500" /><span className="text-green-600">Ativo</span></>
+              ) : (
+                <><AlertCircle className="h-4 w-4 text-orange-500" /><span className="text-orange-600">Inativo</span></>
+              )}
             </div>
-            
             {leadWebhook && (
               <>
-                <div className="space-y-2">
-                  <Label>Leads Capturados</Label>
-                  <div className="text-2xl font-bold text-green-600">
-                    {leadWebhook.success_count || 0}
-                  </div>
+                <div className="text-muted-foreground">
+                  <span className="font-semibold text-green-600">{leadWebhook.success_count || 0}</span> capturados
                 </div>
-                
-                <div className="space-y-2">
-                  <Label>Erros</Label>
-                  <div className="text-2xl font-bold text-red-600">
-                    {leadWebhook.error_count || 0}
-                  </div>
+                <div className="text-muted-foreground">
+                  <span className="font-semibold text-red-600">{leadWebhook.error_count || 0}</span> erros
                 </div>
+                {leadWebhook.last_triggered && (
+                  <div className="text-muted-foreground text-xs">
+                    Último: {new Date(leadWebhook.last_triggered).toLocaleString('pt-BR')}
+                  </div>
+                )}
               </>
             )}
           </div>
 
-          {leadWebhook?.last_triggered && (
-            <div className="space-y-2">
-              <Label>Última Atividade</Label>
-              <p className="text-sm text-muted-foreground">
-                {new Date(leadWebhook.last_triggered).toLocaleString('pt-BR')}
-              </p>
-            </div>
-          )}
-
           <Separator />
 
-          {/* Mapeamento de Campos */}
-          <div className="space-y-4">
-            <Label className="text-base">Mapeamento de Campos</Label>
-            <p className="text-sm text-muted-foreground">
-              Configure como os campos do JSON recebido serão mapeados para os campos do CRM
-            </p>
-            
-            <div className="grid grid-cols-2 gap-4">
-              {Object.entries(fieldMapping).map(([crmField, sourceField]) => (
-                <div key={crmField} className="space-y-2">
-                  <Label className="text-sm">
-                    {crmField === 'name' ? 'Nome' : 
-                     crmField === 'email' ? 'Email' :
-                     crmField === 'phone' ? 'Telefone' :
-                     crmField === 'company' ? 'Empresa' :
-                     crmField === 'position' ? 'Cargo' :
-                     crmField === 'source' ? 'Origem' :
-                     crmField === 'notes' ? 'Observações' :
-                     crmField === 'value' ? 'Valor' : crmField}
-                    {crmField === 'name' && <span className="text-red-500">*</span>}
-                  </Label>
-                  <Input
-                    placeholder={`Campo JSON para ${crmField}`}
-                    value={sourceField}
-                    onChange={(e) => setFieldMapping(prev => ({
-                      ...prev,
-                      [crmField]: e.target.value
-                    }))}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Valores Padrão */}
-          <div className="space-y-4">
-            <Label className="text-base">Valores Padrão</Label>
-            <p className="text-sm text-muted-foreground">
-              Valores que serão aplicados automaticamente quando o lead for criado
-            </p>
-            
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Status Padrão</Label>
-                <Input
-                  value={defaultValues.status}
-                  onChange={(e) => setDefaultValues(prev => ({
-                    ...prev,
-                    status: e.target.value
-                  }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Temperatura Padrão</Label>
+          {/* Default values */}
+          <div className="space-y-3">
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Configurações Padrão</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm">Etapa inicial do pipeline</Label>
                 <Select
-                  value={defaultValues.temperature}
-                  onValueChange={(value) => setDefaultValues(prev => ({
-                    ...prev,
-                    temperature: value
-                  }))}
+                  value={defaultValues.status}
+                  onValueChange={(value) => setDefaultValues(prev => ({ ...prev, status: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(LEAD_TEMPERATURES).map(([key, temp]) => (
-                      <SelectItem key={key} value={key}>
-                        {temp.emoji} {temp.label}
+                    {statusOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Origem Padrão</Label>
+              <div className="space-y-1.5">
+                <Label className="text-sm">Origem padrão</Label>
                 <Input
                   value={defaultValues.source}
-                  onChange={(e) => setDefaultValues(prev => ({
-                    ...prev,
-                    source: e.target.value
-                  }))}
+                  onChange={(e) => setDefaultValues(prev => ({ ...prev, source: e.target.value }))}
+                  placeholder="webhook"
                 />
               </div>
             </div>
           </div>
 
+          {/* Actions */}
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={saveConfiguration} className="flex-1">
+            <Button onClick={saveConfiguration} size="sm">
               Salvar Configuração
             </Button>
             {leadWebhook && (
-              <Button
-                variant="outline"
-                onClick={() => toggleWebhook(leadWebhook.id, leadWebhook.is_active)}
-              >
+              <Button variant="outline" size="sm" onClick={() => toggleWebhook(leadWebhook.id, leadWebhook.is_active)}>
                 {leadWebhook.is_active ? 'Desativar' : 'Ativar'}
               </Button>
             )}
-            <Button variant="outline" onClick={testWebhook}>
-              Testar Webhook
+            <Button variant="outline" size="sm" onClick={testWebhook}>
+              <TestTube className="h-4 w-4 mr-1.5" />
+              Testar
             </Button>
-            <Button variant="outline" onClick={downloadIntegrationGuide}>
-              <Download className="h-4 w-4 mr-2" />
-              Guia de Integração
+            <Button variant="outline" size="sm" onClick={downloadIntegrationGuide}>
+              <Download className="h-4 w-4 mr-1.5" />
+              Guia
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Exemplo de Uso */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Exemplos de Uso</CardTitle>
-          <CardDescription>
-            Como enviar dados para o webhook
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Tabs defaultValue="javascript">
-            <TabsList>
-              <TabsTrigger value="javascript">JavaScript</TabsTrigger>
-              <TabsTrigger value="curl">cURL</TabsTrigger>
-              <TabsTrigger value="html">HTML Form</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="javascript" className="space-y-2">
-              <Label>Exemplo via JavaScript (POST)</Label>
-              <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
-                <code>{`fetch('${webhookUrl}', {
+      {/* Collapsible code examples */}
+      <Collapsible open={examplesOpen} onOpenChange={setExamplesOpen}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors pb-3">
+              <CardTitle className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2">
+                  <Code2 className="h-4 w-4" />
+                  Exemplos de Integração
+                </span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${examplesOpen ? 'rotate-180' : ''}`} />
+              </CardTitle>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              <Tabs defaultValue="javascript">
+                <TabsList className="h-8">
+                  <TabsTrigger value="javascript" className="text-xs px-2 py-1">JavaScript</TabsTrigger>
+                  <TabsTrigger value="curl" className="text-xs px-2 py-1">cURL</TabsTrigger>
+                  <TabsTrigger value="html" className="text-xs px-2 py-1">HTML Form</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="javascript">
+                  <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto">
+                    <code>{`fetch('${webhookUrl}', {
   method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     name: 'João Silva',
     email: 'joao@email.com',
     phone: '11999999999',
-    company: 'Empresa ABC',
-    message: 'Interessado no produto'
+    company: 'Empresa ABC'
   })
 });`}</code>
-              </pre>
-            </TabsContent>
-            
-            <TabsContent value="curl" className="space-y-2">
-              <Label>Exemplo via cURL</Label>
-              <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
-                <code>{`curl -X POST '${webhookUrl}' \\
+                  </pre>
+                </TabsContent>
+
+                <TabsContent value="curl">
+                  <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto">
+                    <code>{`curl -X POST '${webhookUrl}' \\
   -H 'Content-Type: application/json' \\
-  -d '{
-    "name": "João Silva",
-    "email": "joao@email.com",
-    "phone": "11999999999",
-    "company": "Empresa ABC"
-  }'`}</code>
-              </pre>
-            </TabsContent>
-            
-            <TabsContent value="html" className="space-y-2">
-              <Label>Exemplo via HTML Form (GET)</Label>
-              <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
-                <code>{`<form action="${webhookUrl}" method="GET">
+  -d '{"name":"João Silva","email":"joao@email.com","phone":"11999999999"}'`}</code>
+                  </pre>
+                </TabsContent>
+
+                <TabsContent value="html">
+                  <pre className="bg-muted p-3 rounded-lg text-xs overflow-x-auto">
+                    <code>{`<form action="${webhookUrl}" method="GET">
   <input type="text" name="name" placeholder="Nome" required>
   <input type="email" name="email" placeholder="Email">
   <input type="tel" name="phone" placeholder="Telefone">
-  <input type="text" name="company" placeholder="Empresa">
-  <textarea name="notes" placeholder="Mensagem"></textarea>
   <button type="submit">Enviar</button>
 </form>`}</code>
-              </pre>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+                  </pre>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
     </div>
   );
 }
