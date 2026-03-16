@@ -697,8 +697,8 @@ function FormAccordionItem({
 
   const deleteIntegration = async () => {
     await supabase.from("lead_scoring_rules").delete().eq("form_id", integration.form_id).eq("agency_id", agencyId);
-    if (integration._isVirtual) {
-      // Virtual entry: only delete rules, not the parent integration
+    if (integration._isVirtual || integration._isWebhook) {
+      // Virtual/webhook entry: only delete rules, not the parent integration
       toast({ title: "Regras do formulário removidas" });
       onDeleted();
       return;
