@@ -54,8 +54,13 @@ interface LeadDetailsDialogProps {
   onEdit: (lead: Lead) => void;
 }
 
-// Campos padrão do Facebook que não são perguntas do formulário
-const STANDARD_FIELDS = ['full_name', 'email', 'phone_number', 'company_name', 'form_name', 'page_name', 'ad_id', 'adset_id', 'campaign_id', 'form_id', 'page_id', 'platform', 'leadgen_id'];
+// Campos internos/técnicos que não são perguntas do formulário
+const STANDARD_FIELDS = [
+  'full_name', 'email', 'phone_number', 'company_name', 'form_name', 'page_name',
+  'ad_id', 'adset_id', 'campaign_id', 'form_id', 'page_id', 'platform', 'leadgen_id',
+  // Webhook internal fields
+  'webhook_source', 'received_at',
+];
 
 // Formatar pergunta: "qual_o_seu_vgv_mensal?" → "Qual o seu VGV mensal?"
 const formatQuestion = (key: string) => {
