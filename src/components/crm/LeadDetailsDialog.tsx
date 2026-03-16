@@ -190,9 +190,16 @@ export function LeadDetailsDialog({ lead, open, onOpenChange, onEdit }: LeadDeta
     return temp ? `${temp.emoji} ${temp.label}` : temperature;
   };
 
-  const isMetaAdsLead = lead.source === 'facebook_leads';
   const formQuestions = getFormQuestions(lead.custom_fields);
   const daysInFunnel = Math.floor((new Date().getTime() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24));
+
+  // Dynamic source badge
+  const getSourceBadge = () => {
+    if (lead.source === 'facebook_leads') return { label: 'Meta Ads', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' };
+    if (lead.source === 'webhook' || lead.custom_fields?.webhook_source) return { label: 'Webhook', className: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300' };
+    return { label: 'Formulário', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' };
+  };
+  const sourceBadge = getSourceBadge();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
