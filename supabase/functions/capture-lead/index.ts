@@ -17,11 +17,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface WebhookConfig {
-  field_mapping: Record<string, string>;
-  required_fields: string[];
-  default_values: Record<string, any>;
-}
+// Fixed field mapping – known CRM fields
+const KNOWN_FIELDS = new Set([
+  'name', 'email', 'phone', 'company', 'position', 'source', 'notes', 'value'
+]);
 
 // Auto-enroll a new lead in WhatsApp automation
 async function autoEnrollWhatsAppAutomation(supabase: any, agencyId: string, leadId: string, phone: string) {
@@ -54,7 +53,7 @@ async function autoEnrollWhatsAppAutomation(supabase: any, agencyId: string, lea
 
   if (existing) return;
 
-  // Create conversation
+  // Get or create conversation
   let conversationId: string | null = null;
   const { data: existingConv } = await supabase
     .from('whatsapp_conversations')
@@ -94,12 +93,26 @@ async function autoEnrollWhatsAppAutomation(supabase: any, agencyId: string, lea
   console.log(`[CAPTURE-LEAD] ✅ Auto-enrolled lead ${leadId} in WhatsApp automation`);
 }
 
+// Trigger lead qualification scoring
+async function triggerLeadQualification(leadId: string, agencyId: string) {
+  try {
+    const qualUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-lead-qualification`;
+    const resp = await fetch(qualUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      },
+      body: JSON.stringify({ lead_id: leadId, agency_id: agencyId }),
+    });
+    console.log(`[CAPTURE-LEAD] Qualification triggered for ${leadId}: ${resp.status}`);
+  } catch (err) {
+    console.error('[CAPTURE-LEAD] Qualification error:', err);
+  }
+}
+
 Deno.serve(async (req) => {
-  console.log(`[CAPTURE-LEAD] New request: ${req.method} ${req.url}`);
-  
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('[CAPTURE-LEAD] Handling OPTIONS request');
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -108,25 +121,17 @@ Deno.serve(async (req) => {
     const pathParts = url.pathname.split('/');
     const agency_id = pathParts[pathParts.length - 1];
 
-    console.log(`[CAPTURE-LEAD] Processing webhook for agency: ${agency_id}`);
-
     if (!agency_id) {
-      return new Response(
-        JSON.stringify({ error: 'Agency ID is required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Agency ID is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Initialize Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Validate agency exists and is active
+    // Validate agency
     const { data: agency, error: agencyError } = await supabase
       .from('agencies')
       .select('id, is_active')
@@ -134,166 +139,94 @@ Deno.serve(async (req) => {
       .single();
 
     if (agencyError || !agency) {
-      console.error('[CAPTURE-LEAD] Agency not found:', agencyError);
-      return new Response(
-        JSON.stringify({ error: 'Agency not found' }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Agency not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-
     if (!agency.is_active) {
-      console.error('[CAPTURE-LEAD] Agency is not active');
-      return new Response(
-        JSON.stringify({ error: 'Agency is not active' }),
-        { 
-          status: 403, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return new Response(JSON.stringify({ error: 'Agency is not active' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Get webhook configuration for the agency
+    // Load default_values from webhook config (status, source only)
+    let defaultStatus = 'leads';
+    let defaultSource = 'webhook';
+
     const { data: webhookConfig } = await supabase
       .from('agency_webhooks')
       .select('*')
       .eq('agency_id', agency_id)
       .eq('events', '{lead_capture}')
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
-    let fieldMapping: Record<string, string> = {
-      'name': 'name',
-      'email': 'email',
-      'phone': 'phone',
-      'company': 'company',
-      'position': 'position',
-      'source': 'source',
-      'notes': 'notes',
-      'value': 'value'
-    };
-
-  let defaultValues: Record<string, any> = {
-    'status': 'leads',
-    'temperature': 'cold',
-    'source': 'webhook'
-  };
-
-    // Apply custom configuration if exists
     if (webhookConfig?.headers) {
-      const config = webhookConfig.headers as any;
-      if (config.field_mapping) {
-        fieldMapping = { ...fieldMapping, ...config.field_mapping };
-      }
-      if (config.default_values) {
-        const customDefaults = { ...config.default_values };
-        
-        // Garantir que temperature seja válido
-        if (customDefaults.temperature) {
-          const validTemps = ['cold', 'warm', 'hot'];
-          if (!validTemps.includes(customDefaults.temperature)) {
-            customDefaults.temperature = 'cold';
-          }
-        }
-        
-        // Garantir que status seja válido
-        if (customDefaults.status) {
-          const validStatuses = ['leads', 'em_contato', 'qualified', 'scheduled', 'meeting', 'proposal', 'won', 'lost'];
-          if (!validStatuses.includes(customDefaults.status)) {
-            console.warn(`[CAPTURE-LEAD] Invalid status "${customDefaults.status}", using "leads"`);
-            customDefaults.status = 'leads';
-          }
-        }
-        
-        defaultValues = { ...defaultValues, ...customDefaults };
-      }
+      const cfg = webhookConfig.headers as any;
+      if (cfg.default_values?.status) defaultStatus = cfg.default_values.status;
+      if (cfg.default_values?.source) defaultSource = cfg.default_values.source;
     }
 
-    // Parse incoming data
-    let incomingData: any = {};
-    
+    // Parse incoming data (POST JSON, form-urlencoded, GET params)
+    let incomingData: Record<string, any> = {};
+
     if (req.method === 'POST') {
-      const contentType = req.headers.get('content-type');
-      
-      if (contentType?.includes('application/json')) {
+      const contentType = req.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
         incomingData = await req.json();
-      } else if (contentType?.includes('application/x-www-form-urlencoded')) {
+      } else if (contentType.includes('application/x-www-form-urlencoded')) {
         const formData = await req.formData();
         for (const [key, value] of formData.entries()) {
           incomingData[key] = value;
         }
       } else {
-        // Try to parse as JSON anyway
         const text = await req.text();
-        try {
-          incomingData = JSON.parse(text);
-        } catch {
-          incomingData = { raw_data: text };
-        }
+        try { incomingData = JSON.parse(text); } catch { incomingData = { raw_data: text }; }
       }
     } else if (req.method === 'GET') {
-      // Parse query parameters
-      const params = new URLSearchParams(url.search);
-      for (const [key, value] of params.entries()) {
+      for (const [key, value] of new URLSearchParams(url.search).entries()) {
         incomingData[key] = value;
       }
     }
 
-    console.log('[CAPTURE-LEAD] Incoming data:', JSON.stringify(incomingData, null, 2));
+    console.log('[CAPTURE-LEAD] Incoming:', JSON.stringify(incomingData));
 
-    // Map fields according to configuration
-    const mappedData: any = { ...defaultValues };
-    
-    for (const [targetField, sourceField] of Object.entries(fieldMapping)) {
-      if (incomingData[sourceField] !== undefined) {
-        let value = incomingData[sourceField];
-        
-        // Sanitize and validate data
-        if (typeof value === 'string') {
-          value = value.trim();
-          
-          // Special handling for specific fields
-          switch (targetField) {
-            case 'email':
-              // Basic email validation
-              if (value && !value.includes('@')) {
-                console.warn('[CAPTURE-LEAD] Invalid email format:', value);
-                continue;
-              }
-              break;
-            case 'value':
-              // Convert to number if possible
-              const numValue = parseFloat(value);
-              if (!isNaN(numValue)) {
-                value = numValue;
-              }
-              break;
-            case 'phone':
-              // Normalize to digits-only with Brazil country code (55)
-              value = normalizeBrazilPhone(value);
-              break;
-          }
+    // Separate known fields vs custom fields
+    const leadData: Record<string, any> = {};
+    const customFields: Record<string, any> = {};
+
+    for (const [key, rawValue] of Object.entries(incomingData)) {
+      let value = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
+      if (value === '' || value === null || value === undefined) continue;
+
+      if (KNOWN_FIELDS.has(key)) {
+        // Validate/sanitize known fields
+        switch (key) {
+          case 'email':
+            if (typeof value === 'string' && !value.includes('@')) continue;
+            break;
+          case 'value':
+            const num = parseFloat(String(value));
+            if (!isNaN(num)) value = num;
+            break;
+          case 'phone':
+            // Normalize to digits-only with Brazil country code (55)
+            if (typeof value === 'string') value = normalizeBrazilPhone(value);
+            break;
         }
-        
-        mappedData[targetField] = value;
+        leadData[key] = value;
+      } else {
+        // Everything else → custom_fields (flat, for qualification scoring)
+        customFields[key] = value;
       }
     }
 
-    // Ensure required fields
-    if (!mappedData.name) {
-      return new Response(
-        JSON.stringify({ error: 'Name is required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+    // Ensure name
+    if (!leadData.name) {
+      return new Response(JSON.stringify({ error: 'Name is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Get agency owner/admin to set as created_by
-    const { data: agencyAdmin, error: adminError } = await supabase
+    // Get agency admin
+    const { data: agencyAdmin } = await supabase
       .from('agency_users')
       .select('user_id')
       .eq('agency_id', agency_id)
@@ -301,136 +234,73 @@ Deno.serve(async (req) => {
       .limit(1)
       .single();
 
-    if (adminError || !agencyAdmin) {
-      console.error('[CAPTURE-LEAD] No admin found for agency:', adminError);
-      return new Response(
-        JSON.stringify({ error: 'No admin found for agency' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+    if (!agencyAdmin) {
+      return new Response(JSON.stringify({ error: 'No admin found for agency' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Add metadata
-    mappedData.agency_id = agency_id;
-    mappedData.created_by = agencyAdmin.user_id; // Use agency admin as creator
-    mappedData.custom_fields = {
-      webhook_source: true,
-      original_data: incomingData,
-      received_at: new Date().toISOString()
+    // Build final lead record
+    const insertData = {
+      ...leadData,
+      agency_id,
+      created_by: agencyAdmin.user_id,
+      status: leadData.source ? undefined : undefined, // clear, set below
+      temperature: 'cold',
+      source: leadData.source || defaultSource,
+      custom_fields: {
+        ...customFields,
+        form_id: 'webhook_default',
+        webhook_source: true,
+        received_at: new Date().toISOString(),
+      },
     };
+    // Apply default status (can be overridden by payload 'status' field if present, but we keep simple)
+    insertData.status = defaultStatus;
 
-    console.log('[CAPTURE-LEAD] Mapped data:', JSON.stringify(mappedData, null, 2));
+    console.log('[CAPTURE-LEAD] Insert:', JSON.stringify(insertData));
 
     // Insert lead
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .insert(mappedData)
+      .insert(insertData)
       .select()
       .single();
 
     if (leadError) {
-      console.error('[CAPTURE-LEAD] Error inserting lead:', leadError);
-      
-      // Update error count in webhook stats
+      console.error('[CAPTURE-LEAD] Insert error:', leadError);
       if (webhookConfig) {
-        await supabase
-          .from('agency_webhooks')
-          .update({
-            error_count: (webhookConfig.error_count || 0) + 1
-          })
-          .eq('id', webhookConfig.id);
+        await supabase.from('agency_webhooks').update({ error_count: (webhookConfig.error_count || 0) + 1 }).eq('id', webhookConfig.id);
       }
-      
-      return new Response(
-        JSON.stringify({ 
-          error: 'Failed to create lead', 
-          details: leadError.message,
-          code: leadError.code 
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+      return new Response(JSON.stringify({ error: 'Failed to create lead', details: leadError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Update webhook stats
+    if (webhookConfig) {
+      await supabase.from('agency_webhooks').update({
+        success_count: (webhookConfig.success_count || 0) + 1,
+        last_triggered: new Date().toISOString()
+      }).eq('id', webhookConfig.id);
+    }
+
+    console.log('[CAPTURE-LEAD] ✅ Lead created:', lead.id);
+
+    // Trigger qualification scoring (async, non-blocking pattern)
+    triggerLeadQualification(lead.id, agency_id);
+
+    // Auto-enroll in WhatsApp automation
+    if (lead.phone) {
+      autoEnrollWhatsAppAutomation(supabase, agency_id, lead.id, lead.phone).catch(err =>
+        console.error('[CAPTURE-LEAD] WA enrollment error:', err)
       );
     }
 
-    // Update webhook statistics
-    if (webhookConfig) {
-      await supabase
-        .from('agency_webhooks')
-        .update({
-          success_count: (webhookConfig.success_count || 0) + 1,
-          last_triggered: new Date().toISOString()
-        })
-        .eq('id', webhookConfig.id);
-    }
-
-    console.log('[CAPTURE-LEAD] Lead created successfully:', lead.id);
-
-    // Auto-enroll in WhatsApp automation if phone is available
-    if (lead.phone) {
-      try {
-        await autoEnrollWhatsAppAutomation(supabase, agency_id, lead.id, lead.phone);
-      } catch (waError) {
-        console.error('[CAPTURE-LEAD] Error auto-enrolling in WhatsApp:', waError);
-      }
-    }
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        lead_id: lead.id,
-        message: 'Lead captured successfully' 
-      }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    return new Response(JSON.stringify({ success: true, lead_id: lead.id, message: 'Lead captured successfully' }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
     console.error('[CAPTURE-LEAD] Unexpected error:', error);
-    
-    // Update error count if webhook config exists
-    try {
-      const url = new URL(req.url);
-      const pathParts = url.pathname.split('/');
-      const agency_id = pathParts[pathParts.length - 1];
-      
-      if (agency_id) {
-        const supabase = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        );
-        
-        const { data: webhookConfig } = await supabase
-          .from('agency_webhooks')
-          .select('id, error_count')
-          .eq('agency_id', agency_id)
-          .eq('events', '{lead_capture}')
-          .single();
-          
-        if (webhookConfig) {
-          await supabase
-            .from('agency_webhooks')
-            .update({
-              error_count: (webhookConfig.error_count || 0) + 1
-            })
-            .eq('id', webhookConfig.id);
-        }
-      }
-    } catch (updateError) {
-      console.error('[CAPTURE-LEAD] Error updating webhook stats:', updateError);
-    }
-
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    return new Response(JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
