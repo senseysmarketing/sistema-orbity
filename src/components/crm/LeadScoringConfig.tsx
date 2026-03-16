@@ -506,8 +506,8 @@ function FormAccordionItem({
       }
     });
 
-    // If no cached questions, fetch from Meta API and persist
-    if (!usedCache) {
+    // If no cached questions and not a webhook, fetch from Meta API and persist
+    if (!usedCache && !integration._isWebhook) {
       try {
         const { data: metaData, error: metaError } = await supabase.functions.invoke("facebook-leads", {
           body: {
