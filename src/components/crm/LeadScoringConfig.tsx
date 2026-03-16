@@ -433,31 +433,44 @@ function FormAccordionItem({
       .eq("agency_id", agencyId)
       .eq("form_id", targetFormId);
 
-    // Get lead_ids from sync_log filtered by form
-    const { data: syncData } = await supabase
-      .from("facebook_lead_sync_log")
-      .select("lead_id, lead_data")
-      .eq("integration_id", parentId)
-      .limit(500);
-
-    // Filter by real form_id if this is a virtual entry from "all"
-    const leadIds = (syncData || [])
-      .filter((row: any) => {
-        if (!integration._isVirtual) return true;
-        return String(row.lead_data?.form_id) === targetFormId;
-      })
-      .map((row: any) => row.lead_id)
-      .filter(Boolean);
-
-    // Fetch leads by IDs to get custom_fields
     let leadsData: any[] = [];
-    if (leadIds.length > 0) {
+
+    if (integration._isWebhook) {
+      // For webhook forms, scan leads directly
       const { data } = await supabase
         .from("leads")
         .select("custom_fields")
-        .in("id", leadIds.slice(0, 100))
-        .not("custom_fields", "is", null);
+        .eq("agency_id", agencyId)
+        .or("source.eq.webhook,custom_fields->>webhook_source.eq.true")
+        .not("custom_fields", "is", null)
+        .limit(200);
       leadsData = data || [];
+    } else {
+      // Get lead_ids from sync_log filtered by form
+      const { data: syncData } = await supabase
+        .from("facebook_lead_sync_log")
+        .select("lead_id, lead_data")
+        .eq("integration_id", parentId)
+        .limit(500);
+
+      // Filter by real form_id if this is a virtual entry from "all"
+      const leadIds = (syncData || [])
+        .filter((row: any) => {
+          if (!integration._isVirtual) return true;
+          return String(row.lead_data?.form_id) === targetFormId;
+        })
+        .map((row: any) => row.lead_id)
+        .filter(Boolean);
+
+      // Fetch leads by IDs to get custom_fields
+      if (leadIds.length > 0) {
+        const { data } = await supabase
+          .from("leads")
+          .select("custom_fields")
+          .in("id", leadIds.slice(0, 100))
+          .not("custom_fields", "is", null);
+        leadsData = data || [];
+      }
     }
 
     const rules: ScoringRule[] = (rulesRes.data || []).map((r: any) => ({
