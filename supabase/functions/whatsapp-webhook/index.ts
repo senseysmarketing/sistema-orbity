@@ -71,6 +71,41 @@ async function validateSignature(req: Request, body: string): Promise<boolean> {
   }
 }
 
+/**
+ * Finds active/processing automations for a conversation, with a lead_id fallback.
+ * The fallback handles phone format mismatches: the automation may be linked to
+ * conversation A (created at start time) while the incoming message arrived on
+ * conversation B (created by the webhook with a differently-formatted phone number).
+ */
+async function findActiveAutomations(
+  supabase: any,
+  accountId: string,
+  conversationId: string,
+  leadId: string | null
+): Promise<{ id: string }[]> {
+  const { data: byConv } = await supabase
+    .from('whatsapp_automation_control')
+    .select('id')
+    .eq('account_id', accountId)
+    .eq('conversation_id', conversationId)
+    .in('status', ['active', 'processing'])
+    .limit(10);
+
+  if (byConv && byConv.length > 0) return byConv;
+
+  if (!leadId) return [];
+
+  const { data: byLead } = await supabase
+    .from('whatsapp_automation_control')
+    .select('id')
+    .eq('account_id', accountId)
+    .eq('lead_id', leadId)
+    .in('status', ['active', 'processing'])
+    .limit(10);
+
+  return byLead || [];
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -295,6 +330,20 @@ serve(async (req) => {
 
       const timestamp = new Date().toISOString();
 
+      // For outgoing messages: check if already stored by whatsapp-send or the automation queue.
+      // A message_id NOT in the DB means the operator sent it from their phone directly
+      // (not via the CRM or automation), which should pause the automation.
+      let existingMsg: { id: string } | null = null;
+      if (isFromMe) {
+        const { data } = await supabase
+          .from('whatsapp_messages')
+          .select('id')
+          .eq('account_id', account.id)
+          .eq('message_id', messageId)
+          .maybeSingle();
+        existingMsg = data;
+      }
+
       await supabase
         .from('whatsapp_messages')
         .upsert({
@@ -316,35 +365,60 @@ serve(async (req) => {
       if (!isFromMe) {
         updateData.last_customer_message_at = timestamp;
 
-        // Cancel active automations when customer replies
-        const { data: automations } = await supabase
-          .from('whatsapp_automation_control')
-          .select('id, status')
-          .eq('account_id', account.id)
-          .eq('conversation_id', conversation.id)
-          .in('status', ['active', 'processing'])
-          .limit(10);
+        // Stop active automations when customer replies.
+        // Uses lead_id fallback in case the automation is linked to a different
+        // conversation than the one this message arrived on (phone format mismatch).
+        const automations = await findActiveAutomations(
+          supabase, account.id, conversation.id, conversation.lead_id
+        );
 
-        if (automations && automations.length > 0) {
-          for (const automation of automations) {
-            await supabase
-              .from('whatsapp_automation_control')
-              .update({
-                status: 'responded',
-                conversation_state: 'customer_replied',
-              })
-              .eq('id', automation.id);
+        for (const automation of automations) {
+          await supabase.from('whatsapp_automation_control').update({
+            status: 'responded',
+            conversation_state: 'customer_replied',
+            conversation_id: conversation.id, // Fix stale conversation_id if needed
+          }).eq('id', automation.id);
 
-            // Log the event
-            await supabase.from('whatsapp_automation_logs').insert({
-              automation_id: automation.id,
-              account_id: account.id,
-              event: 'customer_replied_webhook',
-              details: { conversation_id: conversation.id, phone_number: phoneNumber },
-            });
-          }
+          await supabase.from('whatsapp_automation_logs').insert({
+            automation_id: automation.id,
+            account_id: account.id,
+            event: 'customer_replied_webhook',
+            details: { conversation_id: conversation.id, phone_number: phoneNumber },
+          });
+        }
 
-          console.log('[whatsapp-webhook] Automation(s) paused - customer replied', {
+        if (automations.length > 0) {
+          console.log('[whatsapp-webhook] Automation(s) responded - customer replied', {
+            count: automations.length,
+            conversation_id: conversation.id,
+          });
+        }
+      } else if (!existingMsg) {
+        // Outgoing message with a message_id not previously stored by our system.
+        // This means the operator sent it from their phone directly (not via the CRM
+        // or the automation queue). Pause the automation so follow-ups stop firing
+        // over a conversation that the operator is already handling manually.
+        const automations = await findActiveAutomations(
+          supabase, account.id, conversation.id, conversation.lead_id
+        );
+
+        for (const automation of automations) {
+          await supabase.from('whatsapp_automation_control').update({
+            status: 'paused',
+            conversation_state: 'operator_takeover',
+            conversation_id: conversation.id,
+          }).eq('id', automation.id);
+
+          await supabase.from('whatsapp_automation_logs').insert({
+            automation_id: automation.id,
+            account_id: account.id,
+            event: 'operator_takeover',
+            details: { conversation_id: conversation.id, phone_number: phoneNumber },
+          });
+        }
+
+        if (automations.length > 0) {
+          console.log('[whatsapp-webhook] Automation(s) paused - operator phone takeover', {
             count: automations.length,
             conversation_id: conversation.id,
           });
