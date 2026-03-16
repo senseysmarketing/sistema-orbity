@@ -37,6 +37,7 @@ interface Integration {
   form_questions: DetectedQuestion[] | null;
   _parentId?: string;
   _isVirtual?: boolean;
+  _isWebhook?: boolean;
 }
 
 interface ScoringRule {
