@@ -20,13 +20,19 @@
 - **Problema**: Números como `37705652138094@lid` são IDs do Meta Messenger, não números WhatsApp. Criavam conversas lixo.
 - **Fix**: Adicionada validação `isValidWhatsAppJid()` que rejeita `@lid`, `@g.us`, `status@broadcast`, e JIDs sem `@s.whatsapp.net`.
 
+### Bug 4: Normalização do 9º dígito BR ✅ CORRIGIDO
+- **Problema**: Lead salvo como `+5551998500033` (13 dígitos) mas resposta chega como `555198500033` (12 dígitos, sem o 9). A RPC e o `phoneVariants()` só faziam match exato, criando conversas órfãs sem `lead_id`.
+- **Fix**:
+  - `phoneVariants()` no webhook agora gera variantes com/sem o 9º dígito após o DDD
+  - RPC `find_lead_by_normalized_phone` reescrita em PL/pgSQL com geração de variantes BR
+  - Fallback no `process-whatsapp-queue` também gera variantes com/sem 9º dígito
+  - Dados do Nilton Luiz Silva: conversa órfã mesclada na principal, automação marcada como `responded`
+
 ### Limpeza de dados ✅ EXECUTADA
 - 716 mensagens fantasma deletadas
 - Conversa fantasma `77e1005b` deletada
 - Conversas com phone_number vazio/curto limpas
-
-### Fallback extra no queue processor ✅ ADICIONADO
-- Além do fallback por `lead_id`, agora busca respostas por variantes de telefone normalizado quando nenhuma resposta é encontrada na conversa principal.
+- Conversa órfã do Nilton (`555198500033`) mesclada na principal (`5551998500033`)
 
 ---
 
@@ -37,7 +43,7 @@ Lead capturado → Auto-enroll → Greeting Step 1 (após delay) → ... → Gre
   → Follow-up Step 1 (após delay) → ... → Follow-up Step N → Finalizado
 
   ↕ A QUALQUER MOMENTO: cliente responde → webhook cancela automação
-  ↕ PROTEÇÃO TRIPLA: 1) webhook direto, 2) lead_id fallback, 3) phone fallback
+  ↕ PROTEÇÃO TRIPLA: 1) webhook direto, 2) lead_id fallback, 3) phone fallback (com variantes BR)
 ```
 
 ## Eventos do Webhook
