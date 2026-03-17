@@ -1,32 +1,55 @@
 
 
-# Corrigir exibição de mensagens enviadas pelo WhatsApp nativo no modal
+# Check-up Completo: Sistema WhatsApp Automation
 
-## Causa raiz identificada
+## Status Geral: ✅ Saudável (após fixes em 17/03/2026)
 
-O webhook está configurado apenas com 3 eventos: `MESSAGES_UPSERT` (recebimento), `MESSAGES_UPDATE` (status) e `CONNECTION_UPDATE`. **Falta o evento `SEND_MESSAGE`**, que é o evento da Evolution API v2 para mensagens enviadas pelo app nativo do WhatsApp. As mensagens que aparecem no modal (as duas primeiras de 11:38 e 11:41) foram salvas diretamente pelo `whatsapp-send` do CRM, não pelo webhook.
+---
 
-As mensagens de 13:30, 13:31 e 14:58 (enviadas pelo app do WhatsApp) nunca chegaram ao webhook, por isso não estão no banco.
+## Bugs Corrigidos (17/03/2026)
 
-## Correções
+### Bug 1: `messages.update` criava mensagens fantasma ✅ CORRIGIDO
+- **Problema**: Evolution API v2 envia `messages.update` como array de status updates (READ/DELIVERED), não como objeto. O código antigo fazia `data?.key` que retornava `undefined` em arrays, criando 716 mensagens fantasma com phone_number vazio.
+- **Fix**: Tratamento separado para `messages.update` — apenas atualiza status de mensagens existentes, nunca cria conversas ou mensagens novas.
 
-### 1. Adicionar `SEND_MESSAGE` à configuração do webhook (`whatsapp-connect/index.ts`)
-- Adicionar `'SEND_MESSAGE'` ao array de events na configuração do webhook
-- Isso faz a Evolution API enviar o evento `send.message` quando mensagens são enviadas do celular
+### Bug 2: RPC `find_lead_by_normalized_phone` não existia ✅ CORRIGIDO
+- **Problema**: O webhook chamava esta RPC para linkar conversas a leads, mas ela nunca foi criada. Falhava silenciosamente, impedindo a detecção de respostas via fallback de lead_id.
+- **Fix**: Criada a função SQL `find_lead_by_normalized_phone` com `regexp_replace` para normalizar telefones.
 
-### 2. Tratar evento `send.message` no webhook handler (`whatsapp-webhook/index.ts`)
-- Adicionar bloco `if (event === 'send.message')` que reutiliza a mesma lógica de `messages.upsert` mas força `isFromMe = true`
-- O payload de `send.message` tem estrutura similar: `data.key.remoteJid`, `data.key.id`, `data.message`
-- Salvar a mensagem na conversa correta usando as variantes de telefone já existentes
-- Não disparar detecção de resposta do cliente (é mensagem enviada)
+### Bug 3: IDs do Meta Messenger (`@lid`) não filtrados ✅ CORRIGIDO
+- **Problema**: Números como `37705652138094@lid` são IDs do Meta Messenger, não números WhatsApp. Criavam conversas lixo.
+- **Fix**: Adicionada validação `isValidWhatsAppJid()` que rejeita `@lid`, `@g.us`, `status@broadcast`, e JIDs sem `@s.whatsapp.net`.
 
-### 3. Reconfigurar webhook da instância existente
-- Como a instância já está criada, o webhook precisa ser reconfigurado para incluir o novo evento
-- A ação `check_webhook` em `whatsapp-connect` já reconfigura o webhook automaticamente -- basta garantir que ela use a mesma lista de eventos atualizada
+### Bug 4: Normalização do 9º dígito BR ✅ CORRIGIDO
+- **Problema**: Lead salvo como `+5551998500033` (13 dígitos) mas resposta chega como `555198500033` (12 dígitos, sem o 9). A RPC e o `phoneVariants()` só faziam match exato, criando conversas órfãs sem `lead_id`.
+- **Fix**:
+  - `phoneVariants()` no webhook agora gera variantes com/sem o 9º dígito após o DDD
+  - RPC `find_lead_by_normalized_phone` reescrita em PL/pgSQL com geração de variantes BR
+  - Fallback no `process-whatsapp-queue` também gera variantes com/sem 9º dígito
+  - Dados do Nilton Luiz Silva: conversa órfã mesclada na principal, automação marcada como `responded`
 
-### Arquivos modificados
-- `supabase/functions/whatsapp-connect/index.ts` -- adicionar `SEND_MESSAGE` aos events
-- `supabase/functions/whatsapp-webhook/index.ts` -- tratar `send.message` event
-- Redeploy de ambas as functions
-- Após deploy, o usuário deve clicar em "Verificar Webhook" nas configurações do WhatsApp para reconfigurar a instância com o novo evento
+### Limpeza de dados ✅ EXECUTADA
+- 716 mensagens fantasma deletadas
+- Conversa fantasma `77e1005b` deletada
+- Conversas com phone_number vazio/curto limpas
+- Conversa órfã do Nilton (`555198500033`) mesclada na principal (`5551998500033`)
 
+---
+
+## Fluxo Atualizado
+
+```text
+Lead capturado → Auto-enroll → Greeting Step 1 (após delay) → ... → Greeting Step N
+  → Follow-up Step 1 (após delay) → ... → Follow-up Step N → Finalizado
+
+  ↕ A QUALQUER MOMENTO: cliente responde → webhook cancela automação
+  ↕ PROTEÇÃO TRIPLA: 1) webhook direto, 2) lead_id fallback, 3) phone fallback (com variantes BR)
+```
+
+## Eventos do Webhook
+
+| Evento | Tratamento |
+|---|---|
+| `messages.upsert` | Processa mensagem nova, cria/busca conversa, detecta resposta |
+| `messages.update` | **Apenas atualiza status** (READ/DELIVERED) de mensagens existentes |
+| `connection.update` | Atualiza status de conexão da conta |

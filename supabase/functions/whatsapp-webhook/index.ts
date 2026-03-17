@@ -252,9 +252,13 @@ serve(async (req) => {
     }
 
     // ========================================
-    // Handle messages.upsert (NEW MESSAGES)
+    // Handle send.message (OUTGOING from native WhatsApp app)
+    // Same logic as messages.upsert but forces isFromMe = true
     // ========================================
-    if (event === 'messages.upsert') {
+    // Handle messages.upsert (NEW MESSAGES) — also handles send.message
+    // ========================================
+    if (event === 'messages.upsert' || event === 'send.message') {
+      const isSendMessageEvent = event === 'send.message';
       if (!data) {
         return new Response(JSON.stringify({ success: true, skipped: 'no message data' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -265,7 +269,7 @@ serve(async (req) => {
       // and wrapped format (Evolution v1: data.message.key + data.message.message)
       const key = data?.key || data?.message?.key;
       const messageId = key?.id || crypto.randomUUID();
-      const isFromMe = key?.fromMe || false;
+      const isFromMe = isSendMessageEvent ? true : (key?.fromMe || false);
       const remoteJid = key?.remoteJid || '';
 
       // Filter out invalid JIDs (groups, status, Meta Messenger @lid)
