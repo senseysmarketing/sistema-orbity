@@ -1,83 +1,57 @@
 
 
-# Check-up Completo: Sistema WhatsApp Automation
+# Fix WhatsApp: Reply Detection, Ghost Messages & Chat Sync
 
-## Status Geral: ✅ Saudável
+## Root Cause Analysis
 
-Todos os componentes estão corretamente implementados e interligados. O log `"Message processed"` confirma que o webhook está funcionando com a instância `orbity_7bef1258`.
+I found **3 critical bugs** by inspecting logs and database:
 
----
+### Bug 1: `messages.update` events create 713+ ghost messages
+Evolution API v2 sends `messages.update` as a **status update** (READ, DELIVERY_ACK, SERVER_ACK) with `data` as an **array**, not an object. The current code does `data?.key` which returns `undefined` on an array, so:
+- `isFromMe` defaults to `false` (looks like customer message)
+- `phoneNumber` becomes `""` (empty)
+- A ghost conversation (`77e1005b`) was created with 713 fake "incoming" messages
+- `last_customer_message_at` gets set on this ghost conversation, corrupting state
 
-## 1. Fluxo de Saudação (Greeting) ✅
+### Bug 2: `find_lead_by_normalized_phone` RPC doesn't exist
+The webhook calls this RPC to link conversations to leads, but the function was never created in the database. It fails silently, so **incoming messages never get linked to leads** — meaning the reply detection (`findActiveAutomations` lead_id fallback) never works.
 
-**Como funciona:**
-- Lead é capturado via `capture-lead` ou `facebook-leads`
-- Auto-enrollment verifica: conta WhatsApp conectada + template `greeting` step 1 ativo
-- Cria registro em `whatsapp_automation_control` com `current_phase: 'greeting'`, `current_step_position: 1`
-- `next_execution_at` = agora + `delay_minutes` do template
-- O cron (`process-whatsapp-queue`, a cada minuto) busca registros com `status: 'active'` e `next_execution_at <= now()`
+### Bug 3: `@lid` Meta Messenger IDs not filtered
+Numbers like `117012189720787` and `37705652138094@lid` are Meta Messenger lead IDs, not WhatsApp numbers. They create junk conversations.
 
-**Sequência de etapas:**
-1. Envia greeting step 1 → busca template greeting step 2
-2. Se existe step 2 → agenda `next_execution_at` = agora + delay do step 2
-3. Quando não há mais steps de greeting → transiciona para `phase: 'followup'`, `step_position: 1`
+### Result
+Follow-ups fire on leads that already replied because:
+1. Real customer replies create orphan conversations (no `lead_id` due to missing RPC)
+2. The automation's `conversation_id` points to a different conversation than the reply
+3. The `lead_id` fallback in both webhook and queue processor fails (no RPC = no lead link)
 
-## 2. Fluxo de Follow-up ✅
+## Fix Plan
 
-- Após última etapa de greeting, busca template `followup` step 1
-- Se existe → `newPhase = 'followup'`, `newStep = 1`, agenda delay
-- Cada step de followup segue a mesma lógica sequencial
-- Quando não há mais steps → `conversation_state: 'closed_no_reply'`, `status: 'finished'`
+### 1. Fix `whatsapp-webhook/index.ts`
+- **Handle `messages.update` correctly**: Parse as array, only update existing message status (READ/DELIVERED), don't create conversations or trigger reply detection
+- **Skip `@lid` remoteJid**: Filter Meta Messenger IDs
+- **Inline lead phone lookup**: Replace the missing `find_lead_by_normalized_phone` RPC with a direct query using `regexp_replace` on the DB side (or create the RPC)
 
-**Delays:** Cada step usa o `delay_minutes` do **próximo** template (não do atual), calculado a partir do momento do envio. Correto.
-
-## 3. Detecção de Resposta do Cliente ✅ (Dupla proteção)
-
-**Proteção 1 - Webhook (tempo real):**
-- `whatsapp-webhook` recebe mensagem com `is_from_me: false`
-- Atualiza `last_customer_message_at` na conversa
-- Busca automações ativas (`status IN ('active', 'processing')`) para aquela conversa
-- Muda status para `'responded'`, state para `'customer_replied'`
-- Registra log `'customer_replied_webhook'`
-
-**Proteção 2 - Queue processor (redundância):**
-- Antes de enviar, `process-whatsapp-queue` compara `last_customer_message_at > last_followup_sent_at`
-- Se cliente respondeu após último follow-up → marca como `'responded'`
-
-## 4. Mecanismos de Segurança ✅
-
-| Mecanismo | Valor | Status |
-|---|---|---|
-| Anti-loop (MIN_INTERVAL) | 120s entre envios | ✅ |
-| Rate limit | 1s entre envios na fila | ✅ |
-| Max retries | 3 tentativas | ✅ |
-| Backoff exponencial | 30s, 2min, 5min | ✅ |
-| Optimistic lock | `status: 'processing'` durante envio | ✅ |
-| Janela de horário (São Paulo) | Reagenda se fora do horário | ✅ |
-| Filtro por fonte | `allowed_sources` check | ✅ |
-| State machine | Trigger `validate_automation_status_transition` | ✅ |
-| Idempotência mensagens | `upsert` com `(account_id, message_id)` | ✅ |
-
-## 5. Envio (`whatsapp-send`) ✅
-
-- Usa secrets centralizados como fallback (`EVOLUTION_API_URL` / `EVOLUTION_API_KEY`)
-- Endpoint: `POST /message/sendText/{instance_name}`
-- Salva mensagem no DB antes do webhook retornar (idempotência)
-- Atualiza `last_message_at` e `last_message_is_from_me` na conversa
-
-## 6. Variáveis Dinâmicas nos Templates ✅
-
-Suporte a: `{{nome}}`, `{{email}}`, `{{telefone}}`, `{{empresa}}`, `{{formulario:campo}}`
-Lookup normalizado com case-insensitive e underscore matching.
-
-## Conclusão
-
-O sistema está completo e funcional. Nenhuma correção necessária. O fluxo end-to-end é:
-
-```text
-Lead capturado → Auto-enroll → Greeting Step 1 (após delay) → ... → Greeting Step N
-  → Follow-up Step 1 (após delay) → ... → Follow-up Step N → Finalizado
-
-  ↕ A QUALQUER MOMENTO: cliente responde → webhook cancela automação
+### 2. Create `find_lead_by_normalized_phone` RPC (SQL migration)
+```sql
+CREATE OR REPLACE FUNCTION find_lead_by_normalized_phone(p_agency_id uuid, p_phone_digits text)
+RETURNS TABLE(id uuid, name text, phone text) AS $$
+  SELECT id, name, phone FROM leads
+  WHERE agency_id = p_agency_id
+    AND regexp_replace(phone, '\D', '', 'g') = p_phone_digits
+  LIMIT 1;
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
 ```
+
+### 3. Clean up ghost data
+- Delete the 713 ghost messages on conversation `77e1005b`
+- Delete the ghost conversation itself
+
+### 4. Fix `process-whatsapp-queue/index.ts`
+- Add additional lead-phone fallback when the conversation's `last_customer_message_at` is null but other conversations with same normalized phone have replies
+
+### Files Modified
+- `supabase/functions/whatsapp-webhook/index.ts` — Handle messages.update array format, skip @lid, fix lead linking
+- `supabase/functions/process-whatsapp-queue/index.ts` — Improve reply detection fallback
+- SQL migration — Create `find_lead_by_normalized_phone` RPC + cleanup ghost data
 
