@@ -2,82 +2,48 @@
 
 # Check-up Completo: Sistema WhatsApp Automation
 
-## Status Geral: ✅ Saudável
-
-Todos os componentes estão corretamente implementados e interligados. O log `"Message processed"` confirma que o webhook está funcionando com a instância `orbity_7bef1258`.
+## Status Geral: ✅ Saudável (após fixes em 17/03/2026)
 
 ---
 
-## 1. Fluxo de Saudação (Greeting) ✅
+## Bugs Corrigidos (17/03/2026)
 
-**Como funciona:**
-- Lead é capturado via `capture-lead` ou `facebook-leads`
-- Auto-enrollment verifica: conta WhatsApp conectada + template `greeting` step 1 ativo
-- Cria registro em `whatsapp_automation_control` com `current_phase: 'greeting'`, `current_step_position: 1`
-- `next_execution_at` = agora + `delay_minutes` do template
-- O cron (`process-whatsapp-queue`, a cada minuto) busca registros com `status: 'active'` e `next_execution_at <= now()`
+### Bug 1: `messages.update` criava mensagens fantasma ✅ CORRIGIDO
+- **Problema**: Evolution API v2 envia `messages.update` como array de status updates (READ/DELIVERED), não como objeto. O código antigo fazia `data?.key` que retornava `undefined` em arrays, criando 716 mensagens fantasma com phone_number vazio.
+- **Fix**: Tratamento separado para `messages.update` — apenas atualiza status de mensagens existentes, nunca cria conversas ou mensagens novas.
 
-**Sequência de etapas:**
-1. Envia greeting step 1 → busca template greeting step 2
-2. Se existe step 2 → agenda `next_execution_at` = agora + delay do step 2
-3. Quando não há mais steps de greeting → transiciona para `phase: 'followup'`, `step_position: 1`
+### Bug 2: RPC `find_lead_by_normalized_phone` não existia ✅ CORRIGIDO
+- **Problema**: O webhook chamava esta RPC para linkar conversas a leads, mas ela nunca foi criada. Falhava silenciosamente, impedindo a detecção de respostas via fallback de lead_id.
+- **Fix**: Criada a função SQL `find_lead_by_normalized_phone` com `regexp_replace` para normalizar telefones.
 
-## 2. Fluxo de Follow-up ✅
+### Bug 3: IDs do Meta Messenger (`@lid`) não filtrados ✅ CORRIGIDO
+- **Problema**: Números como `37705652138094@lid` são IDs do Meta Messenger, não números WhatsApp. Criavam conversas lixo.
+- **Fix**: Adicionada validação `isValidWhatsAppJid()` que rejeita `@lid`, `@g.us`, `status@broadcast`, e JIDs sem `@s.whatsapp.net`.
 
-- Após última etapa de greeting, busca template `followup` step 1
-- Se existe → `newPhase = 'followup'`, `newStep = 1`, agenda delay
-- Cada step de followup segue a mesma lógica sequencial
-- Quando não há mais steps → `conversation_state: 'closed_no_reply'`, `status: 'finished'`
+### Limpeza de dados ✅ EXECUTADA
+- 716 mensagens fantasma deletadas
+- Conversa fantasma `77e1005b` deletada
+- Conversas com phone_number vazio/curto limpas
 
-**Delays:** Cada step usa o `delay_minutes` do **próximo** template (não do atual), calculado a partir do momento do envio. Correto.
+### Fallback extra no queue processor ✅ ADICIONADO
+- Além do fallback por `lead_id`, agora busca respostas por variantes de telefone normalizado quando nenhuma resposta é encontrada na conversa principal.
 
-## 3. Detecção de Resposta do Cliente ✅ (Dupla proteção)
+---
 
-**Proteção 1 - Webhook (tempo real):**
-- `whatsapp-webhook` recebe mensagem com `is_from_me: false`
-- Atualiza `last_customer_message_at` na conversa
-- Busca automações ativas (`status IN ('active', 'processing')`) para aquela conversa
-- Muda status para `'responded'`, state para `'customer_replied'`
-- Registra log `'customer_replied_webhook'`
-
-**Proteção 2 - Queue processor (redundância):**
-- Antes de enviar, `process-whatsapp-queue` compara `last_customer_message_at > last_followup_sent_at`
-- Se cliente respondeu após último follow-up → marca como `'responded'`
-
-## 4. Mecanismos de Segurança ✅
-
-| Mecanismo | Valor | Status |
-|---|---|---|
-| Anti-loop (MIN_INTERVAL) | 120s entre envios | ✅ |
-| Rate limit | 1s entre envios na fila | ✅ |
-| Max retries | 3 tentativas | ✅ |
-| Backoff exponencial | 30s, 2min, 5min | ✅ |
-| Optimistic lock | `status: 'processing'` durante envio | ✅ |
-| Janela de horário (São Paulo) | Reagenda se fora do horário | ✅ |
-| Filtro por fonte | `allowed_sources` check | ✅ |
-| State machine | Trigger `validate_automation_status_transition` | ✅ |
-| Idempotência mensagens | `upsert` com `(account_id, message_id)` | ✅ |
-
-## 5. Envio (`whatsapp-send`) ✅
-
-- Usa secrets centralizados como fallback (`EVOLUTION_API_URL` / `EVOLUTION_API_KEY`)
-- Endpoint: `POST /message/sendText/{instance_name}`
-- Salva mensagem no DB antes do webhook retornar (idempotência)
-- Atualiza `last_message_at` e `last_message_is_from_me` na conversa
-
-## 6. Variáveis Dinâmicas nos Templates ✅
-
-Suporte a: `{{nome}}`, `{{email}}`, `{{telefone}}`, `{{empresa}}`, `{{formulario:campo}}`
-Lookup normalizado com case-insensitive e underscore matching.
-
-## Conclusão
-
-O sistema está completo e funcional. Nenhuma correção necessária. O fluxo end-to-end é:
+## Fluxo Atualizado
 
 ```text
 Lead capturado → Auto-enroll → Greeting Step 1 (após delay) → ... → Greeting Step N
   → Follow-up Step 1 (após delay) → ... → Follow-up Step N → Finalizado
 
   ↕ A QUALQUER MOMENTO: cliente responde → webhook cancela automação
+  ↕ PROTEÇÃO TRIPLA: 1) webhook direto, 2) lead_id fallback, 3) phone fallback
 ```
 
+## Eventos do Webhook
+
+| Evento | Tratamento |
+|---|---|
+| `messages.upsert` | Processa mensagem nova, cria/busca conversa, detecta resposta |
+| `messages.update` | **Apenas atualiza status** (READ/DELIVERED) de mensagens existentes |
+| `connection.update` | Atualiza status de conexão da conta |
