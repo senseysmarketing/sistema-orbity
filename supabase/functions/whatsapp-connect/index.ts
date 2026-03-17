@@ -31,6 +31,7 @@ async function configureWebhook(apiUrl: string, apiKey: string, instanceName: st
         'MESSAGES_UPSERT',
         'MESSAGES_UPDATE',
         'CONNECTION_UPDATE',
+        'SEND_MESSAGE',
       ],
     },
   };
