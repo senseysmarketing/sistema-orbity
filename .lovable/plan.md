@@ -1,57 +1,49 @@
 
 
-# Fix WhatsApp: Reply Detection, Ghost Messages & Chat Sync
+# Check-up Completo: Sistema WhatsApp Automation
 
-## Root Cause Analysis
+## Status Geral: ✅ Saudável (após fixes em 17/03/2026)
 
-I found **3 critical bugs** by inspecting logs and database:
+---
 
-### Bug 1: `messages.update` events create 713+ ghost messages
-Evolution API v2 sends `messages.update` as a **status update** (READ, DELIVERY_ACK, SERVER_ACK) with `data` as an **array**, not an object. The current code does `data?.key` which returns `undefined` on an array, so:
-- `isFromMe` defaults to `false` (looks like customer message)
-- `phoneNumber` becomes `""` (empty)
-- A ghost conversation (`77e1005b`) was created with 713 fake "incoming" messages
-- `last_customer_message_at` gets set on this ghost conversation, corrupting state
+## Bugs Corrigidos (17/03/2026)
 
-### Bug 2: `find_lead_by_normalized_phone` RPC doesn't exist
-The webhook calls this RPC to link conversations to leads, but the function was never created in the database. It fails silently, so **incoming messages never get linked to leads** — meaning the reply detection (`findActiveAutomations` lead_id fallback) never works.
+### Bug 1: `messages.update` criava mensagens fantasma ✅ CORRIGIDO
+- **Problema**: Evolution API v2 envia `messages.update` como array de status updates (READ/DELIVERED), não como objeto. O código antigo fazia `data?.key` que retornava `undefined` em arrays, criando 716 mensagens fantasma com phone_number vazio.
+- **Fix**: Tratamento separado para `messages.update` — apenas atualiza status de mensagens existentes, nunca cria conversas ou mensagens novas.
 
-### Bug 3: `@lid` Meta Messenger IDs not filtered
-Numbers like `117012189720787` and `37705652138094@lid` are Meta Messenger lead IDs, not WhatsApp numbers. They create junk conversations.
+### Bug 2: RPC `find_lead_by_normalized_phone` não existia ✅ CORRIGIDO
+- **Problema**: O webhook chamava esta RPC para linkar conversas a leads, mas ela nunca foi criada. Falhava silenciosamente, impedindo a detecção de respostas via fallback de lead_id.
+- **Fix**: Criada a função SQL `find_lead_by_normalized_phone` com `regexp_replace` para normalizar telefones.
 
-### Result
-Follow-ups fire on leads that already replied because:
-1. Real customer replies create orphan conversations (no `lead_id` due to missing RPC)
-2. The automation's `conversation_id` points to a different conversation than the reply
-3. The `lead_id` fallback in both webhook and queue processor fails (no RPC = no lead link)
+### Bug 3: IDs do Meta Messenger (`@lid`) não filtrados ✅ CORRIGIDO
+- **Problema**: Números como `37705652138094@lid` são IDs do Meta Messenger, não números WhatsApp. Criavam conversas lixo.
+- **Fix**: Adicionada validação `isValidWhatsAppJid()` que rejeita `@lid`, `@g.us`, `status@broadcast`, e JIDs sem `@s.whatsapp.net`.
 
-## Fix Plan
+### Limpeza de dados ✅ EXECUTADA
+- 716 mensagens fantasma deletadas
+- Conversa fantasma `77e1005b` deletada
+- Conversas com phone_number vazio/curto limpas
 
-### 1. Fix `whatsapp-webhook/index.ts`
-- **Handle `messages.update` correctly**: Parse as array, only update existing message status (READ/DELIVERED), don't create conversations or trigger reply detection
-- **Skip `@lid` remoteJid**: Filter Meta Messenger IDs
-- **Inline lead phone lookup**: Replace the missing `find_lead_by_normalized_phone` RPC with a direct query using `regexp_replace` on the DB side (or create the RPC)
+### Fallback extra no queue processor ✅ ADICIONADO
+- Além do fallback por `lead_id`, agora busca respostas por variantes de telefone normalizado quando nenhuma resposta é encontrada na conversa principal.
 
-### 2. Create `find_lead_by_normalized_phone` RPC (SQL migration)
-```sql
-CREATE OR REPLACE FUNCTION find_lead_by_normalized_phone(p_agency_id uuid, p_phone_digits text)
-RETURNS TABLE(id uuid, name text, phone text) AS $$
-  SELECT id, name, phone FROM leads
-  WHERE agency_id = p_agency_id
-    AND regexp_replace(phone, '\D', '', 'g') = p_phone_digits
-  LIMIT 1;
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+---
+
+## Fluxo Atualizado
+
+```text
+Lead capturado → Auto-enroll → Greeting Step 1 (após delay) → ... → Greeting Step N
+  → Follow-up Step 1 (após delay) → ... → Follow-up Step N → Finalizado
+
+  ↕ A QUALQUER MOMENTO: cliente responde → webhook cancela automação
+  ↕ PROTEÇÃO TRIPLA: 1) webhook direto, 2) lead_id fallback, 3) phone fallback
 ```
 
-### 3. Clean up ghost data
-- Delete the 713 ghost messages on conversation `77e1005b`
-- Delete the ghost conversation itself
+## Eventos do Webhook
 
-### 4. Fix `process-whatsapp-queue/index.ts`
-- Add additional lead-phone fallback when the conversation's `last_customer_message_at` is null but other conversations with same normalized phone have replies
-
-### Files Modified
-- `supabase/functions/whatsapp-webhook/index.ts` — Handle messages.update array format, skip @lid, fix lead linking
-- `supabase/functions/process-whatsapp-queue/index.ts` — Improve reply detection fallback
-- SQL migration — Create `find_lead_by_normalized_phone` RPC + cleanup ghost data
-
+| Evento | Tratamento |
+|---|---|
+| `messages.upsert` | Processa mensagem nova, cria/busca conversa, detecta resposta |
+| `messages.update` | **Apenas atualiza status** (READ/DELIVERED) de mensagens existentes |
+| `connection.update` | Atualiza status de conexão da conta |

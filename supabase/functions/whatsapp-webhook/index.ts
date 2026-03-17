@@ -8,7 +8,6 @@ const corsHeaders = {
 
 /**
  * Normalizes a phone number to digits-only format for consistent lookups.
- * Handles formats like "+5527992661416", "55 27 99266-1416", "27992661416".
  */
 function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, '');
@@ -16,19 +15,15 @@ function normalizePhone(phone: string): string {
 
 /**
  * Returns all common phone format variants to try when matching numbers.
- * Evolution API sends digits-only (e.g. "5527992661416"), but leads may be
- * stored with different formatting ("+5527992661416", "27992661416", etc.).
  */
 function phoneVariants(phone: string): string[] {
   const digits = normalizePhone(phone);
   const variants = new Set<string>([digits, '+' + digits]);
-  // Brazilian number with country code 55: also try without country code
   if (digits.startsWith('55') && digits.length === 13) {
-    const local = digits.slice(2); // e.g. "27992661416"
+    const local = digits.slice(2);
     variants.add(local);
     variants.add('+55' + local);
   }
-  // Number without country code: also try with 55 prefix
   if (!digits.startsWith('55') && digits.length === 11) {
     variants.add('55' + digits);
     variants.add('+55' + digits);
@@ -38,11 +33,10 @@ function phoneVariants(phone: string): string[] {
 
 /**
  * Optional HMAC signature validation.
- * If WEBHOOK_SECRET is set in Supabase secrets, validates the x-webhook-signature header.
  */
 async function validateSignature(req: Request, body: string): Promise<boolean> {
   const webhookSecret = Deno.env.get('WEBHOOK_SECRET');
-  if (!webhookSecret) return true; // No secret configured, skip validation
+  if (!webhookSecret) return true;
 
   const signature = req.headers.get('x-webhook-signature') || req.headers.get('x-signature');
   if (!signature) {
@@ -53,17 +47,12 @@ async function validateSignature(req: Request, body: string): Promise<boolean> {
   try {
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(webhookSecret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
+      'raw', encoder.encode(webhookSecret),
+      { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
     );
     const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
     const expectedSignature = Array.from(new Uint8Array(sig))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-
+      .map(b => b.toString(16).padStart(2, '0')).join('');
     return signature === expectedSignature;
   } catch (e) {
     console.error('[whatsapp-webhook] Signature validation error:', e);
@@ -73,37 +62,38 @@ async function validateSignature(req: Request, body: string): Promise<boolean> {
 
 /**
  * Finds active/processing automations for a conversation, with a lead_id fallback.
- * The fallback handles phone format mismatches: the automation may be linked to
- * conversation A (created at start time) while the incoming message arrived on
- * conversation B (created by the webhook with a differently-formatted phone number).
  */
 async function findActiveAutomations(
-  supabase: any,
-  accountId: string,
-  conversationId: string,
-  leadId: string | null
+  supabase: any, accountId: string, conversationId: string, leadId: string | null
 ): Promise<{ id: string }[]> {
   const { data: byConv } = await supabase
-    .from('whatsapp_automation_control')
-    .select('id')
-    .eq('account_id', accountId)
-    .eq('conversation_id', conversationId)
-    .in('status', ['active', 'processing'])
-    .limit(10);
+    .from('whatsapp_automation_control').select('id')
+    .eq('account_id', accountId).eq('conversation_id', conversationId)
+    .in('status', ['active', 'processing']).limit(10);
 
   if (byConv && byConv.length > 0) return byConv;
-
   if (!leadId) return [];
 
   const { data: byLead } = await supabase
-    .from('whatsapp_automation_control')
-    .select('id')
-    .eq('account_id', accountId)
-    .eq('lead_id', leadId)
-    .in('status', ['active', 'processing'])
-    .limit(10);
+    .from('whatsapp_automation_control').select('id')
+    .eq('account_id', accountId).eq('lead_id', leadId)
+    .in('status', ['active', 'processing']).limit(10);
 
   return byLead || [];
+}
+
+/**
+ * Checks if a remoteJid is a valid WhatsApp individual chat.
+ * Filters out group chats, status broadcasts, Meta Messenger IDs (@lid), etc.
+ */
+function isValidWhatsAppJid(remoteJid: string): boolean {
+  if (!remoteJid) return false;
+  if (remoteJid.includes('@g.us')) return false;
+  if (remoteJid === 'status@broadcast') return false;
+  if (remoteJid.includes('@lid')) return false;
+  // Must be a standard WhatsApp JID
+  if (!remoteJid.includes('@s.whatsapp.net')) return false;
+  return true;
 }
 
 serve(async (req) => {
@@ -118,42 +108,35 @@ serve(async (req) => {
 
     const bodyText = await req.text();
 
-    // --- EMPTY BODY GUARD ---
     if (!bodyText || bodyText.trim() === '') {
       console.log('[whatsapp-webhook] Empty body received');
       return new Response('ok', { status: 200 });
     }
 
-    // --- SIGNATURE VALIDATION ---
     const isValid = await validateSignature(req, bodyText);
     if (!isValid) {
-      console.error('[whatsapp-webhook] Invalid webhook signature — check that WEBHOOK_SECRET env var matches Evolution API webhook secret configuration, or remove WEBHOOK_SECRET to disable signature validation');
+      console.error('[whatsapp-webhook] Invalid webhook signature');
       return new Response(JSON.stringify({ success: false, error: 'Invalid signature' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // --- SAFE JSON PARSING ---
     let body: any;
     try {
       body = JSON.parse(bodyText);
     } catch {
       console.log('[whatsapp-webhook] Non-JSON payload received:', bodyText.substring(0, 200));
       return new Response(JSON.stringify({ success: true, skipped: 'non-json payload' }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const { event, instance, data } = body || {};
 
-    // --- EARLY RETURN ON MISSING EVENT ---
     if (!event) {
       console.log('[whatsapp-webhook] Ping/empty event received');
       return new Response(JSON.stringify({ success: true, skipped: 'no event' }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -167,10 +150,8 @@ serve(async (req) => {
 
     // Find account by instance name
     const { data: account } = await supabase
-      .from('whatsapp_accounts')
-      .select('id, agency_id')
-      .eq('instance_name', instance)
-      .maybeSingle();
+      .from('whatsapp_accounts').select('id, agency_id')
+      .eq('instance_name', instance).maybeSingle();
 
     if (!account) {
       console.log('[whatsapp-webhook] Unknown instance:', instance);
@@ -184,13 +165,10 @@ serve(async (req) => {
       const state = data?.state;
       const newStatus = state === 'open' ? 'connected' : state === 'close' ? 'disconnected' : 'connecting';
 
-      await supabase
-        .from('whatsapp_accounts')
-        .update({
-          status: newStatus,
-          qr_code: newStatus === 'connected' ? null : undefined,
-        })
-        .eq('id', account.id);
+      await supabase.from('whatsapp_accounts').update({
+        status: newStatus,
+        qr_code: newStatus === 'connected' ? null : undefined,
+      }).eq('id', account.id);
 
       console.log('[whatsapp-webhook] Connection status updated:', newStatus);
       return new Response(JSON.stringify({ success: true }), {
@@ -198,8 +176,50 @@ serve(async (req) => {
       });
     }
 
-    // Handle messages
-    if (event === 'messages.upsert' || event === 'messages.update') {
+    // ========================================
+    // Handle messages.update (STATUS UPDATES)
+    // Evolution API v2 sends data as an ARRAY of status updates.
+    // These are delivery receipts (READ, DELIVERED, etc.), NOT new messages.
+    // ========================================
+    if (event === 'messages.update') {
+      const updates = Array.isArray(data) ? data : [data];
+
+      for (const update of updates) {
+        const key = update?.key || update?.keyId;
+        const messageId = key?.id || update?.id;
+        const statusCode = update?.status || update?.update?.status;
+
+        if (!messageId) continue;
+
+        // Map Evolution status codes to readable status
+        let newStatus = 'delivered';
+        if (statusCode === 'READ' || statusCode === 3 || statusCode === 4) {
+          newStatus = 'read';
+        } else if (statusCode === 'DELIVERY_ACK' || statusCode === 2) {
+          newStatus = 'delivered';
+        } else if (statusCode === 'SERVER_ACK' || statusCode === 1) {
+          newStatus = 'sent';
+        } else if (statusCode === 'PLAYED' || statusCode === 5) {
+          newStatus = 'read';
+        }
+
+        // Only update existing messages, don't create new ones
+        await supabase.from('whatsapp_messages')
+          .update({ status: newStatus })
+          .eq('account_id', account.id)
+          .eq('message_id', messageId);
+      }
+
+      console.log('[whatsapp-webhook] Status updates processed:', updates.length);
+      return new Response(JSON.stringify({ success: true, status_updates: updates.length }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ========================================
+    // Handle messages.upsert (NEW MESSAGES)
+    // ========================================
+    if (event === 'messages.upsert') {
       if (!data) {
         return new Response(JSON.stringify({ success: true, skipped: 'no message data' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -212,18 +232,26 @@ serve(async (req) => {
       const messageId = key?.id || crypto.randomUUID();
       const isFromMe = key?.fromMe || false;
       const remoteJid = key?.remoteJid || '';
-      // Normalize to digits-only so lookups match regardless of lead phone formatting
-      const phoneNumber = normalizePhone(remoteJid.replace('@s.whatsapp.net', '').replace('@g.us', ''));
 
-      // Skip group messages and status updates
-      if (remoteJid.includes('@g.us') || remoteJid === 'status@broadcast') {
-        return new Response(JSON.stringify({ success: true, skipped: 'group or status' }), {
+      // Filter out invalid JIDs (groups, status, Meta Messenger @lid)
+      if (!isValidWhatsAppJid(remoteJid)) {
+        console.log('[whatsapp-webhook] Skipping invalid JID:', remoteJid);
+        return new Response(JSON.stringify({ success: true, skipped: 'invalid jid' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Extract message content: flat format has data.message = { conversation: ... }
-      // wrapped format has data.message = { key: ..., message: { conversation: ... } }
+      const phoneNumber = normalizePhone(remoteJid.replace('@s.whatsapp.net', ''));
+
+      // Extra guard: skip empty or very short phone numbers
+      if (phoneNumber.length < 8) {
+        console.log('[whatsapp-webhook] Skipping short phone number:', phoneNumber);
+        return new Response(JSON.stringify({ success: true, skipped: 'short phone' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Extract message content
       const msgContent = data?.message?.message ? data.message.message : data?.message;
       const content = msgContent?.conversation ||
         msgContent?.extendedTextMessage?.text ||
@@ -237,49 +265,33 @@ serve(async (req) => {
         msgContent?.documentMessage ? 'document' :
         'text';
 
-      // Find or create conversation.
-      // Phone numbers may be stored in different formats ("+5527...", "5527...", "27..."),
-      // so we try all common variants. We fetch ALL matches (not .maybeSingle()) because
-      // duplicate conversations may exist from before this fix was deployed, and we must
-      // prefer the one that is already linked to a lead.
+      // Find or create conversation using phone variants
       const variants = phoneVariants(phoneNumber);
 
       const { data: matchingConvs } = await supabase
-        .from('whatsapp_conversations')
-        .select('id, lead_id')
-        .eq('account_id', account.id)
-        .in('phone_number', variants);
+        .from('whatsapp_conversations').select('id, lead_id')
+        .eq('account_id', account.id).in('phone_number', variants);
 
-      // Prefer the conversation with lead_id set (the canonical one)
       let conversation: { id: string; lead_id: string | null } | null =
-        matchingConvs?.find(c => c.lead_id) ?? matchingConvs?.[0] ?? null;
+        matchingConvs?.find((c: any) => c.lead_id) ?? matchingConvs?.[0] ?? null;
 
       if (!conversation) {
-        // Try to find the lead by normalizing stored phone to digits-only.
-        // leads.phone may be formatted ("+55 19 98930-3111") so exact-match
-        // variants fail; the RPC uses regexp_replace on the DB side.
+        // Try to find the lead by normalized phone using RPC
         const { data: leadRows } = await supabase.rpc('find_lead_by_normalized_phone', {
           p_agency_id: account.agency_id,
           p_phone_digits: phoneNumber,
         });
         const lead = leadRows?.[0] || null;
 
-        // If we found the lead, check if there's already a conversation linked to it
-        // (e.g. created by startAutomation with a different phone format)
+        // If we found the lead, check for existing conversation linked to it
         if (lead?.id) {
           const { data: leadConv } = await supabase
-            .from('whatsapp_conversations')
-            .select('id, lead_id')
-            .eq('account_id', account.id)
-            .eq('lead_id', lead.id)
-            .maybeSingle();
+            .from('whatsapp_conversations').select('id, lead_id')
+            .eq('account_id', account.id).eq('lead_id', lead.id).maybeSingle();
 
           if (leadConv) {
-            // Update phone_number to the normalized format so future lookups match
-            await supabase
-              .from('whatsapp_conversations')
-              .update({ phone_number: phoneNumber })
-              .eq('id', leadConv.id);
+            await supabase.from('whatsapp_conversations')
+              .update({ phone_number: phoneNumber }).eq('id', leadConv.id);
             conversation = leadConv;
           }
         }
@@ -292,17 +304,13 @@ serve(async (req) => {
               phone_number: phoneNumber,
               lead_id: lead?.id || null,
             }, { onConflict: 'account_id,phone_number' })
-            .select()
-            .single();
+            .select().single();
 
           if (convError) {
-            // Race condition: another request created it, fetch again
             const { data: raceConvs } = await supabase
-              .from('whatsapp_conversations')
-              .select('id, lead_id')
-              .eq('account_id', account.id)
-              .in('phone_number', variants);
-            conversation = raceConvs?.find(c => c.lead_id) ?? raceConvs?.[0] ?? null;
+              .from('whatsapp_conversations').select('id, lead_id')
+              .eq('account_id', account.id).in('phone_number', variants);
+            conversation = raceConvs?.find((c: any) => c.lead_id) ?? raceConvs?.[0] ?? null;
           } else {
             conversation = newConv;
           }
@@ -316,10 +324,8 @@ serve(async (req) => {
         const lead = leadRows2?.[0] || null;
 
         if (lead?.id) {
-          await supabase
-            .from('whatsapp_conversations')
-            .update({ lead_id: lead.id })
-            .eq('id', conversation.id);
+          await supabase.from('whatsapp_conversations')
+            .update({ lead_id: lead.id }).eq('id', conversation.id);
           conversation = { ...conversation, lead_id: lead.id };
         }
       }
@@ -330,22 +336,16 @@ serve(async (req) => {
 
       const timestamp = new Date().toISOString();
 
-      // For outgoing messages: check if already stored by whatsapp-send or the automation queue.
-      // A message_id NOT in the DB means the operator sent it from their phone directly
-      // (not via the CRM or automation), which should pause the automation.
+      // For outgoing messages: check if already stored by whatsapp-send
       let existingMsg: { id: string } | null = null;
       if (isFromMe) {
         const { data } = await supabase
-          .from('whatsapp_messages')
-          .select('id')
-          .eq('account_id', account.id)
-          .eq('message_id', messageId)
-          .maybeSingle();
+          .from('whatsapp_messages').select('id')
+          .eq('account_id', account.id).eq('message_id', messageId).maybeSingle();
         existingMsg = data;
       }
 
-      await supabase
-        .from('whatsapp_messages')
+      await supabase.from('whatsapp_messages')
         .upsert({
           account_id: account.id,
           message_id: messageId,
@@ -354,7 +354,7 @@ serve(async (req) => {
           message_type: messageType,
           content,
           is_from_me: isFromMe,
-          status: event === 'messages.update' ? (data.status || 'delivered') : 'received',
+          status: 'received',
         }, { onConflict: 'account_id,message_id' });
 
       const updateData: Record<string, any> = {
@@ -365,9 +365,7 @@ serve(async (req) => {
       if (!isFromMe) {
         updateData.last_customer_message_at = timestamp;
 
-        // Stop active automations when customer replies.
-        // Uses lead_id fallback in case the automation is linked to a different
-        // conversation than the one this message arrived on (phone format mismatch).
+        // Stop active automations when customer replies
         const automations = await findActiveAutomations(
           supabase, account.id, conversation.id, conversation.lead_id
         );
@@ -376,7 +374,7 @@ serve(async (req) => {
           await supabase.from('whatsapp_automation_control').update({
             status: 'responded',
             conversation_state: 'customer_replied',
-            conversation_id: conversation.id, // Fix stale conversation_id if needed
+            conversation_id: conversation.id,
           }).eq('id', automation.id);
 
           await supabase.from('whatsapp_automation_logs').insert({
@@ -389,15 +387,11 @@ serve(async (req) => {
 
         if (automations.length > 0) {
           console.log('[whatsapp-webhook] Automation(s) responded - customer replied', {
-            count: automations.length,
-            conversation_id: conversation.id,
+            count: automations.length, conversation_id: conversation.id,
           });
         }
       } else if (!existingMsg) {
-        // Outgoing message with a message_id not previously stored by our system.
-        // This means the operator sent it from their phone directly (not via the CRM
-        // or the automation queue). Pause the automation so follow-ups stop firing
-        // over a conversation that the operator is already handling manually.
+        // Operator sent from phone directly — pause automation
         const automations = await findActiveAutomations(
           supabase, account.id, conversation.id, conversation.lead_id
         );
@@ -419,22 +413,16 @@ serve(async (req) => {
 
         if (automations.length > 0) {
           console.log('[whatsapp-webhook] Automation(s) paused - operator phone takeover', {
-            count: automations.length,
-            conversation_id: conversation.id,
+            count: automations.length, conversation_id: conversation.id,
           });
         }
       }
 
-      await supabase
-        .from('whatsapp_conversations')
-        .update(updateData)
-        .eq('id', conversation.id);
+      await supabase.from('whatsapp_conversations').update(updateData).eq('id', conversation.id);
 
       console.log('[whatsapp-webhook] Message processed', {
-        message_id: messageId,
-        phone: phoneNumber,
-        is_from_me: isFromMe,
-        type: messageType,
+        message_id: messageId, phone: phoneNumber,
+        is_from_me: isFromMe, type: messageType, lead_id: conversation.lead_id,
       });
     }
 
@@ -445,8 +433,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('[whatsapp-webhook] Error:', error);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });

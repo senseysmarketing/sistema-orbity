@@ -6647,6 +6647,14 @@ export type Database = {
         Returns: boolean
       }
       extract_month_immutable: { Args: { d: string }; Returns: string }
+      find_lead_by_normalized_phone: {
+        Args: { p_agency_id: string; p_phone_digits: string }
+        Returns: {
+          id: string
+          name: string
+          phone: string
+        }[]
+      }
       get_agency_subscription: {
         Args: { agency_uuid?: string }
         Returns: {
