@@ -269,7 +269,7 @@ serve(async (req) => {
       // and wrapped format (Evolution v1: data.message.key + data.message.message)
       const key = data?.key || data?.message?.key;
       const messageId = key?.id || crypto.randomUUID();
-      const isFromMe = key?.fromMe || false;
+      const isFromMe = isSendMessageEvent ? true : (key?.fromMe || false);
       const remoteJid = key?.remoteJid || '';
 
       // Filter out invalid JIDs (groups, status, Meta Messenger @lid)
