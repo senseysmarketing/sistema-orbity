@@ -19,15 +19,50 @@ function normalizePhone(phone: string): string {
 function phoneVariants(phone: string): string[] {
   const digits = normalizePhone(phone);
   const variants = new Set<string>([digits, '+' + digits]);
+
+  // With country code 55
   if (digits.startsWith('55') && digits.length === 13) {
-    const local = digits.slice(2);
-    variants.add(local);
-    variants.add('+55' + local);
+    // 55 + DDD(2) + 9 + number(8) = 13 digits — has 9th digit
+    const ddd = digits.slice(2, 4);
+    const localWithNine = digits.slice(4); // 9xxxxxxxx (9 digits)
+    const localWithout = digits.slice(5); // xxxxxxxx (8 digits)
+    variants.add(ddd + localWithNine); // DDD + 9 + 8 digits (11)
+    variants.add('+55' + ddd + localWithNine);
+    // Variant WITHOUT the 9th digit
+    variants.add('55' + ddd + localWithout); // 12 digits
+    variants.add('+55' + ddd + localWithout);
+    variants.add(ddd + localWithout); // 10 digits
+  } else if (digits.startsWith('55') && digits.length === 12) {
+    // 55 + DDD(2) + number(8) = 12 digits — missing 9th digit
+    const ddd = digits.slice(2, 4);
+    const localWithout = digits.slice(4); // xxxxxxxx (8 digits)
+    variants.add(ddd + localWithout); // 10 digits
+    variants.add('+55' + ddd + localWithout);
+    // Variant WITH the 9th digit
+    variants.add('55' + ddd + '9' + localWithout); // 13 digits
+    variants.add('+55' + ddd + '9' + localWithout);
+    variants.add(ddd + '9' + localWithout); // 11 digits
   }
-  if (!digits.startsWith('55') && digits.length === 11) {
+
+  // Without country code
+  if (!digits.startsWith('55') && (digits.length === 11 || digits.length === 10)) {
     variants.add('55' + digits);
     variants.add('+55' + digits);
+    if (digits.length === 11) {
+      // Has 9th digit, add variant without
+      const ddd = digits.slice(0, 2);
+      const localWithout = digits.slice(3);
+      variants.add('55' + ddd + localWithout);
+      variants.add(ddd + localWithout);
+    } else if (digits.length === 10) {
+      // Missing 9th digit, add variant with
+      const ddd = digits.slice(0, 2);
+      const local = digits.slice(2);
+      variants.add('55' + ddd + '9' + local);
+      variants.add(ddd + '9' + local);
+    }
   }
+
   return [...variants];
 }
 
