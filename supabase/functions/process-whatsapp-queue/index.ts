@@ -178,11 +178,33 @@ serve(async (req) => {
         if (!replyConv && conv?.phone_number && conv.phone_number.length >= 8) {
           const phoneDigits = conv.phone_number.replace(/\D/g, '');
           const pVariants = new Set<string>([phoneDigits, '+' + phoneDigits]);
+
+          // Brazilian phone variant generation (with/without 9th digit)
           if (phoneDigits.startsWith('55') && phoneDigits.length === 13) {
+            const ddd = phoneDigits.slice(2, 4);
+            const localWithout = phoneDigits.slice(5);
+            pVariants.add(phoneDigits.slice(2)); // without country code
+            pVariants.add('55' + ddd + localWithout); // without 9th digit
+            pVariants.add(ddd + localWithout);
+          } else if (phoneDigits.startsWith('55') && phoneDigits.length === 12) {
+            const ddd = phoneDigits.slice(2, 4);
+            const local = phoneDigits.slice(4);
             pVariants.add(phoneDigits.slice(2));
+            pVariants.add('55' + ddd + '9' + local); // with 9th digit
+            pVariants.add(ddd + '9' + local);
           }
           if (!phoneDigits.startsWith('55') && phoneDigits.length === 11) {
             pVariants.add('55' + phoneDigits);
+            const ddd = phoneDigits.slice(0, 2);
+            const localWithout = phoneDigits.slice(3);
+            pVariants.add('55' + ddd + localWithout);
+            pVariants.add(ddd + localWithout);
+          } else if (!phoneDigits.startsWith('55') && phoneDigits.length === 10) {
+            pVariants.add('55' + phoneDigits);
+            const ddd = phoneDigits.slice(0, 2);
+            const local = phoneDigits.slice(2);
+            pVariants.add('55' + ddd + '9' + local);
+            pVariants.add(ddd + '9' + local);
           }
 
           const { data: phoneConv } = await supabase
