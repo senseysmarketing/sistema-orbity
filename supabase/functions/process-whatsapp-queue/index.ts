@@ -156,9 +156,7 @@ serve(async (req) => {
         if (conv?.last_customer_message_at) {
           replyConv = conv as { id: string; last_customer_message_at: string };
         } else if (record.lead_id) {
-          // Fallback: check any conversation for this lead with a customer reply.
-          // This catches the case where the webhook created a separate conversation
-          // (due to phone format mismatch) and stored the reply there instead.
+          // Fallback 1: check any conversation for this lead with a customer reply.
           const { data: altConv } = await supabase
             .from('whatsapp_conversations')
             .select('id, last_customer_message_at')
@@ -171,6 +169,35 @@ serve(async (req) => {
 
           if (altConv?.last_customer_message_at) {
             replyConv = altConv as { id: string; last_customer_message_at: string };
+          }
+        }
+
+        // Fallback 2: if still no reply found, check by normalized phone number.
+        // This catches cases where the conversation was created with a different phone format
+        // and the lead_id was never linked (e.g. before find_lead_by_normalized_phone existed).
+        if (!replyConv && conv?.phone_number && conv.phone_number.length >= 8) {
+          const phoneDigits = conv.phone_number.replace(/\D/g, '');
+          const pVariants = new Set<string>([phoneDigits, '+' + phoneDigits]);
+          if (phoneDigits.startsWith('55') && phoneDigits.length === 13) {
+            pVariants.add(phoneDigits.slice(2));
+          }
+          if (!phoneDigits.startsWith('55') && phoneDigits.length === 11) {
+            pVariants.add('55' + phoneDigits);
+          }
+
+          const { data: phoneConv } = await supabase
+            .from('whatsapp_conversations')
+            .select('id, last_customer_message_at')
+            .eq('account_id', record.whatsapp_accounts?.id)
+            .in('phone_number', [...pVariants])
+            .not('last_customer_message_at', 'is', null)
+            .neq('id', conv.id)
+            .order('last_customer_message_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (phoneConv?.last_customer_message_at) {
+            replyConv = phoneConv as { id: string; last_customer_message_at: string };
           }
         }
 
