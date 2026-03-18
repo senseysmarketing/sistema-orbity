@@ -25,6 +25,7 @@ export function WhatsAppChat({ leadId, leadPhone }: WhatsAppChatProps) {
     account,
     isConnected,
     sendMessage,
+    syncMessages,
     startAutomation,
     toggleAutomation,
     useConversationMessages,
@@ -35,6 +36,16 @@ export function WhatsAppChat({ leadId, leadPhone }: WhatsAppChatProps) {
   const { data: conversation, isLoading: loadingConv } = useLeadConversation(leadId);
   const { data: messages = [], isLoading: loadingMessages } = useConversationMessages(conversation?.id || null);
   const { data: automation } = useLeadAutomation(leadId);
+
+  // Sync messages from Evolution API when conversation loads
+  const hasSynced = useRef(false);
+  useEffect(() => {
+    if (conversation?.id && leadPhone && !hasSynced.current) {
+      hasSynced.current = true;
+      const normalizedPhone = leadPhone.replace(/\D/g, '');
+      syncMessages.mutate({ phone_number: normalizedPhone, conversation_id: conversation.id });
+    }
+  }, [conversation?.id, leadPhone]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
