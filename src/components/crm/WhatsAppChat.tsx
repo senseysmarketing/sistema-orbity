@@ -132,7 +132,23 @@ export function WhatsAppChat({ leadId, leadPhone }: WhatsAppChatProps) {
           )}
         </div>
         <div className="flex gap-1 flex-shrink-0">
-          {!automation || automation.status === 'finished' || automation.status === 'responded' ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (leadPhone) {
+                syncMessages.mutate({ 
+                  phone_number: leadPhone.replace(/\D/g, ''), 
+                  conversation_id: conversation?.id 
+                });
+              }
+            }}
+            disabled={syncMessages.isPending}
+            className="text-xs h-7 w-7 p-0"
+            title="Sincronizar mensagens"
+          >
+            <RefreshCw className={cn("h-3 w-3", syncMessages.isPending && "animate-spin")} />
+          </Button>
             <Button
               variant="outline"
               size="sm"
