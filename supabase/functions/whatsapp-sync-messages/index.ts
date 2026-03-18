@@ -81,7 +81,23 @@ serve(async (req) => {
     }
 
     const evoData = await evoResponse.json();
-    const messages = Array.isArray(evoData) ? evoData : (evoData?.messages || evoData?.data || []);
+    
+    // Log response structure for debugging
+    const responseType = Array.isArray(evoData) ? 'array' : typeof evoData;
+    const topKeys = evoData && typeof evoData === 'object' && !Array.isArray(evoData) ? Object.keys(evoData) : [];
+    console.log(`[sync] Response type: ${responseType}, keys: ${JSON.stringify(topKeys)}`);
+
+    // Handle various Evolution API response formats
+    let messages: any[] = [];
+    if (Array.isArray(evoData)) {
+      messages = evoData;
+    } else if (evoData && typeof evoData === 'object') {
+      messages = evoData.messages || evoData.data || evoData.records || [];
+      // If still not an array, check if the response itself contains message-like data
+      if (!Array.isArray(messages)) {
+        messages = [];
+      }
+    }
 
     console.log(`[sync] Got ${messages.length} messages from Evolution API`);
 
