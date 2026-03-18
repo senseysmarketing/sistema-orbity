@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   MessageSquare, Send, Loader2, Play, Pause, Bot, 
-  WifiOff, Zap 
+  WifiOff, Zap, RefreshCw
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -25,6 +25,7 @@ export function WhatsAppChat({ leadId, leadPhone }: WhatsAppChatProps) {
     account,
     isConnected,
     sendMessage,
+    syncMessages,
     startAutomation,
     toggleAutomation,
     useConversationMessages,
@@ -35,6 +36,16 @@ export function WhatsAppChat({ leadId, leadPhone }: WhatsAppChatProps) {
   const { data: conversation, isLoading: loadingConv } = useLeadConversation(leadId);
   const { data: messages = [], isLoading: loadingMessages } = useConversationMessages(conversation?.id || null);
   const { data: automation } = useLeadAutomation(leadId);
+
+  // Sync messages from Evolution API when conversation loads
+  const hasSynced = useRef(false);
+  useEffect(() => {
+    if (conversation?.id && leadPhone && !hasSynced.current) {
+      hasSynced.current = true;
+      const normalizedPhone = leadPhone.replace(/\D/g, '');
+      syncMessages.mutate({ phone_number: normalizedPhone, conversation_id: conversation.id });
+    }
+  }, [conversation?.id, leadPhone]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -121,6 +132,23 @@ export function WhatsAppChat({ leadId, leadPhone }: WhatsAppChatProps) {
           )}
         </div>
         <div className="flex gap-1 flex-shrink-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (leadPhone) {
+                syncMessages.mutate({ 
+                  phone_number: leadPhone.replace(/\D/g, ''), 
+                  conversation_id: conversation?.id 
+                });
+              }
+            }}
+            disabled={syncMessages.isPending}
+            className="text-xs h-7 w-7 p-0"
+            title="Sincronizar mensagens"
+          >
+            <RefreshCw className={cn("h-3 w-3", syncMessages.isPending && "animate-spin")} />
+          </Button>
           {!automation || automation.status === 'finished' || automation.status === 'responded' ? (
             <Button
               variant="outline"
