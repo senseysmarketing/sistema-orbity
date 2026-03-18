@@ -149,6 +149,7 @@ export function WhatsAppChat({ leadId, leadPhone }: WhatsAppChatProps) {
           >
             <RefreshCw className={cn("h-3 w-3", syncMessages.isPending && "animate-spin")} />
           </Button>
+          {!automation || automation.status === 'finished' || automation.status === 'responded' ? (
             <Button
               variant="outline"
               size="sm"
