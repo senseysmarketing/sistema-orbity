@@ -52,4 +52,15 @@ Lead capturado → Auto-enroll → Greeting Step 1 (após delay) → ... → Gre
 |---|---|
 | `messages.upsert` | Processa mensagem nova, cria/busca conversa, detecta resposta |
 | `messages.update` | **Apenas atualiza status** (READ/DELIVERED) de mensagens existentes |
+| `send.message` | Processa mensagem enviada via API, salva com isFromMe=true |
 | `connection.update` | Atualiza status de conexão da conta |
+
+## Sync On-Demand (Adicionado 18/03/2026)
+
+A Evolution API não envia webhook para mensagens enviadas pelo app nativo do WhatsApp.
+Solução: edge function `whatsapp-sync-messages` que chama `POST /chat/findMessages/{instance}`
+da Evolution API para buscar mensagens e fazer upsert no banco.
+
+- Chamada automaticamente ao abrir o modal de WhatsApp do lead
+- Botão de refresh manual (ícone RefreshCw) no header do chat
+- Faz upsert usando `account_id,message_id` como chave de unicidade
