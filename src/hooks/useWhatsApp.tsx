@@ -326,6 +326,28 @@ export function useWhatsApp() {
     },
   });
 
+  // Sync messages from Evolution API (on-demand)
+  const syncMessages = useMutation({
+    mutationFn: async (params: { phone_number: string; conversation_id?: string }) => {
+      if (!account?.id) throw new Error('WhatsApp not configured');
+      const normalizedPhone = params.phone_number.replace(/\D/g, '');
+      const { data, error } = await supabase.functions.invoke('whatsapp-sync-messages', {
+        body: {
+          account_id: account.id,
+          phone_number: normalizedPhone,
+          conversation_id: params.conversation_id || null,
+        },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data?.synced > 0) {
+        queryClient.invalidateQueries({ queryKey: ['whatsapp-messages'] });
+      }
+    },
+  });
+
   return {
     account,
     isLoadingAccount,
@@ -336,6 +358,7 @@ export function useWhatsApp() {
     checkWebhook,
     refreshQR,
     sendMessage,
+    syncMessages,
     startAutomation,
     toggleAutomation,
     useConversationMessages,
