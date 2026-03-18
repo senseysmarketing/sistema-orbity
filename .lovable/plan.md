@@ -1,55 +1,40 @@
 
 
-# Check-up Completo: Sistema WhatsApp Automation
+# Sincronizar mensagens enviadas do WhatsApp nativo via polling da Evolution API
 
-## Status Geral: ✅ Saudável (após fixes em 17/03/2026)
+## Diagnóstico
 
----
+A Evolution API **não envia eventos webhook** para mensagens enviadas diretamente pelo app nativo do WhatsApp no celular. O evento `SEND_MESSAGE` só dispara para mensagens enviadas via API. O `MESSAGES_UPSERT` só captura mensagens recebidas (incoming).
 
-## Bugs Corrigidos (17/03/2026)
+Prova: os 2 áudios (11:32, 11:33) e o "Marcelo?" (14:55) do lead Marcelo Lima não aparecem nos logs do webhook, nem no banco de dados. As mensagens que aparecem (12:51, 12:54) foram enviadas pela automação via API.
 
-### Bug 1: `messages.update` criava mensagens fantasma ✅ CORRIGIDO
-- **Problema**: Evolution API v2 envia `messages.update` como array de status updates (READ/DELIVERED), não como objeto. O código antigo fazia `data?.key` que retornava `undefined` em arrays, criando 716 mensagens fantasma com phone_number vazio.
-- **Fix**: Tratamento separado para `messages.update` — apenas atualiza status de mensagens existentes, nunca cria conversas ou mensagens novas.
+## Solução
 
-### Bug 2: RPC `find_lead_by_normalized_phone` não existia ✅ CORRIGIDO
-- **Problema**: O webhook chamava esta RPC para linkar conversas a leads, mas ela nunca foi criada. Falhava silenciosamente, impedindo a detecção de respostas via fallback de lead_id.
-- **Fix**: Criada a função SQL `find_lead_by_normalized_phone` com `regexp_replace` para normalizar telefones.
+Criar um mecanismo de **sync on-demand** que busca mensagens diretamente da Evolution API quando o modal de WhatsApp do lead é aberto.
 
-### Bug 3: IDs do Meta Messenger (`@lid`) não filtrados ✅ CORRIGIDO
-- **Problema**: Números como `37705652138094@lid` são IDs do Meta Messenger, não números WhatsApp. Criavam conversas lixo.
-- **Fix**: Adicionada validação `isValidWhatsAppJid()` que rejeita `@lid`, `@g.us`, `status@broadcast`, e JIDs sem `@s.whatsapp.net`.
+### 1. Nova edge function `whatsapp-sync-messages`
 
-### Bug 4: Normalização do 9º dígito BR ✅ CORRIGIDO
-- **Problema**: Lead salvo como `+5551998500033` (13 dígitos) mas resposta chega como `555198500033` (12 dígitos, sem o 9). A RPC e o `phoneVariants()` só faziam match exato, criando conversas órfãs sem `lead_id`.
-- **Fix**:
-  - `phoneVariants()` no webhook agora gera variantes com/sem o 9º dígito após o DDD
-  - RPC `find_lead_by_normalized_phone` reescrita em PL/pgSQL com geração de variantes BR
-  - Fallback no `process-whatsapp-queue` também gera variantes com/sem 9º dígito
-  - Dados do Nilton Luiz Silva: conversa órfã mesclada na principal, automação marcada como `responded`
+Endpoint que:
+- Recebe `account_id` e `phone_number` do lead
+- Busca a conta WhatsApp (instance_name, api_url, api_key)
+- Chama `POST {api_url}/chat/findMessages/{instance}` com `where.key.remoteJid = "{phone}@s.whatsapp.net"`
+- Faz upsert das mensagens retornadas no `whatsapp_messages` (usando `message_id` como chave)
+- Marca mensagens com `fromMe: true` corretamente
+- Retorna o total sincronizado
 
-### Limpeza de dados ✅ EXECUTADA
-- 716 mensagens fantasma deletadas
-- Conversa fantasma `77e1005b` deletada
-- Conversas com phone_number vazio/curto limpas
-- Conversa órfã do Nilton (`555198500033`) mesclada na principal (`5551998500033`)
+### 2. Atualizar `useWhatsApp.tsx`
 
----
+Adicionar mutation `syncMessages` que chama a nova edge function.
 
-## Fluxo Atualizado
+### 3. Atualizar `WhatsAppChat.tsx`
 
-```text
-Lead capturado → Auto-enroll → Greeting Step 1 (após delay) → ... → Greeting Step N
-  → Follow-up Step 1 (após delay) → ... → Follow-up Step N → Finalizado
+- Chamar `syncMessages` automaticamente quando o componente monta (ou quando a conversa é carregada)
+- Adicionar botão de refresh manual (ícone de sync) no header do chat
+- Mostrar indicador de loading durante sync
 
-  ↕ A QUALQUER MOMENTO: cliente responde → webhook cancela automação
-  ↕ PROTEÇÃO TRIPLA: 1) webhook direto, 2) lead_id fallback, 3) phone fallback (com variantes BR)
-```
+### Arquivos
+- **Criar**: `supabase/functions/whatsapp-sync-messages/index.ts`
+- **Editar**: `src/hooks/useWhatsApp.tsx` — adicionar `syncMessages` mutation
+- **Editar**: `src/components/crm/WhatsAppChat.tsx` — trigger sync on mount + botão refresh
+- **Editar**: `supabase/config.toml` — adicionar config da nova function (verify_jwt = false)
 
-## Eventos do Webhook
-
-| Evento | Tratamento |
-|---|---|
-| `messages.upsert` | Processa mensagem nova, cria/busca conversa, detecta resposta |
-| `messages.update` | **Apenas atualiza status** (READ/DELIVERED) de mensagens existentes |
-| `connection.update` | Atualiza status de conexão da conta |
