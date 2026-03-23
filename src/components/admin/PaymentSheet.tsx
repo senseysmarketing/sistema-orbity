@@ -281,6 +281,37 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                 )}
               </div>
 
+              {/* Upsell/Downsell Switch */}
+              {totalAmount !== baseValue && (
+                <TooltipProvider>
+                  <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-3">
+                    <div className="flex items-center gap-2">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <Label htmlFor="update-contract" className="text-sm font-medium cursor-pointer">
+                            Tornar este o novo valor fixo mensal
+                          </Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[260px]">
+                              <p>Ao ativar, o valor base mensal do cliente será atualizado permanentemente. As faturas dos próximos meses serão geradas com este novo valor.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Atualiza o contrato do cliente para os próximos meses</p>
+                      </div>
+                    </div>
+                    <Switch
+                      id="update-contract"
+                      checked={updateContract}
+                      onCheckedChange={setUpdateContract}
+                    />
+                  </div>
+                </TooltipProvider>
+              )}
+
               {/* Datas e Status */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
