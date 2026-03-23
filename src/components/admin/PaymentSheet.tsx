@@ -161,7 +161,15 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
         .update({ status: "cancelled" as any })
         .eq("id", payment.id);
       if (error) throw error;
-      toast({ title: "Cobrança cancelada", description: "Esta cobrança foi perdoada e não será mais contabilizada." });
+      if (deactivateClient && clientId) {
+        const { error: clientError } = await supabase
+          .from("clients")
+          .update({ active: false })
+          .eq("id", clientId);
+        if (clientError) throw clientError;
+      }
+
+      toast({ title: "Cobrança cancelada", description: deactivateClient ? "Cobrança cancelada e cliente inativado." : "Esta cobrança foi perdoada e não será mais contabilizada." });
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
