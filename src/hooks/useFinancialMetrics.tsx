@@ -297,12 +297,20 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       .sort((a, b) => b.total - a.total);
   }, [expenses, totalPayroll, expenseCategories]);
 
+  const mapStatus = (status: string): CashFlowItem['status'] => {
+    if (status === 'paid') return 'PAID';
+    if (status === 'overdue') return 'OVERDUE';
+    if (status === 'cancelled') return 'CANCELLED';
+    return 'PENDING';
+  };
+
   // Unified cash flow
   const unifiedCashFlow = useMemo((): CashFlowItem[] => {
     const items: CashFlowItem[] = [];
 
     // Payments (income)
     paymentsInMonth.forEach(p => {
+      if (p.status === 'cancelled' as any) return;
       const client = clients.find(c => c.id === p.client_id);
       if (!client || !wasClientActiveInMonth(client, selectedMonth)) return;
       items.push({
@@ -311,7 +319,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         amount: p.amount,
         dueDate: p.due_date,
         type: 'INCOME',
-        status: p.status === 'paid' ? 'PAID' : p.status === 'overdue' ? 'OVERDUE' : 'PENDING',
+        status: mapStatus(p.status),
         sourceType: 'client_payment',
         sourceId: p.id,
       });
@@ -319,13 +327,14 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
 
     // Expenses
     expenses.forEach(e => {
+      if (e.status === 'cancelled' as any) return;
       items.push({
         id: e.id,
         title: e.name,
         amount: e.amount,
         dueDate: e.due_date,
         type: 'EXPENSE',
-        status: e.status === 'paid' ? 'PAID' : e.status === 'overdue' ? 'OVERDUE' : 'PENDING',
+        status: mapStatus(e.status),
         sourceType: 'expense',
         sourceId: e.id,
       });
@@ -333,13 +342,14 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
 
     // Salaries
     salaries.forEach(s => {
+      if (s.status === 'cancelled' as any) return;
       items.push({
         id: s.id,
         title: `Salário - ${s.employee_name}`,
         amount: s.amount,
         dueDate: s.due_date,
         type: 'EXPENSE',
-        status: s.status === 'paid' ? 'PAID' : s.status === 'overdue' ? 'OVERDUE' : 'PENDING',
+        status: mapStatus(s.status),
         sourceType: 'salary',
         sourceId: s.id,
       });
