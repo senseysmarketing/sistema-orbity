@@ -252,7 +252,9 @@ serve(async (req) => {
         }
 
         const account = record.whatsapp_accounts;
-        if (account.status !== 'connected') {
+        // Accept both 'connected' and 'connecting' — Evolution often keeps session active during transient states
+        if (account.status !== 'connected' && account.status !== 'connecting') {
+          console.warn('[process-queue] Account not connected, skipping. Status:', account.status, 'Account:', account.id);
           await supabase.from('whatsapp_automation_control').update({ status: 'active' }).eq('id', record.id);
           continue;
         }

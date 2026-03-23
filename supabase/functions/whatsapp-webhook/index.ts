@@ -198,14 +198,25 @@ serve(async (req) => {
     // Handle connection status updates
     if (event === 'connection.update') {
       const state = data?.state;
-      const newStatus = state === 'open' ? 'connected' : state === 'close' ? 'disconnected' : 'connecting';
+      // Only update status for definitive states: 'open' = connected, 'close' = disconnected
+      // Ignore transient states (connecting, syncing, etc.) to avoid blocking the queue processor
+      let newStatus: string | null = null;
+      if (state === 'open') {
+        newStatus = 'connected';
+      } else if (state === 'close') {
+        newStatus = 'disconnected';
+      }
 
-      await supabase.from('whatsapp_accounts').update({
-        status: newStatus,
-        qr_code: newStatus === 'connected' ? null : undefined,
-      }).eq('id', account.id);
+      if (newStatus) {
+        const updateData: Record<string, any> = { status: newStatus };
+        if (newStatus === 'connected') updateData.qr_code = null;
 
-      console.log('[whatsapp-webhook] Connection status updated:', newStatus);
+        await supabase.from('whatsapp_accounts').update(updateData).eq('id', account.id);
+        console.log('[whatsapp-webhook] Connection status updated:', newStatus);
+      } else {
+        console.log('[whatsapp-webhook] Ignoring transient connection state:', state);
+      }
+
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
