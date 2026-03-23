@@ -540,6 +540,8 @@ export default function Admin() {
         onOpenChange={setExpenseDetailsOpen}
         onEdit={handleEditExpense}
         onDelete={handleDeleteExpense}
+        onDeleteInstance={handleDeleteExpenseInstance}
+        onCancelSubscription={handleCancelExpenseSubscription}
         onRefresh={metrics.refetchAll}
         onViewMaster={handleViewMasterExpense}
       />
