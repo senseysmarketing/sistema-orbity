@@ -468,6 +468,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     // Mutations
     markAsPaid: markAsPaidMutation.mutate,
     isMarkingAsPaid: markAsPaidMutation.isPending,
+    cancelItem: cancelItemMutation.mutate,
+    isCancellingItem: cancelItemMutation.isPending,
 
     // Loading
     isLoading,

@@ -411,6 +411,20 @@ export default function Admin() {
           expensesByCategory={metrics.expensesByCategory}
           onMarkAsPaid={metrics.markAsPaid}
           isMarkingAsPaid={metrics.isMarkingAsPaid}
+          onEditItem={(item) => {
+            if (item.sourceType === 'client_payment') {
+              const payment = metrics.paymentsInMonth.find(p => p.id === item.sourceId);
+              if (payment) { setSelectedPayment(payment); setPaymentFormOpen(true); }
+            } else if (item.sourceType === 'expense') {
+              const expense = metrics.expenses.find(e => e.id === item.sourceId);
+              if (expense) { setSelectedExpense(expense); setExpenseFormOpen(true); }
+            } else if (item.sourceType === 'salary') {
+              const salary = metrics.salaries.find(s => s.id === item.sourceId);
+              if (salary) { setSelectedSalary(salary); setSalaryFormOpen(true); }
+            }
+          }}
+          onCancelItem={metrics.cancelItem}
+          isCancellingItem={metrics.isCancellingItem}
         />
         <ClientProfitabilityCard clients={metrics.clientProfitability} />
       </div>
