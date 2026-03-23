@@ -96,6 +96,8 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
       setStatus("pending");
       setDescription("");
     }
+    setUpdateContract(false);
+    setDeactivateClient(false);
   }, [open, payment, preselectedClient, clients]);
 
   const handleClientChange = (id: string) => {
