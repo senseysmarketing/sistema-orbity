@@ -45,6 +45,8 @@ interface ExpenseDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
   onEdit: (expense: Expense) => void;
   onDelete: (expense: Expense) => void;
+  onDeleteInstance?: (expense: Expense) => void;
+  onCancelSubscription?: (expense: Expense) => void;
   onRefresh?: () => void;
   onViewMaster?: (masterId: string) => void;
 }
