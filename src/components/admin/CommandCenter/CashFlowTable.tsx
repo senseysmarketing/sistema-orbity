@@ -6,7 +6,8 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { MarkAsPaidPopover } from "./MarkAsPaidPopover";
 import type { CashFlowItem, CategoryTotal } from "@/hooks/useFinancialMetrics";
@@ -26,6 +27,7 @@ interface CashFlowTableProps {
 
 export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, className }: CashFlowTableProps) {
   const [filter, setFilter] = useState<FilterType>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [cancelDialogItem, setCancelDialogItem] = useState<CashFlowItem | null>(null);
 
   const filtered = useMemo(() => {
@@ -41,8 +43,11 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
         return d >= today && d <= in7Days && item.status !== 'PAID';
       }
       return true;
+    }).filter(item => {
+      if (!searchTerm.trim()) return true;
+      return item.title.toLowerCase().includes(searchTerm.toLowerCase());
     });
-  }, [cashFlow, filter]);
+  }, [cashFlow, filter, searchTerm]);
 
   const maxCategoryTotal = expensesByCategory.length > 0 ? expensesByCategory[0].total : 1;
   const overdueCount = cashFlow.filter(i => i.status === 'OVERDUE').length;
@@ -72,6 +77,15 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
               <Filter className="h-4 w-4 text-muted-foreground" />
               Fluxo de Caixa
             </CardTitle>
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Pesquisar..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-8 pl-8 text-sm"
+              />
+            </div>
             <div className="flex gap-1.5">
               <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" className="h-7 text-xs" onClick={() => setFilter('all')}>
                 Este Mês

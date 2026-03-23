@@ -12,7 +12,7 @@ interface FloatingActionBarProps {
 
 export function FloatingActionBar({ selectedMonth, onChangeMonth, onNewClient, onNewExpense, onNewPayment }: FloatingActionBarProps) {
   return (
-    <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b -mx-4 px-4 py-3 mb-4 lg:-mx-6 lg:px-6">
+    <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-4 px-4 py-3 mb-4 lg:-mx-6 lg:px-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Centro de Comando</h1>
@@ -33,7 +33,7 @@ export function FloatingActionBar({ selectedMonth, onChangeMonth, onNewClient, o
               })}
             </SelectContent>
           </Select>
-          <Button size="sm" variant="create" onClick={onNewClient} className="h-9">
+          <Button size="sm" variant="outline" onClick={onNewClient} className="h-9">
             <Building className="h-3.5 w-3.5 mr-1" /> Novo Cliente
           </Button>
           <Button size="sm" variant="outline" onClick={onNewExpense} className="h-9">
