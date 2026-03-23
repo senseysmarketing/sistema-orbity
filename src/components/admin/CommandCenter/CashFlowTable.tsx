@@ -27,6 +27,7 @@ interface CashFlowTableProps {
 
 export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, className }: CashFlowTableProps) {
   const [filter, setFilter] = useState<FilterType>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [cancelDialogItem, setCancelDialogItem] = useState<CashFlowItem | null>(null);
 
   const filtered = useMemo(() => {
