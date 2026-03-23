@@ -1,57 +1,54 @@
 
 
-# Exclusao Inteligente de Despesas (Recorrente vs Unica)
+# Refatorar PaymentForm → Sheet Avancado de Gestao de Fatura
 
-## Estado atual
-
-- `ExpenseDetailsDialog` ja tem botao "Excluir" + AlertDialog simples (mesmo texto para todos os tipos)
-- `ExpenseForm` NAO tem botao de exclusao
-- `Admin.tsx` tem `confirmDeleteExpense` que faz `DELETE` direto no banco
-- A logica nao diferencia entre despesa unica, parcelada ou recorrente
+## Resumo
+Substituir o `PaymentForm` (Dialog) por um novo componente `PaymentSheet` (Sheet lateral) com calculo dinamico de fatura, acao de cancelamento inteligente e botao preparatorio de cobranca WhatsApp.
 
 ## Alteracoes
 
-### 1. `ExpenseForm.tsx` — Adicionar botao Excluir + AlertDialog inteligente
+### 1. Novo componente `src/components/admin/PaymentSheet.tsx`
+Substituir completamente o PaymentForm por um Sheet lateral com:
 
-No `DialogFooter` (linha 467), quando `expense` existir (modo edicao):
-- Adicionar botao "Excluir" (ghost, icone Trash2, cor destructive) ao lado esquerdo
-- Ao clicar, abrir AlertDialog com logica condicional:
+**Layout do Sheet:**
+- `SheetHeader`: titulo "Fatura do Mes" + nome do cliente + badge de status (PENDING/OVERDUE/PAID/CANCELLED)
+- `SheetContent` com scroll interno
 
-**Cenario A** (`expense_type !== 'recorrente'` e sem `parent_expense_id`):
-- Titulo: "Excluir Despesa"
-- Texto padrao: "Tem certeza? Esta acao nao pode ser desfeita."
-- Botao: "Excluir" → chama `onDelete(expense)` (novo callback via props)
+**Campos do formulario:**
+- **Cliente** (Select ou Input disabled se preselectedClient) — mesmo comportamento atual
+- **Valor Base do Contrato** — Input disabled, valor `monthly_value` do cliente (somente leitura)
+- **Acrescimos / Multa** — Input numerico opcional, default 0
+- **Descontos** — Input numerico opcional, default 0
+- **Valor Total da Fatura** — campo calculado em tempo real: `baseValue + additions - discounts`. Exibido como texto grande/bold, nao editavel. Este valor sera salvo no `amount` do `client_payments`
+- **Data de Vencimento** — date input
+- **Data de Pagamento** — date input (visivel apenas se status === 'paid')
+- **Status** — Select (pending, paid, overdue)
+- **Observacoes da Fatura** — Textarea, salvo no campo `description` (ja existe na tabela)
 
-**Cenario B** (`expense_type === 'recorrente'` OU `parent_expense_id` presente):
-- Titulo: "Excluir Despesa Recorrente"
-- Texto: "Esta despesa faz parte de uma recorrencia. O que deseja fazer?"
-- Botao 1: "Apagar apenas esta" → chama `onDeleteInstance(expense)` (marca como cancelled ou deleta so esta)
-- Botao 2: "Cancelar Assinatura" → chama `onCancelSubscription(expense)` (deleta/cancela esta + `is_active: false` no pai)
+**Inicializacao em modo edicao:**
+- `baseValue` = valor do contrato mestre do cliente (buscar em `metrics.clients`)
+- `additions` = `payment.amount - baseValue` se positivo, senao 0
+- `discounts` = `baseValue - payment.amount` se positivo, senao 0
+- Ou simplesmente: mostrar o `amount` atual e permitir ajuste via additions/discounts
 
-Props novas no ExpenseForm: `onDelete`, `onDeleteInstance`, `onCancelSubscription`
+**Acoes no footer:**
+- Botao "Salvar" — muta `client_payments` com `amount = baseValue + additions - discounts`
+- Botao "Cancelar" (outline) — fecha o sheet
+- Botao "Cancelar Cobranca" (destructive, icone Ban) — visivel apenas em modo edicao. Abre AlertDialog: "Deseja cancelar esta cobranca? O cliente nao sera cobrado neste mes." → muta status para `cancelled`
+- Botao "Enviar Cobranca via WhatsApp" (outline, icone MessageSquare) — visivel se status === 'pending' ou 'overdue'. Por enquanto, exibe toast "Em breve: integracao com WhatsApp"
 
-### 2. `ExpenseDetailsDialog.tsx` — Melhorar AlertDialog existente (linhas 468-492)
+**Loading:** Skeleton enquanto clients nao carregaram
 
-Mesmo padrão do ExpenseForm:
-- Se `expense_type === 'recorrente'` ou `parent_expense_id` existir → mostrar AlertDialog com 2 opcoes
-- Senao → manter AlertDialog simples atual
+### 2. `src/pages/Admin.tsx` — Trocar PaymentForm por PaymentSheet
+- Substituir import e uso de `<PaymentForm>` por `<PaymentSheet>`
+- Passar `clients={metrics.clients}` como prop para o Sheet resolver o `baseValue`
+- `onSuccess` continua chamando `metrics.refetchAll()`
 
-### 3. `Admin.tsx` — Implementar handlers de exclusao inteligente
+### 3. Nao precisa de migracao SQL
+O campo `description` ja existe em `client_payments` e sera usado para as observacoes.
 
-Adicionar 2 novos handlers:
-
-**`handleDeleteExpenseInstance(expense)`**: Marca apenas a instancia como `cancelled` (status = 'cancelled') em vez de deletar, para manter historico.
-
-**`handleCancelExpenseSubscription(expense)`**: 
-1. Marca a instancia atual como `cancelled`
-2. Busca o `parent_expense_id` (ou usa o proprio `id` se for a mestra)
-3. Faz `UPDATE expenses SET is_active = false WHERE id = parentId`
-4. Invalida queries
-
-Passar esses handlers como props para `ExpenseForm` e `ExpenseDetailsDialog`.
-
-## Arquivos modificados
-- `src/components/admin/ExpenseForm.tsx` — botao excluir + AlertDialog inteligente
-- `src/components/admin/ExpenseDetailsDialog.tsx` — AlertDialog com 2 cenarios
-- `src/pages/Admin.tsx` — novos handlers de exclusao
+## Arquivos
+- **Criar**: `src/components/admin/PaymentSheet.tsx`
+- **Editar**: `src/pages/Admin.tsx` (trocar PaymentForm por PaymentSheet)
+- **Manter**: `src/components/admin/PaymentForm.tsx` (nao deletar, pode ser usado em outros contextos)
 
