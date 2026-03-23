@@ -57,6 +57,8 @@ export function ExpenseDetailsDialog({
   onOpenChange,
   onEdit,
   onDelete,
+  onDeleteInstance,
+  onCancelSubscription,
   onRefresh,
   onViewMaster,
 }: ExpenseDetailsDialogProps) {
