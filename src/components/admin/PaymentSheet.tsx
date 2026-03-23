@@ -11,7 +11,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
-import { Ban, MessageSquare, Save, X } from "lucide-react";
+import { Ban, HelpCircle, MessageSquare, Save, X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface PaymentSheetProps {
   open: boolean;
@@ -34,6 +37,8 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const { currentAgency } = useAgency();
   const [loading, setLoading] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [updateContract, setUpdateContract] = useState(false);
+  const [deactivateClient, setDeactivateClient] = useState(false);
 
   const [clientId, setClientId] = useState("");
   const [baseValue, setBaseValue] = useState(0);
@@ -91,6 +96,8 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
       setStatus("pending");
       setDescription("");
     }
+    setUpdateContract(false);
+    setDeactivateClient(false);
   }, [open, payment, preselectedClient, clients]);
 
   const handleClientChange = (id: string) => {
@@ -127,7 +134,15 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
         if (error) throw error;
       }
 
-      toast({ title: payment ? "Fatura atualizada" : "Fatura criada", description: "Salvo com sucesso!" });
+      if (updateContract && totalAmount !== baseValue) {
+        const { error: contractError } = await supabase
+          .from("clients")
+          .update({ monthly_value: totalAmount })
+          .eq("id", clientId);
+        if (contractError) throw contractError;
+      }
+
+      toast({ title: payment ? "Fatura atualizada" : "Fatura criada", description: updateContract ? "Salvo e contrato atualizado!" : "Salvo com sucesso!" });
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
@@ -146,7 +161,15 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
         .update({ status: "cancelled" as any })
         .eq("id", payment.id);
       if (error) throw error;
-      toast({ title: "Cobrança cancelada", description: "Esta cobrança foi perdoada e não será mais contabilizada." });
+      if (deactivateClient && clientId) {
+        const { error: clientError } = await supabase
+          .from("clients")
+          .update({ active: false })
+          .eq("id", clientId);
+        if (clientError) throw clientError;
+      }
+
+      toast({ title: "Cobrança cancelada", description: deactivateClient ? "Cobrança cancelada e cliente inativado." : "Esta cobrança foi perdoada e não será mais contabilizada." });
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
@@ -258,6 +281,37 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                 )}
               </div>
 
+              {/* Upsell/Downsell Switch */}
+              {totalAmount !== baseValue && (
+                <TooltipProvider>
+                  <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-3">
+                    <div className="flex items-center gap-2">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <Label htmlFor="update-contract" className="text-sm font-medium cursor-pointer">
+                            Tornar este o novo valor fixo mensal
+                          </Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-[260px]">
+                              <p>Ao ativar, o valor base mensal do cliente será atualizado permanentemente. As faturas dos próximos meses serão geradas com este novo valor.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Atualiza o contrato do cliente para os próximos meses</p>
+                      </div>
+                    </div>
+                    <Switch
+                      id="update-contract"
+                      checked={updateContract}
+                      onCheckedChange={setUpdateContract}
+                    />
+                  </div>
+                </TooltipProvider>
+              )}
+
               {/* Datas e Status */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -338,6 +392,31 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
             <AlertDialogDescription>
               Deseja realmente cancelar e perdoar esta cobrança? O cliente não será mais cobrado por este mês. O registro será mantido no histórico.
             </AlertDialogDescription>
+            <TooltipProvider>
+              <div className="flex items-start gap-2 mt-3 rounded-lg border p-3">
+                <Checkbox
+                  id="deactivate-client"
+                  checked={deactivateClient}
+                  onCheckedChange={(v) => setDeactivateClient(v === true)}
+                />
+                <div className="grid gap-0.5 leading-none">
+                  <div className="flex items-center gap-1.5">
+                    <label htmlFor="deactivate-client" className="text-sm font-medium cursor-pointer">
+                      Também inativar este cliente (Pausar contrato)
+                    </label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[260px]">
+                        <p>O cliente será marcado como inativo e novas cobranças não serão geradas nos próximos meses.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Impede geração automática de futuras faturas</p>
+                </div>
+              </div>
+            </TooltipProvider>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Voltar</AlertDialogCancel>
