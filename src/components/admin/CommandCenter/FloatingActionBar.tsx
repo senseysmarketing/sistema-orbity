@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Receipt, DollarSign, Building } from "lucide-react";
+import { Receipt, DollarSign, Building } from "lucide-react";
 
 interface FloatingActionBarProps {
   selectedMonth: string;

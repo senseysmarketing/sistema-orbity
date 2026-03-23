@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { Users, Briefcase, Plus, Play, Settings, UserCheck, UserX } from "lucide-react";
+import { Users, Plus, Play, Settings, UserCheck, UserX } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import type { Employee } from "@/hooks/useFinancialMetrics";
 

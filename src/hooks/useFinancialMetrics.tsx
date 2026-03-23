@@ -129,10 +129,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   // Previous month
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
-  const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-  const prevStartDate = `${prevMonthStr}-01`;
-  const prevLastDay = new Date(prevYear, prevMonth, 0).getDate();
-  const prevEndDate = `${prevMonthStr}-${String(prevLastDay).padStart(2, '0')}`;
+  const _prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
 
   // Queries
   const clientsQuery = useQuery({
