@@ -15,7 +15,7 @@ import type { Client, ClientPayment, Expense, Salary, Employee } from "@/hooks/u
 
 // Forms (keep using Dialog internally - Diretriz 1: they work standalone)
 import { ClientForm } from "@/components/admin/ClientForm";
-import { PaymentForm } from "@/components/admin/PaymentForm";
+import { PaymentSheet } from "@/components/admin/PaymentSheet";
 import { ExpenseForm } from "@/components/admin/ExpenseForm";
 import { SalaryForm } from "@/components/admin/SalaryForm";
 import { EmployeeForm } from "@/components/admin/EmployeeForm";
@@ -486,11 +486,12 @@ export default function Admin() {
         onSuccess={metrics.refetchAll}
       />
 
-      <PaymentForm
+      <PaymentSheet
         open={paymentFormOpen}
         onOpenChange={open => { setPaymentFormOpen(open); if (!open) { setSelectedPayment(null); setPreselectedClientForPayment(null); } }}
         payment={selectedPayment}
         preselectedClient={preselectedClientForPayment || undefined}
+        clients={metrics.clients}
         onSuccess={metrics.refetchAll}
       />
 
