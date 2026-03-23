@@ -386,14 +386,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       const updateData: Record<string, any> = {
         status: 'paid',
         paid_date: paidDate,
+        amount: paidAmount,
       };
-
-      // For client_payments and expenses/salaries, also update amount if different
-      if (sourceType === 'client_payment') {
-        updateData.amount = paidAmount;
-      } else {
-        updateData.amount = paidAmount;
-      }
 
       const { error } = await supabase
         .from(table)
@@ -410,6 +404,29 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     },
     onError: (error: any) => {
       toast({ title: "Erro ao dar baixa", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Cancel item mutation
+  const cancelItemMutation = useMutation({
+    mutationFn: async ({ id, sourceType }: { id: string; sourceType: string }) => {
+      const table = sourceType === 'client_payment' ? 'client_payments' : sourceType === 'expense' ? 'expenses' : 'salaries';
+
+      const { error } = await supabase
+        .from(table)
+        .update({ status: 'cancelled' })
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Item cancelado", description: "O item foi cancelado e removido do fluxo de caixa." });
+      queryClient.invalidateQueries({ queryKey: ['admin-payments-all'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-salaries'] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao cancelar", description: error.message, variant: "destructive" });
     },
   });
 
