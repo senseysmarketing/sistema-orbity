@@ -6746,7 +6746,7 @@ export type Database = {
         | "lead"
         | "meeting"
         | "system"
-      payment_status: "pending" | "paid" | "overdue"
+      payment_status: "pending" | "paid" | "overdue" | "cancelled"
       recurrence_type:
         | "none"
         | "daily"
@@ -6916,7 +6916,7 @@ export const Constants = {
         "meeting",
         "system",
       ],
-      payment_status: ["pending", "paid", "overdue"],
+      payment_status: ["pending", "paid", "overdue", "cancelled"],
       recurrence_type: [
         "none",
         "daily",
