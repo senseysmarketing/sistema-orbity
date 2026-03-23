@@ -29,10 +29,11 @@ interface ExpenseCategory {
   color: string;
 }
 
-export function ExpenseForm({ open, onOpenChange, onSuccess, expense }: ExpenseFormProps) {
+export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, onDeleteInstance, onCancelSubscription }: ExpenseFormProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
   const [loading, setLoading] = useState(false);
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [formData, setFormData] = useState({
     name: '',
