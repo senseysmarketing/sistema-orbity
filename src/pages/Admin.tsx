@@ -499,6 +499,9 @@ export default function Admin() {
         onOpenChange={open => { setExpenseFormOpen(open); if (!open) setSelectedExpense(null); }}
         expense={selectedExpense}
         onSuccess={metrics.refetchAll}
+        onDelete={handleDeleteExpense}
+        onDeleteInstance={handleDeleteExpenseInstance}
+        onCancelSubscription={handleCancelExpenseSubscription}
       />
 
       <SalaryForm
