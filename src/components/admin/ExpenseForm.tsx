@@ -9,13 +9,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
-import { Repeat, Package, CreditCard } from "lucide-react";
+import { Repeat, Package, CreditCard, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface ExpenseFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   expense?: any;
+  onDelete?: (expense: any) => void;
+  onDeleteInstance?: (expense: any) => void;
+  onCancelSubscription?: (expense: any) => void;
 }
 
 interface ExpenseCategory {
