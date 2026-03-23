@@ -241,6 +241,42 @@ export default function Admin() {
     }
   };
 
+  // Smart expense deletion handlers (Instância vs Herança)
+  const handleDeleteExpenseInstance = async (expense: Expense) => {
+    try {
+      const { error } = await supabase.from('expenses').update({ status: 'cancelled' }).eq('id', expense.id);
+      if (error) throw error;
+      toast({ title: "Despesa cancelada", description: `"${expense.name}" foi cancelada para este mês.` });
+      metrics.refetchAll();
+      setExpenseFormOpen(false);
+      setExpenseDetailsOpen(false);
+      setSelectedExpense(null);
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleCancelExpenseSubscription = async (expense: Expense) => {
+    try {
+      // 1. Cancel this instance
+      const { error: instanceError } = await supabase.from('expenses').update({ status: 'cancelled' }).eq('id', expense.id);
+      if (instanceError) throw instanceError;
+
+      // 2. Deactivate the master (parent or self if it's the master)
+      const parentId = expense.parent_expense_id || expense.id;
+      const { error: masterError } = await supabase.from('expenses').update({ is_active: false }).eq('id', parentId);
+      if (masterError) throw masterError;
+
+      toast({ title: "Assinatura cancelada", description: `"${expense.name}" foi cancelada e não será mais gerada automaticamente.` });
+      metrics.refetchAll();
+      setExpenseFormOpen(false);
+      setExpenseDetailsOpen(false);
+      setSelectedExpense(null);
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    }
+  };
+
   // Salary handlers
   const handleViewSalary = (salary: Salary) => { setSelectedSalary(salary); setSalaryDetailsOpen(true); };
   const handleEditSalary = (salary: Salary) => { setSelectedSalary(salary); setSalaryFormOpen(true); };
@@ -463,6 +499,9 @@ export default function Admin() {
         onOpenChange={open => { setExpenseFormOpen(open); if (!open) setSelectedExpense(null); }}
         expense={selectedExpense}
         onSuccess={metrics.refetchAll}
+        onDelete={handleDeleteExpense}
+        onDeleteInstance={handleDeleteExpenseInstance}
+        onCancelSubscription={handleCancelExpenseSubscription}
       />
 
       <SalaryForm
@@ -501,6 +540,8 @@ export default function Admin() {
         onOpenChange={setExpenseDetailsOpen}
         onEdit={handleEditExpense}
         onDelete={handleDeleteExpense}
+        onDeleteInstance={handleDeleteExpenseInstance}
+        onCancelSubscription={handleCancelExpenseSubscription}
         onRefresh={metrics.refetchAll}
         onViewMaster={handleViewMasterExpense}
       />

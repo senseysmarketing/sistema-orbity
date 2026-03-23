@@ -9,13 +9,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
-import { Repeat, Package, CreditCard } from "lucide-react";
+import { Repeat, Package, CreditCard, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface ExpenseFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   expense?: any;
+  onDelete?: (expense: any) => void;
+  onDeleteInstance?: (expense: any) => void;
+  onCancelSubscription?: (expense: any) => void;
 }
 
 interface ExpenseCategory {
@@ -25,10 +29,11 @@ interface ExpenseCategory {
   color: string;
 }
 
-export function ExpenseForm({ open, onOpenChange, onSuccess, expense }: ExpenseFormProps) {
+export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, onDeleteInstance, onCancelSubscription }: ExpenseFormProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
   const [loading, setLoading] = useState(false);
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [formData, setFormData] = useState({
     name: '',
@@ -255,6 +260,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense }: ExpenseF
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -464,16 +470,89 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense }: ExpenseF
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Salvando...' : (expense ? 'Atualizar' : 'Criar')}
-            </Button>
+          <DialogFooter className="flex items-center justify-between gap-2">
+            {expense && (onDelete || onDeleteInstance) && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDeleteAlert(true)}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10 mr-auto"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Salvando...' : (expense ? 'Atualizar' : 'Criar')}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* AlertDialog inteligente para exclusão */}
+    {expense && (
+      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {expense.expense_type === 'recorrente' || expense.parent_expense_id
+                ? 'Excluir Despesa Recorrente'
+                : 'Excluir Despesa'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {expense.expense_type === 'recorrente' || expense.parent_expense_id
+                ? `Esta despesa "${expense.name}" faz parte de uma recorrência. O que você deseja fazer?`
+                : `Tem certeza que deseja excluir a despesa "${expense.name}"? Esta ação não pode ser desfeita.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className={expense.expense_type === 'recorrente' || expense.parent_expense_id ? 'flex-col sm:flex-row gap-2' : ''}>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            {expense.expense_type === 'recorrente' || expense.parent_expense_id ? (
+              <>
+                <AlertDialogAction
+                  onClick={() => {
+                    onDeleteInstance?.(expense);
+                    onOpenChange(false);
+                    setShowDeleteAlert(false);
+                  }}
+                  className="bg-amber-600 text-white hover:bg-amber-700"
+                >
+                  Apagar apenas esta
+                </AlertDialogAction>
+                <AlertDialogAction
+                  onClick={() => {
+                    onCancelSubscription?.(expense);
+                    onOpenChange(false);
+                    setShowDeleteAlert(false);
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Cancelar Assinatura
+                </AlertDialogAction>
+              </>
+            ) : (
+              <AlertDialogAction
+                onClick={() => {
+                  onDelete?.(expense);
+                  onOpenChange(false);
+                  setShowDeleteAlert(false);
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )}
+  </>
   );
 }
