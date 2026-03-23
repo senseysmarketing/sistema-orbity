@@ -13,7 +13,7 @@ interface Payment {
   due_date: string;
   paid_date: string | null;
   amount: number;
-  status: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
 }
 
 interface ExpensePaymentHistoryProps {

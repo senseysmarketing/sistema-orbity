@@ -26,7 +26,7 @@ export interface ClientPayment {
   amount: number;
   due_date: string;
   paid_date: string | null;
-  status: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
   description?: string | null;
 }
 
@@ -36,7 +36,7 @@ export interface Expense {
   amount: number;
   due_date: string;
   paid_date: string | null;
-  status: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
   is_fixed: boolean;
   expense_type?: 'avulsa' | 'recorrente' | 'parcelada';
   category?: string;
@@ -55,7 +55,7 @@ export interface Salary {
   amount: number;
   due_date: string;
   paid_date: string | null;
-  status: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
 }
 
 export interface Employee {
@@ -82,7 +82,7 @@ export interface CashFlowItem {
   amount: number;
   dueDate: string;
   type: 'INCOME' | 'EXPENSE';
-  status: 'PAID' | 'PENDING' | 'OVERDUE';
+  status: 'PAID' | 'PENDING' | 'OVERDUE' | 'CANCELLED';
   sourceType: 'client_payment' | 'expense' | 'salary';
   sourceId: string;
 }
@@ -297,12 +297,20 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       .sort((a, b) => b.total - a.total);
   }, [expenses, totalPayroll, expenseCategories]);
 
+  const mapStatus = (status: string): CashFlowItem['status'] => {
+    if (status === 'paid') return 'PAID';
+    if (status === 'overdue') return 'OVERDUE';
+    if (status === 'cancelled') return 'CANCELLED';
+    return 'PENDING';
+  };
+
   // Unified cash flow
   const unifiedCashFlow = useMemo((): CashFlowItem[] => {
     const items: CashFlowItem[] = [];
 
     // Payments (income)
     paymentsInMonth.forEach(p => {
+      if (p.status === 'cancelled' as any) return;
       const client = clients.find(c => c.id === p.client_id);
       if (!client || !wasClientActiveInMonth(client, selectedMonth)) return;
       items.push({
@@ -311,7 +319,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         amount: p.amount,
         dueDate: p.due_date,
         type: 'INCOME',
-        status: p.status === 'paid' ? 'PAID' : p.status === 'overdue' ? 'OVERDUE' : 'PENDING',
+        status: mapStatus(p.status),
         sourceType: 'client_payment',
         sourceId: p.id,
       });
@@ -319,13 +327,14 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
 
     // Expenses
     expenses.forEach(e => {
+      if (e.status === 'cancelled' as any) return;
       items.push({
         id: e.id,
         title: e.name,
         amount: e.amount,
         dueDate: e.due_date,
         type: 'EXPENSE',
-        status: e.status === 'paid' ? 'PAID' : e.status === 'overdue' ? 'OVERDUE' : 'PENDING',
+        status: mapStatus(e.status),
         sourceType: 'expense',
         sourceId: e.id,
       });
@@ -333,13 +342,14 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
 
     // Salaries
     salaries.forEach(s => {
+      if (s.status === 'cancelled' as any) return;
       items.push({
         id: s.id,
         title: `Salário - ${s.employee_name}`,
         amount: s.amount,
         dueDate: s.due_date,
         type: 'EXPENSE',
-        status: s.status === 'paid' ? 'PAID' : s.status === 'overdue' ? 'OVERDUE' : 'PENDING',
+        status: mapStatus(s.status),
         sourceType: 'salary',
         sourceId: s.id,
       });
@@ -376,14 +386,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       const updateData: Record<string, any> = {
         status: 'paid',
         paid_date: paidDate,
+        amount: paidAmount,
       };
-
-      // For client_payments and expenses/salaries, also update amount if different
-      if (sourceType === 'client_payment') {
-        updateData.amount = paidAmount;
-      } else {
-        updateData.amount = paidAmount;
-      }
 
       const { error } = await supabase
         .from(table)
@@ -400,6 +404,29 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     },
     onError: (error: any) => {
       toast({ title: "Erro ao dar baixa", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Cancel item mutation
+  const cancelItemMutation = useMutation({
+    mutationFn: async ({ id, sourceType }: { id: string; sourceType: string }) => {
+      const table = sourceType === 'client_payment' ? 'client_payments' : sourceType === 'expense' ? 'expenses' : 'salaries';
+
+      const { error } = await supabase
+        .from(table)
+        .update({ status: 'cancelled' })
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Item cancelado", description: "O item foi cancelado e removido do fluxo de caixa." });
+      queryClient.invalidateQueries({ queryKey: ['admin-payments-all'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-salaries'] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao cancelar", description: error.message, variant: "destructive" });
     },
   });
 
@@ -441,6 +468,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     // Mutations
     markAsPaid: markAsPaidMutation.mutate,
     isMarkingAsPaid: markAsPaidMutation.isPending,
+    cancelItem: cancelItemMutation.mutate,
+    isCancellingItem: cancelItemMutation.isPending,
 
     // Loading
     isLoading,

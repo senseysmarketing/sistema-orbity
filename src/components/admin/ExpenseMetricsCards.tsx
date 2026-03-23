@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 interface Expense {
   id: string;
   amount: number;
-  status: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
   paid_date: string | null;
   due_date: string;
 }
@@ -13,7 +13,7 @@ interface Expense {
 interface Salary {
   id: string;
   amount: number;
-  status: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
   paid_date: string | null;
   due_date: string;
 }

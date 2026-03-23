@@ -4,7 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowDownCircle, ArrowUpCircle, Filter } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { MarkAsPaidPopover } from "./MarkAsPaidPopover";
 import type { CashFlowItem, CategoryTotal } from "@/hooks/useFinancialMetrics";
@@ -16,11 +18,15 @@ interface CashFlowTableProps {
   expensesByCategory: CategoryTotal[];
   onMarkAsPaid: (params: { id: string; sourceType: string; paidDate: string; paidAmount: number }) => void;
   isMarkingAsPaid: boolean;
+  onEditItem?: (item: CashFlowItem) => void;
+  onCancelItem?: (params: { id: string; sourceType: string }) => void;
+  isCancellingItem?: boolean;
   className?: string;
 }
 
-export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, className }: CashFlowTableProps) {
+export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, className }: CashFlowTableProps) {
   const [filter, setFilter] = useState<FilterType>('all');
+  const [cancelDialogItem, setCancelDialogItem] = useState<CashFlowItem | null>(null);
 
   const filtered = useMemo(() => {
     const today = new Date();
@@ -28,6 +34,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
     in7Days.setDate(today.getDate() + 7);
 
     return cashFlow.filter(item => {
+      if (item.status === 'CANCELLED') return false;
       if (filter === 'overdue') return item.status === 'OVERDUE';
       if (filter === 'next7') {
         const d = new Date(item.dueDate);
@@ -44,8 +51,16 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
     switch (status) {
       case 'PAID': return <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300 hover:bg-emerald-100">Pago</Badge>;
       case 'OVERDUE': return <Badge variant="destructive">Atrasado</Badge>;
+      case 'CANCELLED': return <Badge className="bg-muted text-muted-foreground hover:bg-muted">Cancelado</Badge>;
       default: return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300 hover:bg-amber-100">Pendente</Badge>;
     }
+  };
+
+  const handleConfirmCancel = () => {
+    if (cancelDialogItem && onCancelItem) {
+      onCancelItem({ id: cancelDialogItem.sourceId, sourceType: cancelDialogItem.sourceType });
+    }
+    setCancelDialogItem(null);
   };
 
   return (
@@ -114,15 +129,41 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                       </TableCell>
                       <TableCell>{statusBadge(item.status)}</TableCell>
                       <TableCell className="text-right">
-                        {item.status !== 'PAID' && (
-                          <MarkAsPaidPopover
-                            originalAmount={item.amount}
-                            isLoading={isMarkingAsPaid}
-                            onConfirm={(paidDate, paidAmount) => {
-                              onMarkAsPaid({ id: item.sourceId, sourceType: item.sourceType, paidDate, paidAmount });
-                            }}
-                          />
-                        )}
+                        <div className="flex items-center justify-end gap-1">
+                          {item.status !== 'PAID' && item.status !== 'CANCELLED' && (
+                            <MarkAsPaidPopover
+                              originalAmount={item.amount}
+                              isLoading={isMarkingAsPaid}
+                              onConfirm={(paidDate, paidAmount) => {
+                                onMarkAsPaid({ id: item.sourceId, sourceType: item.sourceType, paidDate, paidAmount });
+                              }}
+                            />
+                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {onEditItem && (
+                                <DropdownMenuItem onClick={() => onEditItem(item)}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Editar Detalhes
+                                </DropdownMenuItem>
+                              )}
+                              {item.status !== 'PAID' && item.status !== 'CANCELLED' && onCancelItem && (
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => setCancelDialogItem(item)}
+                                >
+                                  <Ban className="h-4 w-4 mr-2" />
+                                  Cancelar / Perdoar
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -158,6 +199,28 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
           </CardContent>
         </Card>
       )}
+
+      {/* Cancel Confirmation Dialog */}
+      <AlertDialog open={!!cancelDialogItem} onOpenChange={(open) => { if (!open) setCancelDialogItem(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar / Perdoar Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja cancelar "{cancelDialogItem?.title}"? O item será removido do fluxo de caixa mas mantido no histórico.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmCancel}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isCancellingItem}
+            >
+              {isCancellingItem ? 'Cancelando...' : 'Confirmar Cancelamento'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

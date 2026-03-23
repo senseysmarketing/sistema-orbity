@@ -17,7 +17,7 @@ interface Expense {
   amount: number;
   due_date: string;
   paid_date: string | null;
-  status: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
   is_fixed: boolean;
   expense_type?: 'avulsa' | 'recorrente' | 'parcelada';
   category?: string;
@@ -35,7 +35,7 @@ interface Salary {
   amount: number;
   due_date: string;
   paid_date: string | null;
-  status: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
 }
 
 type ExpenseOrSalary = (Expense & { type: 'expense' }) | (Salary & { type: 'salary' });
