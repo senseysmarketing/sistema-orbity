@@ -43,8 +43,11 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
         return d >= today && d <= in7Days && item.status !== 'PAID';
       }
       return true;
+    }).filter(item => {
+      if (!searchTerm.trim()) return true;
+      return item.title.toLowerCase().includes(searchTerm.toLowerCase());
     });
-  }, [cashFlow, filter]);
+  }, [cashFlow, filter, searchTerm]);
 
   const maxCategoryTotal = expensesByCategory.length > 0 ? expensesByCategory[0].total : 1;
   const overdueCount = cashFlow.filter(i => i.status === 'OVERDUE').length;
