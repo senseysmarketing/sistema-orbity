@@ -1,66 +1,46 @@
 
 
-# Check-up Completo: Sistema WhatsApp Automation
+# Por que as mensagens não foram enviadas hoje
 
-## Status Geral: ✅ Saudável (após fixes em 17/03/2026)
+## Causa raiz identificada
 
----
-
-## Bugs Corrigidos (17/03/2026)
-
-### Bug 1: `messages.update` criava mensagens fantasma ✅ CORRIGIDO
-- **Problema**: Evolution API v2 envia `messages.update` como array de status updates (READ/DELIVERED), não como objeto. O código antigo fazia `data?.key` que retornava `undefined` em arrays, criando 716 mensagens fantasma com phone_number vazio.
-- **Fix**: Tratamento separado para `messages.update` — apenas atualiza status de mensagens existentes, nunca cria conversas ou mensagens novas.
-
-### Bug 2: RPC `find_lead_by_normalized_phone` não existia ✅ CORRIGIDO
-- **Problema**: O webhook chamava esta RPC para linkar conversas a leads, mas ela nunca foi criada. Falhava silenciosamente, impedindo a detecção de respostas via fallback de lead_id.
-- **Fix**: Criada a função SQL `find_lead_by_normalized_phone` com `regexp_replace` para normalizar telefones.
-
-### Bug 3: IDs do Meta Messenger (`@lid`) não filtrados ✅ CORRIGIDO
-- **Problema**: Números como `37705652138094@lid` são IDs do Meta Messenger, não números WhatsApp. Criavam conversas lixo.
-- **Fix**: Adicionada validação `isValidWhatsAppJid()` que rejeita `@lid`, `@g.us`, `status@broadcast`, e JIDs sem `@s.whatsapp.net`.
-
-### Bug 4: Normalização do 9º dígito BR ✅ CORRIGIDO
-- **Problema**: Lead salvo como `+5551998500033` (13 dígitos) mas resposta chega como `555198500033` (12 dígitos, sem o 9). A RPC e o `phoneVariants()` só faziam match exato, criando conversas órfãs sem `lead_id`.
-- **Fix**:
-  - `phoneVariants()` no webhook agora gera variantes com/sem o 9º dígito após o DDD
-  - RPC `find_lead_by_normalized_phone` reescrita em PL/pgSQL com geração de variantes BR
-  - Fallback no `process-whatsapp-queue` também gera variantes com/sem 9º dígito
-  - Dados do Nilton Luiz Silva: conversa órfã mesclada na principal, automação marcada como `responded`
-
-### Limpeza de dados ✅ EXECUTADA
-- 716 mensagens fantasma deletadas
-- Conversa fantasma `77e1005b` deletada
-- Conversas com phone_number vazio/curto limpas
-- Conversa órfã do Nilton (`555198500033`) mesclada na principal (`5551998500033`)
-
----
-
-## Fluxo Atualizado
+O status da conta WhatsApp está **`connecting`** em vez de **`connected`**.
 
 ```text
-Lead capturado → Auto-enroll → Greeting Step 1 (após delay) → ... → Greeting Step N
-  → Follow-up Step 1 (após delay) → ... → Follow-up Step N → Finalizado
-
-  ↕ A QUALQUER MOMENTO: cliente responde → webhook cancela automação
-  ↕ PROTEÇÃO TRIPLA: 1) webhook direto, 2) lead_id fallback, 3) phone fallback (com variantes BR)
+whatsapp_accounts:
+  instance_name: orbity_7bef1258
+  status: connecting        ← BLOQUEIO AQUI
 ```
 
-## Eventos do Webhook
+No `process-whatsapp-queue`, linha 255, existe a verificação:
+```javascript
+if (account.status !== 'connected') {
+  // volta para 'active' e pula o registro
+}
+```
 
-| Evento | Tratamento |
-|---|---|
-| `messages.upsert` | Processa mensagem nova, cria/busca conversa, detecta resposta |
-| `messages.update` | **Apenas atualiza status** (READ/DELIVERED) de mensagens existentes |
-| `send.message` | Processa mensagem enviada via API, salva com isFromMe=true |
-| `connection.update` | Atualiza status de conexão da conta |
+Resultado: o cron roda a cada minuto, pega os 5 leads pendentes, tenta processar, mas ao verificar que a conta está `connecting` (não `connected`), devolve cada registro para `active` sem enviar nada. Isso se repete indefinidamente sem nenhum log visível.
 
-## Sync On-Demand (Adicionado 18/03/2026)
+O último envio bem-sucedido foi em 20/03 (quinta). Em algum momento entre quinta e hoje, a conta mudou de `connected` para `connecting` -- provavelmente por um evento `connection.update` do webhook da Evolution API.
 
-A Evolution API não envia webhook para mensagens enviadas pelo app nativo do WhatsApp.
-Solução: edge function `whatsapp-sync-messages` que chama `POST /chat/findMessages/{instance}`
-da Evolution API para buscar mensagens e fazer upsert no banco.
+## Correções
 
-- Chamada automaticamente ao abrir o modal de WhatsApp do lead
-- Botão de refresh manual (ícone RefreshCw) no header do chat
-- Faz upsert usando `account_id,message_id` como chave de unicidade
+### 1. Corrigir o status da conta agora (migração SQL)
+- `UPDATE whatsapp_accounts SET status = 'connected' WHERE id = 'a89cf7ee-...'`
+- Isso desbloqueia os 5 leads pendentes imediatamente
+
+### 2. Adicionar log quando a conta não está conectada
+- No `process-whatsapp-queue`, adicionar `console.warn` quando `account.status !== 'connected'` para que no futuro esse problema seja visível nos logs
+
+### 3. Melhorar o handler de `connection.update` no webhook
+- Atualmente, o webhook define `status = 'connecting'` para estados transitórios da Evolution. Precisamos garantir que apenas `state: 'close'` marque como desconectado, e que reconexões automáticas (`state: 'open'`) restaurem para `connected`
+- Revisar o handler para evitar que estados transitórios (`connecting`, `syncing`) bloqueiem o envio
+
+### 4. Adicionar tolerância no queue processor
+- Aceitar tanto `connected` quanto `connecting` como estados válidos para envio (a Evolution geralmente mantém a sessão ativa mesmo durante `connecting`)
+
+### Arquivos
+- Migração SQL: corrigir status da conta
+- `supabase/functions/process-whatsapp-queue/index.ts`: log + tolerância de status
+- `supabase/functions/whatsapp-webhook/index.ts`: revisar handler de `connection.update`
+
