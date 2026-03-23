@@ -134,7 +134,15 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
         if (error) throw error;
       }
 
-      toast({ title: payment ? "Fatura atualizada" : "Fatura criada", description: "Salvo com sucesso!" });
+      if (updateContract && totalAmount !== baseValue) {
+        const { error: contractError } = await supabase
+          .from("clients")
+          .update({ monthly_value: totalAmount })
+          .eq("id", clientId);
+        if (contractError) throw contractError;
+      }
+
+      toast({ title: payment ? "Fatura atualizada" : "Fatura criada", description: updateContract ? "Salvo e contrato atualizado!" : "Salvo com sucesso!" });
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
