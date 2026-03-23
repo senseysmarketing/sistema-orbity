@@ -33,7 +33,7 @@ export function FloatingActionBar({ selectedMonth, onChangeMonth, onNewClient, o
               })}
             </SelectContent>
           </Select>
-          <Button size="sm" variant="create" onClick={onNewClient} className="h-9">
+          <Button size="sm" variant="outline" onClick={onNewClient} className="h-9">
             <Building className="h-3.5 w-3.5 mr-1" /> Novo Cliente
           </Button>
           <Button size="sm" variant="outline" onClick={onNewExpense} className="h-9">

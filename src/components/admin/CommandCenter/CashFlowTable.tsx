@@ -77,6 +77,15 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
               <Filter className="h-4 w-4 text-muted-foreground" />
               Fluxo de Caixa
             </CardTitle>
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Pesquisar..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-8 pl-8 text-sm"
+              />
+            </div>
             <div className="flex gap-1.5">
               <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" className="h-7 text-xs" onClick={() => setFilter('all')}>
                 Este Mês
