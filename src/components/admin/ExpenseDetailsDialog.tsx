@@ -469,28 +469,58 @@ export function ExpenseDetailsDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Alert Dialog para Exclusão */}
+      {/* Alert Dialog para Exclusão Inteligente */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Despesa</AlertDialogTitle>
+            <AlertDialogTitle>
+              {expense.expense_type === 'recorrente' || expense.parent_expense_id
+                ? 'Excluir Despesa Recorrente'
+                : 'Excluir Despesa'}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir a despesa <strong>{expense.name}</strong>? 
-              Esta ação não pode ser desfeita.
+              {expense.expense_type === 'recorrente' || expense.parent_expense_id
+                ? `Esta despesa "${expense.name}" faz parte de uma recorrência. O que você deseja fazer?`
+                : `Tem certeza que deseja excluir a despesa "${expense.name}"? Esta ação não pode ser desfeita.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className={expense.expense_type === 'recorrente' || expense.parent_expense_id ? 'flex-col sm:flex-row gap-2' : ''}>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                onDelete(expense);
-                onOpenChange(false);
-                setShowDeleteAlert(false);
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
+            {expense.expense_type === 'recorrente' || expense.parent_expense_id ? (
+              <>
+                <AlertDialogAction
+                  onClick={() => {
+                    onDeleteInstance?.(expense);
+                    onOpenChange(false);
+                    setShowDeleteAlert(false);
+                  }}
+                  className="bg-amber-600 text-white hover:bg-amber-700"
+                >
+                  Apagar apenas esta
+                </AlertDialogAction>
+                <AlertDialogAction
+                  onClick={() => {
+                    onCancelSubscription?.(expense);
+                    onOpenChange(false);
+                    setShowDeleteAlert(false);
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Cancelar Assinatura
+                </AlertDialogAction>
+              </>
+            ) : (
+              <AlertDialogAction
+                onClick={() => {
+                  onDelete(expense);
+                  onOpenChange(false);
+                  setShowDeleteAlert(false);
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
