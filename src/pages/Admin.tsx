@@ -486,11 +486,12 @@ export default function Admin() {
         onSuccess={metrics.refetchAll}
       />
 
-      <PaymentForm
+      <PaymentSheet
         open={paymentFormOpen}
         onOpenChange={open => { setPaymentFormOpen(open); if (!open) { setSelectedPayment(null); setPreselectedClientForPayment(null); } }}
         payment={selectedPayment}
         preselectedClient={preselectedClientForPayment || undefined}
+        clients={metrics.clients}
         onSuccess={metrics.refetchAll}
       />
 
