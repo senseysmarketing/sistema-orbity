@@ -583,7 +583,7 @@ async function autoEnrollWhatsAppAutomation(supabase: any, agencyId: string, lea
     .from('whatsapp_accounts')
     .select('id, sending_schedule')
     .eq('agency_id', agencyId)
-    .eq('status', 'connected')
+    .in('status', ['connected', 'connecting'])
     .maybeSingle();
 
   if (!waAccount) {

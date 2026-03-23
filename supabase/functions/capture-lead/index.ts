@@ -28,7 +28,7 @@ async function autoEnrollWhatsAppAutomation(supabase: any, agencyId: string, lea
     .from('whatsapp_accounts')
     .select('id')
     .eq('agency_id', agencyId)
-    .eq('status', 'connected')
+    .in('status', ['connected', 'connecting'])
     .maybeSingle();
 
   if (!waAccount) return;
