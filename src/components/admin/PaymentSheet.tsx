@@ -37,6 +37,8 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const { currentAgency } = useAgency();
   const [loading, setLoading] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [updateContract, setUpdateContract] = useState(false);
+  const [deactivateClient, setDeactivateClient] = useState(false);
 
   const [clientId, setClientId] = useState("");
   const [baseValue, setBaseValue] = useState(0);
