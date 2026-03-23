@@ -82,7 +82,7 @@ export interface CashFlowItem {
   amount: number;
   dueDate: string;
   type: 'INCOME' | 'EXPENSE';
-  status: 'PAID' | 'PENDING' | 'OVERDUE';
+  status: 'PAID' | 'PENDING' | 'OVERDUE' | 'CANCELLED';
   sourceType: 'client_payment' | 'expense' | 'salary';
   sourceId: string;
 }
