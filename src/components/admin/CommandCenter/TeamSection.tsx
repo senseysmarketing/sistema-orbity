@@ -23,7 +23,7 @@ interface TeamSectionProps {
 export function TeamSection({
   employees,
   onEditEmployee,
-  onDeleteEmployee,
+  _onDeleteEmployee,
   onToggleEmployeeActive,
   onAddEmployee,
   onGenerateSalaries,
