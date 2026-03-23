@@ -1,46 +1,32 @@
 
 
-# Por que as mensagens não foram enviadas hoje
+# Corrigir leads sem automação de saudação
 
-## Causa raiz identificada
+## Diagnóstico
 
-O status da conta WhatsApp está **`connecting`** em vez de **`connected`**.
+Os 3 leads que estão ativos na fila de automação já foram processados (follow-up 2 enviado, aguardando step 3 amanhã). Não há mensagens pendentes de envio para hoje.
 
-```text
-whatsapp_accounts:
-  instance_name: orbity_7bef1258
-  status: connecting        ← BLOQUEIO AQUI
-```
+O problema real: **11 leads criados entre 20/03 e 23/03 nunca receberam a mensagem de saudação** porque a função `facebook-leads` (linha 586) só cria automações quando `whatsapp_accounts.status = 'connected'`. Como a conta estava `connecting`, esses leads foram silenciosamente ignorados — nenhum registro foi criado em `whatsapp_automation_control`.
 
-No `process-whatsapp-queue`, linha 255, existe a verificação:
-```javascript
-if (account.status !== 'connected') {
-  // volta para 'active' e pula o registro
-}
-```
-
-Resultado: o cron roda a cada minuto, pega os 5 leads pendentes, tenta processar, mas ao verificar que a conta está `connecting` (não `connected`), devolve cada registro para `active` sem enviar nada. Isso se repete indefinidamente sem nenhum log visível.
-
-O último envio bem-sucedido foi em 20/03 (quinta). Em algum momento entre quinta e hoje, a conta mudou de `connected` para `connecting` -- provavelmente por um evento `connection.update` do webhook da Evolution API.
+Leads afetados (sem automação):
+- Eduardo Jonhy, Nilton Carlos Parreira, Marcilio Teixeira, Jefferson Gama, Reinaldo Occhiutto, Eduardo, Fernanda Mariano, Mauro Calione, Denis Cardoso, Apartamentos/Imóveis, Tarcísio Pedrosa
 
 ## Correções
 
-### 1. Corrigir o status da conta agora (migração SQL)
-- `UPDATE whatsapp_accounts SET status = 'connected' WHERE id = 'a89cf7ee-...'`
-- Isso desbloqueia os 5 leads pendentes imediatamente
+### 1. Criar automações retroativamente (migração SQL)
+- Inserir registros em `whatsapp_automation_control` para os 11 leads que não têm automação
+- Status `active`, fase `greeting`, step 1, `next_execution_at` = agora (para envio imediato)
+- Criar conversas em `whatsapp_conversations` para leads que não têm
 
-### 2. Adicionar log quando a conta não está conectada
-- No `process-whatsapp-queue`, adicionar `console.warn` quando `account.status !== 'connected'` para que no futuro esse problema seja visível nos logs
+### 2. Corrigir `facebook-leads/index.ts` (linha 586)
+- Mudar `.eq('status', 'connected')` para `.in('status', ['connected', 'connecting'])`
+- Mesmo padrão de tolerância já aplicado no `process-whatsapp-queue`
 
-### 3. Melhorar o handler de `connection.update` no webhook
-- Atualmente, o webhook define `status = 'connecting'` para estados transitórios da Evolution. Precisamos garantir que apenas `state: 'close'` marque como desconectado, e que reconexões automáticas (`state: 'open'`) restaurem para `connected`
-- Revisar o handler para evitar que estados transitórios (`connecting`, `syncing`) bloqueiem o envio
-
-### 4. Adicionar tolerância no queue processor
-- Aceitar tanto `connected` quanto `connecting` como estados válidos para envio (a Evolution geralmente mantém a sessão ativa mesmo durante `connecting`)
+### 3. Corrigir `capture-lead/index.ts` (linha 31)
+- Mesma correção: aceitar `connecting` além de `connected`
 
 ### Arquivos
-- Migração SQL: corrigir status da conta
-- `supabase/functions/process-whatsapp-queue/index.ts`: log + tolerância de status
-- `supabase/functions/whatsapp-webhook/index.ts`: revisar handler de `connection.update`
+- `supabase/functions/facebook-leads/index.ts` — tolerância de status
+- `supabase/functions/capture-lead/index.ts` — tolerância de status
+- Migração SQL — criar automações para os 11 leads perdidos
 
