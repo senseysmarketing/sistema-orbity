@@ -77,9 +77,7 @@ export default function Admin() {
   const [paymentDeleteDialogOpen, setPaymentDeleteDialogOpen] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<ClientPayment | null>(null);
 
-  // Action states
-  const [runningClosure, setRunningClosure] = useState(false);
-  const [generatingSalaries, setGeneratingSalaries] = useState(false);
+  const [hasEnsuredCurrentMonthPayments, setHasEnsuredCurrentMonthPayments] = useState(false);
   const [hasEnsuredCurrentMonthPayments, setHasEnsuredCurrentMonthPayments] = useState(false);
 
   const hasAccess = profile?.role === 'agency_admin';
