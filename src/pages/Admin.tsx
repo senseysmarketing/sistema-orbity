@@ -322,59 +322,7 @@ export default function Admin() {
     }
   };
 
-  // Monthly actions
-  const handleRunMonthlyClosure = async () => {
-    if (!currentAgency) return;
-    setRunningClosure(true);
-    try {
-      const { error } = await supabase.functions.invoke('monthly-closure');
-      if (error) throw error;
-      toast({ title: "Fechamento executado", description: "Fechamento mensal executado!" });
-      metrics.refetchAll();
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } finally {
-      setRunningClosure(false);
-    }
-  };
-
-  const handleGenerateSalaries = async () => {
-    if (!currentAgency) return;
-    setGeneratingSalaries(true);
-    try {
-      const [year, month] = selectedMonth.split('-').map(Number);
-      const { data: activeEmployees, error: empError } = await supabase.from('employees').select('*').eq('agency_id', currentAgency.id).eq('is_active', true);
-      if (empError) throw empError;
-      if (!activeEmployees?.length) {
-        toast({ title: "Nenhum funcionário ativo", variant: "destructive" }); return;
-      }
-      const lastDay = new Date(year, month, 0).getDate();
-      const startDate = `${selectedMonth}-01`;
-      const endDate = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
-      const { data: existing } = await supabase.from('salaries').select('employee_id').eq('agency_id', currentAgency.id).gte('due_date', startDate).lte('due_date', endDate);
-      const existingIds = new Set(existing?.map(s => s.employee_id) || []);
-      const toGenerate = activeEmployees.filter(e => !existingIds.has(e.id));
-      if (!toGenerate.length) {
-        toast({ title: "Salários já gerados" }); return;
-      }
-      const rows = toGenerate.map(emp => ({
-        agency_id: currentAgency.id,
-        employee_id: emp.id,
-        employee_name: emp.name,
-        amount: emp.base_salary,
-        due_date: `${selectedMonth}-${String(Math.min(emp.payment_day || 5, lastDay)).padStart(2, '0')}`,
-        status: 'pending' as const,
-      }));
-      const { error } = await supabase.from('salaries').insert(rows);
-      if (error) throw error;
-      toast({ title: "Salários gerados", description: `${rows.length} salário(s) gerado(s)` });
-      metrics.refetchAll();
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } finally {
-      setGeneratingSalaries(false);
-    }
-  };
+  // (Manual closure/salary generation removed — handled by cron job)
 
   // ============ RENDER ============
 
