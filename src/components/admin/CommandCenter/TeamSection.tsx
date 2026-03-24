@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { Users, Plus, Play, Settings, UserCheck, UserX } from "lucide-react";
+import { Users, Plus, Settings, UserCheck, UserX } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import type { Employee } from "@/hooks/useFinancialMetrics";
 
@@ -14,10 +14,6 @@ interface TeamSectionProps {
   onDeleteEmployee: (employee: Employee) => void;
   onToggleEmployeeActive: (employee: Employee) => void;
   onAddEmployee: () => void;
-  onGenerateSalaries: () => void;
-  onRunClosure: () => void;
-  generatingSalaries: boolean;
-  runningClosure: boolean;
 }
 
 export function TeamSection({
@@ -26,10 +22,6 @@ export function TeamSection({
   onDeleteEmployee: _onDeleteEmployee,
   onToggleEmployeeActive,
   onAddEmployee,
-  onGenerateSalaries,
-  onRunClosure,
-  generatingSalaries,
-  runningClosure,
 }: TeamSectionProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const activeEmployees = employees.filter(e => e.is_active);
@@ -97,13 +89,6 @@ export function TeamSection({
             <div className="flex gap-2 flex-wrap">
               <Button size="sm" onClick={() => { onAddEmployee(); setSheetOpen(false); }}>
                 <Plus className="h-3.5 w-3.5 mr-1" /> Novo Funcionário
-              </Button>
-              <Button variant="outline" size="sm" onClick={onGenerateSalaries} disabled={generatingSalaries}>
-                <Play className="h-3.5 w-3.5 mr-1" />
-                {generatingSalaries ? 'Gerando...' : 'Gerar Salários'}
-              </Button>
-              <Button variant="outline" size="sm" onClick={onRunClosure} disabled={runningClosure}>
-                {runningClosure ? 'Executando...' : 'Fechamento Mensal'}
               </Button>
             </div>
 
