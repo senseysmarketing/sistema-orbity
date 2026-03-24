@@ -447,10 +447,11 @@ export default function Admin() {
         onCancelSubscription={handleCancelExpenseSubscription}
       />
 
-      <SalaryForm
+      <SalarySheet
         open={salaryFormOpen}
         onOpenChange={open => { setSalaryFormOpen(open); if (!open) setSelectedSalary(null); }}
         salary={selectedSalary}
+        employees={metrics.employees}
         onSuccess={metrics.refetchAll}
       />
 
