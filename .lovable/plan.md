@@ -1,50 +1,24 @@
 
 
-# SalarySheet + Limpeza de UI
+# Conectar SalarySheet e Remover SalaryDetailsDialog
 
-## Verificacoes confirmadas
+## Diagnostico
 
-- **`employees.is_active`**: boolean, ja existe. Usar `is_active: false` para desligamento.
-- **`salaries.description`**: NAO existe. Precisa migracao para adicionar coluna.
-- **`salaries.amount`**: recebera o salario liquido (base + bonus - descontos).
+O `SalarySheet` ja esta renderizado corretamente em Admin.tsx (linha 449) e o `salaryFormOpen` ja e acionado tanto pelo CashFlowTable (linha 402-404) quanto pelo `handleEditSalary`. O problema e que o `SalaryDetailsDialog` antigo ainda esta na arvore de renderizacao, e o `handleViewSalary` ainda aponta para ele — embora nao seja chamado em nenhum componente filho atualmente.
 
-## Alteracoes
+## Alteracoes em `src/pages/Admin.tsx`
 
-### 1. Migracao SQL — adicionar coluna `description` em `salaries`
-```sql
-ALTER TABLE salaries ADD COLUMN description text;
-```
+### 1. Remover SalaryDetailsDialog da arvore de renderizacao
+- Remover import do `SalaryDetailsDialog` (linha 26)
+- Remover state `salaryDetailsOpen` (linha 65)
+- Remover `handleViewSalary` (linha 278) — nao e usado em nenhum componente
+- Remover o bloco `<SalaryDetailsDialog ... />` (linhas 492-498)
 
-### 2. Criar `src/components/admin/SalarySheet.tsx`
-Sheet lateral com:
-- Funcionario (Select, disabled em modo edicao)
-- Salario Base (Input disabled, de `employees.base_salary`)
-- Bonus / Comissoes (Input moeda, default 0)
-- Descontos / Faltas (Input moeda, default 0)
-- Salario Liquido calculado: `base + bonus - descontos` (salvo em `amount`)
-- Data de Vencimento, Data de Pagamento (se paid), Status
-- Observacoes da Folha (Textarea → `salaries.description`)
-- Switch "Atualizar Salario Base" (visivel se liquido != base) → UPDATE `employees.base_salary`
-- Botao "Cancelar Pagamento" (destructive) → AlertDialog com Checkbox "Desligar funcionario" → `employees.is_active = false`
+### 2. Redirecionar qualquer referencia residual
+- Alterar `handleViewSalary` (se mantido) para abrir o SalarySheet em vez do dialog antigo: `setSalaryFormOpen(true)` em vez de `setSalaryDetailsOpen(true)`
 
-### 3. Editar `TeamSection.tsx`
-- Remover props: `onGenerateSalaries`, `onRunClosure`, `generatingSalaries`, `runningClosure`
-- Remover botoes "Gerar Salarios" e "Fechamento Mensal"
-- Manter apenas "Novo Funcionario"
-
-### 4. Editar `Admin.tsx`
-- Substituir `SalaryForm` por `SalarySheet`
-- Passar `employees={metrics.employees}` para resolver salario base
-- Remover states e handlers de `generateSalaries` e `runClosure`
-- Remover props correspondentes do TeamSection
-
-### 5. Atualizar tipo `Salary` em `useFinancialMetrics.tsx`
-- Adicionar `description?: string | null`
+Nenhum outro arquivo precisa de alteracao — os triggers do CashFlowTable e TeamSection ja apontam para `setSalaryFormOpen` corretamente.
 
 ## Arquivos
-- **Migracao**: `ALTER TABLE salaries ADD COLUMN description text`
-- **Criar**: `src/components/admin/SalarySheet.tsx`
-- **Editar**: `src/components/admin/CommandCenter/TeamSection.tsx`
-- **Editar**: `src/pages/Admin.tsx`
-- **Editar**: `src/hooks/useFinancialMetrics.tsx`
+- `src/pages/Admin.tsx` (remover import, state e renderizacao do SalaryDetailsDialog)
 
