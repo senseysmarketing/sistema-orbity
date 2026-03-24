@@ -14,10 +14,6 @@ interface TeamSectionProps {
   onDeleteEmployee: (employee: Employee) => void;
   onToggleEmployeeActive: (employee: Employee) => void;
   onAddEmployee: () => void;
-  onGenerateSalaries: () => void;
-  onRunClosure: () => void;
-  generatingSalaries: boolean;
-  runningClosure: boolean;
 }
 
 export function TeamSection({
@@ -26,10 +22,6 @@ export function TeamSection({
   onDeleteEmployee: _onDeleteEmployee,
   onToggleEmployeeActive,
   onAddEmployee,
-  onGenerateSalaries,
-  onRunClosure,
-  generatingSalaries,
-  runningClosure,
 }: TeamSectionProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const activeEmployees = employees.filter(e => e.is_active);
