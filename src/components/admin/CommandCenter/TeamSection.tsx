@@ -11,6 +11,7 @@ import type { Employee } from "@/hooks/useFinancialMetrics";
 interface TeamSectionProps {
   employees: Employee[];
   onEditEmployee: (employee: Employee) => void;
+  onEditSalaryByEmployee: (employee: Employee) => void;
   onDeleteEmployee: (employee: Employee) => void;
   onToggleEmployeeActive: (employee: Employee) => void;
   onAddEmployee: () => void;
@@ -19,6 +20,7 @@ interface TeamSectionProps {
 export function TeamSection({
   employees,
   onEditEmployee,
+  onEditSalaryByEmployee,
   onDeleteEmployee: _onDeleteEmployee,
   onToggleEmployeeActive,
   onAddEmployee,
