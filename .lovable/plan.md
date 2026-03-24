@@ -1,24 +1,28 @@
 
 
-# Conectar SalarySheet e Remover SalaryDetailsDialog
+# Conectar SalarySheet ao TeamSection + Alinhar Botoes
 
-## Diagnostico
+## Problema
+O botao "Editar" no sheet "Gerenciar Equipe" chama `onEditEmployee` que abre o `EmployeeForm` (modal antigo de dados cadastrais). O usuario espera abrir o `SalarySheet` para editar o salario do mes atual.
 
-O `SalarySheet` ja esta renderizado corretamente em Admin.tsx (linha 449) e o `salaryFormOpen` ja e acionado tanto pelo CashFlowTable (linha 402-404) quanto pelo `handleEditSalary`. O problema e que o `SalaryDetailsDialog` antigo ainda esta na arvore de renderizacao, e o `handleViewSalary` ainda aponta para ele — embora nao seja chamado em nenhum componente filho atualmente.
+## Alteracoes
 
-## Alteracoes em `src/pages/Admin.tsx`
+### 1. `TeamSection.tsx` — Nova prop + alinhamento visual
+- Adicionar prop `onEditSalaryByEmployee: (employee: Employee) => void`
+- O botao "Editar" no sheet interno passara a chamar `onEditSalaryByEmployee(emp)` em vez de `onEditEmployee(emp)`
+- Alinhar botoes "Editar" e "Ativar/Desativar" com layout consistente (mesma largura, `variant="ghost"` uniforme)
 
-### 1. Remover SalaryDetailsDialog da arvore de renderizacao
-- Remover import do `SalaryDetailsDialog` (linha 26)
-- Remover state `salaryDetailsOpen` (linha 65)
-- Remover `handleViewSalary` (linha 278) — nao e usado em nenhum componente
-- Remover o bloco `<SalaryDetailsDialog ... />` (linhas 492-498)
+### 2. `Admin.tsx` — Novo handler + wiring
+- Criar `handleEditSalaryByEmployee(employee)`:
+  1. Busca em `metrics.salaries` o salario do mes atual para esse `employee_id`
+  2. Se encontrar: `setSelectedSalary(salary); setSalaryFormOpen(true)`
+  3. Se nao encontrar: abre o SalarySheet sem salary (modo criacao) pre-selecionando o employee
+- Passar esse handler como prop `onEditSalaryByEmployee` no `TeamSection`
 
-### 2. Redirecionar qualquer referencia residual
-- Alterar `handleViewSalary` (se mantido) para abrir o SalarySheet em vez do dialog antigo: `setSalaryFormOpen(true)` em vez de `setSalaryDetailsOpen(true)`
-
-Nenhum outro arquivo precisa de alteracao — os triggers do CashFlowTable e TeamSection ja apontam para `setSalaryFormOpen` corretamente.
+### 3. Alinhamento visual dos botoes no TeamSection sheet
+- Usar `flex items-center gap-2` nos botoes "Editar" e "Ativar/Desativar" com tamanho consistente
 
 ## Arquivos
-- `src/pages/Admin.tsx` (remover import, state e renderizacao do SalaryDetailsDialog)
+- `src/components/admin/CommandCenter/TeamSection.tsx`
+- `src/pages/Admin.tsx`
 
