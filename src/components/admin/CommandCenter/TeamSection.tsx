@@ -90,13 +90,6 @@ export function TeamSection({
               <Button size="sm" onClick={() => { onAddEmployee(); setSheetOpen(false); }}>
                 <Plus className="h-3.5 w-3.5 mr-1" /> Novo Funcionário
               </Button>
-              <Button variant="outline" size="sm" onClick={onGenerateSalaries} disabled={generatingSalaries}>
-                <Play className="h-3.5 w-3.5 mr-1" />
-                {generatingSalaries ? 'Gerando...' : 'Gerar Salários'}
-              </Button>
-              <Button variant="outline" size="sm" onClick={onRunClosure} disabled={runningClosure}>
-                {runningClosure ? 'Executando...' : 'Fechamento Mensal'}
-              </Button>
             </div>
 
             <Separator />

@@ -56,6 +56,7 @@ export interface Salary {
   due_date: string;
   paid_date: string | null;
   status: 'pending' | 'paid' | 'overdue' | 'cancelled';
+  description?: string | null;
 }
 
 export interface Employee {
