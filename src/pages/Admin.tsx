@@ -62,7 +62,7 @@ export default function Admin() {
   // Details open states
   const [clientDetailsOpen, setClientDetailsOpen] = useState(false);
   const [expenseDetailsOpen, setExpenseDetailsOpen] = useState(false);
-  const [salaryDetailsOpen, setSalaryDetailsOpen] = useState(false);
+  
   const [employeeDetailsOpen, setEmployeeDetailsOpen] = useState(false);
 
   // Delete dialog states
