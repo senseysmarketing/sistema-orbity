@@ -277,6 +277,17 @@ export default function Admin() {
   // Salary handlers
   const handleViewSalary = (salary: Salary) => { setSelectedSalary(salary); setSalaryFormOpen(true); };
   const handleEditSalary = (salary: Salary) => { setSelectedSalary(salary); setSalaryFormOpen(true); };
+  const handleEditSalaryByEmployee = (employee: Employee) => {
+    const now = new Date();
+    const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const salary = metrics.salaries.find(s => s.employee_id === employee.id && s.due_date?.startsWith(monthPrefix));
+    if (salary) {
+      setSelectedSalary(salary);
+    } else {
+      setSelectedSalary(null);
+    }
+    setSalaryFormOpen(true);
+  };
   const handleDeleteSalary = (salary: Salary) => { setSalaryToDelete(salary); setSalaryDeleteDialogOpen(true); };
   const confirmDeleteSalary = async () => {
     if (!salaryToDelete) return;
