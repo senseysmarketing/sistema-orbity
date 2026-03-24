@@ -23,7 +23,7 @@ import { EmployeeForm } from "@/components/admin/EmployeeForm";
 // Details dialogs
 import { ClientDetailsDialog } from "@/components/admin/ClientDetailsDialog";
 import { ExpenseDetailsDialog } from "@/components/admin/ExpenseDetailsDialog";
-import { SalaryDetailsDialog } from "@/components/admin/SalaryDetailsDialog";
+
 import { EmployeeDetailsDialog } from "@/components/admin/EmployeeDetailsDialog";
 
 // Command Center components
@@ -62,7 +62,7 @@ export default function Admin() {
   // Details open states
   const [clientDetailsOpen, setClientDetailsOpen] = useState(false);
   const [expenseDetailsOpen, setExpenseDetailsOpen] = useState(false);
-  const [salaryDetailsOpen, setSalaryDetailsOpen] = useState(false);
+  
   const [employeeDetailsOpen, setEmployeeDetailsOpen] = useState(false);
 
   // Delete dialog states
@@ -275,7 +275,7 @@ export default function Admin() {
   };
 
   // Salary handlers
-  const handleViewSalary = (salary: Salary) => { setSelectedSalary(salary); setSalaryDetailsOpen(true); };
+  const handleViewSalary = (salary: Salary) => { setSelectedSalary(salary); setSalaryFormOpen(true); };
   const handleEditSalary = (salary: Salary) => { setSelectedSalary(salary); setSalaryFormOpen(true); };
   const handleDeleteSalary = (salary: Salary) => { setSalaryToDelete(salary); setSalaryDeleteDialogOpen(true); };
   const confirmDeleteSalary = async () => {
@@ -489,13 +489,6 @@ export default function Admin() {
         onViewMaster={handleViewMasterExpense}
       />
 
-      <SalaryDetailsDialog
-        salary={selectedSalary}
-        open={salaryDetailsOpen}
-        onOpenChange={setSalaryDetailsOpen}
-        onEdit={() => { setSalaryDetailsOpen(false); if (selectedSalary) handleEditSalary(selectedSalary); }}
-        onDelete={() => { setSalaryDetailsOpen(false); if (selectedSalary) handleDeleteSalary(selectedSalary); }}
-      />
 
       <EmployeeDetailsDialog
         employee={selectedEmployee}
