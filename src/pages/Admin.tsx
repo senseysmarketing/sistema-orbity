@@ -275,7 +275,7 @@ export default function Admin() {
   };
 
   // Salary handlers
-  const handleViewSalary = (salary: Salary) => { setSelectedSalary(salary); setSalaryDetailsOpen(true); };
+  const handleViewSalary = (salary: Salary) => { setSelectedSalary(salary); setSalaryFormOpen(true); };
   const handleEditSalary = (salary: Salary) => { setSelectedSalary(salary); setSalaryFormOpen(true); };
   const handleDeleteSalary = (salary: Salary) => { setSalaryToDelete(salary); setSalaryDeleteDialogOpen(true); };
   const confirmDeleteSalary = async () => {
