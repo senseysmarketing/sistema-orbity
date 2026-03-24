@@ -1,32 +1,50 @@
 
-# Adicionar Upsell/Downsell + Pausa de Contrato ao PaymentSheet
 
-## Alteracoes em `src/components/admin/PaymentSheet.tsx`
+# SalarySheet + Limpeza de UI
 
-### 1. Switch "Tornar novo valor fixo mensal" (Upsell/Downsell)
-- Adicionar state `updateContract` (boolean, default false)
-- Abaixo do card "Valor Total da Fatura" (linha ~259), renderizar um bloco com `<Switch>` + label + tooltip (icone `HelpCircle`)
-- Visivel apenas quando `totalAmount !== baseValue` (so faz sentido se o valor mudou)
-- Label: "Tornar este o novo valor fixo mensal"
-- Sub-label: "Atualiza o contrato do cliente para os proximos meses"
-- Tooltip: "Ao ativar, o valor base mensal do cliente sera atualizado permanentemente. As faturas dos proximos meses serao geradas com este novo valor."
+## Verificacoes confirmadas
 
-**Mutacao no handleSubmit:** Se `updateContract === true`, apos salvar o `client_payments`, fazer `supabase.from("clients").update({ monthly_value: totalAmount }).eq("id", clientId)`
+- **`employees.is_active`**: boolean, ja existe. Usar `is_active: false` para desligamento.
+- **`salaries.description`**: NAO existe. Precisa migracao para adicionar coluna.
+- **`salaries.amount`**: recebera o salario liquido (base + bonus - descontos).
 
-### 2. Checkbox "Inativar cliente" no AlertDialog de cancelamento
-- Adicionar state `deactivateClient` (boolean, default false)
-- No corpo do AlertDialog (linha ~338), adicionar `<Checkbox>` com label "Tambem inativar este cliente (Pausar contrato)"
-- Tooltip: "O cliente sera marcado como inativo e novas cobranças não serao geradas nos proximos meses."
+## Alteracoes
 
-**Mutacao no handleCancelPayment:** Se `deactivateClient === true`, apos cancelar o payment, fazer `supabase.from("clients").update({ active: false }).eq("id", clientId)`
+### 1. Migracao SQL — adicionar coluna `description` em `salaries`
+```sql
+ALTER TABLE salaries ADD COLUMN description text;
+```
 
-### 3. Imports adicionais
-- `Switch` de `@/components/ui/switch`
-- `Checkbox` de `@/components/ui/checkbox`
-- `Tooltip, TooltipContent, TooltipProvider, TooltipTrigger` de `@/components/ui/tooltip`
-- `HelpCircle` de `lucide-react`
+### 2. Criar `src/components/admin/SalarySheet.tsx`
+Sheet lateral com:
+- Funcionario (Select, disabled em modo edicao)
+- Salario Base (Input disabled, de `employees.base_salary`)
+- Bonus / Comissoes (Input moeda, default 0)
+- Descontos / Faltas (Input moeda, default 0)
+- Salario Liquido calculado: `base + bonus - descontos` (salvo em `amount`)
+- Data de Vencimento, Data de Pagamento (se paid), Status
+- Observacoes da Folha (Textarea → `salaries.description`)
+- Switch "Atualizar Salario Base" (visivel se liquido != base) → UPDATE `employees.base_salary`
+- Botao "Cancelar Pagamento" (destructive) → AlertDialog com Checkbox "Desligar funcionario" → `employees.is_active = false`
 
-## Arquivo modificado
-- `src/components/admin/PaymentSheet.tsx`
+### 3. Editar `TeamSection.tsx`
+- Remover props: `onGenerateSalaries`, `onRunClosure`, `generatingSalaries`, `runningClosure`
+- Remover botoes "Gerar Salarios" e "Fechamento Mensal"
+- Manter apenas "Novo Funcionario"
 
-Nenhuma migracao SQL necessaria — `clients.monthly_value` e `clients.active` ja existem.
+### 4. Editar `Admin.tsx`
+- Substituir `SalaryForm` por `SalarySheet`
+- Passar `employees={metrics.employees}` para resolver salario base
+- Remover states e handlers de `generateSalaries` e `runClosure`
+- Remover props correspondentes do TeamSection
+
+### 5. Atualizar tipo `Salary` em `useFinancialMetrics.tsx`
+- Adicionar `description?: string | null`
+
+## Arquivos
+- **Migracao**: `ALTER TABLE salaries ADD COLUMN description text`
+- **Criar**: `src/components/admin/SalarySheet.tsx`
+- **Editar**: `src/components/admin/CommandCenter/TeamSection.tsx`
+- **Editar**: `src/pages/Admin.tsx`
+- **Editar**: `src/hooks/useFinancialMetrics.tsx`
+
