@@ -17,7 +17,7 @@ import type { Client, ClientPayment, Expense, Salary, Employee } from "@/hooks/u
 import { ClientForm } from "@/components/admin/ClientForm";
 import { PaymentSheet } from "@/components/admin/PaymentSheet";
 import { ExpenseForm } from "@/components/admin/ExpenseForm";
-import { SalaryForm } from "@/components/admin/SalaryForm";
+import { SalarySheet } from "@/components/admin/SalarySheet";
 import { EmployeeForm } from "@/components/admin/EmployeeForm";
 
 // Details dialogs
