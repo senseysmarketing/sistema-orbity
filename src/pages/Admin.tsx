@@ -23,7 +23,7 @@ import { EmployeeForm } from "@/components/admin/EmployeeForm";
 // Details dialogs
 import { ClientDetailsDialog } from "@/components/admin/ClientDetailsDialog";
 import { ExpenseDetailsDialog } from "@/components/admin/ExpenseDetailsDialog";
-import { SalaryDetailsDialog } from "@/components/admin/SalaryDetailsDialog";
+
 import { EmployeeDetailsDialog } from "@/components/admin/EmployeeDetailsDialog";
 
 // Command Center components
