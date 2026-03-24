@@ -489,13 +489,6 @@ export default function Admin() {
         onViewMaster={handleViewMasterExpense}
       />
 
-      <SalaryDetailsDialog
-        salary={selectedSalary}
-        open={salaryDetailsOpen}
-        onOpenChange={setSalaryDetailsOpen}
-        onEdit={() => { setSalaryDetailsOpen(false); if (selectedSalary) handleEditSalary(selectedSalary); }}
-        onDelete={() => { setSalaryDetailsOpen(false); if (selectedSalary) handleDeleteSalary(selectedSalary); }}
-      />
 
       <EmployeeDetailsDialog
         employee={selectedEmployee}
