@@ -425,6 +425,7 @@ export default function Admin() {
       <TeamSection
         employees={metrics.employees}
         onEditEmployee={handleEditEmployee}
+        onEditSalaryByEmployee={handleEditSalaryByEmployee}
         onDeleteEmployee={handleDeleteEmployee}
         onToggleEmployeeActive={handleToggleEmployeeActive}
         onAddEmployee={() => { setSelectedEmployee(null); setEmployeeFormOpen(true); }}
