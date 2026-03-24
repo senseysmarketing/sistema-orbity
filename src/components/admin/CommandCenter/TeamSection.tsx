@@ -11,6 +11,7 @@ import type { Employee } from "@/hooks/useFinancialMetrics";
 interface TeamSectionProps {
   employees: Employee[];
   onEditEmployee: (employee: Employee) => void;
+  onEditSalaryByEmployee: (employee: Employee) => void;
   onDeleteEmployee: (employee: Employee) => void;
   onToggleEmployeeActive: (employee: Employee) => void;
   onAddEmployee: () => void;
@@ -19,6 +20,7 @@ interface TeamSectionProps {
 export function TeamSection({
   employees,
   onEditEmployee,
+  onEditSalaryByEmployee,
   onDeleteEmployee: _onDeleteEmployee,
   onToggleEmployeeActive,
   onAddEmployee,
@@ -106,11 +108,14 @@ export function TeamSection({
                       <p className="text-xs text-muted-foreground">{emp.role || 'Sem cargo'} · {formatCurrency(emp.base_salary)}</p>
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { onEditEmployee(emp); setSheetOpen(false); }}>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs" onClick={() => { onEditSalaryByEmployee(emp); setSheetOpen(false); }}>
+                      Holerite
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs" onClick={() => { onEditEmployee(emp); setSheetOpen(false); }}>
                       Editar
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onToggleEmployeeActive(emp)}>
+                    <Button variant="ghost" size="sm" className={`h-7 px-2.5 text-xs ${emp.is_active ? 'text-destructive' : 'text-emerald-600'}`} onClick={() => onToggleEmployeeActive(emp)}>
                       {emp.is_active ? 'Desativar' : 'Ativar'}
                     </Button>
                   </div>
