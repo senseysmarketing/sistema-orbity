@@ -418,10 +418,6 @@ export default function Admin() {
         onDeleteEmployee={handleDeleteEmployee}
         onToggleEmployeeActive={handleToggleEmployeeActive}
         onAddEmployee={() => { setSelectedEmployee(null); setEmployeeFormOpen(true); }}
-        onGenerateSalaries={handleGenerateSalaries}
-        onRunClosure={handleRunMonthlyClosure}
-        generatingSalaries={generatingSalaries}
-        runningClosure={runningClosure}
       />
 
       {/* ============ FORMS (Dialog-based, standalone) ============ */}
