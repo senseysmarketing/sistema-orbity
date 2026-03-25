@@ -268,6 +268,15 @@ export function ClientCard({ client, agencyMembers, onUpdate, onRefreshBalance }
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={() => setIsOptimizationOpen(true)}
+                className="h-8 w-8"
+                title="Diário de Otimizações"
+              >
+                <Activity className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handleRefresh}
                 disabled={isRefreshing}
                 className="h-8 w-8"
