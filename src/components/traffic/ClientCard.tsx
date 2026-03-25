@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle, Edit3, TrendingUp, Clock, DollarSign, BarChart3, RefreshCw, CreditCard, Calendar, Wallet } from "lucide-react";
+import { AlertTriangle, CheckCircle, Edit3, TrendingUp, Clock, DollarSign, BarChart3, RefreshCw, CreditCard, Calendar, Wallet, Activity } from "lucide-react";
+import { OptimizationSheet } from "./OptimizationSheet";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
