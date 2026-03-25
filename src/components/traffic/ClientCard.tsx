@@ -56,6 +56,7 @@ export function ClientCard({ client, agencyMembers, onUpdate, onRefreshBalance }
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientData>(client);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isOptimizationOpen, setIsOptimizationOpen] = useState(false);
 
   const { currentAgency } = useAgency();
   const { user } = useAuth();
