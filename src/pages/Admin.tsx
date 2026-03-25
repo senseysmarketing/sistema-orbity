@@ -79,6 +79,7 @@ export default function Admin() {
   const [paymentToDelete, setPaymentToDelete] = useState<ClientPayment | null>(null);
 
   const [hasEnsuredCurrentMonthPayments, setHasEnsuredCurrentMonthPayments] = useState(false);
+  const [clientManagementOpen, setClientManagementOpen] = useState(false);
 
   const hasAccess = profile?.role === 'agency_admin';
 
