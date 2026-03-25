@@ -1,22 +1,63 @@
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { AlertTriangle, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, TrendingUp, Users } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import type { ClientProfitabilityItem } from "@/hooks/useFinancialMetrics";
+import type { Client } from "@/hooks/useFinancialMetrics";
 
 interface ClientProfitabilityCardProps {
   clients: ClientProfitabilityItem[];
+  allClients?: Client[];
+  selectedMonth?: string;
+  onOpenManagement?: () => void;
   className?: string;
 }
 
-export function ClientProfitabilityCard({ clients, className }: ClientProfitabilityCardProps) {
+export function ClientProfitabilityCard({ clients, allClients, selectedMonth, onOpenManagement, className }: ClientProfitabilityCardProps) {
+  const { activeCount, lostMRR } = useMemo(() => {
+    if (!allClients || !selectedMonth) return { activeCount: 0, lostMRR: 0 };
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const active = allClients.filter(c => c.active).length;
+    const lost = allClients
+      .filter(c => {
+        if (!c.cancelled_at) return false;
+        const d = new Date(c.cancelled_at);
+        return d.getFullYear() === year && d.getMonth() === month - 1;
+      })
+      .reduce((sum, c) => sum + (c.monthly_value || 0), 0);
+    return { activeCount: active, lostMRR: lost };
+  }, [allClients, selectedMonth]);
+
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          Rentabilidade por Cliente
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            Rentabilidade por Cliente
+          </CardTitle>
+          {onOpenManagement && (
+            <Button variant="outline" size="sm" onClick={onOpenManagement}>
+              Gerenciar Carteira
+            </Button>
+          )}
+        </div>
+        {allClients && selectedMonth && (
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+            <span className="flex items-center gap-1">
+              <Users className="h-3 w-3" />
+              {activeCount} Ativos
+            </span>
+            {lostMRR > 0 && (
+              <span className="flex items-center gap-1 text-destructive">
+                <AlertTriangle className="h-3 w-3" />
+                Churn: {formatCurrency(lostMRR)}
+              </span>
+            )}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-3 max-h-[500px] overflow-y-auto">
         {clients.length === 0 ? (

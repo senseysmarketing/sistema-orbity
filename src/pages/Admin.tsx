@@ -32,6 +32,7 @@ import { HeroMetrics } from "@/components/admin/CommandCenter/HeroMetrics";
 import { CashFlowTable } from "@/components/admin/CommandCenter/CashFlowTable";
 import { ClientProfitabilityCard } from "@/components/admin/CommandCenter/ClientProfitabilityCard";
 import { TeamSection } from "@/components/admin/CommandCenter/TeamSection";
+import { ClientManagementSheet } from "@/components/admin/CommandCenter/ClientManagementSheet";
 
 export default function Admin() {
   const { profile } = useAuth();
@@ -78,6 +79,7 @@ export default function Admin() {
   const [paymentToDelete, setPaymentToDelete] = useState<ClientPayment | null>(null);
 
   const [hasEnsuredCurrentMonthPayments, setHasEnsuredCurrentMonthPayments] = useState(false);
+  const [clientManagementOpen, setClientManagementOpen] = useState(false);
 
   const hasAccess = profile?.role === 'agency_admin';
 
@@ -418,7 +420,12 @@ export default function Admin() {
           onCancelItem={metrics.cancelItem}
           isCancellingItem={metrics.isCancellingItem}
         />
-        <ClientProfitabilityCard clients={metrics.clientProfitability} />
+        <ClientProfitabilityCard
+          clients={metrics.clientProfitability}
+          allClients={metrics.clients}
+          selectedMonth={selectedMonth}
+          onOpenManagement={() => setClientManagementOpen(true)}
+        />
       </div>
 
       {/* Team Section */}
@@ -429,6 +436,15 @@ export default function Admin() {
         onDeleteEmployee={handleDeleteEmployee}
         onToggleEmployeeActive={handleToggleEmployeeActive}
         onAddEmployee={() => { setSelectedEmployee(null); setEmployeeFormOpen(true); }}
+      />
+
+      {/* Client Management Sheet */}
+      <ClientManagementSheet
+        open={clientManagementOpen}
+        onOpenChange={setClientManagementOpen}
+        clients={metrics.clients}
+        selectedMonth={selectedMonth}
+        agencyId={currentAgency?.id || ""}
       />
 
       {/* ============ FORMS (Dialog-based, standalone) ============ */}
