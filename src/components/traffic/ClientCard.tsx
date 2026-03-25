@@ -550,6 +550,12 @@ export function ClientCard({ client, agencyMembers, onUpdate, onRefreshBalance }
           </div>
         </DialogContent>
       </Dialog>
+      <OptimizationSheet
+        isOpen={isOptimizationOpen}
+        onClose={() => setIsOptimizationOpen(false)}
+        clientName={client.ad_account_name}
+        adAccountId={client.ad_account_id}
+      />
     </>
   );
 }
