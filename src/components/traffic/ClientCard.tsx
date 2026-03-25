@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle, Edit3, TrendingUp, Clock, DollarSign, BarChart3, RefreshCw, CreditCard, Calendar, Wallet } from "lucide-react";
+import { AlertTriangle, CheckCircle, Edit3, TrendingUp, Clock, DollarSign, BarChart3, RefreshCw, CreditCard, Calendar, Wallet, Activity } from "lucide-react";
+import { OptimizationSheet } from "./OptimizationSheet";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,7 @@ export function ClientCard({ client, agencyMembers, onUpdate, onRefreshBalance }
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientData>(client);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isOptimizationOpen, setIsOptimizationOpen] = useState(false);
 
   const { currentAgency } = useAgency();
   const { user } = useAuth();
@@ -263,6 +265,15 @@ export function ClientCard({ client, agencyMembers, onUpdate, onRefreshBalance }
               </div>
             </div>
             <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsOptimizationOpen(true)}
+                className="h-8 w-8"
+                title="Diário de Otimizações"
+              >
+                <Activity className="h-4 w-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -539,6 +550,12 @@ export function ClientCard({ client, agencyMembers, onUpdate, onRefreshBalance }
           </div>
         </DialogContent>
       </Dialog>
+      <OptimizationSheet
+        isOpen={isOptimizationOpen}
+        onClose={() => setIsOptimizationOpen(false)}
+        clientName={client.ad_account_name}
+        adAccountId={client.ad_account_id}
+      />
     </>
   );
 }
