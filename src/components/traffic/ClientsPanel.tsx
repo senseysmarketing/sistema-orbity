@@ -534,6 +534,8 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
         description: "Não foi possível atualizar os dados desta conta.",
         variant: "destructive",
       });
+    } finally {
+      setRefreshingAccountId(null);
     }
   };
 
