@@ -751,7 +751,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
         </Card>
       </div>
 
-      {/* Grid de Cards de Clientes */}
+      {/* Lista de Clientes */}
       {clients.length === 0 ? (
         <Alert>
           <AlertDescription>
@@ -759,19 +759,46 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
           </AlertDescription>
         </Alert>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-2">
           {filteredClients.map((client) => (
-            <ClientCard
+            <ClientListRow
               key={client.ad_account_id}
               client={client}
               agencyMembers={agencyMembers.map((m) => ({ user_id: m.user_id, name: membersMap.get(m.user_id)?.name || m.user_id }))}
-              onUpdate={handleUpdateClient}
+              onSelect={(c) => {
+                setSelectedClient(c);
+                setIsDetailSheetOpen(true);
+              }}
               onRefreshBalance={handleRefreshBalance}
+              onOpenOptimization={(c) => setOptimizationClient(c)}
+              isRefreshing={refreshingAccountId === client.ad_account_id}
             />
           ))}
         </div>
       )}
     </div>
+
+      {/* Detail Sheet */}
+      <ClientDetailSheet
+        client={selectedClient}
+        open={isDetailSheetOpen}
+        onOpenChange={(open) => {
+          setIsDetailSheetOpen(open);
+          if (!open) setSelectedClient(null);
+        }}
+        agencyMembers={agencyMembers.map((m) => ({ user_id: m.user_id, name: membersMap.get(m.user_id)?.name || m.user_id }))}
+        onUpdate={handleUpdateClient}
+      />
+
+      {/* Optimization Sheet */}
+      {optimizationClient && (
+        <OptimizationSheet
+          isOpen={!!optimizationClient}
+          onClose={() => setOptimizationClient(null)}
+          clientName={optimizationClient.ad_account_name}
+          adAccountId={optimizationClient.ad_account_id}
+        />
+      )}
     </>
   );
 }
