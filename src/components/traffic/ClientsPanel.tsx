@@ -495,6 +495,7 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
   };
 
   const handleRefreshBalance = async (accountId: string) => {
+    setRefreshingAccountId(accountId);
     try {
       const { data, error } = await supabase.functions.invoke('facebook-account-summary', {
         body: { accountIds: [accountId], agencyId: currentAgency?.id }
