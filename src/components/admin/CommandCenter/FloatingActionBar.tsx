@@ -15,8 +15,8 @@ export function FloatingActionBar({ selectedMonth, onChangeMonth, onNewClient, o
     <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-4 px-4 py-3 mb-4 lg:-mx-6 lg:px-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Centro de Comando</h1>
-          <p className="text-sm text-muted-foreground">Visão 360° financeira e operacional</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Centro de Comando</h1>
+          <p className="text-sm md:text-base text-muted-foreground">Visão 360° financeira e operacional</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={selectedMonth} onValueChange={onChangeMonth}>
