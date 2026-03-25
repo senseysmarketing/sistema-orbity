@@ -59,6 +59,10 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [isBackgroundRefresh, setIsBackgroundRefresh] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0, phase: 'connecting' as 'connecting' | 'processing' | 'done' });
+  const [selectedClient, setSelectedClient] = useState<ClientData | null>(null);
+  const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
+  const [optimizationClient, setOptimizationClient] = useState<ClientData | null>(null);
+  const [refreshingAccountId, setRefreshingAccountId] = useState<string | null>(null);
   const { toast } = useToast();
   const { currentAgency } = useAgency();
 
