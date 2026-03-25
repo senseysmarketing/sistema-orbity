@@ -10,8 +10,11 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
-import { ClientCard, ClientData } from "./ClientCard";
+import { ClientData } from "./ClientCard";
+import { ClientListRow } from "./ClientListRow";
+import { ClientDetailSheet } from "./ClientDetailSheet";
 import { OptimizationReminder } from "./OptimizationReminder";
+import { OptimizationSheet } from "./OptimizationSheet";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
