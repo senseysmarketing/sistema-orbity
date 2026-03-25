@@ -1,48 +1,70 @@
 
 
-# Gerenciamento de Carteira + Churn no ClientProfitabilityCard
+# Refatoracao do Painel de Clientes de Trafego — Lista Hibrida + Sheet Lateral
+
+## Resumo
+Substituir o grid de cards grandes por uma lista hibrida compacta (linhas horizontais com informacoes-chave) e mover todos os detalhes para um novo Sheet lateral que abre ao clicar no cliente.
 
 ## O que muda
 
-1. **`ClientProfitabilityCard.tsx`** — Adicionar resumo de clientes ativos/churn no header + botao "Gerenciar Carteira"
-2. **`ClientManagementSheet.tsx`** (novo) — Sheet lateral com ChurnAnalysis + lista de clientes com Switch ativar/desativar e AlertDialog de confirmacao
-3. **`Admin.tsx`** — State de abertura + wiring das props
+### 1. Criar `src/components/traffic/ClientListRow.tsx`
+Componente de linha compacta para cada cliente:
+- Dot colorido (verde/amarelo/vermelho) indicando status de saude
+- Nome do cliente (bold) + badge tipo conta (Pre/Pos-paga)
+- Saldo principal ou Gasto do Mes (dependendo do tipo) — valor grande inline
+- Badge de resultados (Excelentes/Bons/Medios/Ruins/Pessimos)
+- Nome do gestor (ou "Sem gestor" em cinza)
+- Indicador de ultima otimizacao (X dias, com cor laranja se >7)
+- Botoes de acao: Refresh, Diario de Otimizacoes, Abrir Detalhes (chevron/seta)
+- Linha inteira clicavel para abrir o Sheet
+- Background sutil colorido por status (como hoje, mas mais discreto — apenas borda esquerda colorida)
 
-## Detalhes Tecnicos
+### 2. Criar `src/components/traffic/ClientDetailSheet.tsx`
+Sheet lateral (`side="right"`, `sm:max-w-[550px]`) com todas as informacoes que hoje estao no card + dialog de edicao, organizadas em secoes:
 
-### 1. `ClientProfitabilityCard.tsx`
-- Novas props: `allClients: Client[]`, `selectedMonth: string`, `onOpenManagement: () => void`
-- Calcular no componente: contagem de ativos no mes, MRR perdido (clientes com `cancelled_at` no mes selecionado)
-- Header: linha "X Ativos | Churn: R$ Y" + botao "Gerenciar Carteira" (variant="outline", size="sm")
+**Header**: Nome, ID, tipo de conta, badge status, badge resultados
 
-### 2. `ClientManagementSheet.tsx` (novo arquivo em `CommandCenter/`)
-- Props: `open`, `onOpenChange`, `clients: Client[]`, `selectedMonth: string`, `agencyId: string`
-- Sheet `side="right"`, `sm:max-w-[600px]`
+**Secao Financeira**: 
+- Saldo/Gasto detalhado (deposito, gasto, disponivel para pre-pagas)
+- Alerta de saldo minimo, dias restantes estimados
 
-**Secao Churn**: Renderiza `<ChurnAnalysis>` dentro de um `Collapsible` (default aberto)
+**Secao Metricas**:
+- Campanhas ativas, orcamento diario, gasto 7 dias, ultima otimizacao
 
-**Secao Lista de Clientes**:
-- Tabs "Todos | Ativos | Inativos" para filtrar
-- Cada item: avatar (iniciais), nome, `formatCurrency(monthly_value)`, Switch
-- **Trava de seguranca — AlertDialog na desativacao**:
-  - Ao clicar Switch para OFF: intercepta e abre AlertDialog com mensagem "Tem certeza que deseja inativar este cliente? Ele sera removido do seu MRR atual e as futuras cobrancas automaticas serao suspensas."
-  - Confirmar: executa `supabase.from('clients').update({ active: false, cancelled_at: now })` 
-  - Reativar (Switch para ON): executa direto sem confirmacao (`active: true, cancelled_at: null`)
-- **Invalidation completa**: apos mutacao, invalidar TODAS as query keys financeiras:
-  - `['admin-clients', agencyId]`
-  - `['admin-payments-all', agencyId]`
-  - `['admin-expenses', agencyId, ...]`
-  - `['admin-salaries', agencyId, ...]`
-  - `['admin-employees', agencyId]`
-  - Usar `queryClient.invalidateQueries({ queryKey: ['admin-clients'] })` + `['admin-payments-all']` (as demais sao recalculadas via useMemo)
+**Secao Configuracao** (editavel inline):
+- Select de resultados, select de gestor, input de saldo minimo
 
-### 3. `Admin.tsx`
-- Novo state: `clientManagementOpen`
-- Renderizar `<ClientManagementSheet>` passando `metrics.clients`, `selectedMonth`, `currentAgency.id`
-- Passar `allClients`, `selectedMonth` e `onOpenManagement` ao `ClientProfitabilityCard`
+**Secao Comentarios**:
+- Lista de comentarios + textarea para novo comentario
+
+**Footer**: Botao salvar alteracoes
+
+Tambem renderiza o `OptimizationSheet` (diario) a partir daqui.
+
+### 3. Refatorar `src/components/traffic/ClientsPanel.tsx`
+- Substituir o grid de `<ClientCard>` por uma lista de `<ClientListRow>`
+- Adicionar state `selectedClient` e `isDetailSheetOpen`
+- Renderizar `<ClientDetailSheet>` uma unica vez, controlado pelo state
+- Manter todos os filtros, stats cards e logica de dados existentes intactos
+- No mobile: linhas empilham verticalmente com layout responsivo
+
+### 4. Manter `src/components/traffic/ClientCard.tsx`
+- NAO deletar — manter para compatibilidade, mas nao sera mais usado pelo ClientsPanel
+- Pode ser removido em iteracao futura
+
+## Layout da Linha (desktop, ~1200px+)
+
+```text
+[●] Conecta Assescon Imoveis   [Pre-paga]   R$ 441,63   [Medios]   Gestor: Joao   ⏱ 0 dias   [↻] [📊] [→]
+[▲] Edno Cordeiro Imoveis      [Pre-paga]   R$ 165,96   [Bons]     Sem gestor     ⏱ 8 dias   [↻] [📊] [→]
+```
+
+- Borda esquerda: verde (saudavel), amarela (atencao), vermelha (critico)
+- Hover: bg sutil
+- Se precisa otimizar (>7 dias): texto laranja + icone de alerta na coluna de otimizacao
 
 ## Arquivos
-- `src/components/admin/CommandCenter/ClientProfitabilityCard.tsx` (editar)
-- `src/components/admin/CommandCenter/ClientManagementSheet.tsx` (criar)
-- `src/pages/Admin.tsx` (editar)
+- `src/components/traffic/ClientListRow.tsx` (criar)
+- `src/components/traffic/ClientDetailSheet.tsx` (criar)
+- `src/components/traffic/ClientsPanel.tsx` (refatorar render de cards para lista)
 
