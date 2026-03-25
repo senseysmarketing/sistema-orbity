@@ -420,7 +420,12 @@ export default function Admin() {
           onCancelItem={metrics.cancelItem}
           isCancellingItem={metrics.isCancellingItem}
         />
-        <ClientProfitabilityCard clients={metrics.clientProfitability} />
+        <ClientProfitabilityCard
+          clients={metrics.clientProfitability}
+          allClients={metrics.clients}
+          selectedMonth={selectedMonth}
+          onOpenManagement={() => setClientManagementOpen(true)}
+        />
       </div>
 
       {/* Team Section */}

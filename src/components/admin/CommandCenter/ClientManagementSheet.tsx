@@ -24,7 +24,7 @@ interface ClientManagementSheetProps {
   agencyId: string;
 }
 
-export function ClientManagementSheet({ open, onOpenChange, clients, selectedMonth, agencyId }: ClientManagementSheetProps) {
+export function ClientManagementSheet({ open, onOpenChange, clients, selectedMonth }: ClientManagementSheetProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [churnOpen, setChurnOpen] = useState(true);
