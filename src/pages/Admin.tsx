@@ -32,6 +32,7 @@ import { HeroMetrics } from "@/components/admin/CommandCenter/HeroMetrics";
 import { CashFlowTable } from "@/components/admin/CommandCenter/CashFlowTable";
 import { ClientProfitabilityCard } from "@/components/admin/CommandCenter/ClientProfitabilityCard";
 import { TeamSection } from "@/components/admin/CommandCenter/TeamSection";
+import { ClientManagementSheet } from "@/components/admin/CommandCenter/ClientManagementSheet";
 
 export default function Admin() {
   const { profile } = useAuth();
