@@ -1,28 +1,40 @@
 
 
-# Conectar SalarySheet ao TeamSection + Alinhar Botoes
+# Diario de Otimizacoes (OptimizationSheet)
 
-## Problema
-O botao "Editar" no sheet "Gerenciar Equipe" chama `onEditEmployee` que abre o `EmployeeForm` (modal antigo de dados cadastrais). O usuario espera abrir o `SalarySheet` para editar o salario do mes atual.
-
-## Alteracoes
-
-### 1. `TeamSection.tsx` — Nova prop + alinhamento visual
-- Adicionar prop `onEditSalaryByEmployee: (employee: Employee) => void`
-- O botao "Editar" no sheet interno passara a chamar `onEditSalaryByEmployee(emp)` em vez de `onEditEmployee(emp)`
-- Alinhar botoes "Editar" e "Ativar/Desativar" com layout consistente (mesma largura, `variant="ghost"` uniforme)
-
-### 2. `Admin.tsx` — Novo handler + wiring
-- Criar `handleEditSalaryByEmployee(employee)`:
-  1. Busca em `metrics.salaries` o salario do mes atual para esse `employee_id`
-  2. Se encontrar: `setSelectedSalary(salary); setSalaryFormOpen(true)`
-  3. Se nao encontrar: abre o SalarySheet sem salary (modo criacao) pre-selecionando o employee
-- Passar esse handler como prop `onEditSalaryByEmployee` no `TeamSection`
-
-### 3. Alinhamento visual dos botoes no TeamSection sheet
-- Usar `flex items-center gap-2` nos botoes "Editar" e "Ativar/Desativar" com tamanho consistente
+## Resumo
+Criar uma gaveta lateral com formulario de registro + timeline de historico de otimizacoes por cliente de trafego. Dados mockados em state local.
 
 ## Arquivos
-- `src/components/admin/CommandCenter/TeamSection.tsx`
-- `src/pages/Admin.tsx`
+
+### 1. Criar `src/components/traffic/OptimizationSheet.tsx`
+Sheet lateral (side="right") com:
+
+**Props**: `isOpen`, `onClose`, `clientName`, `adAccountId`
+
+**Mock state** inicial com 3 registros de exemplo (datas passadas, acoes variadas, status diferentes).
+
+**Formulario (parte superior)**:
+- Data da Acao: DatePicker (Popover + Calendar, default hoje)
+- O que foi feito: Textarea
+- Status do Teste: Select com opcoes "Em Rodagem", "Vencedor", "Perdedor" (badges azul/amarelo, verde, vermelho)
+- Novos Criativos: Input type number
+- Observacoes / Pedidos ao Cliente: Textarea
+- Alerta Inteligente: Checkbox "Lembrar de analisar este teste" + input numerico condicional "em [X] dias"
+- Botao "Salvar Registro" — adiciona ao array mockado e limpa formulario
+
+**Timeline (parte inferior, ScrollArea)**:
+- Linha vertical com circulos coloridos por status
+- Cada item: data formatada, acao, badge de status, contagem de criativos, observacoes
+- Ordenado por data desc
+
+### 2. Editar `src/components/traffic/ClientCard.tsx`
+- Adicionar state `isOptimizationOpen`
+- Adicionar botao com icone `Activity` (tooltip "Diario de Otimizacoes") no grupo de botoes do header (ao lado de refresh e edit, linha ~265)
+- Renderizar `<OptimizationSheet>` passando `clientName={client.ad_account_name}` e `adAccountId={client.ad_account_id}`
+
+## Design
+- Componentes shadcn: Sheet, Calendar, Popover, Select, Textarea, Input, Checkbox, Badge, Button, ScrollArea, Separator
+- Timeline: div com `border-l-2` e circulos absolutos posicionados, cores por status
+- Sheet width: `sm:max-w-lg` para ter espaco confortavel
 
