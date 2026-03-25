@@ -438,6 +438,15 @@ export default function Admin() {
         onAddEmployee={() => { setSelectedEmployee(null); setEmployeeFormOpen(true); }}
       />
 
+      {/* Client Management Sheet */}
+      <ClientManagementSheet
+        open={clientManagementOpen}
+        onOpenChange={setClientManagementOpen}
+        clients={metrics.clients}
+        selectedMonth={selectedMonth}
+        agencyId={currentAgency?.id || ""}
+      />
+
       {/* ============ FORMS (Dialog-based, standalone) ============ */}
       <ClientForm
         open={clientFormOpen}
