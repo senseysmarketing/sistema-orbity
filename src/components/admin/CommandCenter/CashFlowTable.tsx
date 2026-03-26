@@ -105,6 +105,10 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
               >
                 Atrasados {overdueCount > 0 && `(${overdueCount})`}
               </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAdvancedOpen(true)}>
+                <BarChart3 className="h-3.5 w-3.5 mr-1" />
+                Análise Avançada
+              </Button>
             </div>
           </div>
         </CardHeader>
