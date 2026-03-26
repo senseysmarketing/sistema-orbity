@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { RefreshCw, BarChart3, AlertTriangle, Clock, CheckCircle } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
@@ -623,135 +623,104 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
       {/* Banner de Lembrete */}
       <OptimizationReminder onNavigateToCampaigns={onNavigateToCampaigns} />
 
-      {/* Filtros */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Sem saldo / Crítico</Label>
-                  <Switch checked={onlyCritical} onCheckedChange={setOnlyCritical} />
-                </div>
-                <p className="text-xs text-muted-foreground">Mostra apenas contas críticas ou com saldo zerado.</p>
-              </div>
+      {/* Filtros compactos */}
+      <div className="flex flex-wrap items-center gap-3 py-2">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm whitespace-nowrap">Crítico</Label>
+          <Switch checked={onlyCritical} onCheckedChange={setOnlyCritical} />
+        </div>
 
-              <div className="space-y-2">
-                <Label>Resultados</Label>
-                <Select value={resultsFilter} onValueChange={(v) => setResultsFilter(v as ResultsFilter)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="excellent">Excelentes</SelectItem>
-                    <SelectItem value="good">Bons</SelectItem>
-                    <SelectItem value="average">Médios</SelectItem>
-                    <SelectItem value="bad">Ruins</SelectItem>
-                    <SelectItem value="terrible">Péssimos</SelectItem>
-                    <SelectItem value="undefined">Não definido</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        <div className="flex items-center gap-2">
+          <Label className="text-sm whitespace-nowrap">Otimizar</Label>
+          <Switch checked={onlyNeedsOptimization} onCheckedChange={setOnlyNeedsOptimization} />
+        </div>
 
-              <div className="space-y-2">
-                <Label>Gestor</Label>
-                <Select value={managerFilter} onValueChange={(v) => setManagerFilter(v as ManagerFilter)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="unassigned">Sem gestor</SelectItem>
-                    {agencyMembers.map((m) => (
-                      <SelectItem key={m.user_id} value={m.user_id}>
-                        {membersMap.get(m.user_id)?.name || m.user_id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        <Select value={resultsFilter} onValueChange={(v) => setResultsFilter(v as ResultsFilter)}>
+          <SelectTrigger className="w-[140px] h-9">
+            <SelectValue placeholder="Resultados" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="excellent">Excelentes</SelectItem>
+            <SelectItem value="good">Bons</SelectItem>
+            <SelectItem value="average">Médios</SelectItem>
+            <SelectItem value="bad">Ruins</SelectItem>
+            <SelectItem value="terrible">Péssimos</SelectItem>
+            <SelectItem value="undefined">Não definido</SelectItem>
+          </SelectContent>
+        </Select>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Precisa otimizar</Label>
-                  <Switch checked={onlyNeedsOptimization} onCheckedChange={setOnlyNeedsOptimization} />
-                </div>
-                <p className="text-xs text-muted-foreground">Filtra contas sem otimização há 7+ dias.</p>
-              </div>
-            </div>
+        <Select value={managerFilter} onValueChange={(v) => setManagerFilter(v as ManagerFilter)}>
+          <SelectTrigger className="w-[140px] h-9">
+            <SelectValue placeholder="Gestor" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="unassigned">Sem gestor</SelectItem>
+            {agencyMembers.map((m) => (
+              <SelectItem key={m.user_id} value={m.user_id}>
+                {membersMap.get(m.user_id)?.name || m.user_id}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setOnlyCritical(false);
-                  setOnlyNeedsOptimization(false);
-                  setResultsFilter("all");
-                  setManagerFilter("all");
-                }}
-              >
-                Limpar filtros
-              </Button>
-              <div className="text-sm text-muted-foreground">
-                Mostrando <span className="font-medium text-foreground">{filteredClients.length}</span> de {clients.length}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <div className="flex items-center gap-2 ml-auto">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setOnlyCritical(false);
+              setOnlyNeedsOptimization(false);
+              setResultsFilter("all");
+              setManagerFilter("all");
+            }}
+          >
+            Limpar
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {filteredClients.length}/{clients.length}
+          </span>
+        </div>
+      </div>
 
-      {/* Cards de Resumo */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Total</span>
-            </div>
-            <p className="text-2xl font-bold">{stats.total}</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium">Saudáveis</span>
-            </div>
-            <p className="text-2xl font-bold text-green-600">{stats.healthy}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-600" />
-              <span className="text-sm font-medium">Atenção</span>
-            </div>
-            <p className="text-2xl font-bold text-yellow-600">{stats.warning}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-600" />
-              <span className="text-sm font-medium">Críticos</span>
-            </div>
-            <p className="text-2xl font-bold text-red-600">{stats.critical}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-orange-600" />
-              <span className="text-sm font-medium">Otimizar</span>
-            </div>
-            <p className="text-2xl font-bold text-orange-600">{stats.needsOptimization}</p>
-          </CardContent>
-        </Card>
+      {/* Stats bar compacta */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => { setOnlyCritical(false); setOnlyNeedsOptimization(false); setResultsFilter("all"); setManagerFilter("all"); }}
+          className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors hover:bg-accent"
+        >
+          <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
+          Total: {stats.total}
+        </button>
+        <button
+          onClick={() => { setOnlyCritical(false); setOnlyNeedsOptimization(false); }}
+          className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-sm font-medium text-green-700 transition-colors hover:bg-green-100 dark:border-green-800 dark:bg-green-950 dark:text-green-400 dark:hover:bg-green-900"
+        >
+          <CheckCircle className="h-3.5 w-3.5" />
+          Saudáveis: {stats.healthy}
+        </button>
+        <button
+          onClick={() => { setOnlyCritical(false); }}
+          className="inline-flex items-center gap-1.5 rounded-full border border-yellow-200 bg-yellow-50 px-3 py-1 text-sm font-medium text-yellow-700 transition-colors hover:bg-yellow-100 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400 dark:hover:bg-yellow-900"
+        >
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Atenção: {stats.warning}
+        </button>
+        <button
+          onClick={() => setOnlyCritical(true)}
+          className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900"
+        >
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Críticos: {stats.critical}
+        </button>
+        <button
+          onClick={() => setOnlyNeedsOptimization(true)}
+          className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-sm font-medium text-orange-700 transition-colors hover:bg-orange-100 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-400 dark:hover:bg-orange-900"
+        >
+          <Clock className="h-3.5 w-3.5" />
+          Otimizar: {stats.needsOptimization}
+        </button>
       </div>
 
       {/* Lista de Clientes */}
