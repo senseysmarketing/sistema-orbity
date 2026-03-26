@@ -243,6 +243,15 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AdvancedFinancialSheet
+        open={advancedOpen}
+        onOpenChange={setAdvancedOpen}
+        cashFlow={cashFlow}
+        expensesByCategory={expensesByCategory}
+        agencyId={agencyId}
+        selectedMonth={selectedMonth}
+      />
     </div>
   );
 }
