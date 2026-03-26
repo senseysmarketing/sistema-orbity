@@ -95,7 +95,7 @@ export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesB
           {/* Block 2: Visão Anual YTD */}
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Visão Anual (YTD)</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Card>
                 <CardContent className="pt-4 pb-3 px-3 text-center space-y-1">
                   <DollarSign className="h-4 w-4 mx-auto text-primary" />
