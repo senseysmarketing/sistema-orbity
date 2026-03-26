@@ -66,7 +66,7 @@ export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesB
         <div className="mt-6 space-y-6">
           {/* Block 1: Raio-X do Mês */}
           <Card>
-            <CardContent className="pt-5 space-y-3">
+            <CardContent className="pt-5 px-5 space-y-3">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Raio-X do Mês</h3>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
@@ -95,27 +95,27 @@ export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesB
           {/* Block 2: Visão Anual YTD */}
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Visão Anual (YTD)</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Card>
-                <CardContent className="pt-4 pb-3 px-3 text-center space-y-1">
+                <CardContent className="p-4 text-center space-y-1 min-w-0">
                   <DollarSign className="h-4 w-4 mx-auto text-primary" />
                   <p className="text-xs text-muted-foreground">Faturamento Anual</p>
-                  {analytics.isLoading ? <Skeleton className="h-5 w-16 mx-auto" /> : (
-                    <p className="text-sm font-bold">{formatCurrency(analytics.ytdRevenue)}</p>
+                  {analytics.isLoading ? <Skeleton className="h-5 w-20 mx-auto" /> : (
+                    <p className="text-sm font-bold truncate">{formatCurrency(analytics.ytdRevenue)}</p>
                   )}
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-4 pb-3 px-3 text-center space-y-1">
+                <CardContent className="p-4 text-center space-y-1 min-w-0">
                   <Calendar className="h-4 w-4 mx-auto text-primary" />
                   <p className="text-xs text-muted-foreground">Média Mensal</p>
-                  {analytics.isLoading ? <Skeleton className="h-5 w-16 mx-auto" /> : (
-                    <p className="text-sm font-bold">{formatCurrency(analytics.monthlyAvg)}</p>
+                  {analytics.isLoading ? <Skeleton className="h-5 w-20 mx-auto" /> : (
+                    <p className="text-sm font-bold truncate">{formatCurrency(analytics.monthlyAvg)}</p>
                   )}
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-4 pb-3 px-3 text-center space-y-1">
+                <CardContent className="p-4 text-center space-y-1 min-w-0">
                   {analytics.momGrowth >= 0 ? (
                     <TrendingUp className="h-4 w-4 mx-auto text-emerald-500" />
                   ) : (
@@ -135,11 +135,11 @@ export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesB
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-4 pb-3 px-3 text-center space-y-1">
+                <CardContent className="p-4 text-center space-y-1 min-w-0">
                   <Target className="h-4 w-4 mx-auto text-primary" />
                   <p className="text-xs text-muted-foreground">Projeção Anual</p>
-                  {analytics.isLoading ? <Skeleton className="h-5 w-16 mx-auto" /> : (
-                    <p className="text-sm font-bold">{formatCurrency(analytics.annualRunRate)}</p>
+                  {analytics.isLoading ? <Skeleton className="h-5 w-20 mx-auto" /> : (
+                    <p className="text-sm font-bold truncate">{formatCurrency(analytics.annualRunRate)}</p>
                   )}
                 </CardContent>
               </Card>
