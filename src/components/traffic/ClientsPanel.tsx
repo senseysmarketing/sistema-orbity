@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { RefreshCw, BarChart3, AlertTriangle, Clock, CheckCircle } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
