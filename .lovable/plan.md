@@ -1,19 +1,33 @@
 
 
-# Padronizar Tamanho dos Botoes no Command Center
+# Melhorias no AdvancedFinancialSheet — 4 Itens
 
-## Problema
-Os botoes "Este Mes", "Prox. 7 dias", "Atrasados", "Analise Avancada" e "Gerenciar Equipe" estao menores que "Gerenciar Carteira" porque possuem classes extras `h-7 text-xs` ou `h-8 text-xs` que reduzem sua altura e fonte.
+## Mudancas
 
-## Solucao
-Remover as classes `h-7 text-xs` e `h-8 text-xs` desses botoes, deixando todos com o tamanho padrao do `size="sm"` (h-9, text-sm) — igual ao "Gerenciar Carteira".
+### 1. `src/hooks/useAdvancedAnalytics.tsx`
 
-## Arquivos
+**Fix MoM NaN:** Linha 53, trocar a logica:
+- Se `prevMRR === 0 && currentMRR > 0` → retornar `100`
+- Se `prevMRR === 0 && currentMRR === 0` → retornar `0`
+- Caso contrario, calculo normal
 
-### `src/components/admin/CommandCenter/CashFlowTable.tsx` (linhas 94-111)
-- Remover `className="h-7 text-xs"` dos 4 botoes de filtro e analise avancada
+**Aceitar `selectedYear` como parametro opcional:** O hook recebera um `selectedYear` (string) que sobrescreve o ano extraido do `selectedMonth`. Isso permite consultar anos anteriores.
 
-### `src/components/admin/CommandCenter/TeamSection.tsx` (linha 41)
-- Remover `className="h-8 text-xs"` do botao "Gerenciar Equipe"
-- Ajustar icone de `h-3.5 w-3.5` para `h-4 w-4` para manter proporcao
+**Buscar tambem dados do mes anterior quando janeiro:** Quando o mes selecionado e janeiro, o prevMonth pertence ao ano anterior. A query atual so busca o ano corrente, entao o prevMRR sera sempre 0 em janeiro. Adicionar uma segunda query condicional para o ano anterior quando `currentMonthNum === 1`.
+
+**Adicionar `annualRunRate`:** `currentMRR * 12` — calculado no useMemo e retornado.
+
+### 2. `src/components/admin/CommandCenter/AdvancedFinancialSheet.tsx`
+
+**Bloco 1 — Inadimplencia:** Abaixo da barra de progresso, calcular `totalOverdue` a partir do `cashFlow` (filtrar `type === 'INCOME' && status === 'OVERDUE'`). Exibir com `text-destructive` e icone `AlertTriangle` quando > 0.
+
+**Bloco 2 — Run Rate:** Mudar grid de `grid-cols-3` para `grid-cols-2 sm:grid-cols-4`. Adicionar quarto card "Projecao Anual" com `analytics.annualRunRate`.
+
+**Seletor de Ano:** Adicionar `useState` para `selectedYear` (default: ano do `selectedMonth`). Renderizar um `<Select>` discreto ao lado do titulo no SheetHeader com opcoes de ano (ano atual - 2 ate ano atual). Passar `selectedYear` ao hook.
+
+**Loading state:** Exibir `Skeleton` nos valores quando `analytics.isLoading`.
+
+### Arquivos
+- `src/hooks/useAdvancedAnalytics.tsx` (editar)
+- `src/components/admin/CommandCenter/AdvancedFinancialSheet.tsx` (editar)
 
