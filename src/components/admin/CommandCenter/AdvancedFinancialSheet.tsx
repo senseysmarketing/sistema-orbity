@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { TrendingUp, TrendingDown, DollarSign, Calendar, BarChart3 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TrendingUp, TrendingDown, DollarSign, Calendar, BarChart3, AlertTriangle, Target } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useAdvancedAnalytics } from "@/hooks/useAdvancedAnalytics";
 import type { CashFlowItem, CategoryTotal } from "@/hooks/useFinancialMetrics";
@@ -17,11 +20,18 @@ interface AdvancedFinancialSheetProps {
 }
 
 export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesByCategory, agencyId, selectedMonth }: AdvancedFinancialSheetProps) {
-  const analytics = useAdvancedAnalytics({ agencyId, selectedMonth, isOpen: open });
+  const defaultYear = selectedMonth.split('-')[0];
+  const [selectedYear, setSelectedYear] = useState(defaultYear);
+
+  const currentRealYear = new Date().getFullYear();
+  const yearOptions = [currentRealYear - 2, currentRealYear - 1, currentRealYear].map(String);
+
+  const analytics = useAdvancedAnalytics({ agencyId, selectedMonth, isOpen: open, selectedYear });
 
   // Block 1: Month X-Ray
   const totalExpected = cashFlow.filter(i => i.type === 'INCOME' && i.status !== 'CANCELLED').reduce((s, i) => s + i.amount, 0);
   const totalReceived = cashFlow.filter(i => i.type === 'INCOME' && i.status === 'PAID').reduce((s, i) => s + i.amount, 0);
+  const totalOverdue = cashFlow.filter(i => i.type === 'INCOME' && i.status === 'OVERDUE').reduce((s, i) => s + i.amount, 0);
   const progressPct = totalExpected > 0 ? Math.round((totalReceived / totalExpected) * 100) : 0;
 
   const monthLabel = (() => {
@@ -34,10 +44,22 @@ export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesB
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:max-w-[500px] overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            Análise Avançada
-          </SheetTitle>
+          <div className="flex items-center justify-between">
+            <SheetTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Análise Avançada
+            </SheetTitle>
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="w-24 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map(y => (
+                  <SelectItem key={y} value={y}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <SheetDescription>Visão estratégica de {monthLabel}</SheetDescription>
         </SheetHeader>
 
@@ -58,25 +80,38 @@ export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesB
                   <span className="font-semibold text-foreground">{formatCurrency(totalExpected)}</span>
                 </p>
               </div>
+
+              {totalOverdue > 0 && (
+                <div className="flex items-center gap-2 pt-1">
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                  <span className="text-sm text-destructive font-semibold">
+                    {formatCurrency(totalOverdue)} em atraso
+                  </span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {/* Block 2: Visão Anual YTD */}
           <div className="space-y-2">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Visão Anual (YTD)</h3>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <Card>
                 <CardContent className="pt-4 pb-3 px-3 text-center space-y-1">
                   <DollarSign className="h-4 w-4 mx-auto text-primary" />
                   <p className="text-xs text-muted-foreground">Faturamento Anual</p>
-                  <p className="text-sm font-bold">{formatCurrency(analytics.ytdRevenue)}</p>
+                  {analytics.isLoading ? <Skeleton className="h-5 w-16 mx-auto" /> : (
+                    <p className="text-sm font-bold">{formatCurrency(analytics.ytdRevenue)}</p>
+                  )}
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-4 pb-3 px-3 text-center space-y-1">
                   <Calendar className="h-4 w-4 mx-auto text-primary" />
                   <p className="text-xs text-muted-foreground">Média Mensal</p>
-                  <p className="text-sm font-bold">{formatCurrency(analytics.monthlyAvg)}</p>
+                  {analytics.isLoading ? <Skeleton className="h-5 w-16 mx-auto" /> : (
+                    <p className="text-sm font-bold">{formatCurrency(analytics.monthlyAvg)}</p>
+                  )}
                 </CardContent>
               </Card>
               <Card>
@@ -87,14 +122,25 @@ export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesB
                     <TrendingDown className="h-4 w-4 mx-auto text-rose-500" />
                   )}
                   <p className="text-xs text-muted-foreground">Crescimento MoM</p>
-                  <Badge
-                    className={analytics.momGrowth >= 0
-                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300 hover:bg-emerald-100"
-                      : "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-300 hover:bg-rose-100"
-                    }
-                  >
-                    {analytics.momGrowth >= 0 ? '+' : ''}{analytics.momGrowth.toFixed(1)}%
-                  </Badge>
+                  {analytics.isLoading ? <Skeleton className="h-5 w-12 mx-auto" /> : (
+                    <Badge
+                      className={analytics.momGrowth >= 0
+                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300 hover:bg-emerald-100"
+                        : "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-300 hover:bg-rose-100"
+                      }
+                    >
+                      {analytics.momGrowth >= 0 ? '+' : ''}{analytics.momGrowth.toFixed(1)}%
+                    </Badge>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4 pb-3 px-3 text-center space-y-1">
+                  <Target className="h-4 w-4 mx-auto text-primary" />
+                  <p className="text-xs text-muted-foreground">Projeção Anual</p>
+                  {analytics.isLoading ? <Skeleton className="h-5 w-16 mx-auto" /> : (
+                    <p className="text-sm font-bold">{formatCurrency(analytics.annualRunRate)}</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
