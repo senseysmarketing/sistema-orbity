@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
 import { ClientData } from "./ClientCard";
-import { ClientListRow } from "./ClientListRow";
+import { ClientMiniCard } from "./ClientMiniCard";
 import { ClientDetailSheet } from "./ClientDetailSheet";
 import { OptimizationReminder } from "./OptimizationReminder";
 import { OptimizationSheet } from "./OptimizationSheet";
