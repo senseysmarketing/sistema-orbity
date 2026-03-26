@@ -115,7 +115,7 @@ export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesB
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-4 pb-3 px-3 text-center space-y-1">
+                <CardContent className="p-4 text-center space-y-1 min-w-0">
                   {analytics.momGrowth >= 0 ? (
                     <TrendingUp className="h-4 w-4 mx-auto text-emerald-500" />
                   ) : (
