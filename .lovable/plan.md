@@ -1,36 +1,32 @@
 
 
-# Refatorar Lista para Mini Cards em Grid — Painel de Trafego
+# Reorganizar Filtros e Stats Cards do Painel de Clientes
 
 ## Resumo
-Substituir o `ClientListRow` (linhas horizontais) por mini cards compactos em grid (3-4 por linha no desktop). Cada card mostra apenas as informacoes essenciais. Clique abre o Sheet lateral (que ja esta pronto e aprovado).
+Melhorar a organizacao visual dos filtros e cards de resumo, tornando a area mais compacta e com hierarquia visual clara.
 
-## O que muda
+## Mudancas
 
-### 1. Criar `src/components/traffic/ClientMiniCard.tsx`
-Card compacto com layout vertical:
+### `src/components/traffic/ClientsPanel.tsx`
 
-- **Borda superior ou lateral colorida** por status (verde/amarelo/vermelho)
-- **Nome** do cliente (truncado) + badge tipo (Pre/Pos) pequeno
-- **Valor principal** grande e colorido (saldo para pre-paga, gasto mes para pos-paga)
-- **Badge de resultados** (Excelentes/Bons/Medios/Ruins/N-D)
-- **Indicador de otimizacao**: icone + "Xd" (laranja se >7 dias)
-- **Gestor**: nome ou "Sem gestor" em texto discreto
-- **Hover**: shadow + cursor pointer
-- Card inteiro clicavel para abrir o Sheet lateral
-- Botao de refresh (pequeno, canto superior direito)
+**1. Stats Cards → Barra compacta inline (em vez de 5 cards separados)**
+- Substituir os 5 Cards individuais por uma unica linha horizontal com os contadores como "chips" ou badges inline dentro de um unico Card
+- Layout: `Total: 26 | ● Saudaveis: 14 | ▲ Atencao: 0 | △ Criticos: 12 | ⏱ Otimizar: 5`
+- Clicaveis como filtro rapido (clicar em "Criticos" ativa o filtro correspondente)
 
-Layout estimado por card: ~180-220px de altura, responsivo
+**2. Filtros → Layout mais compacto e alinhado**
+- Colocar os switches (Sem saldo/Critico e Precisa otimizar) na mesma linha horizontal
+- Remover as descricoes (textos auxiliares) dos switches — o nome ja e auto-explicativo
+- Alinhar Selects (Resultados, Gestor) e Switches na mesma linha em desktop
+- Mover "Limpar filtros" e "Mostrando X de Y" para o final da mesma linha
+- Remover o Card wrapper dos filtros, usar apenas um `div` com `border-b` ou manter card mas com padding menor
 
-### 2. Refatorar `src/components/traffic/ClientsPanel.tsx`
-- Substituir o mapeamento de `<ClientListRow>` por `<ClientMiniCard>`
-- Grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`
-- Manter toda a logica de filtros, stats cards, state do Sheet lateral
+**3. Ordem visual**
+- Header (titulo + botao atualizar)
+- Filtros (uma unica linha compacta)
+- Stats bar (contadores inline clicaveis)
+- Grid de mini cards
 
-### 3. Manter `ClientListRow.tsx`
-- Nao deletar, apenas deixa de ser usado pelo ClientsPanel
-
-## Arquivos
-- `src/components/traffic/ClientMiniCard.tsx` (criar)
-- `src/components/traffic/ClientsPanel.tsx` (editar — trocar ClientListRow por ClientMiniCard no render)
+## Arquivo
+- `src/components/traffic/ClientsPanel.tsx` (editar linhas 626-755)
 
