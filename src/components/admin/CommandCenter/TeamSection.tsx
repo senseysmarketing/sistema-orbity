@@ -38,8 +38,8 @@ export function TeamSection({
             Equipe ({activeEmployees.length} ativos)
           </CardTitle>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setSheetOpen(true)}>
-              <Settings className="h-3.5 w-3.5 mr-1" />
+            <Button variant="outline" size="sm" onClick={() => setSheetOpen(true)}>
+              <Settings className="h-4 w-4 mr-1" />
               Gerenciar Equipe
             </Button>
           </div>
