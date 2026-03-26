@@ -1,70 +1,36 @@
 
 
-# Refatoracao do Painel de Clientes de Trafego — Lista Hibrida + Sheet Lateral
+# Refatorar Lista para Mini Cards em Grid — Painel de Trafego
 
 ## Resumo
-Substituir o grid de cards grandes por uma lista hibrida compacta (linhas horizontais com informacoes-chave) e mover todos os detalhes para um novo Sheet lateral que abre ao clicar no cliente.
+Substituir o `ClientListRow` (linhas horizontais) por mini cards compactos em grid (3-4 por linha no desktop). Cada card mostra apenas as informacoes essenciais. Clique abre o Sheet lateral (que ja esta pronto e aprovado).
 
 ## O que muda
 
-### 1. Criar `src/components/traffic/ClientListRow.tsx`
-Componente de linha compacta para cada cliente:
-- Dot colorido (verde/amarelo/vermelho) indicando status de saude
-- Nome do cliente (bold) + badge tipo conta (Pre/Pos-paga)
-- Saldo principal ou Gasto do Mes (dependendo do tipo) — valor grande inline
-- Badge de resultados (Excelentes/Bons/Medios/Ruins/Pessimos)
-- Nome do gestor (ou "Sem gestor" em cinza)
-- Indicador de ultima otimizacao (X dias, com cor laranja se >7)
-- Botoes de acao: Refresh, Diario de Otimizacoes, Abrir Detalhes (chevron/seta)
-- Linha inteira clicavel para abrir o Sheet
-- Background sutil colorido por status (como hoje, mas mais discreto — apenas borda esquerda colorida)
+### 1. Criar `src/components/traffic/ClientMiniCard.tsx`
+Card compacto com layout vertical:
 
-### 2. Criar `src/components/traffic/ClientDetailSheet.tsx`
-Sheet lateral (`side="right"`, `sm:max-w-[550px]`) com todas as informacoes que hoje estao no card + dialog de edicao, organizadas em secoes:
+- **Borda superior ou lateral colorida** por status (verde/amarelo/vermelho)
+- **Nome** do cliente (truncado) + badge tipo (Pre/Pos) pequeno
+- **Valor principal** grande e colorido (saldo para pre-paga, gasto mes para pos-paga)
+- **Badge de resultados** (Excelentes/Bons/Medios/Ruins/N-D)
+- **Indicador de otimizacao**: icone + "Xd" (laranja se >7 dias)
+- **Gestor**: nome ou "Sem gestor" em texto discreto
+- **Hover**: shadow + cursor pointer
+- Card inteiro clicavel para abrir o Sheet lateral
+- Botao de refresh (pequeno, canto superior direito)
 
-**Header**: Nome, ID, tipo de conta, badge status, badge resultados
+Layout estimado por card: ~180-220px de altura, responsivo
 
-**Secao Financeira**: 
-- Saldo/Gasto detalhado (deposito, gasto, disponivel para pre-pagas)
-- Alerta de saldo minimo, dias restantes estimados
+### 2. Refatorar `src/components/traffic/ClientsPanel.tsx`
+- Substituir o mapeamento de `<ClientListRow>` por `<ClientMiniCard>`
+- Grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3`
+- Manter toda a logica de filtros, stats cards, state do Sheet lateral
 
-**Secao Metricas**:
-- Campanhas ativas, orcamento diario, gasto 7 dias, ultima otimizacao
-
-**Secao Configuracao** (editavel inline):
-- Select de resultados, select de gestor, input de saldo minimo
-
-**Secao Comentarios**:
-- Lista de comentarios + textarea para novo comentario
-
-**Footer**: Botao salvar alteracoes
-
-Tambem renderiza o `OptimizationSheet` (diario) a partir daqui.
-
-### 3. Refatorar `src/components/traffic/ClientsPanel.tsx`
-- Substituir o grid de `<ClientCard>` por uma lista de `<ClientListRow>`
-- Adicionar state `selectedClient` e `isDetailSheetOpen`
-- Renderizar `<ClientDetailSheet>` uma unica vez, controlado pelo state
-- Manter todos os filtros, stats cards e logica de dados existentes intactos
-- No mobile: linhas empilham verticalmente com layout responsivo
-
-### 4. Manter `src/components/traffic/ClientCard.tsx`
-- NAO deletar — manter para compatibilidade, mas nao sera mais usado pelo ClientsPanel
-- Pode ser removido em iteracao futura
-
-## Layout da Linha (desktop, ~1200px+)
-
-```text
-[●] Conecta Assescon Imoveis   [Pre-paga]   R$ 441,63   [Medios]   Gestor: Joao   ⏱ 0 dias   [↻] [📊] [→]
-[▲] Edno Cordeiro Imoveis      [Pre-paga]   R$ 165,96   [Bons]     Sem gestor     ⏱ 8 dias   [↻] [📊] [→]
-```
-
-- Borda esquerda: verde (saudavel), amarela (atencao), vermelha (critico)
-- Hover: bg sutil
-- Se precisa otimizar (>7 dias): texto laranja + icone de alerta na coluna de otimizacao
+### 3. Manter `ClientListRow.tsx`
+- Nao deletar, apenas deixa de ser usado pelo ClientsPanel
 
 ## Arquivos
-- `src/components/traffic/ClientListRow.tsx` (criar)
-- `src/components/traffic/ClientDetailSheet.tsx` (criar)
-- `src/components/traffic/ClientsPanel.tsx` (refatorar render de cards para lista)
+- `src/components/traffic/ClientMiniCard.tsx` (criar)
+- `src/components/traffic/ClientsPanel.tsx` (editar — trocar ClientListRow por ClientMiniCard no render)
 
