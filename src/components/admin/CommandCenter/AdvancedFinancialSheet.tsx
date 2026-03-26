@@ -66,7 +66,7 @@ export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesB
         <div className="mt-6 space-y-6">
           {/* Block 1: Raio-X do Mês */}
           <Card>
-            <CardContent className="pt-5 space-y-3">
+            <CardContent className="pt-5 px-5 space-y-3">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Raio-X do Mês</h3>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
