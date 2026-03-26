@@ -419,6 +419,8 @@ export default function Admin() {
           }}
           onCancelItem={metrics.cancelItem}
           isCancellingItem={metrics.isCancellingItem}
+          agencyId={currentAgency?.id || ""}
+          selectedMonth={selectedMonth}
         />
         <ClientProfitabilityCard
           clients={metrics.clientProfitability}

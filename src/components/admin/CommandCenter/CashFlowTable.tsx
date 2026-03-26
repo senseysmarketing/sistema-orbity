@@ -6,10 +6,11 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { MarkAsPaidPopover } from "./MarkAsPaidPopover";
+import { AdvancedFinancialSheet } from "./AdvancedFinancialSheet";
 import type { CashFlowItem, CategoryTotal } from "@/hooks/useFinancialMetrics";
 
 type FilterType = 'all' | 'next7' | 'overdue';
@@ -22,13 +23,16 @@ interface CashFlowTableProps {
   onEditItem?: (item: CashFlowItem) => void;
   onCancelItem?: (params: { id: string; sourceType: string }) => void;
   isCancellingItem?: boolean;
+  agencyId: string;
+  selectedMonth: string;
   className?: string;
 }
 
-export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, className }: CashFlowTableProps) {
+export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, agencyId, selectedMonth, className }: CashFlowTableProps) {
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [cancelDialogItem, setCancelDialogItem] = useState<CashFlowItem | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const today = new Date();
@@ -100,6 +104,10 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                 onClick={() => setFilter('overdue')}
               >
                 Atrasados {overdueCount > 0 && `(${overdueCount})`}
+              </Button>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAdvancedOpen(true)}>
+                <BarChart3 className="h-3.5 w-3.5 mr-1" />
+                Análise Avançada
               </Button>
             </div>
           </div>
@@ -235,6 +243,15 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AdvancedFinancialSheet
+        open={advancedOpen}
+        onOpenChange={setAdvancedOpen}
+        cashFlow={cashFlow}
+        expensesByCategory={expensesByCategory}
+        agencyId={agencyId}
+        selectedMonth={selectedMonth}
+      />
     </div>
   );
 }
