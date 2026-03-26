@@ -23,6 +23,8 @@ interface CashFlowTableProps {
   onEditItem?: (item: CashFlowItem) => void;
   onCancelItem?: (params: { id: string; sourceType: string }) => void;
   isCancellingItem?: boolean;
+  agencyId: string;
+  selectedMonth: string;
   className?: string;
 }
 
