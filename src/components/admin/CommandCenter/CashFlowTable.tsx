@@ -10,6 +10,7 @@ import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Se
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { MarkAsPaidPopover } from "./MarkAsPaidPopover";
+import { AdvancedFinancialSheet } from "./AdvancedFinancialSheet";
 import type { CashFlowItem, CategoryTotal } from "@/hooks/useFinancialMetrics";
 
 type FilterType = 'all' | 'next7' | 'overdue';
