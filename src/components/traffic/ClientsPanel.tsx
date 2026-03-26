@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
 import { ClientData } from "./ClientCard";
-import { ClientListRow } from "./ClientListRow";
+import { ClientMiniCard } from "./ClientMiniCard";
 import { ClientDetailSheet } from "./ClientDetailSheet";
 import { OptimizationReminder } from "./OptimizationReminder";
 import { OptimizationSheet } from "./OptimizationSheet";
@@ -762,9 +762,9 @@ export function ClientsPanel({ selectedAdAccounts, onNavigateToCampaigns }: Clie
           </AlertDescription>
         </Alert>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {filteredClients.map((client) => (
-            <ClientListRow
+            <ClientMiniCard
               key={client.ad_account_id}
               client={client}
               agencyMembers={agencyMembers.map((m) => ({ user_id: m.user_id, name: membersMap.get(m.user_id)?.name || m.user_id }))}
