@@ -1,32 +1,46 @@
 
 
-# Reorganizar Filtros e Stats Cards do Painel de Clientes
+# Analise Avancada Financeira — Sheet Lateral + Hook Dedicado
 
 ## Resumo
-Melhorar a organizacao visual dos filtros e cards de resumo, tornando a area mais compacta e com hierarquia visual clara.
+Adicionar botao "Analise Avancada" no header do CashFlowTable que abre um Sheet lateral com 3 blocos: Raio-X do mes, Visao Anual YTD e Distribuicao de Despesas. Um hook dedicado `useAdvancedAnalytics` carrega dados anuais apenas quando o Sheet esta aberto.
 
-## Mudancas
+## Arquivos
 
-### `src/components/traffic/ClientsPanel.tsx`
+### 1. Criar `src/hooks/useAdvancedAnalytics.tsx`
+Hook dedicado com query habilitada apenas quando `isOpen === true`:
+- Busca `client_payments` com `status = 'paid'` do ano vigente (Jan-Dez)
+- Calcula: faturamento anual acumulado, media mensal (acumulado / mes atual), MRR mes anterior para crescimento MoM
+- Recebe `agencyId`, `selectedMonth` e `isOpen` como parametros
 
-**1. Stats Cards → Barra compacta inline (em vez de 5 cards separados)**
-- Substituir os 5 Cards individuais por uma unica linha horizontal com os contadores como "chips" ou badges inline dentro de um unico Card
-- Layout: `Total: 26 | ● Saudaveis: 14 | ▲ Atencao: 0 | △ Criticos: 12 | ⏱ Otimizar: 5`
-- Clicaveis como filtro rapido (clicar em "Criticos" ativa o filtro correspondente)
+### 2. Criar `src/components/admin/CommandCenter/AdvancedFinancialSheet.tsx`
+Sheet lateral (`side="right"`, `sm:max-w-[500px]`) com 3 blocos:
 
-**2. Filtros → Layout mais compacto e alinhado**
-- Colocar os switches (Sem saldo/Critico e Precisa otimizar) na mesma linha horizontal
-- Remover as descricoes (textos auxiliares) dos switches — o nome ja e auto-explicativo
-- Alinhar Selects (Resultados, Gestor) e Switches na mesma linha em desktop
-- Mover "Limpar filtros" e "Mostrando X de Y" para o final da mesma linha
-- Remover o Card wrapper dos filtros, usar apenas um `div` com `border-b` ou manter card mas com padding menor
+**Bloco 1 — Raio-X do Mes:**
+- Progress bar: valor recebido (PAID/INCOME) vs valor total esperado (todos INCOME do mes)
+- Texto: "R$ X recebidos de R$ Y" + percentual
 
-**3. Ordem visual**
-- Header (titulo + botao atualizar)
-- Filtros (uma unica linha compacta)
-- Stats bar (contadores inline clicaveis)
-- Grid de mini cards
+**Bloco 2 — Visao Anual (YTD):**
+- Grid 3 cards: Faturamento Anual, Media Mensal, Crescimento MoM
+- Badge verde (+X%) ou vermelha (-X%) no crescimento
 
-## Arquivo
-- `src/components/traffic/ClientsPanel.tsx` (editar linhas 626-755)
+**Bloco 3 — Top Categorias de Despesa:**
+- Recebe `expensesByCategory` como prop (ja calculado no useFinancialMetrics)
+- Lista top 3 com barra de progresso proporcional e valor
+
+### 3. Editar `src/components/admin/CommandCenter/CashFlowTable.tsx`
+- Adicionar botao `<Button variant="outline" size="sm">` com icone `<BarChart3>` e texto "Analise Avancada" no header, ao lado dos filtros
+- Adicionar state `advancedOpen` e renderizar `<AdvancedFinancialSheet>`
+- Passar props: `cashFlow`, `expensesByCategory`, `agencyId`, `selectedMonth`
+
+### 4. Editar `src/components/admin/CommandCenter/CashFlowTable.tsx` (props)
+- Adicionar `agencyId` e `selectedMonth` as props do componente
+
+### 5. Editar `src/pages/Admin.tsx`
+- Passar `agencyId` e `selectedMonth` para `<CashFlowTable>`
+
+## Fluxo de Dados
+- `cashFlow` (ja disponivel como prop) fornece dados do mes para o Bloco 1
+- `expensesByCategory` (ja disponivel como prop) fornece dados para o Bloco 3
+- `useAdvancedAnalytics` (novo hook, lazy) fornece dados YTD para o Bloco 2
 
