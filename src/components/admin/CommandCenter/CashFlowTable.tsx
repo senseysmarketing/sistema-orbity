@@ -91,22 +91,21 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
               />
             </div>
             <div className="flex gap-1.5">
-              <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" className="h-7 text-xs" onClick={() => setFilter('all')}>
+              <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
                 Este Mês
               </Button>
-              <Button variant={filter === 'next7' ? 'default' : 'outline'} size="sm" className="h-7 text-xs" onClick={() => setFilter('next7')}>
+              <Button variant={filter === 'next7' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('next7')}>
                 Próx. 7 dias
               </Button>
               <Button
                 variant={filter === 'overdue' ? 'destructive' : 'outline'}
                 size="sm"
-                className="h-7 text-xs"
                 onClick={() => setFilter('overdue')}
               >
                 Atrasados {overdueCount > 0 && `(${overdueCount})`}
               </Button>
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setAdvancedOpen(true)}>
-                <BarChart3 className="h-3.5 w-3.5 mr-1" />
+              <Button variant="outline" size="sm" onClick={() => setAdvancedOpen(true)}>
+                <BarChart3 className="h-4 w-4 mr-1" />
                 Análise Avançada
               </Button>
             </div>
