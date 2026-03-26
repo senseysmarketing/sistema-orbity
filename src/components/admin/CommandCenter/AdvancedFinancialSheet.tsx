@@ -106,11 +106,11 @@ export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesB
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-4 pb-3 px-3 text-center space-y-1">
+                <CardContent className="p-4 text-center space-y-1 min-w-0">
                   <Calendar className="h-4 w-4 mx-auto text-primary" />
                   <p className="text-xs text-muted-foreground">Média Mensal</p>
-                  {analytics.isLoading ? <Skeleton className="h-5 w-16 mx-auto" /> : (
-                    <p className="text-sm font-bold">{formatCurrency(analytics.monthlyAvg)}</p>
+                  {analytics.isLoading ? <Skeleton className="h-5 w-20 mx-auto" /> : (
+                    <p className="text-sm font-bold truncate">{formatCurrency(analytics.monthlyAvg)}</p>
                   )}
                 </CardContent>
               </Card>
