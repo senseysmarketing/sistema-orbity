@@ -26,6 +26,7 @@ export function FloatingActionBar({ selectedMonth, onChangeMonth, onNewClient, o
             <SelectContent>
               {Array.from({ length: 12 }, (_, i) => {
                 const date = new Date();
+                date.setDate(1);
                 date.setMonth(date.getMonth() - i);
                 const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
                 const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
