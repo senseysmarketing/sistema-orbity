@@ -171,8 +171,7 @@ async function processAgencyClosure(supabase: any, agencyId: string): Promise<Mo
     .eq('agency_id', agencyId)
     .eq('expense_type', 'parcelada')
     .not('installment_current', 'is', null)
-    .not('installment_total', 'is', null)
-    .lt('installment_current', supabase.raw('installment_total'));
+    .not('installment_total', 'is', null);
 
   for (const expense of parcelledExpenses || []) {
     const nextInstallment = expense.installment_current + 1;
