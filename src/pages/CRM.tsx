@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import { Plus, Search, Users, DollarSign, Target, Calendar, Grid, List, AlertTriangle, TrendingUp, Settings, Download, Filter, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,6 +96,7 @@ export default function CRM() {
   const { refresh: refreshStatuses, mapDatabaseStatusToDisplay, getStatusConfig } = useLeadStatuses();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -396,7 +398,7 @@ export default function CRM() {
       </div>
 
       {/* Main Tabs - 3 tabs: Dashboard, Pipeline, Settings */}
-      <Tabs defaultValue="dashboard" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="dashboard" className="flex-shrink-0 gap-1 md:gap-2">
             <TrendingUp className="h-4 w-4" />
@@ -413,12 +415,12 @@ export default function CRM() {
         </TabsList>
 
         {/* Dashboard Tab */}
-        <TabsContent value="dashboard" className="space-y-4">
+        <TabsContent value="dashboard" forceMount className={cn("space-y-4", activeTab !== "dashboard" && "hidden")}>
           <CRMDashboard leads={leads} />
         </TabsContent>
 
         {/* Pipeline Tab */}
-        <TabsContent value="pipeline" className="space-y-4">
+        <TabsContent value="pipeline" forceMount className={cn("space-y-4", activeTab !== "pipeline" && "hidden")}>
           <UnqualifiedLeadsWarning leads={leads} />
           <Card>
             <CardHeader>
@@ -568,7 +570,7 @@ export default function CRM() {
         </TabsContent>
 
         {/* Settings Tab */}
-        <TabsContent value="settings" className="space-y-4">
+        <TabsContent value="settings" forceMount className={cn("space-y-4", activeTab !== "settings" && "hidden")}>
           <CRMSettings />
         </TabsContent>
       </Tabs>
