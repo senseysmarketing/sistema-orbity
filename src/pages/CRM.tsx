@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import { Plus, Search, Users, DollarSign, Target, Calendar, Grid, List, AlertTriangle, TrendingUp, Settings, Download, Filter, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
