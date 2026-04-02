@@ -570,7 +570,7 @@ export default function CRM() {
         </TabsContent>
 
         {/* Settings Tab */}
-        <TabsContent value="settings" className="space-y-4">
+        <TabsContent value="settings" forceMount className={cn("space-y-4", activeTab !== "settings" && "hidden")}>
           <CRMSettings />
         </TabsContent>
       </Tabs>
