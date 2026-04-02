@@ -398,7 +398,7 @@ export default function CRM() {
       </div>
 
       {/* Main Tabs - 3 tabs: Dashboard, Pipeline, Settings */}
-      <Tabs defaultValue="dashboard" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="dashboard" className="flex-shrink-0 gap-1 md:gap-2">
             <TrendingUp className="h-4 w-4" />
