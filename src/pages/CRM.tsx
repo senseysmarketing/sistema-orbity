@@ -96,6 +96,7 @@ export default function CRM() {
   const { refresh: refreshStatuses, mapDatabaseStatusToDisplay, getStatusConfig } = useLeadStatuses();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
