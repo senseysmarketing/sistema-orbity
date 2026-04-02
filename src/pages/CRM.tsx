@@ -415,7 +415,7 @@ export default function CRM() {
         </TabsList>
 
         {/* Dashboard Tab */}
-        <TabsContent value="dashboard" className="space-y-4">
+        <TabsContent value="dashboard" forceMount className={cn("space-y-4", activeTab !== "dashboard" && "hidden")}>
           <CRMDashboard leads={leads} />
         </TabsContent>
 
