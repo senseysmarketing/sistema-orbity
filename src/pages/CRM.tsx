@@ -420,7 +420,7 @@ export default function CRM() {
         </TabsContent>
 
         {/* Pipeline Tab */}
-        <TabsContent value="pipeline" className="space-y-4">
+        <TabsContent value="pipeline" forceMount className={cn("space-y-4", activeTab !== "pipeline" && "hidden")}>
           <UnqualifiedLeadsWarning leads={leads} />
           <Card>
             <CardHeader>
