@@ -145,7 +145,7 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
         last_contact: formData.last_contact || null,
         next_contact: formData.next_contact || null,
         tags: tags.length > 0 ? tags : null,
-        custom_fields: {},
+        custom_fields: lead?.custom_fields || {},
         updated_at: new Date().toISOString(),
       };
 
