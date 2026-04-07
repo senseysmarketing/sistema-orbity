@@ -4,10 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProductTour } from '@/hooks/useProductTour';
 import { useNavigate } from 'react-router-dom';
+import { HelpAIChat } from './HelpAIChat';
 import { 
   BookOpen, 
   Video, 
-  Lightbulb, 
+  Sparkles,
   RotateCcw,
   LayoutDashboard,
   Users,
@@ -24,71 +25,18 @@ interface HelpCenterProps {
 }
 
 const quickGuides = [
-  {
-    icon: LayoutDashboard,
-    title: 'Dashboard',
-    description: 'Visão geral de métricas e atividades',
-    color: 'text-blue-500',
-    route: '/'
-  },
-  {
-    icon: Users,
-    title: 'CRM - Leads',
-    description: 'Gestão completa do funil de vendas',
-    color: 'text-green-500',
-    route: '/crm'
-  },
-  {
-    icon: CheckSquare,
-    title: 'Tarefas',
-    description: 'Organize e acompanhe o trabalho da equipe',
-    color: 'text-orange-500',
-    route: '/tasks'
-  },
-  {
-    icon: Calendar,
-    title: 'Agenda',
-    description: 'Agende reuniões e eventos',
-    color: 'text-purple-500',
-    route: '/agenda'
-  },
-  {
-    icon: MessageSquare,
-    title: 'Social Media',
-    description: 'Planejamento de conteúdo',
-    color: 'text-pink-500',
-    route: '/social-media'
-  },
-  {
-    icon: TrendingUp,
-    title: 'Tráfego Pago',
-    description: 'Monitore campanhas do Facebook Ads',
-    color: 'text-red-500',
-    route: '/traffic'
-  },
-  {
-    icon: DollarSign,
-    title: 'Financeiro',
-    description: 'Controle de receitas e despesas',
-    color: 'text-emerald-500',
-    route: '/admin'
-  }
-];
-
-const tips = [
-  'Use atalhos de teclado para navegar mais rápido pelo sistema',
-  'Crie lembretes para não esquecer de fazer follow-up com seus leads',
-  'Configure notificações para receber alertas importantes',
-  'Use tags para organizar melhor seus leads e tarefas',
-  'Acompanhe métricas diariamente no Dashboard para tomar decisões estratégicas',
-  'Conecte sua conta do Facebook Ads para monitorar campanhas em tempo real',
-  'Aproveite o Kanban do CRM para visualizar seu funil de vendas'
+  { icon: LayoutDashboard, title: 'Dashboard', description: 'Visão geral de métricas e atividades', color: 'text-blue-500', route: '/' },
+  { icon: Users, title: 'CRM - Leads', description: 'Gestão completa do funil de vendas', color: 'text-green-500', route: '/crm' },
+  { icon: CheckSquare, title: 'Tarefas', description: 'Organize e acompanhe o trabalho da equipe', color: 'text-orange-500', route: '/tasks' },
+  { icon: Calendar, title: 'Agenda', description: 'Agende reuniões e eventos', color: 'text-purple-500', route: '/agenda' },
+  { icon: MessageSquare, title: 'Social Media', description: 'Planejamento de conteúdo', color: 'text-pink-500', route: '/social-media' },
+  { icon: TrendingUp, title: 'Tráfego Pago', description: 'Monitore campanhas do Facebook Ads', color: 'text-red-500', route: '/traffic' },
+  { icon: DollarSign, title: 'Financeiro', description: 'Controle de receitas e despesas', color: 'text-emerald-500', route: '/admin' },
 ];
 
 export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
   const { startTour } = useProductTour();
   const navigate = useNavigate();
-  const randomTip = tips[Math.floor(Math.random() * tips.length)];
 
   const handleStartTour = () => {
     onClose();
@@ -110,8 +58,12 @@ export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
           </SheetDescription>
         </SheetHeader>
 
-        <Tabs defaultValue="guides" className="mt-6">
+        <Tabs defaultValue="ai" className="mt-6">
           <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="ai">
+              <Sparkles className="h-4 w-4 mr-2" />
+              IA Suporte
+            </TabsTrigger>
             <TabsTrigger value="guides">
               <BookOpen className="h-4 w-4 mr-2" />
               Guias
@@ -120,11 +72,11 @@ export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
               <Video className="h-4 w-4 mr-2" />
               Vídeos
             </TabsTrigger>
-            <TabsTrigger value="tips">
-              <Lightbulb className="h-4 w-4 mr-2" />
-              Dicas
-            </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="ai" className="mt-4">
+            <HelpAIChat />
+          </TabsContent>
 
           <TabsContent value="guides" className="space-y-4 mt-4">
             <Card className="border-primary/50">
@@ -183,39 +135,6 @@ export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
                   <Video className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground">Conteúdo em produção</p>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="tips" className="space-y-4 mt-4">
-            <Card className="border-yellow-500/50 bg-yellow-500/5">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5 text-yellow-500" />
-                  <CardTitle>Dica do Dia</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm">{randomTip}</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Dicas Rápidas</CardTitle>
-                <CardDescription>
-                  Maximize sua produtividade com essas dicas
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {tips.map((tip, index) => (
-                    <li key={index} className="flex gap-2">
-                      <span className="text-primary mt-1">•</span>
-                      <span className="text-sm">{tip}</span>
-                    </li>
-                  ))}
-                </ul>
               </CardContent>
             </Card>
           </TabsContent>
