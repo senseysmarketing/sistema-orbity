@@ -1,63 +1,85 @@
 
 
-# Redesign Landing Page com Framer Motion - Estilo Apple
+# Substituir aba "Dicas" por Chat IA de Suporte na Central de Ajuda
 
 ## Resumo
-Instalar `framer-motion`, refatorar o HeroSection com nova copy e animacao de texto revelado (word-by-word com spring), transformar o FeaturesGrid em Bento Grid com nova copy orientada a beneficios, e adicionar animacoes de scroll + efeito tilt 3D nos cards principais. Header/Footer ganham fade-in animado.
 
-## Arquivos Modificados
+Remover a aba "Dicas" do HelpCenter e substituir por uma aba "IA Suporte" com chat conversacional. A aba de IA sera a aba padrao (aberta primeiro). O chat usara streaming via uma nova edge function dedicada (`ai-support-chat`) com um system prompt rico sobre todos os modulos da Orbity e contexto da agencia do usuario.
 
-### 1. `package.json` - Instalar framer-motion
-- Adicionar `"framer-motion": "^11.x"` as dependencias
+## Arquivos
 
-### 2. `src/components/landing/HeroSection.tsx` - Redesign completo
-- Importar `motion` do framer-motion
-- Nova copy:
-  - Titulo: "Orbity: O Sistema Operacional das Agencias de Alta Performance."
-  - Subtitulo: "Centralize CRM, Financeiro, Trafego e Social em uma plataforma inteligente. Automatize processos, fature mais e pare de queimar neuronios com planilhas."
-  - Botao principal: "Agendar Demonstracao Gratuita" (com seta)
-- Layout centralizado (remover grid 2 colunas, texto centralizado imponente)
-- Titulo com fonte maior (`text-5xl md:text-6xl lg:text-7xl`)
-- Animacao word-by-word: split do titulo em palavras, cada `<motion.span>` com `variants` usando `type: "spring"` e delay incremental
-- Mock dashboard mantido abaixo como elemento visual secundario com `motion.div` fade-in com delay
-- Manter AgencyLogos, badge e botao secundario
+### 1. Nova edge function: `supabase/functions/ai-support-chat/index.ts`
 
-### 3. `src/components/landing/FeaturesGrid.tsx` - Bento Grid com nova copy
-- Importar `motion` do framer-motion
-- Nova copy dos cards (beneficios):
-  - CRM: "Feche Mais Contratos" / "Pipeline visual e automacao de leads"
-  - Trafego: "Escale o ROI de Anuncios" / "Monitoramento de Meta e Google Ads integrado"
-  - Criativo: "Produza Criativos que Convertem" / "Prazos, briefings e aprovacao em um clique"
-  - Financeiro: "Inadimplencia Zero" / "Cobranca automatica por PIX/Boleto e fluxo de caixa"
-  - Social: "Gestao de Conteudo Simplificada" / "Calendario editorial e agendamento de posts"
-  - Relatorios: "Decisoes Baseadas em Dados" / "Dashboards de performance em tempo real"
-- Grid reorganizado: 2 cards grandes (CRM e Trafego em `col-span-2`) + 4 cards menores
-- Cada card usa `motion.div` com `whileInView` (slideUp + fadeIn) e delay incremental via `transition.delay`
-- Titulo da secao tambem com `motion.div` whileInView
+- Endpoint de chat com streaming SSE
+- Recebe `messages` (historico completo) + `agency_context` (nome da agencia, plano, qtd clientes/leads/tarefas)
+- System prompt extenso com:
+  - Conhecimento de todos os modulos Orbity (Dashboard, CRM, Tarefas, Agenda, Social Media, Trafego, Financeiro, Contratos, Lembretes, Metas/PPR, Configuracoes)
+  - Rotas de cada tela (ex: `/dashboard/clients`, `/dashboard/crm`, etc.) para incluir links nas respostas
+  - Instrucoes de formatacao: respostas em markdown, com emojis, links das telas como `[Tarefas](/dashboard/tasks)`, texto curto e direto, sem blocos gigantes
+  - Sempre finalizar com um insight/dica sobre o que o usuario pode fazer na agencia
+  - Tom amigavel, direto, brasileiro
+- Usa Lovable AI Gateway com streaming (`stream: true`)
+- Retorna SSE stream direto para o cliente
+- Trata erros 429/402
 
-### 4. `src/components/landing/FeatureCard.tsx` - Adicionar efeito tilt 3D
-- Importar `motion, useMotionValue, useTransform, useSpring` do framer-motion
-- Props: adicionar `large?: boolean` para identificar cards CRM/Trafego
-- Para cards `large`: implementar efeito tilt 3D:
-  - `onMouseMove` calcula posicao relativa do mouse
-  - `useMotionValue` para x/y
-  - `useTransform` converte para `rotateX` (-5 a 5 graus) e `rotateY` (-5 a 5 graus)
-  - `useSpring` para suavizar o movimento
-  - `onMouseLeave` reseta para 0
-  - Aplicar `style={{ rotateX, rotateY, transformPerspective: 1000 }}`
-- Todos os cards: wrappados em `motion.div` (ja recebem whileInView do pai)
+### 2. Novo componente: `src/components/help/HelpAIChat.tsx`
 
-### 5. `src/components/landing/LandingFooter.tsx` - Fade-in animado
-- Wrapper `motion.footer` com `initial={{ opacity: 0, y: 20 }}` e `whileInView={{ opacity: 1, y: 0 }}`
+- Componente de chat dentro da aba
+- Estado: `messages[]` (role + content), `input`, `isLoading`
+- Area de mensagens com scroll automatico
+- Input com botao de enviar
+- Mensagem inicial de boas-vindas da IA (hardcoded, nao consome API)
+- Streaming token-by-token usando fetch SSE (mesmo padrao do useful-context)
+- Renderiza respostas da IA com `react-markdown` para suportar bold, links, emojis, listas
+- Links internos da Orbity (ex: `[CRM](/dashboard/crm)`) navegam via `useNavigate` ao clicar (interceptar clicks em links relativos)
+- Sugestoes rapidas como chips clicaveis: "Como usar o CRM?", "Como criar tarefas?", "Como funciona o financeiro?"
+- Busca contexto da agencia via `useAgency()` e envia como `agency_context` na primeira chamada
 
-### 6. `src/pages/LandingPage.tsx` - Sem mudancas estruturais
-- Componentes ja estao importados; as animacoes sao internas a cada componente
+### 3. Modificar: `src/components/help/HelpCenter.tsx`
+
+- Remover aba "Dicas" (tips) e todo o conteudo relacionado (array `tips`, `randomTip`)
+- Substituir por aba "IA Suporte" com icone `Bot` ou `Sparkles`
+- Mudar `defaultValue` de `"guides"` para `"ai"` (aba IA abre primeiro)
+- Tabs: IA Suporte | Guias | Videos (3 colunas mantidas)
+- TabsContent "ai" renderiza `<HelpAIChat />`
+
+### 4. Instalar dependencia: `react-markdown`
+
+- Para renderizar as respostas da IA com formatacao adequada
+
+## System Prompt da Edge Function (resumo)
+
+```
+Voce e a Orbi, assistente de suporte da Orbity. Responda sempre em PT-BR, com emojis, de forma direta e objetiva.
+
+Modulos da Orbity:
+- Dashboard (/dashboard): metricas, timeline do dia, tarefas pendentes
+- CRM (/dashboard/crm): funil de vendas, kanban de leads, qualificacao
+- Clientes (/dashboard/clients): cadastro, credenciais, arquivos, timeline
+- Tarefas (/dashboard/tasks): kanban, analytics, templates, subtarefas
+- Agenda (/dashboard/agenda): reunioes, calendario, Google Calendar
+- Social Media (/dashboard/social-media): planejamento, posts, calendario editorial
+- Trafego (/dashboard/traffic): Facebook Ads, campanhas, relatorios
+- Financeiro (/dashboard/admin): clientes, despesas, salarios, fluxo de caixa
+- Contratos (/dashboard/contracts): gerador de contratos, templates
+- Lembretes (/dashboard/reminders): listas, lembretes pessoais
+- Metas (/dashboard/goals): PPR, scorecards, NPS
+- Relatorios (/dashboard/reports): dashboards de performance
+- Configuracoes (/dashboard/settings): integracao WhatsApp, Google Calendar, IA
+
+Regras de formatacao:
+- Use markdown: **negrito**, listas, links
+- Links de telas: [nome da tela](/rota)
+- Maximo 3-4 paragrafos curtos
+- Sempre termine com "💡 **Dica:**" + insight actionavel para a agencia
+- Use emojis de forma natural
+```
 
 ## Detalhes Tecnicos
 
-- `framer-motion` e a unica dependencia nova
-- Animacoes usam `whileInView` com `viewport={{ once: true }}` para performance (anima so 1x)
-- Efeito tilt usa `useMotionValue` + `useTransform` + `useSpring` - padrao recomendado do framer-motion
-- Texto revelado no Hero usa `motion.span` com `variants` container/child e `staggerChildren`
-- Paleta mantida: `#1c102f`, `violet-500/600`, `bg-background`, `text-foreground`, `border-border`
+- Streaming SSE no frontend: mesmo padrao documentado no useful-context (parse line-by-line, `data: [DONE]`)
+- `react-markdown` com `remarkGfm` para tabelas e listas
+- Links relativos interceptados com onClick handler para usar `navigate()` em vez de reload
+- Historico de conversa mantido apenas em memoria (reset ao fechar o sheet)
+- Contexto da agencia enviado no body: `{ messages, agency_context: { name, plan, clients_count } }`
 
