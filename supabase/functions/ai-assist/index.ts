@@ -160,6 +160,30 @@ const CONTENT_PLANNING_TOOLS = [
   },
 ];
 
+const CONTRACT_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "extract_contract_data",
+      description: "Gere o texto completo de um contrato de prestação de serviços de marketing digital.",
+      parameters: {
+        type: "object",
+        properties: {
+          contract_text: { type: "string", description: "Texto completo do contrato de prestação de serviços, formatado com quebras de linha, numeração de cláusulas, pronto para impressão." },
+        },
+        required: ["contract_text"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
+const DEFAULT_CONTRACT_PROMPT =
+  "Você é um advogado especialista em contratos de prestação de serviços de marketing digital e publicidade. Gere um contrato profissional, completo e juridicamente robusto em português brasileiro. O contrato deve conter as seguintes cláusulas obrigatórias: 1) OBJETO DO CONTRATO (prestação de serviços de marketing digital), 2) DO VALOR E FORMA DE PAGAMENTO, 3) DO PRAZO DE VIGÊNCIA, 4) DAS OBRIGAÇÕES DA CONTRATADA, 5) DAS OBRIGAÇÕES DO CONTRATANTE, 6) DA RESCISÃO E MULTA, 7) DA CONFIDENCIALIDADE, 8) DO FORO. Use linguagem jurídica formal mas acessível. Inclua espaços para assinatura das partes ao final.";
+
+const CONTRACT_TECHNICAL_INSTRUCTIONS =
+  " IMPORTANTE: O campo 'content' contém um JSON com: client_name, client_contact, agency_name, monthly_value (em reais), duration_months, penalty_percent, custom_instructions. Use esses dados para preencher o contrato. Se custom_instructions tiver cláusulas extras, adicione-as. O texto deve ser PURO (sem markdown), com quebras de linha normais, numeração de cláusulas e formatação de documento jurídico. Inclua a data atual, valores por extenso quando aplicável. Responda em português brasileiro.";
+
 const CAPTION_TOOLS = [
   {
     type: "function" as const,
@@ -287,7 +311,7 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const sb = createClient(supabaseUrl, supabaseKey);
         
-        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : type === "analytics_review" ? "analytics" : type === "content_planning" ? "content_planning" : type === "edit_plan_item" ? "content_planning" : type === "generate_caption" ? "caption" : "report";
+        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : type === "analytics_review" ? "analytics" : type === "content_planning" ? "content_planning" : type === "edit_plan_item" ? "content_planning" : type === "generate_caption" ? "caption" : type === "generate_contract" ? "contract" : "report";
         const { data } = await sb
           .from("agency_ai_prompts")
           .select("custom_prompt")
@@ -360,6 +384,10 @@ serve(async (req) => {
       systemPrompt = DEFAULT_EDIT_PLAN_ITEM_PROMPT + EDIT_PLAN_ITEM_TECHNICAL_INSTRUCTIONS + dateContext;
       tools = EDIT_PLAN_ITEM_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_plan_item" } };
+    } else if (type === "generate_contract") {
+      systemPrompt = DEFAULT_CONTRACT_PROMPT + CONTRACT_TECHNICAL_INSTRUCTIONS + dateContext;
+      tools = CONTRACT_TOOLS;
+      toolChoice = { type: "function", function: { name: "extract_contract_data" } };
     } else {
       return new Response(JSON.stringify({ error: "Tipo inválido." }), {
         status: 400,
