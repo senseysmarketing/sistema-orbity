@@ -51,8 +51,12 @@ export default function SmartContractGenerator({
   const { currentAgency } = useAgency();
   const isMobile = useIsMobile();
 
+  const [clientMode, setClientMode] = useState<'registered' | 'manual'>('registered');
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [manualClientName, setManualClientName] = useState("");
+  const [manualClientDocument, setManualClientDocument] = useState("");
+  const [manualClientContact, setManualClientContact] = useState("");
   const [monthlyValue, setMonthlyValue] = useState("");
   const [durationMonths, setDurationMonths] = useState("12");
   const [penaltyPercent, setPenaltyPercent] = useState("20");
@@ -86,8 +90,12 @@ export default function SmartContractGenerator({
   }, [selectedClientId]);
 
   const handleGenerate = async () => {
-    if (!selectedClient) {
+    if (clientMode === 'registered' && !selectedClient) {
       toast.error("Selecione um cliente");
+      return;
+    }
+    if (clientMode === 'manual' && !manualClientName.trim()) {
+      toast.error("Informe o nome do cliente");
       return;
     }
     if (!monthlyValue || Number(monthlyValue) <= 0) {
@@ -95,11 +103,15 @@ export default function SmartContractGenerator({
       return;
     }
 
+    const clientName = clientMode === 'registered' ? selectedClient!.name : manualClientName.trim();
+    const clientContact = clientMode === 'registered' ? (selectedClient?.contact || "") : manualClientContact.trim();
+
     setIsGenerating(true);
     try {
       const payload = {
-        client_name: selectedClient.name,
-        client_contact: selectedClient.contact || "",
+        client_name: clientName,
+        client_contact: clientContact,
+        client_document: clientMode === 'manual' ? manualClientDocument.trim() : "",
         agency_name: currentAgency?.name || "",
         monthly_value: Number(monthlyValue),
         duration_months: Number(durationMonths),
@@ -156,11 +168,13 @@ export default function SmartContractGenerator({
 
     setIsSaving(true);
     try {
+      const clientName = clientMode === 'registered' ? (selectedClient?.name || "Cliente") : manualClientName.trim();
+
       const { error } = await supabase.from("contracts").insert({
         agency_id: currentAgency.id,
         agency_name: currentAgency.name,
-        client_id: selectedClientId || null,
-        client_name: selectedClient?.name || "Cliente",
+        client_id: clientMode === 'registered' ? (selectedClientId || null) : null,
+        client_name: clientName,
         total_value: Number(monthlyValue) || 0,
         contract_date: new Date().toISOString().split("T")[0],
         start_date: new Date().toISOString().split("T")[0],
@@ -197,22 +211,75 @@ export default function SmartContractGenerator({
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
           <div className="space-y-2">
-            <Label>Cliente</Label>
-            <Select value={selectedClientId} onValueChange={setSelectedClientId}>
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={loadingClients ? "Carregando..." : "Selecione o cliente"}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Tipo de Cliente</Label>
+            <div className="flex gap-1 p-1 bg-muted rounded-lg">
+              <Button
+                type="button"
+                variant={clientMode === 'registered' ? 'default' : 'ghost'}
+                size="sm"
+                className="flex-1 text-xs"
+                onClick={() => setClientMode('registered')}
+              >
+                Cadastrado
+              </Button>
+              <Button
+                type="button"
+                variant={clientMode === 'manual' ? 'default' : 'ghost'}
+                size="sm"
+                className="flex-1 text-xs"
+                onClick={() => setClientMode('manual')}
+              >
+                Novo (manual)
+              </Button>
+            </div>
           </div>
+
+          {clientMode === 'registered' ? (
+            <div className="space-y-2">
+              <Label>Cliente</Label>
+              <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={loadingClients ? "Carregando..." : "Selecione o cliente"}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label>Nome do Cliente *</Label>
+                <Input
+                  placeholder="Nome ou Razão Social"
+                  value={manualClientName}
+                  onChange={(e) => setManualClientName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>CPF / CNPJ</Label>
+                <Input
+                  placeholder="00.000.000/0000-00"
+                  value={manualClientDocument}
+                  onChange={(e) => setManualClientDocument(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contato / E-mail</Label>
+                <Input
+                  placeholder="email@exemplo.com"
+                  value={manualClientContact}
+                  onChange={(e) => setManualClientContact(e.target.value)}
+                />
+              </div>
+            </>
+          )}
 
           <div className="space-y-2">
             <Label>Valor Mensal (R$)</Label>
@@ -257,7 +324,7 @@ export default function SmartContractGenerator({
 
           <Button
             onClick={handleGenerate}
-            disabled={isGenerating || !selectedClientId}
+            disabled={isGenerating || (clientMode === 'registered' ? !selectedClientId : !manualClientName.trim())}
             className="w-full"
             size="lg"
           >
