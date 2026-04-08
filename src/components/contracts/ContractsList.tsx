@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { FileText, Search, Calendar, DollarSign, Eye, Pencil, Trash2 } from "lucide-react";
+import { FileText, Search, Calendar, DollarSign, Eye, Pencil, Trash2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 interface Contract {
@@ -29,7 +29,11 @@ interface Contract {
   created_at: string;
 }
 
-export default function ContractsList() {
+interface ContractsListProps {
+  onNewContract?: () => void;
+}
+
+export default function ContractsList({ onNewContract }: ContractsListProps) {
   const { currentAgency } = useAgency();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,13 +84,15 @@ export default function ContractsList() {
   );
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive"> = {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       active: "default",
+      draft: "outline",
       cancelled: "destructive",
       expired: "secondary",
     };
     const labels: Record<string, string> = {
       active: "Ativo",
+      draft: "Rascunho",
       cancelled: "Cancelado",
       expired: "Expirado",
     };
@@ -147,16 +153,28 @@ export default function ContractsList() {
       </div>
 
       {filteredContracts.length === 0 ? (
-        <Card className="p-12 text-center">
-          <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground mb-2">
-            {searchTerm ? "Nenhum contrato encontrado" : "Nenhum contrato gerado ainda"}
-          </p>
-          {!searchTerm && (
-            <p className="text-sm text-muted-foreground">
-              Clique em "Novo Contrato" para começar
-            </p>
-          )}
+        <Card className="p-16 text-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Sparkles className="h-8 w-8 text-primary" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">
+                {searchTerm ? "Nenhum contrato encontrado" : "Crie seu primeiro contrato com IA"}
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                {searchTerm
+                  ? "Tente buscar com outros termos"
+                  : "Gere contratos profissionais em segundos usando inteligência artificial. Basta informar os dados do cliente e do serviço."}
+              </p>
+            </div>
+            {!searchTerm && onNewContract && (
+              <Button onClick={onNewContract} className="mt-2">
+                <Sparkles className="mr-2 h-4 w-4" />
+                Criar contrato com IA
+              </Button>
+            )}
+          </div>
         </Card>
       ) : (
         <div className="grid gap-4">
