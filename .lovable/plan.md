@@ -1,43 +1,28 @@
 
 
-# Ajustes no Gerador de Contratos
+# Refatorar tela inicial de Contratos
 
-## Problema 1: Tela intermediaria desnecessaria
-Ao clicar em "Novo Contrato", o workspace abre mas o usuario precisa obrigatoriamente selecionar um cliente cadastrado. A tela inicial (lista de contratos vazia + botao "Novo Contrato") pode ser simplificada — o workspace deve abrir diretamente quando nao ha contratos.
-
-**Decisao**: Manter a tela de lista (ela sera util quando houver contratos salvos), mas o fluxo do SmartContractGenerator precisa permitir uso sem cliente cadastrado.
-
-## Problema 2: Obrigatoriedade de cliente cadastrado
-Atualmente o botao "Gerar com IA" exige `selectedClientId` e o `handleGenerate` valida `selectedClient`. Precisa de uma opcao "Cliente Manual" com campos para preencher nome, documento/CNPJ e contato.
+## Problema
+A tela inicial tem abas "Contratos" e "Templates de Servicos" — com a IA integrada, templates de servico nao fazem mais sentido. A tela precisa ser simplificada: apenas a lista de contratos diretamente, sem abas.
 
 ## Solucao
 
-### `src/components/contracts/SmartContractGenerator.tsx`
+### `src/pages/Contracts.tsx`
+- Remover import e uso de `Tabs`, `TabsList`, `TabsTrigger`, `TabsContent`
+- Remover import de `ServicesTemplateManager` e `Settings`
+- Remover toda a estrutura de abas
+- Renderizar `<ContractsList>` diretamente quando `showGenerator` e false
+- Manter header com titulo + botao "Novo Contrato"
+- Adicionar botao "Voltar" no header quando `showGenerator` e true
 
-1. **Adicionar toggle de modo cliente**: Um seletor com 2 opcoes — "Cliente cadastrado" e "Novo cliente (manual)"
-   - Usar botoes ou radio inline acima do Select
+### `src/components/contracts/ContractsList.tsx`
+- Atualizar o empty state para ser mais atrativo e orientado a IA:
+  - Icone maior com Sparkles
+  - Texto: "Crie seu primeiro contrato com IA"
+  - Subtexto explicando que a IA gera o contrato em segundos
+  - Adicionar prop `onNewContract` para callback do botao no empty state
+- Adicionar status "draft" no `getStatusBadge` (ja que os novos contratos sao salvos como draft)
 
-2. **Campos manuais** (vistos quando modo = manual):
-   - Nome do Cliente (Input, obrigatorio)
-   - CPF/CNPJ (Input, opcional)
-   - Contato / E-mail (Input, opcional)
-
-3. **Ajustar validacao no `handleGenerate`**:
-   - Se modo cadastrado: validar `selectedClient` (como hoje)
-   - Se modo manual: validar que `manualClientName` nao esta vazio
-   - Construir payload com dados manuais quando aplicavel
-
-4. **Ajustar `handleSave`**:
-   - Se modo manual: `client_id: null`, `client_name: manualClientName`
-
-5. **Remover obrigatoriedade de `selectedClientId`** no `disabled` do botao "Gerar com IA" — depende do modo escolhido
-
-### Estados novos
-- `clientMode: 'registered' | 'manual'`
-- `manualClientName: string`
-- `manualClientDocument: string`
-- `manualClientContact: string`
-
-### UI do toggle
-Dois botoes inline (estilo segmented control) usando `Button variant="outline"` com destaque no ativo, posicionados antes do Select/campos manuais.
+### Resultado
+Tela limpa: header + lista de contratos (ou empty state convidativo). Sem abas, sem templates. Um clique para abrir o workspace de IA.
 
