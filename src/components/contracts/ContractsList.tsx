@@ -29,7 +29,11 @@ interface Contract {
   created_at: string;
 }
 
-export default function ContractsList() {
+interface ContractsListProps {
+  onNewContract?: () => void;
+}
+
+export default function ContractsList({ onNewContract }: ContractsListProps) {
   const { currentAgency } = useAgency();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
