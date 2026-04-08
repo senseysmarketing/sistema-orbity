@@ -311,7 +311,7 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const sb = createClient(supabaseUrl, supabaseKey);
         
-        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : type === "analytics_review" ? "analytics" : type === "content_planning" ? "content_planning" : type === "edit_plan_item" ? "content_planning" : type === "generate_caption" ? "caption" : "report";
+        const promptType = type === "prefill_task" ? "task" : type === "prefill_post" ? "post" : type === "campaign_analysis" ? "campaign_analysis" : type === "analytics_review" ? "analytics" : type === "content_planning" ? "content_planning" : type === "edit_plan_item" ? "content_planning" : type === "generate_caption" ? "caption" : type === "generate_contract" ? "contract" : "report";
         const { data } = await sb
           .from("agency_ai_prompts")
           .select("custom_prompt")
