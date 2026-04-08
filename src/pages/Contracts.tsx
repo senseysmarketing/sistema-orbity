@@ -45,7 +45,7 @@ export default function Contracts() {
             Voltar
           </Button>
         ) : (
-          <Button onClick={() => setShowGenerator(true)} size="lg">
+          <Button onClick={() => setShowGenerator(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Novo Contrato
           </Button>
