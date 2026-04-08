@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, FileText, Settings } from "lucide-react";
-import ContractGenerator from "@/components/contracts/ContractGenerator";
+import SmartContractGenerator from "@/components/contracts/SmartContractGenerator";
 import ContractsList from "@/components/contracts/ContractsList";
 import ServicesTemplateManager from "@/components/contracts/ServicesTemplateManager";
 import { toast } from "sonner";
@@ -52,12 +52,10 @@ export default function Contracts() {
       </div>
 
       {showGenerator ? (
-        <Card className="p-6">
-          <ContractGenerator
-            onCancel={() => setShowGenerator(false)}
-            onComplete={handleContractGenerated}
-          />
-        </Card>
+        <SmartContractGenerator
+          onCancel={() => setShowGenerator(false)}
+          onComplete={handleContractGenerated}
+        />
       ) : (
         <Tabs defaultValue="contracts" className="space-y-4">
           <TabsList>
