@@ -51,8 +51,12 @@ export default function SmartContractGenerator({
   const { currentAgency } = useAgency();
   const isMobile = useIsMobile();
 
+  const [clientMode, setClientMode] = useState<'registered' | 'manual'>('registered');
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [manualClientName, setManualClientName] = useState("");
+  const [manualClientDocument, setManualClientDocument] = useState("");
+  const [manualClientContact, setManualClientContact] = useState("");
   const [monthlyValue, setMonthlyValue] = useState("");
   const [durationMonths, setDurationMonths] = useState("12");
   const [penaltyPercent, setPenaltyPercent] = useState("20");
