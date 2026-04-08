@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Search, Bell, Calendar as CalendarIcon, Flag, CheckCircle2, List as ListIcon, FolderPlus } from 'lucide-react';
 import { Reminder, useReminders } from '@/hooks/useReminders';
