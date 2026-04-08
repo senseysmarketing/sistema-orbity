@@ -160,6 +160,30 @@ const CONTENT_PLANNING_TOOLS = [
   },
 ];
 
+const CONTRACT_TOOLS = [
+  {
+    type: "function" as const,
+    function: {
+      name: "extract_contract_data",
+      description: "Gere o texto completo de um contrato de prestação de serviços de marketing digital.",
+      parameters: {
+        type: "object",
+        properties: {
+          contract_text: { type: "string", description: "Texto completo do contrato de prestação de serviços, formatado com quebras de linha, numeração de cláusulas, pronto para impressão." },
+        },
+        required: ["contract_text"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
+const DEFAULT_CONTRACT_PROMPT =
+  "Você é um advogado especialista em contratos de prestação de serviços de marketing digital e publicidade. Gere um contrato profissional, completo e juridicamente robusto em português brasileiro. O contrato deve conter as seguintes cláusulas obrigatórias: 1) OBJETO DO CONTRATO (prestação de serviços de marketing digital), 2) DO VALOR E FORMA DE PAGAMENTO, 3) DO PRAZO DE VIGÊNCIA, 4) DAS OBRIGAÇÕES DA CONTRATADA, 5) DAS OBRIGAÇÕES DO CONTRATANTE, 6) DA RESCISÃO E MULTA, 7) DA CONFIDENCIALIDADE, 8) DO FORO. Use linguagem jurídica formal mas acessível. Inclua espaços para assinatura das partes ao final.";
+
+const CONTRACT_TECHNICAL_INSTRUCTIONS =
+  " IMPORTANTE: O campo 'content' contém um JSON com: client_name, client_contact, agency_name, monthly_value (em reais), duration_months, penalty_percent, custom_instructions. Use esses dados para preencher o contrato. Se custom_instructions tiver cláusulas extras, adicione-as. O texto deve ser PURO (sem markdown), com quebras de linha normais, numeração de cláusulas e formatação de documento jurídico. Inclua a data atual, valores por extenso quando aplicável. Responda em português brasileiro.";
+
 const CAPTION_TOOLS = [
   {
     type: "function" as const,
