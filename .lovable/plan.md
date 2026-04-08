@@ -1,16 +1,15 @@
 
 
-# Fix: Aba "Dicas" ainda aparecendo na Central de Ajuda
+# Fix: Margens da tela de Lembretes
 
 ## Problema
-O arquivo `HelpCenter.tsx` ja contem o codigo correto (sem aba Dicas, com IA Suporte como padrao), mas a alteracao anterior pode nao ter sido aplicada corretamente no build. A solucao e reescrever o arquivo para garantir que o build capture a versao atualizada.
+A pagina de Lembretes usa `container mx-auto p-6` como wrapper, o que centraliza o conteudo com margens laterais extras. As demais telas (Agenda, CRM, etc.) usam apenas `space-y-4 md:space-y-6` sem container, aproveitando o padding do layout pai.
 
-## Acao
-Reescrever `src/components/help/HelpCenter.tsx` com o conteudo atual (que ja esta correto no repositorio) para forcar o rebuild. O arquivo ja tem:
-- Aba "IA Suporte" como `defaultValue="ai"`
-- Componente `<HelpAIChat />` integrado
-- Sem aba "Dicas"
-- 3 abas: IA Suporte, Guias, Videos
+## Solucao
 
-Nenhuma mudanca de logica necessaria -- apenas forcar o re-apply do arquivo.
+### `src/pages/Reminders.tsx`
+- Linha ~182: trocar `className="container mx-auto p-6 space-y-6"` por `className="space-y-4 md:space-y-6"`
+- Ajustar o titulo para `text-2xl md:text-3xl` (padrao das demais telas)
+
+Uma unica linha alterada.
 
