@@ -384,6 +384,10 @@ serve(async (req) => {
       systemPrompt = DEFAULT_EDIT_PLAN_ITEM_PROMPT + EDIT_PLAN_ITEM_TECHNICAL_INSTRUCTIONS + dateContext;
       tools = EDIT_PLAN_ITEM_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_plan_item" } };
+    } else if (type === "generate_contract") {
+      systemPrompt = DEFAULT_CONTRACT_PROMPT + CONTRACT_TECHNICAL_INSTRUCTIONS + dateContext;
+      tools = CONTRACT_TOOLS;
+      toolChoice = { type: "function", function: { name: "extract_contract_data" } };
     } else {
       return new Response(JSON.stringify({ error: "Tipo inválido." }), {
         status: 400,
