@@ -1,40 +1,36 @@
 
 
-# Auto-importar formulários Meta desconhecidos no webhook
+# Ajustar Aba de Assinatura nas Configuracoes
 
 ## Problema
-Quando um lead chega via webhook de um formulário novo (que foi alterado ou criado no Meta), o sistema não encontra integração correspondente. Se existe integração "all", o lead é criado mas o formulário não aparece na aba de Qualificação. Se não existe integração nenhuma, o lead é descartado.
+A aba de assinatura ainda mostra "Plano Atual" e referencias a trial, que nao fazem mais sentido no modelo de pricing dinamico por agencia. O historico de faturas precisa funcionar corretamente com o modelo atual.
 
-## Solução
-No webhook handler (`facebook-leads/index.ts`), quando não existe integração exata para o `form_id` recebido, auto-criar um registro em `facebook_lead_integrations` para esse formulário, usando a integração "all" como template (ou a conexão da página). O registro é criado com `form_questions: null`, o que faz o frontend mostrar o badge "Pendente" automaticamente.
+## Alteracoes
 
-## Alterações
+### 1. `src/components/subscription/SubscriptionDetails.tsx`
+- Trocar label "Plano Atual" por "Assinatura" 
+- Remover toda logica e UI de trial (`isTrialActive`, bloco azul de "Periodo de Teste Ativo")
+- Remover `trial`/`trialing` dos `getStatusColor` e `getStatusText`
+- Manter: Status, Proxima Cobranca, botao Gerenciar Assinatura
+- Trocar descricao "Informacoes sobre seu plano atual" por "Informacoes sobre sua assinatura"
+- Exibir o valor mensal da agencia (`monthly_value`) se disponivel — buscar da tabela `agencies`
 
-### 1. `supabase/functions/facebook-leads/index.ts` (webhook handler, ~linha 729-756)
+### 2. `src/hooks/useSubscription.tsx`
+- Remover `trial_end` do `SubscriptionStatus` interface
+- Remover referencias a `trial`/`trialing` em `isFeatureAvailable` e logica geral
+- No `checkSubscription`, continuar usando `check-subscription` normalmente (ele ja retorna dados corretos do Stripe)
 
-Após tentar o match exato e o fallback "all", adicionar lógica de auto-criação:
+### 3. `supabase/functions/check-subscription/index.ts`
+- Na resposta final, continuar retornando `plan_name` (vem da tabela `subscription_plans` corretamente)
+- Remover o fallback para `trialing` → `trial` no `syncData.status` (linhas 153) — mapear tudo como `active`
+- Na funcao `returnLocalSubscription`, remover logica de `isValidTrial`
 
-- Se encontrou "all" mas não exato: usar o "all" para processar o lead E criar um novo registro de integração para o form_id específico
-- Se não encontrou nenhum: buscar qualquer integração ativa da página para obter `connection_id` e `created_by`, criar o registro e processar o lead
-- O novo registro terá: `form_name` obtido da API do Meta (já temos o `leadData` com `form_id`), `form_questions: null`, `default_status` herdado
-- Buscar o nome do formulário via Graph API: `GET /{form_id}?fields=name&access_token=...`
+### 4. `src/components/subscription/BillingHistory.tsx`
+- Sem alteracoes necessarias — o componente ja funciona corretamente buscando da tabela `billing_history` e sincronizando via Stripe
+- O `sync-invoices` ja busca pelo `stripe_customer_id` da agencia, que e independente de plano
 
-Fluxo simplificado:
-```
-1. Tentar match exato → usar se encontrou
-2. Se não, tentar "all" → usar como template
-3. Se achou "all" ou qualquer integração da página:
-   a. Buscar form_name via Meta API
-   b. INSERT em facebook_lead_integrations (form_id específico, form_questions=null)
-   c. Continuar processamento normal do lead
-4. Se nenhuma integração da página existe → skip (sem conexão, impossível processar)
-```
-
-### 2. Nenhuma alteração no frontend
-O `LeadScoringConfig.tsx` já expande formulários individuais e mostra badge "Pendente" quando `form_questions` é null. A auto-criação do registro é suficiente para que o formulário apareça na aba.
-
-## Resultado
-- Formulários novos/alterados do Meta aparecem automaticamente na aba de Qualificação com badge "Pendente"
-- Leads continuam sendo capturados normalmente
-- Usuário só precisa configurar as regras de scoring, sem precisar importar manualmente
+## Arquivos modificados
+- `src/components/subscription/SubscriptionDetails.tsx`
+- `src/hooks/useSubscription.tsx`
+- `supabase/functions/check-subscription/index.ts`
 
