@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
-import { Loader2, Building2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import orbityLogo from "@/assets/orbity-logo.png";
 import authBackground from "@/assets/auth-background-new.png";
 export default function Auth() {
