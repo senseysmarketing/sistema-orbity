@@ -1,38 +1,60 @@
 
 
-# Adicionar Reunioes na Linha do Tempo de Hoje
+# Pivotagem para Venda Consultiva (High-Ticket)
 
-## Problema
-O componente `DayTimeline` mostra rotinas, tarefas, posts e notificacoes, mas nao inclui reunioes. As reunioes do dia ja sao buscadas no `Index.tsx` (via tabela `meetings`), porem nao sao passadas para o `DayTimeline`.
+Transformar o Orbity de self-service para plataforma fechada com funil de qualificacao.
 
-## Solucao
+---
 
-### `src/components/dashboard/DayTimeline.tsx`
+## Arquivos a criar
 
-1. **Expandir `TimelineItem.source`** para incluir `'meeting'`
-2. **Adicionar fetch de reunioes** no `fetchData`: buscar da tabela `meetings` onde `agency_id` corresponde, `start_time` e no dia de hoje, `status != 'cancelled'`, e o usuario e organizador OU esta nos `participants`
-3. **Construir meeting items**: cada reuniao vira um `TimelineItem` com `source: 'meeting'`, horario extraido do `start_time`, titulo, e nome do cliente (join com `clients`)
-4. **Novo campo opcional** em `TimelineItem`: `meetingDuration?: number`, `meetingLocation?: string`
-5. **Renderizar meetings** no JSX: icone `Calendar` azul, badge "Reuniao", horario, titulo, cliente e duracao
-6. **Incluir no merge/sort** junto com os outros itens
+### `src/components/landing/ApplicationModal.tsx`
+Modal de qualificacao estilo Typeform com 4 steps usando framer-motion (ja disponivel no projeto):
 
-### Detalhes da query
-```sql
-SELECT id, title, start_time, duration_minutes, status, location, google_meet_link,
-       clients(name)
-FROM meetings
-WHERE agency_id = ? 
-  AND start_time >= todayT00:00:00
-  AND start_time <= todayT23:59:59
-  AND status != 'cancelled'
-```
+- **Step 1 (Contato)**: Nome Completo, E-mail, WhatsApp
+- **Step 2 (Estrutura)**: Instagram da Agencia, Select "Tamanho da Equipe" (Eu-gencia / 2-5 / 6-15 / 15+)
+- **Step 3 (Faturamento)**: Input "Quantos clientes ativos?", Select "Ticket Medio" (< R$1k / R$1-2.5k / R$2.5-5k / > R$5k)
+- **Step 4 (Sucesso)**: Mensagem de confirmacao
 
-Filtrar no JS: reunioes onde `organizer_id === user_id` OU `participants` inclui `user_id`.
+Componentes: Dialog do shadcn, Progress bar no topo, animacao de slide horizontal entre steps com `motion.div` (AnimatePresence + translateX). Submit simulado com setTimeout + spinner.
 
-### Visual do item na timeline
-```
-[Calendar icon azul] HH:mm [Badge "Reuniao"]
-                     Titulo da reuniao
-                     Cliente · 30min
-```
+---
+
+## Arquivos a modificar
+
+### `src/pages/LandingPage.tsx`
+- Remover import e uso de `PricingSection`
+- Adicionar estado `applicationOpen` e renderizar `<ApplicationModal>`
+- Passar `onOpenApplication` como prop para HeroSection, CTASection, FAQSection
+
+### `src/components/landing/HeroSection.tsx`
+- Receber prop `onOpenApplication`
+- Botao principal: "Aplicar para Consultoria" → chama `onOpenApplication()` (em vez de navigate)
+- Manter botao "Ja tenho conta" apontando para `/auth`
+
+### `src/components/landing/CTASection.tsx`
+- Receber prop `onOpenApplication`
+- Botao: "Aplicar para Consultoria" (em vez de "Comecar Teste Gratis")
+- Remover texto "Nao precisa cartao de credito / Cancele quando quiser"
+- Trocar stats: remover "7 dias teste gratis", substituir por algo como "Consultoria Personalizada"
+
+### `src/components/landing/FAQSection.tsx`
+- Receber prop `onOpenApplication`
+- Atualizar FAQs: remover perguntas sobre teste gratis/cancelamento, adicionar perguntas sobre processo de consultoria
+- Botao "Comecar Teste Gratis" → "Aplicar para Consultoria" chamando `onOpenApplication()`
+
+### `src/components/landing/LandingFooter.tsx`
+- Remover link "Precos" do footer
+
+### `src/pages/Auth.tsx`
+- Remover bloco "Onboarding CTA" (linhas 96-113) com o botao "Criar Nova Agencia" e texto de teste gratis
+- Substituir por texto sutil: "Ainda nao utiliza o Orbity?" com link "Agende uma demonstracao" apontando para `href="#demo"` (temporario)
+
+---
+
+## Resultado
+- Zero mencao a precos, planos ou teste gratis
+- Unica via de entrada: funil de qualificacao (ApplicationModal)
+- Tela de Auth: apenas login + link para demonstracao
+- Landing page limpa: Hero → Problema → Features → Demo → Integracoes → Diferenciais → Depoimentos → FAQ → CTA final
 
