@@ -21,8 +21,8 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
   // Verificar se é admin da agência master (Senseys)
   const isMasterUser = isMasterAgencyAdmin(currentAgency?.id, agencyRole);
 
-  // Never block the auth page
-  if (location.pathname.startsWith('/auth')) {
+  // Never block auth or register pages
+  if (location.pathname.startsWith('/auth') || location.pathname.startsWith('/register')) {
     return <>{children}</>;
   }
 

@@ -43,7 +43,7 @@ interface SubscriptionContextType {
   refreshing: boolean;
   showRefreshAlert: boolean;
   checkSubscription: (forceRefresh?: boolean) => Promise<void>;
-  createCheckout: (priceId: string) => Promise<void>;
+  createCheckout: (priceId?: string, agencyId?: string) => Promise<void>;
   openCustomerPortal: () => Promise<void>;
   refreshPlans: () => Promise<void>;
   isFeatureAvailable: (feature: string) => boolean;
@@ -142,14 +142,18 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createCheckout = async (priceId: string) => {
+  const createCheckout = async (priceId?: string, agencyId?: string) => {
     if (!user) {
       toast.error('Você precisa estar logado para fazer uma assinatura');
       return;
     }
 
+    if (!priceId && !agencyId) {
+      toast.error('Nenhum plano ou agência especificada');
+      return;
+    }
+
     try {
-      // Ensure we have a valid access token
       let { data: sessionData } = await supabase.auth.getSession();
       let accessToken = sessionData.session?.access_token;
       if (!accessToken) {
@@ -161,8 +165,12 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const body: any = {};
+      if (priceId) body.priceId = priceId;
+      if (agencyId) body.agencyId = agencyId;
+
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { priceId },
+        body,
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -170,7 +178,6 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
 
-      // Open checkout in new tab
       if (data?.url) {
         window.open(data.url, '_blank');
       } else {
