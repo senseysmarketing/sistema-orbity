@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
-import { PricingCards } from "@/components/subscription/PricingCards";
+
 import { SubscriptionDetails } from "@/components/subscription/SubscriptionDetails";
 import { BillingHistory } from "@/components/subscription/BillingHistory";
 import { UsersManagement } from "@/components/admin/UsersManagement";
@@ -369,11 +369,6 @@ export default function Settings() {
               <SubscriptionDetails />
               <BillingHistory />
             </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Planos Disponíveis</h3>
-              <PricingCards />
-            </div>
-          </div>
         </TabsContent>
 
         {isAgencyAdmin && (

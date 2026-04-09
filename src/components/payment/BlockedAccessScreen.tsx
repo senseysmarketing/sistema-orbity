@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Calendar, LogOut, MessageCircle } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useState } from 'react';
+
 import { useAuth } from '@/hooks/useAuth';
 
 interface BlockedAccessScreenProps {
