@@ -18,6 +18,10 @@ interface Agency {
   max_leads: number;
   max_tasks: number;
   is_active: boolean;
+  monthly_value?: number;
+  stripe_product_id?: string;
+  stripe_price_id?: string;
+  stripe_customer_id?: string;
   created_at: string;
   updated_at: string;
 }

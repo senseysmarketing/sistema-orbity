@@ -4,7 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const logStep = (step: string, details?: any) => {
@@ -46,7 +46,6 @@ serve(async (req) => {
     }
     const user = userData.user;
     logStep("User authenticated", { userId: user.id, email: user.email });
-    
 
     // Get user's agency
     const { data: agencyUser, error: agencyError } = await supabaseClient
@@ -60,9 +59,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ 
         subscribed: false,
         subscription_status: 'none',
-        plan_name: null,
-        trial_end: null,
-        subscription_end: null 
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
@@ -76,44 +72,7 @@ serve(async (req) => {
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
       logStep("No Stripe key, falling back to local subscription check");
-      
-      // Check local subscription only if Stripe is unavailable
-      const { data: localSubscription } = await supabaseClient
-        .from('agency_subscriptions')
-        .select(`
-          *,
-          subscription_plans!inner (
-            name,
-            slug
-          )
-        `)
-        .eq('agency_id', agencyId)
-        .maybeSingle();
-
-      if (localSubscription && localSubscription.subscription_plans) {
-        const plan = localSubscription.subscription_plans;
-        const isValidTrial = localSubscription.status === 'trial' && 
-          new Date(localSubscription.trial_end) > new Date();
-        
-        return new Response(JSON.stringify({
-          subscribed: localSubscription.status === 'active' || isValidTrial,
-          subscription_status: localSubscription.status,
-          plan_name: plan.name,
-          trial_end: localSubscription.trial_end,
-          subscription_end: localSubscription.current_period_end,
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
-      }
-
-      return new Response(JSON.stringify({ 
-        subscribed: false,
-        subscription_status: 'none',
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      return await returnLocalSubscription(supabaseClient, agencyId);
     }
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
@@ -124,60 +83,17 @@ serve(async (req) => {
     
     if (customers.data.length === 0) {
       logStep("No Stripe customer found, checking local subscription");
-      
-      // Fallback to local subscription
-      const { data: localSubscription } = await supabaseClient
-        .from('agency_subscriptions')
-        .select(`
-          *,
-          subscription_plans!inner (
-            name,
-            slug
-          )
-        `)
-        .eq('agency_id', agencyId)
-        .maybeSingle();
-
-      if (localSubscription && localSubscription.subscription_plans) {
-        const plan = localSubscription.subscription_plans;
-        const isValidTrial = localSubscription.status === 'trial' && 
-          localSubscription.trial_end &&
-          new Date(localSubscription.trial_end) > new Date();
-        
-        const isActive = localSubscription.status === 'active';
-        
-        logStep("Local subscription found", {
-          status: localSubscription.status,
-          isActive,
-          isValidTrial,
-          planName: plan.name
-        });
-        
-        return new Response(JSON.stringify({
-          subscribed: isActive || isValidTrial,
-          subscription_status: localSubscription.status,
-          plan_name: plan.name,
-          trial_end: localSubscription.trial_end,
-          subscription_end: localSubscription.current_period_end,
-          customer_id: localSubscription.stripe_customer_id,
-          subscription_id: localSubscription.stripe_subscription_id,
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
-      }
-
-      return new Response(JSON.stringify({ 
-        subscribed: false,
-        subscription_status: 'none',
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      return await returnLocalSubscription(supabaseClient, agencyId);
     }
 
     const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
+
+    // Save customer ID to agency
+    await supabaseClient
+      .from('agencies')
+      .update({ stripe_customer_id: customerId })
+      .eq('id', agencyId);
 
     // Get active subscriptions
     const subscriptions = await stripe.subscriptions.list({
@@ -192,56 +108,7 @@ serve(async (req) => {
 
     if (!activeSubscription) {
       logStep("No active Stripe subscription, checking local for trial");
-      
-      // Check local for trial period
-      const { data: localSubscription } = await supabaseClient
-        .from('agency_subscriptions')
-        .select(`
-          *,
-          subscription_plans!inner (
-            name,
-            slug
-          )
-        `)
-        .eq('agency_id', agencyId)
-        .maybeSingle();
-
-      if (localSubscription && localSubscription.subscription_plans) {
-        const plan = localSubscription.subscription_plans;
-        const isValidTrial = localSubscription.status === 'trial' && 
-          localSubscription.trial_end &&
-          new Date(localSubscription.trial_end) > new Date();
-        
-        const isActive = localSubscription.status === 'active';
-        
-        logStep("Local subscription found (no Stripe active)", {
-          status: localSubscription.status,
-          isActive,
-          isValidTrial,
-          planName: plan.name
-        });
-        
-        return new Response(JSON.stringify({
-          subscribed: isActive || isValidTrial,
-          subscription_status: localSubscription.status,
-          plan_name: plan.name,
-          trial_end: localSubscription.trial_end,
-          subscription_end: localSubscription.current_period_end,
-          customer_id: localSubscription.stripe_customer_id,
-          subscription_id: localSubscription.stripe_subscription_id,
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
-      }
-
-      return new Response(JSON.stringify({ 
-        subscribed: false,
-        subscription_status: 'none',
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
+      return await returnLocalSubscription(supabaseClient, agencyId);
     }
 
     logStep("Active subscription found in Stripe", { 
@@ -253,12 +120,7 @@ serve(async (req) => {
 
     const toIsoOrNull = (seconds?: number | null): string | null => {
       if (typeof seconds !== 'number' || !isFinite(seconds)) return null;
-      const d = new Date(seconds * 1000);
-      try {
-        return d.toISOString();
-      } catch {
-        return null;
-      }
+      try { return new Date(seconds * 1000).toISOString(); } catch { return null; }
     };
 
     const subscriptionEnd = toIsoOrNull(activeSubscription.current_period_end);
@@ -272,74 +134,73 @@ serve(async (req) => {
       .or(`stripe_price_id_monthly.eq.${priceId},stripe_price_id_yearly.eq.${priceId}`)
       .maybeSingle();
 
-    const planName = plan?.name || 'Básico';
+    const planName = plan?.name || 'Personalizado';
 
-    logStep("Subscription details retrieved from Stripe", { 
-      priceId, 
-      planName, 
-      subscriptionEnd, 
-      trialEnd 
-    });
+    logStep("Subscription details retrieved from Stripe", { priceId, planName, subscriptionEnd, trialEnd });
 
-    // Check if local subscription exists in pending_payment status (from onboarding)
+    // Check if local subscription exists
     const { data: existingSubscription } = await supabaseClient
       .from('agency_subscriptions')
       .select('id, status')
       .eq('agency_id', agencyId)
       .maybeSingle();
 
-    if (existingSubscription?.status === 'pending_payment') {
-      logStep("Found pending_payment subscription, updating to active");
-      
-      // Update existing subscription from pending_payment to active
+    const syncData: any = {
+      agency_id: agencyId,
+      stripe_customer_id: customerId,
+      stripe_subscription_id: activeSubscription.id,
+      stripe_price_id: priceId,
+      status: activeSubscription.status === 'trialing' ? 'trial' : 'active',
+      current_period_start: periodStart,
+      current_period_end: subscriptionEnd,
+      trial_end: trialEnd,
+      billing_cycle: 'monthly',
+      updated_at: new Date().toISOString()
+    };
+
+    if (plan?.id) {
+      syncData.plan_id = plan.id;
+    }
+
+    if (existingSubscription) {
       const { error: updateError } = await supabaseClient
         .from('agency_subscriptions')
-        .update({
-          plan_id: plan?.id,
-          stripe_customer_id: customerId,
-          stripe_subscription_id: activeSubscription.id,
-          stripe_price_id: priceId,
-          status: activeSubscription.status === 'trialing' ? 'trial' : 'active',
-          current_period_start: periodStart,
-          current_period_end: subscriptionEnd,
-          trial_start: null,
-          trial_end: trialEnd,
-          billing_cycle: 'monthly',
-          updated_at: new Date().toISOString()
-        })
+        .update(syncData)
         .eq('agency_id', agencyId);
 
       if (updateError) {
-        logStep("Warning: Could not update subscription from pending_payment", { error: updateError.message });
+        logStep("Warning: Could not update subscription", { error: updateError.message });
       } else {
-        logStep("Successfully updated subscription from pending_payment to active");
+        logStep("Successfully updated local subscription from Stripe");
       }
     } else {
-      // Sync to local database (upsert)
-      const { error: syncError } = await supabaseClient
-        .from('agency_subscriptions')
-        .upsert({
-          agency_id: agencyId,
-          plan_id: plan?.id,
-          stripe_customer_id: customerId,
-          stripe_subscription_id: activeSubscription.id,
-          stripe_price_id: priceId,
-          status: activeSubscription.status === 'trialing' ? 'trial' : 'active',
-          current_period_start: periodStart,
-          current_period_end: subscriptionEnd,
-          trial_end: trialEnd,
-          billing_cycle: 'monthly',
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'agency_id'
-        });
+      // Need a plan_id for insert
+      if (!syncData.plan_id) {
+        const { data: basicPlan } = await supabaseClient
+          .from('subscription_plans')
+          .select('id')
+          .eq('slug', 'basic')
+          .eq('is_active', true)
+          .single();
+        syncData.plan_id = basicPlan?.id;
+      }
 
-      if (syncError) {
-        logStep("Warning: Could not sync subscription to local database", { error: syncError.message });
+      const { error: insertError } = await supabaseClient
+        .from('agency_subscriptions')
+        .insert(syncData);
+
+      if (insertError) {
+        logStep("Warning: Could not insert subscription", { error: insertError.message });
       } else {
-        logStep("Successfully synced Stripe subscription to local database");
+        logStep("Successfully created local subscription from Stripe");
       }
     }
+
+    // Also update agency is_active to true when subscription is valid
+    await supabaseClient
+      .from('agencies')
+      .update({ is_active: true })
+      .eq('id', agencyId);
 
     return new Response(JSON.stringify({
       subscribed: true,
@@ -363,3 +224,48 @@ serve(async (req) => {
     });
   }
 });
+
+async function returnLocalSubscription(supabaseClient: any, agencyId: string) {
+  const { data: localSubscription } = await supabaseClient
+    .from('agency_subscriptions')
+    .select(`
+      *,
+      subscription_plans!inner (
+        name,
+        slug
+      )
+    `)
+    .eq('agency_id', agencyId)
+    .maybeSingle();
+
+  if (localSubscription && localSubscription.subscription_plans) {
+    const plan = localSubscription.subscription_plans;
+    const isValidTrial = localSubscription.status === 'trial' && 
+      localSubscription.trial_end &&
+      new Date(localSubscription.trial_end) > new Date();
+    const isActive = localSubscription.status === 'active';
+
+    logStep("Local subscription found", { status: localSubscription.status, isActive, isValidTrial });
+
+    return new Response(JSON.stringify({
+      subscribed: isActive || isValidTrial,
+      subscription_status: localSubscription.status,
+      plan_name: plan.name,
+      trial_end: localSubscription.trial_end,
+      subscription_end: localSubscription.current_period_end,
+      customer_id: localSubscription.stripe_customer_id,
+      subscription_id: localSubscription.stripe_subscription_id,
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+  }
+
+  return new Response(JSON.stringify({ 
+    subscribed: false,
+    subscription_status: 'none',
+  }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    status: 200,
+  });
+}
