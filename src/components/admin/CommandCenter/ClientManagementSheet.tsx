@@ -4,12 +4,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
@@ -30,6 +31,7 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
   const [churnOpen, setChurnOpen] = useState(true);
   const [filter, setFilter] = useState("all");
   const [confirmClient, setConfirmClient] = useState<Client | null>(null);
+  const [deleteClient, setDeleteClient] = useState<Client | null>(null);
 
   const filteredClients = useMemo(() => {
     if (filter === "active") return clients.filter(c => c.active);
@@ -63,6 +65,21 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("clients").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Cliente excluído", description: "O cliente e todos os seus dados foram removidos permanentemente." });
+      queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-payments-all"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleToggle = (client: Client) => {
     if (client.active) {
       setConfirmClient(client);
@@ -75,6 +92,12 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
     if (!confirmClient) return;
     toggleMutation.mutate({ id: confirmClient.id, activate: false });
     setConfirmClient(null);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteClient) return;
+    deleteMutation.mutate(deleteClient.id);
+    setDeleteClient(null);
   };
 
   const getInitials = (name: string) =>
@@ -160,6 +183,16 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
                         >
                           {client.active ? "Ativo" : "Inativo"}
                         </Badge>
+                        {!client.active && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteClient(client)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Switch
                           checked={client.active}
                           onCheckedChange={() => handleToggle(client)}
@@ -192,6 +225,28 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Sim, inativar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteClient} onOpenChange={(o) => { if (!o) setDeleteClient(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir cliente permanentemente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong>{deleteClient?.name}</strong>?
+              Esta ação é <strong>irreversível</strong> e removerá todos os dados associados a este cliente (pagamentos, notas, arquivos, etc.).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sim, excluir permanentemente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
