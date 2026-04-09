@@ -183,6 +183,16 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
                         >
                           {client.active ? "Ativo" : "Inativo"}
                         </Badge>
+                        {!client.active && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteClient(client)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Switch
                           checked={client.active}
                           onCheckedChange={() => handleToggle(client)}
