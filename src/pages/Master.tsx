@@ -7,7 +7,7 @@ import { AgenciesTable } from '@/components/master/AgenciesTable';
 
 import { MasterAnalytics } from '@/components/master/MasterAnalytics';
 import { OrbityLeadsTable } from '@/components/master/OrbityLeadsTable';
-import { CreateAgencyDialog } from '@/components/master/CreateAgencyDialog';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Building2, Settings, UserPlus } from 'lucide-react';
 import { isMasterAgencyAdmin } from '@/lib/masterAccess';
