@@ -747,12 +747,116 @@ async function handleWebhook(supabase: any, body: any) {
         if (allMatch) {
           integration = allMatch;
           console.log('[WEBHOOK] ✅ Found "all forms" integration');
+
+          // Auto-create specific form integration so it appears in Qualification tab
+          try {
+            const connAccessToken = allMatch.facebook_connections?.access_token;
+            let formName = `Formulário ${formId}`;
+            
+            if (connAccessToken) {
+              try {
+                const formRes = await fetch(`https://graph.facebook.com/v18.0/${formId}?fields=name&access_token=${connAccessToken}`);
+                const formData = await formRes.json();
+                if (formData.name) {
+                  formName = formData.name;
+                }
+              } catch (e) {
+                console.log('[WEBHOOK] ⚠️ Could not fetch form name from Meta, using fallback');
+              }
+            }
+
+            const { error: insertError } = await supabase
+              .from('facebook_lead_integrations')
+              .insert({
+                agency_id: allMatch.agency_id,
+                connection_id: allMatch.connection_id,
+                page_id: pageId,
+                page_name: allMatch.page_name,
+                form_id: formId,
+                form_name: formName,
+                form_questions: null,
+                default_status: allMatch.default_status,
+                default_source: allMatch.default_source,
+                default_priority: allMatch.default_priority,
+                field_mapping: allMatch.field_mapping,
+                sync_method: allMatch.sync_method,
+                is_active: true,
+                created_by: allMatch.created_by,
+              });
+
+            if (insertError) {
+              // Unique constraint violation means it already exists — not a problem
+              if (insertError.code === '23505') {
+                console.log('[WEBHOOK] ℹ️ Form integration already exists, skipping auto-create');
+              } else {
+                console.error('[WEBHOOK] ⚠️ Error auto-creating form integration:', insertError);
+              }
+            } else {
+              console.log(`[WEBHOOK] 🆕 Auto-created integration for form "${formName}" (${formId}) — pending qualification setup`);
+            }
+          } catch (autoCreateErr) {
+            console.error('[WEBHOOK] ⚠️ Auto-create integration failed:', autoCreateErr);
+          }
         }
       }
 
       if (!integration) {
-        console.error('[WEBHOOK] ❌ No active integration found for this page/form');
-        continue;
+        // Last resort: check if there's ANY active integration for this page to get connection info
+        console.log('[WEBHOOK] 🔄 No "all" match either, checking for any page integration...');
+        const { data: anyPageInt } = await supabase
+          .from('facebook_lead_integrations')
+          .select('*, facebook_connections(*)')
+          .eq('page_id', pageId)
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+
+        if (anyPageInt) {
+          integration = anyPageInt;
+          console.log('[WEBHOOK] ✅ Found fallback page integration');
+
+          // Auto-create for this form too
+          try {
+            const connAccessToken = anyPageInt.facebook_connections?.access_token;
+            let formName = `Formulário ${formId}`;
+            if (connAccessToken) {
+              try {
+                const formRes = await fetch(`https://graph.facebook.com/v18.0/${formId}?fields=name&access_token=${connAccessToken}`);
+                const formData = await formRes.json();
+                if (formData.name) formName = formData.name;
+              } catch (_e) { /* ignore */ }
+            }
+
+            await supabase
+              .from('facebook_lead_integrations')
+              .insert({
+                agency_id: anyPageInt.agency_id,
+                connection_id: anyPageInt.connection_id,
+                page_id: pageId,
+                page_name: anyPageInt.page_name,
+                form_id: formId,
+                form_name: formName,
+                form_questions: null,
+                default_status: anyPageInt.default_status,
+                default_source: anyPageInt.default_source,
+                default_priority: anyPageInt.default_priority,
+                field_mapping: anyPageInt.field_mapping,
+                sync_method: anyPageInt.sync_method,
+                is_active: true,
+                created_by: anyPageInt.created_by,
+              })
+              .then(({ error }) => {
+                if (error && error.code !== '23505') {
+                  console.error('[WEBHOOK] ⚠️ Error auto-creating form integration (fallback):', error);
+                } else if (!error) {
+                  console.log(`[WEBHOOK] 🆕 Auto-created integration (fallback) for form "${formName}" (${formId})`);
+                }
+              });
+          } catch (_e) { /* ignore */ }
+        } else {
+          console.error('[WEBHOOK] ❌ No active integration found for this page/form');
+          continue;
+        }
       }
 
       console.log(`[WEBHOOK] ✅ Integration found: ${integration.id}`);
