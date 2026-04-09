@@ -31,6 +31,7 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
   const [churnOpen, setChurnOpen] = useState(true);
   const [filter, setFilter] = useState("all");
   const [confirmClient, setConfirmClient] = useState<Client | null>(null);
+  const [deleteClient, setDeleteClient] = useState<Client | null>(null);
 
   const filteredClients = useMemo(() => {
     if (filter === "active") return clients.filter(c => c.active);
