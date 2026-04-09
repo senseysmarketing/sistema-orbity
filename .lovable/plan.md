@@ -1,41 +1,30 @@
 
-# Atualizar Analytics do Painel Master — Remover Trial/Planos, Adicionar Inadimplencia
 
-## Alteracoes em `src/components/master/MasterAnalytics.tsx`
+# Ajustes na Aba de Agencias: Layout, Paginacao e Pesquisa
 
-### 1. KPI Cards (linha 200-261)
-- **Taxa de Conversao**: Mudar de "Trials → Pagantes" para "Agencias Ativas / Total" (taxa de ativacao)
-- **Churn Rate**: Manter, mas ajustar calculo sem trial
-- **Ticket Medio**: Manter como esta
-- **LTV Estimado**: Manter como esta
+## Alteracoes em `src/components/master/AgenciesTable.tsx`
 
-### 2. Remover referencias a trial no calculo `conversionMetrics` (linhas 104-127)
-- `conversionRate` = agencias ativas / total de agencias
-- Remover `trialExpiredRate`
-- Remover `trial_expired` do calculo
+### 1. Layout: Botao na mesma linha dos status cards
+- Receber `onCreated` como prop (ou receber o botao como children)
+- Mover o botao "Cadastrar Nova Agencia" para dentro do `AgenciesTable`, na mesma linha dos status cards
+- Grid: 4 cards + botao alinhado a direita na mesma row
 
-### 3. STATUS_COLORS e STATUS_LABELS (linhas 47-63)
-- Remover `trialing` e `trial_expired`
-- Adicionar `inadimplente` se necessario (mapear `past_due`)
+### 2. Campo de pesquisa
+- Adicionar state `searchTerm`
+- Input com icone de Search acima da tabela, ao lado do botao "Atualizar"
+- Filtrar `agencies` por `agency_name` (case-insensitive)
 
-### 4. Grafico de Crescimento (linhas 130-138)
-- Mudar label "convertidas" para "ativas" (agencias que pagaram)
+### 3. Paginacao
+- State `currentPage` (default 1), constante `ITEMS_PER_PAGE = 10`
+- Aplicar slice no array filtrado
+- Renderizar controles de paginacao abaixo da tabela (anterior/proximo + indicador de pagina)
+- Reset para pagina 1 quando searchTerm muda
 
-### 5. Distribuicao de Status — Pie Chart (linhas 315-371)
-- Remover trial do dados, manter apenas: Ativo, Inadimplente, Cancelado, Suspenso
+### 4. `src/pages/Master.tsx`
+- Mover `CreateAgencyDialog` para dentro de `AgenciesTable` (passar `onCreated` como prop)
+- Remover o `div flex justify-end` que envolve o botao
 
-### 6. Oportunidades e Alertas (linhas 420-479)
-- Remover secao "Trials expirando em breve" (linhas 430-450)
-- Expandir secao de "Pagamentos pendentes" para mostrar inadimplencia com mais detalhe (valor mensal da agencia, dias em atraso)
-- Adicionar alerta para agencias suspensas
+## Arquivos modificados
+- `src/components/master/AgenciesTable.tsx`
+- `src/pages/Master.tsx`
 
-### 7. Top Agencias por Uso — Tabela (linhas 482-546)
-- Remover coluna "Plano" (linha 499 e 529-531)
-- Adicionar coluna "Valor Mensal" mostrando `monthly_value`
-
-### 8. `src/hooks/useMaster.tsx`
-- Zerar `trialing` e `trial_expired` definitivamente no `getStatusCounts` (ja feito parcialmente)
-
-## Resultado
-- Sem mencoes a trial ou planos em toda a aba Analytics
-- Secao de inadimplencia/alertas mais rica com informacoes de valor e agencias suspensas
