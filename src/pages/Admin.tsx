@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
-import { useLimitEnforcement } from "@/hooks/useLimitEnforcement";
+
 import { useFinancialMetrics } from "@/hooks/useFinancialMetrics";
 import type { Client, ClientPayment, Expense, Salary, Employee } from "@/hooks/useFinancialMetrics";
 

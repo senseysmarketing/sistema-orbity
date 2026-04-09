@@ -5,8 +5,6 @@ import { CalendarDays, CreditCard, AlertCircle, RefreshCw, ExternalLink } from '
 import { useSubscription } from '@/hooks/useSubscription';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Progress } from '@/components/ui/progress';
-import { usePaymentMiddleware } from '@/hooks/usePaymentMiddleware';
 
 export function SubscriptionDetails() {
   const { 
@@ -16,13 +14,6 @@ export function SubscriptionDetails() {
     checkSubscription, 
     openCustomerPortal 
   } = useSubscription();
-  
-  const {
-    planLimits,
-    usageCounts,
-    getUsagePercentage,
-    refreshPaymentStatus
-  } = usePaymentMiddleware();
 
   if (loading) {
     return (
@@ -67,10 +58,6 @@ export function SubscriptionDetails() {
     }
   };
 
-  const formatLimit = (limit: number) => {
-    return limit >= 999999 ? '∞' : limit.toString();
-  };
-
   const isTrialActive = (currentSubscription?.subscription_status === 'trial' || 
     currentSubscription?.subscription_status === 'trialing') && 
     currentSubscription?.trial_end && 
@@ -78,16 +65,6 @@ export function SubscriptionDetails() {
 
   const isSubscriptionActive = currentSubscription?.subscribed && 
     ['active', 'trial', 'trialing'].includes(currentSubscription?.subscription_status || '');
-
-  const hasLimitData = Object.values(planLimits).some(limit => limit > 0);
-
-  const usageLabels = {
-    users: 'Usuários',
-    clients: 'Clientes',
-    contracts: 'Contratos',
-    leads: 'Leads',
-    tasks: 'Tarefas'
-  };
 
   return (
     <Card>
@@ -100,10 +77,7 @@ export function SubscriptionDetails() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              checkSubscription(true);
-              refreshPaymentStatus();
-            }}
+            onClick={() => checkSubscription(true)}
             disabled={refreshing}
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -114,7 +88,6 @@ export function SubscriptionDetails() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Plano e Status */}
         <div className="space-y-3">
           <div className="flex items-center justify-between pb-3 border-b">
             <span className="text-sm font-medium text-muted-foreground">Plano Atual</span>
@@ -130,7 +103,6 @@ export function SubscriptionDetails() {
             </Badge>
           </div>
 
-          {/* Trial Info */}
           {isTrialActive && currentSubscription?.trial_end && (
             <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
               <div className="flex items-start gap-2">
@@ -147,7 +119,6 @@ export function SubscriptionDetails() {
             </div>
           )}
 
-          {/* Next Payment */}
           {isSubscriptionActive && currentSubscription?.subscription_end && !isTrialActive && (
             <div className="flex items-center justify-between pb-3 border-b">
               <span className="text-sm font-medium text-muted-foreground">Próxima Cobrança</span>
@@ -158,42 +129,6 @@ export function SubscriptionDetails() {
           )}
         </div>
 
-        {/* Usage Limits */}
-        {hasLimitData && (
-          <div className="space-y-4 pt-2">
-            <h4 className="font-semibold text-sm">Uso do Plano</h4>
-            {Object.entries(usageCounts).map(([key, count]) => {
-              const limit = planLimits[key as keyof typeof planLimits];
-              const percentage = limit >= 999999 ? 0 : getUsagePercentage(key as keyof typeof planLimits);
-              
-              if (limit === 0) return null;
-
-              return (
-                <div key={key} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {usageLabels[key as keyof typeof usageLabels]}
-                    </span>
-                    <span className={percentage >= 90 ? 'text-red-600 font-medium' : 'font-medium'}>
-                      {count}/{formatLimit(limit)}
-                    </span>
-                  </div>
-                  <Progress 
-                    value={percentage} 
-                    className={`h-2 ${percentage >= 90 ? 'text-red-600' : ''}`}
-                  />
-                  {percentage >= 90 && (
-                    <p className="text-xs text-red-600">
-                      Limite quase atingido! Considere fazer upgrade.
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Action Buttons */}
         <div className="space-y-2 pt-2">
           {isSubscriptionActive && (
             <Button
@@ -205,26 +140,14 @@ export function SubscriptionDetails() {
               Gerenciar Assinatura
             </Button>
           )}
-          
-          {!hasLimitData && (
-            <Button
-              onClick={refreshPaymentStatus}
-              variant="outline"
-              size="sm"
-              className="w-full"
-            >
-              Carregar dados do plano
-            </Button>
-          )}
         </div>
 
-        {/* Warning Messages */}
         {!currentSubscription?.plan_name && (
           <div className="p-3 bg-muted rounded-lg">
             <div className="flex items-start gap-2">
               <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
               <p className="text-sm text-muted-foreground">
-                Nenhum plano selecionado. Escolha um plano abaixo para começar.
+                Nenhum plano ativo. Entre em contato com a equipe comercial para ativar sua conta.
               </p>
             </div>
           </div>

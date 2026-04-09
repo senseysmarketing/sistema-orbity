@@ -1,10 +1,9 @@
 import { usePaymentMiddleware } from '@/hooks/usePaymentMiddleware';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, CreditCard, RefreshCw, Calendar, LogOut } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Calendar, LogOut, MessageCircle } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
-import { PricingCards } from '@/components/subscription/PricingCards';
-import { useState } from 'react';
+
 import { useAuth } from '@/hooks/useAuth';
 
 interface BlockedAccessScreenProps {
@@ -12,52 +11,18 @@ interface BlockedAccessScreenProps {
 }
 
 export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
-  const { paymentStatus, refreshPaymentStatus } = usePaymentMiddleware();
-  const { openCustomerPortal, currentSubscription, checkSubscription } = useSubscription();
+  const { refreshPaymentStatus } = usePaymentMiddleware();
+  const { currentSubscription, checkSubscription } = useSubscription();
   const { signOut } = useAuth();
-  const [showPlans, setShowPlans] = useState(false);
 
   const handleRetry = async () => {
-    // First, sync with Stripe -> local via check-subscription
     await checkSubscription(true);
-    // Then, refresh middleware status based on local DB/RPC
     await refreshPaymentStatus();
     onRetry?.();
   };
 
   const isTrialExpired = currentSubscription?.subscription_end && 
     new Date(currentSubscription.subscription_end) <= new Date();
-  
-  // Only show manage payment if user has a Stripe customer ID (meaning they've subscribed before)
-  const hasStripeCustomer = !!currentSubscription?.customer_id;
-
-  if (showPlans) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50 p-4">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-red-800 mb-2">
-              {isTrialExpired ? 'Trial Expirado' : 'Acesso Suspenso'}
-            </h1>
-            <p className="text-red-600 mb-4">
-              {isTrialExpired 
-                ? 'Seu período de trial de 7 dias expirou. Escolha um plano para continuar.'
-                : 'Escolha um novo plano ou gerencie sua assinatura atual.'
-              }
-            </p>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowPlans(false)}
-              className="mb-6"
-            >
-              ← Voltar
-            </Button>
-          </div>
-          <PricingCards />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 via-white to-orange-50">
@@ -78,37 +43,20 @@ export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
           <CardContent className="space-y-6 text-center">
             <p className="text-red-700">
               {isTrialExpired 
-                ? 'Seu período de trial de 7 dias expirou. Para continuar usando o sistema, você precisa assinar um dos nossos planos.'
-                : 'Sua agência foi suspensa devido a problemas de pagamento.'
+                ? 'Seu período de trial expirou. Entre em contato com nossa equipe comercial para ativar sua assinatura.'
+                : 'Sua agência foi suspensa. Entre em contato com nossa equipe para regularizar o acesso.'
               }
             </p>
             
             <div className="space-y-3">
-              <p className="text-sm text-red-600">
-                {isTrialExpired 
-                  ? 'Escolha um plano para reativar o acesso completo.'
-                  : 'Para reativar o acesso, regularize sua situação de pagamento.'
-                }
-              </p>
-              
               <div className="space-y-2">
                 <Button 
-                  onClick={() => setShowPlans(true)}
-                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  onClick={() => window.open('https://wa.me/5500000000000', '_blank')}
+                  className="w-full bg-green-600 hover:bg-green-700"
                 >
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  {isTrialExpired ? 'Escolher Plano' : 'Ver Planos'}
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  Falar com a Equipe Comercial
                 </Button>
-
-                {!isTrialExpired && hasStripeCustomer && (
-                  <Button 
-                    onClick={openCustomerPortal} 
-                    className="w-full bg-red-600 hover:bg-red-700"
-                  >
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Gerenciar Pagamento
-                  </Button>
-                )}
                 
                 <Button 
                   variant="outline" 

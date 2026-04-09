@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
-import { PricingCards } from "@/components/subscription/PricingCards";
+
 import { SubscriptionDetails } from "@/components/subscription/SubscriptionDetails";
 import { BillingHistory } from "@/components/subscription/BillingHistory";
 import { UsersManagement } from "@/components/admin/UsersManagement";
@@ -364,15 +364,9 @@ export default function Settings() {
             </p>
           </div>
 
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <SubscriptionDetails />
-              <BillingHistory />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Planos Disponíveis</h3>
-              <PricingCards />
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <SubscriptionDetails />
+            <BillingHistory />
           </div>
         </TabsContent>
 

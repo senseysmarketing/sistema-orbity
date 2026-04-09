@@ -1,10 +1,9 @@
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useAgency } from './useAgency';
 import { useCache } from './useCache';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
 
 interface PaymentStatus {
   isValid: boolean;
@@ -14,33 +13,12 @@ interface PaymentStatus {
   subscriptionEnd?: string;
 }
 
-interface PlanLimits {
-  users: number;
-  clients: number;
-  contracts: number;
-  leads: number;
-  tasks: number;
-}
-
-interface UsageCounts {
-  users: number;
-  clients: number;
-  contracts: number;
-  leads: number;
-  tasks: number;
-}
-
 interface PaymentMiddlewareContextType {
   paymentStatus: PaymentStatus;
-  planLimits: PlanLimits;
-  usageCounts: UsageCounts;
   loading: boolean;
   isSuperAdmin: boolean;
   isAgencyAdmin: boolean;
   refreshPaymentStatus: () => Promise<void>;
-  checkLimit: (type: keyof PlanLimits, newCount?: number) => boolean;
-  enforceLimit: (type: keyof PlanLimits, action: string) => boolean;
-  getUsagePercentage: (type: keyof PlanLimits) => number;
 }
 
 const PaymentMiddlewareContext = createContext<PaymentMiddlewareContextType | undefined>(undefined);
@@ -48,30 +26,13 @@ const PaymentMiddlewareContext = createContext<PaymentMiddlewareContextType | un
 export function PaymentMiddlewareProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
   const { currentAgency } = useAgency();
-  // Removido usePageVisibility para evitar re-renders em troca de aba
-  const cache = useCache<PaymentStatus>(3 * 60 * 1000); // 3 minutes cache
-  const navigate = useNavigate();
+  const cache = useCache<PaymentStatus>(3 * 60 * 1000);
   
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>({
     isValid: true,
     isBlocked: false
   });
-  const [planLimits, setPlanLimits] = useState<PlanLimits>({
-    users: 0,
-    clients: 0,
-    contracts: 0,
-    leads: 0,
-    tasks: 0
-  });
-  const [usageCounts, setUsageCounts] = useState<UsageCounts>({
-    users: 0,
-    clients: 0,
-    contracts: 0,
-    leads: 0,
-    tasks: 0
-  });
   const [loading, setLoading] = useState(true);
-  const [lastCheckTime, setLastCheckTime] = useState(0);
 
   const isSuperAdmin = profile?.role === 'super_admin';
   const isAgencyAdmin = profile?.role === 'agency_admin';
@@ -84,7 +45,6 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
 
     const cacheKey = `payment_${currentAgency.id}`;
     
-    // Check cache first unless forcing refresh
     if (!forceRefresh) {
       const cached = cache.get(cacheKey);
       if (cached.exists && !cached.isStale) {
@@ -95,7 +55,6 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
     }
 
     try {
-      // Check if agency subscription is valid
       const { data: isValid, error } = await supabase.rpc('is_agency_subscription_valid', {
         agency_uuid: currentAgency.id
       });
@@ -110,11 +69,10 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
 
       if (!isValid) {
         setPaymentStatus(status);
-        cache.set(cacheKey, status, { ttl: 60000 }); // Short cache for invalid status
+        cache.set(cacheKey, status, { ttl: 60000 });
         return;
       }
 
-      // Get subscription details
       const { data: subscription, error: subError } = await supabase.rpc('get_agency_subscription', {
         agency_uuid: currentAgency.id
       });
@@ -133,17 +91,7 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
 
         setPaymentStatus(fullStatus);
         cache.set(cacheKey, fullStatus);
-
-        setPlanLimits({
-          users: sub.max_users || 0,
-          clients: sub.max_clients || 0,
-          contracts: (sub as any).max_contracts || 0,
-          leads: sub.max_leads || 0,
-          tasks: sub.max_tasks || 0
-        });
       }
-      
-      setLastCheckTime(Date.now());
     } catch (error) {
       console.error('Error checking payment status:', error);
       const errorStatus: PaymentStatus = {
@@ -152,119 +100,42 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
         reason: 'Unable to verify payment status'
       };
       setPaymentStatus(errorStatus);
-      cache.set(cacheKey, errorStatus, { ttl: 30000 }); // Short cache for errors
+      cache.set(cacheKey, errorStatus, { ttl: 30000 });
     } finally {
       setLoading(false);
     }
   };
 
-  const refreshUsageCounts = async () => {
-    if (!currentAgency || isSuperAdmin) return;
-
-    try {
-      // Get current usage counts
-      const [usersResult, clientsResult, contractsResult, leadsResult, tasksResult] = await Promise.all([
-        supabase.from('agency_users').select('*', { count: 'exact', head: true }).eq('agency_id', currentAgency.id),
-        supabase.from('clients').select('*', { count: 'exact', head: true }).eq('agency_id', currentAgency.id).eq('active', true),
-        supabase.from('contracts').select('*', { count: 'exact', head: true }).eq('agency_id', currentAgency.id),
-        supabase.from('leads').select('*', { count: 'exact', head: true }).eq('agency_id', currentAgency.id),
-        supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('agency_id', currentAgency.id).eq('archived', false)
-      ]);
-
-      setUsageCounts({
-        users: usersResult.count || 0,
-        clients: clientsResult.count || 0,
-        contracts: contractsResult.count || 0,
-        leads: leadsResult.count || 0,
-        tasks: tasksResult.count || 0
-      });
-    } catch (error) {
-      console.error('Error fetching usage counts:', error);
-    }
-  };
-
   const refreshPaymentStatus = async () => {
     setLoading(true);
-    await Promise.all([checkPaymentStatus(true), refreshUsageCounts()]);
+    await checkPaymentStatus(true);
   };
 
-  const checkLimit = (type: keyof PlanLimits, newCount?: number): boolean => {
-    if (isSuperAdmin) return true;
-    
-    const currentCount = newCount !== undefined ? newCount : usageCounts[type];
-    const limit = planLimits[type];
-    
-    return currentCount < limit;
-  };
-
-  const enforceLimit = (type: keyof PlanLimits, action: string): boolean => {
-    if (isSuperAdmin) return true;
-
-    if (!paymentStatus.isValid) {
-      toast.error(`Não é possível ${action}. Assinatura inválida ou vencida.`);
-      return false;
-    }
-
-    const currentCount = usageCounts[type];
-    const limit = planLimits[type];
-
-    if (currentCount >= limit) {
-      const limitNames = {
-        users: 'usuários',
-        clients: 'clientes',
-        contracts: 'contratos',
-        leads: 'leads',
-        tasks: 'tarefas'
-      };
-
-      toast.error(
-        `Limite de ${limitNames[type]} atingido (${currentCount}/${limit}). ` +
-        `Faça upgrade do seu plano para continuar.`
-      );
-      return false;
-    }
-
-    return true;
-  };
-
-  const getUsagePercentage = (type: keyof PlanLimits): number => {
-    if (planLimits[type] === 0) return 0;
-    return Math.round((usageCounts[type] / planLimits[type]) * 100);
-  };
-
-  // Check payment status when user or agency changes with intelligent caching
   useEffect(() => {
     if (user && currentAgency) {
-      // Only check immediately if we don't have cached data
       const cacheKey = `payment_${currentAgency.id}`;
       const cached = cache.get(cacheKey);
       
       if (!cached.exists) {
         checkPaymentStatus();
-        refreshUsageCounts();
       } else {
         setPaymentStatus(cached.data || { isValid: false, isBlocked: true });
         setLoading(false);
         
-        // Background refresh if data is stale (no visibility check to avoid re-renders)
         if (cached.isStale) {
           setTimeout(() => {
             checkPaymentStatus(true);
-            refreshUsageCounts();
           }, 1000);
         }
       }
     } else {
       setLoading(false);
     }
-  }, [user, currentAgency]); // Removed visibility dependency to prevent tab-switch re-renders
+  }, [user, currentAgency]);
 
-  // Remove automatic blocking - just show warning toasts instead
   useEffect(() => {
     if (!loading && !isSuperAdmin && paymentStatus.isBlocked) {
-      // Show warning toast instead of blocking access
       toast.error('Atenção: ' + (paymentStatus.reason || 'Subscription invalid'));
-      // Don't redirect automatically - let user choose when to act
     }
   }, [paymentStatus.isBlocked, loading, isSuperAdmin]);
 
@@ -272,15 +143,10 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
     <PaymentMiddlewareContext.Provider
       value={{
         paymentStatus,
-        planLimits,
-        usageCounts,
         loading,
         isSuperAdmin,
         isAgencyAdmin,
         refreshPaymentStatus,
-        checkLimit,
-        enforceLimit,
-        getUsagePercentage,
       }}
     >
       {children}
