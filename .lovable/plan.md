@@ -1,60 +1,45 @@
 
 
-# Pivotagem para Venda Consultiva (High-Ticket)
+# Remover Limitacoes e Simplificar Aba de Assinatura
 
-Transformar o Orbity de self-service para plataforma fechada com funil de qualificacao.
-
----
-
-## Arquivos a criar
-
-### `src/components/landing/ApplicationModal.tsx`
-Modal de qualificacao estilo Typeform com 4 steps usando framer-motion (ja disponivel no projeto):
-
-- **Step 1 (Contato)**: Nome Completo, E-mail, WhatsApp
-- **Step 2 (Estrutura)**: Instagram da Agencia, Select "Tamanho da Equipe" (Eu-gencia / 2-5 / 6-15 / 15+)
-- **Step 3 (Faturamento)**: Input "Quantos clientes ativos?", Select "Ticket Medio" (< R$1k / R$1-2.5k / R$2.5-5k / > R$5k)
-- **Step 4 (Sucesso)**: Mensagem de confirmacao
-
-Componentes: Dialog do shadcn, Progress bar no topo, animacao de slide horizontal entre steps com `motion.div` (AnimatePresence + translateX). Submit simulado com setTimeout + spinner.
-
----
+## Resumo
+Remover todo o sistema de limitacoes (usuarios, clientes, leads, tarefas, contratos) e simplificar a aba de assinatura para mostrar apenas: status, proximo pagamento e tempo restante.
 
 ## Arquivos a modificar
 
-### `src/pages/LandingPage.tsx`
-- Remover import e uso de `PricingSection`
-- Adicionar estado `applicationOpen` e renderizar `<ApplicationModal>`
-- Passar `onOpenApplication` como prop para HeroSection, CTASection, FAQSection
+### 1. `src/hooks/usePaymentMiddleware.tsx`
+- Remover `PlanLimits`, `UsageCounts`, e toda logica de `checkLimit`, `enforceLimit`, `getUsagePercentage`, `refreshUsageCounts`
+- Manter apenas `paymentStatus`, `loading`, `isSuperAdmin`, `isAgencyAdmin`, `refreshPaymentStatus`
+- Remover as queries de contagem (agency_users, clients, contracts, leads, tasks)
 
-### `src/components/landing/HeroSection.tsx`
-- Receber prop `onOpenApplication`
-- Botao principal: "Aplicar para Consultoria" → chama `onOpenApplication()` (em vez de navigate)
-- Manter botao "Ja tenho conta" apontando para `/auth`
+### 2. `src/hooks/useLimitEnforcement.tsx`
+- Deletar arquivo (nao sera mais usado)
 
-### `src/components/landing/CTASection.tsx`
-- Receber prop `onOpenApplication`
-- Botao: "Aplicar para Consultoria" (em vez de "Comecar Teste Gratis")
-- Remover texto "Nao precisa cartao de credito / Cancele quando quiser"
-- Trocar stats: remover "7 dias teste gratis", substituir por algo como "Consultoria Personalizada"
+### 3. `src/components/admin/ClientForm.tsx`
+- Remover import de `useLimitEnforcement` e a verificacao de limite antes de criar cliente
 
-### `src/components/landing/FAQSection.tsx`
-- Receber prop `onOpenApplication`
-- Atualizar FAQs: remover perguntas sobre teste gratis/cancelamento, adicionar perguntas sobre processo de consultoria
-- Botao "Comecar Teste Gratis" → "Aplicar para Consultoria" chamando `onOpenApplication()`
+### 4. `src/components/subscription/SubscriptionDetails.tsx`
+- Remover toda secao "Uso do Plano" (Progress bars, contagens)
+- Remover import de `usePaymentMiddleware`
+- Manter apenas: plano atual, status, trial info, proxima cobranca, botao gerenciar
 
-### `src/components/landing/LandingFooter.tsx`
-- Remover link "Precos" do footer
+### 5. `src/pages/Settings.tsx`
+- Remover `<PricingCards />` e o titulo "Planos Disponiveis" da aba de assinatura
+- Manter apenas `SubscriptionDetails` e `BillingHistory`
 
-### `src/pages/Auth.tsx`
-- Remover bloco "Onboarding CTA" (linhas 96-113) com o botao "Criar Nova Agencia" e texto de teste gratis
-- Substituir por texto sutil: "Ainda nao utiliza o Orbity?" com link "Agende uma demonstracao" apontando para `href="#demo"` (temporario)
+### 6. `src/components/payment/PaymentStatusCard.tsx`
+- Remover secao "Uso do Plano" com Progress bars
+- Simplificar para mostrar apenas status e datas
 
----
+### 7. `src/components/payment/BlockedAccessScreen.tsx`
+- Remover import e uso de `PricingCards`
+- Simplificar para mostrar apenas mensagem de contato com equipe comercial (modelo consultivo)
+
+### 8. `src/components/admin/UsersManagement.tsx`
+- Remover import de `usePaymentMiddleware` e referencia a `planLimits`
 
 ## Resultado
-- Zero mencao a precos, planos ou teste gratis
-- Unica via de entrada: funil de qualificacao (ApplicationModal)
-- Tela de Auth: apenas login + link para demonstracao
-- Landing page limpa: Hero → Problema → Features → Demo → Integracoes → Diferenciais → Depoimentos → FAQ → CTA final
+- Zero limitacoes no sistema — tudo ilimitado
+- Aba de assinatura mostra apenas: status ativo/inativo, proximo pagamento, tempo de trial
+- Sem cards de precos ou planos na area logada
 
