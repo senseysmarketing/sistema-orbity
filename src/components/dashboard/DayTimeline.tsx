@@ -405,7 +405,7 @@ export function DayTimeline() {
                 );
               }
 
-
+              if (item.source === 'task') {
                 const isDone = item.itemStatus === 'done';
                 return (
                   <div key={item.id} className="flex gap-3 group">
