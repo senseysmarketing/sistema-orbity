@@ -2,11 +2,9 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, CreditCard, RefreshCw } from 'lucide-react';
+import { CreditCard, RefreshCw } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { ManageSubscriptionDialog } from './ManageSubscriptionDialog';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 export function SubscriptionStatus() {
   const { currentSubscription, loading, refreshing, checkSubscription, openCustomerPortal } = useSubscription();
@@ -35,11 +33,8 @@ export function SubscriptionStatus() {
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'active': return 'bg-green-500';
-      case 'trial': return 'bg-blue-500';
-      case 'trialing': return 'bg-blue-500';
       case 'past_due': return 'bg-yellow-500';
       case 'canceled': return 'bg-red-500';
-      case 'inactive': return 'bg-gray-500';
       default: return 'bg-gray-500';
     }
   };
@@ -47,27 +42,14 @@ export function SubscriptionStatus() {
   const getStatusText = (status?: string) => {
     switch (status) {
       case 'active': return 'Ativo';
-      case 'trial': return 'Período de Teste';
-      case 'trialing': return 'Período de Teste';
       case 'past_due': return 'Pagamento Pendente';
       case 'canceled': return 'Cancelado';
-      case 'inactive': return 'Inativo';
       default: return 'Inativo';
     }
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '';
-    return format(new Date(dateString), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
-  };
-
-  const isTrialActive = (currentSubscription?.subscription_status === 'trial' || 
-    currentSubscription?.subscription_status === 'trialing') && 
-    currentSubscription?.trial_end && 
-    new Date(currentSubscription.trial_end) > new Date();
-
   const isSubscriptionActive = currentSubscription?.subscribed && 
-    ['active', 'trial', 'trialing'].includes(currentSubscription?.subscription_status || '');
+    currentSubscription?.subscription_status === 'active';
 
   return (
     <Card>
@@ -86,17 +68,15 @@ export function SubscriptionStatus() {
           </Button>
         </CardTitle>
         <CardDescription>
-          Informações sobre sua assinatura atual
+          Informações sobre sua assinatura
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Plano Selecionado:</span>
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-lg">
-              {currentSubscription?.plan_name || 'Nenhum plano selecionado'}
-            </span>
-          </div>
+          <span className="text-sm font-medium">Assinatura:</span>
+          <span className="font-semibold text-lg">
+            {currentSubscription?.plan_name || 'Nenhuma assinatura'}
+          </span>
         </div>
 
         <div className="flex items-center justify-between">
@@ -109,57 +89,19 @@ export function SubscriptionStatus() {
           </Badge>
         </div>
 
-        {isTrialActive && currentSubscription?.trial_end && (
-          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-900">
-                Trial Ativo - Plano {currentSubscription.plan_name}
-              </span>
-            </div>
-            <span className="text-sm text-blue-700 font-medium">
-              Expira em {formatDate(currentSubscription.trial_end)}
-            </span>
-          </div>
-        )}
-
-        {!isTrialActive && currentSubscription?.trial_end && 
-         new Date(currentSubscription.trial_end) <= new Date() && (
-          <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border-l-4 border-red-500">
-            <div className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4 text-red-600" />
-              <span className="text-sm font-medium text-red-900">
-                Trial Expirado
-              </span>
-            </div>
-            <span className="text-sm text-red-700 font-medium">
-              Expirou em {formatDate(currentSubscription.trial_end)}
-            </span>
-          </div>
-        )}
-
-        {isSubscriptionActive && currentSubscription?.subscription_end && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Próxima Cobrança:</span>
-            <span className="text-sm">
-              {formatDate(currentSubscription.subscription_end)}
-            </span>
-          </div>
-        )}
-
         {!currentSubscription?.plan_name && (
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600">
-              Nenhum plano selecionado. Complete o onboarding para escolher um plano.
+          <div className="p-3 bg-muted rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              Nenhuma assinatura ativa. Entre em contato com a equipe comercial.
             </p>
           </div>
         )}
 
-        {currentSubscription?.plan_name && !isTrialActive && 
+        {currentSubscription?.plan_name && 
          currentSubscription?.subscription_status !== 'active' && (
           <div className="p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-500">
             <p className="text-sm text-yellow-800">
-              Para continuar usando o plano {currentSubscription.plan_name}, você precisa ativar sua assinatura.
+              Para continuar usando o sistema, você precisa ativar sua assinatura.
             </p>
           </div>
         )}
@@ -167,11 +109,9 @@ export function SubscriptionStatus() {
         {isSubscriptionActive && (
           <Button
             onClick={() => {
-              // Para planos locais (sem customer_id), usar dialog personalizado
               if (!currentSubscription?.customer_id) {
                 setShowManageDialog(true);
               } else {
-                // Para planos do Stripe, usar customer portal
                 openCustomerPortal();
               }
             }}
