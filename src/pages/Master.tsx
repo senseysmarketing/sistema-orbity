@@ -9,7 +9,7 @@ import { MasterAnalytics } from '@/components/master/MasterAnalytics';
 import { OrbityLeadsTable } from '@/components/master/OrbityLeadsTable';
 import { CreateAgencyDialog } from '@/components/master/CreateAgencyDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Gauge, BarChart3, Building2, Settings, UserPlus } from 'lucide-react';
+import { BarChart3, Building2, Settings, UserPlus } from 'lucide-react';
 import { isMasterAgencyAdmin } from '@/lib/masterAccess';
 
 export default function Master() {

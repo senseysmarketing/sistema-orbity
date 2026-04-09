@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   MoreHorizontal, Eye, Pause, Play, RefreshCw,
-  CheckCircle2, Clock, AlertTriangle, XCircle, Ban
+  CheckCircle2, AlertTriangle, XCircle, Ban
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -77,7 +77,6 @@ export function AgenciesTable() {
   };
 
   const getSituationText = (agency: typeof agencies[0]) => {
-    const trialEnd = agency.trial_end ? new Date(agency.trial_end) : null;
     const periodEnd = agency.current_period_end ? new Date(agency.current_period_end) : null;
 
     switch (agency.computed_status) {
