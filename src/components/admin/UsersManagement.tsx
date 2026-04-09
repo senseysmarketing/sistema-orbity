@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
-import { usePaymentMiddleware } from "@/hooks/usePaymentMiddleware";
+
 
 interface AgencyUser {
   id: string;
@@ -43,7 +43,7 @@ export function UsersManagement() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const { currentAgency, isAgencyAdmin } = useAgency();
   const { toast } = useToast();
-  const { planLimits } = usePaymentMiddleware();
+  
 
   useEffect(() => {
     if (currentAgency && isAgencyAdmin()) {
@@ -139,19 +139,6 @@ export function UsersManagement() {
   const inviteUser = async () => {
     try {
       setInviteLoading(true);
-      
-      // Verificar se ainda há limite de usuários disponível
-      const currentUserCount = users.length;
-      const maxUsers = planLimits?.users || 5;
-      
-      if (currentUserCount >= maxUsers) {
-        toast({
-          title: "Limite de usuários atingido",
-          description: `Você atingiu o limite máximo de ${maxUsers} usuários do seu plano. Faça upgrade para adicionar mais usuários.`,
-          variant: "destructive",
-        });
-        return;
-      }
       
       // Criar usuário usando edge function
       const trimmedEmail = inviteEmail.trim().toLowerCase();
@@ -321,27 +308,15 @@ export function UsersManagement() {
               </CardTitle>
               <CardDescription>
                 Gerencie os membros da sua agência, convide novos usuários e controle permissões
-                {planLimits && (
-                  <span className="block text-sm mt-1">
-                    {users.length} de {planLimits.users} usuários utilizados
-                  </span>
-                )}
               </CardDescription>
             </div>
-            {(() => {
-              const currentUserCount = users.length;
-              const maxUsers = planLimits?.users || 5;
-              const userLimitReached = currentUserCount >= maxUsers;
-              
-              return (
-                <div className="flex flex-col gap-2">
-                  <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button disabled={userLimitReached}>
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Criar Usuário
-                      </Button>
-                    </DialogTrigger>
+            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Criar Usuário
+                </Button>
+              </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Criar Novo Usuário</DialogTitle>
@@ -403,24 +378,6 @@ export function UsersManagement() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-                
-                {userLimitReached && (
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Limite máximo de {maxUsers} usuários atingido
-                    </p>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => window.open('/subscription', '_blank')}
-                    >
-                      Fazer Upgrade
-                    </Button>
-                  </div>
-                )}
-              </div>
-              );
-            })()}
           </div>
         </CardHeader>
         <CardContent>

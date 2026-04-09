@@ -12,7 +12,7 @@ import { DatePickerDemo } from "@/components/ui/date-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
-import { useLimitEnforcement } from "@/hooks/useLimitEnforcement";
+
 
 interface ClientFormProps {
   open: boolean;
@@ -24,7 +24,7 @@ interface ClientFormProps {
 export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientFormProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
-  const { enforceLimitWithToast } = useLimitEnforcement();
+  
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [generateContract, setGenerateContract] = useState(false);
@@ -89,11 +89,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
       return;
     }
     
-    // Check limit only for new clients
-    if (!client) {
-      const canCreate = enforceLimitWithToast('clients', 'adicionar novo cliente');
-      if (!canCreate) return;
-    }
     
     setLoading(true);
 
