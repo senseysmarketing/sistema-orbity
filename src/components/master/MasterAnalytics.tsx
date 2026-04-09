@@ -4,21 +4,21 @@ import { useMaster } from '@/hooks/useMaster';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   TrendingUp, 
-  TrendingDown, 
+   
   Users, 
   Target, 
   DollarSign, 
   AlertTriangle,
-  Clock,
   Award,
   Activity,
   FileText,
-  Percent
+  Percent,
+  Ban
 } from 'lucide-react';
 
 interface MonthlyMetric {
@@ -45,19 +45,15 @@ interface MonthlyRevenue {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  active: 'hsl(142, 76%, 36%)',      // green
-  trialing: 'hsl(217, 91%, 60%)',     // blue
-  trial_expired: 'hsl(0, 84%, 60%)',  // red
-  past_due: 'hsl(25, 95%, 53%)',      // orange
-  canceled: 'hsl(0, 0%, 45%)',        // gray
-  suspended: 'hsl(0, 84%, 40%)',      // dark red
+  active: 'hsl(142, 76%, 36%)',
+  past_due: 'hsl(25, 95%, 53%)',
+  canceled: 'hsl(0, 0%, 45%)',
+  suspended: 'hsl(0, 84%, 40%)',
 };
 
 const STATUS_LABELS: Record<string, string> = {
   active: 'Ativo',
-  trialing: 'Em Trial',
-  trial_expired: 'Trial Expirado',
-  past_due: 'Pagamento Pendente',
+  past_due: 'Inadimplente',
   canceled: 'Cancelado',
   suspended: 'Suspenso',
 };
@@ -100,40 +96,41 @@ export function MasterAnalytics() {
   const statusCounts = getStatusCounts();
   const masterMetrics = getMasterMetrics();
 
-  // Calculate conversion metrics
   const conversionMetrics = useMemo(() => {
-    const totalTrialsFinished = statusCounts.active + statusCounts.trial_expired + statusCounts.canceled;
-    const conversionRate = totalTrialsFinished > 0 
-      ? (statusCounts.active / totalTrialsFinished) * 100 
+    const totalAgencies = agencies.length;
+    const totalActive = statusCounts.active;
+    
+    const activationRate = totalAgencies > 0 
+      ? (totalActive / totalAgencies) * 100 
       : 0;
     
-    const totalActive = statusCounts.active;
     const churnRate = totalActive > 0 
       ? (statusCounts.canceled / (totalActive + statusCounts.canceled)) * 100 
       : 0;
+
+    const delinquencyRate = totalAgencies > 0
+      ? (statusCounts.past_due / totalAgencies) * 100
+      : 0;
     
     const avgTicket = totalActive > 0 ? masterMetrics.mrr / totalActive : 0;
-    const estimatedLTV = avgTicket * 12; // 12 months average lifetime
+    const estimatedLTV = avgTicket * 12;
 
     return {
-      conversionRate,
+      activationRate,
       churnRate,
+      delinquencyRate,
       avgTicket,
       estimatedLTV,
-      trialExpiredRate: agencies.length > 0 
-        ? (statusCounts.trial_expired / agencies.length) * 100 
-        : 0,
     };
   }, [statusCounts, masterMetrics, agencies]);
 
-  // Prepare chart data
   const growthChartData = useMemo(() => {
     return [...monthlyMetrics]
       .reverse()
       .map(m => ({
         month: format(parseISO(m.month), 'MMM/yy', { locale: ptBR }),
         novas: m.new_agencies,
-        convertidas: m.converted_to_paid,
+        ativas: m.converted_to_paid,
       }));
   }, [monthlyMetrics]);
 
@@ -148,7 +145,13 @@ export function MasterAnalytics() {
   }, [monthlyRevenue]);
 
   const statusChartData = useMemo(() => {
-    return Object.entries(statusCounts)
+    const relevantStatuses = { 
+      active: statusCounts.active, 
+      past_due: statusCounts.past_due, 
+      canceled: statusCounts.canceled, 
+      suspended: statusCounts.suspended 
+    };
+    return Object.entries(relevantStatuses)
       .filter(([_, count]) => count > 0)
       .map(([status, count]) => ({
         name: STATUS_LABELS[status] || status,
@@ -157,21 +160,21 @@ export function MasterAnalytics() {
       }));
   }, [statusCounts]);
 
-  // Opportunities: trials expiring soon
-  const opportunities = useMemo(() => {
-    const now = new Date();
+  // Inadimplent agencies (past_due)
+  const pastDueAgencies = useMemo(() => {
     return agencies
-      .filter(a => a.computed_status === 'trialing' && a.trial_end)
-      .map(a => ({
-        ...a,
-        daysLeft: differenceInDays(new Date(a.trial_end!), now),
-      }))
-      .filter(a => a.daysLeft >= 0 && a.daysLeft <= 7)
-      .sort((a, b) => a.daysLeft - b.daysLeft);
+      .filter(a => a.computed_status === 'past_due')
+      .map(a => {
+        const daysOverdue = a.current_period_end 
+          ? differenceInDays(new Date(), new Date(a.current_period_end))
+          : 0;
+        return { ...a, daysOverdue: Math.max(0, daysOverdue) };
+      })
+      .sort((a, b) => b.daysOverdue - a.daysOverdue);
   }, [agencies]);
 
-  // Past due agencies
-  const pastDueAgencies = agencies.filter(a => a.computed_status === 'past_due');
+  // Suspended agencies
+  const suspendedAgencies = agencies.filter(a => a.computed_status === 'suspended');
 
   // Top agencies by usage
   const topAgencies = useMemo(() => {
@@ -197,15 +200,15 @@ export function MasterAnalytics() {
 
   return (
     <div className="space-y-6">
-      {/* Conversion Metrics */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
-                <p className="text-2xl font-bold">{conversionMetrics.conversionRate.toFixed(1)}%</p>
-                <p className="text-xs text-muted-foreground">Trials → Pagantes</p>
+                <p className="text-sm text-muted-foreground">Taxa de Ativação</p>
+                <p className="text-2xl font-bold">{conversionMetrics.activationRate.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground">Agências ativas / total</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
                 <Target className="h-6 w-6 text-green-500" />
@@ -218,12 +221,12 @@ export function MasterAnalytics() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Churn Rate</p>
-                <p className="text-2xl font-bold">{conversionMetrics.churnRate.toFixed(1)}%</p>
-                <p className="text-xs text-muted-foreground">Cancelamentos</p>
+                <p className="text-sm text-muted-foreground">Taxa de Inadimplência</p>
+                <p className="text-2xl font-bold text-amber-600">{conversionMetrics.delinquencyRate.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground">{statusCounts.past_due} agência(s)</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                <TrendingDown className="h-6 w-6 text-red-500" />
+              <div className="h-12 w-12 rounded-full bg-amber-500/10 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-amber-500" />
               </div>
             </div>
           </CardContent>
@@ -235,7 +238,7 @@ export function MasterAnalytics() {
               <div>
                 <p className="text-sm text-muted-foreground">Ticket Médio</p>
                 <p className="text-2xl font-bold">{formatCurrency(conversionMetrics.avgTicket)}</p>
-                <p className="text-xs text-muted-foreground">Por cliente ativo</p>
+                <p className="text-xs text-muted-foreground">Por agência ativa</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center">
                 <DollarSign className="h-6 w-6 text-blue-500" />
@@ -276,7 +279,7 @@ export function MasterAnalytics() {
               <ChartContainer
                 config={{
                   novas: { label: 'Novas', color: 'hsl(var(--primary))' },
-                  convertidas: { label: 'Convertidas', color: 'hsl(142, 76%, 36%)' },
+                  ativas: { label: 'Ativas', color: 'hsl(142, 76%, 36%)' },
                 }}
                 className="h-[250px]"
               >
@@ -295,7 +298,7 @@ export function MasterAnalytics() {
                     />
                     <Area
                       type="monotone"
-                      dataKey="convertidas"
+                      dataKey="ativas"
                       stackId="2"
                       stroke="hsl(142, 76%, 36%)"
                       fill="hsl(142, 76%, 36%)"
@@ -319,7 +322,7 @@ export function MasterAnalytics() {
               <Percent className="h-5 w-5" />
               Distribuição de Status
             </CardTitle>
-            <CardDescription>Agências por status de assinatura</CardDescription>
+            <CardDescription>Agências por situação</CardDescription>
           </CardHeader>
           <CardContent>
             {statusChartData.length > 0 ? (
@@ -371,7 +374,7 @@ export function MasterAnalytics() {
         </Card>
       </div>
 
-      {/* Revenue Chart and Opportunities */}
+      {/* Revenue Chart and Inadimplência */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Monthly Revenue Chart */}
         <Card>
@@ -417,31 +420,36 @@ export function MasterAnalytics() {
           </CardContent>
         </Card>
 
-        {/* Opportunities & Alerts */}
+        {/* Inadimplência & Alertas */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Oportunidades e Alertas
+              Inadimplência e Alertas
             </CardTitle>
-            <CardDescription>Ações recomendadas</CardDescription>
+            <CardDescription>Agências com pagamentos pendentes ou suspensas</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {opportunities.length > 0 && (
+            {pastDueAgencies.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-blue-500" />
-                  Trials expirando em breve
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Pagamentos em atraso ({pastDueAgencies.length})
                 </p>
                 <div className="space-y-2">
-                  {opportunities.slice(0, 3).map((agency) => (
+                  {pastDueAgencies.map((agency) => (
                     <div 
                       key={agency.agency_id} 
-                      className="flex items-center justify-between p-2 bg-blue-500/5 rounded-lg border border-blue-500/20"
+                      className="flex items-center justify-between p-3 bg-amber-500/5 rounded-lg border border-amber-500/20"
                     >
-                      <span className="text-sm">{agency.agency_name}</span>
-                      <Badge variant={agency.daysLeft <= 2 ? 'destructive' : 'secondary'}>
-                        {agency.daysLeft === 0 ? 'Hoje' : `${agency.daysLeft} dias`}
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{agency.agency_name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {agency.monthly_value ? formatCurrency(agency.monthly_value) + '/mês' : 'Valor não definido'}
+                        </span>
+                      </div>
+                      <Badge variant="destructive">
+                        {agency.daysOverdue > 0 ? `${agency.daysOverdue} dias em atraso` : 'Vencido'}
                       </Badge>
                     </div>
                   ))}
@@ -449,30 +457,35 @@ export function MasterAnalytics() {
               </div>
             )}
 
-            {pastDueAgencies.length > 0 && (
+            {suspendedAgencies.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                  Pagamentos pendentes
+                  <Ban className="h-4 w-4 text-red-500" />
+                  Agências suspensas ({suspendedAgencies.length})
                 </p>
                 <div className="space-y-2">
-                  {pastDueAgencies.slice(0, 3).map((agency) => (
+                  {suspendedAgencies.map((agency) => (
                     <div 
                       key={agency.agency_id} 
-                      className="flex items-center justify-between p-2 bg-amber-500/5 rounded-lg border border-amber-500/20"
+                      className="flex items-center justify-between p-3 bg-red-500/5 rounded-lg border border-red-500/20"
                     >
-                      <span className="text-sm">{agency.agency_name}</span>
-                      <Badge variant="outline" className="text-amber-600">Pendente</Badge>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{agency.agency_name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {agency.monthly_value ? formatCurrency(agency.monthly_value) + '/mês' : 'Valor não definido'}
+                        </span>
+                      </div>
+                      <Badge variant="outline" className="text-red-600 border-red-600">Suspensa</Badge>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {opportunities.length === 0 && pastDueAgencies.length === 0 && (
+            {pastDueAgencies.length === 0 && suspendedAgencies.length === 0 && (
               <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                 <Award className="h-12 w-12 mb-2" />
-                <p className="text-sm">Tudo em ordem! Sem alertas.</p>
+                <p className="text-sm">Tudo em ordem! Sem inadimplências ou alertas.</p>
               </div>
             )}
           </CardContent>
@@ -496,7 +509,12 @@ export function MasterAnalytics() {
                   <tr className="border-b">
                     <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">#</th>
                     <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Agência</th>
-                    <th className="text-left py-3 px-2 text-sm font-medium text-muted-foreground">Plano</th>
+                    <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">
+                      <div className="flex items-center justify-center gap-1">
+                        <DollarSign className="h-4 w-4" />
+                        Valor Mensal
+                      </div>
+                    </th>
                     <th className="text-center py-3 px-2 text-sm font-medium text-muted-foreground">
                       <div className="flex items-center justify-center gap-1">
                         <FileText className="h-4 w-4" />
@@ -518,22 +536,25 @@ export function MasterAnalytics() {
                   </tr>
                 </thead>
                 <tbody>
-                  {topAgencies.map((agency, index) => (
-                    <tr key={agency.agency_id} className="border-b last:border-0">
-                      <td className="py-3 px-2">
-                        <Badge variant={index === 0 ? 'default' : 'secondary'}>
-                          {index + 1}º
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-2 font-medium">{agency.agency_name}</td>
-                      <td className="py-3 px-2">
-                        <Badge variant="outline">{agency.plan_name}</Badge>
-                      </td>
-                      <td className="py-3 px-2 text-center font-mono">{agency.task_count}</td>
-                      <td className="py-3 px-2 text-center font-mono">{agency.post_count}</td>
-                      <td className="py-3 px-2 text-center font-mono">{agency.user_count}</td>
-                    </tr>
-                  ))}
+                  {topAgencies.map((agency, index) => {
+                    const agencyData = agencies.find(a => a.agency_id === agency.agency_id);
+                    return (
+                      <tr key={agency.agency_id} className="border-b last:border-0">
+                        <td className="py-3 px-2">
+                          <Badge variant={index === 0 ? 'default' : 'secondary'}>
+                            {index + 1}º
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-2 font-medium">{agency.agency_name}</td>
+                        <td className="py-3 px-2 text-center text-sm">
+                          {agencyData?.monthly_value ? formatCurrency(agencyData.monthly_value) : '—'}
+                        </td>
+                        <td className="py-3 px-2 text-center font-mono">{agency.task_count}</td>
+                        <td className="py-3 px-2 text-center font-mono">{agency.post_count}</td>
+                        <td className="py-3 px-2 text-center font-mono">{agency.user_count}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
