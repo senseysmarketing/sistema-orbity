@@ -390,10 +390,27 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   );
 }
 
+const defaultSubscriptionContext: SubscriptionContextType = {
+  plans: [],
+  currentSubscription: null,
+  loading: true,
+  refreshing: false,
+  showRefreshAlert: false,
+  checkSubscription: async () => {},
+  createCheckout: async () => {},
+  openCustomerPortal: async () => {},
+  refreshPlans: async () => {},
+  isFeatureAvailable: () => true,
+  hasReachedLimit: () => false,
+  getMaxFacebookAdAccounts: () => 5,
+  dismissRefreshAlert: () => {},
+};
+
 export function useSubscription() {
   const context = useContext(SubscriptionContext);
   if (context === undefined) {
-    throw new Error('useSubscription must be used within a SubscriptionProvider');
+    console.warn('useSubscription called outside SubscriptionProvider, using defaults');
+    return defaultSubscriptionContext;
   }
   return context;
 }
