@@ -364,7 +364,48 @@ export function DayTimeline() {
                 );
               }
 
-              if (item.source === 'task') {
+              if (item.source === 'meeting') {
+                const isCompleted = item.itemStatus === 'completed';
+                return (
+                  <div key={item.id} className="flex gap-3 group">
+                    <div className="flex flex-col items-center">
+                      <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 mt-1 text-blue-600 bg-blue-100">
+                        <Calendar className="h-3.5 w-3.5" />
+                      </div>
+                      {idx < items.length - 1 && (
+                        <div className="w-px flex-1 bg-border my-1 min-h-[12px]" />
+                      )}
+                    </div>
+                    <div className={cn('flex-1 pb-3 min-w-0', idx === items.length - 1 && 'pb-0')}>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <p className="text-xs text-muted-foreground font-medium">{item.time}</p>
+                        <Badge variant="outline" className="text-[10px] h-4 px-1 border-0 text-blue-600 bg-blue-100">
+                          Reunião
+                        </Badge>
+                        {item.meetingEndTime && (
+                          <span className="text-[10px] text-muted-foreground">até {item.meetingEndTime}</span>
+                        )}
+                      </div>
+                      <p className={cn('text-sm font-medium leading-snug line-clamp-1', isCompleted && 'line-through text-muted-foreground')}>
+                        {item.itemTitle}
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        {item.itemClientName && (
+                          <p className="text-xs text-muted-foreground line-clamp-1">{item.itemClientName}</p>
+                        )}
+                        {item.itemClientName && item.meetingLocation && (
+                          <span className="text-xs text-muted-foreground">·</span>
+                        )}
+                        {item.meetingLocation && (
+                          <p className="text-xs text-muted-foreground line-clamp-1">{item.meetingLocation}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+
                 const isDone = item.itemStatus === 'done';
                 return (
                   <div key={item.id} className="flex gap-3 group">
