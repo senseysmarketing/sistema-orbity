@@ -1,15 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMaster } from '@/hooks/useMaster';
 import { AgencyDetailsSheet } from '@/components/master/AgencyDetailsSheet';
+import { CreateAgencyDialog } from '@/components/master/CreateAgencyDialog';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   MoreHorizontal, Eye, Pause, Play, RefreshCw,
-  CheckCircle2, AlertTriangle, XCircle, Ban
+  CheckCircle2, AlertTriangle, XCircle, Ban, Search,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -17,11 +20,33 @@ import {
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-export function AgenciesTable() {
+const ITEMS_PER_PAGE = 10;
+
+interface AgenciesTableProps {
+  onCreated?: () => void;
+}
+
+export function AgenciesTable({ onCreated }: AgenciesTableProps) {
   const { agencies, loading, refreshAgencies, suspendAgency, reactivateAgency, getStatusCounts } = useMaster();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedAgency, setSelectedAgency] = useState<typeof agencies[0] | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const filteredAgencies = agencies.filter(agency =>
+    agency.agency_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filteredAgencies.length / ITEMS_PER_PAGE));
+  const paginatedAgencies = filteredAgencies.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const handleSuspend = async (agencyId: string) => {
     setActionLoading(agencyId);
@@ -78,7 +103,6 @@ export function AgenciesTable() {
 
   const getSituationText = (agency: typeof agencies[0]) => {
     const periodEnd = agency.current_period_end ? new Date(agency.current_period_end) : null;
-
     switch (agency.computed_status) {
       case 'active':
         if (periodEnd) {
@@ -127,24 +151,38 @@ export function AgenciesTable() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {statusCards.map((item) => (
-          <div key={item.key} className={`flex items-center gap-3 p-3 rounded-lg border ${item.color}`}>
-            <item.icon className="h-5 w-5" />
-            <div>
-              <div className="text-lg font-bold">{item.count}</div>
-              <div className="text-xs opacity-80">{item.label}</div>
+      <div className="flex items-center gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 flex-1">
+          {statusCards.map((item) => (
+            <div key={item.key} className={`flex items-center gap-3 p-3 rounded-lg border ${item.color}`}>
+              <item.icon className="h-5 w-5" />
+              <div>
+                <div className="text-lg font-bold">{item.count}</div>
+                <div className="text-xs opacity-80">{item.label}</div>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+        {onCreated && <CreateAgencyDialog onCreated={onCreated} />}
       </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Agências ({agencies.length})</CardTitle>
-          <Button variant="outline" size="sm" onClick={refreshAgencies} disabled={loading}>
-            <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
-          </Button>
+          <CardTitle>Agências ({filteredAgencies.length})</CardTitle>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar agência..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 w-[200px] md:w-[260px]"
+              />
+            </div>
+            <Button variant="outline" size="sm" onClick={refreshAgencies} disabled={loading}>
+              <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">
@@ -156,7 +194,6 @@ export function AgenciesTable() {
                   <TableHead>Status Financeiro</TableHead>
                   <TableHead>Situação</TableHead>
                   <TableHead>Valor Mensal</TableHead>
-                  
                   <TableHead>Usuários</TableHead>
                   <TableHead>Clientes</TableHead>
                   <TableHead>Criada em</TableHead>
@@ -164,14 +201,13 @@ export function AgenciesTable() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {agencies.map((agency) => (
+                {paginatedAgencies.map((agency) => (
                   <TableRow key={agency.agency_id}>
                     <TableCell className="font-medium">{agency.agency_name}</TableCell>
                     <TableCell>{getStatusBadge(agency.computed_status)}</TableCell>
                     <TableCell>{getFinancialBadge(agency)}</TableCell>
                     <TableCell>{getSituationText(agency)}</TableCell>
                     <TableCell>{formatCurrency(Number(agency.price_monthly || 0))}</TableCell>
-                    
                     <TableCell>{agency.user_count}</TableCell>
                     <TableCell>{agency.client_count}</TableCell>
                     <TableCell>{formatDate(agency.created_at)}</TableCell>
@@ -203,6 +239,35 @@ export function AgenciesTable() {
               </TableBody>
             </Table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <p className="text-sm text-muted-foreground">
+                Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredAgencies.length)} de {filteredAgencies.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {currentPage} / {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Próximo <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

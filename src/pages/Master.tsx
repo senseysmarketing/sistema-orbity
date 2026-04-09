@@ -65,10 +65,7 @@ export default function Master() {
         </TabsList>
 
         <TabsContent value="agencies" className="space-y-6">
-          <div className="flex justify-end">
-            <CreateAgencyDialog onCreated={refreshAgencies} />
-          </div>
-          <AgenciesTable />
+          <AgenciesTable onCreated={refreshAgencies} />
         </TabsContent>
 
         <TabsContent value="leads" className="space-y-6">
