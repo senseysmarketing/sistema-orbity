@@ -1,24 +1,41 @@
 
+# Atualizar Analytics do Painel Master — Remover Trial/Planos, Adicionar Inadimplencia
 
-# Ajustes Visuais no Painel de Controle
+## Alteracoes em `src/components/master/MasterAnalytics.tsx`
 
-## Alteracoes
+### 1. KPI Cards (linha 200-261)
+- **Taxa de Conversao**: Mudar de "Trials → Pagantes" para "Agencias Ativas / Total" (taxa de ativacao)
+- **Churn Rate**: Manter, mas ajustar calculo sem trial
+- **Ticket Medio**: Manter como esta
+- **LTV Estimado**: Manter como esta
 
-### 1. `src/pages/Master.tsx`
-- Trocar `container mx-auto py-6 space-y-6` por `space-y-4 md:space-y-6` (padrao global sem container fixo)
-- Ajustar titulo para `text-2xl md:text-3xl` e subtitulo para `text-sm md:text-base`
-- Remover aba "Planos" (TabsTrigger + TabsContent)
-- Remover import de `SubscriptionPlansManager`
-- Mudar grid de tabs de `grid-cols-5` para `grid-cols-4`
+### 2. Remover referencias a trial no calculo `conversionMetrics` (linhas 104-127)
+- `conversionRate` = agencias ativas / total de agencias
+- Remover `trialExpiredRate`
+- Remover `trial_expired` do calculo
 
-### 2. `src/components/master/AgenciesTable.tsx`
-- Remover status cards de "Em Trial" e "Trial Expirado" do array `statusCards`
-- Remover coluna "Plano" da tabela (TableHead + TableCell com `plan_name`)
-- Remover referencias a `trialing` e `trial_expired` no `getStatusBadge`
-- Remover casos `trialing` e `trial_expired` no `getSituationText`
+### 3. STATUS_COLORS e STATUS_LABELS (linhas 47-63)
+- Remover `trialing` e `trial_expired`
+- Adicionar `inadimplente` se necessario (mapear `past_due`)
 
-### 3. `src/hooks/useMaster.tsx`
-- Remover `trialing` e `trial_expired` do `getStatusCounts`
+### 4. Grafico de Crescimento (linhas 130-138)
+- Mudar label "convertidas" para "ativas" (agencias que pagaram)
 
-Nenhuma alteracao de banco de dados necessaria.
+### 5. Distribuicao de Status — Pie Chart (linhas 315-371)
+- Remover trial do dados, manter apenas: Ativo, Inadimplente, Cancelado, Suspenso
 
+### 6. Oportunidades e Alertas (linhas 420-479)
+- Remover secao "Trials expirando em breve" (linhas 430-450)
+- Expandir secao de "Pagamentos pendentes" para mostrar inadimplencia com mais detalhe (valor mensal da agencia, dias em atraso)
+- Adicionar alerta para agencias suspensas
+
+### 7. Top Agencias por Uso — Tabela (linhas 482-546)
+- Remover coluna "Plano" (linha 499 e 529-531)
+- Adicionar coluna "Valor Mensal" mostrando `monthly_value`
+
+### 8. `src/hooks/useMaster.tsx`
+- Zerar `trialing` e `trial_expired` definitivamente no `getStatusCounts` (ja feito parcialmente)
+
+## Resultado
+- Sem mencoes a trial ou planos em toda a aba Analytics
+- Secao de inadimplencia/alertas mais rica com informacoes de valor e agencias suspensas
