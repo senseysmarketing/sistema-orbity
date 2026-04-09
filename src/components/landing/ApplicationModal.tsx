@@ -50,12 +50,24 @@ export function ApplicationModal({ open, onOpenChange }: ApplicationModalProps) 
     setStep((s) => s + 1);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      await supabase.from('orbity_leads').insert({
+        name: name.trim(),
+        email: email.trim(),
+        whatsapp: rawPhone(whatsapp),
+        instagram: instagram.trim(),
+        team_size: teamSize,
+        active_clients: activeClients,
+        avg_ticket: avgTicket,
+      } as any);
       nextStep();
-    }, 2000);
+    } catch (error) {
+      console.error('Error submitting application:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleClose = (value: boolean) => {

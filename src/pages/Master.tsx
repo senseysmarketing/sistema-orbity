@@ -6,16 +6,17 @@ import { MasterMetricsCards } from '@/components/master/MasterMetricsCards';
 import { AgenciesTable } from '@/components/master/AgenciesTable';
 import { SubscriptionPlansManager } from '@/components/master/SubscriptionPlansManager';
 import { MasterAnalytics } from '@/components/master/MasterAnalytics';
+import { OrbityLeadsTable } from '@/components/master/OrbityLeadsTable';
+import { CreateAgencyDialog } from '@/components/master/CreateAgencyDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Gauge, BarChart3, Building2, Settings } from 'lucide-react';
+import { Gauge, BarChart3, Building2, Settings, UserPlus } from 'lucide-react';
 import { isMasterAgencyAdmin } from '@/lib/masterAccess';
 
 export default function Master() {
   const navigate = useNavigate();
-  const { isMasterUser, loading } = useMaster();
+  const { isMasterUser, loading, refreshAgencies } = useMaster();
   const { currentAgency, agencyRole, loading: agencyLoading } = useAgency();
 
-  // Verificação de acesso baseada na agência Senseys
   const hasAccess = isMasterAgencyAdmin(currentAgency?.id, agencyRole);
 
   useEffect(() => {
@@ -32,27 +33,31 @@ export default function Master() {
     );
   }
 
-  if (!hasAccess) {
-    return null;
-  }
+  if (!hasAccess) return null;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center space-x-4">
-        <Gauge className="h-8 w-8 text-primary" />
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Painel de Controle</h1>
-          <p className="text-muted-foreground">Controle total sobre todas as agências do sistema</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Gauge className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Painel de Controle</h1>
+            <p className="text-muted-foreground">Controle total sobre todas as agências do sistema</p>
+          </div>
         </div>
       </div>
 
       <MasterMetricsCards />
 
       <Tabs defaultValue="agencies" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="agencies" className="flex items-center space-x-2">
             <Building2 className="h-4 w-4" />
             <span>Agências</span>
+          </TabsTrigger>
+          <TabsTrigger value="leads" className="flex items-center space-x-2">
+            <UserPlus className="h-4 w-4" />
+            <span>Aplicações / Leads</span>
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center space-x-2">
             <BarChart3 className="h-4 w-4" />
@@ -69,7 +74,14 @@ export default function Master() {
         </TabsList>
 
         <TabsContent value="agencies" className="space-y-6">
+          <div className="flex justify-end">
+            <CreateAgencyDialog onCreated={refreshAgencies} />
+          </div>
           <AgenciesTable />
+        </TabsContent>
+
+        <TabsContent value="leads" className="space-y-6">
+          <OrbityLeadsTable />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
