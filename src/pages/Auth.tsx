@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 import orbityLogo from "@/assets/orbity-logo.png";
 import authBackground from "@/assets/auth-background-new.png";
+import { ApplicationModal } from "@/components/landing/ApplicationModal";
 export default function Auth() {
   const { user, loading, signIn } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -15,6 +16,7 @@ export default function Auth() {
   // Login form state
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [applicationOpen, setApplicationOpen] = useState(false);
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -97,9 +99,9 @@ export default function Auth() {
         <div className="text-center">
           <p className="text-sm text-white/80">
             Ainda não utiliza o Orbity?{" "}
-            <a href="#demo" className="text-white underline underline-offset-2 hover:text-white/90 font-medium">
+            <button onClick={() => setApplicationOpen(true)} className="text-white underline underline-offset-2 hover:text-white/90 font-medium">
               Agende uma demonstração
-            </a>
+            </button>
           </p>
         </div>
 
@@ -110,6 +112,7 @@ export default function Auth() {
           </Link>
         </div>
       </div>
+      <ApplicationModal open={applicationOpen} onOpenChange={setApplicationOpen} />
     </div>
   );
 }
