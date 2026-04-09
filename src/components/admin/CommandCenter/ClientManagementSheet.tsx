@@ -65,6 +65,21 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("clients").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: "Cliente excluído", description: "O cliente e todos os seus dados foram removidos permanentemente." });
+      queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-payments-all"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleToggle = (client: Client) => {
     if (client.active) {
       setConfirmClient(client);
@@ -77,6 +92,12 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
     if (!confirmClient) return;
     toggleMutation.mutate({ id: confirmClient.id, activate: false });
     setConfirmClient(null);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteClient) return;
+    deleteMutation.mutate(deleteClient.id);
+    setDeleteClient(null);
   };
 
   const getInitials = (name: string) =>
