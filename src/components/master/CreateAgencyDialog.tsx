@@ -139,7 +139,7 @@ export function CreateAgencyDialog({ onCreated }: CreateAgencyDialogProps) {
               <div className="flex gap-2">
                 <Input value={inviteLink} readOnly className="text-xs bg-background" />
                 <Button size="icon" variant="outline" onClick={handleCopy}>
-                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                  {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">

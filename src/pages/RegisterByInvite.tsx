@@ -215,7 +215,7 @@ export default function RegisterByInvite() {
                 <p className="text-xs text-destructive">As senhas não coincidem</p>
               )}
               {confirmPassword && password === confirmPassword && password.length >= 6 && (
-                <p className="text-xs text-green-600 flex items-center gap-1">
+                <p className="text-xs text-primary flex items-center gap-1">
                   <CheckCircle className="h-3 w-3" /> Senhas coincidem
                 </p>
               )}
