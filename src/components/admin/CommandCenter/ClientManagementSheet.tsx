@@ -177,12 +177,6 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
                               : "Sem valor"}
                           </p>
                         </div>
-                        <Badge
-                          variant={client.active ? "default" : "secondary"}
-                          className="text-[10px] shrink-0"
-                        >
-                          {client.active ? "Ativo" : "Inativo"}
-                        </Badge>
                         {!client.active && (
                           <Button
                             variant="ghost"
@@ -193,6 +187,12 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
+                        <Badge
+                          variant={client.active ? "default" : "secondary"}
+                          className="text-[10px] shrink-0"
+                        >
+                          {client.active ? "Ativo" : "Inativo"}
+                        </Badge>
                         <Switch
                           checked={client.active}
                           onCheckedChange={() => handleToggle(client)}
