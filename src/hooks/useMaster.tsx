@@ -25,6 +25,7 @@ interface MasterAgencyOverview {
   billing_cycle: string | null;
   price_monthly: number | null;
   price_yearly: number | null;
+  monthly_value: number | null;
 }
 
 interface BillingMetrics {
