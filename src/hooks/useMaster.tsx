@@ -172,8 +172,8 @@ export function MasterProvider({ children }: { children: ReactNode }) {
   const getStatusCounts = (): StatusCounts => {
     return {
       active: agencies.filter(a => a.computed_status === 'active').length,
-      trialing: agencies.filter(a => a.computed_status === 'trialing').length,
-      trial_expired: agencies.filter(a => a.computed_status === 'trial_expired').length,
+      trialing: 0,
+      trial_expired: 0,
       past_due: agencies.filter(a => a.computed_status === 'past_due').length,
       canceled: agencies.filter(a => a.computed_status === 'canceled').length,
       suspended: agencies.filter(a => a.computed_status === 'suspended').length,

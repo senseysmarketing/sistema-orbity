@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   MoreHorizontal, Eye, Pause, Play, RefreshCw,
-  CheckCircle2, Clock, AlertTriangle, XCircle, Ban
+  CheckCircle2, AlertTriangle, XCircle, Ban
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -44,10 +44,6 @@ export function AgenciesTable() {
     switch (computedStatus) {
       case 'active':
         return <Badge className="bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20">Ativa</Badge>;
-      case 'trialing':
-        return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 hover:bg-blue-500/20">Em Trial</Badge>;
-      case 'trial_expired':
-        return <Badge className="bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20">Trial Expirado</Badge>;
       case 'past_due':
         return <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/20 hover:bg-orange-500/20">Pgto Pendente</Badge>;
       case 'canceled':
@@ -81,22 +77,9 @@ export function AgenciesTable() {
   };
 
   const getSituationText = (agency: typeof agencies[0]) => {
-    const trialEnd = agency.trial_end ? new Date(agency.trial_end) : null;
     const periodEnd = agency.current_period_end ? new Date(agency.current_period_end) : null;
 
     switch (agency.computed_status) {
-      case 'trialing':
-        if (trialEnd) {
-          const daysLeft = differenceInDays(trialEnd, new Date());
-          return <span className="text-blue-600 text-sm">{daysLeft} dias restantes</span>;
-        }
-        return null;
-      case 'trial_expired':
-        if (trialEnd) {
-          const daysAgo = Math.abs(differenceInDays(new Date(), trialEnd));
-          return <span className="text-red-600 text-sm">Expirou há {daysAgo} dias</span>;
-        }
-        return null;
       case 'active':
         if (periodEnd) {
           return <span className="text-green-600 text-sm">Renova em: {format(periodEnd, 'dd/MM/yyyy', { locale: ptBR })}</span>;
@@ -137,8 +120,6 @@ export function AgenciesTable() {
   const statusCounts = getStatusCounts();
   const statusCards = [
     { key: 'active', label: 'Ativas', count: statusCounts.active, icon: CheckCircle2, color: 'text-green-600 bg-green-500/10' },
-    { key: 'trialing', label: 'Em Trial', count: statusCounts.trialing, icon: Clock, color: 'text-blue-600 bg-blue-500/10' },
-    { key: 'trial_expired', label: 'Trial Expirado', count: statusCounts.trial_expired, icon: AlertTriangle, color: 'text-red-600 bg-red-500/10' },
     { key: 'past_due', label: 'Pgto Pendente', count: statusCounts.past_due, icon: AlertTriangle, color: 'text-orange-600 bg-orange-500/10' },
     { key: 'canceled', label: 'Canceladas', count: statusCounts.canceled, icon: XCircle, color: 'text-gray-600 bg-gray-500/10' },
     { key: 'suspended', label: 'Suspensas', count: statusCounts.suspended, icon: Ban, color: 'text-red-700 bg-red-700/10' },
@@ -175,7 +156,7 @@ export function AgenciesTable() {
                   <TableHead>Status Financeiro</TableHead>
                   <TableHead>Situação</TableHead>
                   <TableHead>Valor Mensal</TableHead>
-                  <TableHead>Plano</TableHead>
+                  
                   <TableHead>Usuários</TableHead>
                   <TableHead>Clientes</TableHead>
                   <TableHead>Criada em</TableHead>
@@ -190,7 +171,7 @@ export function AgenciesTable() {
                     <TableCell>{getFinancialBadge(agency)}</TableCell>
                     <TableCell>{getSituationText(agency)}</TableCell>
                     <TableCell>{formatCurrency(Number(agency.price_monthly || 0))}</TableCell>
-                    <TableCell>{agency.plan_name || 'Sem plano'}</TableCell>
+                    
                     <TableCell>{agency.user_count}</TableCell>
                     <TableCell>{agency.client_count}</TableCell>
                     <TableCell>{formatDate(agency.created_at)}</TableCell>
