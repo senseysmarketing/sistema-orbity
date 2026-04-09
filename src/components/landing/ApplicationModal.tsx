@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,7 +108,18 @@ export function ApplicationModal({ open, onOpenChange }: ApplicationModalProps) 
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="whatsapp">WhatsApp</Label>
-                    <Input id="whatsapp" placeholder="(00) 00000-0000" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
+                    <div className="flex gap-2">
+                      <div className="flex items-center px-3 rounded-md border border-input bg-muted text-sm text-muted-foreground shrink-0">
+                        +55
+                      </div>
+                      <Input
+                        id="whatsapp"
+                        placeholder="(00) 00000-0000"
+                        value={whatsapp}
+                        onChange={(e) => setWhatsapp(formatPhoneBR(e.target.value))}
+                        maxLength={15}
+                      />
+                    </div>
                   </div>
                 </div>
                 <Button className="w-full mt-6 bg-[#1c102f] hover:bg-[#1c102f]/90 text-white" disabled={!isStep1Valid} onClick={nextStep}>
