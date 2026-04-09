@@ -40,7 +40,7 @@ export function DemoAgendaView() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Crie sua conta grátis para agendar reuniões</p>
+              <p>Solicite acesso para agendar reuniões</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -123,7 +123,7 @@ export function DemoAgendaView() {
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Crie sua conta para gerenciar reuniões</p>
+                    <p>Solicite acesso para gerenciar reuniões</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

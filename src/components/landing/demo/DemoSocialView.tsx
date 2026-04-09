@@ -62,7 +62,7 @@ export function DemoSocialView() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Crie sua conta grátis para criar posts</p>
+              <p>Solicite acesso para criar posts</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -132,7 +132,7 @@ export function DemoSocialView() {
                 </Card>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Crie sua conta para editar este post</p>
+                <p>Solicite acesso para editar este post</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

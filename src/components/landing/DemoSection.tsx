@@ -4,8 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DemoCarousel } from "./DemoCarousel";
 
-export function DemoSection() {
-  const navigate = useNavigate();
+export function DemoSection({ onOpenApplication }: { onOpenApplication?: () => void }) {
 
   return (
     <section className="py-20 px-4 bg-gradient-to-b from-background via-[#1c102f]/5 to-background">
@@ -71,9 +70,9 @@ export function DemoSection() {
           <Button 
             size="lg" 
             className="bg-[#1c102f] hover:bg-[#1c102f]/90 text-white gap-2"
-            onClick={() => navigate("/onboarding")}
+            onClick={onOpenApplication}
           >
-            Começar Teste Grátis de 7 Dias
+            Agende uma Demonstração
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
