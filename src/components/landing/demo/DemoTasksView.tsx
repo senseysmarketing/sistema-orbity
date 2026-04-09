@@ -56,7 +56,7 @@ export function DemoTasksView() {
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Crie sua conta para gerenciar tarefas</p>
+                <p>Solicite acesso para gerenciar tarefas</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -81,7 +81,7 @@ export function DemoTasksView() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Crie sua conta grátis para adicionar tarefas</p>
+              <p>Solicite acesso para adicionar tarefas</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

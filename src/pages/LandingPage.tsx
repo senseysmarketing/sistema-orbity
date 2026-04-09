@@ -53,9 +53,9 @@ export default function LandingPage() {
     <div className="min-h-screen bg-background">
       <HeroSection onOpenApplication={openApplication} />
       <ProblemSection />
-      <FeaturesGrid />
+      <FeaturesGrid onOpenApplication={openApplication} />
       <AIFeaturesSection />
-      <DemoSection />
+      <DemoSection onOpenApplication={openApplication} />
       <IntegrationsSection />
       <DifferentialsSection />
       <TestimonialsSection />

@@ -9,7 +9,7 @@ import {
   BarChart3,
   ArrowRight,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+
 import { motion } from "framer-motion";
 
 const features = [
@@ -53,8 +53,7 @@ const features = [
   },
 ];
 
-export function FeaturesGrid() {
-  const navigate = useNavigate();
+export function FeaturesGrid({ onOpenApplication }: { onOpenApplication?: () => void }) {
 
   return (
     <section className="py-20">
@@ -102,14 +101,11 @@ export function FeaturesGrid() {
           <Button
             size="lg"
             className="bg-[#1c102f] hover:bg-[#1c102f]/90 text-white"
-            onClick={() => navigate("/onboarding")}
+            onClick={onOpenApplication}
           >
-            Experimente Todas as Funções
+            Quero Conhecer o Orbity
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
-          <p className="text-sm text-muted-foreground mt-3">
-            7 dias grátis, sem cartão de crédito
-          </p>
         </motion.div>
       </div>
     </section>

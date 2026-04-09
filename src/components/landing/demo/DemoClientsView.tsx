@@ -22,7 +22,7 @@ export function DemoClientsView() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Crie sua conta grátis para adicionar clientes</p>
+              <p>Solicite acesso para adicionar clientes</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -72,7 +72,7 @@ export function DemoClientsView() {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Crie sua conta para ver detalhes</p>
+                      <p>Solicite acesso para ver detalhes</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -84,7 +84,7 @@ export function DemoClientsView() {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Crie sua conta para gerenciar tarefas</p>
+                      <p>Solicite acesso para gerenciar tarefas</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

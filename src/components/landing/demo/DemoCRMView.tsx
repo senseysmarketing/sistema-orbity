@@ -24,7 +24,7 @@ export function DemoCRMView() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Crie sua conta grátis para adicionar leads</p>
+              <p>Solicite acesso para adicionar leads</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -82,7 +82,7 @@ export function DemoCRMView() {
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Crie sua conta para gerenciar este lead</p>
+                      <p>Solicite acesso para gerenciar este lead</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
