@@ -1,8 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, CreditCard, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react';
+import { CreditCard, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useAgency } from '@/hooks/useAgency';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -14,6 +15,7 @@ export function SubscriptionDetails() {
     checkSubscription, 
     openCustomerPortal 
   } = useSubscription();
+  const { currentAgency } = useAgency();
 
   if (loading) {
     return (
@@ -36,11 +38,14 @@ export function SubscriptionDetails() {
     return format(new Date(dateString), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
   };
 
+  const formatCurrency = (value?: number | null) => {
+    if (!value) return null;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'active': return 'bg-green-500';
-      case 'trial': return 'bg-blue-500';
-      case 'trialing': return 'bg-blue-500';
       case 'past_due': return 'bg-yellow-500';
       case 'canceled': return 'bg-red-500';
       default: return 'bg-gray-500';
@@ -50,21 +55,14 @@ export function SubscriptionDetails() {
   const getStatusText = (status?: string) => {
     switch (status) {
       case 'active': return 'Ativo';
-      case 'trial': return 'Período de Teste';
-      case 'trialing': return 'Período de Teste';
       case 'past_due': return 'Pagamento Pendente';
       case 'canceled': return 'Cancelado';
       default: return 'Inativo';
     }
   };
 
-  const isTrialActive = (currentSubscription?.subscription_status === 'trial' || 
-    currentSubscription?.subscription_status === 'trialing') && 
-    currentSubscription?.trial_end && 
-    new Date(currentSubscription.trial_end) > new Date();
-
   const isSubscriptionActive = currentSubscription?.subscribed && 
-    ['active', 'trial', 'trialing'].includes(currentSubscription?.subscription_status || '');
+    currentSubscription?.subscription_status === 'active';
 
   return (
     <Card>
@@ -84,15 +82,15 @@ export function SubscriptionDetails() {
           </Button>
         </div>
         <CardDescription>
-          Informações sobre seu plano atual
+          Informações sobre sua assinatura
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-3">
           <div className="flex items-center justify-between pb-3 border-b">
-            <span className="text-sm font-medium text-muted-foreground">Plano Atual</span>
+            <span className="text-sm font-medium text-muted-foreground">Assinatura</span>
             <span className="font-semibold text-lg">
-              {currentSubscription?.plan_name || 'Nenhum plano'}
+              {currentSubscription?.plan_name || 'Nenhuma assinatura'}
             </span>
           </div>
 
@@ -103,23 +101,16 @@ export function SubscriptionDetails() {
             </Badge>
           </div>
 
-          {isTrialActive && currentSubscription?.trial_end && (
-            <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-              <div className="flex items-start gap-2">
-                <CalendarDays className="h-4 w-4 text-blue-600 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                    Período de Teste Ativo
-                  </p>
-                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                    Expira em {formatDate(currentSubscription.trial_end)}
-                  </p>
-                </div>
-              </div>
+          {currentAgency?.monthly_value && (
+            <div className="flex items-center justify-between pb-3 border-b">
+              <span className="text-sm font-medium text-muted-foreground">Valor Mensal</span>
+              <span className="font-semibold text-lg">
+                {formatCurrency(currentAgency.monthly_value)}
+              </span>
             </div>
           )}
 
-          {isSubscriptionActive && currentSubscription?.subscription_end && !isTrialActive && (
+          {isSubscriptionActive && currentSubscription?.subscription_end && (
             <div className="flex items-center justify-between pb-3 border-b">
               <span className="text-sm font-medium text-muted-foreground">Próxima Cobrança</span>
               <span className="text-sm font-medium">
@@ -147,7 +138,7 @@ export function SubscriptionDetails() {
             <div className="flex items-start gap-2">
               <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
               <p className="text-sm text-muted-foreground">
-                Nenhum plano ativo. Entre em contato com a equipe comercial para ativar sua conta.
+                Nenhuma assinatura ativa. Entre em contato com a equipe comercial para ativar sua conta.
               </p>
             </div>
           </div>

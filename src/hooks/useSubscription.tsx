@@ -30,7 +30,6 @@ interface SubscriptionStatus {
   subscription_status?: string;
   plan_name?: string;
   price_id?: string;
-  trial_end?: string;
   subscription_end?: string;
   customer_id?: string;
   subscription_id?: string;

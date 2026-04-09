@@ -150,10 +150,9 @@ serve(async (req) => {
       stripe_customer_id: customerId,
       stripe_subscription_id: activeSubscription.id,
       stripe_price_id: priceId,
-      status: activeSubscription.status === 'trialing' ? 'trial' : 'active',
+      status: 'active',
       current_period_start: periodStart,
       current_period_end: subscriptionEnd,
-      trial_end: trialEnd,
       billing_cycle: 'monthly',
       updated_at: new Date().toISOString()
     };
@@ -240,18 +239,14 @@ async function returnLocalSubscription(supabaseClient: any, agencyId: string) {
 
   if (localSubscription && localSubscription.subscription_plans) {
     const plan = localSubscription.subscription_plans;
-    const isValidTrial = localSubscription.status === 'trial' && 
-      localSubscription.trial_end &&
-      new Date(localSubscription.trial_end) > new Date();
     const isActive = localSubscription.status === 'active';
 
-    logStep("Local subscription found", { status: localSubscription.status, isActive, isValidTrial });
+    logStep("Local subscription found", { status: localSubscription.status, isActive });
 
     return new Response(JSON.stringify({
-      subscribed: isActive || isValidTrial,
+      subscribed: isActive,
       subscription_status: localSubscription.status,
       plan_name: plan.name,
-      trial_end: localSubscription.trial_end,
       subscription_end: localSubscription.current_period_end,
       customer_id: localSubscription.stripe_customer_id,
       subscription_id: localSubscription.stripe_subscription_id,
