@@ -8,6 +8,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Loader2, CheckCircle2, Sparkles } from "lucide-react";
 
+function formatPhoneBR(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function rawPhone(formatted: string): string {
+  return "55" + formatted.replace(/\D/g, "");
+}
+
 interface ApplicationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -97,7 +108,18 @@ export function ApplicationModal({ open, onOpenChange }: ApplicationModalProps) 
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="whatsapp">WhatsApp</Label>
-                    <Input id="whatsapp" placeholder="(00) 00000-0000" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
+                    <div className="flex gap-2">
+                      <div className="flex items-center px-3 rounded-md border border-input bg-muted text-sm text-muted-foreground shrink-0">
+                        +55
+                      </div>
+                      <Input
+                        id="whatsapp"
+                        placeholder="(00) 00000-0000"
+                        value={whatsapp}
+                        onChange={(e) => setWhatsapp(formatPhoneBR(e.target.value))}
+                        maxLength={15}
+                      />
+                    </div>
                   </div>
                 </div>
                 <Button className="w-full mt-6 bg-[#1c102f] hover:bg-[#1c102f]/90 text-white" disabled={!isStep1Valid} onClick={nextStep}>
