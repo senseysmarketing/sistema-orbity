@@ -4,7 +4,7 @@ import { useMaster } from '@/hooks/useMaster';
 import { useAgency } from '@/hooks/useAgency';
 import { MasterMetricsCards } from '@/components/master/MasterMetricsCards';
 import { AgenciesTable } from '@/components/master/AgenciesTable';
-import { SubscriptionPlansManager } from '@/components/master/SubscriptionPlansManager';
+
 import { MasterAnalytics } from '@/components/master/MasterAnalytics';
 import { OrbityLeadsTable } from '@/components/master/OrbityLeadsTable';
 import { CreateAgencyDialog } from '@/components/master/CreateAgencyDialog';
@@ -36,21 +36,16 @@ export default function Master() {
   if (!hasAccess) return null;
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Gauge className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Painel de Controle</h1>
-            <p className="text-muted-foreground">Controle total sobre todas as agências do sistema</p>
-          </div>
-        </div>
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Painel de Controle</h1>
+        <p className="text-muted-foreground text-sm md:text-base">Controle total sobre todas as agências do sistema</p>
       </div>
 
       <MasterMetricsCards />
 
       <Tabs defaultValue="agencies" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="agencies" className="flex items-center space-x-2">
             <Building2 className="h-4 w-4" />
             <span>Agências</span>
@@ -62,10 +57,6 @@ export default function Master() {
           <TabsTrigger value="analytics" className="flex items-center space-x-2">
             <BarChart3 className="h-4 w-4" />
             <span>Analytics</span>
-          </TabsTrigger>
-          <TabsTrigger value="plans" className="flex items-center space-x-2">
-            <Settings className="h-4 w-4" />
-            <span>Planos</span>
           </TabsTrigger>
           <TabsTrigger value="system" className="flex items-center space-x-2">
             <Settings className="h-4 w-4" />
@@ -86,10 +77,6 @@ export default function Master() {
 
         <TabsContent value="analytics" className="space-y-6">
           <MasterAnalytics />
-        </TabsContent>
-
-        <TabsContent value="plans" className="space-y-6">
-          <SubscriptionPlansManager />
         </TabsContent>
 
         <TabsContent value="system" className="space-y-6">
