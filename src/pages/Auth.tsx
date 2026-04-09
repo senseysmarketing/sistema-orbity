@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
-import { Loader2, Building2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import orbityLogo from "@/assets/orbity-logo.png";
 import authBackground from "@/assets/auth-background-new.png";
 export default function Auth() {
@@ -93,23 +93,14 @@ export default function Auth() {
           </CardContent>
         </Card>
 
-        {/* Onboarding CTA */}
-        <div className="text-center space-y-4">
-          <div className="flex items-center justify-center space-x-2 text-sm text-white">
-            <span>Ainda não tem uma agência?</span>
-          </div>
-          <Button
-            asChild
-            variant="outline"
-            className="w-full bg-white/20 hover:bg-white/30 border-white/30 text-white hover:text-white backdrop-blur-sm"
-          >
-            <Link to="/onboarding" className="flex items-center space-x-2">
-              <Building2 className="h-4 w-4" />
-              <span>Criar Nova Agência</span>
-              <Sparkles className="h-4 w-4" />
-            </Link>
-          </Button>
-          <p className="text-xs text-white/80">🚀 Setup automático • 7 dias grátis • Sem cartão de crédito</p>
+        {/* Demo CTA */}
+        <div className="text-center">
+          <p className="text-sm text-white/80">
+            Ainda não utiliza o Orbity?{" "}
+            <a href="#demo" className="text-white underline underline-offset-2 hover:text-white/90 font-medium">
+              Agende uma demonstração
+            </a>
+          </p>
         </div>
 
         <div className="text-center space-y-1">

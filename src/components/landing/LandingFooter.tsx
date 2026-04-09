@@ -20,7 +20,6 @@ export function LandingFooter() {
             <div className="flex flex-col space-y-2">
               <button onClick={() => navigate("/lp")} className="text-muted-foreground hover:text-foreground text-left transition-colors">Início</button>
               <button onClick={() => navigate("/lp#features")} className="text-muted-foreground hover:text-foreground text-left transition-colors">Funcionalidades</button>
-              <button onClick={() => navigate("/lp#pricing")} className="text-muted-foreground hover:text-foreground text-left transition-colors">Preços</button>
             </div>
           </div>
           <div className="space-y-4">

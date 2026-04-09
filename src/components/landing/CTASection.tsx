@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 import { ArrowRight, Shield } from "lucide-react";
 
-export function CTASection() {
-  const navigate = useNavigate();
+interface CTASectionProps {
+  onOpenApplication?: () => void;
+}
 
+export function CTASection({ onOpenApplication }: CTASectionProps) {
   return (
     <section className="py-20 bg-gradient-to-br from-[#1c102f] via-primary to-secondary">
       <div className="container mx-auto px-4">
@@ -22,9 +23,9 @@ export function CTASection() {
               size="lg" 
               variant="secondary"
               className="text-lg px-8 py-6 h-auto"
-              onClick={() => navigate("/auth?signup=true")}
+              onClick={onOpenApplication}
             >
-              Começar Teste Grátis de 7 Dias
+              Aplicar para Consultoria
               <ArrowRight className="ml-2" />
             </Button>
           </div>
@@ -32,18 +33,18 @@ export function CTASection() {
           <div className="flex items-center justify-center gap-2 pt-4">
             <Shield className="w-5 h-5 text-primary-foreground/80" />
             <p className="text-primary-foreground/80">
-              Não precisa cartão de crédito • Cancele quando quiser
+              Consultoria personalizada • Implantação assistida
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12 max-w-3xl mx-auto">
             <div className="text-primary-foreground/90">
-              <div className="text-3xl font-bold mb-2">7 dias</div>
-              <div className="text-sm">Teste grátis</div>
-            </div>
-            <div className="text-primary-foreground/90">
               <div className="text-3xl font-bold mb-2">100+</div>
               <div className="text-sm">Agências ativas</div>
+            </div>
+            <div className="text-primary-foreground/90">
+              <div className="text-3xl font-bold mb-2">Sob Medida</div>
+              <div className="text-sm">Consultoria personalizada</div>
             </div>
             <div className="text-primary-foreground/90">
               <div className="text-3xl font-bold mb-2">4.9/5</div>
