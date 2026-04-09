@@ -40,6 +40,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Install from "./pages/Install";
 import NotificationSettings from "./pages/NotificationSettings";
 import Goals from "./pages/Goals";
+import RegisterByInvite from "./pages/RegisterByInvite";
 
 
 const queryClient = new QueryClient({
@@ -91,6 +92,7 @@ const App = () => (
                         <Route path="/install" element={<Install />} />
                         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                         <Route path="/onboarding" element={<Onboarding />} />
+                        <Route path="/register" element={<RegisterByInvite />} />
                         <Route path="/welcome" element={<Welcome />} />
                         <Route path="/subscription-success" element={<SubscriptionSuccess />} />
                         <Route path="/subscription-canceled" element={<SubscriptionCanceled />} />

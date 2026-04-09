@@ -287,6 +287,61 @@ export type Database = {
           },
         ]
       }
+      agency_invites: {
+        Row: {
+          agency_id: string
+          created_at: string | null
+          email: string
+          expires_at: string | null
+          id: string
+          owner_name: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string | null
+          email: string
+          expires_at?: string | null
+          id?: string
+          owner_name: string
+          token?: string
+          used_at?: string | null
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string | null
+          email?: string
+          expires_at?: string | null
+          id?: string
+          owner_name?: string
+          token?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_invites_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_invites_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "agency_invites_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       agency_notification_rules: {
         Row: {
           agency_id: string
