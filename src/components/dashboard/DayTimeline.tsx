@@ -191,17 +191,39 @@ export function DayTimeline() {
     const taskItems: TimelineItem[] = allTasks.map((t: any) => buildTaskItem(t, false));
     const requestedTaskItems: TimelineItem[] = createdOnlyTasks.map((t: any) => buildTaskItem(t, true));
 
+    // Build timeline items from meetings (filter by user participation)
+    const userMeetings = ((meetingsRes.data || []) as any[]).filter((m: any) =>
+      m.organizer_id === profile.user_id ||
+      (Array.isArray(m.participants) && m.participants.includes(profile.user_id))
+    );
+
+    const meetingItems: TimelineItem[] = userMeetings.map((m: any) => {
+      const startTime = format(new Date(m.start_time), 'HH:mm');
+      const endTime = m.end_time ? format(new Date(m.end_time), 'HH:mm') : undefined;
+      return {
+        id: `meeting-${m.id}`,
+        time: startTime,
+        source: 'meeting' as const,
+        itemTitle: m.title,
+        itemClientName: m.clients?.name,
+        itemStatus: m.status,
+        meetingEndTime: endTime,
+        meetingLocation: m.location || (m.google_meet_link ? 'Google Meet' : undefined),
+      };
+    });
+
     // Merge and sort chronologically
     const merged = [
       ...routineItems,
+      ...meetingItems,
       ...taskItems,
       ...requestedTaskItems,
       ...notifItems,
     ].sort((a, b) => {
       if (a.time < b.time) return -1;
       if (a.time > b.time) return 1;
-      const priority = { routine: 0, task: 1, post: 2, notification: 3 };
-      return (priority[a.source] || 3) - (priority[b.source] || 3);
+      const priority = { routine: 0, meeting: 1, task: 2, post: 3, notification: 4 };
+      return (priority[a.source] || 4) - (priority[b.source] || 4);
     });
 
     setItems(merged);
