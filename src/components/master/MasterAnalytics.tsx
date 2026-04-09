@@ -9,7 +9,7 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { 
   TrendingUp, 
-  TrendingDown, 
+   
   Users, 
   Target, 
   DollarSign, 
