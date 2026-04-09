@@ -24,7 +24,7 @@ type RoutineStatus = 'pending' | 'late' | 'done';
 interface TimelineItem {
   id: string;
   time: string;
-  source: 'notification' | 'routine' | 'task' | 'post';
+  source: 'notification' | 'routine' | 'task' | 'post' | 'meeting';
   notif?: TimelineEvent;
   routine?: Routine;
   routineStatus?: RoutineStatus;
@@ -32,6 +32,8 @@ interface TimelineItem {
   itemStatus?: string;
   itemClientName?: string;
   isRequested?: boolean;
+  meetingEndTime?: string;
+  meetingLocation?: string;
 }
 
 const notifTypeConfig: Record<string, { icon: React.ReactNode; color: string }> = {
