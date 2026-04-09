@@ -92,7 +92,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
       ]);
 
       if (agenciesResult.error) throw agenciesResult.error;
-      setAgencies((agenciesResult.data || []) as MasterAgencyOverview[]);
+      setAgencies((agenciesResult.data || []) as unknown as MasterAgencyOverview[]);
 
       if (billingResult.data) {
         setBillingMetrics(billingResult.data as BillingMetrics);
