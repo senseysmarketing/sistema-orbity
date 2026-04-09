@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { ProblemSection } from "@/components/landing/ProblemSection";
 import { FeaturesGrid } from "@/components/landing/FeaturesGrid";
+import { AIFeaturesSection } from "@/components/landing/AIFeaturesSection";
 import { DemoSection } from "@/components/landing/DemoSection";
 import { IntegrationsSection } from "@/components/landing/IntegrationsSection";
 import { DifferentialsSection } from "@/components/landing/DifferentialsSection";
@@ -53,6 +54,7 @@ export default function LandingPage() {
       <HeroSection onOpenApplication={openApplication} />
       <ProblemSection />
       <FeaturesGrid />
+      <AIFeaturesSection />
       <DemoSection />
       <IntegrationsSection />
       <DifferentialsSection />
