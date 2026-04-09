@@ -43,7 +43,7 @@ export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
     currentSubscription.subscription_status === 'pending_payment';
 
   // Inadimplente: had subscription but payment failed
-  const isOverdue = currentSubscription?.subscription_status === 'past_due';
+  const _isOverdue = currentSubscription?.subscription_status === 'past_due';
 
   const hasMonthlyValue = currentAgency?.monthly_value && currentAgency.monthly_value > 0;
 
