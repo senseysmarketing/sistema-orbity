@@ -102,7 +102,7 @@ export function DayTimeline() {
     const assignedTasksRes = myTaskIds.length > 0
       ? await supabase
           .from('tasks')
-          .select('id, title, status, due_date, task_type, metadata, clients(name)')
+          .select('id, title, status, due_date, task_type, clients(name)')
           .eq('agency_id', currentAgency.id)
           .eq('archived', false)
           .gte('due_date', `${todayStr}T00:00:00`)
@@ -112,12 +112,21 @@ export function DayTimeline() {
 
     const createdTasksRes = await supabase
       .from('tasks')
-      .select('id, title, status, due_date, task_type, metadata, clients(name)')
+      .select('id, title, status, due_date, task_type, clients(name)')
       .eq('agency_id', currentAgency.id)
       .eq('created_by', profile.user_id)
       .eq('archived', false)
       .gte('due_date', `${todayStr}T00:00:00`)
       .lte('due_date', `${todayStr}T23:59:59`);
+
+    // Fetch meetings for today
+    const meetingsRes = await supabase
+      .from('meetings')
+      .select('id, title, start_time, end_time, status, location, google_meet_link, organizer_id, participants, clients(name)')
+      .eq('agency_id', currentAgency.id)
+      .gte('start_time', `${todayStr}T00:00:00`)
+      .lte('start_time', `${todayStr}T23:59:59`)
+      .neq('status', 'cancelled');
 
     // Merge and deduplicate tasks
     const allTasks = [...(assignedTasksRes.data || [])];
