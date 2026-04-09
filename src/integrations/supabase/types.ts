@@ -181,6 +181,7 @@ export type Database = {
           max_leads: number
           max_tasks: number
           max_users: number
+          monthly_value: number | null
           name: string
           slug: string
           subscription_expires_at: string | null
@@ -200,6 +201,7 @@ export type Database = {
           max_leads?: number
           max_tasks?: number
           max_users?: number
+          monthly_value?: number | null
           name: string
           slug: string
           subscription_expires_at?: string | null
@@ -219,6 +221,7 @@ export type Database = {
           max_leads?: number
           max_tasks?: number
           max_users?: number
+          monthly_value?: number | null
           name?: string
           slug?: string
           subscription_expires_at?: string | null
@@ -3810,6 +3813,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      orbity_leads: {
+        Row: {
+          active_clients: string | null
+          avg_ticket: string | null
+          created_at: string | null
+          email: string
+          id: string
+          instagram: string | null
+          name: string
+          notes: string | null
+          status: string
+          team_size: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          active_clients?: string | null
+          avg_ticket?: string | null
+          created_at?: string | null
+          email: string
+          id?: string
+          instagram?: string | null
+          name: string
+          notes?: string | null
+          status?: string
+          team_size?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          active_clients?: string | null
+          avg_ticket?: string | null
+          created_at?: string | null
+          email?: string
+          id?: string
+          instagram?: string | null
+          name?: string
+          notes?: string | null
+          status?: string
+          team_size?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
       }
       post_assignments_deprecated: {
         Row: {

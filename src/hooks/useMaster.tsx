@@ -25,6 +25,7 @@ interface MasterAgencyOverview {
   billing_cycle: string | null;
   price_monthly: number | null;
   price_yearly: number | null;
+  monthly_value: number | null;
 }
 
 interface BillingMetrics {
@@ -91,7 +92,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
       ]);
 
       if (agenciesResult.error) throw agenciesResult.error;
-      setAgencies((agenciesResult.data || []) as MasterAgencyOverview[]);
+      setAgencies((agenciesResult.data || []) as unknown as MasterAgencyOverview[]);
 
       if (billingResult.data) {
         setBillingMetrics(billingResult.data as BillingMetrics);

@@ -44,14 +44,14 @@ export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
             <p className="text-red-700">
               {isTrialExpired 
                 ? 'Seu período de trial expirou. Entre em contato com nossa equipe comercial para ativar sua assinatura.'
-                : 'Sua agência foi suspensa. Entre em contato com nossa equipe para regularizar o acesso.'
+                : 'Acesso suspenso. Detectamos uma pendência financeira superior a 5 dias. Por favor, regularize o pagamento para restabelecer o acesso.'
               }
             </p>
             
             <div className="space-y-3">
               <div className="space-y-2">
                 <Button 
-                  onClick={() => window.open('https://wa.me/5500000000000', '_blank')}
+                  onClick={() => window.open('https://wa.me/5511999999999?text=Olá, preciso regularizar o acesso da minha agência.', '_blank')}
                   className="w-full bg-green-600 hover:bg-green-700"
                 >
                   <MessageCircle className="mr-2 h-4 w-4" />

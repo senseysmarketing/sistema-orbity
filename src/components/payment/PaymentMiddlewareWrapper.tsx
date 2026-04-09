@@ -49,8 +49,16 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
   const subscriptionActive = !!(currentSubscription?.subscribed &&
     ['active', 'trial', 'trialing', 'past_due'].includes(currentSubscription?.subscription_status || ''));
 
-  // Block access if trial expired or subscription is not active AND subscription context doesn't show active
-  const isBlocked = !paymentStatus?.isValid && !isSuperAdmin && !subscriptionActive;
+  // Check if agency is suspended (is_active === false)
+  const agencySuspended = currentAgency?.is_active === false;
+
+  // Check if past_due > 5 days (inadimplente)
+  const isPastDueBlocked = currentSubscription?.subscription_status === 'past_due' &&
+    currentSubscription?.subscription_end &&
+    (new Date().getTime() - new Date(currentSubscription.subscription_end).getTime()) / (1000 * 60 * 60 * 24) > 5;
+
+  // Block access if: agency suspended, past_due > 5 days, or trial expired without valid subscription
+  const isBlocked = agencySuspended || isPastDueBlocked || (!paymentStatus?.isValid && !isSuperAdmin && !subscriptionActive);
   
   if (isBlocked) {
     return <BlockedAccessScreen />;
