@@ -1,85 +1,101 @@
 
-# Link Personalizado de Onboarding para Novas Agencias
 
-## Fluxo Completo
+# Stripe com Valor Personalizado por Agencia
+
+## Situacao Atual
+- O `CreateAgencyDialog` ja salva `monthly_value` na tabela `agencies`
+- O `create-checkout` usa um `priceId` fixo (de planos pre-definidos na tabela `subscription_plans`)
+- O `check-subscription` busca por email no Stripe e sincroniza com `agency_subscriptions` local
+- Nao existe webhook do Stripe
+
+## Problema
+O modelo atual usa precos fixos do Stripe (`price_abc123`). Com valores negociados por agencia, cada agencia precisa de um preco Stripe unico.
+
+## Solucao: Preco Dinamico no Stripe
+
+Sim, e perfeitamente possivel. O Stripe suporta criar precos (Prices) on-the-fly via API. O fluxo sera:
 
 ```text
-Master cadastra agencia (nome, email, whatsapp, valor)
+Master cadastra agencia com valor negociado (ex: R$ 1.497)
         │
         ▼
-Sistema cria agencia (sem usuario) + gera token unico
+Dono registra via link de convite → Faz login
         │
         ▼
-Master recebe link copiavel: /register?token=abc123
+Sistema detecta: sem pagamento ativo → Redireciona para pagamento
         │
         ▼
-Master envia link manualmente (WhatsApp, email, etc)
+Edge function cria Product + Price no Stripe com o valor da agencia
         │
         ▼
-Dono da agencia clica no link → Tela de Registro
-  - Campos pre-preenchidos: nome da agencia, email
-  - Preenche: senha, confirmar senha, telefone (se quiser)
+Checkout session criada → Dono paga
         │
         ▼
-Conta criada → Redireciona para /auth (login)
-        │
-        ▼
-Apos login, detecta que e primeiro acesso sem pagamento
-  → Exibe tela/modal pedindo para realizar pagamento Stripe
-        │
-        ▼
-Completa pagamento → Acesso liberado ao dashboard
+check-subscription detecta pagamento → Sincroniza localmente
 ```
-
-## Banco de Dados
-
-### Tabela `agency_invites`
-```sql
-CREATE TABLE public.agency_invites (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agency_id UUID REFERENCES agencies(id) ON DELETE CASCADE NOT NULL,
-  email TEXT NOT NULL,
-  owner_name TEXT NOT NULL,
-  token TEXT UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(32), 'hex'),
-  used_at TIMESTAMPTZ,
-  expires_at TIMESTAMPTZ DEFAULT now() + INTERVAL '7 days',
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-- RLS: master admins podem ler/criar; anon pode SELECT por token (para a pagina de registro)
-
-## Arquivos a Criar
-
-### 1. `src/pages/RegisterByInvite.tsx`
-- Rota: `/register?token=xxx`
-- Ao montar, busca dados do invite pelo token (agency name, email, owner name)
-- Exibe formulario com campos pre-preenchidos (email readonly) + campo de senha
-- Ao submeter: chama edge function que cria o usuario, associa a agencia, e marca o invite como usado
-- Redireciona para `/auth` com toast "Conta criada! Faca login"
-
-### 2. `supabase/functions/complete-invite/index.ts`
-- Recebe: token, password, phone (opcional)
-- Valida token (existe, nao usado, nao expirado)
-- Cria usuario via `auth.admin.createUser` com email do invite
-- Associa usuario a agencia via `agency_users`
-- Marca invite como usado (`used_at = now()`)
-- Retorna sucesso
 
 ## Arquivos a Modificar
 
-### 3. `src/components/master/CreateAgencyDialog.tsx`
-- Remover chamada a `agency-onboarding` edge function
-- Nova logica: criar agencia diretamente + inserir registro em `agency_invites`
-- Apos criar, exibir o link copiavel em um dialog de sucesso com botao "Copiar Link"
-- Toast: "Agencia criada! Envie o link de cadastro para o responsavel"
+### 1. `supabase/functions/create-checkout/index.ts`
+- Aceitar `agencyId` no body (alem de ou ao inves de `priceId`)
+- Se `agencyId` fornecido e sem `priceId`:
+  - Buscar `monthly_value` da agencia
+  - Criar um Stripe Product (ou reusar existente via metadata `agency_id`)
+  - Criar um Stripe Price recorrente mensal com o valor
+  - Salvar `stripe_price_id` e `stripe_product_id` na tabela `agencies` (novas colunas)
+  - Usar esse priceId no checkout
+- Manter compatibilidade com `priceId` fixo para fluxos antigos
 
-### 4. `src/App.tsx`
-- Adicionar rota `/register` apontando para `RegisterByInvite`
+### 2. `supabase/functions/check-subscription/index.ts`
+- Apos sincronizar subscription, tambem atualizar `stripe_customer_id` e `stripe_subscription_id` na tabela `agencies` para referencia futura
+- Logica ja funciona: busca por email → encontra subscription → sincroniza. Sem mudancas grandes.
 
-### 5. `src/components/payment/PaymentMiddlewareWrapper.tsx`
-- Adicionar checagem: se usuario logado nao tem pagamento ativo e e primeiro acesso, exibir tela de pagamento obrigatorio (Stripe checkout) ao inves de bloquear
+### 3. `src/components/payment/PaymentMiddlewareWrapper.tsx`
+- Adicionar bypass para rota `/register`
+- Quando usuario logado sem subscription ativa e nao e master: ao inves de bloquear, redirecionar para uma tela de pagamento obrigatorio
 
-## Resultado
-- Zero senha temporaria, zero email automatico
-- Master copia e envia o link pelo canal que preferir
-- Dono da agencia tem experiencia fluida: registra, loga, paga, usa
+### 4. `src/components/payment/BlockedAccessScreen.tsx`
+- Adicionar botao "Realizar Pagamento" que chama `create-checkout` passando o `agencyId` do usuario
+- Diferenciar entre: (a) primeiro acesso sem pagamento → mostrar botao de pagar, (b) inadimplente → mostrar mensagem atual
+
+### 5. `src/hooks/useSubscription.tsx`
+- Atualizar `createCheckout` para aceitar `agencyId` como alternativa a `priceId`
+
+### 6. Migration SQL
+```sql
+ALTER TABLE public.agencies
+  ADD COLUMN IF NOT EXISTS stripe_product_id TEXT,
+  ADD COLUMN IF NOT EXISTS stripe_price_id TEXT,
+  ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+```
+
+## Detalhes Tecnicos
+
+### Criacao de Preco Dinamico no `create-checkout`:
+```ts
+// Buscar ou criar produto
+let product;
+const existingProducts = await stripe.products.search({
+  query: `metadata['agency_id']:'${agencyId}'`
+});
+if (existingProducts.data.length > 0) {
+  product = existingProducts.data[0];
+} else {
+  product = await stripe.products.create({
+    name: `Assinatura - ${agencyName}`,
+    metadata: { agency_id: agencyId }
+  });
+}
+
+// Criar preco recorrente
+const price = await stripe.prices.create({
+  product: product.id,
+  unit_amount: monthlyValue * 100, // centavos
+  currency: 'brl',
+  recurring: { interval: 'month' }
+});
+```
+
+### Fluxo de Primeiro Acesso
+O `PaymentMiddlewareWrapper` detecta `subscription_status === 'none'` ou `pending_payment` e exibe a `BlockedAccessScreen` com CTA de pagamento. O botao chama `create-checkout` com o `agencyId`, gerando o checkout personalizado.
+
