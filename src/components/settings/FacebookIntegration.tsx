@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Facebook, LogOut, Loader2, Shield, RefreshCw, Users, Check, Unlink } from "lucide-react";
+import { Facebook, Loader2, Shield, Users, Check, Unlink } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
