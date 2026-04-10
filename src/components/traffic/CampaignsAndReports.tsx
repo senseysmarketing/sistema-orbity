@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { RefreshCw, FileText, TrendingUp, DollarSign, Eye, Target, BarChart, Play, Sparkles, Copy, RotateCcw, Loader2 } from "lucide-react";
+import { RefreshCw, FileText, TrendingUp, DollarSign, Eye, Target, BarChart, Play, Sparkles, Copy, RotateCcw, Loader2, Share2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { toast as sonnerToast } from "sonner";
 import { useAgency } from "@/hooks/useAgency";
 import { DateRange } from "react-day-picker";
 import { ReportGeneratorModal } from "./ReportGeneratorModal";
@@ -84,6 +85,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<Record<string, string>>({});
   const [aiAnalysisLoading, setAiAnalysisLoading] = useState<string | null>(null);
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   
   const { toast } = useToast();
   const { analyzeCampaign } = useAIAssist();
@@ -409,11 +411,67 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
         </div>
 
         <div className="flex gap-2">
-          <Button onClick={() => fetchAllData()} disabled={loading} variant="outline">
+          <Button onClick={() => fetchAllData()} disabled={loading} variant="outline" size="sm">
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
-          <Button onClick={() => setIsReportModalOpen(true)}>
+          <Button 
+            variant="outline" 
+            size="sm"
+            disabled={isGeneratingLink}
+            onClick={async () => {
+              if (!currentAgency?.id) {
+                sonnerToast.error("Selecione uma conta antes de compartilhar.");
+                return;
+              }
+              setIsGeneratingLink(true);
+              try {
+                // Find a client linked to this agency
+                const { data: clients, error: clientsError } = await supabase
+                  .from("clients")
+                  .select("id")
+                  .eq("agency_id", currentAgency.id)
+                  .eq("active", true)
+                  .limit(1);
+
+                if (clientsError || !clients || clients.length === 0) {
+                  sonnerToast.error("Nenhum cliente ativo encontrado. Cadastre um cliente primeiro.");
+                  return;
+                }
+
+                const clientId = clients[0].id;
+                const reportToken = crypto.randomUUID();
+                const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+
+                const { error: updateError } = await supabase
+                  .from("clients")
+                  .update({ report_token: reportToken, report_expires_at: expiresAt })
+                  .eq("id", clientId);
+
+                if (updateError) {
+                  sonnerToast.error("Erro ao gerar link. Tente novamente.");
+                  return;
+                }
+
+                const url = `${window.location.origin}/report/${reportToken}`;
+                await navigator.clipboard.writeText(url);
+                sonnerToast.success("Link seguro gerado! Válido por 48 horas.");
+              } catch (err) {
+                console.error("Erro ao gerar link:", err);
+                sonnerToast.error("Erro ao gerar link.");
+              } finally {
+                setIsGeneratingLink(false);
+              }
+            }}
+          >
+            {isGeneratingLink ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Share2 className="h-4 w-4 mr-2" />
+            )}
+            Compartilhar
+          </Button>
+          <Button onClick={() => setIsReportModalOpen(true)} size="sm">
             <FileText className="h-4 w-4 mr-2" />
             Gerar Relatório
           </Button>

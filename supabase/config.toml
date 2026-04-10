@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.monthly-closure]
 verify_jwt = false
+
+[functions.public-client-report]
+verify_jwt = false
