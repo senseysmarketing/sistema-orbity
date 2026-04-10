@@ -269,6 +269,20 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   const profitability = totalMRR - burnRate;
   const profitabilityMargin = totalMRR > 0 ? (profitability / totalMRR) * 100 : 0;
 
+  // Gateway fees and net revenue from paid payments in month
+  const totalGatewayFees = useMemo(() => {
+    return paymentsInMonth
+      .filter(p => p.status === 'paid')
+      .reduce((sum, p) => sum + (p.gateway_fee || 0), 0);
+  }, [paymentsInMonth]);
+
+  const totalNetRevenue = useMemo(() => {
+    const paidRevenue = paymentsInMonth
+      .filter(p => p.status === 'paid')
+      .reduce((sum, p) => sum + (p.amount_paid || p.amount), 0);
+    return paidRevenue - totalGatewayFees;
+  }, [paymentsInMonth, totalGatewayFees]);
+
   // Delinquency
   const delinquencyRate = useMemo(() => {
     return paymentsInMonth
