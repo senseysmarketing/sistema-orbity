@@ -205,14 +205,32 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
       if (!metricsError && metricsData?.metrics) {
         setMetrics(metricsData.metrics);
         setChartData(metricsData.chartData || []);
+
+        // Populate available actions from aggregated data
+        if (metricsData.metrics.allActions && metricsData.metrics.allActions.length > 0) {
+          setAvailableActions(metricsData.metrics.allActions);
+        }
       } else {
         // Calcular métricas a partir das campanhas
-        const activeCampaigns = campaignsData?.campaigns?.filter((c: Campaign) => c.status === 'ACTIVE') || [];
-        const totalSpend = activeCampaigns.reduce((sum: number, c: Campaign) => sum + c.spend, 0);
-        const totalImpressions = activeCampaigns.reduce((sum: number, c: Campaign) => sum + c.impressions, 0);
-        const totalClicks = activeCampaigns.reduce((sum: number, c: Campaign) => sum + c.clicks, 0);
-        const totalConversions = activeCampaigns.reduce((sum: number, c: Campaign) => sum + c.conversions, 0);
+        const activeCamps = campaignsData?.campaigns?.filter((c: Campaign) => c.status === 'ACTIVE') || [];
+        const totalSpend = activeCamps.reduce((sum: number, c: Campaign) => sum + c.spend, 0);
+        const totalImpressions = activeCamps.reduce((sum: number, c: Campaign) => sum + c.impressions, 0);
+        const totalClicks = activeCamps.reduce((sum: number, c: Campaign) => sum + c.clicks, 0);
+        const totalConversions = activeCamps.reduce((sum: number, c: Campaign) => sum + c.conversions, 0);
         
+        // Aggregate actions from campaigns
+        const actionsMap: Record<string, number> = {};
+        for (const c of activeCamps) {
+          if (c.actions) {
+            for (const a of c.actions) {
+              const key = a.action_type;
+              actionsMap[key] = (actionsMap[key] || 0) + (parseInt(String(a.value)) || 0);
+            }
+          }
+        }
+        const aggActions = Object.entries(actionsMap).map(([action_type, value]) => ({ action_type, value }));
+        setAvailableActions(aggActions);
+
         setMetrics({
           spend: totalSpend,
           impressions: totalImpressions,
@@ -225,6 +243,25 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
 
         // Gerar dados de gráfico mock se não vier da API
         generateMockChartData();
+      }
+
+      // Auto-detect best action type based on campaign objectives
+      if (selectedActionType === '__default__' && fetchedCampaigns.length > 0) {
+        const objectiveCounts: Record<string, number> = {};
+        for (const c of fetchedCampaigns) {
+          objectiveCounts[c.objective] = (objectiveCounts[c.objective] || 0) + 1;
+        }
+        const topObjective = Object.entries(objectiveCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+        
+        if (topObjective === 'OUTCOME_LEADS') {
+          setSelectedActionType('lead');
+        } else if (topObjective === 'OUTCOME_ENGAGEMENT' || topObjective === 'MESSAGES') {
+          setSelectedActionType('onsite_conversion.messaging_conversation_started_7d');
+        } else if (topObjective === 'OUTCOME_SALES') {
+          setSelectedActionType('purchase');
+        } else {
+          setSelectedActionType('lead');
+        }
       }
 
       setHasInitialData(true);
