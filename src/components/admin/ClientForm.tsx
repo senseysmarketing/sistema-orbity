@@ -163,6 +163,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
 
       const data = {
         name: formData.name,
+        email: formData.email || null,
         contact: formData.contact,
         service: formData.service,
         monthly_value: formData.monthly_value ? parseFloat(formData.monthly_value) : null,
