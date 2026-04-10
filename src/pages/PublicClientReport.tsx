@@ -22,6 +22,7 @@ interface ReportData {
     conversions: number;
   }>;
   is_mock: boolean;
+  period?: { from: string; to: string };
 }
 
 function CountUp({ end, duration = 1.5, prefix = "", suffix = "", decimals = 0 }: { end: number; duration?: number; prefix?: string; suffix?: string; decimals?: number }) {

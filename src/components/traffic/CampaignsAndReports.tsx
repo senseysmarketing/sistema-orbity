@@ -421,31 +421,64 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
             disabled={isGeneratingLink}
             onClick={async () => {
               if (!currentAgency?.id) {
-                sonnerToast.error("Selecione uma conta antes de compartilhar.");
+                sonnerToast.error("Selecione uma agência primeiro.");
+                return;
+              }
+              if (!selectedAccount) {
+                sonnerToast.error("Selecione uma conta de anúncio antes de compartilhar.");
+                return;
+              }
+              if (!dateRange?.from || !dateRange?.to) {
+                sonnerToast.error("Selecione um período antes de compartilhar.");
                 return;
               }
               setIsGeneratingLink(true);
               try {
-                // Find a client linked to this agency
-                const { data: clients, error: clientsError } = await supabase
+                const accountName = selectedAdAccounts.find(a => a.ad_account_id === selectedAccount)?.ad_account_name || '';
+                
+                // Find a client matching the selected account name, or any active client
+                let clientQuery = supabase
                   .from("clients")
                   .select("id")
                   .eq("agency_id", currentAgency.id)
-                  .eq("active", true)
-                  .limit(1);
+                  .eq("active", true);
 
-                if (clientsError || !clients || clients.length === 0) {
-                  sonnerToast.error("Nenhum cliente ativo encontrado. Cadastre um cliente primeiro.");
-                  return;
+                // Try to match by name first
+                const { data: matchedClients } = await clientQuery.ilike("name", `%${accountName}%`).limit(1);
+                
+                let clientId: string;
+                if (matchedClients && matchedClients.length > 0) {
+                  clientId = matchedClients[0].id;
+                } else {
+                  // Fallback: get any active client
+                  const { data: anyClients, error: clientsError } = await supabase
+                    .from("clients")
+                    .select("id")
+                    .eq("agency_id", currentAgency.id)
+                    .eq("active", true)
+                    .limit(1);
+
+                  if (clientsError || !anyClients || anyClients.length === 0) {
+                    sonnerToast.error("Nenhum cliente ativo encontrado. Cadastre um cliente primeiro.");
+                    return;
+                  }
+                  clientId = anyClients[0].id;
                 }
 
-                const clientId = clients[0].id;
                 const reportToken = crypto.randomUUID();
                 const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+                const dateFrom = dateRange.from.toISOString().split('T')[0];
+                const dateTo = dateRange.to.toISOString().split('T')[0];
 
                 const { error: updateError } = await supabase
                   .from("clients")
-                  .update({ report_token: reportToken, report_expires_at: expiresAt })
+                  .update({ 
+                    report_token: reportToken, 
+                    report_expires_at: expiresAt,
+                    report_ad_account_id: selectedAccount,
+                    report_date_from: dateFrom,
+                    report_date_to: dateTo,
+                  })
                   .eq("id", clientId);
 
                 if (updateError) {
@@ -455,7 +488,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
 
                 const url = `${window.location.origin}/report/${reportToken}`;
                 await navigator.clipboard.writeText(url);
-                sonnerToast.success("Link seguro gerado! Válido por 48 horas.");
+                sonnerToast.success(`Link gerado para "${accountName}"! Válido por 48h.`);
               } catch (err) {
                 console.error("Erro ao gerar link:", err);
                 sonnerToast.error("Erro ao gerar link.");
