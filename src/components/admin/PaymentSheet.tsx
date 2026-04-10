@@ -194,7 +194,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const isEditing = !!payment;
   const showWhatsApp = (status === "pending" || status === "overdue") && isEditing;
   const hasAsaasCharge = !!payment?.asaas_payment_id;
-  const showManualFlow = !isAsaasActive || manualOverrideConfirmed;
+  
 
   const handleGenerateAsaasCharge = () => {
     toast({ title: "Em breve", description: "A geração de cobranças via Asaas será disponibilizada em breve." });
