@@ -132,7 +132,9 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
   const [aiAnalysis, setAiAnalysis] = useState<Record<string, string>>({});
   const [aiAnalysisLoading, setAiAnalysisLoading] = useState<string | null>(null);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
-  
+  const [selectedActionType, setSelectedActionType] = useState<string>("__default__");
+  const [availableActions, setAvailableActions] = useState<{ action_type: string; value: number }[]>([]);
+  const [actionSelectorOpen, setActionSelectorOpen] = useState(false);
   const { toast } = useToast();
   const { analyzeCampaign } = useAIAssist();
   const { currentAgency } = useAgency();
