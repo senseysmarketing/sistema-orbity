@@ -336,7 +336,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       items.push({
         id: p.id,
         title: client.name,
-        amount: p.amount,
+        amount: p.status === 'paid' ? (p.amount_paid || p.amount) : p.amount,
         dueDate: p.due_date,
         type: 'INCOME',
         status: mapStatus(p.status),
@@ -477,6 +477,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     profitability,
     profitabilityMargin,
     delinquencyRate,
+    totalGatewayFees,
+    totalNetRevenue,
 
     // Structured data
     unifiedCashFlow,
