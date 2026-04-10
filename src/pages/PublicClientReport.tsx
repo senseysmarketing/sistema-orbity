@@ -313,7 +313,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
           className="mb-8"
         >
           <h3 className="text-white/50 text-xs uppercase tracking-[0.15em] mb-4 font-medium">
-            Evolução (Últimos 7 dias)
+            Evolução no Período
           </h3>
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-5">
             <ResponsiveContainer width="100%" height={250}>
