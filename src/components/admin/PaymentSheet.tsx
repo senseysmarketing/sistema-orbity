@@ -444,7 +444,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
               )}
 
               {/* Asaas Section */}
-              {isAsaasActive && isEditing && (
+              {billingType === 'asaas' && isEditing && (
                 <div className="space-y-2">
                   {hasAsaasCharge ? (
                     <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
