@@ -491,6 +491,10 @@ export type Database = {
           conexa_token: string | null
           conexa_webhook_token: string | null
           created_at: string | null
+          default_fine_percentage: number | null
+          default_interest_percentage: number | null
+          discount_days_before: number | null
+          discount_percentage: number | null
           id: string
           notify_via_email: boolean | null
           notify_via_whatsapp: boolean | null
@@ -517,6 +521,10 @@ export type Database = {
           conexa_token?: string | null
           conexa_webhook_token?: string | null
           created_at?: string | null
+          default_fine_percentage?: number | null
+          default_interest_percentage?: number | null
+          discount_days_before?: number | null
+          discount_percentage?: number | null
           id?: string
           notify_via_email?: boolean | null
           notify_via_whatsapp?: boolean | null
@@ -543,6 +551,10 @@ export type Database = {
           conexa_token?: string | null
           conexa_webhook_token?: string | null
           created_at?: string | null
+          default_fine_percentage?: number | null
+          default_interest_percentage?: number | null
+          discount_days_before?: number | null
+          discount_percentage?: number | null
           id?: string
           notify_via_email?: boolean | null
           notify_via_whatsapp?: boolean | null
