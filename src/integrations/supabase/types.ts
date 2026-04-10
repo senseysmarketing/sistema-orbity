@@ -1477,6 +1477,7 @@ export type Database = {
           report_date_from: string | null
           report_date_to: string | null
           report_expires_at: string | null
+          report_snapshot: Json | null
           report_token: string | null
           service: string | null
           start_date: string | null
@@ -1501,6 +1502,7 @@ export type Database = {
           report_date_from?: string | null
           report_date_to?: string | null
           report_expires_at?: string | null
+          report_snapshot?: Json | null
           report_token?: string | null
           service?: string | null
           start_date?: string | null
@@ -1525,6 +1527,7 @@ export type Database = {
           report_date_from?: string | null
           report_date_to?: string | null
           report_expires_at?: string | null
+          report_snapshot?: Json | null
           report_token?: string | null
           service?: string | null
           start_date?: string | null

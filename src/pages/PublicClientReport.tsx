@@ -15,11 +15,26 @@ interface ReportData {
     conversions: number;
     cpa: number;
     active_campaigns: number;
+    impressions?: number;
+    clicks?: number;
+    cpm?: number;
+    cpc?: number;
+    ctr?: number;
   };
   top_campaigns: Array<{
     name: string;
     objective: string;
     spend: number;
+    conversions: number;
+    impressions?: number;
+    clicks?: number;
+    ctr?: number;
+  }>;
+  chart_data?: Array<{
+    date: string;
+    spend: number;
+    impressions: number;
+    clicks: number;
     conversions: number;
   }>;
   is_mock: boolean;
@@ -67,7 +82,8 @@ const headerVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
 };
 
-const mockChartData = [
+// Fallback mock data only used when no snapshot chart_data exists
+const fallbackChartData = [
   { day: "Seg", investimento: 320, conversoes: 12 },
   { day: "Ter", investimento: 480, conversoes: 18 },
   { day: "Qua", investimento: 410, conversoes: 15 },
@@ -189,11 +205,25 @@ function ReportDashboard({ data }: { data: ReportData }) {
 
   const maxSpend = Math.max(...(data.top_campaigns.map(c => c.spend)), 1);
 
+  // Use real snapshot data for funnel
+  const totalImpressions = data.metrics.impressions || 0;
+  const totalClicks = data.metrics.clicks || 0;
+  const totalConversions = data.metrics.conversions || 0;
+
   const funnelData = [
-    { label: "Impressões", value: 45200, color: "#3b82f6", width: "100%", icon: Eye },
-    { label: "Cliques no Link", value: 1240, color: "#8b5cf6", width: "70%", icon: MousePointerClick },
-    { label: "Conversões", value: data.metrics.conversions || 142, color: "#10b981", width: "40%", icon: Target },
+    { label: "Impressões", value: totalImpressions, color: "#3b82f6", width: "100%", icon: Eye },
+    { label: "Cliques no Link", value: totalClicks, color: "#8b5cf6", width: "70%", icon: MousePointerClick },
+    { label: "Conversões", value: totalConversions, color: "#10b981", width: "40%", icon: Target },
   ];
+
+  // Use real chart data from snapshot, or fallback
+  const chartData = data.chart_data && data.chart_data.length > 0
+    ? data.chart_data.map(d => ({
+        day: d.date,
+        investimento: d.spend,
+        conversoes: d.conversions,
+      }))
+    : fallbackChartData;
 
   return (
     <div className="min-h-screen bg-[#0a0a1a] relative overflow-hidden">
@@ -283,11 +313,11 @@ function ReportDashboard({ data }: { data: ReportData }) {
           className="mb-8"
         >
           <h3 className="text-white/50 text-xs uppercase tracking-[0.15em] mb-4 font-medium">
-            Evolução (Últimos 7 dias)
+            Evolução no Período
           </h3>
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-5">
             <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={mockChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
