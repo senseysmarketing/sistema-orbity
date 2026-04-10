@@ -38,7 +38,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "warnin
 export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselectedClient, clients = [] }: PaymentSheetProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
-  const { isAsaasActive, isConexaActive } = usePaymentGateway();
+  const { enabledGateways } = usePaymentGateway();
   const [loading, setLoading] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [manualOverrideDialogOpen, setManualOverrideDialogOpen] = useState(false);
@@ -54,7 +54,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const [paidDate, setPaidDate] = useState("");
   const [status, setStatus] = useState("pending");
   const [description, setDescription] = useState("");
-
+  const [billingType, setBillingType] = useState("manual");
   const totalAmount = useMemo(() => {
     return Math.max(0, baseValue + additions - discounts);
   }, [baseValue, additions, discounts]);
@@ -81,9 +81,12 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
       setPaidDate(payment.paid_date ? payment.paid_date.split("T")[0] : "");
       setStatus(payment.status || "pending");
       setDescription(payment.description || "");
+      const paymentBt = payment.billing_type || client?.default_billing_type || 'manual';
+      setBillingType(enabledGateways.includes(paymentBt) ? paymentBt : 'manual');
     } else if (preselectedClient) {
       const now = new Date();
       const defaultDue = new Date(now.getFullYear(), now.getMonth(), 15);
+      const clientBt = (preselectedClient as any).default_billing_type || 'manual';
       setClientId(preselectedClient.id);
       setBaseValue(preselectedClient.monthly_value || 0);
       setAdditions(0);
@@ -92,6 +95,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
       setPaidDate("");
       setStatus("pending");
       setDescription("");
+      setBillingType(enabledGateways.includes(clientBt) ? clientBt : 'manual');
     } else {
       setClientId("");
       setBaseValue(0);
@@ -101,11 +105,12 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
       setPaidDate("");
       setStatus("pending");
       setDescription("");
+      setBillingType("manual");
     }
     setUpdateContract(false);
     setDeactivateClient(false);
     setManualOverrideConfirmed(false);
-  }, [open, payment, preselectedClient, clients]);
+  }, [open, payment, preselectedClient, clients, enabledGateways]);
 
   const handleClientChange = (id: string) => {
     setClientId(id);
@@ -113,6 +118,8 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
     if (client?.monthly_value) {
       setBaseValue(client.monthly_value);
     }
+    const clientBt = client?.default_billing_type || 'manual';
+    setBillingType(enabledGateways.includes(clientBt) ? clientBt : 'manual');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -131,6 +138,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
         status: status as "pending" | "paid" | "overdue",
         description: description || null,
         agency_id: currentAgency?.id,
+        billing_type: billingType,
       };
 
       if (payment) {
@@ -196,8 +204,8 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const showWhatsApp = (status === "pending" || status === "overdue") && isEditing;
   const hasAsaasCharge = !!payment?.asaas_payment_id;
   const hasConexaCharge = !!payment?.conexa_charge_id;
-  const isGatewayActive = isAsaasActive || isConexaActive;
-  const gatewayName = isAsaasActive ? 'Asaas' : isConexaActive ? 'Conexa' : 'Manual';
+  const isGatewayActive = billingType !== 'manual';
+  const gatewayName = billingType === 'asaas' ? 'Asaas' : billingType === 'conexa' ? 'Conexa' : 'Manual';
 
   const handleGenerateAsaasCharge = () => {
     toast({ title: "Em breve", description: "A geração de cobranças via Asaas será disponibilizada em breve." });
@@ -319,6 +327,21 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                 )}
               </div>
 
+              {/* Método de Faturamento */}
+              <div className="space-y-2">
+                <Label>Método de Faturamento</Label>
+                <Select value={billingType} onValueChange={setBillingType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {enabledGateways.map((gw) => (
+                      <SelectItem key={gw} value={gw}>
+                        {gw === 'manual' ? 'Manual' : gw === 'asaas' ? 'Asaas' : 'Conexa'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Upsell/Downsell Switch */}
               {totalAmount !== baseValue && (
                 <TooltipProvider>
@@ -421,7 +444,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
               )}
 
               {/* Asaas Section */}
-              {isAsaasActive && isEditing && (
+              {billingType === 'asaas' && isEditing && (
                 <div className="space-y-2">
                   {hasAsaasCharge ? (
                     <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
@@ -462,7 +485,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
               )}
 
               {/* Conexa Section */}
-              {isConexaActive && isEditing && (
+              {billingType === 'conexa' && isEditing && (
                 <div className="space-y-2">
                   {hasConexaCharge ? (
                     <div className="rounded-lg border bg-muted/50 p-3 space-y-2">

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
@@ -9,8 +10,10 @@ export interface PaymentSettings {
   active_gateway: 'manual' | 'asaas' | 'conexa';
   asaas_api_key: string | null;
   asaas_sandbox: boolean;
+  asaas_enabled: boolean;
   conexa_api_key: string | null;
   conexa_token: string | null;
+  conexa_enabled: boolean;
   reminder_before_enabled: boolean;
   reminder_before_days: number;
   reminder_due_date_enabled: boolean;
@@ -26,8 +29,10 @@ const defaultSettings: Omit<PaymentSettings, 'id' | 'agency_id'> = {
   active_gateway: 'manual',
   asaas_api_key: null,
   asaas_sandbox: true,
+  asaas_enabled: false,
   conexa_api_key: null,
   conexa_token: null,
+  conexa_enabled: false,
   reminder_before_enabled: false,
   reminder_before_days: 3,
   reminder_due_date_enabled: false,
@@ -79,15 +84,22 @@ export function usePaymentGateway() {
     },
   });
 
-  const gateway = (settings?.active_gateway ?? 'manual') as 'manual' | 'asaas' | 'conexa';
-  const isAsaasActive = gateway === 'asaas';
-  const isConexaActive = gateway === 'conexa';
+  const isAsaasActive = !!(settings?.asaas_enabled && settings?.asaas_api_key);
+  const isConexaActive = !!(settings?.conexa_enabled && settings?.conexa_api_key);
+
+  const enabledGateways = useMemo(() => {
+    const gateways: string[] = ['manual'];
+    if (isAsaasActive) gateways.push('asaas');
+    if (isConexaActive) gateways.push('conexa');
+    return gateways;
+  }, [isAsaasActive, isConexaActive]);
 
   return {
     settings: settings ? settings : { ...defaultSettings, id: '', agency_id: agencyId || '' } as PaymentSettings,
-    gateway,
+    gateway: (settings?.active_gateway ?? 'manual') as 'manual' | 'asaas' | 'conexa',
     isAsaasActive,
     isConexaActive,
+    enabledGateways,
     isLoading,
     updateSettings: upsertMutation.mutateAsync,
     isSaving: upsertMutation.isPending,

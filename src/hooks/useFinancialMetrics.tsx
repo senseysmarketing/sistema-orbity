@@ -22,6 +22,7 @@ export interface Client {
   zip_code?: string | null;
   asaas_customer_id?: string | null;
   conexa_customer_id?: string | null;
+  default_billing_type?: string | null;
 }
 
 export interface ClientPayment {
@@ -92,6 +93,7 @@ export interface CashFlowItem {
   status: 'PAID' | 'PENDING' | 'OVERDUE' | 'CANCELLED';
   sourceType: 'client_payment' | 'expense' | 'salary';
   sourceId: string;
+  billingType?: string;
 }
 
 export interface ClientProfitabilityItem {
@@ -145,7 +147,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       if (!agencyId) return [];
       const { data, error } = await supabase
         .from('clients')
-        .select('id, name, monthly_value, active, start_date, contact, service, due_date, observations, contract_start_date, contract_end_date, has_loyalty, cancelled_at, document, zip_code, asaas_customer_id, conexa_customer_id')
+        .select('id, name, monthly_value, active, start_date, contact, service, due_date, observations, contract_start_date, contract_end_date, has_loyalty, cancelled_at, document, zip_code, asaas_customer_id, conexa_customer_id, default_billing_type')
         .eq('agency_id', agencyId)
         .order('name');
       if (error) throw error;
@@ -342,6 +344,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         status: mapStatus(p.status),
         sourceType: 'client_payment',
         sourceId: p.id,
+        billingType: (p as any).billing_type || 'manual',
       });
     });
 

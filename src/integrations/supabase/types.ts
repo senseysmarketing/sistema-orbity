@@ -481,10 +481,12 @@ export type Database = {
           active_gateway: string
           agency_id: string
           asaas_api_key: string | null
+          asaas_enabled: boolean | null
           asaas_sandbox: boolean | null
           block_access_days: number | null
           block_access_enabled: boolean | null
           conexa_api_key: string | null
+          conexa_enabled: boolean | null
           conexa_token: string | null
           created_at: string | null
           id: string
@@ -501,10 +503,12 @@ export type Database = {
           active_gateway?: string
           agency_id: string
           asaas_api_key?: string | null
+          asaas_enabled?: boolean | null
           asaas_sandbox?: boolean | null
           block_access_days?: number | null
           block_access_enabled?: boolean | null
           conexa_api_key?: string | null
+          conexa_enabled?: boolean | null
           conexa_token?: string | null
           created_at?: string | null
           id?: string
@@ -521,10 +525,12 @@ export type Database = {
           active_gateway?: string
           agency_id?: string
           asaas_api_key?: string | null
+          asaas_enabled?: boolean | null
           asaas_sandbox?: boolean | null
           block_access_days?: number | null
           block_access_enabled?: boolean | null
           conexa_api_key?: string | null
+          conexa_enabled?: boolean | null
           conexa_token?: string | null
           created_at?: string | null
           id?: string
@@ -1392,6 +1398,7 @@ export type Database = {
           amount: number
           amount_paid: number | null
           asaas_payment_id: string | null
+          billing_type: string | null
           client_id: string
           conexa_charge_id: string | null
           conexa_invoice_url: string | null
@@ -1412,6 +1419,7 @@ export type Database = {
           amount: number
           amount_paid?: number | null
           asaas_payment_id?: string | null
+          billing_type?: string | null
           client_id: string
           conexa_charge_id?: string | null
           conexa_invoice_url?: string | null
@@ -1432,6 +1440,7 @@ export type Database = {
           amount?: number
           amount_paid?: number | null
           asaas_payment_id?: string | null
+          billing_type?: string | null
           client_id?: string
           conexa_charge_id?: string | null
           conexa_invoice_url?: string | null
@@ -1491,6 +1500,7 @@ export type Database = {
           contract_end_date: string | null
           contract_start_date: string | null
           created_at: string
+          default_billing_type: string | null
           document: string | null
           due_date: number | null
           has_loyalty: boolean
@@ -1525,6 +1535,7 @@ export type Database = {
           contract_end_date?: string | null
           contract_start_date?: string | null
           created_at?: string
+          default_billing_type?: string | null
           document?: string | null
           due_date?: number | null
           has_loyalty?: boolean
@@ -1559,6 +1570,7 @@ export type Database = {
           contract_end_date?: string | null
           contract_start_date?: string | null
           created_at?: string
+          default_billing_type?: string | null
           document?: string | null
           due_date?: number | null
           has_loyalty?: boolean
