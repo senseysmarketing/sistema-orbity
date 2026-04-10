@@ -707,7 +707,7 @@ async function processMeetings() {
 
   const { data: meetings, error } = await supabase
     .from('meetings')
-    .select('id, title, start_time, organizer_id, participants, agency_id')
+    .select('id, title, start_time, organizer_id, participants, agency_id, meeting_link')
     .not('agency_id', 'is', null)
     .eq('status', 'scheduled')
     .gte('start_time', now.toISOString());
