@@ -382,13 +382,42 @@ export function ClientDetailsDialog({
     </AlertDialog>
 
     {/* Alert Dialog para Exclusão */}
-    <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+    <AlertDialog open={showDeleteAlert} onOpenChange={(open) => { setShowDeleteAlert(open); if (!open) setDeleteConfirmName(""); }}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Excluir Cliente</AlertDialogTitle>
-          <AlertDialogDescription>
-            Tem certeza que deseja excluir o cliente <strong>{client.name}</strong>? 
-            Esta ação não pode ser desfeita e todos os dados relacionados ao cliente serão removidos permanentemente.
+          <AlertDialogDescription asChild>
+            <div>
+              <p>
+                Tem certeza que deseja excluir o cliente <strong>{client.name}</strong>? 
+                Esta ação não pode ser desfeita e todos os dados relacionados ao cliente serão removidos permanentemente.
+              </p>
+
+              {hasGatewayLink && (
+                <Alert variant="destructive" className="mt-3">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>ATENÇÃO:</strong> Este cliente possui registro no {gatewayName}. 
+                    Excluí-lo <strong>não cancelará</strong> assinaturas ativas nos gateways. 
+                    Cancele as cobranças externamente antes de prosseguir.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {hasGatewayLink && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm font-medium">
+                    Digite <strong>{client.name}</strong> para confirmar:
+                  </p>
+                  <Input
+                    value={deleteConfirmName}
+                    onChange={e => setDeleteConfirmName(e.target.value)}
+                    placeholder={client.name}
+                    className="text-sm"
+                  />
+                </div>
+              )}
+            </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -400,7 +429,9 @@ export function ClientDetailsDialog({
                 onOpenChange(false);
               }
               setShowDeleteAlert(false);
+              setDeleteConfirmName("");
             }}
+            disabled={hasGatewayLink && deleteConfirmName !== client.name}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             Excluir
