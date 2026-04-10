@@ -582,6 +582,9 @@ async function processPosts() {
               task_id: task.id,
               play_sound: true
             },
+            entity_type: 'post',
+            entity_id: task.id,
+            action_type: 'upcoming',
           },
           tracking: {
             notification_type: 'post_upcoming',
@@ -676,6 +679,9 @@ async function processLeads() {
           lead_id: lead.id,
           play_sound: true
         },
+        entity_type: 'lead',
+        entity_id: lead.id,
+        action_type: 'follow_up',
       });
 
       leadsToUpdate.push(lead.id);
