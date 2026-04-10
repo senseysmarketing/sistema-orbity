@@ -35,7 +35,7 @@ export default function Traffic() {
   const [facebookConnections, setFacebookConnections] = useState<FacebookConnection[]>([]);
   const [selectedAdAccounts, setSelectedAdAccounts] = useState<SelectedAdAccount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isConnectionDialogOpen, setIsConnectionDialogOpen] = useState(false);
+  
   const [isManageAccountsOpen, setIsManageAccountsOpen] = useState(false);
   const [isDisconnectDialogOpen, setIsDisconnectDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
@@ -45,6 +45,7 @@ export default function Traffic() {
   const { profile } = useAuth();
   const { currentAgency } = useAgency();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const hasAccess = profile?.role === 'agency_user' || profile?.role === 'agency_admin';
 
@@ -99,15 +100,6 @@ export default function Traffic() {
     }
   };
 
-  const handleConnectionSuccess = () => {
-    fetchConnections();
-    fetchSelectedAdAccounts();
-    setIsConnectionDialogOpen(false);
-    toast({
-      title: "Conexão estabelecida!",
-      description: "Facebook conectado com sucesso.",
-    });
-  };
 
   const handleDisconnectFacebook = async () => {
     if (!currentAgency) return;
