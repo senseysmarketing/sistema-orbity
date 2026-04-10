@@ -193,6 +193,20 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const currentStatus = statusConfig[status] || statusConfig.pending;
   const isEditing = !!payment;
   const showWhatsApp = (status === "pending" || status === "overdue") && isEditing;
+  const hasAsaasCharge = !!payment?.asaas_payment_id;
+  const showManualFlow = !isAsaasActive || manualOverrideConfirmed;
+
+  const handleGenerateAsaasCharge = () => {
+    toast({ title: "Em breve", description: "A geração de cobranças via Asaas será disponibilizada em breve." });
+  };
+
+  const handleCopyPaymentLink = () => {
+    const link = payment?.invoice_url || payment?.pix_copy_paste;
+    if (link) {
+      navigator.clipboard.writeText(link);
+      toast({ title: "Link copiado!", description: "O link de pagamento foi copiado para a área de transferência." });
+    }
+  };
 
   return (
     <>
