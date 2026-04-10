@@ -11,10 +11,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
-import { Ban, HelpCircle, MessageSquare, Save, X } from "lucide-react";
+import { usePaymentGateway } from "@/hooks/usePaymentGateway";
+import { Ban, HelpCircle, MessageSquare, Save, X, QrCode, Copy, MoreVertical } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface PaymentSheetProps {
   open: boolean;
@@ -35,8 +37,11 @@ const statusConfig: Record<string, { label: string; variant: "default" | "warnin
 export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselectedClient, clients = [] }: PaymentSheetProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
+  const { isAsaasActive, isLoading: gatewayLoading } = usePaymentGateway();
   const [loading, setLoading] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [manualOverrideDialogOpen, setManualOverrideDialogOpen] = useState(false);
+  const [manualOverrideConfirmed, setManualOverrideConfirmed] = useState(false);
   const [updateContract, setUpdateContract] = useState(false);
   const [deactivateClient, setDeactivateClient] = useState(false);
 
@@ -98,6 +103,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
     }
     setUpdateContract(false);
     setDeactivateClient(false);
+    setManualOverrideConfirmed(false);
   }, [open, payment, preselectedClient, clients]);
 
   const handleClientChange = (id: string) => {
