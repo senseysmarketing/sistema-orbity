@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Facebook, LogOut, Loader2, Shield, RefreshCw, Users } from "lucide-react";
+import { Facebook, Loader2, Shield, Users, Check, Unlink } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,12 +22,12 @@ interface FacebookConnection {
 }
 
 const getTokenStatus = (expiresAt: string | null) => {
-  if (!expiresAt) return { label: "Desconhecido", variant: "secondary" as const, color: "" };
+  if (!expiresAt) return { label: "Desconhecido", variant: "secondary" as const };
   const expirationDate = new Date(expiresAt);
-  if (isPast(expirationDate)) return { label: "Expirado", variant: "danger" as const, color: "" };
+  if (isPast(expirationDate)) return { label: "Expirado", variant: "danger" as const };
   const daysLeft = differenceInDays(expirationDate, new Date());
-  if (daysLeft <= 30) return { label: `Expira em ${daysLeft}d`, variant: "warning" as const, color: "" };
-  return { label: `Válido (${daysLeft}d)`, variant: "success" as const, color: "" };
+  if (daysLeft <= 30) return { label: `Expira em ${daysLeft}d`, variant: "warning" as const };
+  return { label: `Válido (${daysLeft}d)`, variant: "success" as const };
 };
 
 export const FacebookIntegration = () => {
@@ -52,7 +52,6 @@ export const FacebookIntegration = () => {
       if (error) throw error;
       setConnections(data || []);
 
-      // Fetch ad accounts info
       const { count, error: countError } = await supabase
         .from('selected_ad_accounts')
         .select('*', { count: 'exact', head: true })
@@ -61,7 +60,6 @@ export const FacebookIntegration = () => {
 
       if (!countError) setAdAccountCount(count || 0);
 
-      // Fetch last sync
       const { data: syncData, error: syncError } = await supabase
         .from('selected_ad_accounts')
         .select('last_sync')
@@ -136,18 +134,7 @@ export const FacebookIntegration = () => {
   if (loading) {
     return (
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Facebook className="h-8 w-8 text-blue-600" />
-              <div>
-                <CardTitle className="text-lg">Meta Ads</CardTitle>
-                <CardDescription>Carregando...</CardDescription>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="flex justify-center py-4">
+        <CardContent className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
       </Card>
@@ -158,116 +145,131 @@ export const FacebookIntegration = () => {
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex items-center gap-3">
-            <Facebook className="h-8 w-8 text-blue-600" />
-            <div>
-              <CardTitle className="text-lg">Meta Ads</CardTitle>
-              <CardDescription>
-                Conecte Facebook e Instagram Ads para monitorar campanhas
-              </CardDescription>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30 flex-shrink-0">
+              <Facebook className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
-          </div>
-          <Badge variant={isConnected ? "default" : "secondary"} className={isConnected ? "bg-green-600" : ""}>
-            {isConnected ? "Conectado" : "Desconectado"}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {isConnected && activeConnection ? (
-          <>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Negócio</span>
-                <span className="font-medium">{activeConnection.business_name}</span>
-              </div>
-
-              {activeConnection.facebook_user_id && (
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Facebook User ID</span>
-                  <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">
-                    {activeConnection.facebook_user_id}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5" />
-                  Contas de anúncio
-                </span>
-                <span className="font-medium">{adAccountCount} vinculada{adAccountCount !== 1 ? 's' : ''}</span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <Shield className="h-3.5 w-3.5" />
-                  Token
-                </span>
-                {tokenStatus && (
-                  <Badge variant={tokenStatus.variant}>
-                    {tokenStatus.label}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardTitle className="text-base sm:text-lg">Meta Ads</CardTitle>
+                {isConnected && (
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 flex-shrink-0">
+                    <Check className="mr-1 h-3 w-3" />
+                    Conectado
                   </Badge>
                 )}
               </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Última sincronização
-                </span>
-                <span className="font-medium">
-                  {lastSync
-                    ? format(new Date(lastSync), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
-                    : "Nunca"}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Conectado em</span>
-                <span className="font-medium">
-                  {format(new Date(activeConnection.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                </span>
+              <CardDescription className="text-xs sm:text-sm">
+                <span className="hidden sm:inline">Conecte Facebook e Instagram Ads para monitorar campanhas e métricas</span>
+                <span className="sm:hidden">Monitore campanhas do Facebook e Instagram</span>
+              </CardDescription>
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0 sm:pt-0">
+        {isConnected && activeConnection ? (
+          <>
+            {/* Conta conectada */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 sm:p-4 border rounded-lg bg-muted/30">
+              <div className="space-y-0.5 sm:space-y-1 min-w-0">
+                <p className="text-sm font-medium">{activeConnection.business_name}</p>
+                {activeConnection.facebook_user_id && (
+                  <p className="text-xs text-muted-foreground font-mono">
+                    ID: {activeConnection.facebook_user_id}
+                  </p>
+                )}
+                {lastSync && (
+                  <p className="text-xs text-muted-foreground">
+                    <span className="hidden sm:inline">Última sincronização: </span>
+                    <span className="sm:hidden">Sinc.: </span>
+                    {format(new Date(lastSync), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  </p>
+                )}
               </div>
             </div>
 
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" className="w-full text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Desconectar
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Desconectar Facebook?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Isso removerá todas as contas de anúncios selecionadas e dados associados.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDisconnect} className="bg-destructive text-destructive-foreground">
+            {/* Contas de anúncio */}
+            <div className="flex items-center justify-between gap-3 p-3 sm:p-4 border rounded-lg">
+              <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+                <p className="text-sm font-medium">Contas de anúncio</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {adAccountCount} conta{adAccountCount !== 1 ? 's' : ''} vinculada{adAccountCount !== 1 ? 's' : ''}
+                </p>
+              </div>
+              <Users className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            </div>
+
+            {/* Token */}
+            <div className="flex items-center justify-between gap-3 p-3 sm:p-4 border rounded-lg">
+              <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+                <p className="text-sm font-medium">Token de acesso</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Conectado em {format(new Date(activeConnection.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                </p>
+              </div>
+              {tokenStatus && (
+                <Badge variant={tokenStatus.variant} className="flex-shrink-0">
+                  <Shield className="mr-1 h-3 w-3" />
+                  {tokenStatus.label}
+                </Badge>
+              )}
+            </div>
+
+            {/* Ações */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="w-full sm:w-auto">
+                    <Unlink className="mr-2 h-4 w-4" />
                     Desconectar
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Desconectar Meta Ads?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Isso removerá todas as contas de anúncios selecionadas e dados associados.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDisconnect} className="bg-destructive text-destructive-foreground">
+                      Desconectar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </>
         ) : (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full">
-                <Facebook className="mr-2 h-4 w-4" />
-                Conectar Facebook
-              </Button>
-            </DialogTrigger>
-            <FacebookConnectionDialog
-              onSuccess={handleConnectionSuccess}
-              onClose={() => setIsDialogOpen(false)}
-            />
-          </Dialog>
+          <div className="space-y-4">
+            <div className="p-3 sm:p-4 border rounded-lg bg-muted/30 space-y-2">
+              <p className="text-sm font-medium">Recursos disponíveis:</p>
+              <ul className="text-xs sm:text-sm text-muted-foreground space-y-1">
+                <li>• Monitoramento de campanhas em tempo real</li>
+                <li>• Métricas de desempenho (CPC, CPM, CTR)</li>
+                <li>• Controle de saldo das contas de anúncio</li>
+                <li className="hidden sm:list-item">• Alertas de saldo baixo automáticos</li>
+                <li className="hidden sm:list-item">• Relatórios consolidados por cliente</li>
+              </ul>
+            </div>
+
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full">
+                  <Facebook className="mr-2 h-4 w-4" />
+                  Conectar Meta Ads
+                </Button>
+              </DialogTrigger>
+              <FacebookConnectionDialog
+                onSuccess={handleConnectionSuccess}
+                onClose={() => setIsDialogOpen(false)}
+              />
+            </Dialog>
+          </div>
         )}
       </CardContent>
     </Card>
