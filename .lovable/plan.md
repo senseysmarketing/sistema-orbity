@@ -1,73 +1,40 @@
 
 
-# Multi-Gateway por Cliente e por Pagamento
+# Melhorias de UX no ClientForm.tsx
 
-## 1. Migration SQL
+## Alteracoes
 
-- `clients`: add `default_billing_type TEXT DEFAULT 'manual'`
-- `client_payments`: add `billing_type TEXT DEFAULT 'manual'`
-- `agency_payment_settings`: add `asaas_enabled BOOLEAN DEFAULT false`, `conexa_enabled BOOLEAN DEFAULT false`
-- Validation triggers for both tables (only allow 'manual', 'asaas', 'conexa')
-- Backfill: set `asaas_enabled = true` where `active_gateway = 'asaas'`, same for conexa
+### 1. Mascara de Telefone
+Adicionar funcao `formatPhone` junto das mascaras existentes (formatDocument, formatCep). Formato: `(XX) XXXXX-XXXX` ou `(XX) XXXX-XXXX`. Aplicar no onChange do campo Contato.
 
-## 2. usePaymentGateway.tsx
+### 2. Separar Contato em Email + WhatsApp
+Atualmente o campo "Contato" e generico ("Email, telefone, etc."). Para suportar a regua de cobranca, separar em dois campos:
+- **E-mail** — com texto de ajuda: "Este e-mail receberá as faturas e notas fiscais automáticas."
+- **WhatsApp** — com mascara de telefone e texto: "Este número receberá os links de pagamento e avisos de vencimento."
 
-- Add `asaas_enabled`, `conexa_enabled` to `PaymentSettings` interface
-- Compute `enabledGateways: string[]` — always includes 'manual'; includes 'asaas' if `asaas_enabled && asaas_api_key`; 'conexa' if `conexa_enabled && conexa_api_key`
-- Base `isAsaasActive`/`isConexaActive` on new booleans
-- Export `enabledGateways`
+Adicionar `email` ao `initialFormData` e ao payload de submit. Manter `contact` como campo de WhatsApp (renomear label).
 
-## 3. AsaasIntegration.tsx e ConexaIntegration.tsx
+> **Nota**: Se a tabela `clients` nao tiver coluna `email`, sera necessario adicionar via migration. Vou verificar o schema.
 
-- Switch "Ativar gateway" saves `asaas_enabled`/`conexa_enabled` instead of changing `active_gateway`
-- Remove exclusivity logic (both can be active simultaneously)
+**Alternativa simplificada** (se preferir nao alterar o banco): manter o campo unico "Contato" com mascara de telefone e adicionar os textos de ajuda apenas nele. Porem isso limita a regua de cobranca.
 
-## 4. ClientForm.tsx
+### 3. Layout 2 colunas otimizado
+O formulario ja usa `grid grid-cols-1 md:grid-cols-2` em varias linhas. Reorganizar para:
+- Linha 1: Nome + E-mail
+- Linha 2: WhatsApp + Servico
+- Linha 3: Valor Mensal + Dia de Vencimento
+- Linha 4: Data de Inicio (sozinho ou com outro campo)
+- Fidelidade + datas de contrato (ja ok)
+- Observacoes (full width)
+- Separator + Dados de Faturamento (ja ok)
 
-- Add `default_billing_type` to form data (default 'manual')
-- Add `<Select>` "Forma de Faturamento Padrao" with dynamic options from `enabledGateways`
-- If only 'manual' available, show subtle note about gateway configuration
+## Verificacao necessaria
+Preciso checar se `clients` ja tem coluna `email` no schema.
 
-## 5. PaymentForm.tsx
+## Arquivos modificados
+- `src/components/admin/ClientForm.tsx` — mascara, textos de ajuda, layout
 
-- Add `billing_type` to formData (default 'manual')
-- Add `<Select>` "Metodo de Faturamento" with options from `enabledGateways`
-- On client selection, auto-fill `billing_type` with `client.default_billing_type`
-- Include `billing_type` in insert/update payload
-
-## 6. PaymentSheet.tsx
-
-- Add `billingType` to form state
-- Auto-fill with `client.default_billing_type` on client selection or edit open
-- Show gateway action buttons based on `billingType` value
-- Maintain Pre-Flight Check (document/zip_code)
-- Save `billing_type` in insert/update
-
-### 6.1 Fallback Inteligente do Cliente (NOVO)
-
-Ao auto-preencher o `billing_type` baseado no cliente, verificar se a opcao ainda e valida para a agencia:
-
-```typescript
-const resolvedBillingType = enabledGateways.includes(client.default_billing_type)
-  ? client.default_billing_type
-  : 'manual';
-```
-
-Usar `resolvedBillingType` para preencher o formulario, evitando crashes no `<Select>` caso a agencia tenha desativado o gateway preferido do cliente. Aplicar a mesma logica em `PaymentForm.tsx`.
-
-## 7. CashFlowTable e useFinancialMetrics
-
-- Add `billingType` to `CashFlowItem`
-- Populate from `p.billing_type` in payments
-- Display origin Badge (Manual/Asaas/Conexa) for INCOME items
-
-## Arquivos modificados (7 + migration)
-- Migration SQL (novo)
-- `src/hooks/usePaymentGateway.tsx`
-- `src/components/settings/AsaasIntegration.tsx`
-- `src/components/settings/ConexaIntegration.tsx`
-- `src/components/admin/ClientForm.tsx`
-- `src/components/admin/PaymentForm.tsx`
-- `src/components/admin/PaymentSheet.tsx`
-- `src/hooks/useFinancialMetrics.tsx` + `CashFlowTable.tsx`
+Possivelmente:
+- Migration SQL — adicionar coluna `email` em `clients` (se nao existir)
+- `src/integrations/supabase/types.ts` — atualizar tipos
 
