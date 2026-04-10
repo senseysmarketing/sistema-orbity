@@ -277,7 +277,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="grid gap-4 py-4 overflow-y-auto flex-1 px-1">
-            {/* Linha 1: Nome e Contato */}
+            {/* Linha 1: Nome e E-mail */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="name">Nome *</Label>
@@ -289,18 +289,30 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="contact">Contato</Label>
+                <Label htmlFor="email">E-mail</Label>
                 <Input
-                  id="contact"
-                  value={formData.contact}
-                  onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                  placeholder="Email, telefone, etc."
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="cliente@empresa.com"
                 />
+                <p className="text-xs text-muted-foreground">Este e-mail receberá as faturas e notas fiscais automáticas.</p>
               </div>
             </div>
 
-            {/* Linha 2: Serviço e Valor Mensal */}
+            {/* Linha 2: WhatsApp e Serviço */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="contact">WhatsApp</Label>
+                <Input
+                  id="contact"
+                  value={formData.contact}
+                  onChange={(e) => setFormData({ ...formData, contact: formatPhone(e.target.value) })}
+                  placeholder="(00) 00000-0000"
+                />
+                <p className="text-xs text-muted-foreground">Este número receberá os links de pagamento e avisos de vencimento.</p>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="service">Serviço</Label>
                 <Input
@@ -310,6 +322,9 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
                   placeholder="Tipo de serviço prestado"
                 />
               </div>
+            </div>
+
+            {/* Linha 3: Valor Mensal e Dia de Vencimento */}
               <div className="grid gap-2">
                 <Label htmlFor="monthly_value">Valor Mensal</Label>
                 <Input
