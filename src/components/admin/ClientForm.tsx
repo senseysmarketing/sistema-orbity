@@ -337,18 +337,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
                   placeholder="0,00"
                 />
               </div>
-
-            {/* Linha 3: Data de Início e Dia de Vencimento */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="start_date">Data de Início</Label>
-                <Input
-                  id="start_date"
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                />
-              </div>
               <div className="grid gap-2">
                 <Label htmlFor="due_date">Dia de Vencimento *</Label>
                 <Select 
@@ -366,6 +354,19 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            {/* Linha 4: Data de Início */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="start_date">Data de Início</Label>
+                <Input
+                  id="start_date"
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                />
               </div>
             </div>
 
