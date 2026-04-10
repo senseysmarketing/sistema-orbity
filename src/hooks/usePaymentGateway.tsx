@@ -23,6 +23,8 @@ export interface PaymentSettings {
   block_access_days: number;
   whatsapp_template_reminder: string | null;
   whatsapp_template_overdue: string | null;
+  notify_via_email: boolean;
+  notify_via_whatsapp: boolean;
 }
 
 const defaultSettings: Omit<PaymentSettings, 'id' | 'agency_id'> = {
@@ -42,6 +44,8 @@ const defaultSettings: Omit<PaymentSettings, 'id' | 'agency_id'> = {
   block_access_days: 5,
   whatsapp_template_reminder: null,
   whatsapp_template_overdue: null,
+  notify_via_email: true,
+  notify_via_whatsapp: true,
 };
 
 export function usePaymentGateway() {

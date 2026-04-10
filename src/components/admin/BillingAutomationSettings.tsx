@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Bell, Clock, AlertTriangle, ShieldAlert, Save, Loader2, Info } from "lucide-react";
-import { usePaymentGateway } from "@/hooks/usePaymentGateway";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Bell, Clock, AlertTriangle, ShieldAlert, Save, Loader2, Info, Mail, MessageCircle, CheckCircle2, AlertCircle } from "lucide-react";
+import { usePaymentGateway, PaymentSettings } from "@/hooks/usePaymentGateway";
+import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { useToast } from "@/hooks/use-toast";
 
 interface BillingAutomationSettingsProps {
@@ -19,47 +21,54 @@ interface BillingAutomationSettingsProps {
 
 const TEMPLATE_VARS = ['{nome_cliente}', '{valor}', '{data_vencimento}', '{link_pagamento}'];
 
+type FormData = Omit<PaymentSettings, 'id' | 'agency_id' | 'asaas_api_key' | 'asaas_sandbox' | 'asaas_enabled' | 'conexa_api_key' | 'conexa_token' | 'conexa_enabled' | 'active_gateway'>;
+
+const defaultFormData: FormData = {
+  reminder_before_enabled: false,
+  reminder_before_days: 3,
+  reminder_due_date_enabled: false,
+  reminder_overdue_enabled: false,
+  reminder_overdue_days: 1,
+  block_access_enabled: false,
+  block_access_days: 5,
+  whatsapp_template_reminder: null,
+  whatsapp_template_overdue: null,
+  notify_via_email: true,
+  notify_via_whatsapp: true,
+};
+
 export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomationSettingsProps) {
   const { settings, isAsaasActive, isConexaActive, updateSettings, isSaving } = usePaymentGateway();
+  const { account, isConnected } = useWhatsApp();
   const { toast } = useToast();
 
-  const [reminderBeforeEnabled, setReminderBeforeEnabled] = useState(false);
-  const [reminderBeforeDays, setReminderBeforeDays] = useState(3);
-  const [reminderDueDateEnabled, setReminderDueDateEnabled] = useState(false);
-  const [reminderOverdueEnabled, setReminderOverdueEnabled] = useState(false);
-  const [reminderOverdueDays, setReminderOverdueDays] = useState(1);
-  const [blockAccessEnabled, setBlockAccessEnabled] = useState(false);
-  const [blockAccessDays, setBlockAccessDays] = useState(5);
-  const [templateReminder, setTemplateReminder] = useState("");
-  const [templateOverdue, setTemplateOverdue] = useState("");
+  const [formData, setFormData] = useState<FormData>(defaultFormData);
 
   useEffect(() => {
-    if (settings) {
-      setReminderBeforeEnabled(settings.reminder_before_enabled);
-      setReminderBeforeDays(settings.reminder_before_days);
-      setReminderDueDateEnabled(settings.reminder_due_date_enabled);
-      setReminderOverdueEnabled(settings.reminder_overdue_enabled);
-      setReminderOverdueDays(settings.reminder_overdue_days);
-      setBlockAccessEnabled(settings.block_access_enabled);
-      setBlockAccessDays(settings.block_access_days);
-      setTemplateReminder(settings.whatsapp_template_reminder || "");
-      setTemplateOverdue(settings.whatsapp_template_overdue || "");
+    if (settings && settings.id) {
+      setFormData({
+        reminder_before_enabled: settings.reminder_before_enabled,
+        reminder_before_days: settings.reminder_before_days,
+        reminder_due_date_enabled: settings.reminder_due_date_enabled,
+        reminder_overdue_enabled: settings.reminder_overdue_enabled,
+        reminder_overdue_days: settings.reminder_overdue_days,
+        block_access_enabled: settings.block_access_enabled,
+        block_access_days: settings.block_access_days,
+        whatsapp_template_reminder: settings.whatsapp_template_reminder,
+        whatsapp_template_overdue: settings.whatsapp_template_overdue,
+        notify_via_email: settings.notify_via_email,
+        notify_via_whatsapp: settings.notify_via_whatsapp,
+      });
     }
   }, [settings]);
 
+  const updateField = <K extends keyof FormData>(key: K, value: FormData[K]) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+  };
+
   const handleSave = async () => {
     try {
-      await updateSettings({
-        reminder_before_enabled: reminderBeforeEnabled,
-        reminder_before_days: reminderBeforeDays,
-        reminder_due_date_enabled: reminderDueDateEnabled,
-        reminder_overdue_enabled: reminderOverdueEnabled,
-        reminder_overdue_days: reminderOverdueDays,
-        block_access_enabled: blockAccessEnabled,
-        block_access_days: blockAccessDays,
-        whatsapp_template_reminder: templateReminder || null,
-        whatsapp_template_overdue: templateOverdue || null,
-      });
+      await updateSettings(formData);
       toast({ title: "Régua de cobrança salva!", description: "As configurações de automação foram atualizadas." });
       onOpenChange(false);
     } catch {
@@ -67,8 +76,8 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
     }
   };
 
-  const insertVariable = (setter: React.Dispatch<React.SetStateAction<string>>, variable: string) => {
-    setter(prev => prev + variable);
+  const insertVariable = (field: 'whatsapp_template_reminder' | 'whatsapp_template_overdue', variable: string) => {
+    updateField(field, (formData[field] || '') + variable);
   };
 
   return (
@@ -83,6 +92,51 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
         </SheetHeader>
 
         <div className="mt-6 space-y-5">
+          {/* Canais de Envio */}
+          <Card>
+            <CardContent className="pt-4 space-y-4">
+              <Label className="font-semibold text-sm">Canais de Envio</Label>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-blue-500" />
+                  <Label className="font-medium text-sm">Notificar por E-mail</Label>
+                </div>
+                <Switch checked={formData.notify_via_email} onCheckedChange={v => updateField('notify_via_email', v)} />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4 text-green-500" />
+                    <Label className="font-medium text-sm">Notificar por WhatsApp</Label>
+                  </div>
+                  <Switch checked={formData.notify_via_whatsapp} onCheckedChange={v => updateField('notify_via_whatsapp', v)} />
+                </div>
+
+                {formData.notify_via_whatsapp && (
+                  isConnected ? (
+                    <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <AlertDescription className="text-xs text-green-700 dark:text-green-300">
+                        Conectado como: {account?.phone_number || 'WhatsApp da Agência'}
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                      <AlertDescription className="text-xs text-amber-700 dark:text-amber-300">
+                        WhatsApp desconectado. As mensagens não serão enviadas. Vá em <strong>Configurações &gt; Integrações</strong> para conectar.
+                      </AlertDescription>
+                    </Alert>
+                  )
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Separator />
+
           {/* Event 1: Reminder before */}
           <Card>
             <CardContent className="pt-4 space-y-3">
@@ -91,16 +145,16 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
                   <Clock className="h-4 w-4 text-blue-500" />
                   <Label className="font-medium">Lembrete antes do vencimento</Label>
                 </div>
-                <Switch checked={reminderBeforeEnabled} onCheckedChange={setReminderBeforeEnabled} />
+                <Switch checked={formData.reminder_before_enabled} onCheckedChange={v => updateField('reminder_before_enabled', v)} />
               </div>
-              {reminderBeforeEnabled && (
+              {formData.reminder_before_enabled && (
                 <div className="flex items-center gap-2 pl-6">
                   <Input
                     type="number"
                     min={1}
                     max={30}
-                    value={reminderBeforeDays}
-                    onChange={e => setReminderBeforeDays(Number(e.target.value) || 1)}
+                    value={formData.reminder_before_days}
+                    onChange={e => updateField('reminder_before_days', Number(e.target.value) || 1)}
                     className="w-20"
                   />
                   <span className="text-sm text-muted-foreground">dias antes</span>
@@ -117,7 +171,7 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
                   <Bell className="h-4 w-4 text-amber-500" />
                   <Label className="font-medium">Aviso no dia do vencimento</Label>
                 </div>
-                <Switch checked={reminderDueDateEnabled} onCheckedChange={setReminderDueDateEnabled} />
+                <Switch checked={formData.reminder_due_date_enabled} onCheckedChange={v => updateField('reminder_due_date_enabled', v)} />
               </div>
             </CardContent>
           </Card>
@@ -130,16 +184,16 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
                   <AlertTriangle className="h-4 w-4 text-destructive" />
                   <Label className="font-medium">Cobrança de atraso</Label>
                 </div>
-                <Switch checked={reminderOverdueEnabled} onCheckedChange={setReminderOverdueEnabled} />
+                <Switch checked={formData.reminder_overdue_enabled} onCheckedChange={v => updateField('reminder_overdue_enabled', v)} />
               </div>
-              {reminderOverdueEnabled && (
+              {formData.reminder_overdue_enabled && (
                 <div className="flex items-center gap-2 pl-6">
                   <Input
                     type="number"
                     min={1}
                     max={30}
-                    value={reminderOverdueDays}
-                    onChange={e => setReminderOverdueDays(Number(e.target.value) || 1)}
+                    value={formData.reminder_overdue_days}
+                    onChange={e => updateField('reminder_overdue_days', Number(e.target.value) || 1)}
                     className="w-20"
                   />
                   <span className="text-sm text-muted-foreground">dia(s) após o vencimento</span>
@@ -156,16 +210,16 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
                   <ShieldAlert className="h-4 w-4 text-destructive" />
                   <Label className="font-medium">Bloqueio de acesso</Label>
                 </div>
-                <Switch checked={blockAccessEnabled} onCheckedChange={setBlockAccessEnabled} />
+                <Switch checked={formData.block_access_enabled} onCheckedChange={v => updateField('block_access_enabled', v)} />
               </div>
-              {blockAccessEnabled && (
+              {formData.block_access_enabled && (
                 <div className="flex items-center gap-2 pl-6">
                   <Input
                     type="number"
                     min={1}
                     max={90}
-                    value={blockAccessDays}
-                    onChange={e => setBlockAccessDays(Number(e.target.value) || 1)}
+                    value={formData.block_access_days}
+                    onChange={e => updateField('block_access_days', Number(e.target.value) || 1)}
                     className="w-20"
                   />
                   <span className="text-sm text-muted-foreground">dias de atraso</span>
@@ -192,8 +246,8 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
           <div className="space-y-2">
             <Label className="font-medium">Template para Lembretes (Antes/No Dia)</Label>
             <Textarea
-              value={templateReminder}
-              onChange={e => setTemplateReminder(e.target.value)}
+              value={formData.whatsapp_template_reminder || ''}
+              onChange={e => updateField('whatsapp_template_reminder', e.target.value || null)}
               placeholder="Olá {nome_cliente}, sua fatura no valor de {valor} vence em {data_vencimento}..."
               rows={4}
             />
@@ -203,7 +257,7 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
                   key={v}
                   variant="outline"
                   className="cursor-pointer hover:bg-primary/10 text-xs"
-                  onClick={() => insertVariable(setTemplateReminder, v)}
+                  onClick={() => insertVariable('whatsapp_template_reminder', v)}
                 >
                   {v}
                 </Badge>
@@ -215,8 +269,8 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
           <div className="space-y-2">
             <Label className="font-medium">Template para Atrasos (Cobrança)</Label>
             <Textarea
-              value={templateOverdue}
-              onChange={e => setTemplateOverdue(e.target.value)}
+              value={formData.whatsapp_template_overdue || ''}
+              onChange={e => updateField('whatsapp_template_overdue', e.target.value || null)}
               placeholder="Olá {nome_cliente}, identificamos que sua fatura de {valor} está em atraso..."
               rows={4}
             />
@@ -226,7 +280,7 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
                   key={v}
                   variant="outline"
                   className="cursor-pointer hover:bg-primary/10 text-xs"
-                  onClick={() => insertVariable(setTemplateOverdue, v)}
+                  onClick={() => insertVariable('whatsapp_template_overdue', v)}
                 >
                   {v}
                 </Badge>

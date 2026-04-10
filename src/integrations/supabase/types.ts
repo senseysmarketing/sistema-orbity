@@ -490,6 +490,8 @@ export type Database = {
           conexa_token: string | null
           created_at: string | null
           id: string
+          notify_via_email: boolean | null
+          notify_via_whatsapp: boolean | null
           reminder_before_days: number | null
           reminder_before_enabled: boolean | null
           reminder_due_date_enabled: boolean | null
@@ -512,6 +514,8 @@ export type Database = {
           conexa_token?: string | null
           created_at?: string | null
           id?: string
+          notify_via_email?: boolean | null
+          notify_via_whatsapp?: boolean | null
           reminder_before_days?: number | null
           reminder_before_enabled?: boolean | null
           reminder_due_date_enabled?: boolean | null
@@ -534,6 +538,8 @@ export type Database = {
           conexa_token?: string | null
           created_at?: string | null
           id?: string
+          notify_via_email?: boolean | null
+          notify_via_whatsapp?: boolean | null
           reminder_before_days?: number | null
           reminder_before_enabled?: boolean | null
           reminder_due_date_enabled?: boolean | null
