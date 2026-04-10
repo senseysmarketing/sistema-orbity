@@ -21,7 +21,7 @@ interface BillingAutomationSettingsProps {
 
 const TEMPLATE_VARS = ['{nome_cliente}', '{valor}', '{data_vencimento}', '{link_pagamento}'];
 
-type FormData = Omit<PaymentSettings, 'id' | 'agency_id' | 'asaas_api_key' | 'asaas_sandbox' | 'asaas_enabled' | 'conexa_api_key' | 'conexa_token' | 'conexa_enabled' | 'active_gateway'>;
+type FormData = Omit<PaymentSettings, 'id' | 'agency_id' | 'asaas_api_key' | 'asaas_sandbox' | 'asaas_enabled' | 'conexa_api_key' | 'conexa_token' | 'conexa_enabled' | 'active_gateway' | 'asaas_webhook_token' | 'conexa_webhook_token'>;
 
 const defaultFormData: FormData = {
   reminder_before_enabled: false,

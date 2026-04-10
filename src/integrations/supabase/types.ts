@@ -483,11 +483,13 @@ export type Database = {
           asaas_api_key: string | null
           asaas_enabled: boolean | null
           asaas_sandbox: boolean | null
+          asaas_webhook_token: string | null
           block_access_days: number | null
           block_access_enabled: boolean | null
           conexa_api_key: string | null
           conexa_enabled: boolean | null
           conexa_token: string | null
+          conexa_webhook_token: string | null
           created_at: string | null
           id: string
           notify_via_email: boolean | null
@@ -507,11 +509,13 @@ export type Database = {
           asaas_api_key?: string | null
           asaas_enabled?: boolean | null
           asaas_sandbox?: boolean | null
+          asaas_webhook_token?: string | null
           block_access_days?: number | null
           block_access_enabled?: boolean | null
           conexa_api_key?: string | null
           conexa_enabled?: boolean | null
           conexa_token?: string | null
+          conexa_webhook_token?: string | null
           created_at?: string | null
           id?: string
           notify_via_email?: boolean | null
@@ -531,11 +535,13 @@ export type Database = {
           asaas_api_key?: string | null
           asaas_enabled?: boolean | null
           asaas_sandbox?: boolean | null
+          asaas_webhook_token?: string | null
           block_access_days?: number | null
           block_access_enabled?: boolean | null
           conexa_api_key?: string | null
           conexa_enabled?: boolean | null
           conexa_token?: string | null
+          conexa_webhook_token?: string | null
           created_at?: string | null
           id?: string
           notify_via_email?: boolean | null
@@ -3878,6 +3884,61 @@ export type Database = {
           },
           {
             foreignKeyName: "notification_preferences_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
+      notification_queue: {
+        Row: {
+          agency_id: string
+          channel: string
+          created_at: string
+          id: string
+          payload: Json
+          processed_at: string | null
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          agency_id: string
+          channel?: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          agency_id?: string
+          channel?: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_queue_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "notification_queue_agency_id_fkey"
             columns: ["agency_id"]
             isOneToOne: false
             referencedRelation: "master_agency_usage"
