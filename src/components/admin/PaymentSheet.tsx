@@ -38,7 +38,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "warnin
 export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselectedClient, clients = [] }: PaymentSheetProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
-  const { isAsaasActive, isConexaActive, enabledGateways } = usePaymentGateway();
+  const { enabledGateways } = usePaymentGateway();
   const [loading, setLoading] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [manualOverrideDialogOpen, setManualOverrideDialogOpen] = useState(false);
@@ -485,7 +485,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
               )}
 
               {/* Conexa Section */}
-              {isConexaActive && isEditing && (
+              {billingType === 'conexa' && isEditing && (
                 <div className="space-y-2">
                   {hasConexaCharge ? (
                     <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
