@@ -178,46 +178,26 @@ export default function Traffic() {
             Conecte suas contas de anúncios para monitorar suas campanhas
           </p>
           
-          <div className="max-w-2xl mx-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <Card className="border-2 border-dashed">
-                <CardHeader className="text-center">
-                  <Facebook className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-                  <CardTitle>Meta Ads</CardTitle>
-                  <CardDescription>
-                    Conecte Facebook e Instagram Ads
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="text-center">
-                  <Dialog open={isConnectionDialogOpen} onOpenChange={setIsConnectionDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="w-full" size="lg">
-                        <Facebook className="mr-2 h-5 w-5" />
-                        Conectar Facebook
-                      </Button>
-                    </DialogTrigger>
-                    <FacebookConnectionDialog
-                      onSuccess={handleConnectionSuccess}
-                      onClose={() => setIsConnectionDialogOpen(false)}
-                    />
-                  </Dialog>
-                </CardContent>
-              </Card>
-
-              <Card className="border-2 border-dashed opacity-60">
-                <CardHeader className="text-center">
-                  <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <CardTitle>Google Ads</CardTitle>
-                  <CardDescription>Em breve</CardDescription>
-                </CardHeader>
-                <CardContent className="text-center">
-                  <Button disabled size="lg" className="w-full">
-                    <Badge variant="secondary" className="mr-2">Em Breve</Badge>
-                    Google Ads
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+          <div className="max-w-md mx-auto">
+            <Card className="border-2 border-dashed">
+              <CardHeader className="text-center">
+                <Facebook className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+                <CardTitle>Meta Ads</CardTitle>
+                <CardDescription>
+                  Configure a conexão do Facebook na aba de Integrações nas Configurações
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center">
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={() => navigate('/dashboard/settings?tab=integrations')}
+                >
+                  <Settings className="mr-2 h-5 w-5" />
+                  Ir para Integrações
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
