@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Clock, Wifi, TrendingUp, DollarSign, Target, BarChart3 } from "lucide-react";
+import { Clock, Wifi, TrendingUp, DollarSign, Target, BarChart3, ArrowDown, Eye, MousePointerClick } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 interface ReportData {
   client_name: string;
@@ -65,6 +66,30 @@ const headerVariants = {
   hidden: { opacity: 0, y: -40 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
 };
+
+const mockChartData = [
+  { day: "Seg", investimento: 320, conversoes: 12 },
+  { day: "Ter", investimento: 480, conversoes: 18 },
+  { day: "Qua", investimento: 410, conversoes: 15 },
+  { day: "Qui", investimento: 560, conversoes: 24 },
+  { day: "Sex", investimento: 620, conversoes: 28 },
+  { day: "Sáb", investimento: 390, conversoes: 20 },
+  { day: "Dom", investimento: 290, conversoes: 10 },
+];
+
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-[#1a1a2e]/90 backdrop-blur-xl border border-white/10 rounded-xl px-4 py-3 shadow-2xl">
+      <p className="text-white/50 text-xs mb-1.5">{label}</p>
+      {payload.map((entry: any, i: number) => (
+        <p key={i} className="text-sm font-medium" style={{ color: entry.color }}>
+          {entry.name === "investimento" ? "Investimento" : "Conversões"}: {entry.name === "investimento" ? `R$ ${entry.value.toFixed(2)}` : entry.value}
+        </p>
+      ))}
+    </div>
+  );
+}
 
 export default function PublicClientReport() {
   const { token } = useParams<{ token: string }>();
@@ -164,9 +189,14 @@ function ReportDashboard({ data }: { data: ReportData }) {
 
   const maxSpend = Math.max(...(data.top_campaigns.map(c => c.spend)), 1);
 
+  const funnelData = [
+    { label: "Impressões", value: 45200, color: "#3b82f6", width: "100%", icon: Eye },
+    { label: "Cliques no Link", value: 1240, color: "#8b5cf6", width: "70%", icon: MousePointerClick },
+    { label: "Conversões", value: data.metrics.conversions || 142, color: "#10b981", width: "40%", icon: Target },
+  ];
+
   return (
     <div className="min-h-screen bg-[#0a0a1a] relative overflow-hidden">
-      {/* Radial gradient background */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.08)_0%,_transparent_60%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(139,92,246,0.05)_0%,_transparent_50%)]" />
 
@@ -208,7 +238,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
           )}
         </motion.div>
 
-        {/* Metrics Grid */}
+        {/* Metrics Grid - Glassmorphism Premium */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -221,9 +251,10 @@ function ReportDashboard({ data }: { data: ReportData }) {
               <motion.div
                 key={i}
                 variants={itemVariants}
-                className="bg-white/[0.04] backdrop-blur-md border border-white/[0.08] rounded-2xl p-4 relative overflow-hidden group"
+                className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-5 relative overflow-hidden group"
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <Icon className="absolute top-3 right-3 h-8 w-8 text-white/[0.07]" />
                 <div className="relative">
                   <div className="flex items-center gap-1.5 mb-3">
                     <Icon className="h-3.5 w-3.5 text-white/30" />
@@ -231,7 +262,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
                       {metric.label}
                     </span>
                   </div>
-                  <div className="text-2xl font-bold text-white tracking-tight" style={{ textShadow: "0 0 30px rgba(255,255,255,0.1)" }}>
+                  <div className="text-3xl font-black text-white tracking-tight" style={{ textShadow: "0 0 40px rgba(255,255,255,0.15)" }}>
                     {metric.format === "currency" ? (
                       <CountUp end={metric.value} prefix="R$ " decimals={2} />
                     ) : (
@@ -244,44 +275,136 @@ function ReportDashboard({ data }: { data: ReportData }) {
           })}
         </motion.div>
 
+        {/* Area Chart - Evolução */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="mb-8"
+        >
+          <h3 className="text-white/50 text-xs uppercase tracking-[0.15em] mb-4 font-medium">
+            Evolução (Últimos 7 dias)
+          </h3>
+          <div className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-5">
+            <ResponsiveContainer width="100%" height={250}>
+              <AreaChart data={mockChartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="colorConversions" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="day" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="investimento" name="investimento" stroke="#8b5cf6" strokeWidth={2} fillOpacity={1} fill="url(#colorSpend)" />
+                <Area type="monotone" dataKey="conversoes" name="conversoes" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorConversions)" />
+              </AreaChart>
+            </ResponsiveContainer>
+            <div className="flex items-center justify-center gap-6 mt-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#8b5cf6]" />
+                <span className="text-white/40 text-[11px]">Investimento</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#10b981]" />
+                <span className="text-white/40 text-[11px]">Conversões</span>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Funil do Tráfego */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.1, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="mb-8"
+        >
+          <h3 className="text-white/50 text-xs uppercase tracking-[0.15em] mb-4 font-medium">
+            Funil do Tráfego
+          </h3>
+          <div className="flex flex-col items-center gap-0">
+            {funnelData.map((step, i) => {
+              const Icon = step.icon;
+              return (
+                <div key={i} className="flex flex-col items-center w-full">
+                  {i > 0 && (
+                    <ArrowDown className="h-5 w-5 text-white/20 my-1.5" />
+                  )}
+                  <div
+                    className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl px-5 py-4 flex items-center justify-between transition-all duration-300"
+                    style={{ width: step.width }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${step.color}15` }}>
+                        <Icon className="h-4 w-4" style={{ color: step.color }} />
+                      </div>
+                      <span className="text-white/60 text-sm font-medium">{step.label}</span>
+                    </div>
+                    <span className="text-white font-black text-lg tracking-tight" style={{ textShadow: `0 0 20px ${step.color}30` }}>
+                      <CountUp end={step.value} />
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+
         {/* Top Campaigns */}
         {data.top_campaigns.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ delay: 1.3, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           >
             <h3 className="text-white/50 text-xs uppercase tracking-[0.15em] mb-4 font-medium">
               Top Performance
             </h3>
             <div className="space-y-3">
-              {data.top_campaigns.map((campaign, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 1 + i * 0.15 }}
-                  className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-white/80 text-sm font-medium truncate max-w-[60%]">
-                      {campaign.name}
-                    </span>
-                    <span className="text-white/50 text-xs">
-                      {formatCurrency(campaign.spend)}
-                    </span>
-                  </div>
-                  <Progress
-                    value={(campaign.spend / maxSpend) * 100}
-                    className="h-1.5 bg-white/[0.06] [&>div]:bg-gradient-to-r [&>div]:from-blue-500 [&>div]:to-violet-500"
-                  />
-                  {campaign.conversions > 0 && (
-                    <p className="text-white/30 text-[11px] mt-1.5">
-                      {campaign.conversions} conversão{campaign.conversions > 1 ? "es" : ""}
-                    </p>
-                  )}
-                </motion.div>
-              ))}
+              {data.top_campaigns.map((campaign, i) => {
+                const cpa = campaign.conversions > 0 ? campaign.spend / campaign.conversions : 0;
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 1.4 + i * 0.15 }}
+                    className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl p-4"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-white/80 text-sm font-medium truncate max-w-[60%]">
+                        {campaign.name}
+                      </span>
+                      <span className="text-white/50 text-xs">
+                        {formatCurrency(campaign.spend)}
+                      </span>
+                    </div>
+                    <Progress
+                      value={(campaign.spend / maxSpend) * 100}
+                      className="h-1.5 bg-white/[0.06] [&>div]:bg-gradient-to-r [&>div]:from-blue-500 [&>div]:to-violet-500"
+                    />
+                    <div className="flex items-center justify-between mt-1.5">
+                      {campaign.conversions > 0 && (
+                        <p className="text-white/30 text-[11px]">
+                          {campaign.conversions} conversão{campaign.conversions > 1 ? "es" : ""}
+                        </p>
+                      )}
+                      {cpa > 0 && (
+                        <p className="text-white/40 text-[11px] font-medium">
+                          CPA: {formatCurrency(cpa)}
+                        </p>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           </motion.div>
         )}
@@ -290,7 +413,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1.5 }}
+          transition={{ delay: 1.8 }}
           className="text-center mt-12"
         >
           <p className="text-white/20 text-[11px]">
