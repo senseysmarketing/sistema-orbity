@@ -18,6 +18,10 @@ export interface Client {
   contract_end_date: string | null;
   has_loyalty: boolean;
   cancelled_at: string | null;
+  document?: string | null;
+  zip_code?: string | null;
+  asaas_customer_id?: string | null;
+  conexa_customer_id?: string | null;
 }
 
 export interface ClientPayment {
@@ -28,6 +32,8 @@ export interface ClientPayment {
   paid_date: string | null;
   status: 'pending' | 'paid' | 'overdue' | 'cancelled';
   description?: string | null;
+  gateway_fee?: number | null;
+  amount_paid?: number | null;
 }
 
 export interface Expense {
@@ -139,7 +145,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       if (!agencyId) return [];
       const { data, error } = await supabase
         .from('clients')
-        .select('id, name, monthly_value, active, start_date, contact, service, due_date, observations, contract_start_date, contract_end_date, has_loyalty, cancelled_at')
+        .select('id, name, monthly_value, active, start_date, contact, service, due_date, observations, contract_start_date, contract_end_date, has_loyalty, cancelled_at, document, zip_code, asaas_customer_id, conexa_customer_id')
         .eq('agency_id', agencyId)
         .order('name');
       if (error) throw error;
