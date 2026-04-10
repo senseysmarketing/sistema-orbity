@@ -37,7 +37,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "warnin
 export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselectedClient, clients = [] }: PaymentSheetProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
-  const { isAsaasActive, isLoading: gatewayLoading } = usePaymentGateway();
+  const { isAsaasActive } = usePaymentGateway();
   const [loading, setLoading] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [manualOverrideDialogOpen, setManualOverrideDialogOpen] = useState(false);
@@ -485,6 +485,24 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
             <AlertDialogCancel>Voltar</AlertDialogCancel>
             <AlertDialogAction onClick={handleCancelPayment} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Confirmar Cancelamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Manual Override AlertDialog */}
+      <AlertDialog open={manualOverrideDialogOpen} onOpenChange={setManualOverrideDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Forçar Baixa Manual</AlertDialogTitle>
+            <AlertDialogDescription>
+              Atenção: esta ação apenas atualiza o status no Orbity localmente. Ela <strong>não cancela</strong> a cobrança no Asaas. O cliente ainda poderá receber notificações de cobrança do Asaas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => setManualOverrideConfirmed(true)}>
+              Entendi, prosseguir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
