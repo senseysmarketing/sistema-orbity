@@ -88,6 +88,10 @@ export function ClientDetailsDialog({
 }: ClientDetailsDialogProps) {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [showDeactivateAlert, setShowDeactivateAlert] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+
+  const hasGatewayLink = !!(client?.asaas_customer_id || client?.conexa_customer_id);
+  const gatewayName = client?.asaas_customer_id ? 'Asaas' : 'Conexa';
   
   if (!client) return null;
 
