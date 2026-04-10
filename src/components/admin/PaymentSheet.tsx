@@ -11,10 +11,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
-import { Ban, HelpCircle, MessageSquare, Save, X } from "lucide-react";
+import { usePaymentGateway } from "@/hooks/usePaymentGateway";
+import { Ban, HelpCircle, MessageSquare, Save, X, QrCode, Copy, MoreVertical } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface PaymentSheetProps {
   open: boolean;
@@ -35,8 +37,11 @@ const statusConfig: Record<string, { label: string; variant: "default" | "warnin
 export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselectedClient, clients = [] }: PaymentSheetProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
+  const { isAsaasActive } = usePaymentGateway();
   const [loading, setLoading] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [manualOverrideDialogOpen, setManualOverrideDialogOpen] = useState(false);
+  const [manualOverrideConfirmed, setManualOverrideConfirmed] = useState(false);
   const [updateContract, setUpdateContract] = useState(false);
   const [deactivateClient, setDeactivateClient] = useState(false);
 
@@ -98,6 +103,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
     }
     setUpdateContract(false);
     setDeactivateClient(false);
+    setManualOverrideConfirmed(false);
   }, [open, payment, preselectedClient, clients]);
 
   const handleClientChange = (id: string) => {
@@ -187,6 +193,20 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const currentStatus = statusConfig[status] || statusConfig.pending;
   const isEditing = !!payment;
   const showWhatsApp = (status === "pending" || status === "overdue") && isEditing;
+  const hasAsaasCharge = !!payment?.asaas_payment_id;
+  
+
+  const handleGenerateAsaasCharge = () => {
+    toast({ title: "Em breve", description: "A geração de cobranças via Asaas será disponibilizada em breve." });
+  };
+
+  const handleCopyPaymentLink = () => {
+    const link = payment?.invoice_url || payment?.pix_copy_paste;
+    if (link) {
+      navigator.clipboard.writeText(link);
+      toast({ title: "Link copiado!", description: "O link de pagamento foi copiado para a área de transferência." });
+    }
+  };
 
   return (
     <>
@@ -349,6 +369,49 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                 />
               </div>
 
+              {/* Asaas Section */}
+              {isAsaasActive && isEditing && (
+                <div className="space-y-2">
+                  {hasAsaasCharge ? (
+                    <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="warning" className="text-xs">Aguardando Pagamento (Asaas)</Badge>
+                      </div>
+                      <Button type="button" variant="outline" size="sm" onClick={handleCopyPaymentLink} className="w-full">
+                        <Copy className="h-4 w-4 mr-1" />
+                        Copiar Link de Pagamento
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="default" onClick={handleGenerateAsaasCharge} className="w-full">
+                      <QrCode className="h-4 w-4 mr-1" />
+                      Gerar Cobrança (Asaas)
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Asaas auto-settlement banner */}
+              {isAsaasActive && !manualOverrideConfirmed && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 p-3 flex items-center justify-between">
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    ⚡ Baixa automática habilitada via Asaas
+                  </p>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setManualOverrideDialogOpen(true)}>
+                        Forçar Baixa Manual (Override)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex flex-col gap-2 pt-4 border-t">
                 <div className="flex gap-2">
@@ -422,6 +485,24 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
             <AlertDialogCancel>Voltar</AlertDialogCancel>
             <AlertDialogAction onClick={handleCancelPayment} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Confirmar Cancelamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Manual Override AlertDialog */}
+      <AlertDialog open={manualOverrideDialogOpen} onOpenChange={setManualOverrideDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Forçar Baixa Manual</AlertDialogTitle>
+            <AlertDialogDescription>
+              Atenção: esta ação apenas atualiza o status no Orbity localmente. Ela <strong>não cancela</strong> a cobrança no Asaas. O cliente ainda poderá receber notificações de cobrança do Asaas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => setManualOverrideConfirmed(true)}>
+              Entendi, prosseguir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

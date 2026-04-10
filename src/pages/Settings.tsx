@@ -24,6 +24,7 @@ import { NotificationChannelsConfig } from "@/components/notifications/Notificat
 import { GoogleCalendarIntegration } from "@/components/settings/GoogleCalendarIntegration";
 import { WhatsAppIntegration } from "@/components/settings/WhatsAppIntegration";
 import { AISettingsManager } from "@/components/settings/AISettingsManager";
+import { AsaasIntegration } from "@/components/settings/AsaasIntegration";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -407,6 +408,7 @@ export default function Settings() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <GoogleCalendarIntegration />
             <WhatsAppIntegration />
+            {isAgencyAdmin && <AsaasIntegration />}
           </div>
         </TabsContent>
 
