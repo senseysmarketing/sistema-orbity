@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { RefreshCw, FileText, TrendingUp, DollarSign, Eye, Target, BarChart, Play, Sparkles, Copy, RotateCcw, Loader2, Share2 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { RefreshCw, FileText, TrendingUp, DollarSign, Eye, Target, BarChart, Play, Sparkles, Copy, RotateCcw, Loader2, Share2, ChevronDown, Check } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar } from 'recharts';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +19,48 @@ import { ReportGeneratorModal } from "./ReportGeneratorModal";
 import { useAIAssist } from "@/hooks/useAIAssist";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+// Mapa de tradução de action_types da Meta API
+const ACTION_TYPE_LABELS: Record<string, string> = {
+  'lead': 'Leads',
+  'purchase': 'Compras',
+  'complete_registration': 'Cadastros',
+  'onsite_conversion.messaging_conversation_started_7d': 'Conversas Iniciadas',
+  'onsite_conversion.messaging_first_reply': 'Primeiras Respostas',
+  'link_click': 'Cliques no Link',
+  'landing_page_view': 'Visualizações da Página',
+  'page_engagement': 'Engajamento na Página',
+  'post_engagement': 'Engajamento no Post',
+  'video_view': 'Visualizações de Vídeo',
+  'omni_app_install': 'Instalações do App',
+  'onsite_web_app_add_to_cart': 'Adições ao Carrinho',
+  'initiate_checkout': 'Checkouts Iniciados',
+  'add_payment_info': 'Info de Pagamento',
+  'search': 'Buscas',
+  'add_to_wishlist': 'Lista de Desejos',
+  'contact': 'Contatos',
+  'submit_application': 'Formulários Enviados',
+  'schedule': 'Agendamentos',
+};
+
+function getActionTypeLabel(actionType: string): string {
+  if (ACTION_TYPE_LABELS[actionType]) return ACTION_TYPE_LABELS[actionType];
+  // Handle offsite_conversion.* and onsite_conversion.*
+  if (actionType.startsWith('offsite_conversion.')) {
+    const sub = actionType.replace('offsite_conversion.fb_pixel_', '').replace(/_/g, ' ');
+    return `Conv. Offsite: ${sub.charAt(0).toUpperCase() + sub.slice(1)}`;
+  }
+  if (actionType.startsWith('onsite_conversion.')) {
+    const sub = actionType.replace('onsite_conversion.', '').replace(/_/g, ' ');
+    return `Conv.: ${sub.charAt(0).toUpperCase() + sub.slice(1)}`;
+  }
+  return actionType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+interface ActionData {
+  action_type: string;
+  value: string | number;
+}
 
 interface SelectedAdAccount {
   id: string;
@@ -38,6 +81,7 @@ interface Campaign {
   impressions: number;
   clicks: number;
   conversions: number;
+  actions?: ActionData[];
   ctr: number;
   cpc: number;
 }
@@ -50,6 +94,7 @@ interface MetricsData {
   cpm: number;
   cpc: number;
   ctr: number;
+  allActions?: { action_type: string; value: number }[];
 }
 
 interface ChartData {
@@ -58,6 +103,7 @@ interface ChartData {
   impressions: number;
   clicks: number;
   conversions: number;
+  actions?: ActionData[];
 }
 
 interface CampaignsAndReportsProps {
