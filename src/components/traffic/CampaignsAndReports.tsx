@@ -680,13 +680,44 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Conversões</CardTitle>
+            <div className="flex items-center gap-1.5">
+              <CardTitle className="text-sm font-medium">{currentActionLabel}</CardTitle>
+              <Popover open={actionSelectorOpen} onOpenChange={setActionSelectorOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full">
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2 max-h-60 overflow-y-auto" align="start">
+                  <p className="text-xs text-muted-foreground px-2 py-1 font-medium">Selecionar métrica de conversão</p>
+                  {sortedAvailableActions.length === 0 ? (
+                    <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma ação disponível</p>
+                  ) : (
+                    sortedAvailableActions.map((action) => (
+                      <button
+                        key={action.action_type}
+                        className={`w-full flex items-center justify-between px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors ${
+                          selectedActionType === action.action_type ? 'bg-muted font-medium' : ''
+                        }`}
+                        onClick={() => {
+                          setSelectedActionType(action.action_type);
+                          setActionSelectorOpen(false);
+                        }}
+                      >
+                        <span className="truncate mr-2">{getActionTypeLabel(action.action_type)}</span>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{formatNumber(action.value)}</span>
+                      </button>
+                    ))
+                  )}
+                </PopoverContent>
+              </Popover>
+            </div>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(metrics.conversions)}</div>
+            <div className="text-2xl font-bold">{formatNumber(dynamicTotalConversions)}</div>
             <p className="text-xs text-muted-foreground">
-              Taxa: {((metrics.conversions / metrics.clicks) * 100 || 0).toFixed(2)}%
+              Taxa: {((dynamicTotalConversions / metrics.clicks) * 100 || 0).toFixed(2)}%
             </p>
           </CardContent>
         </Card>
