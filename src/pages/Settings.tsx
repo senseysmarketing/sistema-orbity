@@ -407,12 +407,47 @@ export default function Settings() {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {isAgencyAdmin && <FacebookIntegration />}
-            <GoogleCalendarIntegration />
-            <WhatsAppIntegration />
-            {isAgencyAdmin && <AsaasIntegration />}
-            {isAgencyAdmin && <ConexaIntegration />}
+          <div className="space-y-8">
+            {isAgencyAdmin && (
+              <div>
+                <h3 className="text-lg font-semibold">Marketing e Tráfego</h3>
+                <p className="text-sm text-muted-foreground mb-4">Gerencie suas conexões de anúncios e tráfego pago</p>
+                <Separator className="mb-4" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FacebookIntegration />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <h3 className="text-lg font-semibold">Produtividade</h3>
+              <p className="text-sm text-muted-foreground mb-4">Ferramentas para organizar sua rotina e agenda</p>
+              <Separator className="mb-4" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <GoogleCalendarIntegration />
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold">Comunicação</h3>
+              <p className="text-sm text-muted-foreground mb-4">Canais de comunicação com clientes e leads</p>
+              <Separator className="mb-4" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <WhatsAppIntegration />
+              </div>
+            </div>
+
+            {isAgencyAdmin && (
+              <div>
+                <h3 className="text-lg font-semibold">Gateways de Pagamento</h3>
+                <p className="text-sm text-muted-foreground mb-4">Configure cobranças automatizadas para seus clientes</p>
+                <Separator className="mb-4" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <AsaasIntegration />
+                  <ConexaIntegration />
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
 
