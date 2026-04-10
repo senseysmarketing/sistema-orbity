@@ -387,6 +387,39 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                 />
               </div>
 
+              {/* Financial Transparency — Paid Payment Details */}
+              {isEditing && status === 'paid' && payment && (
+                (payment.gateway_fee > 0 || (payment.amount_paid && payment.amount_paid !== payment.amount)) && (
+                  <div className="rounded-lg border bg-muted/50 p-3 space-y-1.5">
+                    <p className="text-xs font-medium text-muted-foreground">Detalhes do Recebimento</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      <span className="text-muted-foreground">Valor Original:</span>
+                      <span className="text-right font-medium">R$ {(payment.amount || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                      {payment.amount_paid && payment.amount_paid !== payment.amount && (
+                        <>
+                          <span className="text-muted-foreground">Valor Pago:</span>
+                          <span className="text-right font-medium text-green-600">R$ {payment.amount_paid.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                        </>
+                      )}
+                      {payment.gateway_fee > 0 && (
+                        <>
+                          <span className="text-muted-foreground">Taxa do Gateway:</span>
+                          <span className="text-right font-medium text-destructive">- R$ {payment.gateway_fee.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                        </>
+                      )}
+                      {payment.gateway_fee > 0 && (
+                        <>
+                          <span className="text-muted-foreground font-medium">Líquido:</span>
+                          <span className="text-right font-bold text-primary">
+                            R$ {((payment.amount_paid || payment.amount) - (payment.gateway_fee || 0)).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              )}
+
               {/* Asaas Section */}
               {isAsaasActive && isEditing && (
                 <div className="space-y-2">
@@ -401,10 +434,29 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                       </Button>
                     </div>
                   ) : (
-                    <Button type="button" variant="default" onClick={handleGenerateAsaasCharge} className="w-full">
-                      <QrCode className="h-4 w-4 mr-1" />
-                      Gerar Cobrança (Asaas)
-                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="w-full">
+                            <Button
+                              type="button"
+                              variant="default"
+                              onClick={handleGenerateAsaasCharge}
+                              className="w-full"
+                              disabled={!resolvedClient?.document || !resolvedClient?.zip_code}
+                            >
+                              <QrCode className="h-4 w-4 mr-1" />
+                              Gerar Cobrança (Asaas)
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {(!resolvedClient?.document || !resolvedClient?.zip_code) && (
+                          <TooltipContent side="top" className="max-w-[280px]">
+                            <p>Dados de faturamento incompletos. Preencha o CPF/CNPJ e CEP do cliente para emitir cobranças oficiais.</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
                 </div>
               )}
@@ -434,10 +486,29 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                       </div>
                     </div>
                   ) : (
-                    <Button type="button" variant="default" onClick={handleGenerateConexaCharge} className="w-full">
-                      <QrCode className="h-4 w-4 mr-1" />
-                      Gerar Cobrança (Conexa)
-                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="w-full">
+                            <Button
+                              type="button"
+                              variant="default"
+                              onClick={handleGenerateConexaCharge}
+                              className="w-full"
+                              disabled={!resolvedClient?.document || !resolvedClient?.zip_code}
+                            >
+                              <QrCode className="h-4 w-4 mr-1" />
+                              Gerar Cobrança (Conexa)
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {(!resolvedClient?.document || !resolvedClient?.zip_code) && (
+                          <TooltipContent side="top" className="max-w-[280px]">
+                            <p>Dados de faturamento incompletos. Preencha o CPF/CNPJ e CEP do cliente para emitir cobranças oficiais.</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
                 </div>
               )}

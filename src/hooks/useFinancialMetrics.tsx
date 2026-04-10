@@ -18,6 +18,10 @@ export interface Client {
   contract_end_date: string | null;
   has_loyalty: boolean;
   cancelled_at: string | null;
+  document?: string | null;
+  zip_code?: string | null;
+  asaas_customer_id?: string | null;
+  conexa_customer_id?: string | null;
 }
 
 export interface ClientPayment {
@@ -28,6 +32,8 @@ export interface ClientPayment {
   paid_date: string | null;
   status: 'pending' | 'paid' | 'overdue' | 'cancelled';
   description?: string | null;
+  gateway_fee?: number | null;
+  amount_paid?: number | null;
 }
 
 export interface Expense {
@@ -139,7 +145,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       if (!agencyId) return [];
       const { data, error } = await supabase
         .from('clients')
-        .select('id, name, monthly_value, active, start_date, contact, service, due_date, observations, contract_start_date, contract_end_date, has_loyalty, cancelled_at')
+        .select('id, name, monthly_value, active, start_date, contact, service, due_date, observations, contract_start_date, contract_end_date, has_loyalty, cancelled_at, document, zip_code, asaas_customer_id, conexa_customer_id')
         .eq('agency_id', agencyId)
         .order('name');
       if (error) throw error;
@@ -263,6 +269,20 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   const profitability = totalMRR - burnRate;
   const profitabilityMargin = totalMRR > 0 ? (profitability / totalMRR) * 100 : 0;
 
+  // Gateway fees and net revenue from paid payments in month
+  const totalGatewayFees = useMemo(() => {
+    return paymentsInMonth
+      .filter(p => p.status === 'paid')
+      .reduce((sum, p) => sum + (p.gateway_fee || 0), 0);
+  }, [paymentsInMonth]);
+
+  const totalNetRevenue = useMemo(() => {
+    const paidRevenue = paymentsInMonth
+      .filter(p => p.status === 'paid')
+      .reduce((sum, p) => sum + (p.amount_paid || p.amount), 0);
+    return paidRevenue - totalGatewayFees;
+  }, [paymentsInMonth, totalGatewayFees]);
+
   // Delinquency
   const delinquencyRate = useMemo(() => {
     return paymentsInMonth
@@ -316,7 +336,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       items.push({
         id: p.id,
         title: client.name,
-        amount: p.amount,
+        amount: p.status === 'paid' ? (p.amount_paid || p.amount) : p.amount,
         dueDate: p.due_date,
         type: 'INCOME',
         status: mapStatus(p.status),
@@ -457,6 +477,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     profitability,
     profitabilityMargin,
     delinquencyRate,
+    totalGatewayFees,
+    totalNetRevenue,
 
     // Structured data
     unifiedCashFlow,
