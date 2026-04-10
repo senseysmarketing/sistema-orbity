@@ -574,13 +574,12 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                 const dateFrom = dateRange.from.toISOString().split('T')[0];
                 const dateTo = dateRange.to.toISOString().split('T')[0];
 
-                // Build snapshot from current dashboard state
                 const snapshot = {
                   metrics: {
                     spend: metrics.spend,
                     impressions: metrics.impressions,
                     clicks: metrics.clicks,
-                    conversions: metrics.conversions,
+                    conversions: dynamicTotalConversions,
                     cpm: metrics.cpm,
                     cpc: metrics.cpc,
                     ctr: metrics.ctr,
@@ -592,13 +591,15 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                       name: c.name,
                       objective: c.objective,
                       spend: c.spend,
-                      conversions: c.conversions,
+                      conversions: computeConversionsForActions(c.actions, c.conversions),
                       impressions: c.impressions,
                       clicks: c.clicks,
                       ctr: c.ctr,
                     })),
                   chart_data: chartData,
                   active_campaigns: campaigns.filter(c => c.status === 'ACTIVE').length,
+                  selectedActionType,
+                  actionTypeLabel: currentActionLabel,
                 };
 
                 const { error: updateError } = await supabase
