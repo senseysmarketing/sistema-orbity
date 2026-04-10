@@ -77,11 +77,13 @@ export function usePaymentGateway() {
 
   const gateway = settings?.active_gateway ?? 'manual';
   const isAsaasActive = gateway === 'asaas';
+  const isConexaActive = gateway === 'conexa';
 
   return {
     settings: settings ? settings : { ...defaultSettings, id: '', agency_id: agencyId || '' } as PaymentSettings,
     gateway,
     isAsaasActive,
+    isConexaActive,
     isLoading,
     updateSettings: upsertMutation.mutateAsync,
     isSaving: upsertMutation.isPending,

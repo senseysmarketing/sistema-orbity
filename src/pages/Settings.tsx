@@ -25,6 +25,7 @@ import { GoogleCalendarIntegration } from "@/components/settings/GoogleCalendarI
 import { WhatsAppIntegration } from "@/components/settings/WhatsAppIntegration";
 import { AISettingsManager } from "@/components/settings/AISettingsManager";
 import { AsaasIntegration } from "@/components/settings/AsaasIntegration";
+import { ConexaIntegration } from "@/components/settings/ConexaIntegration";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -409,6 +410,7 @@ export default function Settings() {
             <GoogleCalendarIntegration />
             <WhatsAppIntegration />
             {isAgencyAdmin && <AsaasIntegration />}
+            {isAgencyAdmin && <ConexaIntegration />}
           </div>
         </TabsContent>
 
