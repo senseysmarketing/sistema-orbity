@@ -24,6 +24,9 @@ interface NotificationData {
   action_url?: string;
   action_label?: string;
   metadata?: any;
+  entity_type?: string;
+  entity_id?: string;
+  action_type?: string;
 }
 
 interface BatchTrackingRecord {
@@ -183,17 +186,26 @@ async function batchTrackNotifications(records: BatchTrackingRecord[]) {
 async function batchCreateNotifications(notifications: NotificationData[]) {
   if (notifications.length === 0) return;
 
-  const { error } = await supabase
-    .from('notifications')
-    .insert(notifications);
+  // Use individual inserts with ON CONFLICT handling for deduplication
+  let created = 0;
+  for (const notification of notifications) {
+    const { error } = await supabase
+      .from('notifications')
+      .insert(notification);
 
-  if (error) {
-    console.error('Error batch creating notifications:', error);
-    return;
+    if (error) {
+      // Check if it's a unique constraint violation (duplicate)
+      if (error.code === '23505') {
+        console.log(`⏭️ Duplicate notification skipped: ${notification.entity_type}/${notification.entity_id}/${notification.action_type}`);
+        continue;
+      }
+      console.error('Error creating notification:', error);
+      continue;
+    }
+    created++;
   }
 
-  // Push notifications são disparadas automaticamente pelo trigger do banco (trg_push_on_new_notification)
-  console.log(`[Notifications] ${notifications.length} notificações criadas (push será enviado via trigger)`);
+  console.log(`[Notifications] ${created}/${notifications.length} notificações criadas (push será enviado via trigger)`);
 }
 
 // ============================================
