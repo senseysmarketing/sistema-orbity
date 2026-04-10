@@ -26,6 +26,7 @@ import { WhatsAppIntegration } from "@/components/settings/WhatsAppIntegration";
 import { AISettingsManager } from "@/components/settings/AISettingsManager";
 import { AsaasIntegration } from "@/components/settings/AsaasIntegration";
 import { ConexaIntegration } from "@/components/settings/ConexaIntegration";
+import { FacebookIntegration } from "@/components/settings/FacebookIntegration";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -407,6 +408,7 @@ export default function Settings() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {isAgencyAdmin && <FacebookIntegration />}
             <GoogleCalendarIntegration />
             <WhatsAppIntegration />
             {isAgencyAdmin && <AsaasIntegration />}
