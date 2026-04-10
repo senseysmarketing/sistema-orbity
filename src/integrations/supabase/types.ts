@@ -484,6 +484,8 @@ export type Database = {
           asaas_sandbox: boolean | null
           block_access_days: number | null
           block_access_enabled: boolean | null
+          conexa_api_key: string | null
+          conexa_token: string | null
           created_at: string | null
           id: string
           reminder_before_days: number | null
@@ -502,6 +504,8 @@ export type Database = {
           asaas_sandbox?: boolean | null
           block_access_days?: number | null
           block_access_enabled?: boolean | null
+          conexa_api_key?: string | null
+          conexa_token?: string | null
           created_at?: string | null
           id?: string
           reminder_before_days?: number | null
@@ -520,6 +524,8 @@ export type Database = {
           asaas_sandbox?: boolean | null
           block_access_days?: number | null
           block_access_enabled?: boolean | null
+          conexa_api_key?: string | null
+          conexa_token?: string | null
           created_at?: string | null
           id?: string
           reminder_before_days?: number | null
@@ -1386,6 +1392,9 @@ export type Database = {
           amount: number
           asaas_payment_id: string | null
           client_id: string
+          conexa_charge_id: string | null
+          conexa_invoice_url: string | null
+          conexa_pix_copy_paste: string | null
           created_at: string
           description: string | null
           due_date: string
@@ -1401,6 +1410,9 @@ export type Database = {
           amount: number
           asaas_payment_id?: string | null
           client_id: string
+          conexa_charge_id?: string | null
+          conexa_invoice_url?: string | null
+          conexa_pix_copy_paste?: string | null
           created_at?: string
           description?: string | null
           due_date: string
@@ -1416,6 +1428,9 @@ export type Database = {
           amount?: number
           asaas_payment_id?: string | null
           client_id?: string
+          conexa_charge_id?: string | null
+          conexa_invoice_url?: string | null
+          conexa_pix_copy_paste?: string | null
           created_at?: string
           description?: string | null
           due_date?: string
@@ -1463,6 +1478,7 @@ export type Database = {
           agency_id: string | null
           asaas_customer_id: string | null
           cancelled_at: string | null
+          conexa_customer_id: string | null
           contact: string | null
           contract_end_date: string | null
           contract_start_date: string | null
@@ -1488,6 +1504,7 @@ export type Database = {
           agency_id?: string | null
           asaas_customer_id?: string | null
           cancelled_at?: string | null
+          conexa_customer_id?: string | null
           contact?: string | null
           contract_end_date?: string | null
           contract_start_date?: string | null
@@ -1513,6 +1530,7 @@ export type Database = {
           agency_id?: string | null
           asaas_customer_id?: string | null
           cancelled_at?: string | null
+          conexa_customer_id?: string | null
           contact?: string | null
           contract_end_date?: string | null
           contract_start_date?: string | null
