@@ -1,49 +1,40 @@
 
 
-# Juros, Multa e Descontos — Plano Completo
+# Refatoracao Visual do ClientForm.tsx
 
 ## Resumo
-Adicionar configuracao visual de regras financeiras (multa, juros, desconto) no painel da agencia, exibir diferencas de valor em pagamentos concluidos, e acoplar essas regras ao payload de criacao de cobrancas.
+Reestruturar o layout do modal de cliente em 3 secoes visuais com hierarquia clara, modal mais largo, scroll interno, e campos reagrupados em grids otimizados.
 
-## Alteracoes
+## Alteracoes (arquivo unico: `src/components/admin/ClientForm.tsx`)
 
-### 1. `src/hooks/usePaymentGateway.tsx`
-- Adicionar 4 campos a interface `PaymentSettings`: `default_fine_percentage`, `default_interest_percentage`, `discount_percentage`, `discount_days_before`
-- Adicionar defaults correspondentes em `defaultSettings`
+### 1. Modal e ScrollArea
+- `DialogContent`: alterar classe para `sm:max-w-2xl` (de `max-w-[600px]`)
+- Importar `ScrollArea` de `@/components/ui/scroll-area`
+- Envolver o conteudo do form com `<ScrollArea className="max-h-[80vh] px-1">`
 
-### 2. `src/components/admin/BillingAutomationSettings.tsx`
-- Remover os 4 novos campos do `Omit` no type `FormData`
-- Adicionar ao `defaultFormData` e ao `useEffect` de sincronizacao
-- Nova secao "Juros, Multas e Descontos" com `Card` contendo 4 inputs numericos com tooltips:
-  - Multa por Atraso (%)
-  - Juros de Mora (% ao mes)
-  - Desconto Pontualidade (%)
-  - Dias limite para desconto
-- Incluir `handleSave` para persistir esses campos
+### 2. Secao 1 — Dados Principais
+Titulo: `"Dados Principais"` (`h3 text-sm font-medium text-muted-foreground`)
+- Grid 2 colunas: **Nome** (col-span-2 ou ao lado de **Status/Active**)
+- Grid 2 colunas: **E-mail** | **WhatsApp** (com FormDescriptions mantidos)
+- Grid 2 colunas: **Servico** | **Data de Inicio**
+- Fidelidade (switch) + datas de contrato condicionais
+- Observacoes
 
-### 3. `src/components/admin/PaymentSheet.tsx`
-- No bloco "Detalhes do Recebimento" (linhas ~420-451), adicionar linhas contextuais:
-  - Se `amount_paid > amount`: linha verde `"+ R$ X recebidos em juros/multa"`
-  - Se `amount_paid < amount`: linha amarela `"- R$ X concedidos em desconto"`
+### 3. Separator + Secao 2 — Configuracoes de Cobranca
+Titulo: `"Configurações de Cobrança"`
+- Grid **3 colunas**: **Valor Mensal** | **Dia de Vencimento** | **Forma de Faturamento**
+- Isso colapsa 3 linhas atuais em 1 unica linha
 
-### 4. Acoplamento na emissao — `src/hooks/useCreatePayment.ts`
-- Importar `usePaymentGateway` para ler as regras financeiras da agencia
-- Incluir no payload de `createPayment` os campos `fine_percentage`, `interest_percentage`, `discount_percentage`, `discount_days_before` para que fiquem persistidos ou disponiveis
-- Adicionar comentario TODO no codigo indicando que, quando a Edge Function de emissao para Asaas/Conexa for implementada, ela devera:
-  1. Buscar `agency_payment_settings` da agencia
-  2. Montar o objeto `fine`, `interest` e `discount` conforme documentacao do gateway
-  3. Injetar no JSON enviado a API
+### 4. Separator + Secao 3 — Dados de Faturamento
+Titulo: `"Dados de Faturamento"` (manter subtitulo existente)
+- Grid 2 colunas: **CPF/CNPJ** | **CEP**
+- Grid 3 colunas: **Rua** (col-span-2) | **Numero**
+- Grid 3 colunas: **Complemento** | **Bairro** | **Cidade**
+- Grid 2 colunas: **Estado** (sozinho, ja existente)
 
-### 5. `src/components/admin/FirstPaymentDialog.tsx`
-- Mesmo acoplamento: passar as regras financeiras via `usePaymentGateway` para o `createPayment`, garantindo que o fluxo fast-track tambem carregue as regras
+### 5. Footer
+Manter `DialogFooter` fixo com `border-t`, botoes alinhados a direita (ja esta assim).
 
-## Arquivos
-- `src/hooks/usePaymentGateway.tsx`
-- `src/components/admin/BillingAutomationSettings.tsx`
-- `src/components/admin/PaymentSheet.tsx`
-- `src/hooks/useCreatePayment.ts`
-- `src/components/admin/FirstPaymentDialog.tsx`
-
-## Nenhuma migration necessaria
-As colunas ja existem no banco (migration anterior executada com sucesso).
+## Logica
+Nenhuma alteracao em logica, estado, validacao ou submit. Apenas JSX/Tailwind.
 
