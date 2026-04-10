@@ -19,6 +19,7 @@ import { PaymentSheet } from "@/components/admin/PaymentSheet";
 import { ExpenseForm } from "@/components/admin/ExpenseForm";
 import { SalarySheet } from "@/components/admin/SalarySheet";
 import { EmployeeForm } from "@/components/admin/EmployeeForm";
+import { FirstPaymentDialog } from "@/components/admin/FirstPaymentDialog";
 
 // Details dialogs
 import { ClientDetailsDialog } from "@/components/admin/ClientDetailsDialog";
@@ -80,6 +81,7 @@ export default function Admin() {
 
   const [hasEnsuredCurrentMonthPayments, setHasEnsuredCurrentMonthPayments] = useState(false);
   const [clientManagementOpen, setClientManagementOpen] = useState(false);
+  const [firstPaymentClient, setFirstPaymentClient] = useState<any>(null);
 
   const hasAccess = profile?.role === 'agency_admin';
 
@@ -455,6 +457,17 @@ export default function Admin() {
         onOpenChange={open => { setClientFormOpen(open); if (!open) setSelectedClient(null); }}
         client={selectedClient}
         onSuccess={metrics.refetchAll}
+        onClientCreated={(newClient) => {
+          setClientFormOpen(false);
+          setSelectedClient(null);
+          setFirstPaymentClient(newClient);
+        }}
+      />
+
+      <FirstPaymentDialog
+        isOpen={!!firstPaymentClient}
+        onClose={() => { setFirstPaymentClient(null); metrics.refetchAll(); }}
+        client={firstPaymentClient}
       />
 
       <PaymentSheet
