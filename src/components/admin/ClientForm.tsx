@@ -9,10 +9,32 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePickerDemo } from "@/components/ui/date-picker";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
+import { Loader2 } from "lucide-react";
 
+// Máscaras
+function formatDocument(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 14);
+  if (digits.length <= 11) {
+    return digits
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  }
+  return digits
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+}
+
+function formatCep(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  return digits.replace(/(\d{5})(\d)/, '$1-$2');
+}
 
 interface ClientFormProps {
   open: boolean;
@@ -21,28 +43,38 @@ interface ClientFormProps {
   client?: any;
 }
 
+const initialFormData = {
+  name: '',
+  contact: '',
+  service: '',
+  monthly_value: '',
+  active: true,
+  start_date: '',
+  due_date: '1',
+  observations: '',
+  contract_start_date: null as string | null,
+  contract_end_date: null as string | null,
+  has_loyalty: true,
+  document: '',
+  zip_code: '',
+  street: '',
+  number: '',
+  complement: '',
+  neighborhood: '',
+  city: '',
+  state: '',
+};
+
 export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientFormProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
   
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [cepLoading, setCepLoading] = useState(false);
   const [generateContract, setGenerateContract] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    contact: '',
-    service: '',
-    monthly_value: '',
-    active: true,
-    start_date: '',
-    due_date: '1',
-    observations: '',
-    contract_start_date: null,
-    contract_end_date: null,
-    has_loyalty: true,
-  });
+  const [formData, setFormData] = useState({ ...initialFormData });
 
-  // Atualizar formulário quando cliente mudar
   useEffect(() => {
     if (client) {
       setFormData({
@@ -57,29 +89,47 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         contract_start_date: client.contract_start_date || null,
         contract_end_date: client.contract_end_date || null,
         has_loyalty: client.has_loyalty ?? true,
+        document: client.document || '',
+        zip_code: client.zip_code || '',
+        street: client.street || '',
+        number: client.number || '',
+        complement: client.complement || '',
+        neighborhood: client.neighborhood || '',
+        city: client.city || '',
+        state: client.state || '',
       });
     } else {
-      // Resetar formulário para novo cliente
-      setFormData({
-        name: '',
-        contact: '',
-        service: '',
-        monthly_value: '',
-        active: true,
-        start_date: '',
-        due_date: '1',
-        observations: '',
-        contract_start_date: null,
-        contract_end_date: null,
-        has_loyalty: true,
-      });
+      setFormData({ ...initialFormData });
     }
   }, [client]);
+
+  const fetchAddressByCep = async (cep: string) => {
+    const cleanCep = cep.replace(/\D/g, '');
+    if (cleanCep.length !== 8) return;
+    
+    setCepLoading(true);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+      if (!data.erro) {
+        setFormData(prev => ({
+          ...prev,
+          street: data.logradouro || prev.street,
+          neighborhood: data.bairro || prev.neighborhood,
+          city: data.localidade || prev.city,
+          state: data.uf || prev.state,
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+    } finally {
+      setCepLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate required fields for loyalty clients
     if (formData.has_loyalty && (!formData.contract_start_date || !formData.contract_end_date)) {
       toast({
         title: "Campos obrigatórios",
@@ -89,19 +139,33 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
       return;
     }
     
-    
     setLoading(true);
 
     try {
+      const cleanDocument = formData.document.replace(/\D/g, '');
+      const cleanZipCode = formData.zip_code.replace(/\D/g, '');
+
       const data = {
-        ...formData,
+        name: formData.name,
+        contact: formData.contact,
+        service: formData.service,
         monthly_value: formData.monthly_value ? parseFloat(formData.monthly_value) : null,
+        active: formData.active,
         start_date: formData.start_date || null,
         due_date: parseInt(formData.due_date),
+        observations: formData.observations,
         contract_start_date: formData.contract_start_date,
         contract_end_date: formData.contract_end_date,
         has_loyalty: formData.has_loyalty,
         agency_id: currentAgency?.id,
+        document: cleanDocument || null,
+        zip_code: cleanZipCode || null,
+        street: formData.street || null,
+        number: formData.number || null,
+        complement: formData.complement || null,
+        neighborhood: formData.neighborhood || null,
+        city: formData.city || null,
+        state: formData.state || null,
       };
 
       let savedClientId: string | undefined;
@@ -123,13 +187,10 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         if (clientError) throw clientError;
         savedClientId = newClientData?.id;
 
-        // Criar pagamento automático para o cliente
         if (newClientData && formData.monthly_value) {
           const currentDate = new Date();
           const currentYear = currentDate.getFullYear();
           const currentMonth = currentDate.getMonth();
-          
-          // Calcular a data de vencimento para o mês atual
           const dueDay = Math.min(parseInt(formData.due_date), 28);
           const dueDate = new Date(currentYear, currentMonth, dueDay);
           
@@ -163,19 +224,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
               navigate(`/contracts?clientId=${savedClientId}`);
             }
             
-            setFormData({
-              name: '',
-              contact: '',
-              service: '',
-              monthly_value: '',
-              active: true,
-              start_date: '',
-              due_date: '1',
-              observations: '',
-              contract_start_date: null,
-              contract_end_date: null,
-              has_loyalty: true,
-            });
+            setFormData({ ...initialFormData });
             return;
           }
         }
@@ -189,24 +238,11 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
       onSuccess();
       onOpenChange(false);
       
-      // Redirecionar para gerador de contrato se checkbox marcado
       if (generateContract && !client && savedClientId) {
         navigate(`/contracts?clientId=${savedClientId}`);
       }
       
-      setFormData({
-        name: '',
-        contact: '',
-        service: '',
-        monthly_value: '',
-        active: true,
-        start_date: '',
-        due_date: '1',
-        observations: '',
-        contract_start_date: null,
-        contract_end_date: null,
-        has_loyalty: true,
-      });
+      setFormData({ ...initialFormData });
     } catch (error: any) {
       toast({
         title: "Erro",
@@ -375,6 +411,104 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
                 placeholder="Observações adicionais"
                 rows={3}
               />
+            </div>
+
+            {/* === DADOS DE FATURAMENTO === */}
+            <div className="pt-2">
+              <Separator />
+              <h3 className="text-sm font-semibold mt-4 mb-1">Dados de Faturamento</h3>
+              <p className="text-xs text-muted-foreground mb-4">Necessários para emissão de cobranças via Asaas/Conexa</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="document">CPF/CNPJ</Label>
+                <Input
+                  id="document"
+                  value={formData.document}
+                  onChange={(e) => setFormData({ ...formData, document: formatDocument(e.target.value) })}
+                  placeholder="000.000.000-00"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="zip_code">CEP</Label>
+                <div className="relative">
+                  <Input
+                    id="zip_code"
+                    value={formData.zip_code}
+                    onChange={(e) => setFormData({ ...formData, zip_code: formatCep(e.target.value) })}
+                    onBlur={() => fetchAddressByCep(formData.zip_code)}
+                    placeholder="00000-000"
+                  />
+                  {cepLoading && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid gap-2 md:col-span-2">
+                <Label htmlFor="street">Rua</Label>
+                <Input
+                  id="street"
+                  value={formData.street}
+                  onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                  placeholder="Logradouro"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="number">Número</Label>
+                <Input
+                  id="number"
+                  value={formData.number}
+                  onChange={(e) => setFormData({ ...formData, number: e.target.value })}
+                  placeholder="Nº"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="complement">Complemento</Label>
+                <Input
+                  id="complement"
+                  value={formData.complement}
+                  onChange={(e) => setFormData({ ...formData, complement: e.target.value })}
+                  placeholder="Sala, Andar..."
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="neighborhood">Bairro</Label>
+                <Input
+                  id="neighborhood"
+                  value={formData.neighborhood}
+                  onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
+                  placeholder="Bairro"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="city">Cidade</Label>
+                <Input
+                  id="city"
+                  value={formData.city}
+                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                  placeholder="Cidade"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="state">Estado</Label>
+                <Input
+                  id="state"
+                  value={formData.state}
+                  onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase().slice(0, 2) })}
+                  placeholder="UF"
+                  maxLength={2}
+                />
+              </div>
             </div>
 
             {/* Checkbox para gerar contrato (apenas para novos clientes) */}
