@@ -1,59 +1,69 @@
 
 
-# Campos de Faturamento no Cliente (CPF/CNPJ + Endereço + ViaCEP)
+# Expandir Gestão de Cobranças — Revisão com 3 Regras Adicionais
 
-## Resumo
-Adicionar campos de faturamento (documento e endereço) à tabela `clients`, ao formulário de cadastro/edição com auto-preenchimento via ViaCEP, e à visualização do cliente.
+## Resumo das adições ao plano original
 
-## 1. Migration — Novos campos na tabela `clients`
+O plano original (gateway badges, alertas, soft delete) continua válido. As 3 regras adicionais reforçam a integridade dos dados:
 
-Os campos `document`, `zip_code`, `street`, `number`, `complement`, `neighborhood`, `city`, `state` não existem. Criar migration:
+## 1. Migration SQL — Constraint de Status (NOVA)
+
+Verificação feita: **não existe** CHECK constraint nas colunas `status` de `client_payments`, `expenses` nem `salaries`. Os valores são TEXT livre. Criar migration adicionando constraint explícito em todas as 3 tabelas:
 
 ```sql
-ALTER TABLE public.clients
-  ADD COLUMN IF NOT EXISTS document TEXT,
-  ADD COLUMN IF NOT EXISTS zip_code TEXT,
-  ADD COLUMN IF NOT EXISTS street TEXT,
-  ADD COLUMN IF NOT EXISTS number TEXT,
-  ADD COLUMN IF NOT EXISTS complement TEXT,
-  ADD COLUMN IF NOT EXISTS neighborhood TEXT,
-  ADD COLUMN IF NOT EXISTS city TEXT,
-  ADD COLUMN IF NOT EXISTS state TEXT;
+ALTER TABLE public.client_payments
+  ADD CONSTRAINT client_payments_status_check
+  CHECK (status IN ('pending', 'paid', 'overdue', 'cancelled'));
+
+ALTER TABLE public.expenses
+  ADD CONSTRAINT expenses_status_check
+  CHECK (status IN ('pending', 'paid', 'overdue', 'cancelled'));
+
+ALTER TABLE public.salaries
+  ADD CONSTRAINT salaries_status_check
+  CHECK (status IN ('pending', 'paid', 'overdue', 'cancelled'));
 ```
 
-Todos nullable — sem obrigatoriedade.
+## 2. Prevenção de "Receita Fantasma" — Auditoria nos hooks
 
-## 2. ClientForm.tsx — Seção "Dados de Faturamento"
+### `useFinancialMetrics.tsx`
+- **`unifiedCashFlow`** (linhas 313-346): Já filtra `cancelled` com `return` — mas os itens cancelados **devem aparecer** na tabela (regra 3). Alterar para **incluir** cancelled no cashFlow mas mantê-los excluídos dos cálculos numéricos.
+- **`totalExpenses`** (linha 251): Atualmente soma TODAS as expenses sem filtrar cancelled. Corrigir: `expenses.filter(e => e.status !== 'cancelled').reduce(...)`.
+- **`totalPayroll`** (linha 256): Idem para salários: `salaries.filter(s => s.status !== 'cancelled').reduce(...)`.
+- **`delinquencyRate`** (linha 268): Já filtra por `status === 'overdue'`, OK.
 
-- Adicionar ao `formData`: `document`, `zip_code`, `street`, `number`, `complement`, `neighborhood`, `city`, `state`
-- Carregar valores existentes no `useEffect` de edição
-- Incluir no `handleSubmit` os novos campos no objeto `data`
-- Adicionar separador visual (`<Separator />` + título "Dados de Faturamento") após a seção atual
-- Campos:
-  - **CPF/CNPJ** — input com máscara (formatação visual: `000.000.000-00` para CPF, `00.000.000/0001-00` para CNPJ, baseado no length)
-  - **CEP** — input com máscara `00000-000` e `onBlur` que chama ViaCEP quando 8 dígitos
-  - **Rua**, **Número**, **Complemento** — grid 3 colunas
-  - **Bairro**, **Cidade**, **Estado** — grid 3 colunas
-- Função `fetchAddressByCep`: fetch `https://viacep.com.br/ws/${cep}/json/`, preenche `street`, `neighborhood`, `city`, `state` automaticamente
-- Resetar esses campos no reset do form
+### `useAdvancedAnalytics.tsx`
+- Já busca apenas `status = 'paid'` no Supabase (`.eq('status', 'paid')`), portanto cancelled nunca entra. OK, sem alteração.
 
-## 3. ClientDetailsDialog.tsx — Exibir dados de faturamento
+## 3. Visualização de Cancelled no CashFlowTable
 
-- Adicionar campos ao interface `Client`
-- Na aba "Informações", adicionar seção "Dados de Faturamento" com:
-  - CPF/CNPJ formatado
-  - Endereço completo em uma linha (Rua, Nº - Complemento, Bairro - Cidade/UF, CEP)
-  - Se nenhum campo preenchido, mostrar texto: "Dados de faturamento não cadastrados"
+### `useFinancialMetrics.tsx` — Incluir cancelled no cashFlow
+- Remover os `if (status === 'cancelled') return;` das linhas 314, 331, 346
+- Os itens cancelados agora aparecem no array `unifiedCashFlow` com status `CANCELLED`
 
-## 4. ClientOverview.tsx — Card de faturamento
+### `CashFlowTable.tsx` — Filtro e estilo visual
+- **Filtro** (linha 43): Remover `if (item.status === 'CANCELLED') return false;` — cancelled deve aparecer no filtro "Este Mês"
+- **Estilo da linha**: Quando `item.status === 'CANCELLED'`, aplicar `opacity-50` no `<TableRow>`
+- **Valor numérico**: Aplicar `line-through text-muted-foreground` no `<TableCell>` do valor
+- **Ações**: Esconder botões de "Marcar como Pago" e menu de cancelamento para itens cancelled
 
-- Na página de detalhe do cliente (`ClientDetail`), adicionar card "Dados de Faturamento" na grid `lg:grid-cols-2` ao lado de "Próximas Reuniões"
-- Exibir documento e endereço formatados
-- Badge de alerta se documento estiver vazio: "CPF/CNPJ pendente"
+## 4. Hard Delete → Soft Delete no Admin.tsx (do plano original)
 
-## Arquivos modificados (4)
+- **`handleDeletePaymentById`** (linha 187): Trocar `.delete()` por `.update({ status: 'cancelled' })`
+- **`confirmDeletePayment`** (linha 208): Trocar `.delete()` por `.update({ status: 'cancelled' })`
+- Alterar toasts de "Excluído" para "Cancelado"
+
+## 5. Gateway Badges + Alertas (do plano original, mantidos)
+
+- Badge de origem (Manual/Asaas/Conexa) no CashFlowTable e ClientPaymentHistory
+- Alerta amarelo no PaymentSheet ao editar cobrança com gateway
+- Mensagem dinâmica no AlertDialog de cancelamento
+
+## Arquivos modificados
 - Migration SQL (novo)
-- `src/components/admin/ClientForm.tsx`
-- `src/components/admin/ClientDetailsDialog.tsx`
-- `src/components/clients/ClientOverview.tsx`
+- `src/hooks/useFinancialMetrics.tsx`
+- `src/components/admin/CommandCenter/CashFlowTable.tsx`
+- `src/components/admin/ClientPaymentHistory.tsx`
+- `src/components/admin/PaymentSheet.tsx`
+- `src/pages/Admin.tsx`
 
