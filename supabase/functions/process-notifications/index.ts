@@ -769,7 +769,10 @@ async function processMeetings() {
             message: meeting.title,
             action_url: '/agenda',
             action_label: 'Ver reunião',
-            metadata: { meeting_id: meeting.id, play_sound: true },
+            metadata: { meeting_id: meeting.id, play_sound: true, meeting_link: (meeting as any).meeting_link || null },
+            entity_type: 'meeting',
+            entity_id: meeting.id,
+            action_type: 'reminder',
           });
           toTrack.push({
             notification_type: 'meeting',
@@ -795,7 +798,10 @@ async function processMeetings() {
               message: meeting.title,
               action_url: '/agenda',
               action_label: 'Ver reunião',
-              metadata: { meeting_id: meeting.id, play_sound: true },
+              metadata: { meeting_id: meeting.id, play_sound: true, meeting_link: (meeting as any).meeting_link || null },
+              entity_type: 'meeting',
+              entity_id: meeting.id,
+              action_type: 'reminder',
             });
             toTrack.push({
               notification_type: 'meeting',
