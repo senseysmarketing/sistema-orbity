@@ -36,7 +36,7 @@ export function useNotifications() {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
   const { user } = useAuth();
-  const { showNotification } = useBrowserNotifications();
+  const _browserNotifications = useBrowserNotifications();
 
   const fetchNotifications = useCallback(async () => {
     if (!currentAgency?.id) return;
