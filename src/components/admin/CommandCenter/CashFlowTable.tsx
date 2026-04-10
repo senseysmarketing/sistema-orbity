@@ -40,11 +40,10 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
     in7Days.setDate(today.getDate() + 7);
 
     return cashFlow.filter(item => {
-      if (item.status === 'CANCELLED') return false;
       if (filter === 'overdue') return item.status === 'OVERDUE';
       if (filter === 'next7') {
         const d = new Date(item.dueDate);
-        return d >= today && d <= in7Days && item.status !== 'PAID';
+        return d >= today && d <= in7Days && item.status !== 'PAID' && item.status !== 'CANCELLED';
       }
       return true;
     }).filter(item => {
@@ -132,8 +131,10 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map(item => (
-                    <TableRow key={`${item.sourceType}-${item.id}`} className={item.status === 'OVERDUE' ? 'bg-rose-50/50 dark:bg-rose-950/10' : ''}>
+                  filtered.map(item => {
+                    const isCancelled = item.status === 'CANCELLED';
+                    return (
+                    <TableRow key={`${item.sourceType}-${item.id}`} className={`${item.status === 'OVERDUE' ? 'bg-rose-50/50 dark:bg-rose-950/10' : ''} ${isCancelled ? 'opacity-50' : ''}`}>
                       <TableCell className="pr-0">
                         {item.type === 'INCOME' ? (
                           <ArrowUpCircle className="h-4 w-4 text-emerald-500" />
@@ -142,7 +143,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                         )}
                       </TableCell>
                       <TableCell className="font-medium text-sm">{item.title}</TableCell>
-                      <TableCell className={`text-right font-semibold text-sm ${item.type === 'INCOME' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      <TableCell className={`text-right font-semibold text-sm ${isCancelled ? 'line-through text-muted-foreground' : item.type === 'INCOME' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                         {item.type === 'INCOME' ? '+' : '-'} {formatCurrency(item.amount)}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
@@ -187,7 +188,8 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
