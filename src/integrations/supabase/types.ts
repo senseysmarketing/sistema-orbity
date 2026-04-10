@@ -476,6 +476,85 @@ export type Database = {
           },
         ]
       }
+      agency_payment_settings: {
+        Row: {
+          active_gateway: string
+          agency_id: string
+          asaas_api_key: string | null
+          asaas_sandbox: boolean | null
+          block_access_days: number | null
+          block_access_enabled: boolean | null
+          created_at: string | null
+          id: string
+          reminder_before_days: number | null
+          reminder_before_enabled: boolean | null
+          reminder_due_date_enabled: boolean | null
+          reminder_overdue_days: number | null
+          reminder_overdue_enabled: boolean | null
+          updated_at: string | null
+          whatsapp_template_overdue: string | null
+          whatsapp_template_reminder: string | null
+        }
+        Insert: {
+          active_gateway?: string
+          agency_id: string
+          asaas_api_key?: string | null
+          asaas_sandbox?: boolean | null
+          block_access_days?: number | null
+          block_access_enabled?: boolean | null
+          created_at?: string | null
+          id?: string
+          reminder_before_days?: number | null
+          reminder_before_enabled?: boolean | null
+          reminder_due_date_enabled?: boolean | null
+          reminder_overdue_days?: number | null
+          reminder_overdue_enabled?: boolean | null
+          updated_at?: string | null
+          whatsapp_template_overdue?: string | null
+          whatsapp_template_reminder?: string | null
+        }
+        Update: {
+          active_gateway?: string
+          agency_id?: string
+          asaas_api_key?: string | null
+          asaas_sandbox?: boolean | null
+          block_access_days?: number | null
+          block_access_enabled?: boolean | null
+          created_at?: string | null
+          id?: string
+          reminder_before_days?: number | null
+          reminder_before_enabled?: boolean | null
+          reminder_due_date_enabled?: boolean | null
+          reminder_overdue_days?: number | null
+          reminder_overdue_enabled?: boolean | null
+          updated_at?: string | null
+          whatsapp_template_overdue?: string | null
+          whatsapp_template_reminder?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_payment_settings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_payment_settings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "agency_payment_settings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       agency_subscriptions: {
         Row: {
           agency_id: string
@@ -1305,36 +1384,45 @@ export type Database = {
         Row: {
           agency_id: string | null
           amount: number
+          asaas_payment_id: string | null
           client_id: string
           created_at: string
           description: string | null
           due_date: string
           id: string
+          invoice_url: string | null
           paid_date: string | null
+          pix_copy_paste: string | null
           status: Database["public"]["Enums"]["payment_status"]
           updated_at: string
         }
         Insert: {
           agency_id?: string | null
           amount: number
+          asaas_payment_id?: string | null
           client_id: string
           created_at?: string
           description?: string | null
           due_date: string
           id?: string
+          invoice_url?: string | null
           paid_date?: string | null
+          pix_copy_paste?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
         }
         Update: {
           agency_id?: string | null
           amount?: number
+          asaas_payment_id?: string | null
           client_id?: string
           created_at?: string
           description?: string | null
           due_date?: string
           id?: string
+          invoice_url?: string | null
           paid_date?: string | null
+          pix_copy_paste?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
         }
@@ -1373,6 +1461,7 @@ export type Database = {
         Row: {
           active: boolean
           agency_id: string | null
+          asaas_customer_id: string | null
           cancelled_at: string | null
           contact: string | null
           contract_end_date: string | null
@@ -1391,6 +1480,7 @@ export type Database = {
         Insert: {
           active?: boolean
           agency_id?: string | null
+          asaas_customer_id?: string | null
           cancelled_at?: string | null
           contact?: string | null
           contract_end_date?: string | null
@@ -1409,6 +1499,7 @@ export type Database = {
         Update: {
           active?: boolean
           agency_id?: string | null
+          asaas_customer_id?: string | null
           cancelled_at?: string | null
           contact?: string | null
           contract_end_date?: string | null
