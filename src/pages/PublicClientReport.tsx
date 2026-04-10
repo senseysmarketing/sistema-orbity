@@ -205,11 +205,25 @@ function ReportDashboard({ data }: { data: ReportData }) {
 
   const maxSpend = Math.max(...(data.top_campaigns.map(c => c.spend)), 1);
 
+  // Use real snapshot data for funnel
+  const totalImpressions = data.metrics.impressions || 0;
+  const totalClicks = data.metrics.clicks || 0;
+  const totalConversions = data.metrics.conversions || 0;
+
   const funnelData = [
-    { label: "Impressões", value: 45200, color: "#3b82f6", width: "100%", icon: Eye },
-    { label: "Cliques no Link", value: 1240, color: "#8b5cf6", width: "70%", icon: MousePointerClick },
-    { label: "Conversões", value: data.metrics.conversions || 142, color: "#10b981", width: "40%", icon: Target },
+    { label: "Impressões", value: totalImpressions, color: "#3b82f6", width: "100%", icon: Eye },
+    { label: "Cliques no Link", value: totalClicks, color: "#8b5cf6", width: "70%", icon: MousePointerClick },
+    { label: "Conversões", value: totalConversions, color: "#10b981", width: "40%", icon: Target },
   ];
+
+  // Use real chart data from snapshot, or fallback
+  const chartData = data.chart_data && data.chart_data.length > 0
+    ? data.chart_data.map(d => ({
+        day: d.date,
+        investimento: d.spend,
+        conversoes: d.conversions,
+      }))
+    : fallbackChartData;
 
   return (
     <div className="min-h-screen bg-[#0a0a1a] relative overflow-hidden">
