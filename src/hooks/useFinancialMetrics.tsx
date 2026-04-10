@@ -246,14 +246,14 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       .reduce((sum, c) => sum + (c.monthly_value || 0), 0);
   }, [clients, selectedMonth]);
 
-  // Expenses total
+  // Expenses total (exclude cancelled)
   const totalExpenses = useMemo(() => {
-    return expenses.reduce((sum, e) => sum + e.amount, 0);
+    return expenses.filter(e => e.status !== 'cancelled').reduce((sum, e) => sum + e.amount, 0);
   }, [expenses]);
 
-  // Payroll total
+  // Payroll total (exclude cancelled)
   const totalPayroll = useMemo(() => {
-    return salaries.reduce((sum, s) => sum + s.amount, 0);
+    return salaries.filter(s => s.status !== 'cancelled').reduce((sum, s) => sum + s.amount, 0);
   }, [salaries]);
 
   // Burn rate
@@ -273,7 +273,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       .reduce((sum, p) => sum + p.amount, 0);
   }, [paymentsInMonth, clients, selectedMonth]);
 
-  // Expenses by category
+  // Expenses by category (exclude cancelled)
   const expensesByCategory = useMemo((): CategoryTotal[] => {
     const map = new Map<string, { total: number; icon?: string; color?: string }>();
 
@@ -282,7 +282,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       map.set('Folha de Pagamento', { total: totalPayroll, icon: '👥', color: '#6366f1' });
     }
 
-    expenses.forEach(e => {
+    expenses.filter(e => e.status !== 'cancelled').forEach(e => {
       const cat = e.category || 'Sem Categoria';
       const existing = map.get(cat) || { total: 0 };
       const categoryInfo = expenseCategories.find(ec => ec.name === cat);
@@ -309,9 +309,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   const unifiedCashFlow = useMemo((): CashFlowItem[] => {
     const items: CashFlowItem[] = [];
 
-    // Payments (income)
+    // Payments (income) — include cancelled for visibility
     paymentsInMonth.forEach(p => {
-      if (p.status === 'cancelled' as any) return;
       const client = clients.find(c => c.id === p.client_id);
       if (!client || !wasClientActiveInMonth(client, selectedMonth)) return;
       items.push({
@@ -326,9 +325,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       });
     });
 
-    // Expenses
+    // Expenses — include cancelled for visibility
     expenses.forEach(e => {
-      if (e.status === 'cancelled' as any) return;
       items.push({
         id: e.id,
         title: e.name,
@@ -341,9 +339,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       });
     });
 
-    // Salaries
+    // Salaries — include cancelled for visibility
     salaries.forEach(s => {
-      if (s.status === 'cancelled' as any) return;
       items.push({
         id: s.id,
         title: `Salário - ${s.employee_name}`,

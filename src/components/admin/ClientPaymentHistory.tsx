@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, Clock, AlertCircle, Trash2, Calendar, X, Check } from "lucide-react";
+import { CheckCircle, Clock, AlertCircle, Trash2, Calendar, X, Check, Ban } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useState } from "react";
@@ -23,6 +23,8 @@ interface Payment {
   due_date: string;
   paid_date: string | null;
   status: 'pending' | 'paid' | 'overdue' | 'cancelled';
+  asaas_payment_id?: string | null;
+  conexa_charge_id?: string | null;
 }
 
 interface ClientPaymentHistoryProps {
@@ -43,6 +45,8 @@ export function ClientPaymentHistory({ payments, onMarkAsPaid, onDeletePayment, 
         return <Clock className="h-5 w-5 text-yellow-600" />;
       case 'overdue':
         return <AlertCircle className="h-5 w-5 text-red-600" />;
+      case 'cancelled':
+        return <Ban className="h-5 w-5 text-muted-foreground" />;
       default:
         return null;
     }
@@ -56,9 +60,17 @@ export function ClientPaymentHistory({ payments, onMarkAsPaid, onDeletePayment, 
         return <Badge className="bg-yellow-600 text-white">Pendente</Badge>;
       case 'overdue':
         return <Badge className="bg-red-600 text-white">Atrasado</Badge>;
+      case 'cancelled':
+        return <Badge className="bg-muted text-muted-foreground">Cancelado</Badge>;
       default:
         return null;
     }
+  };
+
+  const getGatewayBadge = (payment: Payment) => {
+    if (payment.asaas_payment_id) return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 text-[10px] px-1.5">Asaas</Badge>;
+    if (payment.conexa_charge_id) return <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300 text-[10px] px-1.5">Conexa</Badge>;
+    return <Badge className="bg-muted text-muted-foreground text-[10px] px-1.5">Manual</Badge>;
   };
 
   const formatDate = (dateString: string) => {
@@ -117,7 +129,9 @@ export function ClientPaymentHistory({ payments, onMarkAsPaid, onDeletePayment, 
               <Card 
                 key={payment.id} 
                 className={`relative ml-14 mb-4 ${
-                  payment.status === 'paid' 
+                  payment.status === 'cancelled'
+                    ? 'bg-muted/30 opacity-50'
+                    : payment.status === 'paid' 
                     ? 'bg-green-50/50 dark:bg-green-950/20' 
                     : payment.status === 'overdue'
                     ? 'bg-red-50/50 dark:bg-red-950/20'
@@ -132,11 +146,12 @@ export function ClientPaymentHistory({ payments, onMarkAsPaid, onDeletePayment, 
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-semibold capitalize">
                           {formatMonth(payment.due_date)}
                         </h4>
                         {getStatusBadge(payment.status)}
+                        {getGatewayBadge(payment)}
                       </div>
                       
                       <p className="text-2xl font-bold text-primary">
@@ -182,7 +197,7 @@ export function ClientPaymentHistory({ payments, onMarkAsPaid, onDeletePayment, 
                     </div>
                     
                     <div className="flex flex-col gap-2">
-                      {payment.status !== 'paid' && (
+                      {payment.status !== 'paid' && payment.status !== 'cancelled' && (
                         <>
                           <Button
                             size="sm"
@@ -200,15 +215,17 @@ export function ClientPaymentHistory({ payments, onMarkAsPaid, onDeletePayment, 
                           </Button>
                         </>
                       )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setPaymentToDelete(payment.id)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Excluir
-                      </Button>
+                      {payment.status !== 'cancelled' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setPaymentToDelete(payment.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Cancelar
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>

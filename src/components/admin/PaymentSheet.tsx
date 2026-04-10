@@ -12,7 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
 import { usePaymentGateway } from "@/hooks/usePaymentGateway";
-import { Ban, HelpCircle, MessageSquare, Save, X, QrCode, Copy, MoreVertical } from "lucide-react";
+import { Ban, HelpCircle, MessageSquare, Save, X, QrCode, Copy, MoreVertical, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -238,6 +239,15 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4 py-2">
+              {/* Gateway sync warning */}
+              {isEditing && (hasAsaasCharge || hasConexaCharge) && (
+                <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-700 dark:text-amber-300 text-xs">
+                    Aviso: Alterar o valor ou vencimento atualizará automaticamente o boleto no seu gateway de pagamento ({hasAsaasCharge ? 'Asaas' : 'Conexa'}).
+                  </AlertDescription>
+                </Alert>
+              )}
               {/* Cliente */}
               <div className="space-y-2">
                 <Label>Cliente *</Label>
@@ -494,7 +504,9 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
           <AlertDialogHeader>
             <AlertDialogTitle>Cancelar Cobrança</AlertDialogTitle>
             <AlertDialogDescription>
-              Deseja realmente cancelar e perdoar esta cobrança? O cliente não será mais cobrado por este mês. O registro será mantido no histórico.
+              {hasAsaasCharge || hasConexaCharge
+                ? `Tem certeza que deseja cancelar esta cobrança? O boleto será cancelado no gateway (${hasAsaasCharge ? 'Asaas' : 'Conexa'}) e o cliente não poderá mais pagá-lo. O registro será mantido no histórico.`
+                : 'Deseja realmente cancelar e perdoar esta cobrança? O cliente não será mais cobrado por este mês. O registro será mantido no histórico.'}
             </AlertDialogDescription>
             <TooltipProvider>
               <div className="flex items-start gap-2 mt-3 rounded-lg border p-3">

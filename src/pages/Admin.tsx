@@ -184,9 +184,9 @@ export default function Admin() {
   };
   const handleDeletePaymentById = async (paymentId: string) => {
     try {
-      const { error } = await supabase.from('client_payments').delete().eq('id', paymentId);
+      const { error } = await supabase.from('client_payments').update({ status: 'cancelled' as any }).eq('id', paymentId);
       if (error) throw error;
-      toast({ title: "Excluído", description: "Pagamento excluído" });
+      toast({ title: "Cancelado", description: "Pagamento cancelado com sucesso" });
       metrics.refetchAll();
     } catch (error: any) {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -205,9 +205,9 @@ export default function Admin() {
   const confirmDeletePayment = async () => {
     if (!paymentToDelete) return;
     try {
-      const { error } = await supabase.from('client_payments').delete().eq('id', paymentToDelete.id);
+      const { error } = await supabase.from('client_payments').update({ status: 'cancelled' as any }).eq('id', paymentToDelete.id);
       if (error) throw error;
-      toast({ title: "Excluído", description: "Pagamento excluído" });
+      toast({ title: "Cancelado", description: "Pagamento cancelado com sucesso" });
       metrics.refetchAll();
     } catch (error: any) {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
