@@ -239,7 +239,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{client ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
           <DialogDescription>
@@ -247,296 +247,299 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="grid gap-4 py-4 overflow-y-auto flex-1 px-1">
-            {/* Linha 1: Nome e E-mail */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Nome *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="email">E-mail</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="cliente@empresa.com"
-                />
-                <p className="text-xs text-muted-foreground">Este e-mail receberá as faturas e notas fiscais automáticas.</p>
-              </div>
-            </div>
+          <ScrollArea className="max-h-[80vh] px-1">
+            <div className="space-y-4 py-4 pr-3">
 
-            {/* Linha 2: WhatsApp e Serviço */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="contact">WhatsApp</Label>
-                <Input
-                  id="contact"
-                  value={formData.contact}
-                  onChange={(e) => setFormData({ ...formData, contact: formatPhone(e.target.value) })}
-                  placeholder="(00) 00000-0000"
-                />
-                <p className="text-xs text-muted-foreground">Este número receberá os links de pagamento e avisos de vencimento.</p>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="service">Serviço</Label>
-                <Input
-                  id="service"
-                  value={formData.service}
-                  onChange={(e) => setFormData({ ...formData, service: e.target.value })}
-                  placeholder="Tipo de serviço prestado"
-                />
-              </div>
-            </div>
+              {/* ── Seção 1: Dados Principais ── */}
+              <h3 className="text-sm font-medium text-muted-foreground">Dados Principais</h3>
 
-            {/* Linha 3: Valor Mensal e Dia de Vencimento */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="monthly_value">Valor Mensal</Label>
-                <Input
-                  id="monthly_value"
-                  type="number"
-                  step="0.01"
-                  value={formData.monthly_value}
-                  onChange={(e) => setFormData({ ...formData, monthly_value: e.target.value })}
-                  placeholder="0,00"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="due_date">Dia de Vencimento *</Label>
-                <Select 
-                  value={formData.due_date.toString()} 
-                  onValueChange={(value) => setFormData({ ...formData, due_date: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o dia" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                      <SelectItem key={day} value={day.toString()}>
-                        Dia {day}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Linha 4: Data de Início */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="start_date">Data de Início</Label>
-                <Input
-                  id="start_date"
-                  type="date"
-                  value={formData.start_date}
-                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                />
-              </div>
-            </div>
-
-            {/* Fidelidade */}
-            <div className="grid gap-2">
-              <Label>Fidelidade</Label>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="has_loyalty"
-                  checked={formData.has_loyalty}
-                  onCheckedChange={(checked) => setFormData({ ...formData, has_loyalty: checked })}
-                />
-                <Label htmlFor="has_loyalty">Cliente tem fidelidade</Label>
-              </div>
-            </div>
-
-            {/* Datas de Contrato (quando tem fidelidade) */}
-            {formData.has_loyalty && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label>Início do Contrato *</Label>
-                  <DatePickerDemo
-                    date={formData.contract_start_date ? new Date(formData.contract_start_date + 'T00:00:00') : undefined}
-                    onDateChange={(date) => {
-                      if (date) {
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const day = String(date.getDate()).padStart(2, '0');
-                        setFormData({ 
-                          ...formData, 
-                          contract_start_date: `${year}-${month}-${day}`
-                        });
-                      } else {
-                        setFormData({ ...formData, contract_start_date: null });
-                      }
-                    }}
-                    placeholder="Selecione a data de início"
+                  <Label htmlFor="name">Nome *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label>Fim do Contrato *</Label>
-                  <DatePickerDemo
-                    date={formData.contract_end_date ? new Date(formData.contract_end_date + 'T00:00:00') : undefined}
-                    onDateChange={(date) => {
-                      if (date) {
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const day = String(date.getDate()).padStart(2, '0');
-                        setFormData({ 
-                          ...formData, 
-                          contract_end_date: `${year}-${month}-${day}`
-                        });
-                      } else {
-                        setFormData({ ...formData, contract_end_date: null });
-                      }
-                    }}
-                    placeholder="Selecione a data de fim"
+                  <Label>Status</Label>
+                  <div className="flex items-center space-x-2 h-10">
+                    <Switch
+                      id="active"
+                      checked={formData.active}
+                      onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
+                    />
+                    <Label htmlFor="active" className="text-sm">{formData.active ? 'Ativo' : 'Inativo'}</Label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="email">E-mail de Faturamento</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="cliente@empresa.com"
+                  />
+                  <p className="text-xs text-muted-foreground">Receberá faturas e notas fiscais automáticas.</p>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="contact">Contato (WhatsApp)</Label>
+                  <Input
+                    id="contact"
+                    value={formData.contact}
+                    onChange={(e) => setFormData({ ...formData, contact: formatPhone(e.target.value) })}
+                    placeholder="(00) 00000-0000"
+                  />
+                  <p className="text-xs text-muted-foreground">Receberá links de pagamento e avisos.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="service">Serviço</Label>
+                  <Input
+                    id="service"
+                    value={formData.service}
+                    onChange={(e) => setFormData({ ...formData, service: e.target.value })}
+                    placeholder="Tipo de serviço prestado"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="start_date">Data de Início</Label>
+                  <Input
+                    id="start_date"
+                    type="date"
+                    value={formData.start_date}
+                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                   />
                 </div>
               </div>
-            )}
 
-            {/* Observações */}
-            <div className="grid gap-2">
-              <Label htmlFor="observations">Observações</Label>
-              <Textarea
-                id="observations"
-                value={formData.observations}
-                onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
-                placeholder="Observações adicionais"
-                rows={3}
-              />
-            </div>
+              <div className="grid gap-2">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="has_loyalty"
+                    checked={formData.has_loyalty}
+                    onCheckedChange={(checked) => setFormData({ ...formData, has_loyalty: checked })}
+                  />
+                  <Label htmlFor="has_loyalty">Cliente tem fidelidade</Label>
+                </div>
+              </div>
 
-            {/* === DADOS DE FATURAMENTO === */}
-            <div className="pt-2">
-              <Separator />
-              <h3 className="text-sm font-semibold mt-4 mb-1">Dados de Faturamento</h3>
-              <p className="text-xs text-muted-foreground mb-4">Necessários para emissão de cobranças via Asaas/Conexa</p>
-            </div>
+              {formData.has_loyalty && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Início do Contrato *</Label>
+                    <DatePickerDemo
+                      date={formData.contract_start_date ? new Date(formData.contract_start_date + 'T00:00:00') : undefined}
+                      onDateChange={(date) => {
+                        if (date) {
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          setFormData({ ...formData, contract_start_date: `${year}-${month}-${day}` });
+                        } else {
+                          setFormData({ ...formData, contract_start_date: null });
+                        }
+                      }}
+                      placeholder="Selecione a data de início"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Fim do Contrato *</Label>
+                    <DatePickerDemo
+                      date={formData.contract_end_date ? new Date(formData.contract_end_date + 'T00:00:00') : undefined}
+                      onDateChange={(date) => {
+                        if (date) {
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          setFormData({ ...formData, contract_end_date: `${year}-${month}-${day}` });
+                        } else {
+                          setFormData({ ...formData, contract_end_date: null });
+                        }
+                      }}
+                      placeholder="Selecione a data de fim"
+                    />
+                  </div>
+                </div>
+              )}
 
-            {/* Forma de Faturamento Padrão */}
-            <div className="grid gap-2">
-              <Label htmlFor="default_billing_type">Forma de Faturamento Padrão</Label>
-              <Select
-                value={formData.default_billing_type}
-                onValueChange={(value) => setFormData({ ...formData, default_billing_type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {enabledGateways.map((gw) => (
-                    <SelectItem key={gw} value={gw}>
-                      {gw === 'manual' ? 'Manual' : gw === 'asaas' ? 'Asaas' : 'Conexa'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="grid gap-2">
+                <Label htmlFor="observations">Observações</Label>
+                <Textarea
+                  id="observations"
+                  value={formData.observations}
+                  onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                  placeholder="Observações adicionais"
+                  rows={2}
+                />
+              </div>
+
+              {/* ── Seção 2: Configurações de Cobrança ── */}
+              <Separator className="my-4" />
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Configurações de Cobrança</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="monthly_value">Valor Mensal</Label>
+                  <Input
+                    id="monthly_value"
+                    type="number"
+                    step="0.01"
+                    value={formData.monthly_value}
+                    onChange={(e) => setFormData({ ...formData, monthly_value: e.target.value })}
+                    placeholder="0,00"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="due_date">Dia de Vencimento *</Label>
+                  <Select
+                    value={formData.due_date.toString()}
+                    onValueChange={(value) => setFormData({ ...formData, due_date: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o dia" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                        <SelectItem key={day} value={day.toString()}>
+                          Dia {day}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="default_billing_type">Forma de Faturamento</Label>
+                  <Select
+                    value={formData.default_billing_type}
+                    onValueChange={(value) => setFormData({ ...formData, default_billing_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {enabledGateways.map((gw) => (
+                        <SelectItem key={gw} value={gw}>
+                          {gw === 'manual' ? 'Manual' : gw === 'asaas' ? 'Asaas' : 'Conexa'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               {enabledGateways.length <= 1 && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Info className="h-3 w-3" />
                   Apenas faturamento manual ativo. Configure gateways em Configurações &gt; Integrações.
                 </p>
               )}
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="document">CPF/CNPJ</Label>
-                <Input
-                  id="document"
-                  value={formData.document}
-                  onChange={(e) => setFormData({ ...formData, document: formatDocument(e.target.value) })}
-                  placeholder="000.000.000-00"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="zip_code">CEP</Label>
-                <div className="relative">
+              {/* ── Seção 3: Dados de Faturamento ── */}
+              <Separator className="my-4" />
+              <h3 className="text-sm font-medium text-muted-foreground mb-1">Dados de Faturamento</h3>
+              <p className="text-xs text-muted-foreground mb-3">Necessários para emissão de cobranças via Asaas/Conexa</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="document">CPF/CNPJ</Label>
                   <Input
-                    id="zip_code"
-                    value={formData.zip_code}
-                    onChange={(e) => setFormData({ ...formData, zip_code: formatCep(e.target.value) })}
-                    onBlur={() => fetchAddressByCep(formData.zip_code)}
-                    placeholder="00000-000"
+                    id="document"
+                    value={formData.document}
+                    onChange={(e) => setFormData({ ...formData, document: formatDocument(e.target.value) })}
+                    placeholder="000.000.000-00"
                   />
-                  {cepLoading && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                  )}
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="zip_code">CEP</Label>
+                  <div className="relative">
+                    <Input
+                      id="zip_code"
+                      value={formData.zip_code}
+                      onChange={(e) => setFormData({ ...formData, zip_code: formatCep(e.target.value) })}
+                      onBlur={() => fetchAddressByCep(formData.zip_code)}
+                      placeholder="00000-000"
+                    />
+                    {cepLoading && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="grid gap-2 md:col-span-2">
-                <Label htmlFor="street">Rua</Label>
-                <Input
-                  id="street"
-                  value={formData.street}
-                  onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-                  placeholder="Logradouro"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="street">Rua</Label>
+                  <Input
+                    id="street"
+                    value={formData.street}
+                    onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                    placeholder="Logradouro"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="number">Número</Label>
+                  <Input
+                    id="number"
+                    value={formData.number}
+                    onChange={(e) => setFormData({ ...formData, number: e.target.value })}
+                    placeholder="Nº"
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="number">Número</Label>
-                <Input
-                  id="number"
-                  value={formData.number}
-                  onChange={(e) => setFormData({ ...formData, number: e.target.value })}
-                  placeholder="Nº"
-                />
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="complement">Complemento</Label>
-                <Input
-                  id="complement"
-                  value={formData.complement}
-                  onChange={(e) => setFormData({ ...formData, complement: e.target.value })}
-                  placeholder="Sala, Andar..."
-                />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="complement">Complemento</Label>
+                  <Input
+                    id="complement"
+                    value={formData.complement}
+                    onChange={(e) => setFormData({ ...formData, complement: e.target.value })}
+                    placeholder="Sala, Andar..."
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="neighborhood">Bairro</Label>
+                  <Input
+                    id="neighborhood"
+                    value={formData.neighborhood}
+                    onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
+                    placeholder="Bairro"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="city">Cidade</Label>
+                  <Input
+                    id="city"
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    placeholder="Cidade"
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="neighborhood">Bairro</Label>
-                <Input
-                  id="neighborhood"
-                  value={formData.neighborhood}
-                  onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
-                  placeholder="Bairro"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="city">Cidade</Label>
-                <Input
-                  id="city"
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                  placeholder="Cidade"
-                />
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="state">Estado</Label>
-                <Input
-                  id="state"
-                  value={formData.state}
-                  onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase().slice(0, 2) })}
-                  placeholder="UF"
-                  maxLength={2}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="state">Estado</Label>
+                  <Input
+                    id="state"
+                    value={formData.state}
+                    onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase().slice(0, 2) })}
+                    placeholder="UF"
+                    maxLength={2}
+                  />
+                </div>
               </div>
-            </div>
 
-          </div>
+            </div>
+          </ScrollArea>
           <DialogFooter className="mt-4 pt-4 border-t bg-background">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
