@@ -187,7 +187,11 @@ function ReportDashboard({ data }: { data: ReportData }) {
           <h1 className="text-xl font-bold text-white mb-1">
             {data.client_name}
           </h1>
-          <p className="text-white/50 text-sm mb-3">Relatório de Performance</p>
+          <p className="text-white/50 text-sm mb-3">
+            {data.period?.from && data.period?.to
+              ? `${new Date(data.period.from + 'T00:00:00').toLocaleDateString('pt-BR')} — ${new Date(data.period.to + 'T00:00:00').toLocaleDateString('pt-BR')}`
+              : 'Relatório de Performance'}
+          </p>
           <div className="inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-400 text-xs font-medium px-3 py-1.5 rounded-full border border-emerald-500/20">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
