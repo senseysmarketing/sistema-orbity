@@ -38,7 +38,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "warnin
 
 export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselectedClient, clients = [] }: PaymentSheetProps) {
   const { toast } = useToast();
-  const { currentAgency } = useAgency();
+  const { currentAgency } = useAgency(); // kept for cancel/contract flows
   const { enabledGateways } = usePaymentGateway();
   const { createPayment: createPaymentHook, updatePayment: updatePaymentHook } = useCreatePayment();
   const [loading, setLoading] = useState(false);
