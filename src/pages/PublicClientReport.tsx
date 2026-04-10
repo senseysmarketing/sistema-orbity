@@ -1,0 +1,298 @@
+import { useEffect, useState, useRef } from "react";
+import { useParams } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Clock, Wifi, TrendingUp, DollarSign, Target, BarChart3 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface ReportData {
+  client_name: string;
+  agency_name: string;
+  agency_logo: string | null;
+  metrics: {
+    spend: number;
+    conversions: number;
+    cpa: number;
+    active_campaigns: number;
+  };
+  top_campaigns: Array<{
+    name: string;
+    objective: string;
+    spend: number;
+    conversions: number;
+  }>;
+  is_mock: boolean;
+}
+
+function CountUp({ end, duration = 1.5, prefix = "", suffix = "", decimals = 0 }: { end: number; duration?: number; prefix?: string; suffix?: string; decimals?: number }) {
+  const [count, setCount] = useState(0);
+  const ref = useRef<number>();
+
+  useEffect(() => {
+    const startTime = Date.now();
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / (duration * 1000), 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(eased * end);
+      if (progress < 1) {
+        ref.current = requestAnimationFrame(animate);
+      }
+    };
+    ref.current = requestAnimationFrame(animate);
+    return () => { if (ref.current) cancelAnimationFrame(ref.current); };
+  }, [end, duration]);
+
+  const formatted = decimals > 0 ? count.toFixed(decimals) : Math.round(count).toLocaleString("pt-BR");
+  return <span>{prefix}{formatted}{suffix}</span>;
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.15, delayChildren: 0.3 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+};
+
+const headerVariants = {
+  hidden: { opacity: 0, y: -40 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
+};
+
+export default function PublicClientReport() {
+  const { token } = useParams<{ token: string }>();
+  const [data, setData] = useState<ReportData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => {
+    if (!token) { setExpired(true); setLoading(false); return; }
+
+    const fetchReport = async () => {
+      try {
+        const SUPABASE_URL = "https://ovookkywclrqfmtumelw.supabase.co";
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/public-client-report`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+
+        if (res.status === 403) {
+          setExpired(true);
+        } else if (res.ok) {
+          const payload = await res.json();
+          setData(payload);
+        } else {
+          setExpired(true);
+        }
+      } catch {
+        setExpired(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchReport();
+  }, [token]);
+
+  if (loading) return <LoadingState />;
+  if (expired || !data) return <ExpiredState />;
+  return <ReportDashboard data={data} />;
+}
+
+function LoadingState() {
+  return (
+    <div className="min-h-screen bg-[#0a0a1a] flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-md space-y-6">
+        <Skeleton className="h-8 w-48 mx-auto bg-white/5" />
+        <Skeleton className="h-4 w-64 mx-auto bg-white/5" />
+        <div className="grid grid-cols-2 gap-4 mt-8">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} className="h-28 rounded-2xl bg-white/5" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExpiredState() {
+  return (
+    <div className="min-h-screen bg-[#0a0a1a] flex items-center justify-center p-6">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        className="text-center max-w-sm"
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mb-6"
+        >
+          <div className="w-20 h-20 rounded-full bg-orange-500/10 flex items-center justify-center mx-auto mb-6">
+            <Clock className="h-10 w-10 text-orange-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-white mb-3">Link Expirado</h1>
+          <p className="text-white/50 text-sm leading-relaxed">
+            Por questões de segurança, este relatório ficou disponível por apenas 48 horas. 
+            Por favor, solicite um novo acesso ao seu gestor na Sensey's.
+          </p>
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+}
+
+function ReportDashboard({ data }: { data: ReportData }) {
+  const formatCurrency = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+
+  const metrics = [
+    { label: "Investimento", value: data.metrics.spend, icon: DollarSign, format: "currency" },
+    { label: "Conversões", value: data.metrics.conversions, icon: Target, format: "number" },
+    { label: "Custo / Conversão", value: data.metrics.cpa, icon: TrendingUp, format: "currency" },
+    { label: "Campanhas Ativas", value: data.metrics.active_campaigns, icon: BarChart3, format: "number" },
+  ];
+
+  const maxSpend = Math.max(...(data.top_campaigns.map(c => c.spend)), 1);
+
+  return (
+    <div className="min-h-screen bg-[#0a0a1a] relative overflow-hidden">
+      {/* Radial gradient background */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.08)_0%,_transparent_60%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(139,92,246,0.05)_0%,_transparent_50%)]" />
+
+      <div className="relative z-10 max-w-lg mx-auto px-4 py-8 pb-20">
+        {/* Header */}
+        <motion.div
+          variants={headerVariants}
+          initial="hidden"
+          animate="visible"
+          className="text-center mb-8"
+        >
+          {data.agency_logo && (
+            <img src={data.agency_logo} alt={data.agency_name} className="h-10 mx-auto mb-4 rounded-lg" />
+          )}
+          <h2 className="text-white/40 text-xs uppercase tracking-[0.2em] mb-2">
+            {data.agency_name}
+          </h2>
+          <h1 className="text-xl font-bold text-white mb-1">
+            {data.client_name}
+          </h1>
+          <p className="text-white/50 text-sm mb-3">Relatório de Performance</p>
+          <div className="inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-400 text-xs font-medium px-3 py-1.5 rounded-full border border-emerald-500/20">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <Wifi className="h-3 w-3" />
+            Ao Vivo
+          </div>
+
+          {data.is_mock && (
+            <p className="text-white/30 text-[10px] mt-3">
+              * Dados em cache. Conecte o Meta Ads para dados em tempo real.
+            </p>
+          )}
+        </motion.div>
+
+        {/* Metrics Grid */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-2 gap-3 mb-8"
+        >
+          {metrics.map((metric, i) => {
+            const Icon = metric.icon;
+            return (
+              <motion.div
+                key={i}
+                variants={itemVariants}
+                className="bg-white/[0.04] backdrop-blur-md border border-white/[0.08] rounded-2xl p-4 relative overflow-hidden group"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative">
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <Icon className="h-3.5 w-3.5 text-white/30" />
+                    <span className="text-white/40 text-[11px] font-medium uppercase tracking-wider">
+                      {metric.label}
+                    </span>
+                  </div>
+                  <div className="text-2xl font-bold text-white tracking-tight" style={{ textShadow: "0 0 30px rgba(255,255,255,0.1)" }}>
+                    {metric.format === "currency" ? (
+                      <CountUp end={metric.value} prefix="R$ " decimals={2} />
+                    ) : (
+                      <CountUp end={metric.value} />
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </motion.div>
+
+        {/* Top Campaigns */}
+        {data.top_campaigns.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <h3 className="text-white/50 text-xs uppercase tracking-[0.15em] mb-4 font-medium">
+              Top Performance
+            </h3>
+            <div className="space-y-3">
+              {data.top_campaigns.map((campaign, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 1 + i * 0.15 }}
+                  className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white/80 text-sm font-medium truncate max-w-[60%]">
+                      {campaign.name}
+                    </span>
+                    <span className="text-white/50 text-xs">
+                      {formatCurrency(campaign.spend)}
+                    </span>
+                  </div>
+                  <Progress
+                    value={(campaign.spend / maxSpend) * 100}
+                    className="h-1.5 bg-white/[0.06] [&>div]:bg-gradient-to-r [&>div]:from-blue-500 [&>div]:to-violet-500"
+                  />
+                  {campaign.conversions > 0 && (
+                    <p className="text-white/30 text-[11px] mt-1.5">
+                      {campaign.conversions} conversão{campaign.conversions > 1 ? "es" : ""}
+                    </p>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Footer */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5 }}
+          className="text-center mt-12"
+        >
+          <p className="text-white/20 text-[11px]">
+            Gerado por <span className="text-white/30 font-medium">Sensey's</span>
+          </p>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
