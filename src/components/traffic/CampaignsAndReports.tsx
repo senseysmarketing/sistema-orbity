@@ -470,6 +470,33 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                 const dateFrom = dateRange.from.toISOString().split('T')[0];
                 const dateTo = dateRange.to.toISOString().split('T')[0];
 
+                // Build snapshot from current dashboard state
+                const snapshot = {
+                  metrics: {
+                    spend: metrics.spend,
+                    impressions: metrics.impressions,
+                    clicks: metrics.clicks,
+                    conversions: metrics.conversions,
+                    cpm: metrics.cpm,
+                    cpc: metrics.cpc,
+                    ctr: metrics.ctr,
+                  },
+                  top_campaigns: campaigns
+                    .sort((a, b) => b.spend - a.spend)
+                    .slice(0, 5)
+                    .map(c => ({
+                      name: c.name,
+                      objective: c.objective,
+                      spend: c.spend,
+                      conversions: c.conversions,
+                      impressions: c.impressions,
+                      clicks: c.clicks,
+                      ctr: c.ctr,
+                    })),
+                  chart_data: chartData,
+                  active_campaigns: campaigns.filter(c => c.status === 'ACTIVE').length,
+                };
+
                 const { error: updateError } = await supabase
                   .from("clients")
                   .update({ 
@@ -478,6 +505,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                     report_ad_account_id: selectedAccount,
                     report_date_from: dateFrom,
                     report_date_to: dateTo,
+                    report_snapshot: snapshot as any,
                   })
                   .eq("id", clientId);
 
