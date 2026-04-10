@@ -15,11 +15,26 @@ interface ReportData {
     conversions: number;
     cpa: number;
     active_campaigns: number;
+    impressions?: number;
+    clicks?: number;
+    cpm?: number;
+    cpc?: number;
+    ctr?: number;
   };
   top_campaigns: Array<{
     name: string;
     objective: string;
     spend: number;
+    conversions: number;
+    impressions?: number;
+    clicks?: number;
+    ctr?: number;
+  }>;
+  chart_data?: Array<{
+    date: string;
+    spend: number;
+    impressions: number;
+    clicks: number;
     conversions: number;
   }>;
   is_mock: boolean;
