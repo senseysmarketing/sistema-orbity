@@ -1,31 +1,68 @@
 
 
-# Responsividade do PublicClientReport.tsx
+# Integração Conexa — Gateway de Pagamentos
 
-## Problema
-Os números grandes (ex: "R$ 652.76", "77.316") transbordam dos cards e dos blocos do funil em telas pequenas. Os blocos do funil com largura percentual (70%, 40%) ficam estreitos demais, cortando o conteúdo.
+## Resumo
+Adicionar suporte ao gateway Conexa com a mesma arquitetura híbrida do Asaas: migrations de banco, componente de configuração, hook atualizado, PaymentSheet com renderização condicional, e compatibilidade na régua de cobrança.
 
-## Alterações em `src/pages/PublicClientReport.tsx`
+## 1. Migration SQL
 
-### 1. Cards de Métricas - Texto Responsivo
-- Trocar `text-3xl` por `text-xl sm:text-2xl md:text-3xl` nos valores
-- Adicionar `min-w-0` e `break-words` / `overflow-hidden` nos cards
-- Reduzir padding de `p-5` para `p-3 sm:p-5`
+```sql
+-- Atualizar constraint do gateway
+ALTER TABLE public.agency_payment_settings 
+  DROP CONSTRAINT IF EXISTS agency_payment_settings_active_gateway_check;
+ALTER TABLE public.agency_payment_settings 
+  ADD CONSTRAINT agency_payment_settings_active_gateway_check 
+  CHECK (active_gateway IN ('manual', 'asaas', 'conexa'));
 
-### 2. Funil do Tráfego - Larguras Mínimas
-- Mudar larguras de `100%/70%/40%` para `100%/85%/70%` para evitar esmagamento
-- Adicionar `min-w-0` nos blocos do funil
-- Reduzir font-size do valor de `text-lg` para `text-base sm:text-lg`
-- Reduzir label de `text-sm` para `text-xs sm:text-sm`
-- Reduzir padding de `px-5 py-4` para `px-3 py-3 sm:px-5 sm:py-4`
+-- Campos Conexa na config da agência
+ALTER TABLE public.agency_payment_settings
+  ADD COLUMN IF NOT EXISTS conexa_api_key TEXT,
+  ADD COLUMN IF NOT EXISTS conexa_token TEXT;
 
-### 3. Gráfico AreaChart
-- Reduzir `height` de 250 para 200 em mobile via classe condicional
-- Ajustar `margin.left` de -20 para -15
+-- ID do cliente no Conexa
+ALTER TABLE public.clients
+  ADD COLUMN IF NOT EXISTS conexa_customer_id TEXT;
 
-### 4. Container Geral
-- O `max-w-lg` já limita bem; adicionar `px-3 sm:px-4` para telas muito pequenas
+-- Colunas de cobrança Conexa nos pagamentos
+ALTER TABLE public.client_payments
+  ADD COLUMN IF NOT EXISTS conexa_charge_id TEXT,
+  ADD COLUMN IF NOT EXISTS conexa_invoice_url TEXT,
+  ADD COLUMN IF NOT EXISTS conexa_pix_copy_paste TEXT;
+```
 
-## Arquivo modificado: 1
-- `src/pages/PublicClientReport.tsx`
+## 2. Novo componente `src/components/settings/ConexaIntegration.tsx`
+- Clone da estrutura do `AsaasIntegration.tsx`
+- Campos: `conexa_api_key`, `conexa_token` (mascarados)
+- Master Switch que seta `active_gateway: 'conexa'`
+- Badge Conectado/Desconectado
+- Ícone DollarSign com cor diferenciada (azul em vez de verde)
+
+## 3. `src/pages/Settings.tsx`
+- Importar e renderizar `<ConexaIntegration />` ao lado do Asaas na grid de integrações
+
+## 4. `src/hooks/usePaymentGateway.tsx`
+- Atualizar tipo `active_gateway` para `'manual' | 'asaas' | 'conexa'`
+- Adicionar `isConexaActive` ao retorno (`gateway === 'conexa'`)
+- Adicionar campos `conexa_api_key`, `conexa_token` ao `PaymentSettings` interface e defaults
+
+## 5. `src/components/admin/PaymentSheet.tsx`
+- Importar `isConexaActive` do hook
+- Duplicar bloco Asaas para Conexa: se `gateway === 'conexa'` e editando:
+  - Se `payment.conexa_charge_id` existe → botões "Copiar Link (Conexa)" e "Copiar PIX"
+  - Senão → botão "Gerar Cobrança (Conexa)"
+- Banner de baixa automática: exibir para Conexa com mesma lógica (texto "Baixa automática via Conexa Webhook" + override manual)
+
+## 6. `src/components/admin/BillingAutomationSettings.tsx`
+- Atualizar texto do hint contextual para incluir Conexa:
+  - `isConexaActive` → mensagem similar ao Asaas sobre `{link_pagamento}`
+  - Ajustar condição: `isAsaasActive || isConexaActive`
+
+## Arquivos modificados (5 + 1 novo + migration)
+- Migration SQL
+- `src/hooks/usePaymentGateway.tsx`
+- `src/components/settings/ConexaIntegration.tsx` (novo)
+- `src/pages/Settings.tsx`
+- `src/components/admin/PaymentSheet.tsx`
+- `src/components/admin/BillingAutomationSettings.tsx`
 
