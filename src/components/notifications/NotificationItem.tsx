@@ -10,7 +10,9 @@ import {
   FileText,
   AlertCircle,
   X,
-  ExternalLink
+  ExternalLink,
+  Video,
+  Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNotifications, type Notification, type NotificationType } from "@/hooks/useNotifications";
@@ -33,7 +35,18 @@ const iconMap: Record<NotificationType, any> = {
   system: AlertCircle,
 };
 
-const colorMap: Record<NotificationType, string> = {
+const borderColorMap: Record<NotificationType, string> = {
+  reminder: "border-l-blue-500",
+  task: "border-l-green-500",
+  post: "border-l-purple-500",
+  payment: "border-l-orange-500",
+  expense: "border-l-red-500",
+  lead: "border-l-cyan-500",
+  meeting: "border-l-indigo-500",
+  system: "border-l-muted-foreground",
+};
+
+const iconColorMap: Record<NotificationType, string> = {
   reminder: "text-blue-500",
   task: "text-green-500",
   post: "text-purple-500",
@@ -41,13 +54,15 @@ const colorMap: Record<NotificationType, string> = {
   expense: "text-red-500",
   lead: "text-cyan-500",
   meeting: "text-indigo-500",
-  system: "text-gray-500",
+  system: "text-muted-foreground",
 };
 
 export function NotificationItem({ notification, onClose }: NotificationItemProps) {
   const { markAsRead, archiveNotification } = useNotifications();
   const navigate = useNavigate();
   const Icon = iconMap[notification.type] || Bell;
+
+  const meetingLink = notification.metadata?.meeting_link;
 
   const handleClick = async () => {
     if (!notification.is_read) {
@@ -66,24 +81,54 @@ export function NotificationItem({ notification, onClose }: NotificationItemProp
     await archiveNotification(notification.id);
   };
 
+  const handleJoinCall = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (meetingLink) {
+      if (!notification.is_read) {
+        markAsRead(notification.id);
+      }
+      window.open(meetingLink, '_blank');
+    }
+  };
+
+  const handleViewTask = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!notification.is_read) {
+      markAsRead(notification.id);
+    }
+    navigate('/tasks');
+    onClose();
+  };
+
   return (
     <div
       className={cn(
-        "p-3 md:p-4 hover:bg-muted/50 transition-colors cursor-pointer relative group",
-        !notification.is_read && "bg-primary/5"
+        "p-3 md:p-4 hover:bg-muted/50 transition-colors cursor-pointer relative group border-l-3",
+        borderColorMap[notification.type],
+        !notification.is_read ? "bg-primary/5" : "opacity-75"
       )}
       onClick={handleClick}
     >
       <div className="flex gap-2 md:gap-3">
-        <div className={cn("mt-0.5 md:mt-1", colorMap[notification.type])}>
+        <div className={cn("mt-0.5 md:mt-1 shrink-0", iconColorMap[notification.type])}>
           <Icon className="h-4 w-4 md:h-5 md:w-5" />
         </div>
         
-        <div className="flex-1 space-y-0.5 md:space-y-1 min-w-0">
+        <div className="flex-1 space-y-1 md:space-y-1.5 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <p className="font-medium text-xs md:text-sm leading-tight line-clamp-1">
-              {notification.title}
-            </p>
+            <div className="flex items-center gap-2 min-w-0">
+              {!notification.is_read && (
+                <div className="h-2 w-2 rounded-full bg-primary shrink-0" />
+              )}
+              <p className={cn(
+                "text-xs md:text-sm leading-tight line-clamp-1",
+                !notification.is_read ? "font-semibold" : "font-medium"
+              )}>
+                {notification.title}
+              </p>
+            </div>
             <Button
               variant="ghost"
               size="icon"
@@ -99,6 +144,32 @@ export function NotificationItem({ notification, onClose }: NotificationItemProp
           <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">
             {notification.message}
           </p>
+
+          {/* Rich Actions */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {notification.type === 'meeting' && meetingLink && (
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={handleJoinCall}
+              >
+                <Video className="h-3 w-3" />
+                Entrar na Call
+              </Button>
+            )}
+
+            {notification.type === 'task' && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={handleViewTask}
+              >
+                <Eye className="h-3 w-3" />
+                Ver Tarefa
+              </Button>
+            )}
+          </div>
           
           <div className="flex items-center gap-2 md:gap-3 text-[10px] md:text-xs text-muted-foreground">
             <span>
@@ -108,7 +179,7 @@ export function NotificationItem({ notification, onClose }: NotificationItemProp
               })}
             </span>
             
-            {notification.action_label && (
+            {notification.action_label && notification.type !== 'task' && (
               <>
                 <span>•</span>
                 <span className="flex items-center gap-1 text-primary">
@@ -120,12 +191,6 @@ export function NotificationItem({ notification, onClose }: NotificationItemProp
             )}
           </div>
         </div>
-        
-        {!notification.is_read && (
-          <div className="mt-1 md:mt-2">
-            <div className="h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-primary" />
-          </div>
-        )}
       </div>
     </div>
   );

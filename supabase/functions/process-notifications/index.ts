@@ -24,6 +24,9 @@ interface NotificationData {
   action_url?: string;
   action_label?: string;
   metadata?: any;
+  entity_type?: string;
+  entity_id?: string;
+  action_type?: string;
 }
 
 interface BatchTrackingRecord {
@@ -183,17 +186,26 @@ async function batchTrackNotifications(records: BatchTrackingRecord[]) {
 async function batchCreateNotifications(notifications: NotificationData[]) {
   if (notifications.length === 0) return;
 
-  const { error } = await supabase
-    .from('notifications')
-    .insert(notifications);
+  // Use individual inserts with ON CONFLICT handling for deduplication
+  let created = 0;
+  for (const notification of notifications) {
+    const { error } = await supabase
+      .from('notifications')
+      .insert(notification);
 
-  if (error) {
-    console.error('Error batch creating notifications:', error);
-    return;
+    if (error) {
+      // Check if it's a unique constraint violation (duplicate)
+      if (error.code === '23505') {
+        console.log(`⏭️ Duplicate notification skipped: ${notification.entity_type}/${notification.entity_id}/${notification.action_type}`);
+        continue;
+      }
+      console.error('Error creating notification:', error);
+      continue;
+    }
+    created++;
   }
 
-  // Push notifications são disparadas automaticamente pelo trigger do banco (trg_push_on_new_notification)
-  console.log(`[Notifications] ${notifications.length} notificações criadas (push será enviado via trigger)`);
+  console.log(`[Notifications] ${created}/${notifications.length} notificações criadas (push será enviado via trigger)`);
 }
 
 // ============================================
@@ -354,6 +366,9 @@ async function processReminders() {
           reminder_id: reminder.id,
           play_sound: true
         },
+        entity_type: 'reminder',
+        entity_id: reminder.id,
+        action_type: 'reminder',
       });
 
       remindersToUpdate.push({
@@ -439,6 +454,9 @@ async function processTasks() {
               task_id: task.id,
               play_sound: true
             },
+            entity_type: 'task',
+            entity_id: task.id,
+            action_type: 'upcoming',
           },
           tracking: {
             notification_type: 'task_upcoming',
@@ -564,6 +582,9 @@ async function processPosts() {
               task_id: task.id,
               play_sound: true
             },
+            entity_type: 'post',
+            entity_id: task.id,
+            action_type: 'upcoming',
           },
           tracking: {
             notification_type: 'post_upcoming',
@@ -658,6 +679,9 @@ async function processLeads() {
           lead_id: lead.id,
           play_sound: true
         },
+        entity_type: 'lead',
+        entity_id: lead.id,
+        action_type: 'follow_up',
       });
 
       leadsToUpdate.push(lead.id);
@@ -683,7 +707,7 @@ async function processMeetings() {
 
   const { data: meetings, error } = await supabase
     .from('meetings')
-    .select('id, title, start_time, organizer_id, participants, agency_id')
+    .select('id, title, start_time, organizer_id, participants, agency_id, meeting_link')
     .not('agency_id', 'is', null)
     .eq('status', 'scheduled')
     .gte('start_time', now.toISOString());
@@ -745,7 +769,10 @@ async function processMeetings() {
             message: meeting.title,
             action_url: '/agenda',
             action_label: 'Ver reunião',
-            metadata: { meeting_id: meeting.id, play_sound: true },
+            metadata: { meeting_id: meeting.id, play_sound: true, meeting_link: (meeting as any).meeting_link || null },
+            entity_type: 'meeting',
+            entity_id: meeting.id,
+            action_type: 'reminder',
           });
           toTrack.push({
             notification_type: 'meeting',
@@ -771,7 +798,10 @@ async function processMeetings() {
               message: meeting.title,
               action_url: '/agenda',
               action_label: 'Ver reunião',
-              metadata: { meeting_id: meeting.id, play_sound: true },
+              metadata: { meeting_id: meeting.id, play_sound: true, meeting_link: (meeting as any).meeting_link || null },
+              entity_type: 'meeting',
+              entity_id: meeting.id,
+              action_type: 'reminder',
             });
             toTrack.push({
               notification_type: 'meeting',

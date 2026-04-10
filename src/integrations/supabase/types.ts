@@ -3897,9 +3897,12 @@ export type Database = {
       notifications: {
         Row: {
           action_label: string | null
+          action_type: string | null
           action_url: string | null
           agency_id: string
           created_at: string
+          entity_id: string | null
+          entity_type: string | null
           id: string
           is_archived: boolean
           is_read: boolean
@@ -3914,9 +3917,12 @@ export type Database = {
         }
         Insert: {
           action_label?: string | null
+          action_type?: string | null
           action_url?: string | null
           agency_id: string
           created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
           id?: string
           is_archived?: boolean
           is_read?: boolean
@@ -3931,9 +3937,12 @@ export type Database = {
         }
         Update: {
           action_label?: string | null
+          action_type?: string | null
           action_url?: string | null
           agency_id?: string
           created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
           id?: string
           is_archived?: boolean
           is_read?: boolean
