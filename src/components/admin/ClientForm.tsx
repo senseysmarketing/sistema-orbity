@@ -13,7 +13,8 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
-import { Loader2 } from "lucide-react";
+import { usePaymentGateway } from "@/hooks/usePaymentGateway";
+import { Loader2, Info } from "lucide-react";
 
 // Máscaras
 function formatDocument(value: string): string {
@@ -63,11 +64,13 @@ const initialFormData = {
   neighborhood: '',
   city: '',
   state: '',
+  default_billing_type: 'manual',
 };
 
 export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientFormProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
+  const { enabledGateways } = usePaymentGateway();
   
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -97,6 +100,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         neighborhood: client.neighborhood || '',
         city: client.city || '',
         state: client.state || '',
+        default_billing_type: client.default_billing_type || 'manual',
       });
     } else {
       setFormData({ ...initialFormData });
@@ -166,6 +170,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         neighborhood: formData.neighborhood || null,
         city: formData.city || null,
         state: formData.state || null,
+        default_billing_type: formData.default_billing_type,
       };
 
       let savedClientId: string | undefined;

@@ -11,7 +11,7 @@ import { usePaymentGateway } from "@/hooks/usePaymentGateway";
 import { useToast } from "@/hooks/use-toast";
 
 export function ConexaIntegration() {
-  const { settings, isConexaActive, isLoading, updateSettings, isSaving } = usePaymentGateway();
+  const { settings, isLoading, updateSettings, isSaving } = usePaymentGateway();
   const { toast } = useToast();
 
   const [apiKey, setApiKey] = useState("");
