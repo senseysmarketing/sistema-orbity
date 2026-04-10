@@ -38,7 +38,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "warnin
 export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselectedClient, clients = [] }: PaymentSheetProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
-  const { isAsaasActive, isConexaActive } = usePaymentGateway();
+  const { isAsaasActive, isConexaActive, enabledGateways } = usePaymentGateway();
   const [loading, setLoading] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [manualOverrideDialogOpen, setManualOverrideDialogOpen] = useState(false);
@@ -54,7 +54,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const [paidDate, setPaidDate] = useState("");
   const [status, setStatus] = useState("pending");
   const [description, setDescription] = useState("");
-
+  const [billingType, setBillingType] = useState("manual");
   const totalAmount = useMemo(() => {
     return Math.max(0, baseValue + additions - discounts);
   }, [baseValue, additions, discounts]);
@@ -81,9 +81,12 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
       setPaidDate(payment.paid_date ? payment.paid_date.split("T")[0] : "");
       setStatus(payment.status || "pending");
       setDescription(payment.description || "");
+      const paymentBt = payment.billing_type || client?.default_billing_type || 'manual';
+      setBillingType(enabledGateways.includes(paymentBt) ? paymentBt : 'manual');
     } else if (preselectedClient) {
       const now = new Date();
       const defaultDue = new Date(now.getFullYear(), now.getMonth(), 15);
+      const clientBt = (preselectedClient as any).default_billing_type || 'manual';
       setClientId(preselectedClient.id);
       setBaseValue(preselectedClient.monthly_value || 0);
       setAdditions(0);
@@ -92,6 +95,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
       setPaidDate("");
       setStatus("pending");
       setDescription("");
+      setBillingType(enabledGateways.includes(clientBt) ? clientBt : 'manual');
     } else {
       setClientId("");
       setBaseValue(0);
@@ -101,11 +105,12 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
       setPaidDate("");
       setStatus("pending");
       setDescription("");
+      setBillingType("manual");
     }
     setUpdateContract(false);
     setDeactivateClient(false);
     setManualOverrideConfirmed(false);
-  }, [open, payment, preselectedClient, clients]);
+  }, [open, payment, preselectedClient, clients, enabledGateways]);
 
   const handleClientChange = (id: string) => {
     setClientId(id);
