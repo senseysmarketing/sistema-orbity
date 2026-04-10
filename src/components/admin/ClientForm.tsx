@@ -56,6 +56,7 @@ interface ClientFormProps {
 
 const initialFormData = {
   name: '',
+  email: '',
   contact: '',
   service: '',
   monthly_value: '',
