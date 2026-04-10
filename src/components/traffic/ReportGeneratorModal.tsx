@@ -76,7 +76,7 @@ export function ReportGeneratorModal({ isOpen, onClose, reportData, agencyId }: 
 - Investimento: R$ ${reportData.totalSpend.toFixed(2)}
 - Impressões: ${reportData.totalImpressions}
 - Cliques: ${reportData.totalClicks}
-- Conversões: ${reportData.totalConversions}
+- ${reportData.conversionLabel || 'Conversões'}: ${reportData.totalConversions}
 - CTR: ${reportData.avgCTR.toFixed(2)}%
 - CPC: R$ ${reportData.avgCPC.toFixed(2)}
 - CPM: R$ ${reportData.avgCPM.toFixed(2)}`;
