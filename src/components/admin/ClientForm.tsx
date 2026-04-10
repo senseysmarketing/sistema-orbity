@@ -93,6 +93,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
     if (client) {
       setFormData({
         name: client.name || '',
+        email: client.email || '',
         contact: client.contact || '',
         service: client.service || '',
         monthly_value: client.monthly_value?.toString() || '',
