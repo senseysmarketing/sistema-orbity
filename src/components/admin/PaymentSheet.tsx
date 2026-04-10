@@ -327,6 +327,21 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                 )}
               </div>
 
+              {/* Método de Faturamento */}
+              <div className="space-y-2">
+                <Label>Método de Faturamento</Label>
+                <Select value={billingType} onValueChange={setBillingType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {enabledGateways.map((gw) => (
+                      <SelectItem key={gw} value={gw}>
+                        {gw === 'manual' ? 'Manual' : gw === 'asaas' ? 'Asaas' : 'Conexa'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Upsell/Downsell Switch */}
               {totalAmount !== baseValue && (
                 <TooltipProvider>
