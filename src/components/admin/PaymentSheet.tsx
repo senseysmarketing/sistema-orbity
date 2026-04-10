@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
 import { usePaymentGateway } from "@/hooks/usePaymentGateway";
+import { useCreatePayment } from "@/hooks/useCreatePayment";
 import { Ban, HelpCircle, MessageSquare, Save, X, QrCode, Copy, MoreVertical, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
@@ -37,8 +38,9 @@ const statusConfig: Record<string, { label: string; variant: "default" | "warnin
 
 export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselectedClient, clients = [] }: PaymentSheetProps) {
   const { toast } = useToast();
-  const { currentAgency } = useAgency();
+  const { currentAgency } = useAgency(); // kept for cancel/contract flows
   const { enabledGateways } = usePaymentGateway();
+  const { createPayment: createPaymentHook, updatePayment: updatePaymentHook } = useCreatePayment();
   const [loading, setLoading] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [manualOverrideDialogOpen, setManualOverrideDialogOpen] = useState(false);
@@ -130,23 +132,29 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
     }
     setLoading(true);
     try {
-      const data = {
-        client_id: clientId,
-        amount: totalAmount,
-        due_date: dueDate,
-        paid_date: paidDate || null,
-        status: status as "pending" | "paid" | "overdue",
-        description: description || null,
-        agency_id: currentAgency?.id,
-        billing_type: billingType,
-      };
-
       if (payment) {
-        const { error } = await supabase.from("client_payments").update(data).eq("id", payment.id);
-        if (error) throw error;
+        const success = await updatePaymentHook({
+          id: payment.id,
+          client_id: clientId,
+          amount: totalAmount,
+          due_date: dueDate,
+          paid_date: paidDate || null,
+          status: status as "pending" | "paid" | "overdue",
+          description: description || null,
+          billing_type: billingType,
+        });
+        if (!success) { setLoading(false); return; }
       } else {
-        const { error } = await supabase.from("client_payments").insert([data]);
-        if (error) throw error;
+        const result = await createPaymentHook({
+          client_id: clientId,
+          amount: totalAmount,
+          due_date: dueDate,
+          paid_date: paidDate || null,
+          status: status as "pending" | "paid" | "overdue",
+          description: description || null,
+          billing_type: billingType,
+        });
+        if (!result) { setLoading(false); return; }
       }
 
       if (updateContract && totalAmount !== baseValue) {
@@ -157,7 +165,6 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
         if (contractError) throw contractError;
       }
 
-      toast({ title: payment ? "Fatura atualizada" : "Fatura criada", description: updateContract ? "Salvo e contrato atualizado!" : "Salvo com sucesso!" });
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {

@@ -52,6 +52,7 @@ interface ClientFormProps {
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   client?: any;
+  onClientCreated?: (client: any) => void;
 }
 
 const initialFormData = {
@@ -78,7 +79,7 @@ const initialFormData = {
   default_billing_type: 'manual',
 };
 
-export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientFormProps) {
+export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCreated }: ClientFormProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
   const { enabledGateways } = usePaymentGateway();
@@ -205,43 +206,13 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
         if (clientError) throw clientError;
         savedClientId = newClientData?.id;
 
-        if (newClientData && formData.monthly_value) {
-          const currentDate = new Date();
-          const currentYear = currentDate.getFullYear();
-          const currentMonth = currentDate.getMonth();
-          const dueDay = Math.min(parseInt(formData.due_date), 28);
-          const dueDate = new Date(currentYear, currentMonth, dueDay);
-          
-          const { error: paymentError } = await supabase
-            .from('client_payments')
-            .insert([{
-              client_id: newClientData.id,
-              amount: parseFloat(formData.monthly_value),
-              due_date: dueDate.toISOString().split('T')[0],
-              status: 'pending',
-              agency_id: currentAgency?.id,
-              description: 'Mensalidade'
-            }]);
-          
-          if (paymentError) {
-            console.error('Erro ao criar pagamento automático:', paymentError);
-            toast({
-              title: "Cliente criado, mas pagamento não gerado",
-              description: "Use o botão 'Gerar Pagamento' no card do cliente ou adicione manualmente.",
-              variant: "destructive",
-            });
-          } else {
-            toast({
-              title: "Cliente criado com sucesso",
-              description: "Pagamento do mês atual gerado automaticamente!",
-            });
-            onSuccess();
-            onOpenChange(false);
-            
-            
-            setFormData({ ...initialFormData });
-            return;
-          }
+        // Delegate first payment to FirstPaymentDialog via callback
+        if (newClientData && onClientCreated) {
+          onSuccess();
+          onOpenChange(false);
+          setFormData({ ...initialFormData });
+          onClientCreated(newClientData);
+          return;
         }
       }
 
