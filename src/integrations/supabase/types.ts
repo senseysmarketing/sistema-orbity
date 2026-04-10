@@ -1503,6 +1503,7 @@ export type Database = {
           default_billing_type: string | null
           document: string | null
           due_date: number | null
+          email: string | null
           has_loyalty: boolean
           id: string
           monthly_value: number | null
@@ -1538,6 +1539,7 @@ export type Database = {
           default_billing_type?: string | null
           document?: string | null
           due_date?: number | null
+          email?: string | null
           has_loyalty?: boolean
           id?: string
           monthly_value?: number | null
@@ -1573,6 +1575,7 @@ export type Database = {
           default_billing_type?: string | null
           document?: string | null
           due_date?: number | null
+          email?: string | null
           has_loyalty?: boolean
           id?: string
           monthly_value?: number | null
