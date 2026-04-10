@@ -417,6 +417,23 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
   const activeCampaigns = campaigns.filter(c => c.status === 'ACTIVE');
   const selectedAccountName = selectedAdAccounts.find(a => a.ad_account_id === selectedAccount)?.ad_account_name || '';
 
+  // Compute dynamic conversion values based on selected action type
+  const currentActionLabel = selectedActionType === '__default__' ? 'Conversões' : getActionTypeLabel(selectedActionType);
+  
+  const computeConversionsForActions = (actions?: ActionData[], fallbackConversions?: number): number => {
+    if (!actions || actions.length === 0 || selectedActionType === '__default__') return fallbackConversions || 0;
+    const match = actions.find(a => a.action_type === selectedActionType);
+    return match ? (parseInt(String(match.value)) || 0) : 0;
+  };
+
+  const dynamicTotalConversions = selectedActionType === '__default__' 
+    ? metrics.conversions
+    : (metrics.allActions?.find(a => a.action_type === selectedActionType)?.value || 
+       activeCampaigns.reduce((sum, c) => sum + computeConversionsForActions(c.actions, 0), 0));
+
+  // Sorted available actions for the selector
+  const sortedAvailableActions = [...availableActions].sort((a, b) => b.value - a.value);
+
   const reportData = {
     accountName: selectedAccountName,
     period: dateRange?.from && dateRange?.to 
@@ -425,10 +442,11 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
     totalSpend: metrics.spend,
     totalImpressions: metrics.impressions,
     totalClicks: metrics.clicks,
-    totalConversions: metrics.conversions,
+    totalConversions: dynamicTotalConversions,
     avgCTR: metrics.ctr,
     avgCPC: metrics.cpc,
     avgCPM: metrics.cpm,
+    conversionLabel: currentActionLabel,
   };
 
   if (loading && !hasInitialData) {
