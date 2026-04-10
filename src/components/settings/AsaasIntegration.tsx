@@ -23,18 +23,18 @@ export function AsaasIntegration() {
     if (settings) {
       setApiKey(settings.asaas_api_key || "");
       setSandbox(settings.asaas_sandbox ?? true);
-      setGatewayActive(isAsaasActive);
+      setGatewayActive(settings.asaas_enabled ?? false);
     }
-  }, [settings, isAsaasActive]);
+  }, [settings]);
 
   const handleSave = async () => {
     try {
       await updateSettings({
         asaas_api_key: apiKey || null,
         asaas_sandbox: sandbox,
-        active_gateway: gatewayActive ? 'asaas' : 'manual',
+        asaas_enabled: gatewayActive,
       });
-      toast({ title: "Configurações salvas!", description: gatewayActive ? "Asaas ativado como gateway principal." : "Gateway manual ativo." });
+      toast({ title: "Configurações salvas!", description: gatewayActive ? "Asaas habilitado como gateway." : "Asaas desabilitado." });
     } catch {
       // error handled by hook
     }
@@ -76,10 +76,10 @@ export function AsaasIntegration() {
         <div className="flex items-center justify-between rounded-lg border p-3">
           <div className="space-y-0.5">
             <Label htmlFor="asaas-active" className="text-sm font-medium cursor-pointer">
-              Ativar Asaas como gateway principal
+              Habilitar Asaas
             </Label>
             <p className="text-xs text-muted-foreground">
-              Substitui o fluxo manual por cobranças automatizadas
+              Disponibiliza Asaas como opção de faturamento para clientes
             </p>
           </div>
           <Switch

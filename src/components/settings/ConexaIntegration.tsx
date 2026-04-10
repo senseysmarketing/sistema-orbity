@@ -24,18 +24,18 @@ export function ConexaIntegration() {
     if (settings) {
       setApiKey(settings.conexa_api_key || "");
       setToken(settings.conexa_token || "");
-      setGatewayActive(isConexaActive);
+      setGatewayActive(settings.conexa_enabled ?? false);
     }
-  }, [settings, isConexaActive]);
+  }, [settings]);
 
   const handleSave = async () => {
     try {
       await updateSettings({
         conexa_api_key: apiKey || null,
         conexa_token: token || null,
-        active_gateway: gatewayActive ? 'conexa' : 'manual',
+        conexa_enabled: gatewayActive,
       });
-      toast({ title: "Configurações salvas!", description: gatewayActive ? "Conexa ativado como gateway principal." : "Gateway manual ativo." });
+      toast({ title: "Configurações salvas!", description: gatewayActive ? "Conexa habilitado como gateway." : "Conexa desabilitado." });
     } catch {
       // error handled by hook
     }
@@ -77,10 +77,10 @@ export function ConexaIntegration() {
         <div className="flex items-center justify-between rounded-lg border p-3">
           <div className="space-y-0.5">
             <Label htmlFor="conexa-active" className="text-sm font-medium cursor-pointer">
-              Ativar Conexa como gateway principal
+              Habilitar Conexa
             </Label>
             <p className="text-xs text-muted-foreground">
-              Substitui o fluxo manual por cobranças automatizadas
+              Disponibiliza Conexa como opção de faturamento para clientes
             </p>
           </div>
           <Switch
