@@ -794,7 +794,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                   <TableHead>Última Alteração</TableHead>
                   <TableHead>Gasto</TableHead>
                   <TableHead>Cliques</TableHead>
-                  <TableHead>Conversões</TableHead>
+                  <TableHead>{currentActionLabel}</TableHead>
                   <TableHead>CTR</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -815,7 +815,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                       </TableCell>
                       <TableCell>{formatCurrency(campaign.spend)}</TableCell>
                       <TableCell>{formatNumber(campaign.clicks)}</TableCell>
-                      <TableCell>{campaign.conversions}</TableCell>
+                      <TableCell>{computeConversionsForActions(campaign.actions, campaign.conversions)}</TableCell>
                       <TableCell>{campaign.ctr.toFixed(2)}%</TableCell>
                       <TableCell>
                         <Button 
