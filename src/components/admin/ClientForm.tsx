@@ -248,7 +248,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <ScrollArea className="max-h-[80vh] px-1">
+          <ScrollArea className="flex-1 overflow-auto px-1">
             <div className="space-y-4 py-4 pr-3">
 
               {/* ── Seção 1: Dados Principais ── */}
