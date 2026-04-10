@@ -182,7 +182,8 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
       });
 
       if (campaignsError) throw campaignsError;
-      setCampaigns(campaignsData?.campaigns || []);
+      const fetchedCampaigns = campaignsData?.campaigns || [];
+      setCampaigns(fetchedCampaigns);
 
       // Etapa 2: Buscar métricas agregadas
       if (!isBackground) {
