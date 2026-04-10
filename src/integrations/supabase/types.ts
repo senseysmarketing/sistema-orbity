@@ -1390,6 +1390,7 @@ export type Database = {
         Row: {
           agency_id: string | null
           amount: number
+          amount_paid: number | null
           asaas_payment_id: string | null
           client_id: string
           conexa_charge_id: string | null
@@ -1398,6 +1399,7 @@ export type Database = {
           created_at: string
           description: string | null
           due_date: string
+          gateway_fee: number | null
           id: string
           invoice_url: string | null
           paid_date: string | null
@@ -1408,6 +1410,7 @@ export type Database = {
         Insert: {
           agency_id?: string | null
           amount: number
+          amount_paid?: number | null
           asaas_payment_id?: string | null
           client_id: string
           conexa_charge_id?: string | null
@@ -1416,6 +1419,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           due_date: string
+          gateway_fee?: number | null
           id?: string
           invoice_url?: string | null
           paid_date?: string | null
@@ -1426,6 +1430,7 @@ export type Database = {
         Update: {
           agency_id?: string | null
           amount?: number
+          amount_paid?: number | null
           asaas_payment_id?: string | null
           client_id?: string
           conexa_charge_id?: string | null
@@ -1434,6 +1439,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           due_date?: string
+          gateway_fee?: number | null
           id?: string
           invoice_url?: string | null
           paid_date?: string | null

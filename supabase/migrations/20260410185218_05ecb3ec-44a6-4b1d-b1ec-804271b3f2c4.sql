@@ -1,0 +1,3 @@
+ALTER TABLE public.client_payments
+  ADD COLUMN IF NOT EXISTS gateway_fee NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS amount_paid NUMERIC;
