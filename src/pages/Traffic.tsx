@@ -40,7 +40,7 @@ export default function Traffic() {
   const [isManageAccountsOpen, setIsManageAccountsOpen] = useState(false);
   const [isDisconnectDialogOpen, setIsDisconnectDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('traffic-active-tab') || 'clients';
+    return localStorage.getItem('traffic-active-tab') || 'campaigns';
   });
   
   const { profile } = useAuth();
@@ -332,25 +332,25 @@ export default function Traffic() {
       {/* Tabs - 2 abas */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="clients" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Painel de Clientes
-          </TabsTrigger>
           <TabsTrigger value="campaigns" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             Campanhas e Relatórios
           </TabsTrigger>
+          <TabsTrigger value="clients" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Painel de Clientes
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="campaigns" className="space-y-6">
+          <CampaignsAndReports selectedAdAccounts={selectedAdAccounts} />
+        </TabsContent>
 
         <TabsContent value="clients" className="space-y-6">
           <ClientsPanel 
             selectedAdAccounts={selectedAdAccounts} 
             onNavigateToCampaigns={() => setActiveTab('campaigns')}
           />
-        </TabsContent>
-
-        <TabsContent value="campaigns" className="space-y-6">
-          <CampaignsAndReports selectedAdAccounts={selectedAdAccounts} />
         </TabsContent>
       </Tabs>
     </div>
