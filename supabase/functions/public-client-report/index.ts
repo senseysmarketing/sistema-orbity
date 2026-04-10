@@ -80,6 +80,7 @@ Deno.serve(async (req) => {
       top_campaigns: snapshot?.top_campaigns || [],
       chart_data: snapshot?.chart_data || [],
       active_campaigns: snapshot?.active_campaigns || 0,
+      actionTypeLabel: snapshot?.actionTypeLabel || null,
       is_mock: !snapshot,
       period: { from: dateFrom, to: dateTo },
     };
