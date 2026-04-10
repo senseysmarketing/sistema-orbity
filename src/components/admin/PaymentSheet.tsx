@@ -37,7 +37,7 @@ const statusConfig: Record<string, { label: string; variant: "default" | "warnin
 export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselectedClient, clients = [] }: PaymentSheetProps) {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
-  const { isAsaasActive } = usePaymentGateway();
+  const { isAsaasActive, isConexaActive } = usePaymentGateway();
   const [loading, setLoading] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [manualOverrideDialogOpen, setManualOverrideDialogOpen] = useState(false);
@@ -194,14 +194,22 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const isEditing = !!payment;
   const showWhatsApp = (status === "pending" || status === "overdue") && isEditing;
   const hasAsaasCharge = !!payment?.asaas_payment_id;
-  
+  const hasConexaCharge = !!payment?.conexa_charge_id;
+  const isGatewayActive = isAsaasActive || isConexaActive;
+  const gatewayName = isAsaasActive ? 'Asaas' : isConexaActive ? 'Conexa' : 'Manual';
 
   const handleGenerateAsaasCharge = () => {
     toast({ title: "Em breve", description: "A geração de cobranças via Asaas será disponibilizada em breve." });
   };
 
-  const handleCopyPaymentLink = () => {
-    const link = payment?.invoice_url || payment?.pix_copy_paste;
+  const handleGenerateConexaCharge = () => {
+    toast({ title: "Em breve", description: "A geração de cobranças via Conexa será disponibilizada em breve." });
+  };
+
+  const handleCopyPaymentLink = (source: 'asaas' | 'conexa' = 'asaas') => {
+    const link = source === 'conexa'
+      ? (payment?.conexa_invoice_url || payment?.conexa_pix_copy_paste)
+      : (payment?.invoice_url || payment?.pix_copy_paste);
     if (link) {
       navigator.clipboard.writeText(link);
       toast({ title: "Link copiado!", description: "O link de pagamento foi copiado para a área de transferência." });
@@ -377,7 +385,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                       <div className="flex items-center justify-between">
                         <Badge variant="warning" className="text-xs">Aguardando Pagamento (Asaas)</Badge>
                       </div>
-                      <Button type="button" variant="outline" size="sm" onClick={handleCopyPaymentLink} className="w-full">
+                      <Button type="button" variant="outline" size="sm" onClick={() => handleCopyPaymentLink('asaas')} className="w-full">
                         <Copy className="h-4 w-4 mr-1" />
                         Copiar Link de Pagamento
                       </Button>
@@ -391,11 +399,44 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                 </div>
               )}
 
-              {/* Asaas auto-settlement banner */}
-              {isAsaasActive && !manualOverrideConfirmed && (
+              {/* Conexa Section */}
+              {isConexaActive && isEditing && (
+                <div className="space-y-2">
+                  {hasConexaCharge ? (
+                    <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="warning" className="text-xs">Aguardando Pagamento (Conexa)</Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => handleCopyPaymentLink('conexa')} className="flex-1">
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copiar Link (Conexa)
+                        </Button>
+                        {payment?.conexa_pix_copy_paste && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => {
+                            navigator.clipboard.writeText(payment.conexa_pix_copy_paste);
+                            toast({ title: "PIX copiado!" });
+                          }} className="flex-1">
+                            <QrCode className="h-4 w-4 mr-1" />
+                            Copiar PIX
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="default" onClick={handleGenerateConexaCharge} className="w-full">
+                      <QrCode className="h-4 w-4 mr-1" />
+                      Gerar Cobrança (Conexa)
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Gateway auto-settlement banner */}
+              {isGatewayActive && !manualOverrideConfirmed && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 p-3 flex items-center justify-between">
                   <p className="text-xs text-amber-700 dark:text-amber-300">
-                    ⚡ Baixa automática habilitada via Asaas
+                    ⚡ Baixa automática habilitada via {gatewayName}
                   </p>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -496,7 +537,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
           <AlertDialogHeader>
             <AlertDialogTitle>Forçar Baixa Manual</AlertDialogTitle>
             <AlertDialogDescription>
-              Atenção: esta ação apenas atualiza o status no Orbity localmente. Ela <strong>não cancela</strong> a cobrança no Asaas. O cliente ainda poderá receber notificações de cobrança do Asaas.
+              Atenção: esta ação apenas atualiza o status no Orbity localmente. Ela <strong>não cancela</strong> a cobrança no {gatewayName}. O cliente ainda poderá receber notificações de cobrança do {gatewayName}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

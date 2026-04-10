@@ -6,9 +6,11 @@ import { useToast } from "@/hooks/use-toast";
 export interface PaymentSettings {
   id: string;
   agency_id: string;
-  active_gateway: 'manual' | 'asaas';
+  active_gateway: 'manual' | 'asaas' | 'conexa';
   asaas_api_key: string | null;
   asaas_sandbox: boolean;
+  conexa_api_key: string | null;
+  conexa_token: string | null;
   reminder_before_enabled: boolean;
   reminder_before_days: number;
   reminder_due_date_enabled: boolean;
@@ -24,6 +26,8 @@ const defaultSettings: Omit<PaymentSettings, 'id' | 'agency_id'> = {
   active_gateway: 'manual',
   asaas_api_key: null,
   asaas_sandbox: true,
+  conexa_api_key: null,
+  conexa_token: null,
   reminder_before_enabled: false,
   reminder_before_days: 3,
   reminder_due_date_enabled: false,
@@ -75,13 +79,15 @@ export function usePaymentGateway() {
     },
   });
 
-  const gateway = settings?.active_gateway ?? 'manual';
+  const gateway = (settings?.active_gateway ?? 'manual') as 'manual' | 'asaas' | 'conexa';
   const isAsaasActive = gateway === 'asaas';
+  const isConexaActive = gateway === 'conexa';
 
   return {
     settings: settings ? settings : { ...defaultSettings, id: '', agency_id: agencyId || '' } as PaymentSettings,
     gateway,
     isAsaasActive,
+    isConexaActive,
     isLoading,
     updateSettings: upsertMutation.mutateAsync,
     isSaving: upsertMutation.isPending,

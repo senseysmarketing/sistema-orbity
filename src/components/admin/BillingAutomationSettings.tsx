@@ -20,7 +20,7 @@ interface BillingAutomationSettingsProps {
 const TEMPLATE_VARS = ['{nome_cliente}', '{valor}', '{data_vencimento}', '{link_pagamento}'];
 
 export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomationSettingsProps) {
-  const { settings, isAsaasActive, updateSettings, isSaving } = usePaymentGateway();
+  const { settings, isAsaasActive, isConexaActive, updateSettings, isSaving } = usePaymentGateway();
   const { toast } = useToast();
 
   const [reminderBeforeEnabled, setReminderBeforeEnabled] = useState(false);
@@ -182,6 +182,8 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
             <p className="text-xs text-blue-700 dark:text-blue-300">
               {isAsaasActive
                 ? "Gateway Asaas ativo — use a variável {link_pagamento} para incluir o link de cobrança automático."
+                : isConexaActive
+                ? "Gateway Conexa ativo — use a variável {link_pagamento} para incluir o link de cobrança automático."
                 : "Gateway Manual ativo — inclua sua chave PIX ou dados bancários diretamente no texto do template."}
             </p>
           </div>
