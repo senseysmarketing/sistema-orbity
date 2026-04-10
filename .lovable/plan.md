@@ -1,69 +1,62 @@
 
 
-# Expandir Gestão de Cobranças — Revisão com 3 Regras Adicionais
+# Auditoria Financeira: Taxas, Valores Pagos, Pre-Flight e Trava de Exclusão (Revisado)
 
-## Resumo das adições ao plano original
+## Ponto 1 — ClientForm.tsx: JA IMPLEMENTADO
+O formulário ja possui campos `document`, `zip_code`, `street`, etc., com mascara e ViaCEP `onBlur`. Nenhuma alteracao necessaria.
 
-O plano original (gateway badges, alertas, soft delete) continua válido. As 3 regras adicionais reforçam a integridade dos dados:
+## Ponto 2 — Nomenclatura confirmada
+A coluna se chama `amount` (nao `value`). Portanto o calculo sera `p.amount_paid || p.amount`.
 
-## 1. Migration SQL — Constraint de Status (NOVA)
+---
 
-Verificação feita: **não existe** CHECK constraint nas colunas `status` de `client_payments`, `expenses` nem `salaries`. Os valores são TEXT livre. Criar migration adicionando constraint explícito em todas as 3 tabelas:
+## Implementacao
+
+### 1. Migration SQL — Novas colunas
 
 ```sql
 ALTER TABLE public.client_payments
-  ADD CONSTRAINT client_payments_status_check
-  CHECK (status IN ('pending', 'paid', 'overdue', 'cancelled'));
-
-ALTER TABLE public.expenses
-  ADD CONSTRAINT expenses_status_check
-  CHECK (status IN ('pending', 'paid', 'overdue', 'cancelled'));
-
-ALTER TABLE public.salaries
-  ADD CONSTRAINT salaries_status_check
-  CHECK (status IN ('pending', 'paid', 'overdue', 'cancelled'));
+  ADD COLUMN IF NOT EXISTS gateway_fee NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS amount_paid NUMERIC;
 ```
 
-## 2. Prevenção de "Receita Fantasma" — Auditoria nos hooks
+### 2. useFinancialMetrics.tsx — Tipos e calculos
 
-### `useFinancialMetrics.tsx`
-- **`unifiedCashFlow`** (linhas 313-346): Já filtra `cancelled` com `return` — mas os itens cancelados **devem aparecer** na tabela (regra 3). Alterar para **incluir** cancelled no cashFlow mas mantê-los excluídos dos cálculos numéricos.
-- **`totalExpenses`** (linha 251): Atualmente soma TODAS as expenses sem filtrar cancelled. Corrigir: `expenses.filter(e => e.status !== 'cancelled').reduce(...)`.
-- **`totalPayroll`** (linha 256): Idem para salários: `salaries.filter(s => s.status !== 'cancelled').reduce(...)`.
-- **`delinquencyRate`** (linha 268): Já filtra por `status === 'overdue'`, OK.
+- Adicionar `gateway_fee` e `amount_paid` a interface `ClientPayment`
+- Adicionar `document`, `zip_code`, `asaas_customer_id`, `conexa_customer_id` a interface `Client` e ao `.select()` do clients query (linha 142)
+- Nos calculos de receita (pagamentos paid no cashFlow), usar `p.amount_paid || p.amount`
+- Exportar `totalGatewayFees`: soma de `gateway_fee` dos pagamentos paid no mes
+- Exportar `totalNetRevenue`: receita recebida menos taxas
 
-### `useAdvancedAnalytics.tsx`
-- Já busca apenas `status = 'paid'` no Supabase (`.eq('status', 'paid')`), portanto cancelled nunca entra. OK, sem alteração.
+### 3. PaymentSheet.tsx — Pre-Flight Check nos botoes de gateway
 
-## 3. Visualização de Cancelled no CashFlowTable
+- Nos botoes "Gerar Cobranca (Asaas)" (linha 404) e "Gerar Cobranca (Conexa)" (linha 437):
+  - Se `!resolvedClient?.document || !resolvedClient?.zip_code`, botao fica `disabled`
+  - Envolver com `<TooltipProvider>/<Tooltip>` com mensagem: "Dados de faturamento incompletos. Preencha o CPF/CNPJ e CEP do cliente."
 
-### `useFinancialMetrics.tsx` — Incluir cancelled no cashFlow
-- Remover os `if (status === 'cancelled') return;` das linhas 314, 331, 346
-- Os itens cancelados agora aparecem no array `unifiedCashFlow` com status `CANCELLED`
+### 4. PaymentSheet.tsx — Transparencia visual no detalhe (NOVO)
 
-### `CashFlowTable.tsx` — Filtro e estilo visual
-- **Filtro** (linha 43): Remover `if (item.status === 'CANCELLED') return false;` — cancelled deve aparecer no filtro "Este Mês"
-- **Estilo da linha**: Quando `item.status === 'CANCELLED'`, aplicar `opacity-50` no `<TableRow>`
-- **Valor numérico**: Aplicar `line-through text-muted-foreground` no `<TableCell>` do valor
-- **Ações**: Esconder botões de "Marcar como Pago" e menu de cancelamento para itens cancelled
+- Quando `isEditing && status === 'paid'` e existirem dados de `gateway_fee > 0` ou `amount_paid !== amount`:
+  - Exibir bloco somente-leitura apos o status badge:
+    - "Valor Original: R$ X"
+    - "Valor Pago: R$ Y" (se `amount_paid` diferente)
+    - "Taxa do Gateway: R$ Z" (se `gateway_fee > 0`)
+    - "Liquido: R$ (amount_paid - gateway_fee)"
+  - Usar fundo `bg-muted/50` com bordas arredondadas
 
-## 4. Hard Delete → Soft Delete no Admin.tsx (do plano original)
+### 5. ClientDetailsDialog.tsx — Trava de exclusao com confirmacao dupla
 
-- **`handleDeletePaymentById`** (linha 187): Trocar `.delete()` por `.update({ status: 'cancelled' })`
-- **`confirmDeletePayment`** (linha 208): Trocar `.delete()` por `.update({ status: 'cancelled' })`
-- Alterar toasts de "Excluído" para "Cancelado"
+- Adicionar `asaas_customer_id` e `conexa_customer_id` a interface `Client` (linhas 13-34)
+- No AlertDialog de exclusao (linhas 376-402):
+  - Se `client.asaas_customer_id || client.conexa_customer_id`:
+    - Exibir `<Alert variant="destructive">` com aviso sobre assinaturas ativas no gateway
+    - Adicionar `<Input>` para digitar o nome do cliente
+    - Botao "Excluir" so habilita quando texto === `client.name`
+  - Novo state: `deleteConfirmName`
 
-## 5. Gateway Badges + Alertas (do plano original, mantidos)
-
-- Badge de origem (Manual/Asaas/Conexa) no CashFlowTable e ClientPaymentHistory
-- Alerta amarelo no PaymentSheet ao editar cobrança com gateway
-- Mensagem dinâmica no AlertDialog de cancelamento
-
-## Arquivos modificados
+## Arquivos modificados (4)
 - Migration SQL (novo)
 - `src/hooks/useFinancialMetrics.tsx`
-- `src/components/admin/CommandCenter/CashFlowTable.tsx`
-- `src/components/admin/ClientPaymentHistory.tsx`
 - `src/components/admin/PaymentSheet.tsx`
-- `src/pages/Admin.tsx`
+- `src/components/admin/ClientDetailsDialog.tsx`
 
