@@ -82,7 +82,8 @@ const headerVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
 };
 
-const mockChartData = [
+// Fallback mock data only used when no snapshot chart_data exists
+const fallbackChartData = [
   { day: "Seg", investimento: 320, conversoes: 12 },
   { day: "Ter", investimento: 480, conversoes: 18 },
   { day: "Qua", investimento: 410, conversoes: 15 },
