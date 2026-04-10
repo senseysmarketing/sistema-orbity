@@ -325,6 +325,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
             </div>
 
             {/* Linha 3: Valor Mensal e Dia de Vencimento */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="monthly_value">Valor Mensal</Label>
                 <Input
@@ -336,7 +337,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
                   placeholder="0,00"
                 />
               </div>
-            </div>
 
             {/* Linha 3: Data de Início e Dia de Vencimento */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
