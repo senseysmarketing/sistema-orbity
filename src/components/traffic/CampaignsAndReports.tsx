@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { RefreshCw, FileText, TrendingUp, DollarSign, Eye, Target, BarChart, Play, Sparkles, Copy, RotateCcw, Loader2, Share2 } from "lucide-react";
+import { RefreshCw, FileText, TrendingUp, DollarSign, Eye, Target, BarChart, Play, Sparkles, Copy, RotateCcw, Loader2, Share2, ChevronDown } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar } from 'recharts';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +19,48 @@ import { ReportGeneratorModal } from "./ReportGeneratorModal";
 import { useAIAssist } from "@/hooks/useAIAssist";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+// Mapa de tradução de action_types da Meta API
+const ACTION_TYPE_LABELS: Record<string, string> = {
+  'lead': 'Leads',
+  'purchase': 'Compras',
+  'complete_registration': 'Cadastros',
+  'onsite_conversion.messaging_conversation_started_7d': 'Conversas Iniciadas',
+  'onsite_conversion.messaging_first_reply': 'Primeiras Respostas',
+  'link_click': 'Cliques no Link',
+  'landing_page_view': 'Visualizações da Página',
+  'page_engagement': 'Engajamento na Página',
+  'post_engagement': 'Engajamento no Post',
+  'video_view': 'Visualizações de Vídeo',
+  'omni_app_install': 'Instalações do App',
+  'onsite_web_app_add_to_cart': 'Adições ao Carrinho',
+  'initiate_checkout': 'Checkouts Iniciados',
+  'add_payment_info': 'Info de Pagamento',
+  'search': 'Buscas',
+  'add_to_wishlist': 'Lista de Desejos',
+  'contact': 'Contatos',
+  'submit_application': 'Formulários Enviados',
+  'schedule': 'Agendamentos',
+};
+
+function getActionTypeLabel(actionType: string): string {
+  if (ACTION_TYPE_LABELS[actionType]) return ACTION_TYPE_LABELS[actionType];
+  // Handle offsite_conversion.* and onsite_conversion.*
+  if (actionType.startsWith('offsite_conversion.')) {
+    const sub = actionType.replace('offsite_conversion.fb_pixel_', '').replace(/_/g, ' ');
+    return `Conv. Offsite: ${sub.charAt(0).toUpperCase() + sub.slice(1)}`;
+  }
+  if (actionType.startsWith('onsite_conversion.')) {
+    const sub = actionType.replace('onsite_conversion.', '').replace(/_/g, ' ');
+    return `Conv.: ${sub.charAt(0).toUpperCase() + sub.slice(1)}`;
+  }
+  return actionType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+interface ActionData {
+  action_type: string;
+  value: string | number;
+}
 
 interface SelectedAdAccount {
   id: string;
@@ -38,6 +81,7 @@ interface Campaign {
   impressions: number;
   clicks: number;
   conversions: number;
+  actions?: ActionData[];
   ctr: number;
   cpc: number;
 }
@@ -50,6 +94,7 @@ interface MetricsData {
   cpm: number;
   cpc: number;
   ctr: number;
+  allActions?: { action_type: string; value: number }[];
 }
 
 interface ChartData {
@@ -58,6 +103,7 @@ interface ChartData {
   impressions: number;
   clicks: number;
   conversions: number;
+  actions?: ActionData[];
 }
 
 interface CampaignsAndReportsProps {
@@ -86,7 +132,9 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
   const [aiAnalysis, setAiAnalysis] = useState<Record<string, string>>({});
   const [aiAnalysisLoading, setAiAnalysisLoading] = useState<string | null>(null);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
-  
+  const [selectedActionType, setSelectedActionType] = useState<string>("__default__");
+  const [availableActions, setAvailableActions] = useState<{ action_type: string; value: number }[]>([]);
+  const [actionSelectorOpen, setActionSelectorOpen] = useState(false);
   const { toast } = useToast();
   const { analyzeCampaign } = useAIAssist();
   const { currentAgency } = useAgency();
@@ -134,7 +182,8 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
       });
 
       if (campaignsError) throw campaignsError;
-      setCampaigns(campaignsData?.campaigns || []);
+      const fetchedCampaigns = campaignsData?.campaigns || [];
+      setCampaigns(fetchedCampaigns);
 
       // Etapa 2: Buscar métricas agregadas
       if (!isBackground) {
@@ -156,14 +205,32 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
       if (!metricsError && metricsData?.metrics) {
         setMetrics(metricsData.metrics);
         setChartData(metricsData.chartData || []);
+
+        // Populate available actions from aggregated data
+        if (metricsData.metrics.allActions && metricsData.metrics.allActions.length > 0) {
+          setAvailableActions(metricsData.metrics.allActions);
+        }
       } else {
         // Calcular métricas a partir das campanhas
-        const activeCampaigns = campaignsData?.campaigns?.filter((c: Campaign) => c.status === 'ACTIVE') || [];
-        const totalSpend = activeCampaigns.reduce((sum: number, c: Campaign) => sum + c.spend, 0);
-        const totalImpressions = activeCampaigns.reduce((sum: number, c: Campaign) => sum + c.impressions, 0);
-        const totalClicks = activeCampaigns.reduce((sum: number, c: Campaign) => sum + c.clicks, 0);
-        const totalConversions = activeCampaigns.reduce((sum: number, c: Campaign) => sum + c.conversions, 0);
+        const activeCamps = campaignsData?.campaigns?.filter((c: Campaign) => c.status === 'ACTIVE') || [];
+        const totalSpend = activeCamps.reduce((sum: number, c: Campaign) => sum + c.spend, 0);
+        const totalImpressions = activeCamps.reduce((sum: number, c: Campaign) => sum + c.impressions, 0);
+        const totalClicks = activeCamps.reduce((sum: number, c: Campaign) => sum + c.clicks, 0);
+        const totalConversions = activeCamps.reduce((sum: number, c: Campaign) => sum + c.conversions, 0);
         
+        // Aggregate actions from campaigns
+        const actionsMap: Record<string, number> = {};
+        for (const c of activeCamps) {
+          if (c.actions) {
+            for (const a of c.actions) {
+              const key = a.action_type;
+              actionsMap[key] = (actionsMap[key] || 0) + (parseInt(String(a.value)) || 0);
+            }
+          }
+        }
+        const aggActions = Object.entries(actionsMap).map(([action_type, value]) => ({ action_type, value }));
+        setAvailableActions(aggActions);
+
         setMetrics({
           spend: totalSpend,
           impressions: totalImpressions,
@@ -176,6 +243,25 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
 
         // Gerar dados de gráfico mock se não vier da API
         generateMockChartData();
+      }
+
+      // Auto-detect best action type based on campaign objectives
+      if (selectedActionType === '__default__' && fetchedCampaigns.length > 0) {
+        const objectiveCounts: Record<string, number> = {};
+        for (const c of fetchedCampaigns) {
+          objectiveCounts[c.objective] = (objectiveCounts[c.objective] || 0) + 1;
+        }
+        const topObjective = Object.entries(objectiveCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+        
+        if (topObjective === 'OUTCOME_LEADS') {
+          setSelectedActionType('lead');
+        } else if (topObjective === 'OUTCOME_ENGAGEMENT' || topObjective === 'MESSAGES') {
+          setSelectedActionType('onsite_conversion.messaging_conversation_started_7d');
+        } else if (topObjective === 'OUTCOME_SALES') {
+          setSelectedActionType('purchase');
+        } else {
+          setSelectedActionType('lead');
+        }
       }
 
       setHasInitialData(true);
@@ -331,6 +417,23 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
   const activeCampaigns = campaigns.filter(c => c.status === 'ACTIVE');
   const selectedAccountName = selectedAdAccounts.find(a => a.ad_account_id === selectedAccount)?.ad_account_name || '';
 
+  // Compute dynamic conversion values based on selected action type
+  const currentActionLabel = selectedActionType === '__default__' ? 'Conversões' : getActionTypeLabel(selectedActionType);
+  
+  const computeConversionsForActions = (actions?: ActionData[], fallbackConversions?: number): number => {
+    if (!actions || actions.length === 0 || selectedActionType === '__default__') return fallbackConversions || 0;
+    const match = actions.find(a => a.action_type === selectedActionType);
+    return match ? (parseInt(String(match.value)) || 0) : 0;
+  };
+
+  const dynamicTotalConversions = selectedActionType === '__default__' 
+    ? metrics.conversions
+    : (metrics.allActions?.find(a => a.action_type === selectedActionType)?.value || 
+       activeCampaigns.reduce((sum, c) => sum + computeConversionsForActions(c.actions, 0), 0));
+
+  // Sorted available actions for the selector
+  const sortedAvailableActions = [...availableActions].sort((a, b) => b.value - a.value);
+
   const reportData = {
     accountName: selectedAccountName,
     period: dateRange?.from && dateRange?.to 
@@ -339,10 +442,11 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
     totalSpend: metrics.spend,
     totalImpressions: metrics.impressions,
     totalClicks: metrics.clicks,
-    totalConversions: metrics.conversions,
+    totalConversions: dynamicTotalConversions,
     avgCTR: metrics.ctr,
     avgCPC: metrics.cpc,
     avgCPM: metrics.cpm,
+    conversionLabel: currentActionLabel,
   };
 
   if (loading && !hasInitialData) {
@@ -470,13 +574,12 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                 const dateFrom = dateRange.from.toISOString().split('T')[0];
                 const dateTo = dateRange.to.toISOString().split('T')[0];
 
-                // Build snapshot from current dashboard state
                 const snapshot = {
                   metrics: {
                     spend: metrics.spend,
                     impressions: metrics.impressions,
                     clicks: metrics.clicks,
-                    conversions: metrics.conversions,
+                    conversions: dynamicTotalConversions,
                     cpm: metrics.cpm,
                     cpc: metrics.cpc,
                     ctr: metrics.ctr,
@@ -488,13 +591,15 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                       name: c.name,
                       objective: c.objective,
                       spend: c.spend,
-                      conversions: c.conversions,
+                      conversions: computeConversionsForActions(c.actions, c.conversions),
                       impressions: c.impressions,
                       clicks: c.clicks,
                       ctr: c.ctr,
                     })),
                   chart_data: chartData,
                   active_campaigns: campaigns.filter(c => c.status === 'ACTIVE').length,
+                  selectedActionType,
+                  actionTypeLabel: currentActionLabel,
                 };
 
                 const { error: updateError } = await supabase
@@ -576,13 +681,44 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Conversões</CardTitle>
+            <div className="flex items-center gap-1.5">
+              <CardTitle className="text-sm font-medium">{currentActionLabel}</CardTitle>
+              <Popover open={actionSelectorOpen} onOpenChange={setActionSelectorOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full">
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-2 max-h-60 overflow-y-auto" align="start">
+                  <p className="text-xs text-muted-foreground px-2 py-1 font-medium">Selecionar métrica de conversão</p>
+                  {sortedAvailableActions.length === 0 ? (
+                    <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma ação disponível</p>
+                  ) : (
+                    sortedAvailableActions.map((action) => (
+                      <button
+                        key={action.action_type}
+                        className={`w-full flex items-center justify-between px-2 py-1.5 text-sm rounded hover:bg-muted transition-colors ${
+                          selectedActionType === action.action_type ? 'bg-muted font-medium' : ''
+                        }`}
+                        onClick={() => {
+                          setSelectedActionType(action.action_type);
+                          setActionSelectorOpen(false);
+                        }}
+                      >
+                        <span className="truncate mr-2">{getActionTypeLabel(action.action_type)}</span>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{formatNumber(action.value)}</span>
+                      </button>
+                    ))
+                  )}
+                </PopoverContent>
+              </Popover>
+            </div>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(metrics.conversions)}</div>
+            <div className="text-2xl font-bold">{formatNumber(dynamicTotalConversions)}</div>
             <p className="text-xs text-muted-foreground">
-              Taxa: {((metrics.conversions / metrics.clicks) * 100 || 0).toFixed(2)}%
+              Taxa: {((dynamicTotalConversions / metrics.clicks) * 100 || 0).toFixed(2)}%
             </p>
           </CardContent>
         </Card>
@@ -659,7 +795,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                   <TableHead>Última Alteração</TableHead>
                   <TableHead>Gasto</TableHead>
                   <TableHead>Cliques</TableHead>
-                  <TableHead>Conversões</TableHead>
+                  <TableHead>{currentActionLabel}</TableHead>
                   <TableHead>CTR</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
@@ -680,7 +816,7 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                       </TableCell>
                       <TableCell>{formatCurrency(campaign.spend)}</TableCell>
                       <TableCell>{formatNumber(campaign.clicks)}</TableCell>
-                      <TableCell>{campaign.conversions}</TableCell>
+                      <TableCell>{computeConversionsForActions(campaign.actions, campaign.conversions)}</TableCell>
                       <TableCell>{campaign.ctr.toFixed(2)}%</TableCell>
                       <TableCell>
                         <Button 

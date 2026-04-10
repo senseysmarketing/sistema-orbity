@@ -160,16 +160,29 @@ serve(async (req) => {
                 }
               }
 
+              // Aggregate all action types
+              const allActionsMap: Record<string, number> = {};
+              for (const insight of insightsData.data) {
+                if (insight.actions) {
+                  for (const action of insight.actions) {
+                    const key = action.action_type;
+                    allActionsMap[key] = (allActionsMap[key] || 0) + (parseInt(action.value) || 0);
+                  }
+                }
+              }
+              const allActions = Object.entries(allActionsMap).map(([action_type, value]) => ({ action_type, value }));
+
               const dataLength = insightsData.data.length;
               realMetrics = {
                 spend: totalSpend,
                 impressions: totalImpressions,
                 clicks: totalClicks,
                 conversions: totalConversions,
+                allActions,
                 cpm: dataLength > 0 ? totalCpm / dataLength : 0,
                 cpc: dataLength > 0 ? totalCpc / dataLength : 0,
                 ctr: dataLength > 0 ? totalCtr / dataLength : 0,
-                accountBalance: 0 // Será buscado separadamente se necessário
+                accountBalance: 0
               }
 
               // Buscar dados diários para gráfico
@@ -197,7 +210,8 @@ serve(async (req) => {
                     spend: parseFloat(insight.spend || '0'),
                     impressions: parseInt(insight.impressions || '0'),
                     clicks: parseInt(insight.clicks || '0'),
-                    conversions: conversions
+                    conversions: conversions,
+                    actions: insight.actions || [],
                   };
                 });
               }

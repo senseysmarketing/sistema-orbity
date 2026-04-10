@@ -39,6 +39,7 @@ interface ReportData {
   }>;
   is_mock: boolean;
   period?: { from: string; to: string };
+  actionTypeLabel?: string;
 }
 
 function CountUp({ end, duration = 1.5, prefix = "", suffix = "", decimals = 0 }: { end: number; duration?: number; prefix?: string; suffix?: string; decimals?: number }) {
@@ -198,7 +199,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
 
   const metrics = [
     { label: "Investimento", value: data.metrics.spend, icon: DollarSign, format: "currency" },
-    { label: "Conversões", value: data.metrics.conversions, icon: Target, format: "number" },
+    { label: data.actionTypeLabel || "Conversões", value: data.metrics.conversions, icon: Target, format: "number" },
     { label: "Custo / Conversão", value: data.metrics.cpa, icon: TrendingUp, format: "currency" },
     { label: "Campanhas Ativas", value: data.metrics.active_campaigns, icon: BarChart3, format: "number" },
   ];
@@ -213,7 +214,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
   const funnelData = [
     { label: "Impressões", value: totalImpressions, color: "#3b82f6", width: "100%", icon: Eye },
     { label: "Cliques no Link", value: totalClicks, color: "#8b5cf6", width: "85%", icon: MousePointerClick },
-    { label: "Conversões", value: totalConversions, color: "#10b981", width: "70%", icon: Target },
+    { label: data.actionTypeLabel || "Conversões", value: totalConversions, color: "#10b981", width: "70%", icon: Target },
   ];
 
   // Use real chart data from snapshot, or fallback
@@ -423,7 +424,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
                     <div className="flex items-center justify-between mt-1.5">
                       {campaign.conversions > 0 && (
                         <p className="text-white/30 text-[11px]">
-                          {campaign.conversions} conversão{campaign.conversions > 1 ? "es" : ""}
+                          {campaign.conversions} {(data.actionTypeLabel || "conversão").toLowerCase()}{campaign.conversions > 1 && !data.actionTypeLabel ? "es" : ""}
                         </p>
                       )}
                       {cpa > 0 && (
