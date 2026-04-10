@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { AlertCircle, Facebook, Plus, Settings, BarChart, Activity, LogOut, Users, TrendingUp } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { AlertCircle, Facebook, Plus, Settings, BarChart, Activity, LogOut, Users, TrendingUp, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
