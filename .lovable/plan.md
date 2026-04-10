@@ -1,34 +1,23 @@
 
 
-# Facebook Integration Card nas Configurações + Redirect do Tráfego
+# Enriquecer Card Meta Ads (sem gastos/campanhas)
 
-## Resumo
-Criar um componente `FacebookIntegration.tsx` na aba de Integrações (Settings) que centraliza a conexão/desconexão do Facebook, e atualizar a tela de Controle de Tráfego para redirecionar o usuário às Configurações quando não houver conexão ativa.
+## Informações a exibir quando conectado
 
-## 1. Novo componente: `src/components/settings/FacebookIntegration.tsx`
+1. **Conta conectada** — nome do negócio (`business_name`)
+2. **Facebook User ID** — `facebook_user_id`
+3. **Contas de anúncio vinculadas** — contagem de `selected_ad_accounts` ativas
+4. **Validade do token** — `token_expires_at` com badge verde/amarelo/vermelho
+5. **Última sincronização** — `last_sync` mais recente das contas
+6. **Data da conexão** — `created_at`
 
-Card no mesmo padrão visual do Google Calendar e WhatsApp:
-- **Header**: ícone Facebook + título "Meta Ads" + Badge Conectado/Desconectado
-- **Descrição**: "Conecte Facebook e Instagram Ads para monitorar campanhas"
-- **Estado desconectado**: Botão "Conectar Facebook" que abre o `FacebookConnectionDialog` existente
-- **Estado conectado**: Exibe nome do negócio, data da conexão, e botões "Desconectar"
-- Reutiliza a mesma lógica de `facebook_connections` já presente em `Traffic.tsx` (query por `agency_id` + `is_active`)
+## Alteração
 
-## 2. Atualizar `src/pages/Settings.tsx`
+**Arquivo**: `src/components/settings/FacebookIntegration.tsx`
 
-- Importar `FacebookIntegration`
-- Adicionar na grid de integrações (antes do Asaas/Conexa): `{isAgencyAdmin && <FacebookIntegration />}`
-
-## 3. Atualizar `src/pages/Traffic.tsx`
-
-- No bloco `facebookConnections.length === 0` (linhas 171-223): substituir o Dialog de conexão inline por uma mensagem + botão que redireciona para `/dashboard/settings?tab=integrations`
-- Texto: "Configure a conexão do Facebook nas Configurações"
-- Botão: "Ir para Integrações" com `useNavigate`
-- Remover imports não mais necessários (FacebookConnectionDialog do contexto de "primeira conexão")
-- Manter o Dialog de desconexão e reconexão no header do tráfego quando já conectado
-
-## Arquivos modificados (3)
-- `src/components/settings/FacebookIntegration.tsx` (novo)
-- `src/pages/Settings.tsx`
-- `src/pages/Traffic.tsx`
+- Buscar `selected_ad_accounts` ativas (count) e `last_sync` mais recente
+- Buscar `token_expires_at` e `facebook_user_id` da conexão
+- Layout com linhas de informação (label à esquerda, valor à direita) igual aos outros cards
+- Badge de status do token: verde (>30 dias), amarelo (≤30 dias), vermelho (expirado)
+- Manter botões de conectar/desconectar existentes
 
