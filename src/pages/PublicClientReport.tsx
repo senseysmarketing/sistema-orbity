@@ -424,7 +424,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
                     <div className="flex items-center justify-between mt-1.5">
                       {campaign.conversions > 0 && (
                         <p className="text-white/30 text-[11px]">
-                          {campaign.conversions} conversão{campaign.conversions > 1 ? "es" : ""}
+                          {campaign.conversions} {(data.actionTypeLabel || "conversão").toLowerCase()}{campaign.conversions > 1 && !data.actionTypeLabel ? "es" : ""}
                         </p>
                       )}
                       {cpa > 0 && (
