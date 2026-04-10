@@ -1,34 +1,59 @@
 
 
-# Organizar cards de integrações por categoria
+# Campos de Faturamento no Cliente (CPF/CNPJ + Endereço + ViaCEP)
 
-## Alteração em `src/pages/Settings.tsx` (linhas 410-416)
+## Resumo
+Adicionar campos de faturamento (documento e endereço) à tabela `clients`, ao formulário de cadastro/edição com auto-preenchimento via ViaCEP, e à visualização do cliente.
 
-Substituir a grid única por seções com título e separador:
+## 1. Migration — Novos campos na tabela `clients`
 
-### Categorias:
-1. **Marketing e Tráfego** — Meta Ads (Facebook)
-2. **Produtividade** — Google Calendar
-3. **Comunicação** — WhatsApp
-4. **Gateways de Pagamento** — Asaas, Conexa
+Os campos `document`, `zip_code`, `street`, `number`, `complement`, `neighborhood`, `city`, `state` não existem. Criar migration:
 
-### Estrutura para cada categoria:
-```
-<div>
-  <h3 className="text-lg font-semibold">Título da Categoria</h3>
-  <p className="text-sm text-muted-foreground mb-4">Descrição curta</p>
-  <Separator className="mb-4" />
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-    {cards}
-  </div>
-</div>
+```sql
+ALTER TABLE public.clients
+  ADD COLUMN IF NOT EXISTS document TEXT,
+  ADD COLUMN IF NOT EXISTS zip_code TEXT,
+  ADD COLUMN IF NOT EXISTS street TEXT,
+  ADD COLUMN IF NOT EXISTS number TEXT,
+  ADD COLUMN IF NOT EXISTS complement TEXT,
+  ADD COLUMN IF NOT EXISTS neighborhood TEXT,
+  ADD COLUMN IF NOT EXISTS city TEXT,
+  ADD COLUMN IF NOT EXISTS state TEXT;
 ```
 
-- Categorias com apenas 1 card usam grid normalmente (card ocupa metade)
-- Categorias com 2 cards ficam lado a lado
-- Cards admin-only mantêm `{isAgencyAdmin && ...}`
-- Separação visual entre categorias via `space-y-8` no container pai
+Todos nullable — sem obrigatoriedade.
 
-## Arquivo modificado (1)
-- `src/pages/Settings.tsx`
+## 2. ClientForm.tsx — Seção "Dados de Faturamento"
+
+- Adicionar ao `formData`: `document`, `zip_code`, `street`, `number`, `complement`, `neighborhood`, `city`, `state`
+- Carregar valores existentes no `useEffect` de edição
+- Incluir no `handleSubmit` os novos campos no objeto `data`
+- Adicionar separador visual (`<Separator />` + título "Dados de Faturamento") após a seção atual
+- Campos:
+  - **CPF/CNPJ** — input com máscara (formatação visual: `000.000.000-00` para CPF, `00.000.000/0001-00` para CNPJ, baseado no length)
+  - **CEP** — input com máscara `00000-000` e `onBlur` que chama ViaCEP quando 8 dígitos
+  - **Rua**, **Número**, **Complemento** — grid 3 colunas
+  - **Bairro**, **Cidade**, **Estado** — grid 3 colunas
+- Função `fetchAddressByCep`: fetch `https://viacep.com.br/ws/${cep}/json/`, preenche `street`, `neighborhood`, `city`, `state` automaticamente
+- Resetar esses campos no reset do form
+
+## 3. ClientDetailsDialog.tsx — Exibir dados de faturamento
+
+- Adicionar campos ao interface `Client`
+- Na aba "Informações", adicionar seção "Dados de Faturamento" com:
+  - CPF/CNPJ formatado
+  - Endereço completo em uma linha (Rua, Nº - Complemento, Bairro - Cidade/UF, CEP)
+  - Se nenhum campo preenchido, mostrar texto: "Dados de faturamento não cadastrados"
+
+## 4. ClientOverview.tsx — Card de faturamento
+
+- Na página de detalhe do cliente (`ClientDetail`), adicionar card "Dados de Faturamento" na grid `lg:grid-cols-2` ao lado de "Próximas Reuniões"
+- Exibir documento e endereço formatados
+- Badge de alerta se documento estiver vazio: "CPF/CNPJ pendente"
+
+## Arquivos modificados (4)
+- Migration SQL (novo)
+- `src/components/admin/ClientForm.tsx`
+- `src/components/admin/ClientDetailsDialog.tsx`
+- `src/components/clients/ClientOverview.tsx`
 
