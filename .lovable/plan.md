@@ -1,40 +1,42 @@
 
 
-# Refatoracao Visual do ClientForm.tsx
+# Central de Despesas — Refatoracao + Sheet Lateral
 
 ## Resumo
-Reestruturar o layout do modal de cliente em 3 secoes visuais com hierarquia clara, modal mais largo, scroll interno, e campos reagrupados em grids otimizados.
+Modernizar o card "Top Categorias de Custo" com barras de progresso percentuais e adicionar botao para abrir nova "Central de Despesas" em Sheet lateral com 3 abas.
 
-## Alteracoes (arquivo unico: `src/components/admin/ClientForm.tsx`)
+## Arquivos
 
-### 1. Modal e ScrollArea
-- `DialogContent`: alterar classe para `sm:max-w-2xl` (de `max-w-[600px]`)
-- Importar `ScrollArea` de `@/components/ui/scroll-area`
-- Envolver o conteudo do form com `<ScrollArea className="max-h-[80vh] px-1">`
+### 1. `src/components/admin/CommandCenter/CashFlowTable.tsx`
+- Refatorar o bloco "Top Categorias de Custo" (linhas 209-233):
+  - Calcular percentual de cada categoria sobre o total de despesas (nao sobre o max)
+  - Exibir formato: "Marketing (R$ 5.000) [=====] 45%"
+  - Adicionar botao "Central de Despesas" no CardHeader ao lado do titulo
+  - Novo estado `isExpenseSheetOpen` para controlar o Sheet
+  - Renderizar `<AdvancedExpenseSheet>` passando `cashFlow`, `expensesByCategory`, `agencyId`, `selectedMonth`
 
-### 2. Secao 1 — Dados Principais
-Titulo: `"Dados Principais"` (`h3 text-sm font-medium text-muted-foreground`)
-- Grid 2 colunas: **Nome** (col-span-2 ou ao lado de **Status/Active**)
-- Grid 2 colunas: **E-mail** | **WhatsApp** (com FormDescriptions mantidos)
-- Grid 2 colunas: **Servico** | **Data de Inicio**
-- Fidelidade (switch) + datas de contrato condicionais
-- Observacoes
+### 2. `src/components/admin/CommandCenter/AdvancedExpenseSheet.tsx` (NOVO)
+- Sheet lateral com `sm:max-w-[800px]`, titulo "Central de Contas a Pagar"
+- 3 abas via `<Tabs>`:
 
-### 3. Separator + Secao 2 — Configuracoes de Cobranca
-Titulo: `"Configurações de Cobrança"`
-- Grid **3 colunas**: **Valor Mensal** | **Dia de Vencimento** | **Forma de Faturamento**
-- Isso colapsa 3 linhas atuais em 1 unica linha
+**Aba 1 — Contas do Mes:**
+- Filtrar `cashFlow` onde `type === 'EXPENSE'` e `status !== 'CANCELLED'` (ja inclui despesas + salarios pelo `useFinancialMetrics`)
+- Tabela com colunas: Vencimento, Descricao, Categoria (badge), Valor, Status (badge colorido)
+- Totalizar pendente vs pago no topo
 
-### 4. Separator + Secao 3 — Dados de Faturamento
-Titulo: `"Dados de Faturamento"` (manter subtitulo existente)
-- Grid 2 colunas: **CPF/CNPJ** | **CEP**
-- Grid 3 colunas: **Rua** (col-span-2) | **Numero**
-- Grid 3 colunas: **Complemento** | **Bairro** | **Cidade**
-- Grid 2 colunas: **Estado** (sozinho, ja existente)
+**Aba 2 — Assinaturas Ativas:**
+- Query separada: buscar `expenses` onde `expense_type = 'recorrente'` e `is_active = true` da agencia
+- Exibir valor mensal comprometido no topo como KPI
+- Lista com nome, categoria, valor mensal, dia de recorrencia
 
-### 5. Footer
-Manter `DialogFooter` fixo com `border-t`, botoes alinhados a direita (ja esta assim).
+**Aba 3 — Parcelamentos:**
+- Query separada: buscar `expenses` onde `expense_type = 'parcelada'` com parcelas restantes
+- Barra de progresso: `installment_current / installment_total`
+- Formato: "Macbook - Parcela 3 de 10"
 
-## Logica
-Nenhuma alteracao em logica, estado, validacao ou submit. Apenas JSX/Tailwind.
+### 3. Nenhuma migration necessaria
+Os campos `expense_type` (enum: avulsa/recorrente/parcelada), `installment_current`, `installment_total`, `recurrence_day`, `is_active` ja existem na tabela `expenses`.
+
+## Consistencia visual
+Seguir o padrao do `AdvancedFinancialSheet.tsx`: mesmos componentes Card, Progress, Badge, formatCurrency, icones Lucide.
 
