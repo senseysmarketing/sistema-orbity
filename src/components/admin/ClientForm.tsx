@@ -425,6 +425,32 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
               <p className="text-xs text-muted-foreground mb-4">Necessários para emissão de cobranças via Asaas/Conexa</p>
             </div>
 
+            {/* Forma de Faturamento Padrão */}
+            <div className="grid gap-2">
+              <Label htmlFor="default_billing_type">Forma de Faturamento Padrão</Label>
+              <Select
+                value={formData.default_billing_type}
+                onValueChange={(value) => setFormData({ ...formData, default_billing_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {enabledGateways.map((gw) => (
+                    <SelectItem key={gw} value={gw}>
+                      {gw === 'manual' ? 'Manual' : gw === 'asaas' ? 'Asaas' : 'Conexa'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {enabledGateways.length <= 1 && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  Apenas faturamento manual ativo. Configure gateways em Configurações &gt; Integrações.
+                </p>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="document">CPF/CNPJ</Label>
