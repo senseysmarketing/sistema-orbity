@@ -369,6 +369,49 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                 />
               </div>
 
+              {/* Asaas Section */}
+              {isAsaasActive && isEditing && (
+                <div className="space-y-2">
+                  {hasAsaasCharge ? (
+                    <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="warning" className="text-xs">Aguardando Pagamento (Asaas)</Badge>
+                      </div>
+                      <Button type="button" variant="outline" size="sm" onClick={handleCopyPaymentLink} className="w-full">
+                        <Copy className="h-4 w-4 mr-1" />
+                        Copiar Link de Pagamento
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button type="button" variant="default" onClick={handleGenerateAsaasCharge} className="w-full">
+                      <QrCode className="h-4 w-4 mr-1" />
+                      Gerar Cobrança (Asaas)
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Asaas auto-settlement banner */}
+              {isAsaasActive && !manualOverrideConfirmed && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 p-3 flex items-center justify-between">
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    ⚡ Baixa automática habilitada via Asaas
+                  </p>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setManualOverrideDialogOpen(true)}>
+                        Forçar Baixa Manual (Override)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex flex-col gap-2 pt-4 border-t">
                 <div className="flex gap-2">
