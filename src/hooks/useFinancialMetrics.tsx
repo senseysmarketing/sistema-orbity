@@ -92,6 +92,7 @@ export interface CashFlowItem {
   status: 'PAID' | 'PENDING' | 'OVERDUE' | 'CANCELLED';
   sourceType: 'client_payment' | 'expense' | 'salary';
   sourceId: string;
+  billingType?: string;
 }
 
 export interface ClientProfitabilityItem {
@@ -342,6 +343,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         status: mapStatus(p.status),
         sourceType: 'client_payment',
         sourceId: p.id,
+        billingType: (p as any).billing_type || 'manual',
       });
     });
 

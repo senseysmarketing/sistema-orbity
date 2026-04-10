@@ -142,7 +142,16 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                           <ArrowDownCircle className="h-4 w-4 text-rose-500" />
                         )}
                       </TableCell>
-                      <TableCell className="font-medium text-sm">{item.title}</TableCell>
+                      <TableCell className="font-medium text-sm">
+                        <div className="flex items-center gap-1.5">
+                          {item.title}
+                          {item.type === 'INCOME' && item.billingType && item.billingType !== 'manual' && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 font-normal">
+                              {item.billingType === 'asaas' ? 'Asaas' : 'Conexa'}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className={`text-right font-semibold text-sm ${isCancelled ? 'line-through text-muted-foreground' : item.type === 'INCOME' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                         {item.type === 'INCOME' ? '+' : '-'} {formatCurrency(item.amount)}
                       </TableCell>
