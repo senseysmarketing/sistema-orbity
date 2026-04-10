@@ -1,81 +1,31 @@
 
 
-# Snapshot de Dados no Momento de Compartilhar
+# Responsividade do PublicClientReport.tsx
 
 ## Problema
-A Edge Function `public-client-report` faz chamadas independentes à Meta Ads API com parâmetros que podem divergir dos usados no dashboard. Isso gera dados inconsistentes (valores diferentes, métricas sem nexo).
+Os números grandes (ex: "R$ 652.76", "77.316") transbordam dos cards e dos blocos do funil em telas pequenas. Os blocos do funil com largura percentual (70%, 40%) ficam estreitos demais, cortando o conteúdo.
 
-## Solução: Salvar um snapshot dos dados no momento do clique em "Compartilhar"
-Em vez de re-buscar dados da Meta na Edge Function, **salvar os dados já carregados no dashboard** (metrics, campaigns, chartData) como JSON no banco, e a Edge Function apenas retorna esse snapshot.
+## Alterações em `src/pages/PublicClientReport.tsx`
 
-## Migration SQL
+### 1. Cards de Métricas - Texto Responsivo
+- Trocar `text-3xl` por `text-xl sm:text-2xl md:text-3xl` nos valores
+- Adicionar `min-w-0` e `break-words` / `overflow-hidden` nos cards
+- Reduzir padding de `p-5` para `p-3 sm:p-5`
 
-```sql
-ALTER TABLE public.clients
-  ADD COLUMN IF NOT EXISTS report_snapshot JSONB;
-```
+### 2. Funil do Tráfego - Larguras Mínimas
+- Mudar larguras de `100%/70%/40%` para `100%/85%/70%` para evitar esmagamento
+- Adicionar `min-w-0` nos blocos do funil
+- Reduzir font-size do valor de `text-lg` para `text-base sm:text-lg`
+- Reduzir label de `text-sm` para `text-xs sm:text-sm`
+- Reduzir padding de `px-5 py-4` para `px-3 py-3 sm:px-5 sm:py-4`
 
-## Arquivos Modificados
+### 3. Gráfico AreaChart
+- Reduzir `height` de 250 para 200 em mobile via classe condicional
+- Ajustar `margin.left` de -20 para -15
 
-### 1. `src/components/traffic/CampaignsAndReports.tsx`
-No onClick do botão "Compartilhar", construir o payload snapshot a partir dos states já carregados (`metrics`, `campaigns`, `chartData`) e salvá-lo no campo `report_snapshot`:
+### 4. Container Geral
+- O `max-w-lg` já limita bem; adicionar `px-3 sm:px-4` para telas muito pequenas
 
-```ts
-const snapshot = {
-  metrics: {
-    spend: metrics.spend,
-    impressions: metrics.impressions,
-    clicks: metrics.clicks,
-    conversions: metrics.conversions,
-    cpm: metrics.cpm,
-    cpc: metrics.cpc,
-    ctr: metrics.ctr,
-  },
-  top_campaigns: campaigns
-    .sort((a, b) => b.spend - a.spend)
-    .slice(0, 5)
-    .map(c => ({
-      name: c.name, objective: c.objective,
-      spend: c.spend, conversions: c.conversions,
-      impressions: c.impressions, clicks: c.clicks, ctr: c.ctr
-    })),
-  chart_data: chartData,
-  active_campaigns: campaigns.filter(c => c.status === 'ACTIVE').length,
-};
-
-// No update:
-.update({
-  report_token, report_expires_at, report_ad_account_id,
-  report_date_from, report_date_to,
-  report_snapshot: snapshot,
-})
-```
-
-### 2. `supabase/functions/public-client-report/index.ts`
-Simplificar drasticamente: em vez de chamar a Meta API, apenas:
-1. Validar token e expiração (como hoje)
-2. Ler `report_snapshot` do registro do cliente
-3. Retornar o snapshot diretamente no payload
-
-Eliminar todo o código de chamada à Graph API. A Edge Function passa a ter ~40 linhas.
-
-### 3. `src/pages/PublicClientReport.tsx`
-Atualizar a interface `ReportData` para receber os novos campos do snapshot:
-- `impressions`, `clicks`, `cpm`, `cpc`, `ctr`
-- `chart_data` (dados reais do gráfico em vez de mock)
-- Usar `chart_data` no AreaChart em vez do `mockChartData`
-- Usar `impressions` e `clicks` reais no funil em vez de valores hardcoded
-- Exibir métricas adicionais (CPM, CPC, CTR) se desejado
-
-## Benefícios
-- Dados 100% idênticos ao que o usuário vê no dashboard
-- Sem chamadas à Meta API na Edge Function (mais rápido, sem risco de token expirado)
-- Edge Function fica simples e confiável
-- Gráfico e funil com dados reais em vez de mock
-
-## Arquivos totais (3 modificados + migration)
-- Migration SQL (nova coluna `report_snapshot`)
-- `src/components/traffic/CampaignsAndReports.tsx`
-- `supabase/functions/public-client-report/index.ts`
+## Arquivo modificado: 1
 - `src/pages/PublicClientReport.tsx`
 
