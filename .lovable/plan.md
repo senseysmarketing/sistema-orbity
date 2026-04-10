@@ -1,23 +1,35 @@
 
 
-# Enriquecer Card Meta Ads (sem gastos/campanhas)
+# Reorganizar Card Meta Ads no estilo Google Calendar
 
-## Informações a exibir quando conectado
+## Alterações em `src/components/settings/FacebookIntegration.tsx`
 
-1. **Conta conectada** — nome do negócio (`business_name`)
-2. **Facebook User ID** — `facebook_user_id`
-3. **Contas de anúncio vinculadas** — contagem de `selected_ad_accounts` ativas
-4. **Validade do token** — `token_expires_at` com badge verde/amarelo/vermelho
-5. **Última sincronização** — `last_sync` mais recente das contas
-6. **Data da conexão** — `created_at`
+### Header
+- Trocar o ícone solto `<Facebook>` por um container com fundo azul (`bg-blue-100 rounded-lg`) igual ao Google Calendar
+- Badge "Conectado" com estilo outline verde (✓ Conectado) em vez do badge sólido verde
+- Usar mesma estrutura de padding (`p-4 sm:p-6`)
 
-## Alteração
+### Estado conectado — blocos com `border rounded-lg`
+Reorganizar as informações em blocos visuais separados (mesmo padrão `p-3 sm:p-4 border rounded-lg`):
 
-**Arquivo**: `src/components/settings/FacebookIntegration.tsx`
+1. **Conta conectada** — bloco com `bg-muted/30`:
+   - Nome do negócio (`business_name`) como título
+   - Facebook User ID abaixo em texto menor
+   - Última sincronização como subtexto
 
-- Buscar `selected_ad_accounts` ativas (count) e `last_sync` mais recente
-- Buscar `token_expires_at` e `facebook_user_id` da conexão
-- Layout com linhas de informação (label à esquerda, valor à direita) igual aos outros cards
-- Badge de status do token: verde (>30 dias), amarelo (≤30 dias), vermelho (expirado)
-- Manter botões de conectar/desconectar existentes
+2. **Contas de anúncio** — bloco com ícone Users + contagem
+
+3. **Token** — bloco com status do token (badge verde/amarelo/vermelho)
+
+4. **Rodapé** — botão "Desconectar" no estilo destructive igual ao Google Calendar (sem AlertDialog inline, usar botão direto com confirmação)
+
+### Estado desconectado
+- Adicionar bloco "Recursos disponíveis" com lista de features (igual ao Google Calendar) antes do botão de conectar
+
+### Dados adicionais
+- O campo `business_name` da `facebook_connections` já contém o nome da conta — será exibido como título do bloco "Conta conectada"
+- Buscar também o `facebook_user_name` se disponível na tabela (verificar schema)
+
+## Arquivo modificado (1)
+- `src/components/settings/FacebookIntegration.tsx`
 
