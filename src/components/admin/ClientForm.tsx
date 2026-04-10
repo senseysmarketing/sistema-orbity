@@ -75,7 +75,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
-  const [generateContract, setGenerateContract] = useState(false);
+  
   const [formData, setFormData] = useState({ ...initialFormData });
 
   useEffect(() => {
@@ -225,9 +225,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
             onSuccess();
             onOpenChange(false);
             
-            if (generateContract && savedClientId) {
-              navigate(`/contracts?clientId=${savedClientId}`);
-            }
             
             setFormData({ ...initialFormData });
             return;
@@ -243,9 +240,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
       onSuccess();
       onOpenChange(false);
       
-      if (generateContract && !client && savedClientId) {
-        navigate(`/contracts?clientId=${savedClientId}`);
-      }
       
       setFormData({ ...initialFormData });
     } catch (error: any) {
@@ -542,29 +536,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client }: ClientForm
               </div>
             </div>
 
-            {/* Checkbox para gerar contrato (apenas para novos clientes) */}
-            {!client && (
-              <div className="flex items-center space-x-2 p-4 border rounded-lg bg-muted/50">
-                <Checkbox
-                  id="generate-contract"
-                  checked={generateContract}
-                  onCheckedChange={(checked) => setGenerateContract(checked as boolean)}
-                />
-                <Label htmlFor="generate-contract" className="cursor-pointer">
-                  Gerar contrato após cadastro
-                </Label>
-              </div>
-            )}
-
-            {/* Status do Cliente */}
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="active"
-                checked={formData.active}
-                onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
-              />
-              <Label htmlFor="active">Cliente Ativo</Label>
-            </div>
           </div>
           <DialogFooter className="mt-4 pt-4 border-t bg-background">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
