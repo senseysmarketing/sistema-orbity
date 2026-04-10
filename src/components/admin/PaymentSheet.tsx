@@ -437,7 +437,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                           <span className="text-right font-medium text-destructive">- R$ {payment.gateway_fee.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
                         </>
                       )}
-                      {payment.gateway_fee > 0 && (
+                    {payment.gateway_fee > 0 && (
                         <>
                           <span className="text-muted-foreground font-medium">Líquido:</span>
                           <span className="text-right font-bold text-primary">
@@ -446,6 +446,17 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                         </>
                       )}
                     </div>
+                    {/* Contextual diff: interest/fine or discount */}
+                    {payment.amount_paid && payment.amount_paid > payment.amount && (
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                        + R$ {(payment.amount_paid - payment.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} recebidos em juros/multa
+                      </p>
+                    )}
+                    {payment.amount_paid && payment.amount_paid < payment.amount && (
+                      <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                        - R$ {(payment.amount - payment.amount_paid).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} concedidos em desconto
+                      </p>
+                    )}
                   </div>
                 )
               )}

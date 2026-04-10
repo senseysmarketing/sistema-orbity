@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Bell, Clock, AlertTriangle, ShieldAlert, Save, Loader2, Info, Mail, MessageCircle, CheckCircle2, AlertCircle } from "lucide-react";
+import { Bell, Clock, AlertTriangle, ShieldAlert, Save, Loader2, Info, Mail, MessageCircle, CheckCircle2, AlertCircle, Percent } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePaymentGateway, PaymentSettings } from "@/hooks/usePaymentGateway";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +36,10 @@ const defaultFormData: FormData = {
   whatsapp_template_overdue: null,
   notify_via_email: true,
   notify_via_whatsapp: true,
+  default_fine_percentage: 2.00,
+  default_interest_percentage: 1.00,
+  discount_percentage: 0.00,
+  discount_days_before: 0,
 };
 
 export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomationSettingsProps) {
@@ -58,6 +63,10 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
         whatsapp_template_overdue: settings.whatsapp_template_overdue,
         notify_via_email: settings.notify_via_email,
         notify_via_whatsapp: settings.notify_via_whatsapp,
+        default_fine_percentage: settings.default_fine_percentage ?? 2.00,
+        default_interest_percentage: settings.default_interest_percentage ?? 1.00,
+        discount_percentage: settings.discount_percentage ?? 0.00,
+        discount_days_before: settings.discount_days_before ?? 0,
       });
     }
   }, [settings]);
@@ -287,6 +296,113 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
               ))}
             </div>
           </div>
+
+          <Separator />
+
+          {/* Juros, Multas e Descontos */}
+          <Card>
+            <CardContent className="pt-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <Percent className="h-4 w-4 text-primary" />
+                <Label className="font-semibold text-sm">Juros, Multas e Descontos</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Essas regras são enviadas ao gateway (Asaas/Conexa) na emissão da cobrança. O próprio gateway calcula os acréscimos ou descontos automaticamente.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <TooltipProvider>
+                  <div className="space-y-1.5">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Label className="text-xs cursor-help flex items-center gap-1">
+                          Multa por Atraso (%)
+                          <Info className="h-3 w-3 text-muted-foreground" />
+                        </Label>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px]">
+                        <p className="text-xs">Multa fixa cobrada uma única vez após o vencimento.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="10"
+                      value={formData.default_fine_percentage}
+                      onChange={e => updateField('default_fine_percentage', Number(e.target.value) || 0)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Label className="text-xs cursor-help flex items-center gap-1">
+                          Juros de Mora (% ao mês)
+                          <Info className="h-3 w-3 text-muted-foreground" />
+                        </Label>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px]">
+                        <p className="text-xs">Juros calculados pro-rata die (por dia) sobre o valor do boleto.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="10"
+                      value={formData.default_interest_percentage}
+                      onChange={e => updateField('default_interest_percentage', Number(e.target.value) || 0)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Label className="text-xs cursor-help flex items-center gap-1">
+                          Desconto Pontualidade (%)
+                          <Info className="h-3 w-3 text-muted-foreground" />
+                        </Label>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px]">
+                        <p className="text-xs">Desconto aplicado se o pagamento for realizado até X dias antes do vencimento.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={formData.discount_percentage}
+                      onChange={e => updateField('discount_percentage', Number(e.target.value) || 0)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Label className="text-xs cursor-help flex items-center gap-1">
+                          Dias limite p/ desconto
+                          <Info className="h-3 w-3 text-muted-foreground" />
+                        </Label>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px]">
+                        <p className="text-xs">Quantos dias antes do vencimento o desconto é válido. Ex: 0 = até o dia do vencimento.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="0"
+                      max="30"
+                      value={formData.discount_days_before}
+                      onChange={e => updateField('discount_days_before', Number(e.target.value) || 0)}
+                    />
+                  </div>
+                </TooltipProvider>
+              </div>
+            </CardContent>
+          </Card>
 
           <Button onClick={handleSave} disabled={isSaving} className="w-full">
             {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
