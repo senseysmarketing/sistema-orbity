@@ -212,8 +212,8 @@ function ReportDashboard({ data }: { data: ReportData }) {
 
   const funnelData = [
     { label: "Impressões", value: totalImpressions, color: "#3b82f6", width: "100%", icon: Eye },
-    { label: "Cliques no Link", value: totalClicks, color: "#8b5cf6", width: "70%", icon: MousePointerClick },
-    { label: "Conversões", value: totalConversions, color: "#10b981", width: "40%", icon: Target },
+    { label: "Cliques no Link", value: totalClicks, color: "#8b5cf6", width: "85%", icon: MousePointerClick },
+    { label: "Conversões", value: totalConversions, color: "#10b981", width: "70%", icon: Target },
   ];
 
   // Use real chart data from snapshot, or fallback
@@ -230,7 +230,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.08)_0%,_transparent_60%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(139,92,246,0.05)_0%,_transparent_50%)]" />
 
-      <div className="relative z-10 max-w-lg mx-auto px-4 py-8 pb-20">
+      <div className="relative z-10 max-w-lg mx-auto px-3 sm:px-4 py-8 pb-20">
         {/* Header */}
         <motion.div
           variants={headerVariants}
@@ -281,7 +281,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
               <motion.div
                 key={i}
                 variants={itemVariants}
-                className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-5 relative overflow-hidden group"
+                className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-3 sm:p-5 relative overflow-hidden min-w-0 group"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <Icon className="absolute top-3 right-3 h-8 w-8 text-white/[0.07]" />
@@ -292,7 +292,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
                       {metric.label}
                     </span>
                   </div>
-                  <div className="text-3xl font-black text-white tracking-tight" style={{ textShadow: "0 0 40px rgba(255,255,255,0.15)" }}>
+                  <div className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight truncate" style={{ textShadow: "0 0 40px rgba(255,255,255,0.15)" }}>
                     {metric.format === "currency" ? (
                       <CountUp end={metric.value} prefix="R$ " decimals={2} />
                     ) : (
@@ -316,8 +316,8 @@ function ReportDashboard({ data }: { data: ReportData }) {
             Evolução no Período
           </h3>
           <div className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl p-5">
-            <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
@@ -368,16 +368,16 @@ function ReportDashboard({ data }: { data: ReportData }) {
                     <ArrowDown className="h-5 w-5 text-white/20 my-1.5" />
                   )}
                   <div
-                    className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl px-5 py-4 flex items-center justify-between transition-all duration-300"
+                    className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl px-3 py-3 sm:px-5 sm:py-4 flex items-center justify-between transition-all duration-300 min-w-0"
                     style={{ width: step.width }}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${step.color}15` }}>
                         <Icon className="h-4 w-4" style={{ color: step.color }} />
                       </div>
-                      <span className="text-white/60 text-sm font-medium">{step.label}</span>
+                      <span className="text-white/60 text-xs sm:text-sm font-medium">{step.label}</span>
                     </div>
-                    <span className="text-white font-black text-lg tracking-tight" style={{ textShadow: `0 0 20px ${step.color}30` }}>
+                    <span className="text-white font-black text-base sm:text-lg tracking-tight" style={{ textShadow: `0 0 20px ${step.color}30` }}>
                       <CountUp end={step.value} />
                     </span>
                   </div>
