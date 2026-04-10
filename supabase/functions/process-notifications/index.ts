@@ -366,6 +366,9 @@ async function processReminders() {
           reminder_id: reminder.id,
           play_sound: true
         },
+        entity_type: 'reminder',
+        entity_id: reminder.id,
+        action_type: 'reminder',
       });
 
       remindersToUpdate.push({
@@ -451,6 +454,9 @@ async function processTasks() {
               task_id: task.id,
               play_sound: true
             },
+            entity_type: 'task',
+            entity_id: task.id,
+            action_type: 'upcoming',
           },
           tracking: {
             notification_type: 'task_upcoming',
