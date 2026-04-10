@@ -23,6 +23,25 @@ interface Client {
   contract_start_date: string | null;
   contract_end_date: string | null;
   has_loyalty: boolean;
+  document?: string | null;
+  zip_code?: string | null;
+  street?: string | null;
+  number?: string | null;
+  complement?: string | null;
+  neighborhood?: string | null;
+  city?: string | null;
+  state?: string | null;
+}
+
+function formatDocumentDisplay(doc: string): string {
+  const digits = doc.replace(/\D/g, '');
+  if (digits.length === 11) {
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  }
+  if (digits.length === 14) {
+    return digits.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  }
+  return doc;
 }
 
 interface Payment {
@@ -207,6 +226,41 @@ export function ClientDetailsDialog({
                 <p className="text-base mt-1 p-3 bg-muted rounded-lg">{client.observations}</p>
               </div>
             )}
+
+            {/* Dados de Faturamento */}
+            <div className="p-4 bg-muted/50 rounded-lg">
+              <h3 className="font-semibold mb-3">Dados de Faturamento</h3>
+              {client.document || client.street || client.city ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">CPF/CNPJ</label>
+                    <p className="text-base">{client.document ? formatDocumentDisplay(client.document) : 'N/A'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground">Endereço</label>
+                    <p className="text-base">
+                      {[
+                        client.street,
+                        client.number ? `Nº ${client.number}` : null,
+                        client.complement ? `- ${client.complement}` : null,
+                      ].filter(Boolean).join(', ') || ''}
+                      {(client.neighborhood || client.city) && (
+                        <>
+                          {client.street ? ' — ' : ''}
+                          {[
+                            client.neighborhood,
+                            client.city && client.state ? `${client.city}/${client.state}` : client.city,
+                          ].filter(Boolean).join(', ')}
+                        </>
+                      )}
+                      {client.zip_code && ` • CEP ${client.zip_code.replace(/(\d{5})(\d{3})/, '$1-$2')}`}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Dados de faturamento não cadastrados</p>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="history" className="mt-4">
