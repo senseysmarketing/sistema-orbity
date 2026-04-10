@@ -1,35 +1,34 @@
 
 
-# Reorganizar Card Meta Ads no estilo Google Calendar
+# Organizar cards de integrações por categoria
 
-## Alterações em `src/components/settings/FacebookIntegration.tsx`
+## Alteração em `src/pages/Settings.tsx` (linhas 410-416)
 
-### Header
-- Trocar o ícone solto `<Facebook>` por um container com fundo azul (`bg-blue-100 rounded-lg`) igual ao Google Calendar
-- Badge "Conectado" com estilo outline verde (✓ Conectado) em vez do badge sólido verde
-- Usar mesma estrutura de padding (`p-4 sm:p-6`)
+Substituir a grid única por seções com título e separador:
 
-### Estado conectado — blocos com `border rounded-lg`
-Reorganizar as informações em blocos visuais separados (mesmo padrão `p-3 sm:p-4 border rounded-lg`):
+### Categorias:
+1. **Marketing e Tráfego** — Meta Ads (Facebook)
+2. **Produtividade** — Google Calendar
+3. **Comunicação** — WhatsApp
+4. **Gateways de Pagamento** — Asaas, Conexa
 
-1. **Conta conectada** — bloco com `bg-muted/30`:
-   - Nome do negócio (`business_name`) como título
-   - Facebook User ID abaixo em texto menor
-   - Última sincronização como subtexto
+### Estrutura para cada categoria:
+```
+<div>
+  <h3 className="text-lg font-semibold">Título da Categoria</h3>
+  <p className="text-sm text-muted-foreground mb-4">Descrição curta</p>
+  <Separator className="mb-4" />
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    {cards}
+  </div>
+</div>
+```
 
-2. **Contas de anúncio** — bloco com ícone Users + contagem
-
-3. **Token** — bloco com status do token (badge verde/amarelo/vermelho)
-
-4. **Rodapé** — botão "Desconectar" no estilo destructive igual ao Google Calendar (sem AlertDialog inline, usar botão direto com confirmação)
-
-### Estado desconectado
-- Adicionar bloco "Recursos disponíveis" com lista de features (igual ao Google Calendar) antes do botão de conectar
-
-### Dados adicionais
-- O campo `business_name` da `facebook_connections` já contém o nome da conta — será exibido como título do bloco "Conta conectada"
-- Buscar também o `facebook_user_name` se disponível na tabela (verificar schema)
+- Categorias com apenas 1 card usam grid normalmente (card ocupa metade)
+- Categorias com 2 cards ficam lado a lado
+- Cards admin-only mantêm `{isAgencyAdmin && ...}`
+- Separação visual entre categorias via `space-y-8` no container pai
 
 ## Arquivo modificado (1)
-- `src/components/settings/FacebookIntegration.tsx`
+- `src/pages/Settings.tsx`
 
