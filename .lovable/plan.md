@@ -1,94 +1,49 @@
 
 
-# Edge Function: payment-webhook — Plano Corrigido
+# Juros, Multa e Descontos — Plano Completo
 
 ## Resumo
-Webhook multi-tenant que recebe eventos do Asaas/Conexa, valida tokens por agência, atualiza pagamentos com idempotência, e enfileira notificações na `notification_queue`.
+Adicionar configuracao visual de regras financeiras (multa, juros, desconto) no painel da agencia, exibir diferencas de valor em pagamentos concluidos, e acoplar essas regras ao payload de criacao de cobrancas.
 
-## Descobertas
-- `notification_queue` **não existe** no banco. Precisa ser criada via migration.
-- `client_payments` já possui: `asaas_payment_id`, `conexa_charge_id`, `status`, `amount_paid`, `gateway_fee`, `paid_date`, `agency_id`.
-- `agency_payment_settings` **não** possui colunas de webhook token — precisam ser adicionadas.
+## Alteracoes
 
-## Alterações
+### 1. `src/hooks/usePaymentGateway.tsx`
+- Adicionar 4 campos a interface `PaymentSettings`: `default_fine_percentage`, `default_interest_percentage`, `discount_percentage`, `discount_days_before`
+- Adicionar defaults correspondentes em `defaultSettings`
 
-### 1. Migration SQL (2 alterações)
+### 2. `src/components/admin/BillingAutomationSettings.tsx`
+- Remover os 4 novos campos do `Omit` no type `FormData`
+- Adicionar ao `defaultFormData` e ao `useEffect` de sincronizacao
+- Nova secao "Juros, Multas e Descontos" com `Card` contendo 4 inputs numericos com tooltips:
+  - Multa por Atraso (%)
+  - Juros de Mora (% ao mes)
+  - Desconto Pontualidade (%)
+  - Dias limite para desconto
+- Incluir `handleSave` para persistir esses campos
 
-**a) Novas colunas de token em `agency_payment_settings`:**
-```sql
-ALTER TABLE public.agency_payment_settings
-  ADD COLUMN IF NOT EXISTS asaas_webhook_token TEXT,
-  ADD COLUMN IF NOT EXISTS conexa_webhook_token TEXT;
-```
+### 3. `src/components/admin/PaymentSheet.tsx`
+- No bloco "Detalhes do Recebimento" (linhas ~420-451), adicionar linhas contextuais:
+  - Se `amount_paid > amount`: linha verde `"+ R$ X recebidos em juros/multa"`
+  - Se `amount_paid < amount`: linha amarela `"- R$ X concedidos em desconto"`
 
-**b) Nova tabela `notification_queue`:**
-```sql
-CREATE TABLE public.notification_queue (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agency_id UUID NOT NULL REFERENCES public.agencies(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  channel TEXT NOT NULL DEFAULT 'in_app',
-  payload JSONB NOT NULL DEFAULT '{}',
-  status TEXT NOT NULL DEFAULT 'pending',
-  created_at TIMESTAMPTZ DEFAULT now(),
-  processed_at TIMESTAMPTZ
-);
-ALTER TABLE public.notification_queue ENABLE ROW LEVEL SECURITY;
-```
-RLS: policy para service_role apenas (backend-only table).
+### 4. Acoplamento na emissao — `src/hooks/useCreatePayment.ts`
+- Importar `usePaymentGateway` para ler as regras financeiras da agencia
+- Incluir no payload de `createPayment` os campos `fine_percentage`, `interest_percentage`, `discount_percentage`, `discount_days_before` para que fiquem persistidos ou disponiveis
+- Adicionar comentario TODO no codigo indicando que, quando a Edge Function de emissao para Asaas/Conexa for implementada, ela devera:
+  1. Buscar `agency_payment_settings` da agencia
+  2. Montar o objeto `fine`, `interest` e `discount` conforme documentacao do gateway
+  3. Injetar no JSON enviado a API
 
-### 2. Edge Function: `supabase/functions/payment-webhook/index.ts`
-
-**URL format:**
-```
-POST /payment-webhook?gateway=asaas&agency_id=<UUID>
-POST /payment-webhook?gateway=conexa&agency_id=<UUID>
-```
-
-**Fluxo completo (sem early return antes do processamento):**
-
-1. Ler `gateway` e `agency_id` da query string. Se ausentes, retornar 400.
-2. Buscar `agency_payment_settings` por `agency_id` usando Service Role Key.
-3. Validar header `asaas-access-token` contra `asaas_webhook_token` do banco (ou equivalente Conexa). Se inválido, retornar 401.
-4. Parsear evento do payload:
-   - Asaas: `event` + `payment.id` + `payment.value` + `payment.netValue`
-   - Conexa: formato equivalente
-5. **Idempotência**: SELECT status atual do pagamento por `asaas_payment_id`. Se evento é `PAYMENT_RECEIVED` e status já é `paid`, retornar 200 silencioso ("Already processed").
-6. UPDATE `client_payments` conforme evento:
-   - `PAYMENT_RECEIVED` → status='paid', amount_paid=netValue, gateway_fee=value-netValue, paid_date=now()
-   - `PAYMENT_OVERDUE` → status='overdue'
-   - `PAYMENT_DELETED` → status='cancelled'
-7. Se `PAYMENT_RECEIVED`: INSERT em `notification_queue` com channel='in_app', payload com dados do recebimento, user_id do owner da agência (via `agency_users` role='owner').
-8. Retornar `new Response("OK", { status: 200 })` **somente no final** do try. Catch retorna 200 com log do erro (para não causar retry do gateway).
-
-### 3. Config (`supabase/config.toml`)
-```toml
-[functions.payment-webhook]
-verify_jwt = false
-```
-
-### 4. Atualizar `usePaymentGateway.tsx`
-Adicionar `asaas_webhook_token` e `conexa_webhook_token` à interface `PaymentSettings` e ao `defaultSettings`.
-
-## Mapeamento de eventos
-
-```text
-Asaas Event          | Conexa Event       | DB Status
----------------------|--------------------|----------
-PAYMENT_RECEIVED     | charge.paid        | paid
-PAYMENT_OVERDUE      | charge.overdue     | overdue
-PAYMENT_DELETED      | charge.cancelled   | cancelled
-```
+### 5. `src/components/admin/FirstPaymentDialog.tsx`
+- Mesmo acoplamento: passar as regras financeiras via `usePaymentGateway` para o `createPayment`, garantindo que o fluxo fast-track tambem carregue as regras
 
 ## Arquivos
-- Migration SQL (nova — tokens + notification_queue)
-- `supabase/functions/payment-webhook/index.ts` (novo)
-- `supabase/config.toml` (adicionar entry)
-- `src/hooks/usePaymentGateway.tsx` (adicionar campos de token)
-- `src/integrations/supabase/types.ts` (atualizar tipos)
+- `src/hooks/usePaymentGateway.tsx`
+- `src/components/admin/BillingAutomationSettings.tsx`
+- `src/components/admin/PaymentSheet.tsx`
+- `src/hooks/useCreatePayment.ts`
+- `src/components/admin/FirstPaymentDialog.tsx`
 
-## Pós-deploy
-Cada agência deverá:
-1. Gerar um token no painel do Asaas e salvar em "Configurações > Faturamento" no Orbity (campo `asaas_webhook_token`)
-2. Configurar a URL do webhook no Asaas: `https://ovookkywclrqfmtumelw.supabase.co/functions/v1/payment-webhook?gateway=asaas&agency_id=<SEU_UUID>`
+## Nenhuma migration necessaria
+As colunas ja existem no banco (migration anterior executada com sucesso).
 
