@@ -33,6 +33,8 @@ interface Client {
   neighborhood?: string | null;
   city?: string | null;
   state?: string | null;
+  asaas_customer_id?: string | null;
+  conexa_customer_id?: string | null;
 }
 
 function formatDocumentDisplay(doc: string): string {
