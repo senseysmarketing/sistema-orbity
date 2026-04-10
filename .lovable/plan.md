@@ -1,90 +1,116 @@
 
 
-# Integração Asaas + Régua de Cobrança Automática (Revisado)
+# Link Mágico de Relatório Público (Revisado com Segurança)
 
 ## Resumo
-Gateway de pagamentos Asaas (PIX/Boleto) híbrido com fluxo manual, régua de cobrança automática com templates separados, e safety switch para override manual.
+Relatório público compartilhável via token seguro com expiração de 48h. Edge Function dedicada para contornar RLS com segurança. Página dark mode premium com framer-motion.
 
-## Migration (SQL)
+---
+
+## Migration SQL
 
 ```sql
-CREATE TABLE public.agency_payment_settings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agency_id UUID REFERENCES public.agencies(id) ON DELETE CASCADE NOT NULL UNIQUE,
-  active_gateway TEXT NOT NULL DEFAULT 'manual' CHECK (active_gateway IN ('manual', 'asaas')),
-  asaas_api_key TEXT,
-  asaas_sandbox BOOLEAN DEFAULT true,
-  reminder_before_enabled BOOLEAN DEFAULT false,
-  reminder_before_days INTEGER DEFAULT 3,
-  reminder_due_date_enabled BOOLEAN DEFAULT false,
-  reminder_overdue_enabled BOOLEAN DEFAULT false,
-  reminder_overdue_days INTEGER DEFAULT 1,
-  block_access_enabled BOOLEAN DEFAULT false,
-  block_access_days INTEGER DEFAULT 5,
-  whatsapp_template_reminder TEXT,
-  whatsapp_template_overdue TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-ALTER TABLE public.agency_payment_settings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Agency admins manage payment settings"
-  ON public.agency_payment_settings FOR ALL TO authenticated
-  USING (public.is_agency_admin(agency_id))
-  WITH CHECK (public.is_agency_admin(agency_id));
-
-ALTER TABLE public.client_payments
-  ADD COLUMN IF NOT EXISTS asaas_payment_id TEXT,
-  ADD COLUMN IF NOT EXISTS invoice_url TEXT,
-  ADD COLUMN IF NOT EXISTS pix_copy_paste TEXT;
-
 ALTER TABLE public.clients
-  ADD COLUMN IF NOT EXISTS asaas_customer_id TEXT;
+  ADD COLUMN IF NOT EXISTS report_token TEXT,
+  ADD COLUMN IF NOT EXISTS report_expires_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_clients_report_token
+  ON public.clients(report_token) WHERE report_token IS NOT NULL;
 ```
+
+Nenhuma policy `anon` na tabela `clients`. O acesso público é feito exclusivamente via Edge Function com Service Role.
+
+---
+
+## Nova Edge Function: `public-client-report`
+
+**Arquivo:** `supabase/functions/public-client-report/index.ts`
+
+- Recebe `POST { token: string }`
+- Usa `supabaseAdmin` (Service Role Key) para buscar cliente onde `report_token = token`
+- Valida expiração: se `report_expires_at < now()` ou não encontrado, retorna `403 { error: "expired" }`
+- Se válido:
+  1. Busca dados básicos do cliente (nome, empresa)
+  2. Busca `ad_accounts` vinculadas ao cliente via `client_id`
+  3. Para cada ad account com `access_token` ativo, chama a API da Meta para obter métricas (spend, conversions, campaigns)
+  4. Se não houver conexão Meta, retorna dados mockados com flag `is_mock: true`
+  5. Retorna payload: `{ client_name, company, metrics: { spend, conversions, cpa, active_campaigns }, top_campaigns: [...], is_mock }`
+- CORS headers incluídos em todas as respostas
+- `verify_jwt = false` no `config.toml`
+
+---
 
 ## Novos Arquivos
 
-### 1. `src/hooks/usePaymentGateway.tsx`
-Hook que busca `agency_payment_settings` para a agência atual. Expõe `gateway`, `settings`, `isAsaasActive`, `loading`.
+### 1. `src/pages/PublicClientReport.tsx`
 
-### 2. `src/components/settings/AsaasIntegration.tsx`
-Card na aba Integrações:
-- Master Switch "Ativar Asaas como gateway principal"
-- Input API Key (mascarado)
-- Switch Sandbox/Produção
-- Botão "Salvar e Conectar" com badge de status
-- Salva em `agency_payment_settings`
+- Extrai `:token` via `useParams()`
+- Faz `POST` para Edge Function `public-client-report` com `{ token }`
+- **3 estados de renderização:**
+  - **Loading**: tela dark com skeleton animado
+  - **Expirado/Erro** (status 403): tela dark minimalista com ícone `<Clock>` laranja, "Link Expirado", subtítulo orientando solicitar novo acesso
+  - **Dashboard**: página dark mode premium com:
+    - Fundo escuro com gradiente radial sutil (tons azul/roxo)
+    - Header com slide-down: logo, nome do cliente, "Relatório de Performance", badge "Ao Vivo" piscando verde
+    - Grid 2x2 de métricas (glassmorphism `bg-white/5 backdrop-blur-md border-white/10`): Investimento, Conversões, Custo/Conversão, Campanhas Ativas
+    - `staggerChildren` fade-up com framer-motion
+    - Animação count-up nos números
+    - Top 3 campanhas com barras `<Progress>`
+    - Rodapé "Gerado por Sensey's"
+- Todas as animações via `framer-motion` (já instalado)
+- Mobile-first, sem scroll horizontal
 
-### 3. `src/components/admin/BillingAutomationSettings.tsx`
-Sheet lateral com:
-- Switches e inputs numéricos para cada evento da régua
-- **Dois Textareas separados**:
-  - "Template para Lembretes (Antes/No Dia)" — variáveis `{nome_cliente}`, `{valor}`, `{data_vencimento}`, `{link_pagamento}`
-  - "Template para Atrasos (Cobrança)" — mesmas variáveis
-- Dica contextual: "Gateway Manual? Use sua chave PIX. Gateway Asaas? Use {link_pagamento}."
+### 2. Rota em `src/App.tsx`
+
+```tsx
+<Route path="/report/:token" element={<PublicClientReport />} />
+```
+
+Adicionada nas rotas públicas (fora do escopo de autenticação).
+
+---
 
 ## Arquivos Modificados
 
-### 4. `src/pages/Settings.tsx`
-Renderizar `<AsaasIntegration />` no grid de integrações
+### 3. `src/components/traffic/CampaignsAndReports.tsx`
 
-### 5. `src/components/admin/PaymentSheet.tsx`
-- Importar `usePaymentGateway`
-- **Gateway manual**: fluxo atual inalterado
-- **Gateway Asaas**:
-  - Botão "Gerar Cobrança (Asaas)" (mock: toast "Em breve")
-  - Se `asaas_payment_id` existe: "Copiar Link de Pagamento" + badge status
-  - Banner "Baixa automática habilitada via Asaas"
-  - **Safety Switch**: botão ghost/menu `...` com "Forçar Baixa Manual (Override)" que abre `AlertDialog` avisando que não cancela a cobrança no Asaas, apenas atualiza localmente. Se confirmado, permite fluxo manual normal.
+- **Botão "Compartilhar"**: `<Button variant="outline" size="sm">` com ícone `<Share2>`, ao lado do botão "Atualizar"
+- **Estado `isGeneratingLink`**: boolean que controla spinner/loading no botão e desabilita cliques duplos
+- **Validação de contexto**: se `clientId` não estiver disponível (nenhuma conta/cliente selecionado), exibe `toast.error("Selecione uma conta antes de compartilhar")`
+- **Lógica onClick**:
+  1. Seta `isGeneratingLink = true`
+  2. Gera token: `crypto.randomUUID()`
+  3. Calcula expiração: `new Date(Date.now() + 48 * 60 * 60 * 1000)`
+  4. Faz `update` no Supabase: `clients.update({ report_token, report_expires_at }).eq('id', clientId)`
+  5. Se erro no update: `toast.error("Erro ao gerar link")` e retorna
+  6. Monta URL: `window.location.origin + '/report/' + token`
+  7. Copia para clipboard
+  8. `toast.success("Link seguro gerado! Válido por 48 horas.")`
+  9. Seta `isGeneratingLink = false` no `finally`
 
-### 6. `src/components/admin/CommandCenter/AdvancedFinancialSheet.tsx`
-Botão "Régua de Cobrança" que abre `BillingAutomationSettings`
+### 4. `supabase/config.toml`
 
-## Arquivos totais (6 + migration)
+Adicionar entrada para a nova Edge Function:
+```toml
+[functions.public-client-report]
+verify_jwt = false
+```
+
+---
+
+## Segurança
+
+- Nenhuma policy `anon` em tabelas sensíveis
+- Todo acesso público passa pela Edge Function com Service Role
+- Token UUID não expõe IDs internos
+- Expiração de 48h validada server-side
+- Index no banco para busca rápida por token
+
+## Arquivos totais (3 novos + 2 modificados)
+- Edge Function `supabase/functions/public-client-report/index.ts` (novo)
+- `src/pages/PublicClientReport.tsx` (novo)
+- `src/App.tsx`
+- `src/components/traffic/CampaignsAndReports.tsx`
+- `supabase/config.toml`
 - Migration SQL
-- `src/hooks/usePaymentGateway.tsx` (novo)
-- `src/components/settings/AsaasIntegration.tsx` (novo)
-- `src/components/admin/BillingAutomationSettings.tsx` (novo)
-- `src/pages/Settings.tsx`
-- `src/components/admin/PaymentSheet.tsx`
-- `src/components/admin/CommandCenter/AdvancedFinancialSheet.tsx`
 
