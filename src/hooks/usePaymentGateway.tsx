@@ -25,6 +25,8 @@ export interface PaymentSettings {
   whatsapp_template_overdue: string | null;
   notify_via_email: boolean;
   notify_via_whatsapp: boolean;
+  asaas_webhook_token: string | null;
+  conexa_webhook_token: string | null;
 }
 
 const defaultSettings: Omit<PaymentSettings, 'id' | 'agency_id'> = {
@@ -46,6 +48,8 @@ const defaultSettings: Omit<PaymentSettings, 'id' | 'agency_id'> = {
   whatsapp_template_overdue: null,
   notify_via_email: true,
   notify_via_whatsapp: true,
+  asaas_webhook_token: null,
+  conexa_webhook_token: null,
 };
 
 export function usePaymentGateway() {
