@@ -19,6 +19,7 @@ interface ReportData {
   avgCTR: number;
   avgCPC: number;
   avgCPM: number;
+  conversionLabel?: string;
 }
 
 interface ReportGeneratorModalProps {
