@@ -88,7 +88,8 @@ export function ReportGeneratorModal({ isOpen, onClose, reportData, agencyId }: 
     setAiLoading(false);
   };
 
-  const { accountName, period, totalSpend, totalImpressions, totalClicks, totalConversions, avgCTR, avgCPC, avgCPM } = reportData;
+  const { accountName, period, totalSpend, totalImpressions, totalClicks, totalConversions, avgCTR, avgCPC, avgCPM, conversionLabel } = reportData;
+  const convLabel = conversionLabel || 'Conversões';
 
   const templates = [
     {
@@ -102,7 +103,7 @@ export function ReportGeneratorModal({ isOpen, onClose, reportData, agencyId }: 
 💰 *INVESTIMENTO:* ${formatCurrency(totalSpend)}
 👁️ *IMPRESSÕES:* ${formatNumber(totalImpressions)}
 🖱️ *CLIQUES:* ${formatNumber(totalClicks)}
-🎯 *CONVERSÕES:* ${totalConversions}
+🎯 *${convLabel.toUpperCase()}:* ${totalConversions}
 
 📈 *MÉTRICAS:*
 • CTR: ${avgCTR.toFixed(2)}%
@@ -116,7 +117,7 @@ export function ReportGeneratorModal({ isOpen, onClose, reportData, agencyId }: 
       category: "Conversões",
       message: `🎯 *RESULTADOS DO PERÍODO*
 
-${totalConversions} conversões geradas! 🔥
+${totalConversions} ${convLabel.toLowerCase()} geradas! 🔥
 
 💡 *Destaques:*
 📍 Investimento de ${formatCurrency(totalSpend)}
@@ -143,7 +144,7 @@ CPM: ${formatCurrency(avgCPM)}
 🎯 *PERFORMANCE:*
 ✨ ${formatNumber(totalImpressions)} impressões
 🖱️ ${formatNumber(totalClicks)} cliques
-🎯 ${totalConversions} conversões
+🎯 ${totalConversions} ${convLabel.toLowerCase()}
 📊 CTR: ${avgCTR.toFixed(2)}%
 
 🚀 *Status:* Campanhas otimizadas!`
@@ -153,7 +154,7 @@ CPM: ${formatCurrency(avgCPM)}
       category: "Social",
       message: `📊 RESULTADOS DO MÊS 📊
 
-${totalConversions} CONVERSÕES! 🎯
+${totalConversions} ${convLabel.toUpperCase()}! 🎯
 
 💰 ${formatCurrency(totalSpend)} investidos
 👥 ${formatNumber(totalImpressions)} pessoas alcançadas
@@ -170,7 +171,7 @@ Estratégia + Otimização = RESULTADOS! ✨`
     { key: 'totalSpend', value: formatCurrency(totalSpend), description: 'Investimento total' },
     { key: 'totalImpressions', value: formatNumber(totalImpressions), description: 'Total de impressões' },
     { key: 'totalClicks', value: formatNumber(totalClicks), description: 'Total de cliques' },
-    { key: 'totalConversions', value: totalConversions.toString(), description: 'Total de conversões' },
+    { key: 'totalConversions', value: totalConversions.toString(), description: `Total de ${convLabel.toLowerCase()}` },
     { key: 'avgCTR', value: `${avgCTR.toFixed(2)}%`, description: 'CTR médio' },
     { key: 'avgCPC', value: formatCurrency(avgCPC), description: 'CPC médio' },
     { key: 'avgCPM', value: formatCurrency(avgCPM), description: 'CPM médio' },
