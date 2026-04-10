@@ -1473,6 +1473,8 @@ export type Database = {
           monthly_value: number | null
           name: string
           observations: string | null
+          report_expires_at: string | null
+          report_token: string | null
           service: string | null
           start_date: string | null
           updated_at: string
@@ -1492,6 +1494,8 @@ export type Database = {
           monthly_value?: number | null
           name: string
           observations?: string | null
+          report_expires_at?: string | null
+          report_token?: string | null
           service?: string | null
           start_date?: string | null
           updated_at?: string
@@ -1511,6 +1515,8 @@ export type Database = {
           monthly_value?: number | null
           name?: string
           observations?: string | null
+          report_expires_at?: string | null
+          report_token?: string | null
           service?: string | null
           start_date?: string | null
           updated_at?: string
