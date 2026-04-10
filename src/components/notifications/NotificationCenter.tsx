@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, CheckCheck, Moon } from "lucide-react";
+import { Settings, CheckCheck, Moon, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,29 +11,34 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { NotificationItem } from "./NotificationItem";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotifications, type NotificationType } from "@/hooks/useNotifications";
 
 interface NotificationCenterProps {
   onClose: () => void;
 }
 
+type TabFilter = 'all' | 'meetings' | 'tasks' | 'alerts';
+
+const TAB_TYPE_MAP: Record<TabFilter, NotificationType[] | null> = {
+  all: null,
+  meetings: ['meeting'],
+  tasks: ['task'],
+  alerts: ['payment', 'expense', 'system', 'reminder', 'lead'],
+};
+
 export function NotificationCenter({ onClose }: NotificationCenterProps) {
   const navigate = useNavigate();
   const { notifications, loading, markAllAsRead, enableDoNotDisturb } = useNotifications();
-  const [filter, setFilter] = useState<'all' | 'unread' | 'today'>('unread');
-
-  const handleDoNotDisturb = (hours: number) => {
-    enableDoNotDisturb(hours);
-  };
+  const [activeTab, setActiveTab] = useState<TabFilter>('all');
+  const [onlyUnread, setOnlyUnread] = useState(false);
 
   const filteredNotifications = notifications.filter(n => {
-    if (filter === 'unread') return !n.is_read;
-    if (filter === 'today') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return new Date(n.created_at) >= today;
-    }
+    const typeFilter = TAB_TYPE_MAP[activeTab];
+    if (typeFilter && !typeFilter.includes(n.type)) return false;
+    if (onlyUnread && n.is_read) return false;
     return true;
   });
 
@@ -42,6 +47,12 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
     high: filteredNotifications.filter(n => n.priority === 'high'),
     medium: filteredNotifications.filter(n => n.priority === 'medium'),
     low: filteredNotifications.filter(n => n.priority === 'low'),
+  };
+
+  const getTabCount = (tab: TabFilter) => {
+    const types = TAB_TYPE_MAP[tab];
+    if (!types) return notifications.filter(n => !n.is_read).length;
+    return notifications.filter(n => types.includes(n.type) && !n.is_read).length;
   };
 
   return (
@@ -56,19 +67,19 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleDoNotDisturb(1)}>
+              <DropdownMenuItem onClick={() => enableDoNotDisturb(1)}>
                 Não perturbe por 1 hora
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDoNotDisturb(2)}>
+              <DropdownMenuItem onClick={() => enableDoNotDisturb(2)}>
                 Não perturbe por 2 horas
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDoNotDisturb(4)}>
+              <DropdownMenuItem onClick={() => enableDoNotDisturb(4)}>
                 Não perturbe por 4 horas
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDoNotDisturb(8)}>
+              <DropdownMenuItem onClick={() => enableDoNotDisturb(8)}>
                 Não perturbe por 8 horas
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDoNotDisturb(24)}>
+              <DropdownMenuItem onClick={() => enableDoNotDisturb(24)}>
                 Não perturbe por 24 horas
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -96,18 +107,56 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
         </div>
       </div>
 
-      <Tabs defaultValue="unread" className="w-full" onValueChange={(v) => setFilter(v as any)}>
+      <Tabs defaultValue="all" className="w-full" onValueChange={(v) => setActiveTab(v as TabFilter)}>
         <TabsList className="w-full rounded-none border-b h-10">
-          <TabsTrigger value="all" className="flex-1 text-xs sm:text-sm">Todas</TabsTrigger>
-          <TabsTrigger value="unread" className="flex-1 text-xs sm:text-sm">
-            <span className="hidden sm:inline">Não lidas</span>
-            <span className="sm:hidden">Novas</span>
+          <TabsTrigger value="all" className="flex-1 text-xs sm:text-sm gap-1">
+            Todas
+            {getTabCount('all') > 0 && (
+              <span className="bg-primary text-primary-foreground rounded-full text-[10px] px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                {getTabCount('all')}
+              </span>
+            )}
           </TabsTrigger>
-          <TabsTrigger value="today" className="flex-1 text-xs sm:text-sm">Hoje</TabsTrigger>
+          <TabsTrigger value="meetings" className="flex-1 text-xs sm:text-sm gap-1">
+            Reuniões
+            {getTabCount('meetings') > 0 && (
+              <span className="bg-indigo-500 text-white rounded-full text-[10px] px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                {getTabCount('meetings')}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="flex-1 text-xs sm:text-sm gap-1">
+            Tarefas
+            {getTabCount('tasks') > 0 && (
+              <span className="bg-green-500 text-white rounded-full text-[10px] px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                {getTabCount('tasks')}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="alerts" className="flex-1 text-xs sm:text-sm gap-1">
+            Alertas
+            {getTabCount('alerts') > 0 && (
+              <span className="bg-destructive text-destructive-foreground rounded-full text-[10px] px-1.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                {getTabCount('alerts')}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value={filter} className="m-0">
-          <ScrollArea className="h-[60vh] md:h-[500px]">
+        <div className="flex items-center justify-end gap-2 px-3 py-2 border-b">
+          <Label htmlFor="unread-toggle" className="text-xs text-muted-foreground cursor-pointer">
+            Só não lidas
+          </Label>
+          <Switch
+            id="unread-toggle"
+            checked={onlyUnread}
+            onCheckedChange={setOnlyUnread}
+            className="scale-75"
+          />
+        </div>
+
+        <TabsContent value={activeTab} className="m-0">
+          <ScrollArea className="h-[55vh] md:h-[460px]">
             {loading ? (
               <div className="p-8 text-center text-muted-foreground">
                 Carregando...
@@ -118,7 +167,6 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
               </div>
             ) : (
               <div className="divide-y">
-                {/* Urgent notifications */}
                 {groupedNotifications.urgent.length > 0 && (
                   <div>
                     <div className="px-3 md:px-4 py-2 bg-destructive/10">
@@ -134,7 +182,6 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
                   </div>
                 )}
 
-                {/* High priority notifications */}
                 {groupedNotifications.high.length > 0 && (
                   <div>
                     <div className="px-3 md:px-4 py-2 bg-orange-500/10">
@@ -150,7 +197,6 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
                   </div>
                 )}
 
-                {/* Medium priority notifications */}
                 {groupedNotifications.medium.length > 0 && (
                   <>
                     {(groupedNotifications.urgent.length > 0 || groupedNotifications.high.length > 0) && (
@@ -166,7 +212,6 @@ export function NotificationCenter({ onClose }: NotificationCenterProps) {
                   </>
                 )}
 
-                {/* Low priority notifications */}
                 {groupedNotifications.low.length > 0 && (
                   <>
                     {filteredNotifications.length > groupedNotifications.low.length && (
