@@ -2,8 +2,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, FileText, UserX, Info, History, TrendingUp, BarChart3, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Edit, FileText, UserX, Info, History, TrendingUp, BarChart3, Trash2, AlertTriangle } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
 import { ClientHealthIndicator } from "./ClientHealthIndicator";
 import { ClientPaymentHistory } from "./ClientPaymentHistory";
