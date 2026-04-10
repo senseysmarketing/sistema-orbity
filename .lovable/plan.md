@@ -1,81 +1,73 @@
 
 
-# Refatoracao do Sistema de Notificacoes — Anti-Duplicidade, Abas por Tipo e Rich Actions
+# Multi-Gateway por Cliente e por Pagamento
 
-## 1. Migration SQL — Blindagem contra duplicidades
+## 1. Migration SQL
 
-Adicionar 3 colunas na tabela `notifications` e criar constraint unico:
+- `clients`: add `default_billing_type TEXT DEFAULT 'manual'`
+- `client_payments`: add `billing_type TEXT DEFAULT 'manual'`
+- `agency_payment_settings`: add `asaas_enabled BOOLEAN DEFAULT false`, `conexa_enabled BOOLEAN DEFAULT false`
+- Validation triggers for both tables (only allow 'manual', 'asaas', 'conexa')
+- Backfill: set `asaas_enabled = true` where `active_gateway = 'asaas'`, same for conexa
 
-```sql
-ALTER TABLE public.notifications
-  ADD COLUMN IF NOT EXISTS entity_type TEXT,
-  ADD COLUMN IF NOT EXISTS entity_id UUID,
-  ADD COLUMN IF NOT EXISTS action_type TEXT;
+## 2. usePaymentGateway.tsx
 
-CREATE UNIQUE INDEX IF NOT EXISTS unique_notification_event
-  ON public.notifications (user_id, entity_type, entity_id, action_type)
-  WHERE entity_type IS NOT NULL AND entity_id IS NOT NULL AND action_type IS NOT NULL;
-```
+- Add `asaas_enabled`, `conexa_enabled` to `PaymentSettings` interface
+- Compute `enabledGateways: string[]` — always includes 'manual'; includes 'asaas' if `asaas_enabled && asaas_api_key`; 'conexa' if `conexa_enabled && conexa_api_key`
+- Base `isAsaasActive`/`isConexaActive` on new booleans
+- Export `enabledGateways`
 
-Uso de partial unique index (em vez de UNIQUE constraint) para nao bloquear notificacoes legacy que nao possuem esses campos.
+## 3. AsaasIntegration.tsx e ConexaIntegration.tsx
 
-## 2. Atualizar DB Functions que criam notificacoes
+- Switch "Ativar gateway" saves `asaas_enabled`/`conexa_enabled` instead of changing `active_gateway`
+- Remove exclusivity logic (both can be active simultaneously)
 
-Alterar as 3 funcoes Postgres que fazem INSERT INTO notifications para incluir `entity_type`, `entity_id`, `action_type`:
+## 4. ClientForm.tsx
 
-- **`notify_task_assignment()`**: entity_type='task', entity_id=task_id, action_type='assigned'
-- **`notify_task_update_events()`**: entity_type='task', entity_id=task_id, action_type='status_changed' ou 'updated_important'
-- **`apply_task_event_rules()`**: entity_type='task', entity_id=task_id, action_type=event_key
+- Add `default_billing_type` to form data (default 'manual')
+- Add `<Select>` "Forma de Faturamento Padrao" with dynamic options from `enabledGateways`
+- If only 'manual' available, show subtle note about gateway configuration
 
-Todos os INSERTs ganham `ON CONFLICT ON CONSTRAINT ... DO NOTHING` (usando o partial index).
+## 5. PaymentForm.tsx
 
-## 3. Atualizar Edge Function `process-notifications`
+- Add `billing_type` to formData (default 'manual')
+- Add `<Select>` "Metodo de Faturamento" with options from `enabledGateways`
+- On client selection, auto-fill `billing_type` with `client.default_billing_type`
+- Include `billing_type` in insert/update payload
 
-- Adicionar `entity_type`, `entity_id`, `action_type` ao `NotificationData` interface
-- No `processMeetings()`: preencher entity_type='meeting', entity_id=meeting.id, action_type='reminder'
-- No `batchCreateNotifications()`: usar `.upsert(..., { onConflict: 'user_id,entity_type,entity_id,action_type', ignoreDuplicates: true })` ou tratar erro de constraint
+## 6. PaymentSheet.tsx
 
-## 4. Refatorar NotificationCenter.tsx — Abas por tipo
+- Add `billingType` to form state
+- Auto-fill with `client.default_billing_type` on client selection or edit open
+- Show gateway action buttons based on `billingType` value
+- Maintain Pre-Flight Check (document/zip_code)
+- Save `billing_type` in insert/update
 
-Substituir as abas atuais (Todas / Nao lidas / Hoje) por:
+### 6.1 Fallback Inteligente do Cliente (NOVO)
 
-**Todas | Reunioes | Tarefas | Alertas**
-
-- "Reunioes": filtra type === 'meeting'
-- "Tarefas": filtra type === 'task'
-- "Alertas": filtra type in ('payment', 'expense', 'system', 'reminder')
-- Manter botao "Marcar todas como lidas" e "Nao Lidas" como filtro secundario (checkbox ou toggle)
-
-## 5. Refatorar NotificationItem.tsx — Rich Actions
-
-- Melhorar layout: borda esquerda colorida por tipo (em vez de apenas icone colorido)
-- **Meeting com link**: Se `metadata.meeting_link` existir, renderizar `<Button size="sm">Entrar na Call</Button>` que abre o link
-- **Task**: Renderizar `<Button variant="outline" size="sm">Ver Tarefa</Button>` que navega para `/tasks`
-- Manter bolinha de unread + archive button
-
-## 6. Optimistic UI no useNotifications.tsx
-
-O `markAsRead` ja faz update otimista (linhas 89-92). Inverter a ordem para estado primeiro, request depois:
+Ao auto-preencher o `billing_type` baseado no cliente, verificar se a opcao ainda e valida para a agencia:
 
 ```typescript
-// Optimistic: update UI immediately
-setNotifications(prev => prev.map(n => ...));
-setUnreadCount(prev => Math.max(0, prev - 1));
-// Then persist
-const { error } = await supabase...
-if (error) { /* revert */ }
+const resolvedBillingType = enabledGateways.includes(client.default_billing_type)
+  ? client.default_billing_type
+  : 'manual';
 ```
 
-Mesma logica para `archiveNotification`.
+Usar `resolvedBillingType` para preencher o formulario, evitando crashes no `<Select>` caso a agencia tenha desativado o gateway preferido do cliente. Aplicar a mesma logica em `PaymentForm.tsx`.
 
-## 7. Atualizar interface Notification
+## 7. CashFlowTable e useFinancialMetrics
 
-Adicionar `entity_type`, `entity_id`, `action_type` opcionais a interface `Notification` no hook.
+- Add `billingType` to `CashFlowItem`
+- Populate from `p.billing_type` in payments
+- Display origin Badge (Manual/Asaas/Conexa) for INCOME items
 
-## Arquivos modificados (5 + migration)
-- Migration SQL (novo) — colunas + index + update DB functions
-- `supabase/functions/process-notifications/index.ts` — entity fields nos inserts
-- `src/hooks/useNotifications.tsx` — interface + optimistic UI
-- `src/components/notifications/NotificationCenter.tsx` — abas por tipo
-- `src/components/notifications/NotificationItem.tsx` — rich actions + borda colorida
+## Arquivos modificados (7 + migration)
+- Migration SQL (novo)
+- `src/hooks/usePaymentGateway.tsx`
+- `src/components/settings/AsaasIntegration.tsx`
+- `src/components/settings/ConexaIntegration.tsx`
+- `src/components/admin/ClientForm.tsx`
+- `src/components/admin/PaymentForm.tsx`
+- `src/components/admin/PaymentSheet.tsx`
+- `src/hooks/useFinancialMetrics.tsx` + `CashFlowTable.tsx`
 
