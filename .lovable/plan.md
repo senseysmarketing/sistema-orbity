@@ -1,62 +1,81 @@
 
 
-# Auditoria Financeira: Taxas, Valores Pagos, Pre-Flight e Trava de Exclusão (Revisado)
+# Refatoracao do Sistema de Notificacoes — Anti-Duplicidade, Abas por Tipo e Rich Actions
 
-## Ponto 1 — ClientForm.tsx: JA IMPLEMENTADO
-O formulário ja possui campos `document`, `zip_code`, `street`, etc., com mascara e ViaCEP `onBlur`. Nenhuma alteracao necessaria.
+## 1. Migration SQL — Blindagem contra duplicidades
 
-## Ponto 2 — Nomenclatura confirmada
-A coluna se chama `amount` (nao `value`). Portanto o calculo sera `p.amount_paid || p.amount`.
-
----
-
-## Implementacao
-
-### 1. Migration SQL — Novas colunas
+Adicionar 3 colunas na tabela `notifications` e criar constraint unico:
 
 ```sql
-ALTER TABLE public.client_payments
-  ADD COLUMN IF NOT EXISTS gateway_fee NUMERIC DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS amount_paid NUMERIC;
+ALTER TABLE public.notifications
+  ADD COLUMN IF NOT EXISTS entity_type TEXT,
+  ADD COLUMN IF NOT EXISTS entity_id UUID,
+  ADD COLUMN IF NOT EXISTS action_type TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS unique_notification_event
+  ON public.notifications (user_id, entity_type, entity_id, action_type)
+  WHERE entity_type IS NOT NULL AND entity_id IS NOT NULL AND action_type IS NOT NULL;
 ```
 
-### 2. useFinancialMetrics.tsx — Tipos e calculos
+Uso de partial unique index (em vez de UNIQUE constraint) para nao bloquear notificacoes legacy que nao possuem esses campos.
 
-- Adicionar `gateway_fee` e `amount_paid` a interface `ClientPayment`
-- Adicionar `document`, `zip_code`, `asaas_customer_id`, `conexa_customer_id` a interface `Client` e ao `.select()` do clients query (linha 142)
-- Nos calculos de receita (pagamentos paid no cashFlow), usar `p.amount_paid || p.amount`
-- Exportar `totalGatewayFees`: soma de `gateway_fee` dos pagamentos paid no mes
-- Exportar `totalNetRevenue`: receita recebida menos taxas
+## 2. Atualizar DB Functions que criam notificacoes
 
-### 3. PaymentSheet.tsx — Pre-Flight Check nos botoes de gateway
+Alterar as 3 funcoes Postgres que fazem INSERT INTO notifications para incluir `entity_type`, `entity_id`, `action_type`:
 
-- Nos botoes "Gerar Cobranca (Asaas)" (linha 404) e "Gerar Cobranca (Conexa)" (linha 437):
-  - Se `!resolvedClient?.document || !resolvedClient?.zip_code`, botao fica `disabled`
-  - Envolver com `<TooltipProvider>/<Tooltip>` com mensagem: "Dados de faturamento incompletos. Preencha o CPF/CNPJ e CEP do cliente."
+- **`notify_task_assignment()`**: entity_type='task', entity_id=task_id, action_type='assigned'
+- **`notify_task_update_events()`**: entity_type='task', entity_id=task_id, action_type='status_changed' ou 'updated_important'
+- **`apply_task_event_rules()`**: entity_type='task', entity_id=task_id, action_type=event_key
 
-### 4. PaymentSheet.tsx — Transparencia visual no detalhe (NOVO)
+Todos os INSERTs ganham `ON CONFLICT ON CONSTRAINT ... DO NOTHING` (usando o partial index).
 
-- Quando `isEditing && status === 'paid'` e existirem dados de `gateway_fee > 0` ou `amount_paid !== amount`:
-  - Exibir bloco somente-leitura apos o status badge:
-    - "Valor Original: R$ X"
-    - "Valor Pago: R$ Y" (se `amount_paid` diferente)
-    - "Taxa do Gateway: R$ Z" (se `gateway_fee > 0`)
-    - "Liquido: R$ (amount_paid - gateway_fee)"
-  - Usar fundo `bg-muted/50` com bordas arredondadas
+## 3. Atualizar Edge Function `process-notifications`
 
-### 5. ClientDetailsDialog.tsx — Trava de exclusao com confirmacao dupla
+- Adicionar `entity_type`, `entity_id`, `action_type` ao `NotificationData` interface
+- No `processMeetings()`: preencher entity_type='meeting', entity_id=meeting.id, action_type='reminder'
+- No `batchCreateNotifications()`: usar `.upsert(..., { onConflict: 'user_id,entity_type,entity_id,action_type', ignoreDuplicates: true })` ou tratar erro de constraint
 
-- Adicionar `asaas_customer_id` e `conexa_customer_id` a interface `Client` (linhas 13-34)
-- No AlertDialog de exclusao (linhas 376-402):
-  - Se `client.asaas_customer_id || client.conexa_customer_id`:
-    - Exibir `<Alert variant="destructive">` com aviso sobre assinaturas ativas no gateway
-    - Adicionar `<Input>` para digitar o nome do cliente
-    - Botao "Excluir" so habilita quando texto === `client.name`
-  - Novo state: `deleteConfirmName`
+## 4. Refatorar NotificationCenter.tsx — Abas por tipo
 
-## Arquivos modificados (4)
-- Migration SQL (novo)
-- `src/hooks/useFinancialMetrics.tsx`
-- `src/components/admin/PaymentSheet.tsx`
-- `src/components/admin/ClientDetailsDialog.tsx`
+Substituir as abas atuais (Todas / Nao lidas / Hoje) por:
+
+**Todas | Reunioes | Tarefas | Alertas**
+
+- "Reunioes": filtra type === 'meeting'
+- "Tarefas": filtra type === 'task'
+- "Alertas": filtra type in ('payment', 'expense', 'system', 'reminder')
+- Manter botao "Marcar todas como lidas" e "Nao Lidas" como filtro secundario (checkbox ou toggle)
+
+## 5. Refatorar NotificationItem.tsx — Rich Actions
+
+- Melhorar layout: borda esquerda colorida por tipo (em vez de apenas icone colorido)
+- **Meeting com link**: Se `metadata.meeting_link` existir, renderizar `<Button size="sm">Entrar na Call</Button>` que abre o link
+- **Task**: Renderizar `<Button variant="outline" size="sm">Ver Tarefa</Button>` que navega para `/tasks`
+- Manter bolinha de unread + archive button
+
+## 6. Optimistic UI no useNotifications.tsx
+
+O `markAsRead` ja faz update otimista (linhas 89-92). Inverter a ordem para estado primeiro, request depois:
+
+```typescript
+// Optimistic: update UI immediately
+setNotifications(prev => prev.map(n => ...));
+setUnreadCount(prev => Math.max(0, prev - 1));
+// Then persist
+const { error } = await supabase...
+if (error) { /* revert */ }
+```
+
+Mesma logica para `archiveNotification`.
+
+## 7. Atualizar interface Notification
+
+Adicionar `entity_type`, `entity_id`, `action_type` opcionais a interface `Notification` no hook.
+
+## Arquivos modificados (5 + migration)
+- Migration SQL (novo) — colunas + index + update DB functions
+- `supabase/functions/process-notifications/index.ts` — entity fields nos inserts
+- `src/hooks/useNotifications.tsx` — interface + optimistic UI
+- `src/components/notifications/NotificationCenter.tsx` — abas por tipo
+- `src/components/notifications/NotificationItem.tsx` — rich actions + borda colorida
 
