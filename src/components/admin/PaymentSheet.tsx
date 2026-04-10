@@ -118,6 +118,8 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
     if (client?.monthly_value) {
       setBaseValue(client.monthly_value);
     }
+    const clientBt = client?.default_billing_type || 'manual';
+    setBillingType(enabledGateways.includes(clientBt) ? clientBt : 'manual');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,6 +138,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
         status: status as "pending" | "paid" | "overdue",
         description: description || null,
         agency_id: currentAgency?.id,
+        billing_type: billingType,
       };
 
       if (payment) {
@@ -201,8 +204,8 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const showWhatsApp = (status === "pending" || status === "overdue") && isEditing;
   const hasAsaasCharge = !!payment?.asaas_payment_id;
   const hasConexaCharge = !!payment?.conexa_charge_id;
-  const isGatewayActive = isAsaasActive || isConexaActive;
-  const gatewayName = isAsaasActive ? 'Asaas' : isConexaActive ? 'Conexa' : 'Manual';
+  const isGatewayActive = billingType !== 'manual';
+  const gatewayName = billingType === 'asaas' ? 'Asaas' : billingType === 'conexa' ? 'Conexa' : 'Manual';
 
   const handleGenerateAsaasCharge = () => {
     toast({ title: "Em breve", description: "A geração de cobranças via Asaas será disponibilizada em breve." });
