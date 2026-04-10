@@ -1478,16 +1478,21 @@ export type Database = {
           agency_id: string | null
           asaas_customer_id: string | null
           cancelled_at: string | null
+          city: string | null
+          complement: string | null
           conexa_customer_id: string | null
           contact: string | null
           contract_end_date: string | null
           contract_start_date: string | null
           created_at: string
+          document: string | null
           due_date: number | null
           has_loyalty: boolean
           id: string
           monthly_value: number | null
           name: string
+          neighborhood: string | null
+          number: string | null
           observations: string | null
           report_ad_account_id: string | null
           report_date_from: string | null
@@ -1497,23 +1502,31 @@ export type Database = {
           report_token: string | null
           service: string | null
           start_date: string | null
+          state: string | null
+          street: string | null
           updated_at: string
+          zip_code: string | null
         }
         Insert: {
           active?: boolean
           agency_id?: string | null
           asaas_customer_id?: string | null
           cancelled_at?: string | null
+          city?: string | null
+          complement?: string | null
           conexa_customer_id?: string | null
           contact?: string | null
           contract_end_date?: string | null
           contract_start_date?: string | null
           created_at?: string
+          document?: string | null
           due_date?: number | null
           has_loyalty?: boolean
           id?: string
           monthly_value?: number | null
           name: string
+          neighborhood?: string | null
+          number?: string | null
           observations?: string | null
           report_ad_account_id?: string | null
           report_date_from?: string | null
@@ -1523,23 +1536,31 @@ export type Database = {
           report_token?: string | null
           service?: string | null
           start_date?: string | null
+          state?: string | null
+          street?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Update: {
           active?: boolean
           agency_id?: string | null
           asaas_customer_id?: string | null
           cancelled_at?: string | null
+          city?: string | null
+          complement?: string | null
           conexa_customer_id?: string | null
           contact?: string | null
           contract_end_date?: string | null
           contract_start_date?: string | null
           created_at?: string
+          document?: string | null
           due_date?: number | null
           has_loyalty?: boolean
           id?: string
           monthly_value?: number | null
           name?: string
+          neighborhood?: string | null
+          number?: string | null
           observations?: string | null
           report_ad_account_id?: string | null
           report_date_from?: string | null
@@ -1549,7 +1570,10 @@ export type Database = {
           report_token?: string | null
           service?: string | null
           start_date?: string | null
+          state?: string | null
+          street?: string | null
           updated_at?: string
+          zip_code?: string | null
         }
         Relationships: [
           {
