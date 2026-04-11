@@ -36,6 +36,11 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
   const [loading, setLoading] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+
+  // Context identification: Root (Master) vs Branch (Child)
+  const isMaster = !!expense && !expense.parent_expense_id &&
+    (expense.expense_type === 'recorrente' || expense.expense_type === 'parcelada');
+  const isChild = !!expense && !!expense.parent_expense_id;
   const [formData, setFormData] = useState({
     name: '',
     amount: '',
