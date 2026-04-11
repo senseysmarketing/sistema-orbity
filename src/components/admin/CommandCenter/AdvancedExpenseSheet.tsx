@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowDownCircle, CalendarClock, Repeat, CreditCard, TrendingUp, Pause, Play, Leaf, Pencil } from "lucide-react";
+import { ArrowDownCircle, CalendarClock, Repeat, CreditCard, TrendingUp, Pause, Play, Leaf, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
