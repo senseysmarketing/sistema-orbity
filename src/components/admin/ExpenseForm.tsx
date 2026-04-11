@@ -422,7 +422,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
             </div>
 
             {/* Campos específicos por tipo */}
-            {formData.expense_type === 'parcelada' && !expense ? (
+            {formData.expense_type === 'parcelada' && (!expense || isMaster) ? (
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="installment_amount">Valor da Parcela *</Label>
@@ -445,6 +445,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
                     value={formData.installment_total}
                     onChange={(e) => setFormData({ ...formData, installment_total: e.target.value })}
                     required
+                    disabled={!!expense}
                   />
                 </div>
               </div>
