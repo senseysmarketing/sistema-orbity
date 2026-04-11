@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowDownCircle, CalendarClock, Repeat, CreditCard, TrendingUp, Pause, Play, Leaf } from "lucide-react";
+import { ArrowDownCircle, CalendarClock, Repeat, CreditCard, TrendingUp, Pause, Play, Leaf, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,7 @@ interface AdvancedExpenseSheetProps {
   expensesByCategory: CategoryTotal[];
   agencyId: string;
   selectedMonth: string;
+  onEditExpense?: (expenseId: string) => void;
 }
 
 const statusBadge = (status: string) => {
@@ -168,10 +170,11 @@ function ExpenseAnomalyAlerts({ cashFlow, agencyId }: { cashFlow: CashFlowItem[]
 }
 
 // ─── SaaS Tracker Subscription Card ───
-function SubscriptionCard({ exp, onToggle, isToggling }: {
+function SubscriptionCard({ exp, onToggle, isToggling, onEdit }: {
   exp: any;
   onToggle: (id: string, newStatus: string) => void;
   isToggling: boolean;
+  onEdit?: (id: string) => void;
 }) {
   const isPaused = exp.subscription_status === 'paused';
   const isCanceled = exp.subscription_status === 'canceled';
@@ -200,16 +203,23 @@ function SubscriptionCard({ exp, onToggle, isToggling }: {
               )}
             </div>
           </div>
-          {!isCanceled && (
-            <div className="flex items-center gap-2 shrink-0">
-              {isPaused ? <Pause className="h-3.5 w-3.5 text-muted-foreground" /> : <Play className="h-3.5 w-3.5 text-emerald-500" />}
-              <Switch
-                checked={isActive}
-                onCheckedChange={(checked) => onToggle(exp.id, checked ? 'active' : 'paused')}
-                disabled={isToggling}
-              />
-            </div>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {onEdit && (
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(exp.id)}>
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {!isCanceled && (
+              <>
+                {isPaused ? <Pause className="h-3.5 w-3.5 text-muted-foreground" /> : <Play className="h-3.5 w-3.5 text-emerald-500" />}
+                <Switch
+                  checked={isActive}
+                  onCheckedChange={(checked) => onToggle(exp.id, checked ? 'active' : 'paused')}
+                  disabled={isToggling}
+                />
+              </>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-between">
@@ -232,7 +242,7 @@ function SubscriptionCard({ exp, onToggle, isToggling }: {
 }
 
 // ─── Main Sheet Component ───
-export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, selectedMonth }: AdvancedExpenseSheetProps) {
+export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, selectedMonth, onEditExpense }: AdvancedExpenseSheetProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
