@@ -6,10 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
-import { Repeat, Package, CreditCard, Trash2 } from "lucide-react";
+import { Repeat, Package, CreditCard, Trash2, Info, AlertTriangle } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface ExpenseFormProps {
@@ -35,6 +36,11 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
   const [loading, setLoading] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+
+  // Context identification: Root (Master) vs Branch (Child)
+  const isMaster = !!expense && !expense.parent_expense_id &&
+    (expense.expense_type === 'recorrente' || expense.expense_type === 'parcelada');
+  const isChild = !!expense && !!expense.parent_expense_id;
   const [formData, setFormData] = useState({
     name: '',
     amount: '',
@@ -195,10 +201,45 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
           .eq('id', expense.id);
         if (error) throw error;
 
-        toast({
-          title: "Despesa atualizada",
-          description: "Despesa atualizada com sucesso!",
-        });
+        // Cascading update for Master records — update pending children
+        if (isMaster) {
+          const childAmount = expense.expense_type === 'parcelada'
+            ? parseFloat(formData.installment_amount as string)
+            : baseData.amount;
+
+          const { error: cascadeError } = await supabase
+            .from('expenses')
+            .update({
+              name: baseData.name,
+              amount: childAmount,
+              base_value: baseData.base_value,
+              category: baseData.category,
+              description: baseData.description,
+              currency: baseData.currency,
+              exchange_rate: baseData.exchange_rate,
+            })
+            .eq('parent_expense_id', expense.id)
+            .eq('status', 'pending');
+
+          if (cascadeError) {
+            console.error('Erro ao atualizar filhos pendentes:', cascadeError);
+          }
+
+          toast({
+            title: "Assinatura atualizada",
+            description: "Assinatura e faturas pendentes atualizadas com sucesso!",
+          });
+        } else if (isChild) {
+          toast({
+            title: "Fatura atualizada",
+            description: "Fatura do mês atualizada com sucesso!",
+          });
+        } else {
+          toast({
+            title: "Despesa atualizada",
+            description: "Despesa atualizada com sucesso!",
+          });
+        }
       } else {
         // Criar nova despesa
         if (formData.expense_type === 'parcelada') {
@@ -286,6 +327,29 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
             {expense ? 'Edite as informações da despesa.' : 'Adicione uma nova despesa ao sistema.'}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Contextual alerts for Master vs Child editing */}
+        {isMaster && (
+          <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-blue-700 dark:text-blue-300 text-sm">
+              <strong>Você está editando as regras desta {expense?.expense_type === 'recorrente' ? 'assinatura' : 'compra parcelada'}.</strong>
+              {' '}As alterações afetarão os próximos lançamentos e faturas pendentes. Faturas já pagas não serão alteradas.
+              <br />
+              <span className="text-xs opacity-80">Nota: Mudanças no dia de vencimento se aplicarão apenas às faturas geradas a partir do próximo mês.</span>
+            </AlertDescription>
+          </Alert>
+        )}
+        {isChild && (
+          <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertDescription className="text-amber-700 dark:text-amber-300 text-sm">
+              <strong>Você está editando apenas a fatura deste mês.</strong>
+              {' '}Para alterar o valor fixo ou cancelar, edite a assinatura na aba "Assinaturas Ativas".
+            </AlertDescription>
+          </Alert>
+        )}
+
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             {/* Tipo de Despesa */}
@@ -358,7 +422,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
             </div>
 
             {/* Campos específicos por tipo */}
-            {formData.expense_type === 'parcelada' && !expense ? (
+            {formData.expense_type === 'parcelada' && (!expense || isMaster) ? (
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="installment_amount">Valor da Parcela *</Label>
@@ -381,6 +445,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
                     value={formData.installment_total}
                     onChange={(e) => setFormData({ ...formData, installment_total: e.target.value })}
                     required
+                    disabled={!!expense}
                   />
                 </div>
               </div>
