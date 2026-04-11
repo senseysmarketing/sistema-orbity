@@ -1,92 +1,45 @@
 
 
-# SaaS Tracker com Deteccao de Anomalias — Plano Blindado
+# Correção de Duplicação na Central de Despesas
 
-## Resumo
-Evoluir a aba "Assinaturas" para SaaS Tracker com kill switch, deteccao de anomalias com protecao cambial, suporte a moeda estrangeira no formulario, e ajustes no monthly-closure. Inclui as 3 blindagens solicitadas.
+## Diagnóstico
 
-## 1. Migration — Schema
+Analisei os dados no banco e o código atual. Resultado:
 
-```sql
-ALTER TABLE public.expenses
-  ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT 'active',
-  ADD COLUMN IF NOT EXISTS base_value NUMERIC,
-  ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'BRL',
-  ADD COLUMN IF NOT EXISTS exchange_rate NUMERIC;
+1. **Aba "SaaS Tracker" (Assinaturas)**: A query JÁ possui `.is('parent_expense_id', null)` (linha 257). Existem 22 mestres únicos no banco. As duplicações visíveis no screenshot são do estado anterior ao deploy — código atual está correto.
 
--- Trigger de validacao
-CREATE OR REPLACE FUNCTION validate_expense_subscription_fields()
-RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  IF NEW.subscription_status IS NOT NULL AND
-     NEW.subscription_status NOT IN ('active', 'paused', 'canceled') THEN
-    RAISE EXCEPTION 'Invalid subscription_status: %', NEW.subscription_status;
-  END IF;
-  IF NEW.currency IS NOT NULL AND
-     NEW.currency NOT IN ('BRL', 'USD', 'EUR') THEN
-    RAISE EXCEPTION 'Invalid currency: %', NEW.currency;
-  END IF;
-  RETURN NEW;
-END;
-$$;
+2. **Aba "Parcelamentos"** (BUG CONFIRMADO): A query busca TODOS os registros `parcelada` sem filtrar por `parent_expense_id IS NULL`. Resultado: "Escola Jonas (Mentoria)" aparece 10x (cada parcela individual), quando deveria aparecer 1x como card mestre com barra de progresso agregada.
 
-CREATE TRIGGER trg_validate_expense_subscription
-  BEFORE INSERT OR UPDATE ON public.expenses
-  FOR EACH ROW EXECUTE FUNCTION validate_expense_subscription_fields();
+3. **Aba "Contas do Mês"**: Alimentada pelo `cashFlow` do `useFinancialMetrics`, que já filtra por `startDate/endDate` (linhas 182-183). Está correto — só mostra despesas com `due_date` no mês selecionado.
 
--- Backfill de dados historicos (Blindagem 3)
-UPDATE public.expenses
-SET base_value = amount,
-    subscription_status = 'active',
-    currency = 'BRL'
-WHERE expense_type = 'recorrente' AND base_value IS NULL;
-```
+4. **Totais de despesas**: O cálculo em `useFinancialMetrics` (linha 258-260) já respeita o filtro de data. Porém, inclui a parcela mestre (installment 1) que tem `due_date` no mês — isso está correto pois ela É a conta do mês.
 
-## 2. `AdvancedExpenseSheet.tsx` — SaaS Tracker + Anomalias
+## Correções
 
-### Aba "Assinaturas" vira SaaS Tracker
-- Query busca tambem `subscription_status`, `base_value`, `currency`, `exchange_rate`
-- Remover filtro `is_active: true`, mostrar pausadas tambem
-- Grid de cards (`grid grid-cols-1 md:grid-cols-2 gap-3`)
-- Cada card:
-  - Nome, categoria badge, valor base, badge de moeda (USD/EUR se aplicavel)
-  - **Switch** para toggle `subscription_status` (active ↔ paused)
-  - `useMutation` com invalidacao otimista
-  - **Blindagem 2 — Kill Switch cancela pendentes**: ao pausar, executar UPDATE em contas filhas com `parent_expense_id = id` e `status = 'pending'` → `status = 'cancelled'`
-  - Cards pausados: `opacity-60`, borda pontilhada, badge verde "Economia projetada: R$ X/ano"
-  - Cards cancelados: `opacity-40`, cinza
-- KPIs no topo: "Ativo: R$ X/mes" vs "Pausado: R$ Y/mes (economia)"
+### Arquivo: `AdvancedExpenseSheet.tsx`
 
-### Componente `ExpenseAnomalyAlerts` no topo da Aba "Contas do Mes"
-- **Blindagem 1 — Matematica cambial correta**:
-  - Para cada despesa do mes com `sourceType === 'expense'`, buscar a despesa mestra ou historico via `parent_expense_id`
-  - Se `currency !== 'BRL'`: buscar ultima fatura paga (mesmo `parent_expense_id`, status `paid`, mes anterior). Comparar `amount` atual vs `amount` anterior em BRL
-  - Se nao houver historico: usar `base_value * exchange_rate * 1.15` como fallback
-  - Se `currency === 'BRL'`: comparar diretamente `amount` vs `base_value * 1.15`
-  - Gatilho: aumento > 15% → `<Alert variant="destructive">` com icone `TrendingUp`
-  - Texto: "Atencao: [Nome] veio R$ [diff] mais cara este mes (aumento de X%)"
+**Aba Parcelamentos** (linhas 310-323):
+- Alterar query para buscar apenas mestres: adicionar `.is('parent_expense_id', null)`
+- Para cada mestre, fazer uma sub-query ou buscar filhos para calcular progresso real
+- Abordagem: buscar mestres e contar parcelas pagas via query separada nos filhos
 
-## 3. `ExpenseForm.tsx` — Campos de moeda e cotacao
-- Adicionar ao formData: `currency` (default 'BRL'), `base_value`, `exchange_rate`
-- Select de moeda (BRL/USD/EUR)
-- Quando `currency !== 'BRL'`: campo "Cotacao utilizada" + preview "Valor estimado em Reais: R$ X"
-- Salvar `base_value`, `currency`, `exchange_rate` no insert/update
-- Para recorrentes: salvar `subscription_status: 'active'` por default
+**Nova lógica do card de parcelamento**:
+- Buscar mestres (`parent_expense_id IS NULL, expense_type = 'parcelada'`)
+- Para cada mestre, buscar contagem de filhos pagos via query agregada
+- Calcular progresso: `parcelas_pagas / installment_total`
+- Mostrar valor total (`amount * installment_total`) e valor da parcela
+- Filtrar apenas parcelamentos com parcelas restantes
 
-## 4. `monthly-closure/index.ts` — Respeitar subscription_status
-- Na secao de geracao de despesas recorrentes (linha ~127), adicionar filtro:
-  `.in('subscription_status', ['active'])` (nao incluir null para forcar backfill)
-- Atualizar: apos backfill, todos recorrentes terao `subscription_status = 'active'`
+### Arquivo: `useFinancialMetrics.tsx`
 
-## Arquivos modificados
-1. Migration SQL (novas colunas + trigger + backfill)
-2. `src/components/admin/CommandCenter/AdvancedExpenseSheet.tsx`
-3. `src/components/admin/ExpenseForm.tsx`
-4. `supabase/functions/monthly-closure/index.ts`
+Sem alterações necessárias — a query de despesas já filtra por data e os totais estão corretos.
 
-## Design System
-- Cards pausados: `opacity-60`, borda pontilhada (`border-dashed`), badge verde de economia
-- Cards cancelados: `opacity-40`, cinza
-- Alertas de anomalia: `<Alert variant="destructive">` com `TrendingUp` vermelho
-- Moeda estrangeira: badge azul "USD" ou "EUR" no card
+### Arquivo: `ExpenseForm.tsx`
+
+Sem alterações necessárias — a criação já implementa corretamente o padrão parent/child (mestre com `parent_expense_id = null`, filhos apontando para o mestre).
+
+## Resumo de alterações
+- 1 arquivo modificado: `AdvancedExpenseSheet.tsx`
+- Corrigir query de parcelamentos para mostrar apenas mestres com progresso agregado
+- Nenhuma migration necessária
 
