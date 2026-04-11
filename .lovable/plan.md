@@ -1,35 +1,39 @@
 
 
-# Adicionar Botões de Edição na Central de Contas a Pagar
+# Adicionar Botão de Excluir Parcelamentos
 
-## Problema
-Os cards de assinaturas (SaaS Tracker) e parcelamentos na `AdvancedExpenseSheet` não possuem botões de edição. O `ExpenseForm` só é acessível pela tabela de fluxo de caixa na página Admin principal.
+## Resumo
+Adicionar um ícone de lixeira (Trash2) nos cards de parcelamentos que cancela apenas as parcelas pendentes, preservando as já pagas.
 
-## Solução
+## Alterações no `AdvancedExpenseSheet.tsx`
 
-### Arquivo: `AdvancedExpenseSheet.tsx`
+1. **Import**: Adicionar `Trash2` do lucide-react.
 
-1. **Adicionar callbacks na interface do componente**:
-   - `onEditExpense?: (expenseId: string) => void` — callback que o componente pai (Admin.tsx) usará para abrir o ExpenseForm com a despesa selecionada.
+2. **Mutation de exclusão**: Criar `deleteInstallmentMutation` que:
+   - Recebe o `masterId`
+   - Faz `UPDATE` nos filhos pendentes: `.update({ status: 'paid' })` → NÃO. Faz **DELETE** nos filhos com `status = 'pending'` e `parent_expense_id = masterId`
+   - Também deleta o mestre se ele próprio estiver pendente, OU atualiza seu `status` para `canceled`
+   - Abordagem mais segura: marcar como `canceled` (não deletar fisicamente) tanto o mestre quanto os filhos pendentes
 
-2. **Botão de edição nos cards de Assinatura (SubscriptionCard)**:
-   - Adicionar um ícone de lápis (`Pencil`) clicável ao lado do nome ou dos controles existentes (Play/Switch).
-   - Ao clicar, chama `onEditExpense(exp.id)`.
+   ```ts
+   // Cancelar filhos pendentes
+   await supabase.from('expenses')
+     .update({ status: 'canceled' })
+     .eq('parent_expense_id', masterId)
+     .eq('status', 'pending');
+   
+   // Cancelar o mestre
+   await supabase.from('expenses')
+     .update({ status: 'canceled' })
+     .eq('id', masterId);
+   ```
 
-3. **Botão de edição nos cards de Parcelamento**:
-   - Adicionar o mesmo ícone de lápis em cada card de parcelamento.
-   - Ao clicar, chama `onEditExpense(exp.id)`.
+3. **UI**: Adicionar botão `Trash2` ao lado do `Pencil` nos cards de parcelamento, com `confirm()` antes de executar.
 
-4. **Botão de edição na tabela "Contas do Mês"**:
-   - Adicionar uma coluna de ações na tabela com ícone de edição para cada linha de despesa.
+4. **Toast**: "Parcelamento cancelado. Parcelas já pagas foram preservadas."
 
-### Arquivo: `Admin.tsx`
-
-5. **Passar o callback para o AdvancedExpenseSheet**:
-   - Criar handler que busca a despesa pelo ID, seta `selectedExpense` e abre o `ExpenseForm`.
-   - Passar como prop `onEditExpense` para o `AdvancedExpenseSheet`.
+5. **Invalidação**: Invalidar queries `installment-expenses` e `financial-metrics`.
 
 ## Arquivos modificados
-- `src/components/admin/CommandCenter/AdvancedExpenseSheet.tsx`
-- `src/pages/Admin.tsx`
+- `src/components/admin/CommandCenter/AdvancedExpenseSheet.tsx` (único arquivo)
 
