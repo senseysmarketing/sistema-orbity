@@ -130,7 +130,6 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                   <TableRow>
                     <TableHead>Vencimento</TableHead>
                     <TableHead>Descrição</TableHead>
-                    <TableHead>Categoria</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
@@ -138,7 +137,7 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                 <TableBody>
                   {monthExpenses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                         Nenhuma despesa no mês
                       </TableCell>
                     </TableRow>
@@ -148,9 +147,6 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                         {new Date(item.dueDate + 'T00:00:00').toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell className="font-medium text-sm">{item.title}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">{item.category || '—'}</Badge>
-                      </TableCell>
                       <TableCell className="text-right font-semibold text-sm text-rose-600 dark:text-rose-400">
                         {formatCurrency(item.amount)}
                       </TableCell>

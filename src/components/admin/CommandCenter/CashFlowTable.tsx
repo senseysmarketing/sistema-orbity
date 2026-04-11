@@ -34,6 +34,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
   const [searchTerm, setSearchTerm] = useState('');
   const [cancelDialogItem, setCancelDialogItem] = useState<CashFlowItem | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const today = new Date();
