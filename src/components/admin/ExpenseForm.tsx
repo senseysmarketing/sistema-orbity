@@ -201,10 +201,45 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
           .eq('id', expense.id);
         if (error) throw error;
 
-        toast({
-          title: "Despesa atualizada",
-          description: "Despesa atualizada com sucesso!",
-        });
+        // Cascading update for Master records — update pending children
+        if (isMaster) {
+          const childAmount = expense.expense_type === 'parcelada'
+            ? parseFloat(formData.installment_amount as string)
+            : baseData.amount;
+
+          const { error: cascadeError } = await supabase
+            .from('expenses')
+            .update({
+              name: baseData.name,
+              amount: childAmount,
+              base_value: baseData.base_value,
+              category: baseData.category,
+              description: baseData.description,
+              currency: baseData.currency,
+              exchange_rate: baseData.exchange_rate,
+            })
+            .eq('parent_expense_id', expense.id)
+            .eq('status', 'pending');
+
+          if (cascadeError) {
+            console.error('Erro ao atualizar filhos pendentes:', cascadeError);
+          }
+
+          toast({
+            title: "Assinatura atualizada",
+            description: "Assinatura e faturas pendentes atualizadas com sucesso!",
+          });
+        } else if (isChild) {
+          toast({
+            title: "Fatura atualizada",
+            description: "Fatura do mês atualizada com sucesso!",
+          });
+        } else {
+          toast({
+            title: "Despesa atualizada",
+            description: "Despesa atualizada com sucesso!",
+          });
+        }
       } else {
         // Criar nova despesa
         if (formData.expense_type === 'parcelada') {
