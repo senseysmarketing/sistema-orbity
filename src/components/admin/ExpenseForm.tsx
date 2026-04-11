@@ -216,7 +216,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
               installment_current: 1,
               installment_total: totalInstallments,
               parent_expense_id: null,
-            }])
+            } as any])
             .select()
             .single();
 
@@ -241,7 +241,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
           if (installments.length > 0) {
             const { error: installmentsError } = await supabase
               .from('expenses')
-              .insert(installments);
+              .insert(installments as any);
             if (installmentsError) throw installmentsError;
           }
 
@@ -253,7 +253,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
           // Criar despesa avulsa ou recorrente
           const { error } = await supabase
             .from('expenses')
-            .insert([baseData]);
+            .insert([baseData] as any);
           if (error) throw error;
 
           toast({
