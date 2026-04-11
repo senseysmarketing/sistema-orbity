@@ -446,6 +446,7 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                           </Button>
                         </TableCell>
                       )}
+                    </TableRow>
                   ))}
                 </TableBody>
               </Table>
