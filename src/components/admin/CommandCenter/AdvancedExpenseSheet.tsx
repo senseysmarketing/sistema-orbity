@@ -419,12 +419,13 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                     <TableHead>Descrição</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead>Status</TableHead>
+                    {onEditExpense && <TableHead className="w-10"></TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {monthExpenses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={onEditExpense ? 5 : 4} className="text-center text-muted-foreground py-8">
                         Nenhuma despesa no mês
                       </TableCell>
                     </TableRow>
@@ -438,7 +439,13 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                         {formatCurrency(item.amount)}
                       </TableCell>
                       <TableCell>{statusBadge(item.status)}</TableCell>
-                    </TableRow>
+                      {onEditExpense && item.sourceId && (
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditExpense(item.sourceId!)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      )}
                   ))}
                 </TableBody>
               </Table>
