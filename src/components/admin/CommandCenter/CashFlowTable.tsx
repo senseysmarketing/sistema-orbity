@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { MarkAsPaidPopover } from "./MarkAsPaidPopover";
 import { AdvancedFinancialSheet } from "./AdvancedFinancialSheet";
+import { AdvancedExpenseSheet } from "./AdvancedExpenseSheet";
 import type { CashFlowItem, CategoryTotal } from "@/hooks/useFinancialMetrics";
 
 type FilterType = 'all' | 'next7' | 'overdue';
