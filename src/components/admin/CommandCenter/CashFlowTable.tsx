@@ -27,9 +27,10 @@ interface CashFlowTableProps {
   agencyId: string;
   selectedMonth: string;
   className?: string;
+  onEditExpenseById?: (expenseId: string) => void;
 }
 
-export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, agencyId, selectedMonth, className }: CashFlowTableProps) {
+export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, agencyId, selectedMonth, className, onEditExpenseById }: CashFlowTableProps) {
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [cancelDialogItem, setCancelDialogItem] = useState<CashFlowItem | null>(null);
@@ -278,6 +279,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
         expensesByCategory={expensesByCategory}
         agencyId={agencyId}
         selectedMonth={selectedMonth}
+        onEditExpense={onEditExpenseById}
       />
     </div>
   );

@@ -220,6 +220,13 @@ export default function Admin() {
 
   // Expense handlers
   const handleEditExpense = (expense: Expense) => { setSelectedExpense(expense); setExpenseFormOpen(true); };
+  const handleEditExpenseById = async (expenseId: string) => {
+    if (!currentAgency) return;
+    const { data, error } = await supabase.from('expenses').select('*').eq('id', expenseId).eq('agency_id', currentAgency.id).single();
+    if (error || !data) { toast({ title: "Erro", description: "Despesa não encontrada", variant: "destructive" }); return; }
+    setSelectedExpense(data);
+    setExpenseFormOpen(true);
+  };
   const handleViewExpense = (expense: Expense) => { setSelectedExpense(expense); setExpenseDetailsOpen(true); };
   const handleViewMasterExpense = async (masterId: string) => {
     if (!currentAgency) return;
@@ -423,6 +430,7 @@ export default function Admin() {
           isCancellingItem={metrics.isCancellingItem}
           agencyId={currentAgency?.id || ""}
           selectedMonth={selectedMonth}
+          onEditExpenseById={handleEditExpenseById}
         />
         <ClientProfitabilityCard
           clients={metrics.clientProfitability}

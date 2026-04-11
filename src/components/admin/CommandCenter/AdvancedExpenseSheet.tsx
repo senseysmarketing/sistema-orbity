@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowDownCircle, CalendarClock, Repeat, CreditCard, TrendingUp, Pause, Play, Leaf } from "lucide-react";
+import { ArrowDownCircle, CalendarClock, Repeat, CreditCard, TrendingUp, Pause, Play, Leaf, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,7 @@ interface AdvancedExpenseSheetProps {
   expensesByCategory: CategoryTotal[];
   agencyId: string;
   selectedMonth: string;
+  onEditExpense?: (expenseId: string) => void;
 }
 
 const statusBadge = (status: string) => {
@@ -168,10 +170,11 @@ function ExpenseAnomalyAlerts({ cashFlow, agencyId }: { cashFlow: CashFlowItem[]
 }
 
 // ─── SaaS Tracker Subscription Card ───
-function SubscriptionCard({ exp, onToggle, isToggling }: {
+function SubscriptionCard({ exp, onToggle, isToggling, onEdit }: {
   exp: any;
   onToggle: (id: string, newStatus: string) => void;
   isToggling: boolean;
+  onEdit?: (id: string) => void;
 }) {
   const isPaused = exp.subscription_status === 'paused';
   const isCanceled = exp.subscription_status === 'canceled';
@@ -200,16 +203,23 @@ function SubscriptionCard({ exp, onToggle, isToggling }: {
               )}
             </div>
           </div>
-          {!isCanceled && (
-            <div className="flex items-center gap-2 shrink-0">
-              {isPaused ? <Pause className="h-3.5 w-3.5 text-muted-foreground" /> : <Play className="h-3.5 w-3.5 text-emerald-500" />}
-              <Switch
-                checked={isActive}
-                onCheckedChange={(checked) => onToggle(exp.id, checked ? 'active' : 'paused')}
-                disabled={isToggling}
-              />
-            </div>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {onEdit && (
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(exp.id)}>
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {!isCanceled && (
+              <>
+                {isPaused ? <Pause className="h-3.5 w-3.5 text-muted-foreground" /> : <Play className="h-3.5 w-3.5 text-emerald-500" />}
+                <Switch
+                  checked={isActive}
+                  onCheckedChange={(checked) => onToggle(exp.id, checked ? 'active' : 'paused')}
+                  disabled={isToggling}
+                />
+              </>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center justify-between">
@@ -232,7 +242,7 @@ function SubscriptionCard({ exp, onToggle, isToggling }: {
 }
 
 // ─── Main Sheet Component ───
-export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, selectedMonth }: AdvancedExpenseSheetProps) {
+export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, selectedMonth, onEditExpense }: AdvancedExpenseSheetProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -409,12 +419,13 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                     <TableHead>Descrição</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead>Status</TableHead>
+                    {onEditExpense && <TableHead className="w-10"></TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {monthExpenses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={onEditExpense ? 5 : 4} className="text-center text-muted-foreground py-8">
                         Nenhuma despesa no mês
                       </TableCell>
                     </TableRow>
@@ -428,6 +439,13 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                         {formatCurrency(item.amount)}
                       </TableCell>
                       <TableCell>{statusBadge(item.status)}</TableCell>
+                      {onEditExpense && item.sourceId && (
+                        <TableCell>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditExpense(item.sourceId!)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -476,6 +494,7 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                     exp={exp}
                     onToggle={(id, newStatus) => toggleMutation.mutate({ id, newStatus })}
                     isToggling={toggleMutation.isPending}
+                    onEdit={onEditExpense}
                   />
                 ))}
               </div>
@@ -505,9 +524,16 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                             {exp.category && ` • ${exp.category}`}
                           </p>
                         </div>
-                        <div className="text-right space-y-0.5">
-                          <p className="font-semibold text-sm text-rose-600 dark:text-rose-400">{formatCurrency(exp.amount)}/parcela</p>
-                          <p className="text-xs text-muted-foreground">Total: {formatCurrency(totalValue)}</p>
+                        <div className="flex items-center gap-3">
+                          {onEditExpense && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditExpense(exp.id)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <div className="text-right space-y-0.5">
+                            <p className="font-semibold text-sm text-rose-600 dark:text-rose-400">{formatCurrency(exp.amount)}/parcela</p>
+                            <p className="text-xs text-muted-foreground">Total: {formatCurrency(totalValue)}</p>
+                          </div>
                         </div>
                       </div>
                       <div className="space-y-1">
