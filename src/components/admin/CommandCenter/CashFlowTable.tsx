@@ -270,6 +270,15 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
         agencyId={agencyId}
         selectedMonth={selectedMonth}
       />
+
+      <AdvancedExpenseSheet
+        open={expenseSheetOpen}
+        onOpenChange={setExpenseSheetOpen}
+        cashFlow={cashFlow}
+        expensesByCategory={expensesByCategory}
+        agencyId={agencyId}
+        selectedMonth={selectedMonth}
+      />
     </div>
   );
 }
