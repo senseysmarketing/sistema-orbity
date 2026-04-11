@@ -46,7 +46,10 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
     description: '',
     recurrence_day: '',
     installment_total: '',
-    installment_amount: '', // Valor de cada parcela
+    installment_amount: '',
+    currency: 'BRL' as 'BRL' | 'USD' | 'EUR',
+    base_value: '',
+    exchange_rate: '',
   });
 
   useEffect(() => {
@@ -69,6 +72,9 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
         recurrence_day: expense.recurrence_day?.toString() || '',
         installment_total: expense.installment_total?.toString() || '',
         installment_amount: expense.amount || '',
+        currency: expense.currency || 'BRL',
+        base_value: expense.base_value?.toString() || '',
+        exchange_rate: expense.exchange_rate?.toString() || '',
       });
     } else {
       setFormData({
@@ -83,6 +89,9 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
         recurrence_day: '',
         installment_total: '',
         installment_amount: '',
+        currency: 'BRL',
+        base_value: '',
+        exchange_rate: '',
       });
     }
   }, [expense, open]);
@@ -156,7 +165,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
         finalAmount = installmentAmount; // Cada parcela tem este valor
       }
 
-      const baseData = {
+      const baseData: Record<string, any> = {
         name: formData.name,
         amount: finalAmount,
         due_date: formData.due_date,
@@ -168,7 +177,15 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
         description: formData.description || null,
         recurrence_day: formData.expense_type === 'recorrente' ? parseInt(formData.recurrence_day) : null,
         agency_id: currentAgency?.id,
+        currency: formData.currency,
+        base_value: formData.base_value ? parseFloat(formData.base_value) : finalAmount,
+        exchange_rate: formData.exchange_rate ? parseFloat(formData.exchange_rate) : null,
       };
+
+      // For recurring, default subscription_status to active
+      if (formData.expense_type === 'recorrente' && !expense) {
+        baseData.subscription_status = 'active';
+      }
 
       if (expense) {
         // Atualizar despesa existente
@@ -199,7 +216,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
               installment_current: 1,
               installment_total: totalInstallments,
               parent_expense_id: null,
-            }])
+            } as any])
             .select()
             .single();
 
@@ -224,7 +241,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
           if (installments.length > 0) {
             const { error: installmentsError } = await supabase
               .from('expenses')
-              .insert(installments);
+              .insert(installments as any);
             if (installmentsError) throw installmentsError;
           }
 
@@ -236,7 +253,7 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
           // Criar despesa avulsa ou recorrente
           const { error } = await supabase
             .from('expenses')
-            .insert([baseData]);
+            .insert([baseData] as any);
           if (error) throw error;
 
           toast({
@@ -424,6 +441,51 @@ export function ExpenseForm({ open, onOpenChange, onSuccess, expense, onDelete, 
                 />
                 <p className="text-xs text-muted-foreground">
                   A despesa vencerá todo dia {formData.recurrence_day || '__'} de cada mês
+                </p>
+              </div>
+            )}
+
+            {/* Moeda e Cotação */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="currency">Moeda</Label>
+                <Select
+                  value={formData.currency}
+                  onValueChange={(value) => setFormData({ ...formData, currency: value as 'BRL' | 'USD' | 'EUR' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BRL">🇧🇷 BRL</SelectItem>
+                    <SelectItem value="USD">🇺🇸 USD</SelectItem>
+                    <SelectItem value="EUR">🇪🇺 EUR</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {formData.currency !== 'BRL' && (
+                <div className="grid gap-2">
+                  <Label htmlFor="exchange_rate">Cotação utilizada</Label>
+                  <Input
+                    id="exchange_rate"
+                    type="number"
+                    step="0.01"
+                    placeholder="Ex: 5.25"
+                    value={formData.exchange_rate}
+                    onChange={(e) => setFormData({ ...formData, exchange_rate: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Preview de conversão */}
+            {formData.currency !== 'BRL' && formData.exchange_rate && formData.amount && (
+              <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  💱 Valor estimado em Reais:{' '}
+                  <span className="font-semibold">
+                    {(parseFloat(formData.amount) * parseFloat(formData.exchange_rate)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
                 </p>
               </div>
             )}

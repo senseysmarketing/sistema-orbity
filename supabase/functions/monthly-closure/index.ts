@@ -123,14 +123,15 @@ async function processAgencyClosure(supabase: any, agencyId: string): Promise<Mo
   }
 
   // 2. GERAR DESPESAS RECORRENTES
-  // Buscar APENAS despesas mestras ATIVAS (sem parent_expense_id e is_active = true)
+  // Buscar APENAS despesas mestras ATIVAS com subscription_status 'active'
   const { data: recurringExpenses } = await supabase
     .from('expenses')
     .select('*')
     .eq('agency_id', agencyId)
     .eq('expense_type', 'recorrente')
-    .eq('is_active', true)  // Apenas despesas ativas
-    .is('parent_expense_id', null);  // Apenas mestras
+    .eq('is_active', true)
+    .eq('subscription_status', 'active')  // Respeitar kill switch
+    .is('parent_expense_id', null);
 
   for (const expense of recurringExpenses || []) {
     const dueDay = expense.recurrence_day || new Date(expense.due_date).getDate();

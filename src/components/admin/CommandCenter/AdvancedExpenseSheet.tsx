@@ -6,10 +6,13 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowDownCircle, CalendarClock, Repeat, CreditCard, DollarSign } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ArrowDownCircle, CalendarClock, Repeat, CreditCard, TrendingUp, Pause, Play, Leaf } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import type { CashFlowItem, CategoryTotal } from "@/hooks/useFinancialMetrics";
 
 interface AdvancedExpenseSheetProps {
@@ -30,33 +33,278 @@ const statusBadge = (status: string) => {
   }
 };
 
+const currencyBadge = (currency: string | null) => {
+  if (!currency || currency === 'BRL') return null;
+  return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 text-[10px] px-1.5 py-0">{currency}</Badge>;
+};
+
+// ─── Anomaly Detection Component ───
+function ExpenseAnomalyAlerts({ cashFlow, agencyId }: { cashFlow: CashFlowItem[]; agencyId: string }) {
+  const expenseItems = useMemo(() =>
+    cashFlow.filter(i => i.type === 'EXPENSE' && i.sourceType === 'expense' && i.status !== 'CANCELLED'),
+    [cashFlow]
+  );
+
+  // Fetch master expenses with base_value for comparison
+  const parentIds = useMemo(() => {
+    const ids = new Set<string>();
+    expenseItems.forEach(item => {
+      if (item.id) ids.add(item.id);
+    });
+    return Array.from(ids);
+  }, [expenseItems]);
+
+  const { data: expenseDetails } = useQuery({
+    queryKey: ['expense-anomaly-details', agencyId, parentIds],
+    queryFn: async () => {
+      if (parentIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('id, name, amount, base_value, currency, exchange_rate, parent_expense_id')
+        .in('id', parentIds);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: parentIds.length > 0,
+  });
+
+  // Fetch last paid invoices for foreign currency comparisons
+  const parentExpenseIds = useMemo(() => {
+    if (!expenseDetails) return [];
+    return expenseDetails
+      .filter(e => e.parent_expense_id)
+      .map(e => e.parent_expense_id!)
+      .filter((v, i, a) => a.indexOf(v) === i);
+  }, [expenseDetails]);
+
+  const { data: lastPaidInvoices } = useQuery({
+    queryKey: ['last-paid-invoices', parentExpenseIds],
+    queryFn: async () => {
+      if (parentExpenseIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('id, amount, parent_expense_id, status, due_date')
+        .in('parent_expense_id', parentExpenseIds)
+        .eq('status', 'paid')
+        .order('due_date', { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: parentExpenseIds.length > 0,
+  });
+
+  // Fetch master base_value/currency for foreign currency fallback
+  const { data: masterExpenses } = useQuery({
+    queryKey: ['master-expenses-for-anomaly', parentExpenseIds],
+    queryFn: async () => {
+      if (parentExpenseIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('id, base_value, currency, exchange_rate')
+        .in('id', parentExpenseIds);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: parentExpenseIds.length > 0,
+  });
+
+  const anomalies = useMemo(() => {
+    if (!expenseDetails) return [];
+    const alerts: { name: string; currentAmount: number; expectedAmount: number; diff: number; pct: number }[] = [];
+
+    for (const exp of expenseDetails) {
+      const currentAmount = exp.amount;
+      const parentId = exp.parent_expense_id;
+      const master = masterExpenses?.find(m => m.id === parentId);
+      const currency = master?.currency || exp.currency || 'BRL';
+
+      let threshold: number | null = null;
+
+      if (currency !== 'BRL' && parentId) {
+        // Blindagem 1: Compare with last paid invoice in BRL
+        const lastPaid = lastPaidInvoices?.find(lp => lp.parent_expense_id === parentId && lp.id !== exp.id);
+        if (lastPaid) {
+          threshold = lastPaid.amount * 1.15;
+        } else {
+          // Fallback: base_value * exchange_rate * 1.15
+          const bv = master?.base_value || exp.base_value;
+          const er = master?.exchange_rate || exp.exchange_rate || 1;
+          if (bv) threshold = bv * er * 1.15;
+        }
+      } else {
+        // BRL: compare with base_value directly
+        const bv = master?.base_value || exp.base_value;
+        if (bv && bv > 0) {
+          threshold = bv * 1.15;
+        }
+      }
+
+      if (threshold && currentAmount > threshold) {
+        const expectedAmount = threshold / 1.15;
+        const diff = currentAmount - expectedAmount;
+        const pct = Math.round(((currentAmount - expectedAmount) / expectedAmount) * 100);
+        alerts.push({ name: exp.name, currentAmount, expectedAmount, diff, pct });
+      }
+    }
+    return alerts;
+  }, [expenseDetails, lastPaidInvoices, masterExpenses]);
+
+  if (anomalies.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      {anomalies.map((a, i) => (
+        <Alert key={i} variant="destructive" className="border-destructive/50">
+          <TrendingUp className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            <strong>Atenção:</strong> A despesa <strong>{a.name}</strong> veio{' '}
+            <strong>{formatCurrency(a.diff)}</strong> mais cara este mês (aumento de{' '}
+            <strong>{a.pct}%</strong>). Verifique a fatura.
+          </AlertDescription>
+        </Alert>
+      ))}
+    </div>
+  );
+}
+
+// ─── SaaS Tracker Subscription Card ───
+function SubscriptionCard({ exp, onToggle, isToggling }: {
+  exp: any;
+  onToggle: (id: string, newStatus: string) => void;
+  isToggling: boolean;
+}) {
+  const isPaused = exp.subscription_status === 'paused';
+  const isCanceled = exp.subscription_status === 'canceled';
+  const isActive = !isPaused && !isCanceled;
+  const baseValue = exp.base_value || exp.amount;
+  const annualSavings = baseValue * 12;
+
+  return (
+    <Card className={`transition-all ${
+      isCanceled ? 'opacity-40 border-dashed' :
+      isPaused ? 'opacity-60 border-dashed border-muted-foreground/30' : ''
+    }`}>
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-1 flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-medium truncate">{exp.name}</p>
+              {currencyBadge(exp.currency)}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {exp.category && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">{exp.category}</Badge>
+              )}
+              {exp.recurrence_day && (
+                <span className="text-xs text-muted-foreground">Dia {exp.recurrence_day}</span>
+              )}
+            </div>
+          </div>
+          {!isCanceled && (
+            <div className="flex items-center gap-2 shrink-0">
+              {isPaused ? <Pause className="h-3.5 w-3.5 text-muted-foreground" /> : <Play className="h-3.5 w-3.5 text-emerald-500" />}
+              <Switch
+                checked={isActive}
+                onCheckedChange={(checked) => onToggle(exp.id, checked ? 'active' : 'paused')}
+                disabled={isToggling}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className={`font-semibold text-sm ${isActive ? 'text-rose-600 dark:text-rose-400' : 'text-muted-foreground'}`}>
+            {formatCurrency(baseValue)}/mês
+          </span>
+          {isPaused && (
+            <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300 text-[10px]">
+              <Leaf className="h-3 w-3 mr-1" />
+              Economia: {formatCurrency(annualSavings)}/ano
+            </Badge>
+          )}
+          {isCanceled && (
+            <Badge className="bg-muted text-muted-foreground text-[10px]">Cancelada</Badge>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Main Sheet Component ───
 export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, selectedMonth }: AdvancedExpenseSheetProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   // Tab 1 data — from cashFlow
-  const monthExpenses = useMemo(() => {
-    return cashFlow.filter(i => i.type === 'EXPENSE' && i.status !== 'CANCELLED');
-  }, [cashFlow]);
+  const monthExpenses = useMemo(() =>
+    cashFlow.filter(i => i.type === 'EXPENSE' && i.status !== 'CANCELLED'),
+    [cashFlow]
+  );
 
   const totalPending = useMemo(() => monthExpenses.filter(i => i.status !== 'PAID').reduce((s, i) => s + i.amount, 0), [monthExpenses]);
   const totalPaid = useMemo(() => monthExpenses.filter(i => i.status === 'PAID').reduce((s, i) => s + i.amount, 0), [monthExpenses]);
 
-  // Tab 2 — recurring expenses
+  // Tab 2 — SaaS Tracker (all recurring, including paused)
   const { data: recurringExpenses, isLoading: loadingRecurring } = useQuery({
-    queryKey: ['recurring-expenses', agencyId],
+    queryKey: ['recurring-expenses-tracker', agencyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('expenses')
-        .select('id, name, category, amount, recurrence_day, is_active')
+        .select('id, name, category, amount, recurrence_day, is_active, subscription_status, base_value, currency, exchange_rate')
         .eq('agency_id', agencyId)
         .eq('expense_type', 'recorrente')
-        .eq('is_active', true)
+        .is('parent_expense_id', null)
         .order('amount', { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []).filter(e => e.subscription_status !== 'canceled' || e.is_active);
     },
     enabled: open,
   });
 
-  const recurringTotal = useMemo(() => (recurringExpenses ?? []).reduce((s, e) => s + e.amount, 0), [recurringExpenses]);
+  const activeTotal = useMemo(() =>
+    (recurringExpenses ?? []).filter(e => e.subscription_status === 'active').reduce((s, e) => s + (e.base_value || e.amount), 0),
+    [recurringExpenses]
+  );
+  const pausedTotal = useMemo(() =>
+    (recurringExpenses ?? []).filter(e => e.subscription_status === 'paused').reduce((s, e) => s + (e.base_value || e.amount), 0),
+    [recurringExpenses]
+  );
+
+  // Kill Switch mutation (Blindagem 2)
+  const toggleMutation = useMutation({
+    mutationFn: async ({ id, newStatus }: { id: string; newStatus: string }) => {
+      // Update subscription status
+      const { error } = await supabase
+        .from('expenses')
+        .update({ subscription_status: newStatus } as any)
+        .eq('id', id);
+      if (error) throw error;
+
+      // Blindagem 2: If pausing, cancel pending child invoices
+      if (newStatus === 'paused' || newStatus === 'canceled') {
+        const { error: childError } = await supabase
+          .from('expenses')
+          .update({ status: 'cancelled' } as any)
+          .eq('parent_expense_id', id)
+          .eq('status', 'pending');
+        if (childError) console.error('Erro ao cancelar pendentes:', childError);
+      }
+    },
+    onSuccess: (_, { newStatus }) => {
+      queryClient.invalidateQueries({ queryKey: ['recurring-expenses-tracker'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
+      toast({
+        title: newStatus === 'paused' ? '⏸️ Assinatura pausada' : '▶️ Assinatura reativada',
+        description: newStatus === 'paused'
+          ? 'Faturas pendentes foram canceladas automaticamente.'
+          : 'A assinatura voltará a gerar faturas no próximo ciclo.',
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    },
+  });
 
   // Tab 3 — installment expenses
   const { data: installmentExpenses, isLoading: loadingInstallments } = useQuery({
@@ -99,7 +347,7 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
             </TabsTrigger>
             <TabsTrigger value="recurring" className="flex-1">
               <Repeat className="h-3.5 w-3.5 mr-1.5" />
-              Assinaturas
+              SaaS Tracker
             </TabsTrigger>
             <TabsTrigger value="installments" className="flex-1">
               <CreditCard className="h-3.5 w-3.5 mr-1.5" />
@@ -107,8 +355,10 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
             </TabsTrigger>
           </TabsList>
 
-          {/* Tab 1 — Month Expenses */}
+          {/* Tab 1 — Month Expenses with Anomaly Alerts */}
           <TabsContent value="month" className="mt-4 space-y-4">
+            <ExpenseAnomalyAlerts cashFlow={cashFlow} agencyId={agencyId} />
+
             <div className="grid grid-cols-2 gap-3">
               <Card>
                 <CardContent className="p-4 text-center space-y-1">
@@ -137,7 +387,7 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                 <TableBody>
                   {monthExpenses.length === 0 ? (
                     <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                         Nenhuma despesa no mês
                       </TableCell>
                     </TableRow>
@@ -158,41 +408,48 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
             </div>
           </TabsContent>
 
-          {/* Tab 2 — Recurring / Subscriptions */}
+          {/* Tab 2 — SaaS Tracker */}
           <TabsContent value="recurring" className="mt-4 space-y-4">
-            <Card>
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Comprometido mensal fixo</span>
-                </div>
-                {loadingRecurring ? <Skeleton className="h-6 w-24" /> : (
-                  <span className="text-lg font-bold text-rose-600 dark:text-rose-400">{formatCurrency(recurringTotal)}</span>
-                )}
-              </CardContent>
-            </Card>
+            <div className="grid grid-cols-2 gap-3">
+              <Card>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Play className="h-4 w-4 text-emerald-500" />
+                    <span className="text-xs text-muted-foreground">Ativo/mês</span>
+                  </div>
+                  {loadingRecurring ? <Skeleton className="h-6 w-24" /> : (
+                    <span className="text-lg font-bold text-rose-600 dark:text-rose-400">{formatCurrency(activeTotal)}</span>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Leaf className="h-4 w-4 text-emerald-500" />
+                    <span className="text-xs text-muted-foreground">Economia/mês</span>
+                  </div>
+                  {loadingRecurring ? <Skeleton className="h-6 w-24" /> : (
+                    <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(pausedTotal)}</span>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
             {loadingRecurring ? (
-              <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
+              </div>
             ) : (recurringExpenses ?? []).length === 0 ? (
-              <p className="text-center text-muted-foreground py-8 text-sm">Nenhuma assinatura ativa</p>
+              <p className="text-center text-muted-foreground py-8 text-sm">Nenhuma assinatura cadastrada</p>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {(recurringExpenses ?? []).map(exp => (
-                  <Card key={exp.id}>
-                    <CardContent className="p-3 flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <p className="text-sm font-medium">{exp.name}</p>
-                        <div className="flex items-center gap-2">
-                          {exp.category && <Badge variant="outline" className="text-[10px] px-1 py-0">{exp.category}</Badge>}
-                          {exp.recurrence_day && (
-                            <span className="text-xs text-muted-foreground">Dia {exp.recurrence_day}</span>
-                          )}
-                        </div>
-                      </div>
-                      <span className="font-semibold text-sm text-rose-600 dark:text-rose-400">{formatCurrency(exp.amount)}/mês</span>
-                    </CardContent>
-                  </Card>
+                  <SubscriptionCard
+                    key={exp.id}
+                    exp={exp}
+                    onToggle={(id, newStatus) => toggleMutation.mutate({ id, newStatus })}
+                    isToggling={toggleMutation.isPending}
+                  />
                 ))}
               </div>
             )}
