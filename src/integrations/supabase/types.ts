@@ -2325,10 +2325,13 @@ export type Database = {
         Row: {
           agency_id: string | null
           amount: number
+          base_value: number | null
           category: string | null
           created_at: string
+          currency: string | null
           description: string | null
           due_date: string
+          exchange_rate: number | null
           expense_type: Database["public"]["Enums"]["expense_type"] | null
           id: string
           installment_current: number | null
@@ -2341,15 +2344,19 @@ export type Database = {
           parent_expense_id: string | null
           recurrence_day: number | null
           status: Database["public"]["Enums"]["payment_status"]
+          subscription_status: string | null
           updated_at: string
         }
         Insert: {
           agency_id?: string | null
           amount: number
+          base_value?: number | null
           category?: string | null
           created_at?: string
+          currency?: string | null
           description?: string | null
           due_date: string
+          exchange_rate?: number | null
           expense_type?: Database["public"]["Enums"]["expense_type"] | null
           id?: string
           installment_current?: number | null
@@ -2362,15 +2369,19 @@ export type Database = {
           parent_expense_id?: string | null
           recurrence_day?: number | null
           status?: Database["public"]["Enums"]["payment_status"]
+          subscription_status?: string | null
           updated_at?: string
         }
         Update: {
           agency_id?: string | null
           amount?: number
+          base_value?: number | null
           category?: string | null
           created_at?: string
+          currency?: string | null
           description?: string | null
           due_date?: string
+          exchange_rate?: number | null
           expense_type?: Database["public"]["Enums"]["expense_type"] | null
           id?: string
           installment_current?: number | null
@@ -2383,6 +2394,7 @@ export type Database = {
           parent_expense_id?: string | null
           recurrence_day?: number | null
           status?: Database["public"]["Enums"]["payment_status"]
+          subscription_status?: string | null
           updated_at?: string
         }
         Relationships: [
