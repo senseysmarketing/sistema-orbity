@@ -306,18 +306,45 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
     },
   });
 
-  // Tab 3 — installment expenses
+  // Tab 3 — installment master expenses (parent only)
   const { data: installmentExpenses, isLoading: loadingInstallments } = useQuery({
     queryKey: ['installment-expenses', agencyId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // 1. Fetch only master records (parent_expense_id IS NULL)
+      const { data: masters, error } = await supabase
         .from('expenses')
         .select('id, name, category, amount, installment_current, installment_total, due_date, status')
         .eq('agency_id', agencyId)
         .eq('expense_type', 'parcelada')
+        .is('parent_expense_id', null)
         .order('due_date', { ascending: true });
       if (error) throw error;
-      return (data ?? []).filter(e => (e.installment_current ?? 0) < (e.installment_total ?? 1));
+      if (!masters || masters.length === 0) return [];
+
+      // 2. For each master, count paid children to get real progress
+      const masterIds = masters.map(m => m.id);
+      const { data: children, error: childErr } = await supabase
+        .from('expenses')
+        .select('parent_expense_id, status')
+        .in('parent_expense_id', masterIds);
+      if (childErr) throw childErr;
+
+      // Build a map: masterId -> { paid, total }
+      const progressMap: Record<string, { paid: number; total: number }> = {};
+      for (const child of (children ?? [])) {
+        const pid = child.parent_expense_id!;
+        if (!progressMap[pid]) progressMap[pid] = { paid: 0, total: 0 };
+        progressMap[pid].total += 1;
+        if (child.status === 'paid') progressMap[pid].paid += 1;
+      }
+
+      return masters.map(m => {
+        const progress = progressMap[m.id];
+        // If children exist, use child count; otherwise fallback to master fields
+        const paidCount = progress ? progress.paid : (m.status === 'paid' ? 1 : 0);
+        const totalCount = progress ? progress.total : (m.installment_total ?? 1);
+        return { ...m, _paidCount: paidCount, _totalChildren: totalCount };
+      }).filter(m => m._paidCount < m._totalChildren); // Only show with remaining installments
     },
     enabled: open,
   });
@@ -463,9 +490,10 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
               <p className="text-center text-muted-foreground py-8 text-sm">Nenhum parcelamento ativo</p>
             ) : (
               (installmentExpenses ?? []).map(exp => {
-                const current = exp.installment_current ?? 0;
-                const total = exp.installment_total ?? 1;
-                const pct = Math.round((current / total) * 100);
+                const paid = exp._paidCount ?? 0;
+                const total = exp._totalChildren ?? (exp.installment_total ?? 1);
+                const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
+                const totalValue = exp.amount * total;
                 return (
                   <Card key={exp.id}>
                     <CardContent className="p-4 space-y-2">
@@ -473,13 +501,13 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                         <div className="space-y-0.5">
                           <p className="text-sm font-medium">{exp.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Parcela {current} de {total}
+                            {paid} de {total} parcelas pagas
                             {exp.category && ` • ${exp.category}`}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-sm text-rose-600 dark:text-rose-400">{formatCurrency(exp.amount)}</p>
-                          {statusBadge(exp.status)}
+                        <div className="text-right space-y-0.5">
+                          <p className="font-semibold text-sm text-rose-600 dark:text-rose-400">{formatCurrency(exp.amount)}/parcela</p>
+                          <p className="text-xs text-muted-foreground">Total: {formatCurrency(totalValue)}</p>
                         </div>
                       </div>
                       <div className="space-y-1">
