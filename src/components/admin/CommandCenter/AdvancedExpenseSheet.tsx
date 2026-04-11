@@ -490,9 +490,10 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
               <p className="text-center text-muted-foreground py-8 text-sm">Nenhum parcelamento ativo</p>
             ) : (
               (installmentExpenses ?? []).map(exp => {
-                const current = exp.installment_current ?? 0;
-                const total = exp.installment_total ?? 1;
-                const pct = Math.round((current / total) * 100);
+                const paid = exp._paidCount ?? 0;
+                const total = exp._totalChildren ?? (exp.installment_total ?? 1);
+                const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
+                const totalValue = exp.amount * total;
                 return (
                   <Card key={exp.id}>
                     <CardContent className="p-4 space-y-2">
@@ -500,13 +501,13 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                         <div className="space-y-0.5">
                           <p className="text-sm font-medium">{exp.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Parcela {current} de {total}
+                            {paid} de {total} parcelas pagas
                             {exp.category && ` • ${exp.category}`}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-sm text-rose-600 dark:text-rose-400">{formatCurrency(exp.amount)}</p>
-                          {statusBadge(exp.status)}
+                        <div className="text-right space-y-0.5">
+                          <p className="font-semibold text-sm text-rose-600 dark:text-rose-400">{formatCurrency(exp.amount)}/parcela</p>
+                          <p className="text-xs text-muted-foreground">Total: {formatCurrency(totalValue)}</p>
                         </div>
                       </div>
                       <div className="space-y-1">
