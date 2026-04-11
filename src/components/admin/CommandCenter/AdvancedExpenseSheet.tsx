@@ -316,7 +316,37 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
     },
   });
 
-  // Tab 3 — installment master expenses (parent only)
+  // Delete/Cancel installment mutation
+  const cancelInstallmentMutation = useMutation({
+    mutationFn: async (masterId: string) => {
+      // Cancel pending children
+      const { error: childError } = await supabase
+        .from('expenses')
+        .update({ status: 'cancelled' } as any)
+        .eq('parent_expense_id', masterId)
+        .eq('status', 'pending');
+      if (childError) throw childError;
+
+      // Cancel the master
+      const { error: masterError } = await supabase
+        .from('expenses')
+        .update({ status: 'cancelled', subscription_status: 'canceled' } as any)
+        .eq('id', masterId);
+      if (masterError) throw masterError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['installment-expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-metrics'] });
+      toast({
+        title: '🗑️ Parcelamento cancelado',
+        description: 'Parcelas já pagas foram preservadas no histórico.',
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' });
+    },
+  });
+
   const { data: installmentExpenses, isLoading: loadingInstallments } = useQuery({
     queryKey: ['installment-expenses', agencyId],
     queryFn: async () => {
@@ -530,6 +560,18 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => {
+                              if (confirm(`Cancelar parcelamento "${exp.name}"?\n\nParcelas já pagas serão preservadas. Apenas as pendentes serão canceladas.`)) {
+                                cancelInstallmentMutation.mutate(exp.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                           <div className="text-right space-y-0.5">
                             <p className="font-semibold text-sm text-rose-600 dark:text-rose-400">{formatCurrency(exp.amount)}/parcela</p>
                             <p className="text-xs text-muted-foreground">Total: {formatCurrency(totalValue)}</p>
