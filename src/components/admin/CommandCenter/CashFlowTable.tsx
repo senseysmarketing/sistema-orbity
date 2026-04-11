@@ -54,7 +54,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
     });
   }, [cashFlow, filter, searchTerm]);
 
-  const maxCategoryTotal = expensesByCategory.length > 0 ? expensesByCategory[0].total : 1;
+  const totalExpenses = expensesByCategory.reduce((s, c) => s + c.total, 0) || 1;
   const overdueCount = cashFlow.filter(i => i.status === 'OVERDUE').length;
 
   const statusBadge = (status: string) => {
@@ -212,24 +212,30 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
       {expensesByCategory.length > 0 && (
         <Card className="mt-4">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Top Categorias de Custo</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Top Categorias de Custo</CardTitle>
+              <Button variant="outline" size="sm" onClick={() => setExpenseSheetOpen(true)}>
+                Central de Despesas
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {expensesByCategory.slice(0, 5).map((cat, i) => (
-              <div key={i} className="space-y-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-1.5">
-                    {cat.icon && <span className="text-xs">{cat.icon}</span>}
-                    {cat.category}
-                  </span>
-                  <span className="font-semibold">{formatCurrency(cat.total)}</span>
+            {expensesByCategory.slice(0, 5).map((cat, i) => {
+              const pct = Math.round((cat.total / totalExpenses) * 100);
+              return (
+                <div key={i} className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1.5">
+                      {cat.icon && <span className="text-xs">{cat.icon}</span>}
+                      {cat.category}
+                      <span className="text-muted-foreground">({formatCurrency(cat.total)})</span>
+                    </span>
+                    <span className="font-semibold text-muted-foreground">{pct}%</span>
+                  </div>
+                  <Progress value={pct} className="h-2" />
                 </div>
-                <Progress
-                  value={(cat.total / maxCategoryTotal) * 100}
-                  className="h-1.5"
-                />
-              </div>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       )}
