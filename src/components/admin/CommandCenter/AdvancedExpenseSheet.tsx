@@ -494,6 +494,7 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                     exp={exp}
                     onToggle={(id, newStatus) => toggleMutation.mutate({ id, newStatus })}
                     isToggling={toggleMutation.isPending}
+                    onEdit={onEditExpense}
                   />
                 ))}
               </div>
@@ -523,9 +524,16 @@ export function AdvancedExpenseSheet({ open, onOpenChange, cashFlow, agencyId, s
                             {exp.category && ` • ${exp.category}`}
                           </p>
                         </div>
-                        <div className="text-right space-y-0.5">
-                          <p className="font-semibold text-sm text-rose-600 dark:text-rose-400">{formatCurrency(exp.amount)}/parcela</p>
-                          <p className="text-xs text-muted-foreground">Total: {formatCurrency(totalValue)}</p>
+                        <div className="flex items-center gap-3">
+                          {onEditExpense && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditExpense(exp.id)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          <div className="text-right space-y-0.5">
+                            <p className="font-semibold text-sm text-rose-600 dark:text-rose-400">{formatCurrency(exp.amount)}/parcela</p>
+                            <p className="text-xs text-muted-foreground">Total: {formatCurrency(totalValue)}</p>
+                          </div>
                         </div>
                       </div>
                       <div className="space-y-1">
