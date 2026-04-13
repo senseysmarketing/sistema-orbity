@@ -1,57 +1,54 @@
 
 
-# Correção do Gateway Conexa: Alinhamento com API + Fix de Estado
+# Fix: Leads "won" com won_at NULL não contabilizados
 
-## Descobertas da Documentação
+## Diagnóstico
 
-A documentação do Conexa (conexa.app) confirma:
+O lead **Diego Minichillo** tem `status = 'won'` mas `won_at = NULL`. O dashboard filtra vendas por `won_at` dentro do período selecionado (linha 111: `if (!wonAt) return false`), então leads sem `won_at` são silenciosamente ignorados.
 
-1. **Token unico**: O Conexa usa um unico "Application Token" gerado em Config > Integrações > API/Token. Nao existe separacao entre "API Key" e "Token" -- e um unico token de acesso.
-2. **O Conexa nao e um gateway de pagamento direto** -- e um sistema de gestao que integra com gateways reais (Efi/Gerencianet, Cielo, Banco Inter) para boleto/PIX/cartao. A API do Conexa expoe endpoints para gerenciar clientes, faturas, cobranças dentro do ecossistema Conexa.
-3. **Autenticacao**: Header `token` com o valor do Application Token gerado no painel Conexa.
+O trigger `set_lead_won_at_trigger` existe e está ativo, mas por algum motivo não disparou para esse lead (possivelmente inserido já com status `won` em vez de atualizado para `won`, já que o trigger é `BEFORE UPDATE` apenas).
 
-## O que precisa mudar
+## Correções
 
-### 1. `ConexaIntegration.tsx` -- UI (Input unico + fix de estado)
+### 1. Migration: Preencher won_at para leads órfãos
+```sql
+UPDATE leads 
+SET won_at = COALESCE(status_changed_at, updated_at, NOW()) 
+WHERE status = 'won' AND won_at IS NULL;
+```
 
-- **Remover** o input "Token" duplicado e os states `token`, `showToken`
-- **Renomear** o input restante para "Token de Acesso (Conexa)"
-- Mapear para `conexa_api_key` no banco (coluna existente)
-- **Fix do bug de estado**: Adicionar `useRef(initialized)` para evitar que o `useEffect` resete o estado local a cada re-render
+### 2. Migration: Adicionar trigger de INSERT
+O trigger atual só cobre `BEFORE UPDATE`. Se um lead for inserido diretamente com `status = 'won'` (ex: via Manual), o `won_at` fica NULL. Adicionar cobertura para INSERT:
+```sql
+CREATE OR REPLACE FUNCTION set_lead_won_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status = 'won' AND (OLD IS NULL OR OLD.status IS DISTINCT FROM 'won') THEN
+    NEW.won_at := NOW();
+  ELSIF NEW.status != 'won' THEN
+    NEW.won_at := NULL;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-### 2. `usePaymentGateway.tsx` -- Estabilizar referencia do fallback
+DROP TRIGGER IF EXISTS set_lead_won_at_trigger ON leads;
+CREATE TRIGGER set_lead_won_at_trigger
+  BEFORE INSERT OR UPDATE ON leads
+  FOR EACH ROW EXECUTE FUNCTION set_lead_won_at();
+```
 
-**Root cause do bug**: Linha 114 cria um novo objeto `{ ...defaultSettings, id: '', agency_id: ... }` a cada render quando `settings` e `null`. Isso dispara o `useEffect([settings])` no `ConexaIntegration`, resetando os inputs.
-
-**Fix**: Envolver o fallback em `useMemo` para estabilizar a referencia.
-
-### 3. Limpeza do campo `conexa_token` no DB
-
-O campo `conexa_token` na tabela `agency_payment_settings` fica orfao (nunca mais sera usado). Nao precisa de migration para remover agora -- podemos ignorar. O `handleSave` simplesmente para de enviar `conexa_token`.
-
-### 4. Edge Functions -- sem alteracao necessaria agora
-
-O `settle-gateway-payment` ja tem um `TODO` para Conexa settlement. O `payment-webhook` ja suporta eventos Conexa via `CONEXA_EVENT_MAP` e valida via `x-conexa-token` header. Ambos usam `conexa_api_key` do `agency_payment_settings` para autenticacao. Tudo alinhado com a API real.
+### 3. CRMDashboard.tsx: Fallback defensivo
+Na linha 111, em vez de descartar leads com `won_at` NULL, usar fallback:
+```ts
+const wonAt = l.won_at ? new Date(l.won_at) : (l.status_changed_at ? new Date(l.status_changed_at) : null);
+```
+Isso garante que mesmo se o trigger falhar no futuro, o dashboard ainda contabiliza a venda.
 
 ## Arquivos modificados
 
-| Arquivo | Alteracao |
+| Arquivo | Alteração |
 |---------|-----------|
-| `src/hooks/usePaymentGateway.tsx` | `useMemo` no fallback settings (linha 114) |
-| `src/components/settings/ConexaIntegration.tsx` | Input unico + `useRef` init guard |
-
-## Detalhes tecnicos
-
-```text
-usePaymentGateway.tsx (linha 114):
-  ANTES:  settings: settings ? settings : { ...defaultSettings, ... }
-  DEPOIS: settings: useMemo(() => settings ?? { ...defaultSettings, ... }, [settings, agencyId])
-
-ConexaIntegration.tsx:
-  - Remove: token state, showToken state, segundo input
-  - Add: useRef(false) para initialized
-  - useEffect: só popula se !initialized.current
-  - handleSave: envia apenas conexa_api_key (sem conexa_token)
-  - Label: "Token de Acesso (Conexa)"
-```
+| Migration SQL | Fix dados órfãos + trigger INSERT |
+| `src/components/crm/CRMDashboard.tsx` | Fallback `won_at → status_changed_at` |
 
