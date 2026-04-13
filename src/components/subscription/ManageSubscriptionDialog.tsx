@@ -12,7 +12,7 @@ interface ManageSubscriptionDialogProps {
 }
 
 export function ManageSubscriptionDialog({ open, onOpenChange }: ManageSubscriptionDialogProps) {
-  const { plans, currentSubscription, createCheckout } = useSubscription();
+  const { plans, createCheckout } = useSubscription();
   const [loading, setLoading] = useState(false);
 
   const formatPrice = (price: number) => {
@@ -56,7 +56,7 @@ export function ManageSubscriptionDialog({ open, onOpenChange }: ManageSubscript
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           {orbityPlans.map((plan) => {
             const isAnnual = plan.slug === 'orbity_annual';
-            const isMonthly = plan.slug === 'orbity_monthly';
+            
 
             return (
               <Card 
