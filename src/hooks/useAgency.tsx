@@ -43,6 +43,7 @@ interface AgencyContextType {
   agencyRole: string | null;
   loading: boolean;
   hasNoAgency: boolean;
+  fetchError: boolean;
   switchAgency: (agencyId: string) => Promise<void>;
   createAgency: (agencyData: Partial<Agency>) => Promise<Agency | null>;
   updateAgency: (agencyId: string, updates: Partial<Agency>) => Promise<void>;
@@ -62,10 +63,13 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
   const [agencyRole, setAgencyRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasNoAgency, setHasNoAgency] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
 
   // Ref para evitar re-fetch quando user não mudou
   const previousUserIdRef = useRef<string | null>(null);
   const isFetchingRef = useRef(false);
+
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   const fetchUserAgencies = async () => {
     if (!user) return;
@@ -76,48 +80,65 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    try {
-      isFetchingRef.current = true;
-      setLoading(true);
-      const { data: agencyUsers, error: agencyUsersError } = await supabase
-        .from('agency_users')
-        .select(`
-          *,
-          agencies (*)
-        `)
-        .eq('user_id', user.id);
+    isFetchingRef.current = true;
+    setLoading(true);
+    setFetchError(false);
 
-      if (agencyUsersError) throw agencyUsersError;
+    const MAX_RETRIES = 3;
 
-      const agencies = agencyUsers?.map(au => au.agencies).filter(Boolean) || [];
-      setUserAgencies(agencies);
-      
-      // Check if user has no agency
-      if (agencies.length === 0) {
-        setHasNoAgency(true);
-        setCurrentAgency(null);
-        setAgencyRole(null);
-        localStorage.removeItem('currentAgencyId');
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`[Agency] Fetch attempt ${attempt}/${MAX_RETRIES}`);
+        const { data: agencyUsers, error: agencyUsersError } = await supabase
+          .from('agency_users')
+          .select(`
+            *,
+            agencies (*)
+          `)
+          .eq('user_id', user.id);
+
+        if (agencyUsersError) throw agencyUsersError;
+
+        const agencies = agencyUsers?.map(au => au.agencies).filter(Boolean) || [];
+        setUserAgencies(agencies);
+        
+        // Check if user has no agency
+        if (agencies.length === 0) {
+          setHasNoAgency(true);
+          setCurrentAgency(null);
+          setAgencyRole(null);
+          localStorage.removeItem('currentAgencyId');
+        } else {
+          setHasNoAgency(false);
+
+          // Set current agency (first one if not set)
+          if (!currentAgency) {
+            const firstAgency = agencies[0];
+            const userRole = agencyUsers?.find(au => au.agency_id === firstAgency.id)?.role;
+            setCurrentAgency(firstAgency);
+            setAgencyRole(userRole || null);
+            localStorage.setItem('currentAgencyId', firstAgency.id);
+          }
+        }
+
+        // Success — break out of retry loop
+        isFetchingRef.current = false;
+        setLoading(false);
         return;
+      } catch (error) {
+        console.error(`[Agency] Attempt ${attempt} failed:`, error);
+        if (attempt < MAX_RETRIES) {
+          await delay(1000);
+        } else {
+          // All retries exhausted
+          console.error('[Agency] All retries failed, setting fetchError');
+          setFetchError(true);
+        }
       }
-      
-      setHasNoAgency(false);
-
-      // Set current agency (first one if not set)
-      if (!currentAgency) {
-        const firstAgency = agencies[0];
-        const userRole = agencyUsers?.find(au => au.agency_id === firstAgency.id)?.role;
-        setCurrentAgency(firstAgency);
-        setAgencyRole(userRole || null);
-        localStorage.setItem('currentAgencyId', firstAgency.id);
-      }
-    } catch (error) {
-      console.error('Error fetching agencies:', error);
-      toast.error('Erro ao carregar agências');
-    } finally {
-      isFetchingRef.current = false;
-      setLoading(false);
     }
+
+    isFetchingRef.current = false;
+    setLoading(false);
   };
 
   const switchAgency = async (agencyId: string) => {
@@ -282,6 +303,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         agencyRole,
         loading,
         hasNoAgency,
+        fetchError,
         switchAgency,
         createAgency,
         updateAgency,
