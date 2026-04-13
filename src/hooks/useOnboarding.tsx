@@ -28,12 +28,15 @@ interface OnboardingData {
   adminUser: AdminUser;
 }
 
+type OnboardingFlow = 'trial' | 'direct_monthly' | 'direct_annual' | 'default';
+
 interface OnboardingContextType {
   currentStep: number;
   totalSteps: number;
   onboardingData: Partial<OnboardingData>;
   loading: boolean;
   stepStartTime: number;
+  flow: OnboardingFlow;
   updateCompanyData: (data: CompanyData) => void;
   updatePlanSelection: (planSlug: string) => void;
   updateAdminUser: (data: AdminUser) => void;
@@ -46,8 +49,17 @@ interface OnboardingContextType {
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
-// Helper para obter nome da etapa
-const getStepName = (step: number): string => {
+// Step names vary depending on flow
+const getStepName = (step: number, flow: OnboardingFlow): string => {
+  if (flow === 'trial') {
+    // Trial: company_data -> admin_user -> confirmation (no plan selection)
+    const stepNames: Record<number, string> = {
+      1: 'company_data',
+      2: 'admin_user',
+      3: 'confirmation'
+    };
+    return stepNames[step] || 'unknown';
+  }
   const stepNames: Record<number, string> = {
     1: 'company_data',
     2: 'plan_selection',
@@ -57,13 +69,29 @@ const getStepName = (step: number): string => {
   return stepNames[step] || 'unknown';
 };
 
-export function OnboardingProvider({ children }: { children: ReactNode }) {
+interface OnboardingProviderProps {
+  children: ReactNode;
+  flow?: OnboardingFlow;
+}
+
+export function OnboardingProvider({ children, flow = 'default' }: OnboardingProviderProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [onboardingData, setOnboardingData] = useState<Partial<OnboardingData>>({});
   const [loading, setLoading] = useState(false);
   const [stepStartTime, setStepStartTime] = useState<number>(Date.now());
-  const totalSteps = 4;
+  
+  // Trial flow skips plan selection (3 steps instead of 4)
+  const totalSteps = flow === 'trial' ? 3 : 4;
   const hasTrackedAbandonment = useRef(false);
+
+  // For trial flow, auto-set plan to basic
+  useEffect(() => {
+    if (flow === 'trial') {
+      setOnboardingData(prev => ({ ...prev, planSlug: 'basic' }));
+    } else if (flow === 'direct_monthly' || flow === 'direct_annual') {
+      setOnboardingData(prev => ({ ...prev, planSlug: 'basic' }));
+    }
+  }, [flow]);
 
   // Rastrear abandono quando sai da página
   useEffect(() => {
@@ -73,7 +101,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       const timeSpent = Math.floor((Date.now() - stepStartTime) / 1000);
       trackOnboardingAbandoned({
         step: currentStep,
-        step_name: getStepName(currentStep),
+        step_name: getStepName(currentStep, flow),
         time_spent_seconds: timeSpent,
       });
       hasTrackedAbandonment.current = true;
@@ -81,7 +109,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [currentStep, stepStartTime]);
+  }, [currentStep, stepStartTime, flow]);
 
   const updateCompanyData = (data: CompanyData) => {
     setOnboardingData(prev => ({ ...prev, companyData: data }));
@@ -100,10 +128,9 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       const timeSpent = Math.floor((Date.now() - stepStartTime) / 1000);
       const nextStepNumber = currentStep + 1;
       
-      // Rastrear mudança de etapa
       trackOnboardingStep({
         step: nextStepNumber,
-        step_name: getStepName(nextStepNumber),
+        step_name: getStepName(nextStepNumber, flow),
         total_steps: totalSteps,
         time_on_previous_step: timeSpent,
       });
@@ -120,7 +147,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       
       trackOnboardingStep({
         step: prevStepNumber,
-        step_name: getStepName(prevStepNumber),
+        step_name: getStepName(prevStepNumber, flow),
         total_steps: totalSteps,
         time_on_previous_step: timeSpent,
       });
@@ -131,7 +158,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   };
 
   const initiateCheckout = async (planSlug: string): Promise<boolean> => {
-    // Validar dados completos
     if (!onboardingData.companyData || !onboardingData.adminUser) {
       toast.error('Complete os dados da empresa e do administrador primeiro');
       return false;
@@ -143,7 +169,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         body: {
           companyData: onboardingData.companyData,
           adminUser: onboardingData.adminUser,
-          planSlug
+          planSlug,
+          billingCycle: flow === 'direct_annual' ? 'yearly' : 'monthly'
         }
       });
       
@@ -156,7 +183,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         throw new Error('URL de checkout não retornada');
       }
       
-      // Salvar estado no sessionStorage para login posterior
       sessionStorage.setItem('onboarding_checkout', JSON.stringify({
         agencyId: data.agencyId,
         email: onboardingData.adminUser.email,
@@ -164,15 +190,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         planSlug: planSlug
       }));
       
-      // Disparar evento InitiateCheckout para Meta Pixel
       trackInitiateCheckout({
         content_name: planSlug,
         currency: 'BRL'
       });
       
       toast.success('Redirecionando para checkout...');
-      
-      // Abrir checkout em nova aba
       window.open(data.checkoutUrl, '_blank');
       
       return true;
@@ -189,6 +212,11 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     if (!onboardingData.companyData || !onboardingData.planSlug || !onboardingData.adminUser) {
       toast.error('Dados incompletos para finalizar o onboarding');
       return false;
+    }
+
+    // For direct flows, redirect to checkout instead of creating trial
+    if (flow === 'direct_monthly' || flow === 'direct_annual') {
+      return initiateCheckout(onboardingData.planSlug);
     }
 
     setLoading(true);
@@ -212,7 +240,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
       toast.success('Agência criada com sucesso! Trial de 7 dias iniciado.');
       
-      // Auto-login the newly created user
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: onboardingData.adminUser.email,
         password: onboardingData.adminUser.password
@@ -224,10 +251,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      // Marcar que não deve rastrear abandono (conversão bem sucedida)
       hasTrackedAbandonment.current = true;
       
-      // Disparar eventos para Meta Pixel após cadastro bem-sucedido
       trackCompleteRegistration({
         content_name: onboardingData.planSlug || 'basic',
         currency: 'BRL'
@@ -239,7 +264,6 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         currency: 'BRL'
       });
 
-      // After successful login, user will be redirected to Welcome page by its own useEffect
       return true;
     } catch (error: any) {
       console.error('Onboarding error:', error);
@@ -265,6 +289,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         onboardingData,
         loading,
         stepStartTime,
+        flow,
         updateCompanyData,
         updatePlanSelection,
         updateAdminUser,

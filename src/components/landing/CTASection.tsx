@@ -1,11 +1,15 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Shield } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, CalendarDays, Shield } from "lucide-react";
 
 interface CTASectionProps {
   onOpenApplication?: () => void;
+  onOpenScheduling?: () => void;
 }
 
-export function CTASection({ onOpenApplication }: CTASectionProps) {
+export function CTASection({ onOpenApplication, onOpenScheduling }: CTASectionProps) {
+  const navigate = useNavigate();
+
   return (
     <section className="py-20 bg-gradient-to-br from-[#1c102f] via-primary to-secondary">
       <div className="container mx-auto px-4">
@@ -15,7 +19,7 @@ export function CTASection({ onOpenApplication }: CTASectionProps) {
           </h2>
           
           <p className="text-xl text-primary-foreground/90 max-w-2xl mx-auto">
-            Junte-se a centenas de agências que já escalaram suas operações com nossa plataforma
+            Comece com 7 dias grátis ou agende uma apresentação personalizada com nosso time
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -23,17 +27,26 @@ export function CTASection({ onOpenApplication }: CTASectionProps) {
               size="lg" 
               variant="secondary"
               className="text-lg px-8 py-6 h-auto"
-              onClick={onOpenApplication}
+              onClick={() => navigate('/onboarding?flow=trial')}
             >
-              Aplicar para Consultoria
+              Começar Teste Grátis (7 Dias)
               <ArrowRight className="ml-2" />
+            </Button>
+            <Button 
+              size="lg" 
+              variant="outline"
+              className="text-lg px-8 py-6 h-auto border-white/30 text-primary-foreground hover:bg-white/10"
+              onClick={onOpenScheduling}
+            >
+              <CalendarDays className="mr-2" />
+              Agendar Apresentação
             </Button>
           </div>
 
           <div className="flex items-center justify-center gap-2 pt-4">
             <Shield className="w-5 h-5 text-primary-foreground/80" />
             <p className="text-primary-foreground/80">
-              Consultoria personalizada • Implantação assistida
+              Sem cartão de crédito • 7 dias grátis • Cancele a qualquer momento
             </p>
           </div>
 
@@ -43,8 +56,8 @@ export function CTASection({ onOpenApplication }: CTASectionProps) {
               <div className="text-sm">Agências ativas</div>
             </div>
             <div className="text-primary-foreground/90">
-              <div className="text-3xl font-bold mb-2">Sob Medida</div>
-              <div className="text-sm">Consultoria personalizada</div>
+              <div className="text-3xl font-bold mb-2">R$ 297</div>
+              <div className="text-sm">A partir de /mês</div>
             </div>
             <div className="text-primary-foreground/90">
               <div className="text-3xl font-bold mb-2">4.9/5</div>

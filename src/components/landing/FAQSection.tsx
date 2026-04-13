@@ -5,16 +5,21 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, MessageCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, MessageCircle, CalendarDays } from "lucide-react";
 
 const faqs = [
   {
-    question: "Como funciona o processo de consultoria?",
-    answer: "Após preencher a aplicação, nossa equipe analisa o perfil da sua agência e entra em contato via WhatsApp para agendar uma demonstração personalizada. Na call, desenhamos juntos a melhor solução para sua operação."
+    question: "Quanto custa o Orbity?",
+    answer: "O Orbity custa R$ 397/mês no plano mensal ou R$ 297/mês no plano anual (cobrado anualmente por R$ 3.564). Todos os módulos estão inclusos em ambos os planos."
   },
   {
-    question: "Por que o Orbity não tem preço fixo no site?",
-    answer: "Cada agência tem necessidades únicas. O investimento é calculado com base no número de clientes, usuários e módulos necessários, garantindo que você pague apenas pelo que realmente precisa."
+    question: "O teste grátis precisa de cartão de crédito?",
+    answer: "Não! Você pode testar o Orbity por 7 dias gratuitamente sem precisar cadastrar nenhum cartão de crédito. Após os 7 dias, basta escolher seu plano para continuar."
+  },
+  {
+    question: "O que acontece quando o trial acaba?",
+    answer: "Após os 7 dias de teste, o acesso ao sistema é pausado até que você escolha um plano. Todos os seus dados ficam salvos e disponíveis assim que você assinar."
   },
   {
     question: "Vocês têm integração com outras ferramentas?",
@@ -29,16 +34,19 @@ const faqs = [
     answer: "Absolutamente! Utilizamos criptografia SSL, backups diários automáticos, e nossos servidores seguem as normas LGPD. Seus dados estão seguros e são de sua propriedade."
   },
   {
-    question: "Vocês ajudam na migração de dados?",
-    answer: "Sim! Nossa equipe cuida de toda a migração de dados de planilhas e outras ferramentas, garantindo uma transição suave e sem perda de informações."
+    question: "Posso cancelar a qualquer momento?",
+    answer: "Sim! No plano mensal, você pode cancelar a qualquer momento sem multa. No plano anual, o cancelamento encerra a renovação automática ao final do período contratado."
   }
 ];
 
 interface FAQSectionProps {
   onOpenApplication?: () => void;
+  onOpenScheduling?: () => void;
 }
 
-export function FAQSection({ onOpenApplication }: FAQSectionProps) {
+export function FAQSection({ onOpenApplication, onOpenScheduling }: FAQSectionProps) {
+  const navigate = useNavigate();
+
   const openWhatsApp = () => {
     const phoneNumber = "551631841908";
     const message = "Olá! Tenho uma dúvida sobre a Orbity.";
@@ -67,9 +75,13 @@ export function FAQSection({ onOpenApplication }: FAQSectionProps) {
         <div className="text-center mt-12">
           <p className="text-muted-foreground mb-4">Ainda tem dúvidas? Fale conosco!</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-[#1c102f] hover:bg-[#1c102f]/90 text-white" onClick={onOpenApplication}>
-              Aplicar para Consultoria
+            <Button size="lg" className="bg-[#1c102f] hover:bg-[#1c102f]/90 text-white" onClick={() => navigate('/onboarding?flow=trial')}>
+              Começar Teste Grátis
               <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+            <Button size="lg" variant="outline" onClick={onOpenScheduling}>
+              <CalendarDays className="mr-2 h-5 w-5" />
+              Agendar Apresentação
             </Button>
             <Button size="lg" variant="outline" onClick={openWhatsApp}>
               Falar no WhatsApp

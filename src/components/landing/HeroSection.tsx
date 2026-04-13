@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, LayoutDashboard, Users, TrendingUp, CheckSquare } from "lucide-react";
+import { ArrowRight, CalendarDays, LayoutDashboard, Users, TrendingUp, CheckSquare } from "lucide-react";
 import { AgencyLogos } from "./AgencyLogos";
 import { motion } from "framer-motion";
 
@@ -18,9 +18,10 @@ const wordVariants = {
 
 interface HeroSectionProps {
   onOpenApplication?: () => void;
+  onOpenScheduling?: () => void;
 }
 
-export function HeroSection({ onOpenApplication }: HeroSectionProps) {
+export function HeroSection({ onOpenApplication, onOpenScheduling }: HeroSectionProps) {
   const navigate = useNavigate();
 
   return (
@@ -28,7 +29,7 @@ export function HeroSection({ onOpenApplication }: HeroSectionProps) {
       <div className="container mx-auto px-4">
         <div className="flex flex-col items-center text-center max-w-5xl mx-auto space-y-8">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="inline-block px-4 py-2 bg-[#1c102f]/15 rounded-full border border-[#1c102f]/30">
-            <span className="text-sm font-medium text-[#1c102f] dark:text-violet-300">✨ A Plataforma Completa para Agências</span>
+            <span className="text-sm font-medium text-[#1c102f] dark:text-violet-300">✨ 7 Dias Grátis • Sem Cartão de Crédito</span>
           </motion.div>
 
           <motion.h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-tight" variants={containerVariants} initial="hidden" animate="visible">
@@ -44,12 +45,13 @@ export function HeroSection({ onOpenApplication }: HeroSectionProps) {
           </motion.p>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1, duration: 0.5 }} className="flex flex-col sm:flex-row gap-4">
-            <Button size="lg" className="text-lg bg-[#1c102f] hover:bg-[#1c102f]/90 text-white" onClick={onOpenApplication}>
-              Aplicar para Consultoria
+            <Button size="lg" className="text-lg bg-[#1c102f] hover:bg-[#1c102f]/90 text-white" onClick={() => navigate('/onboarding?flow=trial')}>
+              Começar Teste Grátis
               <ArrowRight className="ml-2" />
             </Button>
-            <Button size="lg" variant="outline" className="text-lg border-[#1c102f]/30 hover:bg-[#1c102f]/10 hover:border-[#1c102f]/50" onClick={() => navigate("/auth")}>
-              Já tenho conta
+            <Button size="lg" variant="outline" className="text-lg border-[#1c102f]/30 hover:bg-[#1c102f]/10 hover:border-[#1c102f]/50" onClick={onOpenScheduling}>
+              <CalendarDays className="mr-2 h-5 w-5" />
+              Agendar Apresentação
             </Button>
           </motion.div>
 
