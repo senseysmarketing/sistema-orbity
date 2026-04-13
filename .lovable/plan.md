@@ -1,76 +1,70 @@
 
 
-# Fix: Sistema travado no loading (PaymentMiddleware)
+# Fix: Logout Travado + Guard no onAuthStateChange
 
-## Problema raiz
+## Resumo
 
-O `PaymentMiddlewareWrapper` envolve todo o conteudo do dashboard. Ele mostra um spinner enquanto `loading === true`. O hook `usePaymentMiddleware` chama `supabase.rpc('is_agency_subscription_valid')` que esta travando ou falhando:
-
-- Se o RPC **trava** (timeout do Supabase): `loading` fica `true` para sempre → spinner infinito
-- Se o RPC **falha** (erro): o catch define `isValid: false, isBlocked: true` → tela bloqueada
-
-Ambos os cenarios impedem o usuario de acessar o sistema. A politica atual e **fail-closed** (bloquear em caso de erro), que causa falsos positivos.
+Corrigir logout que trava quando Supabase nao responde, adicionar guard no `onAuthStateChange` para SIGNED_OUT, e garantir staleTime adequado. O usuario tambem vai expandir o storage do Supabase por conta propria (causa raiz dos 504s).
 
 ## Alteracoes
 
-### 1. `src/hooks/usePaymentMiddleware.tsx` — Fail-open + timeout
+### 1. `src/hooks/useAuth.tsx` — signOut com Promise.race (3s timeout)
 
-**Erro deve liberar acesso** (fail-open): No `catch` block (linhas 95-103), mudar para `isValid: true, isBlocked: false` em vez de bloquear. Erros de rede nao devem impedir usuarios legítimos.
+Refatorar `signOut` (linhas 297-322):
+- Primeiro: executar `supabase.auth.signOut({ scope: 'local' })` dentro de `Promise.race` com timeout de 3s
+- O SDK limpa localStorage/cookies sincronamente antes da chamada de rede
+- Se timeout: catch assume, limpa estado React residual
+- Depois do Promise.race (success ou timeout): limpar states locais e fazer `window.location.replace('/auth')`
+- NAO redirecionar antes do signOut (evita loop de reautenticacao)
 
-**Timeout de seguranca**: Adicionar um `setTimeout` de 10 segundos que força `setLoading(false)` com status valido, caso o RPC nao responda. Cancelar o timeout quando a resposta chegar.
+### 2. `src/hooks/useAuth.tsx` — Guard no onAuthStateChange
 
-**Guard contra chamadas sem agencia**: Se `currentAgency` for null no momento do check, definir `paymentStatus` como valido por padrao e `loading: false` imediatamente (nao travar esperando).
+No listener `onAuthStateChange` (linhas 117-191), adicionar early return no topo:
 
-### 2. `src/components/payment/PaymentMiddlewareWrapper.tsx` — Timeout de fallback
+```
+if (event === 'SIGNED_OUT' || !newSession) {
+  currentUserIdRef.current = null;
+  sessionRef.current = null;
+  setUser(null);
+  setSession(null);
+  setProfile(null);
+  setLoading(false);
+  return; // JAMAIS fazer fetch de profile
+}
+```
 
-Adicionar um `useEffect` com timeout de 15 segundos: se `loading` continuar true, forcar renderizacao dos children com um `console.warn`. Isso e uma rede de seguranca caso o hook falhe silenciosamente.
+Isso substitui a logica atual que tenta processar SIGNED_OUT junto com SIGNED_IN (linha 162).
 
-### 3. `src/hooks/usePaymentMiddleware.tsx` — Logging melhorado
+### 3. `src/hooks/useAgency.tsx` — Guard contra fetch pos-logout
 
-Adicionar `console.log` nos pontos criticos:
-- Inicio do check (`[PaymentMiddleware] Checking...`)
-- Resultado do RPC
-- Erro capturado
-- Timeout atingido
+Na funcao `fetchUserAgencies` (linha 74), apos o await do Supabase (linha 92), verificar se `user` ainda existe antes de processar resultado. Se user ficou null durante o fetch, descartar e retornar.
 
-Isso permite diagnosticar problemas futuros nos logs.
+### 4. staleTime — Ja configurado
+
+O `staleTime` global de 5 minutos ja esta definido em `src/App.tsx` (linha 51). Nenhuma alteracao necessaria.
 
 ## Detalhes tecnicos
 
 ```text
-checkPaymentStatus():
-  if (!user || !currentAgency) → setLoading(false), return (VALIDO por padrao)
-  
-  timeoutId = setTimeout(15s) → force loading=false, isValid=true
-  
+signOut():
   try:
-    rpc('is_agency_subscription_valid')
-    clearTimeout(timeoutId)
-    process result normally
+    await Promise.race([
+      supabase.auth.signOut({ scope: 'local' }),
+      new Promise((_, reject) => setTimeout(() => reject('timeout'), 3000))
+    ])
   catch:
-    clearTimeout(timeoutId)
-    isValid = TRUE  ← FAIL-OPEN (antes era false)
-    log error para diagnostico
+    console.warn('[Auth] signOut timeout or error')
   finally:
-    setLoading(false)
-```
-
-PaymentMiddlewareWrapper:
-```text
-useEffect:
-  if loading:
-    timeout = 15s → setForceAllow(true), console.warn
-  cleanup: clearTimeout
-
-render:
-  if loading && !forceAllow → spinner
-  if forceAllow → children (bypass)
+    // Limpar estado React
+    setUser(null), setSession(null), setProfile(null)
+    currentUserIdRef.current = null
+    window.location.replace('/auth')
 ```
 
 ## Arquivos modificados
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/hooks/usePaymentMiddleware.tsx` | Fail-open no catch, timeout de seguranca, logging |
-| `src/components/payment/PaymentMiddlewareWrapper.tsx` | Timeout fallback de 15s |
+| `src/hooks/useAuth.tsx` | signOut com Promise.race 3s, guard SIGNED_OUT no onAuthStateChange |
+| `src/hooks/useAgency.tsx` | Guard contra fetch quando user e null pos-logout |
 
