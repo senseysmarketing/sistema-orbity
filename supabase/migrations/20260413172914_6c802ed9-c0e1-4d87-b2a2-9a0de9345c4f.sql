@@ -1,0 +1,1 @@
+UPDATE public.subscription_plans SET price_monthly = 397.00, price_yearly = 3564.00 WHERE slug = 'basic';
