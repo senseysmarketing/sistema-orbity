@@ -33,6 +33,7 @@ interface SubscriptionStatus {
   subscription_end?: string;
   customer_id?: string;
   subscription_id?: string;
+  trial_end?: string;
 }
 
 interface SubscriptionContextType {
