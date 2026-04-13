@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { OnboardingProvider, useOnboarding } from '@/hooks/useOnboarding';
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
 import { CompanyDataStep } from '@/components/onboarding/CompanyDataStep';
@@ -110,6 +110,7 @@ function OnboardingContent() {
 
 export default function Onboarding() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   
   const flow = useMemo(() => {
     const flowParam = searchParams.get('flow');
@@ -118,6 +119,13 @@ export default function Onboarding() {
     }
     return 'default' as const;
   }, [searchParams]);
+
+  // Redirect invalid/missing flow to trial (prevents access to legacy PlanSelectionStep)
+  useEffect(() => {
+    if (flow === 'default') {
+      navigate('/onboarding?flow=trial', { replace: true });
+    }
+  }, [flow, navigate]);
 
   return (
     <OnboardingProvider flow={flow}>

@@ -11,7 +11,9 @@ import {
   Building2, 
   User, 
   Calendar,
-  Shield
+  Shield,
+  CreditCard,
+  TrendingDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { trackViewContent } from '@/lib/metaPixel';
@@ -21,50 +23,62 @@ export function ConfirmationStep() {
     onboardingData, 
     submitOnboarding, 
     prevStep, 
-    loading 
+    loading,
+    flow
   } = useOnboarding();
   const navigate = useNavigate();
   const hasTrackedView = useRef(false);
 
-  // Rastrear visualização da etapa de confirmação
   useEffect(() => {
-    if (!hasTrackedView.current && onboardingData.planSlug) {
+    if (!hasTrackedView.current) {
+      const value = flow === 'direct_annual' ? 297 : flow === 'direct_monthly' ? 397 : 0;
       trackViewContent({
         content_name: 'Onboarding Confirmation',
-        content_category: 'Onboarding Final Review',
-        content_ids: [onboardingData.planSlug],
-        value: getPlanInfo(onboardingData.planSlug).price,
+        content_category: `Onboarding - ${flow}`,
+        content_ids: [onboardingData.planSlug || 'orbity_trial'],
+        value,
       });
       hasTrackedView.current = true;
     }
-  }, [onboardingData.planSlug]);
+  }, [flow, onboardingData.planSlug]);
 
   const handleSubmit = async () => {
     const success = await submitOnboarding();
-    if (success) {
-      // Navigate to welcome page for guided tour after successful onboarding
+    if (success && flow === 'trial') {
       navigate('/welcome');
+    }
+    // direct flows: redirect handled by initiateCheckout (window.open to checkout URL)
+  };
+
+  const getPlanDisplay = () => {
+    switch (flow) {
+      case 'direct_monthly':
+        return {
+          title: 'Orbity Mensal - Acesso Completo',
+          price: 'R$ 397,00/mês',
+          badge: <Badge variant="secondary" className="bg-blue-100 text-blue-800">Faturamento Mensal</Badge>,
+          showTrial: false,
+        };
+      case 'direct_annual':
+        return {
+          title: 'Orbity Anual - Acesso Completo',
+          price: '12x R$ 297,00',
+          badge: <Badge variant="secondary" className="bg-green-100 text-green-800"><TrendingDown className="h-3 w-3 mr-1" />Economia de R$ 1.200 ao ano</Badge>,
+          showTrial: false,
+        };
+      case 'trial':
+      default:
+        return {
+          title: 'Orbity - Acesso Completo',
+          price: 'Definido após o teste',
+          badge: null,
+          showTrial: true,
+        };
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
-  };
-
-  // Get plan details (for display purposes)
-  const getPlanInfo = (slug: string) => {
-    const plans = {
-      basic: { name: 'Básico', price: 97 },
-      professional: { name: 'Profissional', price: 197 },
-      enterprise: { name: 'Enterprise', price: 597 }
-    };
-    return plans[slug as keyof typeof plans] || { name: slug, price: 0 };
-  };
-
-  const planInfo = getPlanInfo(onboardingData.planSlug || '');
+  const planDisplay = getPlanDisplay();
+  const isDirect = flow === 'direct_monthly' || flow === 'direct_annual';
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
@@ -74,7 +88,7 @@ export function ConfirmationStep() {
         </div>
         <CardTitle className="text-2xl">Confirme os Dados</CardTitle>
         <p className="text-muted-foreground">
-          Revise as informações antes de criar sua agência
+          Revise as informações antes de {isDirect ? 'prosseguir para o pagamento' : 'criar sua agência'}
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -120,17 +134,26 @@ export function ConfirmationStep() {
           </div>
           <div className="bg-muted/50 rounded-lg p-4 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-medium">{planInfo.name}</span>
-              <Badge variant="secondary">
-                {formatCurrency(planInfo.price)}/mês
-              </Badge>
+              <span className="font-medium">{planDisplay.title}</span>
+              {isDirect ? (
+                <Badge variant="secondary">{planDisplay.price}</Badge>
+              ) : (
+                <span className="text-sm text-muted-foreground italic">{planDisplay.price}</span>
+              )}
             </div>
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-600 font-medium">
-                7 dias de trial gratuito
-              </span>
-            </div>
+            {planDisplay.badge && (
+              <div className="flex items-center">
+                {planDisplay.badge}
+              </div>
+            )}
+            {planDisplay.showTrial && (
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-4 w-4 text-green-600" />
+                <span className="text-sm text-green-600 font-medium">
+                  7 dias de trial gratuito
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -158,19 +181,32 @@ export function ConfirmationStep() {
         </div>
 
         {/* What happens next */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className={`${isDirect ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'} border rounded-lg p-4`}>
           <div className="flex items-start space-x-3">
-            <Rocket className="h-5 w-5 text-blue-600 mt-0.5" />
+            {isDirect ? (
+              <CreditCard className="h-5 w-5 text-blue-600 mt-0.5" />
+            ) : (
+              <Rocket className="h-5 w-5 text-green-600 mt-0.5" />
+            )}
             <div className="space-y-2">
-              <h4 className="text-sm font-medium text-blue-900">
+              <h4 className={`text-sm font-medium ${isDirect ? 'text-blue-900' : 'text-green-900'}`}>
                 O que acontece agora?
               </h4>
-              <ul className="text-xs text-blue-700 space-y-1">
-                <li>• Sua agência será criada automaticamente</li>
-                <li>• O período de trial de 7 dias será iniciado</li>
-                <li>• Você fará login automaticamente como administrador</li>
-                <li>• Poderá começar a usar todas as funcionalidades imediatamente</li>
-              </ul>
+              {isDirect ? (
+                <ul className="text-xs text-blue-700 space-y-1">
+                  <li>• Sua agência será criada automaticamente</li>
+                  <li>• Você será direcionado para o pagamento seguro</li>
+                  <li>• Seu acesso será liberado imediatamente após a confirmação</li>
+                  <li>• Poderá começar a usar todas as funcionalidades na hora</li>
+                </ul>
+              ) : (
+                <ul className="text-xs text-green-700 space-y-1">
+                  <li>• Sua agência será criada automaticamente</li>
+                  <li>• O período de trial de 7 dias será iniciado</li>
+                  <li>• Você fará login automaticamente como administrador</li>
+                  <li>• Após o teste, escolha o plano ideal para continuar</li>
+                </ul>
+              )}
             </div>
           </div>
         </div>
@@ -184,12 +220,17 @@ export function ConfirmationStep() {
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Criando Agência...
+                {isDirect ? 'Processando...' : 'Criando Agência...'}
+              </>
+            ) : isDirect ? (
+              <>
+                <CreditCard className="mr-2 h-4 w-4" />
+                Ir para Pagamento
               </>
             ) : (
               <>
                 <Rocket className="mr-2 h-4 w-4" />
-                Criar Agência
+                Criar Agência e Iniciar Trial
               </>
             )}
           </Button>
