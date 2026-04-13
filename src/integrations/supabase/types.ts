@@ -4153,13 +4153,17 @@ export type Database = {
       orbity_leads: {
         Row: {
           active_clients: string | null
+          agency_name: string | null
           avg_ticket: string | null
           created_at: string | null
           email: string
           id: string
           instagram: string | null
+          lead_source: string | null
           name: string
           notes: string | null
+          phone: string | null
+          scheduled_at: string | null
           status: string
           team_size: string | null
           updated_at: string | null
@@ -4167,13 +4171,17 @@ export type Database = {
         }
         Insert: {
           active_clients?: string | null
+          agency_name?: string | null
           avg_ticket?: string | null
           created_at?: string | null
           email: string
           id?: string
           instagram?: string | null
+          lead_source?: string | null
           name: string
           notes?: string | null
+          phone?: string | null
+          scheduled_at?: string | null
           status?: string
           team_size?: string | null
           updated_at?: string | null
@@ -4181,13 +4189,17 @@ export type Database = {
         }
         Update: {
           active_clients?: string | null
+          agency_name?: string | null
           avg_ticket?: string | null
           created_at?: string | null
           email?: string
           id?: string
           instagram?: string | null
+          lead_source?: string | null
           name?: string
           notes?: string | null
+          phone?: string | null
+          scheduled_at?: string | null
           status?: string
           team_size?: string | null
           updated_at?: string | null
