@@ -1,54 +1,43 @@
 
 
-# Fix: Leads "won" com won_at NULL não contabilizados
+# Fix: Suspensao de Agencia + Tela de Acesso Suspenso
 
-## Diagnóstico
+## Problema 1: Suspensao nao funciona
+A funcao `suspendAgency` faz `supabase.from('agencies').update({ is_active: false })`. A RLS policy de UPDATE usa `is_master_user()` que verifica `profiles.role = 'administrador'`. Porem o admin master e identificado via `is_master_agency_admin()` (tabela `agency_users`). Se o perfil nao tem `role = 'administrador'`, a RLS bloqueia silenciosamente (0 rows, sem erro), e o toast mostra sucesso falso.
 
-O lead **Diego Minichillo** tem `status = 'won'` mas `won_at = NULL`. O dashboard filtra vendas por `won_at` dentro do período selecionado (linha 111: `if (!wonAt) return false`), então leads sem `won_at` são silenciosamente ignorados.
+## Problema 2: Tela de suspensao
+A `BlockedAccessScreen` atual ja detecta `agencySuspended` mas mostra a mesma tela generica. Precisa de uma tela dedicada para suspensao administrativa.
 
-O trigger `set_lead_won_at_trigger` existe e está ativo, mas por algum motivo não disparou para esse lead (possivelmente inserido já com status `won` em vez de atualizado para `won`, já que o trigger é `BEFORE UPDATE` apenas).
+## Correcoes
 
-## Correções
-
-### 1. Migration: Preencher won_at para leads órfãos
+### 1. Migration: Adicionar RLS policy correta
 ```sql
-UPDATE leads 
-SET won_at = COALESCE(status_changed_at, updated_at, NOW()) 
-WHERE status = 'won' AND won_at IS NULL;
+CREATE POLICY "Master agency admins can update all agencies"
+ON public.agencies FOR UPDATE
+USING (public.is_master_agency_admin())
+WITH CHECK (public.is_master_agency_admin());
 ```
 
-### 2. Migration: Adicionar trigger de INSERT
-O trigger atual só cobre `BEFORE UPDATE`. Se um lead for inserido diretamente com `status = 'won'` (ex: via Manual), o `won_at` fica NULL. Adicionar cobertura para INSERT:
-```sql
-CREATE OR REPLACE FUNCTION set_lead_won_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.status = 'won' AND (OLD IS NULL OR OLD.status IS DISTINCT FROM 'won') THEN
-    NEW.won_at := NOW();
-  ELSIF NEW.status != 'won' THEN
-    NEW.won_at := NULL;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+### 2. `useMaster.tsx`: Validar resultado do update
+Apos o `.update()`, verificar se houve rows afetadas. Se `count === 0` e sem erro, mostrar toast de erro informando que a operacao nao teve efeito.
 
-DROP TRIGGER IF EXISTS set_lead_won_at_trigger ON leads;
-CREATE TRIGGER set_lead_won_at_trigger
-  BEFORE INSERT OR UPDATE ON leads
-  FOR EACH ROW EXECUTE FUNCTION set_lead_won_at();
-```
+### 3. `PaymentMiddlewareWrapper.tsx`: Diferenciar suspensao de bloqueio financeiro
+Passar prop `reason` para `BlockedAccessScreen` indicando se e suspensao administrativa vs inadimplencia.
 
-### 3. CRMDashboard.tsx: Fallback defensivo
-Na linha 111, em vez de descartar leads com `won_at` NULL, usar fallback:
-```ts
-const wonAt = l.won_at ? new Date(l.won_at) : (l.status_changed_at ? new Date(l.status_changed_at) : null);
-```
-Isso garante que mesmo se o trigger falhar no futuro, o dashboard ainda contabiliza a venda.
+### 4. `BlockedAccessScreen.tsx`: Tela dedicada para suspensao
+Quando `reason === 'suspended'`:
+- Icone de Ban (vermelho)
+- Titulo: "Acesso Suspenso pelo Administrador"
+- Mensagem: "O acesso da sua agencia foi suspenso. Entre em contato com o suporte para mais informacoes."
+- Botoes: WhatsApp suporte + Sair da conta
+- Sem botao de pagamento ou retry
 
 ## Arquivos modificados
 
-| Arquivo | Alteração |
+| Arquivo | Alteracao |
 |---------|-----------|
-| Migration SQL | Fix dados órfãos + trigger INSERT |
-| `src/components/crm/CRMDashboard.tsx` | Fallback `won_at → status_changed_at` |
+| Migration SQL | Nova RLS policy com `is_master_agency_admin()` |
+| `src/hooks/useMaster.tsx` | Validar count do update |
+| `src/components/payment/PaymentMiddlewareWrapper.tsx` | Passar reason para BlockedAccessScreen |
+| `src/components/payment/BlockedAccessScreen.tsx` | Tela dedicada para suspensao |
 
