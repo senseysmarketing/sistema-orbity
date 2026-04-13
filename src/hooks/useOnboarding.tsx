@@ -84,12 +84,14 @@ export function OnboardingProvider({ children, flow = 'default' }: OnboardingPro
   const totalSteps = flow === 'trial' ? 3 : 4;
   const hasTrackedAbandonment = useRef(false);
 
-  // For trial flow, auto-set plan to basic
+  // Set plan slug based on flow
   useEffect(() => {
     if (flow === 'trial') {
-      setOnboardingData(prev => ({ ...prev, planSlug: 'basic' }));
-    } else if (flow === 'direct_monthly' || flow === 'direct_annual') {
-      setOnboardingData(prev => ({ ...prev, planSlug: 'basic' }));
+      setOnboardingData(prev => ({ ...prev, planSlug: 'orbity_trial' }));
+    } else if (flow === 'direct_monthly') {
+      setOnboardingData(prev => ({ ...prev, planSlug: 'orbity_monthly' }));
+    } else if (flow === 'direct_annual') {
+      setOnboardingData(prev => ({ ...prev, planSlug: 'orbity_annual' }));
     }
   }, [flow]);
 
@@ -254,12 +256,12 @@ export function OnboardingProvider({ children, flow = 'default' }: OnboardingPro
       hasTrackedAbandonment.current = true;
       
       trackCompleteRegistration({
-        content_name: onboardingData.planSlug || 'basic',
+        content_name: onboardingData.planSlug || 'orbity_trial',
         currency: 'BRL'
       });
       
       trackLead({
-        content_name: onboardingData.planSlug || 'basic',
+        content_name: onboardingData.planSlug || 'orbity_trial',
         content_category: 'Agency Onboarding',
         currency: 'BRL'
       });

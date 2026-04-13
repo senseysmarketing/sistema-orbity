@@ -34,8 +34,8 @@ serve(async (req) => {
 
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { companyData, adminUser, planSlug } = await req.json();
-    logStep("Request received", { planSlug });
+    const { companyData, adminUser, planSlug, billingCycle } = await req.json();
+    logStep("Request received", { planSlug, billingCycle });
 
     if (!companyData || !adminUser || !planSlug) {
       throw new Error("Missing required data: companyData, adminUser, or planSlug");
@@ -150,12 +150,21 @@ serve(async (req) => {
       logStep("Existing Stripe customer found", { customerId });
     }
 
+    // Use yearly price if available and billing cycle is yearly, otherwise monthly
+    const priceId = (billingCycle === 'yearly' && planData.stripe_price_id_yearly) 
+      ? planData.stripe_price_id_yearly 
+      : planData.stripe_price_id_monthly;
+
+    if (!priceId) {
+      throw new Error(`No Stripe price ID found for plan ${planSlug} with billing cycle ${billingCycle || 'monthly'}`);
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : adminUser.email,
       line_items: [
         {
-          price: planData.stripe_price_id_monthly,
+          price: priceId,
           quantity: 1,
         },
       ],
