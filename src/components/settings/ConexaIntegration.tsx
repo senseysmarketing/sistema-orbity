@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,16 +15,15 @@ export function ConexaIntegration() {
   const { toast } = useToast();
 
   const [apiKey, setApiKey] = useState("");
-  const [token, setToken] = useState("");
   const [gatewayActive, setGatewayActive] = useState(false);
   const [showKey, setShowKey] = useState(false);
-  const [showToken, setShowToken] = useState(false);
+  const initialized = useRef(false);
 
   useEffect(() => {
-    if (settings) {
+    if (settings && !initialized.current) {
       setApiKey(settings.conexa_api_key || "");
-      setToken(settings.conexa_token || "");
       setGatewayActive(settings.conexa_enabled ?? false);
+      initialized.current = true;
     }
   }, [settings]);
 
@@ -32,7 +31,6 @@ export function ConexaIntegration() {
     try {
       await updateSettings({
         conexa_api_key: apiKey || null,
-        conexa_token: token || null,
         conexa_enabled: gatewayActive,
       });
       toast({ title: "Configurações salvas!", description: gatewayActive ? "Conexa habilitado como gateway." : "Conexa desabilitado." });
@@ -41,7 +39,7 @@ export function ConexaIntegration() {
     }
   };
 
-  const hasCredentials = !!apiKey.trim() || !!token.trim();
+  const hasCredentials = !!apiKey.trim();
 
   if (isLoading) {
     return (
@@ -63,7 +61,7 @@ export function ConexaIntegration() {
             </div>
             <div>
               <CardTitle className="text-base">Conexa</CardTitle>
-              <CardDescription className="text-xs">Gateway de pagamentos (PIX/Boleto)</CardDescription>
+              <CardDescription className="text-xs">Sistema de gestão financeira (PIX/Boleto/Cartão)</CardDescription>
             </div>
           </div>
           <Badge variant={hasCredentials && gatewayActive ? "default" : "secondary"} className={hasCredentials && gatewayActive ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 hover:bg-blue-100" : ""}>
@@ -92,16 +90,19 @@ export function ConexaIntegration() {
 
         <Separator />
 
-        {/* API Key */}
+        {/* Token de Acesso */}
         <div className="space-y-2">
-          <Label htmlFor="conexa-key">API Key</Label>
+          <Label htmlFor="conexa-token">Token de Acesso (Conexa)</Label>
+          <p className="text-xs text-muted-foreground">
+            Gere em Config &gt; Integrações &gt; API/Token no painel do Conexa
+          </p>
           <div className="relative">
             <Input
-              id="conexa-key"
+              id="conexa-token"
               type={showKey ? "text" : "password"}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Sua API Key do Conexa"
+              placeholder="Cole seu Application Token aqui"
               className="pr-10"
             />
             <Button
@@ -112,30 +113,6 @@ export function ConexaIntegration() {
               onClick={() => setShowKey(!showKey)}
             >
               {showKey ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-            </Button>
-          </div>
-        </div>
-
-        {/* Token */}
-        <div className="space-y-2">
-          <Label htmlFor="conexa-token">Token</Label>
-          <div className="relative">
-            <Input
-              id="conexa-token"
-              type={showToken ? "text" : "password"}
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="Seu Token do Conexa"
-              className="pr-10"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-              onClick={() => setShowToken(!showToken)}
-            >
-              {showToken ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
             </Button>
           </div>
         </div>
