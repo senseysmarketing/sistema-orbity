@@ -1,50 +1,60 @@
 
 
-# Refatorar Card de Assinatura com Travas de Seguranca
+# Fix Race Condition: Falso Positivo na Tela de Bloqueio (com refinamentos)
 
 ## Resumo
 
-Corrigir bug do "0", adicionar suporte a `trialing`, cronometro de trial com fallback seguro, CTA de upgrade, e refatorar o dialog de planos para exibir apenas Orbity Mensal/Anual.
+Corrigir race condition onde usuarios ativos caem na tela de bloqueio por falha de rede ou timing de auth. Inclui retry automatico, feedback de erro distinto, e botao de soft refresh.
 
 ## Alteracoes
 
-### 1. `src/hooks/useSubscription.tsx`
+### 1. `src/hooks/useAgency.tsx`
 
-Adicionar `trial_end?: string` a interface `SubscriptionStatus` (linha 28-36). O campo ja e retornado pelo edge function `check-subscription` como `trial_end` (confirmado no codigo).
+**Trava de autenticacao**: O guard `if (!user) return` ja existe (linha 71), mas o `useEffect` (linha ~200) depende de `user?.id`. Reforcar garantindo que `setLoading(false)` so ocorre apos tentativa real.
 
-### 2. `src/components/subscription/SubscriptionDetails.tsx`
+**Retry com 3 tentativas**:
+- Substituir o bloco try/catch de `fetchUserAgencies` por um loop de 3 tentativas com delay de 1s entre cada
+- No `catch` final (apos 3 falhas): setar `fetchError = true`, NAO setar `hasNoAgency = true`
+- Resetar `fetchError = false` no inicio de cada chamada
 
-- **Bug do "0"**: Linha ~119, trocar `{currentAgency?.monthly_value && (` por `{(currentAgency?.monthly_value ?? 0) > 0 && (`
-- **Badges**: Adicionar caso `trialing` → Badge azul "Periodo de Teste (Ativo)"; `past_due` → vermelho "Pagamento Atrasado"; `canceled` → cinza "Inativo"
-- **Cronometro**: Se `trialing`, exibir "Valido ate [data]" + "Faltam X dias" usando `Math.max(0, differenceInDays(...))`. Se 0 dias, exibir "Expira hoje"
-- **CTA**: Se `trialing`/`past_due`/`canceled`, adicionar Separator + texto motivacional + botao "Escolher Plano e Assinar" que abre `ManageSubscriptionDialog`
-- Expandir `isSubscriptionActive` para incluir `trialing`
+**Novo estado e export**:
+- Adicionar `const [fetchError, setFetchError] = useState(false)` 
+- Expor `fetchError` no contexto e na interface `AgencyContextType`
 
-### 3. `src/components/subscription/SubscriptionStatus.tsx`
+### 2. `src/components/layout/AppLayout.tsx`
 
-Mesmas correcoes de badges para `trialing`, `past_due`, `canceled`.
+- Importar `fetchError` do `useAgency()`
+- Apos o check de auth (`!user`), adicionar:
+  ```
+  if (fetchError) return <ConnectionErrorScreen onRetry={refreshAgencies} />;
+  ```
+- Alterar linha 41 para `if (hasNoAgency)` — remover `userAgencies.length === 0` redundante (confiar apenas em `hasNoAgency` que so e setado apos query bem-sucedida)
 
-### 4. `src/components/subscription/ManageSubscriptionDialog.tsx`
+### 3. `src/components/agency/NoAgencyScreen.tsx`
 
-Refatoracao critica:
-- Filtrar `plans` para exibir APENAS slugs `orbity_monthly` e `orbity_annual` (remover planos legados)
-- Exibir cards com: "Orbity Mensal R$ 397/mes" e "Orbity Anual R$ 297/mes (cobrado anualmente R$ 3.564)"
-- O botao de checkout deve usar `stripe_price_id_monthly` para mensal e `stripe_price_id_yearly` para anual
-- Remover mencoes a planos Basic/Professional/Enterprise/Senseys
+- Importar `useAgency` para acessar `refreshAgencies`
+- Adicionar estado local `retrying` para feedback visual
+- Botao "Tentar Novamente" (variant="outline"):
+  - Primeiro tenta `refreshAgencies()` (soft refresh)
+  - Se apos o refresh `hasNoAgency` ainda for true, faz `window.location.reload()` como fallback
+- Manter botao "Sair" existente
 
-## Detalhes tecnicos
+### 4. Novo: `src/components/agency/ConnectionErrorScreen.tsx`
 
-- `trial_end` confirmado como nome exato retornado pelo edge function (linha 209 de `check-subscription/index.ts`)
-- Importar `differenceInDays` de `date-fns` e `Separator` de `@/components/ui/separator`
-- Cronometro usa `Math.max(0, differenceInDays(new Date(trial_end), new Date()))` para nunca exibir negativo
-- O filtro de planos no dialog usa `['orbity_monthly', 'orbity_annual'].includes(plan.slug)`
+Componente simples para erro de conexao (distinto do NoAgencyScreen):
+- Icone de erro de rede (WifiOff ou AlertTriangle)
+- Titulo: "Falha de Conexao"
+- Texto: "Nao foi possivel verificar seus dados. Isso pode ser um problema temporario de rede."
+- Botao "Tentar Novamente" que chama `onRetry` prop
+- Botao "Sair" secundario
+- Visual diferente do NoAgencyScreen para que suporte identifique o problema
 
 ## Arquivos modificados
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/hooks/useSubscription.tsx` | `trial_end` na interface |
-| `src/components/subscription/SubscriptionDetails.tsx` | Bug fix, badges, cronometro, CTA |
-| `src/components/subscription/SubscriptionStatus.tsx` | Badges atualizados |
-| `src/components/subscription/ManageSubscriptionDialog.tsx` | Filtrar apenas planos Orbity |
+| `src/hooks/useAgency.tsx` | Retry 3x, estado `fetchError`, export no contexto |
+| `src/components/layout/AppLayout.tsx` | Check `fetchError`, remover `userAgencies.length === 0` |
+| `src/components/agency/NoAgencyScreen.tsx` | Botao soft refresh + fallback reload |
+| `src/components/agency/ConnectionErrorScreen.tsx` | Novo componente de erro de conexao |
 
