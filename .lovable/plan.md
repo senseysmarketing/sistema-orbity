@@ -1,75 +1,115 @@
 
 
-# Edge Function `settle-gateway-payment` + Integração Frontend
+# Refatoração Full-Stack: Modelo Híbrido PLG + SLG (com 3 correções)
 
 ## Resumo
-Criar a Edge Function que faz a baixa no Asaas (receiveInCash) respeitando os 3 pontos críticos levantados, e conectar o frontend.
+Implementar o novo modelo de negócio com trial self-service de 7 dias, agendamento de demo, preços públicos (R$ 397/mês ou R$ 297/mês anual), e as 3 correções solicitadas: blindagem de datas no scheduling, seleção de plano pós-trial, e atualização dos slugs de pricing.
 
-## 1. Nova Edge Function: `supabase/functions/settle-gateway-payment/index.ts`
+---
 
-**Fluxo:**
-1. Receber `{ paymentId, paidDate, paidAmount, syncWithGateway }` do body
-2. Validar JWT via header `Authorization` + `getClaims()`
-3. Criar cliente Supabase com o auth header do request (RLS do utilizador)
-4. Buscar o `client_payments` pelo ID (retorna `asaas_payment_id`, `agency_id`, etc.)
-5. Verificar que o utilizador pertence à agência (RLS já garante, mas validar explicitamente)
-6. **Se `syncWithGateway === true`:**
-   - Criar cliente service_role para ler `agency_payment_settings` (tabela com RLS restrita)
-   - Buscar `asaas_api_key` e `asaas_sandbox` da agência
-   - Montar URL: sandbox → `https://sandbox.asaas.com/api/v3/payments/{id}/receiveInCash` / produção → `https://api.asaas.com/v3/payments/{id}/receiveInCash`
-   - POST com body: `{ paymentDate, value, notifyCustomer: false }`
-   - Header: `access_token: {asaas_api_key}`
-   - Tratar erro da API do Asaas
-7. Atualizar `client_payments`: `status: 'paid'`, `paid_date`, `amount_paid` (via cliente do utilizador com RLS)
-8. Retornar sucesso com CORS headers
+## 1. Migration: Colunas em `orbity_leads`
 
-**Padrão de autenticação (ponto 3 do user):**
-```ts
-const authHeader = req.headers.get('Authorization')!;
-const userClient = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
-// Validar claims
-const { data: claims } = await userClient.auth.getClaims(token);
+```sql
+ALTER TABLE orbity_leads
+  ADD COLUMN IF NOT EXISTS agency_name TEXT,
+  ADD COLUMN IF NOT EXISTS phone TEXT,
+  ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS lead_source TEXT DEFAULT 'application';
 ```
 
-**Service role apenas para ler API keys:**
-```ts
-const adminClient = createClient(url, serviceRoleKey);
-const { data: settings } = await adminClient.from('agency_payment_settings')
-  .select('asaas_api_key, asaas_sandbox')
-  .eq('agency_id', agencyId)
-  .single();
+E atualizar `subscription_plans` com os novos valores:
+
+```sql
+UPDATE subscription_plans SET price_monthly = 397.00, price_yearly = 3564.00 WHERE slug = 'basic';
 ```
 
-## 2. `supabase/config.toml`
-Adicionar entry:
-```toml
-[functions.settle-gateway-payment]
-verify_jwt = false
-```
+Criar um slug `basic_annual` se necessário, ou usar o campo `billing_cycle` existente em `agency_subscriptions` para diferenciar mensal vs anual.
 
-## 3. Frontend: `PaymentSheet.tsx`
+---
 
-**`handleSyncSettlement`** — descomentar e passar `syncWithGateway: true`:
-```ts
-const { data, error } = await supabase.functions.invoke('settle-gateway-payment', {
-  body: { paymentId: payment.id, paidDate: pendingSettlement.paidDate, paidAmount: pendingSettlement.paidAmount, syncWithGateway: true }
-});
-```
-Remover o fallback `executeLocalSettlement` — a Edge Function já faz o update local.
+## 2. Novo: `DemoSchedulingModal.tsx`
 
-**`handleLocalOnlySettlement`** — também chamar a Edge Function mas com `syncWithGateway: false`:
-```ts
-const { data, error } = await supabase.functions.invoke('settle-gateway-payment', {
-  body: { paymentId: payment.id, paidDate: pendingSettlement.paidDate, paidAmount: pendingSettlement.paidAmount, syncWithGateway: false }
-});
-```
-Isto centraliza a lógica de update num único ponto (a Edge Function).
+Modal de 2 etapas ativado por "Agendar Apresentação":
 
-## Arquivos modificados
-- `supabase/functions/settle-gateway-payment/index.ts` (novo)
-- `supabase/config.toml` (nova entry)
-- `src/components/admin/PaymentSheet.tsx` (descomentar invoke, remover fallback local)
+- **Etapa 1**: Nome, Nome da Agência, Email, Telefone (máscara BR)
+- **Etapa 2**: Calendar + grid de horários (09:00-18:00, intervalos 1h)
 
-## Sem migration
-Nenhuma alteração de schema necessária. Todos os campos já existem.
+**Correção 1 aplicada — Blindagem de data/hora:**
+- Calendar: `disabled={(date) => date < today || isWeekend(date)}`
+- Horários: Se a data selecionada for hoje, filtra `hora > horaAtual` (ex: se são 14:30, oculta 09:00 a 14:00)
+- Se nenhum horário disponível no dia de hoje, mostrar mensagem "Sem horários disponíveis hoje"
+
+Submissão: INSERT em `orbity_leads` com `lead_source: 'scheduling'`, `scheduled_at`, `agency_name`, `phone`. Tela de sucesso.
+
+---
+
+## 3. Novo: `PricingSection.tsx`
+
+Toggle Mensal/Anual:
+- Mensal: R$ 397/mês
+- Anual: R$ 297/mês (R$ 3.564/ano, economia de R$ 1.200)
+- CTA primário: "Começar Teste Grátis (7 Dias)" → `/onboarding?flow=trial`
+- CTA secundário: "Agendar Apresentação" → abre DemoSchedulingModal
+
+---
+
+## 4. Landing Page e componentes
+
+**`LandingPage.tsx`**: Adicionar `schedulingOpen` state, `DemoSchedulingModal`, `PricingSection` entre seções existentes. Passar `onOpenScheduling` aos componentes.
+
+**`HeroSection.tsx`**: Botão primário "Começar Teste Grátis" → `/onboarding?flow=trial`. Botão secundário "Agendar Apresentação" → `onOpenScheduling()`. Adicionar prop `onOpenScheduling`.
+
+**`CTASection.tsx`**: Dois botões (trial + agendamento). Adicionar prop `onOpenScheduling`.
+
+**`FAQSection.tsx`**: Atualizar FAQs para refletir preços públicos e trial grátis.
+
+---
+
+## 5. Onboarding (`useOnboarding.tsx` + `Onboarding.tsx`)
+
+Ler `?flow=trial|direct_monthly|direct_annual` via `useSearchParams`.
+
+- **`flow=trial`**: Pular `PlanSelectionStep` (totalSteps = 3). No `submitOnboarding`, planSlug = `'basic'` automaticamente. Redireciona para dashboard após login.
+- **`flow=direct_monthly`**: planSlug = `'basic'`, billing_cycle = `'monthly'`. Após criar agência, chama `initiateCheckout`.
+- **`flow=direct_annual`**: planSlug = `'basic'`, billing_cycle = `'yearly'`. Após criar agência, chama `initiateCheckout`.
+
+**Correção 3 aplicada**: Os flows `direct_monthly` e `direct_annual` mapeiam para o mesmo plano `basic` mas com `billing_cycle` diferente, e os valores corretos (R$ 397 mensal, R$ 297/mês anual) são puxados da tabela `subscription_plans`.
+
+---
+
+## 6. BlockedAccessScreen — Correção 2 aplicada
+
+**Problema**: Trial expirado → botão "Assinar Agora" chamava checkout direto sem escolha de plano.
+
+**Solução**: Adicionar estado `showPlanSelection` ao `BlockedAccessScreen`. Ao clicar "Assinar Agora":
+1. Mostrar um sub-componente inline com dois cards: Mensal (R$ 397) e Anual (R$ 297/mês)
+2. Ao escolher, chamar `createCheckout` com o billing_cycle adequado
+3. Botão "Voltar" para retornar à tela de bloqueio
+
+---
+
+## 7. Master Panel
+
+**`AgenciesTable.tsx`**: Adicionar badge "Trial" com dias restantes para agências com `subscription_status = 'trial'`. Usar `differenceInDays(trial_end, now())`.
+
+**`OrbityLeadsTable.tsx`**: Adicionar colunas `agency_name`, `scheduled_at`, `phone`. Atualizar STATUS_OPTIONS para incluir "Agendado", "Apresentado", "Fechado", "Perdido". Ordenar por `scheduled_at ASC NULLS LAST`.
+
+---
+
+## Arquivos
+
+| Arquivo | Ação |
+|---------|------|
+| Migration SQL | Colunas em `orbity_leads` + UPDATE `subscription_plans` |
+| `src/components/landing/DemoSchedulingModal.tsx` | Novo |
+| `src/components/landing/PricingSection.tsx` | Novo |
+| `src/pages/LandingPage.tsx` | Modificado |
+| `src/components/landing/HeroSection.tsx` | Modificado |
+| `src/components/landing/CTASection.tsx` | Modificado |
+| `src/components/landing/FAQSection.tsx` | Modificado |
+| `src/pages/Onboarding.tsx` | Modificado |
+| `src/hooks/useOnboarding.tsx` | Modificado |
+| `src/components/payment/BlockedAccessScreen.tsx` | Modificado |
+| `src/components/master/AgenciesTable.tsx` | Modificado |
+| `src/components/master/OrbityLeadsTable.tsx` | Modificado |
 
