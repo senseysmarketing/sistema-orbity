@@ -110,8 +110,12 @@ export function usePaymentGateway() {
     return gateways;
   }, [isAsaasActive, isConexaActive]);
 
+  const stableSettings = useMemo(() => {
+    return settings ?? { ...defaultSettings, id: '', agency_id: agencyId || '' } as PaymentSettings;
+  }, [settings, agencyId]);
+
   return {
-    settings: settings ? settings : { ...defaultSettings, id: '', agency_id: agencyId || '' } as PaymentSettings,
+    settings: stableSettings,
     gateway: (settings?.active_gateway ?? 'manual') as 'manual' | 'asaas' | 'conexa',
     isAsaasActive,
     isConexaActive,
