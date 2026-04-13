@@ -1,18 +1,18 @@
 
 
-# Mover "X leads" e "Exportar" para a linha dos filtros
+# Adicionar Paginacao na Lista de Leads
 
-## Alteração
+## Alteracao
 
-Mover o conteúdo da "Actions Row" (linhas 521-550) para dentro da "Filters Row" (linha 476), colocando o count de leads e o botão Exportar no final da mesma linha dos selects de filtro, com um `flex-1` separando.
+Adicionar estado de paginacao no componente `LeadsList.tsx` com 25 leads por pagina, exibindo controles de navegacao abaixo da tabela.
 
-### Arquivo: `src/pages/CRM.tsx`
+### Arquivo: `src/components/crm/LeadsList.tsx`
 
-- Remover o bloco "Actions Row" separado (linhas 521-550)
-- Dentro da div de filtros (linha 476), após o último `Select`, adicionar:
-  - O botão "Limpar Filtros" (condicional)
-  - Um `flex-1` spacer
-  - O texto `{filteredLeads.length} leads`
-  - O botão "Exportar"
-- Tudo ficará em uma única linha com scroll horizontal se necessário
+1. Adicionar `useState` para `currentPage` (iniciar em 1)
+2. Definir `ITEMS_PER_PAGE = 25`
+3. Calcular `totalPages`, `paginatedLeads` (slice do array ordenado)
+4. Renderizar apenas `paginatedLeads` na tabela
+5. Abaixo da tabela, adicionar controles de paginacao usando os componentes existentes de `@/components/ui/pagination` (Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationLink)
+6. Mostrar info "Mostrando X-Y de Z leads"
+7. Resetar `currentPage` para 1 quando a lista de leads mudar (via `useEffect`)
 
