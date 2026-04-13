@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { usePaymentMiddleware } from '@/hooks/usePaymentMiddleware';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, RefreshCw, Calendar, LogOut, MessageCircle, CreditCard, Loader2, Check, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Calendar, LogOut, MessageCircle, CreditCard, Loader2, Check, ArrowLeft, Ban } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAuth } from '@/hooks/useAuth';
 import { useAgency } from '@/hooks/useAgency';
 
 interface BlockedAccessScreenProps {
   onRetry?: () => void;
+  reason?: 'suspended' | 'payment';
 }
 
 export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
