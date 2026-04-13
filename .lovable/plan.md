@@ -1,39 +1,76 @@
 
 
-# Adicionar Botão de Excluir Parcelamentos
+# Correção de Busca por Telefone e Bug de Edição→Criação no CRM
 
-## Resumo
-Adicionar um ícone de lixeira (Trash2) nos cards de parcelamentos que cancela apenas as parcelas pendentes, preservando as já pagas.
+## Problema 1: Busca não filtra por telefone
+O filtro de busca (linha 247-250 de `CRM.tsx`) só pesquisa por `name`, `email` e `company`. Telefone não está incluído.
 
-## Alterações no `AdvancedExpenseSheet.tsx`
+## Problema 2: Bug de dados "grudados" ao criar novo lead
+Quando o usuário edita um lead e fecha o modal, o `selectedLead` não é limpo. Ao clicar "Novo Lead", o `Dialog` abre com `selectedLead` ainda preenchido, puxando os dados do lead anterior no `LeadForm`.
 
-1. **Import**: Adicionar `Trash2` do lucide-react.
+A raiz do problema está na linha 372: `onOpenChange={setShowLeadForm}` — quando o Dialog fecha, ele só seta `showLeadForm = false` mas nunca faz `setSelectedLead(null)`.
 
-2. **Mutation de exclusão**: Criar `deleteInstallmentMutation` que:
-   - Recebe o `masterId`
-   - Faz `UPDATE` nos filhos pendentes: `.update({ status: 'paid' })` → NÃO. Faz **DELETE** nos filhos com `status = 'pending'` e `parent_expense_id = masterId`
-   - Também deleta o mestre se ele próprio estiver pendente, OU atualiza seu `status` para `canceled`
-   - Abordagem mais segura: marcar como `canceled` (não deletar fisicamente) tanto o mestre quanto os filhos pendentes
+---
 
-   ```ts
-   // Cancelar filhos pendentes
-   await supabase.from('expenses')
-     .update({ status: 'canceled' })
-     .eq('parent_expense_id', masterId)
-     .eq('status', 'pending');
-   
-   // Cancelar o mestre
-   await supabase.from('expenses')
-     .update({ status: 'canceled' })
-     .eq('id', masterId);
-   ```
+## Alterações
 
-3. **UI**: Adicionar botão `Trash2` ao lado do `Pencil` nos cards de parcelamento, com `confirm()` antes de executar.
+### Arquivo: `src/pages/CRM.tsx`
 
-4. **Toast**: "Parcelamento cancelado. Parcelas já pagas foram preservadas."
+**1. Adicionar `phone` ao filtro de busca (linha ~247-250):**
+```ts
+const matchesSearch = searchQuery === '' || 
+  lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  lead.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  lead.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  lead.company?.toLowerCase().includes(searchQuery.toLowerCase());
+```
 
-5. **Invalidação**: Invalidar queries `installment-expenses` e `financial-metrics`.
+Para telefone, também normalizar removendo caracteres não-numéricos para que busca por "11999" encontre "(11) 99900-0000":
+```ts
+const normalizedSearch = searchQuery.replace(/\D/g, '');
+const matchesPhone = normalizedSearch.length > 0 && 
+  lead.phone?.replace(/\D/g, '').includes(normalizedSearch);
+
+const matchesSearch = searchQuery === '' || 
+  lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  lead.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  lead.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  matchesPhone;
+```
+
+**2. Corrigir bug do selectedLead ao fechar/abrir Dialog (linha ~372):**
+```ts
+onOpenChange={(open) => {
+  setShowLeadForm(open);
+  if (!open) setSelectedLead(null);
+}}
+```
+
+**3. Limpar selectedLead ao clicar "Novo Lead" (no DialogTrigger, linha ~373-377):**
+```tsx
+<Button variant="action" onClick={() => setSelectedLead(null)}>
+```
+
+### Arquivo: `src/components/crm/LeadForm.tsx`
+
+**4. Resetar formData quando `lead` muda de preenchido para null (linha ~74-106):**
+Adicionar um `else` no useEffect para resetar o form quando `lead` é null (criação):
+```ts
+useEffect(() => {
+  if (lead && statuses.length > 0) {
+    // ... código existente de preenchimento
+  } else if (!lead) {
+    setFormData({
+      name: '', email: '', phone: '', company: '', position: '',
+      source: 'manual', status: 'leads', temperature: 'cold',
+      value: 0, notes: '', assigned_to: '', last_contact: '',
+      next_contact: '', tags: '',
+    });
+  }
+}, [lead, statuses]);
+```
 
 ## Arquivos modificados
-- `src/components/admin/CommandCenter/AdvancedExpenseSheet.tsx` (único arquivo)
+- `src/pages/CRM.tsx`
+- `src/components/crm/LeadForm.tsx`
 
