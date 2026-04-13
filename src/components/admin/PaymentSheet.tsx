@@ -209,19 +209,25 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
     toast({ title: "Em breve", description: "Integração com WhatsApp para cobrança será disponibilizada em breve." });
   };
 
-  const executeLocalSettlement = async (settlePaidDate: string, settlePaidAmount: number) => {
+  const invokeSettlement = async (paidDate: string, paidAmount: number, syncWithGateway: boolean) => {
     if (!payment) return;
     setLoading(true);
     try {
-      const { error } = await supabase.from("client_payments")
-        .update({ status: "paid" as any, paid_date: settlePaidDate, amount_paid: settlePaidAmount })
-        .eq("id", payment.id);
+      const { data, error } = await supabase.functions.invoke('settle-gateway-payment', {
+        body: { paymentId: payment.id, paidDate, paidAmount, syncWithGateway },
+      });
       if (error) throw error;
-      toast({ title: "✅ Baixa registrada", description: "Pagamento confirmado no Orbity." });
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: "✅ Baixa registrada",
+        description: syncWithGateway && data?.syncedWithGateway
+          ? `Pagamento confirmado no Orbity e no ${hasAsaasCharge ? 'Asaas' : 'Conexa'}.`
+          : "Pagamento confirmado no Orbity.",
+      });
       onSuccess();
       onOpenChange(false);
     } catch (err: any) {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
+      toast({ title: "Erro ao dar baixa", description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -234,27 +240,19 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
       setSyncDialogOpen(true);
       return;
     }
-    await executeLocalSettlement(settlePaidDate, settlePaidAmount);
+    await invokeSettlement(settlePaidDate, settlePaidAmount, false);
   };
 
   const handleSyncSettlement = async () => {
     if (!pendingSettlement || !payment) return;
-    setLoading(true);
-    try {
-      // TODO: Integrar chamada para Edge Function settle-gateway-payment
-      // await supabase.functions.invoke('settle-gateway-payment', {
-      //   body: { paymentId: payment.id, paidDate: pendingSettlement.paidDate, paidAmount: pendingSettlement.paidAmount }
-      // });
-      await executeLocalSettlement(pendingSettlement.paidDate, pendingSettlement.paidAmount);
-    } finally {
-      setSyncDialogOpen(false);
-      setPendingSettlement(null);
-    }
+    await invokeSettlement(pendingSettlement.paidDate, pendingSettlement.paidAmount, true);
+    setSyncDialogOpen(false);
+    setPendingSettlement(null);
   };
 
   const handleLocalOnlySettlement = async () => {
     if (!pendingSettlement) return;
-    await executeLocalSettlement(pendingSettlement.paidDate, pendingSettlement.paidAmount);
+    await invokeSettlement(pendingSettlement.paidDate, pendingSettlement.paidAmount, false);
     setSyncDialogOpen(false);
     setPendingSettlement(null);
   };
