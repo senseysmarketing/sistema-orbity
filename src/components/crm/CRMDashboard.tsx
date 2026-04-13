@@ -108,7 +108,7 @@ export function CRMDashboard({ leads }: CRMDashboardProps) {
     // Vendas filtradas por data de FECHAMENTO (won_at) - considera TODOS os leads
     const wonLeads = leads.filter(l => {
       if (normalizeLeadStatusToDb(l.status) !== 'won') return false;
-      const wonAt = l.won_at ? new Date(l.won_at) : null;
+      const wonAt = l.won_at ? new Date(l.won_at) : (l.status_changed_at ? new Date(l.status_changed_at) : null);
       if (!wonAt) return false;
       return wonAt >= dateRange.from && wonAt <= dateRange.to;
     });
