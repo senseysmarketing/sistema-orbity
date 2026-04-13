@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { usePaymentMiddleware } from '@/hooks/usePaymentMiddleware';
 import { useAuth } from '@/hooks/useAuth';
 import { useAgency } from '@/hooks/useAgency';
@@ -6,6 +6,8 @@ import { BlockedAccessScreen } from '@/components/payment/BlockedAccessScreen';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useLocation } from 'react-router-dom';
 import { isMasterAgencyAdmin } from '@/lib/masterAccess';
+
+const FORCE_ALLOW_TIMEOUT_MS = 15_000;
 
 interface PaymentMiddlewareWrapperProps {
   children: ReactNode;
@@ -17,6 +19,22 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
   const { currentAgency, agencyRole } = useAgency();
   const { currentSubscription } = useSubscription();
   const location = useLocation();
+  const [forceAllow, setForceAllow] = useState(false);
+
+  // Safety fallback: if loading hangs for 15s, force-allow access
+  useEffect(() => {
+    if (!loading) {
+      setForceAllow(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      console.warn('[PaymentMiddlewareWrapper] Loading timeout reached (15s) — forcing access');
+      setForceAllow(true);
+    }, FORCE_ALLOW_TIMEOUT_MS);
+
+    return () => clearTimeout(timeout);
+  }, [loading]);
 
   // Verificar se é admin da agência master (Senseys)
   const isMasterUser = isMasterAgencyAdmin(currentAgency?.id, agencyRole);
@@ -26,8 +44,8 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
     return <>{children}</>;
   }
 
-  // Show loading spinner while checking payment status
-  if (loading) {
+  // Show loading spinner while checking payment status (with force-allow escape)
+  if (loading && !forceAllow) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -42,6 +60,11 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
 
   // If not authenticated, don't block (allow auth/public routes)
   if (!session) {
+    return <>{children}</>;
+  }
+
+  // If force-allowed due to timeout, skip payment checks
+  if (forceAllow) {
     return <>{children}</>;
   }
 
