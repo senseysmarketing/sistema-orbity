@@ -61,7 +61,8 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
   const isBlocked = agencySuspended || isPastDueBlocked || (!paymentStatus?.isValid && !isSuperAdmin && !subscriptionActive);
   
   if (isBlocked) {
-    return <BlockedAccessScreen />;
+    const reason = agencySuspended ? 'suspended' : 'payment';
+    return <BlockedAccessScreen reason={reason} />;
   }
 
   return <>{children}</>;
