@@ -21,7 +21,7 @@ interface HeroSectionProps {
   onOpenScheduling?: () => void;
 }
 
-export function HeroSection({ onOpenApplication, onOpenScheduling }: HeroSectionProps) {
+export function HeroSection({ onOpenScheduling }: HeroSectionProps) {
   const navigate = useNavigate();
 
   return (

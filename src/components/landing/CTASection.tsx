@@ -7,7 +7,7 @@ interface CTASectionProps {
   onOpenScheduling?: () => void;
 }
 
-export function CTASection({ onOpenApplication, onOpenScheduling }: CTASectionProps) {
+export function CTASection({ onOpenScheduling }: CTASectionProps) {
   const navigate = useNavigate();
 
   return (

@@ -44,7 +44,7 @@ interface FAQSectionProps {
   onOpenScheduling?: () => void;
 }
 
-export function FAQSection({ onOpenApplication, onOpenScheduling }: FAQSectionProps) {
+export function FAQSection({ onOpenScheduling }: FAQSectionProps) {
   const navigate = useNavigate();
 
   const openWhatsApp = () => {
