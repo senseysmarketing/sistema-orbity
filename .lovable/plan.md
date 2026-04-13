@@ -1,40 +1,50 @@
 
 
-# Atualizar Stripe Price IDs nos planos Orbity
+# Refatorar Card de Assinatura com Travas de Seguranca
 
-## O que já foi feito
+## Resumo
 
-Os produtos e preços foram criados com sucesso no Stripe:
+Corrigir bug do "0", adicionar suporte a `trialing`, cronometro de trial com fallback seguro, CTA de upgrade, e refatorar o dialog de planos para exibir apenas Orbity Mensal/Anual.
 
-| Plano | Produto | Price ID | Valor |
-|-------|---------|----------|-------|
-| Orbity Mensal | `prod_UKVcka52hXSHPs` | `price_1TLqbBCLXDdhG50oXYQnIRz7` | R$ 397/mês |
-| Orbity Anual | `prod_UKVcSlJKBjvsdf` | `price_1TLqbVCLXDdhG50olvvUBnzv` | R$ 3.564/ano |
+## Alteracoes
 
-## O que falta
+### 1. `src/hooks/useSubscription.tsx`
 
-Atualizar os registros no banco de dados (os planos herdaram IDs antigos do plano "basic"). Uma migration SQL com os seguintes UPDATEs:
+Adicionar `trial_end?: string` a interface `SubscriptionStatus` (linha 28-36). O campo ja e retornado pelo edge function `check-subscription` como `trial_end` (confirmado no codigo).
 
-```sql
--- orbity_monthly: setar price mensal correto, limpar yearly
-UPDATE public.subscription_plans
-SET stripe_price_id_monthly = 'price_1TLqbBCLXDdhG50oXYQnIRz7',
-    stripe_price_id_yearly = NULL
-WHERE slug = 'orbity_monthly';
+### 2. `src/components/subscription/SubscriptionDetails.tsx`
 
--- orbity_annual: setar price anual correto, limpar monthly
-UPDATE public.subscription_plans
-SET stripe_price_id_monthly = NULL,
-    stripe_price_id_yearly = 'price_1TLqbVCLXDdhG50olvvUBnzv'
-WHERE slug = 'orbity_annual';
+- **Bug do "0"**: Linha ~119, trocar `{currentAgency?.monthly_value && (` por `{(currentAgency?.monthly_value ?? 0) > 0 && (`
+- **Badges**: Adicionar caso `trialing` → Badge azul "Periodo de Teste (Ativo)"; `past_due` → vermelho "Pagamento Atrasado"; `canceled` → cinza "Inativo"
+- **Cronometro**: Se `trialing`, exibir "Valido ate [data]" + "Faltam X dias" usando `Math.max(0, differenceInDays(...))`. Se 0 dias, exibir "Expira hoje"
+- **CTA**: Se `trialing`/`past_due`/`canceled`, adicionar Separator + texto motivacional + botao "Escolher Plano e Assinar" que abre `ManageSubscriptionDialog`
+- Expandir `isSubscriptionActive` para incluir `trialing`
 
--- orbity_trial: garantir que não tem price IDs (é gratuito)
-UPDATE public.subscription_plans
-SET stripe_price_id_monthly = NULL,
-    stripe_price_id_yearly = NULL
-WHERE slug = 'orbity_trial';
-```
+### 3. `src/components/subscription/SubscriptionStatus.tsx`
 
-### Arquivo
-- Nova migration SQL em `supabase/migrations/`
+Mesmas correcoes de badges para `trialing`, `past_due`, `canceled`.
+
+### 4. `src/components/subscription/ManageSubscriptionDialog.tsx`
+
+Refatoracao critica:
+- Filtrar `plans` para exibir APENAS slugs `orbity_monthly` e `orbity_annual` (remover planos legados)
+- Exibir cards com: "Orbity Mensal R$ 397/mes" e "Orbity Anual R$ 297/mes (cobrado anualmente R$ 3.564)"
+- O botao de checkout deve usar `stripe_price_id_monthly` para mensal e `stripe_price_id_yearly` para anual
+- Remover mencoes a planos Basic/Professional/Enterprise/Senseys
+
+## Detalhes tecnicos
+
+- `trial_end` confirmado como nome exato retornado pelo edge function (linha 209 de `check-subscription/index.ts`)
+- Importar `differenceInDays` de `date-fns` e `Separator` de `@/components/ui/separator`
+- Cronometro usa `Math.max(0, differenceInDays(new Date(trial_end), new Date()))` para nunca exibir negativo
+- O filtro de planos no dialog usa `['orbity_monthly', 'orbity_annual'].includes(plan.slug)`
+
+## Arquivos modificados
+
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/hooks/useSubscription.tsx` | `trial_end` na interface |
+| `src/components/subscription/SubscriptionDetails.tsx` | Bug fix, badges, cronometro, CTA |
+| `src/components/subscription/SubscriptionStatus.tsx` | Badges atualizados |
+| `src/components/subscription/ManageSubscriptionDialog.tsx` | Filtrar apenas planos Orbity |
 
