@@ -72,6 +72,15 @@ export function LeadForm({ lead, onSave, onCancel }: LeadFormProps) {
   });
 
   useEffect(() => {
+    if (!lead) {
+      setFormData({
+        name: '', email: '', phone: '', company: '', position: '',
+        source: 'manual', status: 'leads', temperature: 'cold' as LeadTemperature,
+        value: 0, notes: '', assigned_to: '', last_contact: '',
+        next_contact: '', tags: '',
+      });
+      return;
+    }
     if (lead && statuses.length > 0) {
       // Tentar match direto primeiro (statusKey já existente nos statuses carregados)
       const directMatch = statuses.find(s => getStatusKey(s.name) === lead.status);
