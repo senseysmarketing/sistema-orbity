@@ -33,8 +33,9 @@ export function SubscriptionStatus() {
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'active': return 'bg-green-500';
-      case 'past_due': return 'bg-yellow-500';
-      case 'canceled': return 'bg-red-500';
+      case 'trialing': return 'bg-blue-400';
+      case 'past_due': return 'bg-red-500';
+      case 'canceled': return 'bg-gray-500';
       default: return 'bg-gray-500';
     }
   };
@@ -42,14 +43,15 @@ export function SubscriptionStatus() {
   const getStatusText = (status?: string) => {
     switch (status) {
       case 'active': return 'Ativo';
-      case 'past_due': return 'Pagamento Pendente';
-      case 'canceled': return 'Cancelado';
+      case 'trialing': return 'Período de Teste (Ativo)';
+      case 'past_due': return 'Pagamento Atrasado';
+      case 'canceled': return 'Inativo';
       default: return 'Inativo';
     }
   };
 
   const isSubscriptionActive = currentSubscription?.subscribed && 
-    currentSubscription?.subscription_status === 'active';
+    (currentSubscription?.subscription_status === 'active' || currentSubscription?.subscription_status === 'trialing');
 
   return (
     <Card>
@@ -98,7 +100,8 @@ export function SubscriptionStatus() {
         )}
 
         {currentSubscription?.plan_name && 
-         currentSubscription?.subscription_status !== 'active' && (
+         currentSubscription?.subscription_status !== 'active' &&
+         currentSubscription?.subscription_status !== 'trialing' && (
           <div className="p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-500">
             <p className="text-sm text-yellow-800">
               Para continuar usando o sistema, você precisa ativar sua assinatura.
@@ -109,7 +112,7 @@ export function SubscriptionStatus() {
         {isSubscriptionActive && (
           <Button
             onClick={() => {
-              if (!currentSubscription?.customer_id) {
+              if (!currentSubscription?.customer_id || currentSubscription?.subscription_status === 'trialing') {
                 setShowManageDialog(true);
               } else {
                 openCustomerPortal();
@@ -118,7 +121,7 @@ export function SubscriptionStatus() {
             className="w-full"
             variant="outline"
           >
-            Gerenciar Assinatura
+            {currentSubscription?.subscription_status === 'trialing' ? 'Escolher Plano e Assinar' : 'Gerenciar Assinatura'}
           </Button>
         )}
       </CardContent>
