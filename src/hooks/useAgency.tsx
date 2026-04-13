@@ -99,6 +99,14 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
 
         if (agencyUsersError) throw agencyUsersError;
 
+        // Guard: se user ficou null durante o fetch (logout), descartar resultado
+        if (!user) {
+          console.log('[Agency] User became null during fetch, discarding result');
+          isFetchingRef.current = false;
+          setLoading(false);
+          return;
+        }
+
         const agencies = agencyUsers?.map(au => au.agencies).filter(Boolean) || [];
         setUserAgencies(agencies);
         

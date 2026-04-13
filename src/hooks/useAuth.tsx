@@ -116,11 +116,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
+        // Guard: SIGNED_OUT ou session nula → limpar tudo e sair imediatamente
+        if (event === 'SIGNED_OUT' || !newSession) {
+          console.log('[Auth] SIGNED_OUT or null session — clearing all state');
+          currentUserIdRef.current = null;
+          sessionRef.current = null;
+          setUser(null);
+          setSession(null);
+          setProfile(null);
+          setLoading(false);
+          return; // JAMAIS fazer fetch de profile aqui
+        }
+
         // Eventos silenciosos que não devem causar re-render da árvore inteira
         const silentEvents = ['TOKEN_REFRESHED'];
         
         if (silentEvents.includes(event)) {
-          // Token foi renovado silenciosamente - atualizar ref mas não estado
           console.log('[Auth] Token refreshed silently, skipping state update');
           sessionRef.current = newSession;
           return;
@@ -130,39 +141,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const newUserId = newSession?.user?.id || null;
         const currentUserId = currentUserIdRef.current;
         
-        // Só atualizar estado se o user realmente mudou
-        if (newUserId !== currentUserId) {
-          console.log('[Auth] User changed:', currentUserId, '->', newUserId);
+        if (newUserId !== currentUserId || event === 'SIGNED_IN') {
+          console.log('[Auth] User changed or SIGNED_IN:', currentUserId, '->', newUserId);
           currentUserIdRef.current = newUserId;
           sessionRef.current = newSession;
           
-          setSession(newSession);
-          setUser(newSession?.user ?? null);
-          
-          if (newSession?.user) {
-            setLastActivityTime(Date.now());
-            setSessionExpired(false);
-            setShowSessionAlert(false);
-            
-            // Fetch user profile
-            setTimeout(async () => {
-              const { data: profileData } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('user_id', newSession.user.id)
-                .single();
-              
-              if (profileData) {
-                setProfile(profileData as Profile);
-              }
-            }, 0);
-          } else {
-            setProfile(null);
-          }
-        } else if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-          // Sempre processar eventos de sign in/out explícitos
-          console.log('[Auth] Explicit auth event:', event);
-          sessionRef.current = newSession;
           setSession(newSession);
           setUser(newSession?.user ?? null);
           
@@ -296,28 +279,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
-      // Clear local state first
+      // Executar signOut com timeout de 3s (fire-and-forget se Supabase travar)
+      await Promise.race([
+        supabase.auth.signOut({ scope: 'local' }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('signOut timeout')), 3000))
+      ]);
+      console.log('[Auth] signOut completed successfully');
+    } catch (error) {
+      console.warn('[Auth] signOut timeout or error, proceeding with cleanup:', error);
+    } finally {
+      // Sempre limpar estado local e redirecionar
+      currentUserIdRef.current = null;
+      sessionRef.current = null;
       setUser(null);
       setSession(null);
       setProfile(null);
       setSessionExpired(false);
       setShowSessionAlert(false);
       setLoading(false);
-
-      // Sign out from Supabase (ignore errors for invalid sessions)
-      await supabase.auth.signOut({ scope: 'local' });
-
-      toast({
-        title: "Logout realizado",
-        description: "Você foi desconectado com sucesso.",
-      });
-    } catch (error) {
-      console.error('Error during sign out:', error);
-    } finally {
-      // Always redirect to auth page, regardless of errors
-      setTimeout(() => {
-        window.location.href = '/auth';
-      }, 100);
+      window.location.replace('/auth');
     }
   };
 
