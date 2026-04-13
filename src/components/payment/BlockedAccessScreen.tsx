@@ -12,7 +12,7 @@ interface BlockedAccessScreenProps {
   reason?: 'suspended' | 'payment';
 }
 
-export function BlockedAccessScreen({ onRetry }: BlockedAccessScreenProps) {
+export function BlockedAccessScreen({ onRetry, reason = 'payment' }: BlockedAccessScreenProps) {
   const { refreshPaymentStatus } = usePaymentMiddleware();
   const { currentSubscription, checkSubscription, createCheckout } = useSubscription();
   const { signOut } = useAuth();
