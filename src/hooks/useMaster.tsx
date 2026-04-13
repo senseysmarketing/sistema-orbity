@@ -111,14 +111,14 @@ export function MasterProvider({ children }: { children: ReactNode }) {
 
   const suspendAgency = async (agencyId: string) => {
     try {
-      const { error, count } = await supabase
+      const { error, data } = await supabase
         .from('agencies')
         .update({ is_active: false })
         .eq('id', agencyId)
-        .select('id', { count: 'exact', head: true });
+        .select('id');
 
       if (error) throw error;
-      if (count === 0) {
+      if (!data || data.length === 0) {
         toast.error('Não foi possível suspender a agência. Verifique suas permissões.');
         return;
       }
@@ -133,14 +133,14 @@ export function MasterProvider({ children }: { children: ReactNode }) {
 
   const reactivateAgency = async (agencyId: string) => {
     try {
-      const { error, count } = await supabase
+      const { error, data } = await supabase
         .from('agencies')
         .update({ is_active: true })
         .eq('id', agencyId)
-        .select('id', { count: 'exact', head: true });
+        .select('id');
 
       if (error) throw error;
-      if (count === 0) {
+      if (!data || data.length === 0) {
         toast.error('Não foi possível reativar a agência. Verifique suas permissões.');
         return;
       }
