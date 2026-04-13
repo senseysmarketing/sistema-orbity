@@ -1,76 +1,120 @@
 
 
-# Correção de Busca por Telefone e Bug de Edição→Criação no CRM
+# Baixa Sincronizada com Gateway no PaymentSheet
 
-## Problema 1: Busca não filtra por telefone
-O filtro de busca (linha 247-250 de `CRM.tsx`) só pesquisa por `name`, `email` e `company`. Telefone não está incluído.
+## Resumo
+Adicionar ao `PaymentSheet.tsx` um fluxo de "Dar Baixa" com `MarkAsPaidPopover` no rodapé, que detecta se a cobrança possui vínculo com gateway (Asaas/Conexa) e oferece sincronização via modal antes de confirmar.
 
-## Problema 2: Bug de dados "grudados" ao criar novo lead
-Quando o usuário edita um lead e fecha o modal, o `selectedLead` não é limpo. Ao clicar "Novo Lead", o `Dialog` abre com `selectedLead` ainda preenchido, puxando os dados do lead anterior no `LeadForm`.
+## Alterações no `PaymentSheet.tsx` (único arquivo)
 
-A raiz do problema está na linha 372: `onOpenChange={setShowLeadForm}` — quando o Dialog fecha, ele só seta `showLeadForm = false` mas nunca faz `setSelectedLead(null)`.
+### 1. Imports
+- Adicionar `import { MarkAsPaidPopover } from "./CommandCenter/MarkAsPaidPopover";`
+- Adicionar `CheckCircle` ao import do lucide-react
 
----
-
-## Alterações
-
-### Arquivo: `src/pages/CRM.tsx`
-
-**1. Adicionar `phone` ao filtro de busca (linha ~247-250):**
+### 2. Novo estado para o sync dialog
 ```ts
-const matchesSearch = searchQuery === '' || 
-  lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  lead.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  lead.phone?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  lead.company?.toLowerCase().includes(searchQuery.toLowerCase());
+const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+const [pendingSettlement, setPendingSettlement] = useState<{ paidDate: string; paidAmount: number } | null>(null);
 ```
 
-Para telefone, também normalizar removendo caracteres não-numéricos para que busca por "11999" encontre "(11) 99900-0000":
+### 3. Função `handleManualSettlement`
 ```ts
-const normalizedSearch = searchQuery.replace(/\D/g, '');
-const matchesPhone = normalizedSearch.length > 0 && 
-  lead.phone?.replace(/\D/g, '').includes(normalizedSearch);
-
-const matchesSearch = searchQuery === '' || 
-  lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  lead.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  lead.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-  matchesPhone;
-```
-
-**2. Corrigir bug do selectedLead ao fechar/abrir Dialog (linha ~372):**
-```ts
-onOpenChange={(open) => {
-  setShowLeadForm(open);
-  if (!open) setSelectedLead(null);
-}}
-```
-
-**3. Limpar selectedLead ao clicar "Novo Lead" (no DialogTrigger, linha ~373-377):**
-```tsx
-<Button variant="action" onClick={() => setSelectedLead(null)}>
-```
-
-### Arquivo: `src/components/crm/LeadForm.tsx`
-
-**4. Resetar formData quando `lead` muda de preenchido para null (linha ~74-106):**
-Adicionar um `else` no useEffect para resetar o form quando `lead` é null (criação):
-```ts
-useEffect(() => {
-  if (lead && statuses.length > 0) {
-    // ... código existente de preenchimento
-  } else if (!lead) {
-    setFormData({
-      name: '', email: '', phone: '', company: '', position: '',
-      source: 'manual', status: 'leads', temperature: 'cold',
-      value: 0, notes: '', assigned_to: '', last_contact: '',
-      next_contact: '', tags: '',
-    });
+const handleManualSettlement = async (paidDate: string, paidAmount: number) => {
+  if (!payment) return;
+  
+  // Se tem gateway vinculado → abrir dialog de sincronização
+  if (hasAsaasCharge || hasConexaCharge) {
+    setPendingSettlement({ paidDate, paidAmount });
+    setSyncDialogOpen(true);
+    return;
   }
-}, [lead, statuses]);
+  
+  // Sem gateway → baixa local direta
+  await executeLocalSettlement(paidDate, paidAmount);
+};
+```
+
+### 4. Função `executeLocalSettlement` (baixa apenas local)
+```ts
+const executeLocalSettlement = async (paidDate: string, paidAmount: number) => {
+  setLoading(true);
+  try {
+    const { error } = await supabase.from("client_payments")
+      .update({ status: "paid", paid_date: paidDate, amount_paid: paidAmount })
+      .eq("id", payment.id);
+    if (error) throw error;
+    toast({ title: "✅ Baixa registrada", description: "Pagamento confirmado no Orbity." });
+    onSuccess();
+    onOpenChange(false);
+  } catch (err: any) {
+    toast({ title: "Erro", description: err.message, variant: "destructive" });
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+### 5. Função `handleSyncSettlement` (baixa local + gateway)
+```ts
+const handleSyncSettlement = async () => {
+  if (!pendingSettlement || !payment) return;
+  setLoading(true);
+  try {
+    // TODO: Integrar chamada para Edge Function settle-gateway-payment
+    // await supabase.functions.invoke('settle-gateway-payment', { body: { paymentId: payment.id, ... } });
+    
+    // Por ora, executa apenas a baixa local
+    await executeLocalSettlement(pendingSettlement.paidDate, pendingSettlement.paidAmount);
+  } finally {
+    setSyncDialogOpen(false);
+    setPendingSettlement(null);
+  }
+};
+```
+
+### 6. MarkAsPaidPopover no rodapé (dentro do bloco de Actions, após WhatsApp)
+Renderizar apenas quando `isEditing && (status === 'pending' || status === 'overdue')`:
+```tsx
+<MarkAsPaidPopover
+  originalAmount={totalAmount}
+  isLoading={loading}
+  onConfirm={handleManualSettlement}
+>
+  <Button type="button" variant="outline" className="w-full text-green-600">
+    <CheckCircle className="h-4 w-4 mr-1" />
+    Dar Baixa Manual
+  </Button>
+</MarkAsPaidPopover>
+```
+
+### 7. Novo AlertDialog de Sincronização (após os dialogs existentes)
+```tsx
+<AlertDialog open={syncDialogOpen} onOpenChange={(o) => { if (!o) { setSyncDialogOpen(false); setPendingSettlement(null); } }}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Sincronizar com Gateway?</AlertDialogTitle>
+      <AlertDialogDescription>
+        Esta cobrança está vinculada ao {hasAsaasCharge ? 'Asaas' : 'Conexa'}. 
+        Deseja que o Orbity confirme o recebimento manual também no gateway? 
+        Isso evitará que o banco continue cobrando o cliente.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+      <AlertDialogCancel>Voltar</AlertDialogCancel>
+      <Button variant="outline" onClick={() => { executeLocalSettlement(...); setSyncDialogOpen(false); }}>
+        Apenas no Orbity
+      </Button>
+      <AlertDialogAction onClick={handleSyncSettlement} disabled={loading}>
+        Sim, baixar no Banco
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
 ```
 
 ## Arquivos modificados
-- `src/pages/CRM.tsx`
-- `src/components/crm/LeadForm.tsx`
+- `src/components/admin/PaymentSheet.tsx` (único arquivo)
+
+## Sem migration
+Nenhuma alteração de schema necessária. A Edge Function `settle-gateway-payment` será implementada numa etapa posterior (marcada com TODO).
 
