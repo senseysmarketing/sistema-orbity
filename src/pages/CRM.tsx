@@ -244,10 +244,15 @@ export default function CRM() {
           })();
 
     return leads.filter(lead => {
+      const normalizedSearch = searchQuery.replace(/\D/g, '');
+      const matchesPhone = normalizedSearch.length > 0 && 
+        lead.phone?.replace(/\D/g, '').includes(normalizedSearch);
+
       const matchesSearch = searchQuery === '' || 
         lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         lead.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lead.company?.toLowerCase().includes(searchQuery.toLowerCase());
+        lead.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        matchesPhone;
       
       const leadDbStatus = normalizeLeadStatusToDb(lead.status);
       const matchesStatus = filterDbStatus === 'all' || leadDbStatus === filterDbStatus;
@@ -369,9 +374,12 @@ export default function CRM() {
             Gestão comercial com funil de vendas e métricas de investimento
           </p>
         </div>
-        <Dialog open={showLeadForm} onOpenChange={setShowLeadForm}>
+        <Dialog open={showLeadForm} onOpenChange={(open) => {
+          setShowLeadForm(open);
+          if (!open) setSelectedLead(null);
+        }}>
           <DialogTrigger asChild>
-            <Button variant="action">
+            <Button variant="action" onClick={() => setSelectedLead(null)}>
               <Plus className="mr-2 h-4 w-4" />
               Novo Lead
             </Button>
