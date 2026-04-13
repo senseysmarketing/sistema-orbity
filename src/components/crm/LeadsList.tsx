@@ -1,10 +1,14 @@
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { MoreHorizontal, Edit, Trash2, Eye, Building, Mail, Phone, Calendar, DollarSign } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
+
+const ITEMS_PER_PAGE = 25;
 
 interface Lead {
   id: string;
@@ -37,6 +41,17 @@ interface LeadsListProps {
 }
 
 export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [leads.length]);
+
+  const sortedLeads = [...leads].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const totalPages = Math.ceil(sortedLeads.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedLeads = sortedLeads.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'leads': return 'bg-blue-100 text-blue-800';
@@ -121,9 +136,7 @@ export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {[...leads]
-                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                .map((lead) => (
+              {paginatedLeads.map((lead) => (
                 <TableRow key={lead.id}>
                   <TableCell>
                     <div className="space-y-1">
@@ -236,6 +249,51 @@ export function LeadsList({ leads, onEdit, onDelete, onView }: LeadsListProps) {
             </TableBody>
           </Table>
         </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t px-4 py-3">
+            <span className="text-sm text-muted-foreground">
+              Mostrando {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, sortedLeads.length)} de {sortedLeads.length} leads
+            </span>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                  .reduce<number[]>((acc, page, idx, arr) => {
+                    if (idx > 0 && page - arr[idx - 1] > 1) acc.push(-arr[idx - 1]);
+                    acc.push(page);
+                    return acc;
+                  }, [])
+                  .map(page => page < 0 ? (
+                    <PaginationItem key={`ellipsis-${page}`}>
+                      <span className="px-2 text-muted-foreground">...</span>
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
