@@ -1,10 +1,14 @@
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { MoreHorizontal, Edit, Trash2, Eye, Building, Mail, Phone, Calendar, DollarSign } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { LEAD_TEMPERATURES, LeadTemperature } from "@/lib/leadTemperature";
+
+const ITEMS_PER_PAGE = 25;
 
 interface Lead {
   id: string;
