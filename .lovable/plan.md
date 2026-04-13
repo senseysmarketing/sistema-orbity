@@ -1,70 +1,40 @@
 
 
-# Corrigir Onboarding: Slugs, Redirect Default e Submit Híbrido
+# Atualizar Stripe Price IDs nos planos Orbity
 
-## Resumo
+## O que já foi feito
 
-Aplicar 3 correções críticas ao onboarding: slugs diferenciados por ciclo, redirect automático para trial quando flow inválido, e garantir que fluxos diretos não redirecionem ao dashboard.
+Os produtos e preços foram criados com sucesso no Stripe:
 
-## Alterações
+| Plano | Produto | Price ID | Valor |
+|-------|---------|----------|-------|
+| Orbity Mensal | `prod_UKVcka52hXSHPs` | `price_1TLqbBCLXDdhG50oXYQnIRz7` | R$ 397/mês |
+| Orbity Anual | `prod_UKVcSlJKBjvsdf` | `price_1TLqbVCLXDdhG50olvvUBnzv` | R$ 3.564/ano |
 
-### 1. `src/hooks/useOnboarding.tsx` — Slugs diferenciados
+## O que falta
 
-**Linha 88-93**: Trocar `planSlug: 'basic'` por slugs específicos:
-- `flow === 'trial'` → `planSlug: 'orbity_trial'`
-- `flow === 'direct_monthly'` → `planSlug: 'orbity_monthly'`
-- `flow === 'direct_annual'` → `planSlug: 'orbity_annual'`
+Atualizar os registros no banco de dados (os planos herdaram IDs antigos do plano "basic"). Uma migration SQL com os seguintes UPDATEs:
 
-**Linha 257/263**: Trocar fallback `'basic'` por `'orbity_trial'` nos tracking calls.
+```sql
+-- orbity_monthly: setar price mensal correto, limpar yearly
+UPDATE public.subscription_plans
+SET stripe_price_id_monthly = 'price_1TLqbBCLXDdhG50oXYQnIRz7',
+    stripe_price_id_yearly = NULL
+WHERE slug = 'orbity_monthly';
 
-### 2. `src/pages/Onboarding.tsx` — Redirect para trial se flow inválido
+-- orbity_annual: setar price anual correto, limpar monthly
+UPDATE public.subscription_plans
+SET stripe_price_id_monthly = NULL,
+    stripe_price_id_yearly = 'price_1TLqbVCLXDdhG50olvvUBnzv'
+WHERE slug = 'orbity_annual';
 
-No componente `Onboarding`, após calcular `flow`, se o resultado for `'default'` (nenhum param válido), redirecionar automaticamente para `/onboarding?flow=trial` usando `navigate` com `replace: true`. Isso impede acesso ao PlanSelectionStep legado.
-
-```
-const flow = useMemo(() => { ... }, [searchParams]);
-
-useEffect(() => {
-  if (flow === 'default') {
-    navigate('/onboarding?flow=trial', { replace: true });
-  }
-}, [flow, navigate]);
-```
-
-Também ajustar `totalSteps` no OnboardingProvider: como `default` nunca será atingido, o fluxo de 4 steps com PlanSelectionStep fica inacessível.
-
-### 3. `src/components/onboarding/ConfirmationStep.tsx` — UI dinâmica + submit híbrido
-
-Reescrever o componente conforme o plano anterior aprovado (renderização condicional por flow), com estas garantias adicionais:
-
-- **Botão**: `flow === 'trial'` → "Criar Agência e Iniciar Trial" / flows direct → "Ir para Pagamento"
-- **handleSubmit**: Já está correto no `useOnboarding` — `submitOnboarding()` chama `initiateCheckout()` nos flows direct e só redireciona ao `/welcome` no trial. O `ConfirmationStep` apenas chama `submitOnboarding()` e navega para `/welcome` **somente se** `success === true` **e** `flow === 'trial'`. Para flows direct, o redirect é feito pelo `window.open` dentro de `initiateCheckout`.
-
-Ajuste no handleSubmit do ConfirmationStep:
-```tsx
-const handleSubmit = async () => {
-  const success = await submitOnboarding();
-  if (success && flow === 'trial') {
-    navigate('/welcome');
-  }
-  // direct flows: redirect handled by initiateCheckout (window.open to checkout URL)
-};
+-- orbity_trial: garantir que não tem price IDs (é gratuito)
+UPDATE public.subscription_plans
+SET stripe_price_id_monthly = NULL,
+    stripe_price_id_yearly = NULL
+WHERE slug = 'orbity_trial';
 ```
 
-- Remover `getPlanInfo` hardcoded com planos antigos (97/197/597)
-- Renderizar bloco "Plano Selecionado" condicionalmente por flow (conforme plano anterior)
-- Remover `trackViewContent` com `getPlanInfo` — substituir por valores fixos baseados no flow
-
-### 4. `supabase/functions/onboarding-checkout/index.ts` — Aceitar novos slugs
-
-Verificar se o edge function consegue resolver `orbity_monthly` e `orbity_annual` na tabela `subscription_plans`. Se os slugs não existirem na tabela, será necessária uma migration para atualizar/criar os registros corretos.
-
-## Arquivos modificados
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/hooks/useOnboarding.tsx` | Slugs diferenciados por flow |
-| `src/pages/Onboarding.tsx` | Redirect default → trial |
-| `src/components/onboarding/ConfirmationStep.tsx` | UI dinâmica + navigate condicional |
-| Possível migration SQL | Garantir slugs `orbity_monthly`/`orbity_annual` na tabela `subscription_plans` |
+### Arquivo
+- Nova migration SQL em `supabase/migrations/`
 
