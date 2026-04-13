@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.payment-webhook]
 verify_jwt = false
+
+[functions.settle-gateway-payment]
+verify_jwt = false
