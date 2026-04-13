@@ -48,6 +48,8 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const [manualOverrideConfirmed, setManualOverrideConfirmed] = useState(false);
   const [updateContract, setUpdateContract] = useState(false);
   const [deactivateClient, setDeactivateClient] = useState(false);
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [pendingSettlement, setPendingSettlement] = useState<{ paidDate: string; paidAmount: number } | null>(null);
 
   const [clientId, setClientId] = useState("");
   const [baseValue, setBaseValue] = useState(0);
@@ -205,6 +207,56 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
 
   const handleWhatsApp = () => {
     toast({ title: "Em breve", description: "Integração com WhatsApp para cobrança será disponibilizada em breve." });
+  };
+
+  const executeLocalSettlement = async (settlePaidDate: string, settlePaidAmount: number) => {
+    if (!payment) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.from("client_payments")
+        .update({ status: "paid" as any, paid_date: settlePaidDate, amount_paid: settlePaidAmount })
+        .eq("id", payment.id);
+      if (error) throw error;
+      toast({ title: "✅ Baixa registrada", description: "Pagamento confirmado no Orbity." });
+      onSuccess();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManualSettlement = async (settlePaidDate: string, settlePaidAmount: number) => {
+    if (!payment) return;
+    if (hasAsaasCharge || hasConexaCharge) {
+      setPendingSettlement({ paidDate: settlePaidDate, paidAmount: settlePaidAmount });
+      setSyncDialogOpen(true);
+      return;
+    }
+    await executeLocalSettlement(settlePaidDate, settlePaidAmount);
+  };
+
+  const handleSyncSettlement = async () => {
+    if (!pendingSettlement || !payment) return;
+    setLoading(true);
+    try {
+      // TODO: Integrar chamada para Edge Function settle-gateway-payment
+      // await supabase.functions.invoke('settle-gateway-payment', {
+      //   body: { paymentId: payment.id, paidDate: pendingSettlement.paidDate, paidAmount: pendingSettlement.paidAmount }
+      // });
+      await executeLocalSettlement(pendingSettlement.paidDate, pendingSettlement.paidAmount);
+    } finally {
+      setSyncDialogOpen(false);
+      setPendingSettlement(null);
+    }
+  };
+
+  const handleLocalOnlySettlement = async () => {
+    if (!pendingSettlement) return;
+    await executeLocalSettlement(pendingSettlement.paidDate, pendingSettlement.paidAmount);
+    setSyncDialogOpen(false);
+    setPendingSettlement(null);
   };
 
   const currentStatus = statusConfig[status] || statusConfig.pending;
@@ -595,6 +647,19 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                   </Button>
                 )}
 
+                {isEditing && (status === 'pending' || status === 'overdue') && (
+                  <MarkAsPaidPopover
+                    originalAmount={totalAmount}
+                    isLoading={loading}
+                    onConfirm={handleManualSettlement}
+                  >
+                    <Button type="button" variant="outline" className="w-full text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950/30">
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Dar Baixa Manual
+                    </Button>
+                  </MarkAsPaidPopover>
+                )}
+
                 {isEditing && status !== "cancelled" && (
                   <Button
                     type="button"
@@ -669,6 +734,27 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={() => setManualOverrideConfirmed(true)}>
               Entendi, prosseguir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Sync Settlement AlertDialog */}
+      <AlertDialog open={syncDialogOpen} onOpenChange={(o) => { if (!o) { setSyncDialogOpen(false); setPendingSettlement(null); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sincronizar com Gateway?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta cobrança está vinculada ao <strong>{hasAsaasCharge ? 'Asaas' : 'Conexa'}</strong>. Deseja que o Orbity confirme o recebimento manual também no gateway? Isso evitará que o banco continue cobrando o cliente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <Button variant="outline" onClick={handleLocalOnlySettlement} disabled={loading}>
+              Apenas no Orbity
+            </Button>
+            <AlertDialogAction onClick={handleSyncSettlement} disabled={loading}>
+              Sim, baixar no Banco
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
