@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useAgency } from './useAgency';
@@ -21,6 +21,9 @@ interface PaymentMiddlewareContextType {
   refreshPaymentStatus: () => Promise<void>;
 }
 
+const VALID_DEFAULT: PaymentStatus = { isValid: true, isBlocked: false };
+const RPC_TIMEOUT_MS = 10_000;
+
 const PaymentMiddlewareContext = createContext<PaymentMiddlewareContextType | undefined>(undefined);
 
 export function PaymentMiddlewareProvider({ children }: { children: ReactNode }) {
@@ -28,36 +31,57 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
   const { currentAgency } = useAgency();
   const cache = useCache<PaymentStatus>(3 * 60 * 1000);
   
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>({
-    isValid: true,
-    isBlocked: false
-  });
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(VALID_DEFAULT);
   const [loading, setLoading] = useState(true);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isSuperAdmin = profile?.role === 'super_admin';
   const isAgencyAdmin = profile?.role === 'agency_admin';
 
+  const clearSafetyTimeout = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
   const checkPaymentStatus = async (forceRefresh = false) => {
+    // Guard: no user or no agency → valid by default, don't hang
     if (!user || !currentAgency || isSuperAdmin) {
+      console.log('[PaymentMiddleware] Skipping check (no user/agency or superAdmin)');
+      setPaymentStatus(VALID_DEFAULT);
       setLoading(false);
       return;
     }
+
+    console.log('[PaymentMiddleware] Checking for agency:', currentAgency.id);
 
     const cacheKey = `payment_${currentAgency.id}`;
     
     if (!forceRefresh) {
       const cached = cache.get(cacheKey);
       if (cached.exists && !cached.isStale) {
-        setPaymentStatus(cached.data || { isValid: false, isBlocked: true });
+        setPaymentStatus(cached.data || VALID_DEFAULT);
         setLoading(false);
         return;
       }
     }
 
+    // Safety timeout: if RPC hangs, force fail-open after 10s
+    clearSafetyTimeout();
+    timeoutRef.current = setTimeout(() => {
+      console.warn('[PaymentMiddleware] RPC timeout reached — forcing fail-open');
+      setPaymentStatus(VALID_DEFAULT);
+      setLoading(false);
+    }, RPC_TIMEOUT_MS);
+
     try {
       const { data: isValid, error } = await supabase.rpc('is_agency_subscription_valid', {
         agency_uuid: currentAgency.id
       });
+
+      clearSafetyTimeout();
+      console.log('[PaymentMiddleware] RPC result:', { isValid, error: error?.message });
 
       if (error) throw error;
 
@@ -81,26 +105,21 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
 
       if (subscription && subscription.length > 0) {
         const sub = subscription[0];
-        
         const fullStatus: PaymentStatus = {
           isValid: true,
           isBlocked: false,
           trialEnd: sub.trial_end,
           subscriptionEnd: sub.current_period_end
         };
-
         setPaymentStatus(fullStatus);
         cache.set(cacheKey, fullStatus);
       }
     } catch (error) {
-      console.error('Error checking payment status:', error);
-      const errorStatus: PaymentStatus = {
-        isValid: false,
-        isBlocked: true,
-        reason: 'Unable to verify payment status'
-      };
-      setPaymentStatus(errorStatus);
-      cache.set(cacheKey, errorStatus, { ttl: 30000 });
+      clearSafetyTimeout();
+      // FAIL-OPEN: network/RPC errors should NOT block legitimate users
+      console.error('[PaymentMiddleware] Error (fail-open applied):', error);
+      setPaymentStatus(VALID_DEFAULT);
+      cache.set(cacheKey, VALID_DEFAULT, { ttl: 30000 });
     } finally {
       setLoading(false);
     }
@@ -119,7 +138,7 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
       if (!cached.exists) {
         checkPaymentStatus();
       } else {
-        setPaymentStatus(cached.data || { isValid: false, isBlocked: true });
+        setPaymentStatus(cached.data || VALID_DEFAULT);
         setLoading(false);
         
         if (cached.isStale) {
@@ -129,6 +148,8 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
         }
       }
     } else {
+      // No user or agency yet — don't hang, set valid default
+      setPaymentStatus(VALID_DEFAULT);
       setLoading(false);
     }
   }, [user, currentAgency]);
@@ -138,6 +159,11 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
       toast.error('Atenção: ' + (paymentStatus.reason || 'Subscription invalid'));
     }
   }, [paymentStatus.isBlocked, loading, isSuperAdmin]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => clearSafetyTimeout();
+  }, []);
 
   return (
     <PaymentMiddlewareContext.Provider
