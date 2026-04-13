@@ -513,40 +513,41 @@ export default function CRM() {
                             {source === 'facebook_leads' ? 'Meta Ads' : source}
                           </SelectItem>
                         ))}
-                      </SelectContent>
+                    </SelectContent>
                     </Select>
-                  </div>
-                </div>
 
-                {/* Actions Row */}
-                <div className="flex flex-wrap items-center gap-2">
-                  {(statusFilter !== 'all' || priorityFilter !== 'all' || sourceFilter !== 'all' || searchQuery) && (
+                    {(statusFilter !== 'all' || priorityFilter !== 'all' || sourceFilter !== 'all' || searchQuery) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-shrink-0"
+                        onClick={() => {
+                          setStatusFilter('all');
+                          setPriorityFilter('all');
+                          setSourceFilter('all');
+                          setSearchQuery('');
+                        }}
+                      >
+                        Limpar Filtros
+                      </Button>
+                    )}
+
+                    <div className="flex-1" />
+
+                    <span className="text-sm text-muted-foreground flex-shrink-0">
+                      {filteredLeads.length} leads
+                    </span>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        setStatusFilter('all');
-                        setPriorityFilter('all');
-                        setSourceFilter('all');
-                        setSearchQuery('');
-                      }}
+                      className="flex-shrink-0"
+                      onClick={exportToCSV}
+                      disabled={filteredLeads.length === 0}
                     >
-                      Limpar Filtros
+                      <Download className="h-4 w-4 mr-2" />
+                      Exportar
                     </Button>
-                  )}
-                  <div className="flex-1" />
-                  <span className="text-sm text-muted-foreground">
-                    {filteredLeads.length} leads
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={exportToCSV}
-                    disabled={filteredLeads.length === 0}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
+                  </div>
                 </div>
               </div>
 
