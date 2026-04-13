@@ -65,8 +65,22 @@ export function AgenciesTable({ onCreated }: AgenciesTableProps) {
     setSheetOpen(true);
   };
 
-  const getStatusBadge = (computedStatus: string) => {
-    switch (computedStatus) {
+  const getStatusBadge = (agency: typeof agencies[0]) => {
+    // Check for trial status
+    if (agency.subscription_status === 'trial') {
+      const trialEnd = agency.trial_end ? new Date(agency.trial_end) : null;
+      if (trialEnd && trialEnd > new Date()) {
+        const daysLeft = differenceInDays(trialEnd, new Date());
+        return (
+          <Badge className="bg-violet-500/10 text-violet-600 border-violet-500/20 hover:bg-violet-500/20">
+            Trial ({daysLeft}d restantes)
+          </Badge>
+        );
+      }
+      return <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/20 hover:bg-orange-500/20">Trial Expirado</Badge>;
+    }
+    
+    switch (agency.computed_status) {
       case 'active':
         return <Badge className="bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20">Ativa</Badge>;
       case 'past_due':
@@ -204,7 +218,7 @@ export function AgenciesTable({ onCreated }: AgenciesTableProps) {
                 {paginatedAgencies.map((agency) => (
                   <TableRow key={agency.agency_id}>
                     <TableCell className="font-medium">{agency.agency_name}</TableCell>
-                    <TableCell>{getStatusBadge(agency.computed_status)}</TableCell>
+                    <TableCell>{getStatusBadge(agency)}</TableCell>
                     <TableCell>{getFinancialBadge(agency)}</TableCell>
                     <TableCell>{getSituationText(agency)}</TableCell>
                     <TableCell>{formatCurrency(Number(agency.price_monthly || 0))}</TableCell>
