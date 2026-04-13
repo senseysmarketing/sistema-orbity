@@ -11,12 +11,13 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { HelpButton } from "@/components/help/HelpButton";
 import { TourTooltip } from "@/components/tour/TourTooltip";
 import { NoAgencyScreen } from "@/components/agency/NoAgencyScreen";
+import { ConnectionErrorScreen } from "@/components/agency/ConnectionErrorScreen";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PushActivationBanner } from "@/components/notifications/PushActivationBanner";
 
 export function AppLayout() {
   const { user, loading: authLoading } = useAuth();
-  const { loading: agencyLoading, hasNoAgency, userAgencies } = useAgency();
+  const { loading: agencyLoading, hasNoAgency, fetchError, refreshAgencies } = useAgency();
   const { theme, setTheme } = useTheme();
 
   const toggleTheme = () => {
@@ -37,8 +38,13 @@ export function AppLayout() {
     return <Navigate to="/" replace />;
   }
 
+  // Connection error -> show distinct error screen
+  if (fetchError) {
+    return <ConnectionErrorScreen onRetry={refreshAgencies} />;
+  }
+
   // Authenticated but has no agency -> show blocked screen
-  if (hasNoAgency || userAgencies.length === 0) {
+  if (hasNoAgency) {
     return <NoAgencyScreen />;
   }
 
