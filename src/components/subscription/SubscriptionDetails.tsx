@@ -1,11 +1,14 @@
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CreditCard, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { CreditCard, AlertCircle, RefreshCw, ExternalLink, Sparkles } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAgency } from '@/hooks/useAgency';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { ManageSubscriptionDialog } from './ManageSubscriptionDialog';
 
 export function SubscriptionDetails() {
   const { 
@@ -16,6 +19,7 @@ export function SubscriptionDetails() {
     openCustomerPortal 
   } = useSubscription();
   const { currentAgency } = useAgency();
+  const [showManageDialog, setShowManageDialog] = useState(false);
 
   if (loading) {
     return (
@@ -46,8 +50,9 @@ export function SubscriptionDetails() {
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'active': return 'bg-green-500';
-      case 'past_due': return 'bg-yellow-500';
-      case 'canceled': return 'bg-red-500';
+      case 'trialing': return 'bg-blue-400';
+      case 'past_due': return 'bg-red-500';
+      case 'canceled': return 'bg-gray-500';
       default: return 'bg-gray-500';
     }
   };
@@ -55,14 +60,27 @@ export function SubscriptionDetails() {
   const getStatusText = (status?: string) => {
     switch (status) {
       case 'active': return 'Ativo';
-      case 'past_due': return 'Pagamento Pendente';
-      case 'canceled': return 'Cancelado';
+      case 'trialing': return 'Período de Teste (Ativo)';
+      case 'past_due': return 'Pagamento Atrasado';
+      case 'canceled': return 'Inativo';
       default: return 'Inativo';
     }
   };
 
+  const isTrialing = currentSubscription?.subscription_status === 'trialing';
   const isSubscriptionActive = currentSubscription?.subscribed && 
-    currentSubscription?.subscription_status === 'active';
+    (currentSubscription?.subscription_status === 'active' || isTrialing);
+  const needsUpgrade = isTrialing || 
+    currentSubscription?.subscription_status === 'past_due' || 
+    currentSubscription?.subscription_status === 'canceled';
+
+  const trialDaysRemaining = isTrialing && currentSubscription?.trial_end
+    ? Math.max(0, differenceInDays(new Date(currentSubscription.trial_end), new Date()))
+    : null;
+
+  const trialDaysText = trialDaysRemaining !== null
+    ? trialDaysRemaining === 0 ? 'Expira hoje' : `Faltam ${trialDaysRemaining} dia${trialDaysRemaining !== 1 ? 's' : ''}`
+    : null;
 
   return (
     <Card>
@@ -101,16 +119,30 @@ export function SubscriptionDetails() {
             </Badge>
           </div>
 
-          {currentAgency?.monthly_value && (
+          {isTrialing && currentSubscription?.trial_end && (
+            <div className="flex items-center justify-between pb-3 border-b">
+              <span className="text-sm font-medium text-muted-foreground">Válido até</span>
+              <div className="text-right">
+                <span className="text-sm font-medium">
+                  {formatDate(currentSubscription.trial_end)}
+                </span>
+                {trialDaysText && (
+                  <p className="text-xs text-muted-foreground mt-0.5">{trialDaysText}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {(currentAgency?.monthly_value ?? 0) > 0 && (
             <div className="flex items-center justify-between pb-3 border-b">
               <span className="text-sm font-medium text-muted-foreground">Valor Mensal</span>
               <span className="font-semibold text-lg">
-                {formatCurrency(currentAgency.monthly_value)}
+                {formatCurrency(currentAgency?.monthly_value)}
               </span>
             </div>
           )}
 
-          {isSubscriptionActive && currentSubscription?.subscription_end && (
+          {isSubscriptionActive && !isTrialing && currentSubscription?.subscription_end && (
             <div className="flex items-center justify-between pb-3 border-b">
               <span className="text-sm font-medium text-muted-foreground">Próxima Cobrança</span>
               <span className="text-sm font-medium">
@@ -121,7 +153,7 @@ export function SubscriptionDetails() {
         </div>
 
         <div className="space-y-2 pt-2">
-          {isSubscriptionActive && (
+          {isSubscriptionActive && !isTrialing && (
             <Button
               onClick={openCustomerPortal}
               className="w-full"
@@ -143,7 +175,32 @@ export function SubscriptionDetails() {
             </div>
           </div>
         )}
+
+        {needsUpgrade && (
+          <>
+            <Separator className="my-4" />
+            <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-3">
+              <div className="flex items-start gap-2">
+                <Sparkles className="h-5 w-5 text-primary mt-0.5" />
+                <p className="text-sm text-foreground">
+                  Garanta acesso contínuo ao Orbity. Faça o upgrade para o plano completo e não perca seus dados.
+                </p>
+              </div>
+              <Button
+                className="w-full sm:w-auto"
+                onClick={() => setShowManageDialog(true)}
+              >
+                Escolher Plano e Assinar
+              </Button>
+            </div>
+          </>
+        )}
       </CardContent>
+
+      <ManageSubscriptionDialog
+        open={showManageDialog}
+        onOpenChange={setShowManageDialog}
+      />
     </Card>
   );
 }
