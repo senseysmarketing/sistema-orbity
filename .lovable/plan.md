@@ -1,120 +1,75 @@
 
 
-# Baixa Sincronizada com Gateway no PaymentSheet
+# Edge Function `settle-gateway-payment` + Integração Frontend
 
 ## Resumo
-Adicionar ao `PaymentSheet.tsx` um fluxo de "Dar Baixa" com `MarkAsPaidPopover` no rodapé, que detecta se a cobrança possui vínculo com gateway (Asaas/Conexa) e oferece sincronização via modal antes de confirmar.
+Criar a Edge Function que faz a baixa no Asaas (receiveInCash) respeitando os 3 pontos críticos levantados, e conectar o frontend.
 
-## Alterações no `PaymentSheet.tsx` (único arquivo)
+## 1. Nova Edge Function: `supabase/functions/settle-gateway-payment/index.ts`
 
-### 1. Imports
-- Adicionar `import { MarkAsPaidPopover } from "./CommandCenter/MarkAsPaidPopover";`
-- Adicionar `CheckCircle` ao import do lucide-react
+**Fluxo:**
+1. Receber `{ paymentId, paidDate, paidAmount, syncWithGateway }` do body
+2. Validar JWT via header `Authorization` + `getClaims()`
+3. Criar cliente Supabase com o auth header do request (RLS do utilizador)
+4. Buscar o `client_payments` pelo ID (retorna `asaas_payment_id`, `agency_id`, etc.)
+5. Verificar que o utilizador pertence à agência (RLS já garante, mas validar explicitamente)
+6. **Se `syncWithGateway === true`:**
+   - Criar cliente service_role para ler `agency_payment_settings` (tabela com RLS restrita)
+   - Buscar `asaas_api_key` e `asaas_sandbox` da agência
+   - Montar URL: sandbox → `https://sandbox.asaas.com/api/v3/payments/{id}/receiveInCash` / produção → `https://api.asaas.com/v3/payments/{id}/receiveInCash`
+   - POST com body: `{ paymentDate, value, notifyCustomer: false }`
+   - Header: `access_token: {asaas_api_key}`
+   - Tratar erro da API do Asaas
+7. Atualizar `client_payments`: `status: 'paid'`, `paid_date`, `amount_paid` (via cliente do utilizador com RLS)
+8. Retornar sucesso com CORS headers
 
-### 2. Novo estado para o sync dialog
+**Padrão de autenticação (ponto 3 do user):**
 ```ts
-const [syncDialogOpen, setSyncDialogOpen] = useState(false);
-const [pendingSettlement, setPendingSettlement] = useState<{ paidDate: string; paidAmount: number } | null>(null);
+const authHeader = req.headers.get('Authorization')!;
+const userClient = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
+// Validar claims
+const { data: claims } = await userClient.auth.getClaims(token);
 ```
 
-### 3. Função `handleManualSettlement`
+**Service role apenas para ler API keys:**
 ```ts
-const handleManualSettlement = async (paidDate: string, paidAmount: number) => {
-  if (!payment) return;
-  
-  // Se tem gateway vinculado → abrir dialog de sincronização
-  if (hasAsaasCharge || hasConexaCharge) {
-    setPendingSettlement({ paidDate, paidAmount });
-    setSyncDialogOpen(true);
-    return;
-  }
-  
-  // Sem gateway → baixa local direta
-  await executeLocalSettlement(paidDate, paidAmount);
-};
+const adminClient = createClient(url, serviceRoleKey);
+const { data: settings } = await adminClient.from('agency_payment_settings')
+  .select('asaas_api_key, asaas_sandbox')
+  .eq('agency_id', agencyId)
+  .single();
 ```
 
-### 4. Função `executeLocalSettlement` (baixa apenas local)
+## 2. `supabase/config.toml`
+Adicionar entry:
+```toml
+[functions.settle-gateway-payment]
+verify_jwt = false
+```
+
+## 3. Frontend: `PaymentSheet.tsx`
+
+**`handleSyncSettlement`** — descomentar e passar `syncWithGateway: true`:
 ```ts
-const executeLocalSettlement = async (paidDate: string, paidAmount: number) => {
-  setLoading(true);
-  try {
-    const { error } = await supabase.from("client_payments")
-      .update({ status: "paid", paid_date: paidDate, amount_paid: paidAmount })
-      .eq("id", payment.id);
-    if (error) throw error;
-    toast({ title: "✅ Baixa registrada", description: "Pagamento confirmado no Orbity." });
-    onSuccess();
-    onOpenChange(false);
-  } catch (err: any) {
-    toast({ title: "Erro", description: err.message, variant: "destructive" });
-  } finally {
-    setLoading(false);
-  }
-};
+const { data, error } = await supabase.functions.invoke('settle-gateway-payment', {
+  body: { paymentId: payment.id, paidDate: pendingSettlement.paidDate, paidAmount: pendingSettlement.paidAmount, syncWithGateway: true }
+});
 ```
+Remover o fallback `executeLocalSettlement` — a Edge Function já faz o update local.
 
-### 5. Função `handleSyncSettlement` (baixa local + gateway)
+**`handleLocalOnlySettlement`** — também chamar a Edge Function mas com `syncWithGateway: false`:
 ```ts
-const handleSyncSettlement = async () => {
-  if (!pendingSettlement || !payment) return;
-  setLoading(true);
-  try {
-    // TODO: Integrar chamada para Edge Function settle-gateway-payment
-    // await supabase.functions.invoke('settle-gateway-payment', { body: { paymentId: payment.id, ... } });
-    
-    // Por ora, executa apenas a baixa local
-    await executeLocalSettlement(pendingSettlement.paidDate, pendingSettlement.paidAmount);
-  } finally {
-    setSyncDialogOpen(false);
-    setPendingSettlement(null);
-  }
-};
+const { data, error } = await supabase.functions.invoke('settle-gateway-payment', {
+  body: { paymentId: payment.id, paidDate: pendingSettlement.paidDate, paidAmount: pendingSettlement.paidAmount, syncWithGateway: false }
+});
 ```
-
-### 6. MarkAsPaidPopover no rodapé (dentro do bloco de Actions, após WhatsApp)
-Renderizar apenas quando `isEditing && (status === 'pending' || status === 'overdue')`:
-```tsx
-<MarkAsPaidPopover
-  originalAmount={totalAmount}
-  isLoading={loading}
-  onConfirm={handleManualSettlement}
->
-  <Button type="button" variant="outline" className="w-full text-green-600">
-    <CheckCircle className="h-4 w-4 mr-1" />
-    Dar Baixa Manual
-  </Button>
-</MarkAsPaidPopover>
-```
-
-### 7. Novo AlertDialog de Sincronização (após os dialogs existentes)
-```tsx
-<AlertDialog open={syncDialogOpen} onOpenChange={(o) => { if (!o) { setSyncDialogOpen(false); setPendingSettlement(null); } }}>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>Sincronizar com Gateway?</AlertDialogTitle>
-      <AlertDialogDescription>
-        Esta cobrança está vinculada ao {hasAsaasCharge ? 'Asaas' : 'Conexa'}. 
-        Deseja que o Orbity confirme o recebimento manual também no gateway? 
-        Isso evitará que o banco continue cobrando o cliente.
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-      <AlertDialogCancel>Voltar</AlertDialogCancel>
-      <Button variant="outline" onClick={() => { executeLocalSettlement(...); setSyncDialogOpen(false); }}>
-        Apenas no Orbity
-      </Button>
-      <AlertDialogAction onClick={handleSyncSettlement} disabled={loading}>
-        Sim, baixar no Banco
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
-```
+Isto centraliza a lógica de update num único ponto (a Edge Function).
 
 ## Arquivos modificados
-- `src/components/admin/PaymentSheet.tsx` (único arquivo)
+- `supabase/functions/settle-gateway-payment/index.ts` (novo)
+- `supabase/config.toml` (nova entry)
+- `src/components/admin/PaymentSheet.tsx` (descomentar invoke, remover fallback local)
 
 ## Sem migration
-Nenhuma alteração de schema necessária. A Edge Function `settle-gateway-payment` será implementada numa etapa posterior (marcada com TODO).
+Nenhuma alteração de schema necessária. Todos os campos já existem.
 
