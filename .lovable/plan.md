@@ -1,60 +1,76 @@
 
 
-# Fix Race Condition: Falso Positivo na Tela de Bloqueio (com refinamentos)
+# Fix: Sistema travado no loading (PaymentMiddleware)
 
-## Resumo
+## Problema raiz
 
-Corrigir race condition onde usuarios ativos caem na tela de bloqueio por falha de rede ou timing de auth. Inclui retry automatico, feedback de erro distinto, e botao de soft refresh.
+O `PaymentMiddlewareWrapper` envolve todo o conteudo do dashboard. Ele mostra um spinner enquanto `loading === true`. O hook `usePaymentMiddleware` chama `supabase.rpc('is_agency_subscription_valid')` que esta travando ou falhando:
+
+- Se o RPC **trava** (timeout do Supabase): `loading` fica `true` para sempre → spinner infinito
+- Se o RPC **falha** (erro): o catch define `isValid: false, isBlocked: true` → tela bloqueada
+
+Ambos os cenarios impedem o usuario de acessar o sistema. A politica atual e **fail-closed** (bloquear em caso de erro), que causa falsos positivos.
 
 ## Alteracoes
 
-### 1. `src/hooks/useAgency.tsx`
+### 1. `src/hooks/usePaymentMiddleware.tsx` — Fail-open + timeout
 
-**Trava de autenticacao**: O guard `if (!user) return` ja existe (linha 71), mas o `useEffect` (linha ~200) depende de `user?.id`. Reforcar garantindo que `setLoading(false)` so ocorre apos tentativa real.
+**Erro deve liberar acesso** (fail-open): No `catch` block (linhas 95-103), mudar para `isValid: true, isBlocked: false` em vez de bloquear. Erros de rede nao devem impedir usuarios legítimos.
 
-**Retry com 3 tentativas**:
-- Substituir o bloco try/catch de `fetchUserAgencies` por um loop de 3 tentativas com delay de 1s entre cada
-- No `catch` final (apos 3 falhas): setar `fetchError = true`, NAO setar `hasNoAgency = true`
-- Resetar `fetchError = false` no inicio de cada chamada
+**Timeout de seguranca**: Adicionar um `setTimeout` de 10 segundos que força `setLoading(false)` com status valido, caso o RPC nao responda. Cancelar o timeout quando a resposta chegar.
 
-**Novo estado e export**:
-- Adicionar `const [fetchError, setFetchError] = useState(false)` 
-- Expor `fetchError` no contexto e na interface `AgencyContextType`
+**Guard contra chamadas sem agencia**: Se `currentAgency` for null no momento do check, definir `paymentStatus` como valido por padrao e `loading: false` imediatamente (nao travar esperando).
 
-### 2. `src/components/layout/AppLayout.tsx`
+### 2. `src/components/payment/PaymentMiddlewareWrapper.tsx` — Timeout de fallback
 
-- Importar `fetchError` do `useAgency()`
-- Apos o check de auth (`!user`), adicionar:
-  ```
-  if (fetchError) return <ConnectionErrorScreen onRetry={refreshAgencies} />;
-  ```
-- Alterar linha 41 para `if (hasNoAgency)` — remover `userAgencies.length === 0` redundante (confiar apenas em `hasNoAgency` que so e setado apos query bem-sucedida)
+Adicionar um `useEffect` com timeout de 15 segundos: se `loading` continuar true, forcar renderizacao dos children com um `console.warn`. Isso e uma rede de seguranca caso o hook falhe silenciosamente.
 
-### 3. `src/components/agency/NoAgencyScreen.tsx`
+### 3. `src/hooks/usePaymentMiddleware.tsx` — Logging melhorado
 
-- Importar `useAgency` para acessar `refreshAgencies`
-- Adicionar estado local `retrying` para feedback visual
-- Botao "Tentar Novamente" (variant="outline"):
-  - Primeiro tenta `refreshAgencies()` (soft refresh)
-  - Se apos o refresh `hasNoAgency` ainda for true, faz `window.location.reload()` como fallback
-- Manter botao "Sair" existente
+Adicionar `console.log` nos pontos criticos:
+- Inicio do check (`[PaymentMiddleware] Checking...`)
+- Resultado do RPC
+- Erro capturado
+- Timeout atingido
 
-### 4. Novo: `src/components/agency/ConnectionErrorScreen.tsx`
+Isso permite diagnosticar problemas futuros nos logs.
 
-Componente simples para erro de conexao (distinto do NoAgencyScreen):
-- Icone de erro de rede (WifiOff ou AlertTriangle)
-- Titulo: "Falha de Conexao"
-- Texto: "Nao foi possivel verificar seus dados. Isso pode ser um problema temporario de rede."
-- Botao "Tentar Novamente" que chama `onRetry` prop
-- Botao "Sair" secundario
-- Visual diferente do NoAgencyScreen para que suporte identifique o problema
+## Detalhes tecnicos
+
+```text
+checkPaymentStatus():
+  if (!user || !currentAgency) → setLoading(false), return (VALIDO por padrao)
+  
+  timeoutId = setTimeout(15s) → force loading=false, isValid=true
+  
+  try:
+    rpc('is_agency_subscription_valid')
+    clearTimeout(timeoutId)
+    process result normally
+  catch:
+    clearTimeout(timeoutId)
+    isValid = TRUE  ← FAIL-OPEN (antes era false)
+    log error para diagnostico
+  finally:
+    setLoading(false)
+```
+
+PaymentMiddlewareWrapper:
+```text
+useEffect:
+  if loading:
+    timeout = 15s → setForceAllow(true), console.warn
+  cleanup: clearTimeout
+
+render:
+  if loading && !forceAllow → spinner
+  if forceAllow → children (bypass)
+```
 
 ## Arquivos modificados
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/hooks/useAgency.tsx` | Retry 3x, estado `fetchError`, export no contexto |
-| `src/components/layout/AppLayout.tsx` | Check `fetchError`, remover `userAgencies.length === 0` |
-| `src/components/agency/NoAgencyScreen.tsx` | Botao soft refresh + fallback reload |
-| `src/components/agency/ConnectionErrorScreen.tsx` | Novo componente de erro de conexao |
+| `src/hooks/usePaymentMiddleware.tsx` | Fail-open no catch, timeout de seguranca, logging |
+| `src/components/payment/PaymentMiddlewareWrapper.tsx` | Timeout fallback de 15s |
 
