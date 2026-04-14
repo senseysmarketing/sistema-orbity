@@ -278,8 +278,19 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       .reduce((sum, p) => sum + (p.amount_paid || p.amount || 0), 0);
   }, [paymentsInMonth]);
 
+  // Paid costs (cash basis)
+  const paidExpenses = useMemo(() => {
+    return expenses.filter(e => e.status === 'paid').reduce((sum, e) => sum + e.amount, 0);
+  }, [expenses]);
+
+  const paidPayroll = useMemo(() => {
+    return salaries.filter(s => s.status === 'paid').reduce((sum, s) => sum + s.amount, 0);
+  }, [salaries]);
+
+  const paidBurnRate = paidExpenses + paidPayroll;
+
   // Real profitability (cash basis)
-  const realProfitability = paidRevenue - burnRate;
+  const realProfitability = paidRevenue - paidBurnRate;
   const realProfitabilityMargin = paidRevenue > 0 ? (realProfitability / paidRevenue) * 100 : 0;
 
   // Gateway fees and net revenue from paid payments in month
