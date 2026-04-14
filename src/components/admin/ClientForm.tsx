@@ -470,6 +470,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
                     value={formData.document}
                     onChange={(e) => setFormData({ ...formData, document: formatDocument(e.target.value) })}
                     placeholder="000.000.000-00"
+                    className={isEditing && !formData.document.replace(/\D/g, '') ? 'border-amber-500 focus-visible:ring-amber-500' : ''}
                   />
                 </div>
                 <div className="grid gap-2">
@@ -481,6 +482,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
                       onChange={(e) => setFormData({ ...formData, zip_code: formatCep(e.target.value) })}
                       onBlur={() => fetchAddressByCep(formData.zip_code)}
                       placeholder="00000-000"
+                      className={isEditing && !formData.zip_code.replace(/\D/g, '') ? 'border-amber-500 focus-visible:ring-amber-500' : ''}
                     />
                     {cepLoading && (
                       <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
