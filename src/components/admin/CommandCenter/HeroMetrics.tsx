@@ -9,11 +9,13 @@ interface HeroMetricsProps {
   burnRate: number;
   profitability: number;
   profitabilityMargin: number;
+  realProfitability: number;
+  realProfitabilityMargin: number;
   delinquencyRate: number;
   isLoading: boolean;
 }
 
-export function HeroMetrics({ totalMRR, burnRate, profitability, profitabilityMargin, delinquencyRate, isLoading }: HeroMetricsProps) {
+export function HeroMetrics({ totalMRR, burnRate, profitability, profitabilityMargin, realProfitability, realProfitabilityMargin, delinquencyRate, isLoading }: HeroMetricsProps) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -48,17 +50,18 @@ export function HeroMetrics({ totalMRR, burnRate, profitability, profitabilityMa
       borderColor: "border-rose-200 dark:border-rose-800",
     },
     {
-      label: "Lucratividade",
-      value: formatCurrency(profitability),
+      label: "Lucratividade (Caixa)",
+      value: formatCurrency(realProfitability),
       icon: Calculator,
-      iconColor: profitability >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400",
-      bgColor: profitability >= 0 ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-rose-50 dark:bg-rose-950/30",
-      borderColor: profitability >= 0 ? "border-emerald-200 dark:border-emerald-800" : "border-rose-200 dark:border-rose-800",
+      iconColor: realProfitability >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400",
+      bgColor: realProfitability >= 0 ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-rose-50 dark:bg-rose-950/30",
+      borderColor: realProfitability >= 0 ? "border-emerald-200 dark:border-emerald-800" : "border-rose-200 dark:border-rose-800",
       badge: (
-        <Badge variant={profitability >= 0 ? "default" : "destructive"} className="ml-2 text-xs">
-          {profitabilityMargin.toFixed(1)}%
+        <Badge variant={realProfitability >= 0 ? "default" : "destructive"} className="ml-2 text-xs">
+          {realProfitabilityMargin.toFixed(1)}%
         </Badge>
       ),
+      subtitle: `Previsto: ${formatCurrency(profitability)} (${profitabilityMargin.toFixed(1)}%)`,
     },
     {
       label: "Inadimplência",
@@ -85,6 +88,9 @@ export function HeroMetrics({ totalMRR, burnRate, profitability, profitabilityMa
               <span className="text-2xl font-bold tracking-tight">{m.value}</span>
               {m.badge}
             </div>
+            {m.subtitle && (
+              <p className="text-xs text-muted-foreground mt-1.5">{m.subtitle}</p>
+            )}
           </CardContent>
         </Card>
       ))}
