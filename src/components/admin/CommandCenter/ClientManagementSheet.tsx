@@ -289,6 +289,18 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Client Form */}
+      <ClientForm
+        open={!!editingClient}
+        onOpenChange={(o) => { if (!o) setEditingClient(null); }}
+        client={editingClient}
+        onSuccess={() => {
+          setEditingClient(null);
+          queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
+          queryClient.invalidateQueries({ queryKey: ["admin-payments-all"] });
+        }}
+      />
     </>
   );
 }
