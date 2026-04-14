@@ -103,6 +103,9 @@ async function createAsaasPayment(
 }
 
 // --------------- Conexa helpers ---------------
+// NOTE: Conexa API base URL is a placeholder. Replace with the real endpoint
+// once the Conexa API documentation/credentials are confirmed.
+const CONEXA_BASE_URL = "https://api.conexapay.com.br";
 
 async function ensureConexaCustomer(
   client: { name: string; email: string | null; document: string | null; conexa_customer_id: string | null },
@@ -116,7 +119,7 @@ async function ensureConexaCustomer(
   if (client.email) payload.email = client.email;
   if (client.document) payload.cpfCnpj = client.document;
 
-  const res = await fetch("https://api.conexa.app/v1/customers", {
+  const res = await fetch(`${CONEXA_BASE_URL}/v1/customers`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -155,7 +158,7 @@ async function createConexaCharge(
     description: description || "Cobrança",
   };
 
-  const res = await fetch("https://api.conexa.app/v1/charges", {
+  const res = await fetch(`${CONEXA_BASE_URL}/v1/charges`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
