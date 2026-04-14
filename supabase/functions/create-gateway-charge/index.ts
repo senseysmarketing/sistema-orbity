@@ -180,7 +180,6 @@ async function createConexaSale(
 
   if (!res.ok) {
     const err = await res.text();
-    // Detect product/unit mismatch
     if (err.includes("product") && (err.includes("company") || err.includes("unit"))) {
       throw new Error(`O produto configurado não pertence à mesma unidade do cliente no Conexa. Verifique se o ID do Produto Padrão está cadastrado na unidade correta. Erro original: ${err}`);
     }
@@ -188,6 +187,67 @@ async function createConexaSale(
   }
 
   return await res.json();
+}
+
+/**
+ * Creates a Conexa Charge from an existing Sale, then fetches the charge URL.
+ */
+async function createConexaCharge(
+  saleId: string,
+  dueDate: string,
+  notes: string | null,
+  baseUrl: string,
+  apiKey: string
+): Promise<{ chargeId: string; chargeUrl: string | null; billetUrl: string | null }> {
+  const chargeBody = {
+    salesIds: [parseInt(saleId, 10)],
+    dueDate,
+    notes: notes || undefined,
+  };
+
+  console.log("[Conexa] Creating charge with body:", JSON.stringify(chargeBody));
+
+  const chargeRes = await fetch(`${baseUrl}/charge`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(chargeBody),
+  });
+
+  if (!chargeRes.ok) {
+    const errText = await chargeRes.text();
+    throw new Error(`Erro ao criar cobrança no Conexa (${chargeRes.status}): ${errText}`);
+  }
+
+  const chargeData = await chargeRes.json();
+  const chargeId = String(chargeData.id);
+
+  console.log("[Conexa] Charge created with ID:", chargeId);
+
+  // GET /charge/{chargeId} to retrieve URLs
+  const getRes = await fetch(`${baseUrl}/charge/${chargeId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
+
+  let chargeUrl: string | null = null;
+  let billetUrl: string | null = null;
+
+  if (getRes.ok) {
+    const chargeDetail = await getRes.json();
+    chargeUrl = chargeDetail.chargeUrl || null;
+    billetUrl = chargeDetail.billetUrl || null;
+    console.log("[Conexa] Charge URLs:", { chargeUrl, billetUrl });
+  } else {
+    const errText = await getRes.text();
+    console.warn("[Conexa] Could not fetch charge details:", errText);
+  }
+
+  return { chargeId, chargeUrl, billetUrl };
 }
 
 // --------------- Main handler ---------------
