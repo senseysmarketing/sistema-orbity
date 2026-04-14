@@ -14,9 +14,8 @@ const ASAAS_EVENT_MAP: Record<string, string> = {
 };
 
 const CONEXA_EVENT_MAP: Record<string, string> = {
-  "charge.paid": "paid",
-  "charge.overdue": "overdue",
-  "charge.cancelled": "cancelled",
+  "__conexa_settled": "paid",
+  "__conexa_cancelled": "cancelled",
 };
 
 Deno.serve(async (req) => {
@@ -69,11 +68,9 @@ Deno.serve(async (req) => {
       }
     } else {
       const expectedToken = settings.conexa_webhook_token;
-      const receivedToken =
-        req.headers.get("x-conexa-token") ||
-        req.headers.get("authorization")?.replace("Bearer ", "");
-      if (!expectedToken || receivedToken !== expectedToken) {
-        console.warn(`[payment-webhook] Invalid Conexa token for agency ${agencyId}`);
+      const receivedSecret = url.searchParams.get("secret");
+      if (!expectedToken || receivedSecret !== expectedToken) {
+        console.warn(`[payment-webhook] Invalid Conexa secret for agency ${agencyId}`);
         return new Response("Unauthorized", { status: 401 });
       }
     }
@@ -93,11 +90,26 @@ Deno.serve(async (req) => {
       netValue = body.payment?.netValue ?? value;
       lookupColumn = "asaas_payment_id";
     } else {
-      eventName = body.event;
-      paymentExternalId = body.data?.id || body.data?.charge_id;
-      value = body.data?.amount ?? body.data?.value ?? 0;
-      netValue = body.data?.net_amount ?? body.data?.netValue ?? value;
+      // Conexa sends flat JSON payloads (no event/data wrappers)
+      const chargeId = body.chargeId || body.id;
+      paymentExternalId = chargeId ? String(chargeId) : "";
       lookupColumn = "conexa_charge_id";
+
+      if (body.paidAmount && body.paymentDate) {
+        // Quitação (settlement)
+        eventName = "__conexa_settled";
+        value = body.paidAmount ?? 0;
+        netValue = value; // Conexa doesn't provide net value in webhook
+      } else if (body.status === "cancelled" || body.status === "excluded") {
+        // Cancelamento
+        eventName = "__conexa_cancelled";
+        value = body.amount ?? 0;
+        netValue = value;
+      } else {
+        eventName = body.event || body.status || "";
+        value = body.amount ?? 0;
+        netValue = value;
+      }
     }
 
     if (!eventName || !paymentExternalId) {
@@ -176,7 +188,7 @@ Deno.serve(async (req) => {
         const formattedAmount = new Intl.NumberFormat("pt-BR", {
           style: "currency",
           currency: "BRL",
-        }).format(netValue);
+        }).format(value);
 
         await supabase.from("notification_queue").insert({
           agency_id: payment.agency_id,
