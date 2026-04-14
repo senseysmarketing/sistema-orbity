@@ -173,8 +173,56 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
       setCepLoading(false);
     }
   };
+  const fetchCnpjData = async (cnpj: string) => {
+    setCnpjLoading(true);
+    setDocumentError(null);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const cep = (data.cep || '').replace(/\D/g, '');
+      setFormData(prev => ({
+        ...prev,
+        name: data.nome_fantasia || data.razao_social || prev.name,
+        zip_code: cep ? formatCep(cep) : prev.zip_code,
+        street: data.logradouro || prev.street,
+        number: data.numero || prev.number,
+        complement: data.complemento || prev.complement,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.municipio || prev.city,
+        state: data.uf || prev.state,
+      }));
+      toast({
+        title: "CNPJ encontrado",
+        description: `Dados de "${data.nome_fantasia || data.razao_social}" importados.`,
+      });
+    } catch {
+      toast({
+        title: "CNPJ não encontrado",
+        description: "Preencha os dados manualmente.",
+        variant: "destructive",
+      });
+    } finally {
+      setCnpjLoading(false);
+    }
+  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleDocumentChange = (value: string) => {
+    const formatted = formatDocument(value);
+    const digits = formatted.replace(/\D/g, '');
+    setFormData(prev => ({ ...prev, document: formatted }));
+    
+    if (digits.length === 11) {
+      setDocumentError(validateCPF(digits) ? null : "CPF inválido");
+    } else if (digits.length === 14) {
+      setDocumentError(null);
+      fetchCnpjData(digits);
+    } else {
+      setDocumentError(null);
+    }
+  };
+
+
     e.preventDefault();
     
     if (formData.has_loyalty && (!formData.contract_start_date || !formData.contract_end_date)) {
