@@ -236,32 +236,6 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
             </CardContent>
           </Card>
 
-          {/* Event 4: Block access */}
-          <Card>
-            <CardContent className="pt-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="h-4 w-4 text-destructive" />
-                  <Label className="font-medium">Bloqueio de acesso</Label>
-                </div>
-                <Switch checked={formData.block_access_enabled} onCheckedChange={v => updateField('block_access_enabled', v)} />
-              </div>
-              {formData.block_access_enabled && (
-                <div className="flex items-center gap-2 pl-6">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={90}
-                    value={formData.block_access_days}
-                    onChange={e => updateField('block_access_days', Number(e.target.value) || 1)}
-                    className="w-20"
-                  />
-                  <span className="text-sm text-muted-foreground">dias de atraso</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           <Separator />
 
           {/* Templates por Gateway */}
