@@ -103,23 +103,22 @@ async function createAsaasPayment(
 // --------------- Conexa v2 helpers ---------------
 
 async function ensureConexaCustomer(
-  client: { name: string; email: string | null; document: string | null; conexa_customer_id: string | null },
+  client: { name: string; conexa_customer_id: string | null },
   baseUrl: string,
   apiKey: string,
   adminClient: any,
   clientId: string,
-  companyId?: number | null
+  unitId: number
 ): Promise<string> {
   if (client.conexa_customer_id) return client.conexa_customer_id;
 
-  const normalizedCompanyId = Number(companyId);
-  if (!Number.isInteger(normalizedCompanyId) || normalizedCompanyId <= 0) {
-    throw new Error("Conexa Company ID não configurado para esta agência.");
+  if (!Number.isInteger(unitId) || unitId <= 0) {
+    throw new Error("ID da Unidade do Conexa não configurado para esta agência.");
   }
 
   const payload: Record<string, unknown> = {
+    companyId: unitId,
     name: client.name,
-    companyId: normalizedCompanyId,
   };
 
   const res = await fetch(`${baseUrl}/customer`, {
@@ -154,20 +153,19 @@ async function createConexaSale(
   _description: string | null,
   productId: number,
   baseUrl: string,
-  apiKey: string,
-  companyId: number
+  apiKey: string
 ) {
   const body: Record<string, unknown> = {
     customerId: parseInt(customerId, 10),
-    companyId,
-    items: [
-      {
-        productId,
-        quantity: 1,
-        unitPrice: amount,
-      },
-    ],
+    productId,
+    quantity: 1,
+    amount,
+    referenceDate: new Date().toISOString(),
   };
+
+  if (_description) {
+    body.notes = _description;
+  }
 
   console.log("[Conexa] Creating sale with body:", JSON.stringify(body));
 
@@ -182,6 +180,10 @@ async function createConexaSale(
 
   if (!res.ok) {
     const err = await res.text();
+    // Detect product/unit mismatch
+    if (err.includes("product") && (err.includes("company") || err.includes("unit"))) {
+      throw new Error(`O produto configurado não pertence à mesma unidade do cliente no Conexa. Verifique se o ID do Produto Padrão está cadastrado na unidade correta. Erro original: ${err}`);
+    }
     throw new Error(`Conexa sale creation failed (${res.status}): ${err}`);
   }
 
