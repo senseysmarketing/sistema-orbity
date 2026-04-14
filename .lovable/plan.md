@@ -1,62 +1,67 @@
 
 
-# Refatoração RLS — Migration SQL
+# Fase 1 — Régua de Cobrança Multi-Gateway
 
-## O que será feito
+## Migration SQL
 
-Uma única migration SQL que consolida políticas duplicadas, aplica `(select auth.uid())` para avaliação única por query, e adiciona indexes faltantes.
+Add 9 columns to `agency_payment_settings` and 1 to `clients`, then copy existing template data based on the active gateway:
 
-## Detalhes da Migration
-
-### 1. Profiles — SELECT (4 → 2 políticas)
-- **DROP**: `Users can view own profile`, `Admins can view all profiles`, `Users can view profiles in their agencies`
-- **CREATE** `profiles_select` com EXISTS otimizado (conforme solicitado):
 ```sql
-CREATE POLICY "profiles_select" ON profiles FOR SELECT USING (
-  user_id = (select auth.uid())
-  OR EXISTS (
-    SELECT 1 FROM agency_users au1
-    JOIN agency_users au2 ON au1.agency_id = au2.agency_id
-    WHERE au1.user_id = profiles.user_id 
-    AND au2.user_id = (select auth.uid())
-  )
-  OR is_admin()
-);
-```
-- **Manter**: `Super admins can view all profiles` (ALL) — sem alterar
-- **Atualizar** INSERT e UPDATE para usar `(select auth.uid())`
+-- New columns
+ALTER TABLE agency_payment_settings
+  ADD COLUMN manual_billing_enabled boolean DEFAULT false,
+  ADD COLUMN manual_template_reminder text,
+  ADD COLUMN manual_template_overdue text,
+  ADD COLUMN conexa_billing_enabled boolean DEFAULT false,
+  ADD COLUMN conexa_template_reminder text,
+  ADD COLUMN conexa_template_overdue text,
+  ADD COLUMN asaas_billing_enabled boolean DEFAULT false,
+  ADD COLUMN asaas_template_reminder text,
+  ADD COLUMN asaas_template_overdue text;
 
-### 2. Agencies — SELECT (3 → 1 política)
-- **DROP**: `Users can view their agencies`, `Master agency admins can view all agencies`, `Master users can view all agency data`
-- **CREATE** `agencies_select` consolidada com `(select auth.uid())`
+ALTER TABLE clients ADD COLUMN billing_automation_enabled boolean DEFAULT true;
 
-### 3. Agencies — UPDATE (3 → 1 política)  
-- **DROP**: as 3 políticas UPDATE
-- **CREATE** `agencies_update` consolidada com USING + WITH CHECK
-
-### 4. Agency Subscriptions — otimizar auth.uid()
-- A política `Agency members can view their subscription` já usa `user_belongs_to_agency()` (security definer) — OK
-- Sem alteração necessária (funções security definer já evitam per-row eval)
-
-### 5. Notifications + Notification Preferences — `(select auth.uid())`
-- Recriar políticas SELECT/UPDATE/INSERT/DELETE que usam `auth.uid() = user_id` para `(select auth.uid()) = user_id`
-
-### 6. Indexes
-```sql
-CREATE INDEX IF NOT EXISTS idx_notification_preferences_agency_id ON notification_preferences(agency_id);
-CREATE INDEX IF NOT EXISTS idx_notification_event_preferences_agency_id ON notification_event_preferences(agency_id);
+-- Retrocompatibilidade: copy old global templates to the active gateway's columns
+UPDATE agency_payment_settings
+SET
+  manual_template_reminder = CASE WHEN active_gateway = 'manual' THEN whatsapp_template_reminder END,
+  manual_template_overdue  = CASE WHEN active_gateway = 'manual' THEN whatsapp_template_overdue END,
+  conexa_template_reminder = CASE WHEN active_gateway = 'conexa' THEN whatsapp_template_reminder END,
+  conexa_template_overdue  = CASE WHEN active_gateway = 'conexa' THEN whatsapp_template_overdue END,
+  asaas_template_reminder  = CASE WHEN active_gateway = 'asaas'  THEN whatsapp_template_reminder END,
+  asaas_template_overdue   = CASE WHEN active_gateway = 'asaas'  THEN whatsapp_template_overdue END,
+  -- Also enable billing for whichever gateway had templates
+  manual_billing_enabled = CASE WHEN active_gateway = 'manual' AND whatsapp_template_reminder IS NOT NULL THEN true ELSE false END,
+  conexa_billing_enabled = CASE WHEN active_gateway = 'conexa' AND whatsapp_template_reminder IS NOT NULL THEN true ELSE false END,
+  asaas_billing_enabled  = CASE WHEN active_gateway = 'asaas'  AND whatsapp_template_reminder IS NOT NULL THEN true ELSE false END
+WHERE whatsapp_template_reminder IS NOT NULL OR whatsapp_template_overdue IS NOT NULL;
 ```
 
-### Nota sobre recursão
-- `is_admin()` consulta `profiles.role` — mas é `SECURITY DEFINER`, bypassa RLS. Sem risco de loop.
-- `is_master_agency_admin()` consulta `agency_users` — sem relação circular com `profiles` ou `agencies`.
+## `src/hooks/usePaymentGateway.tsx`
 
-## Impacto
-- ~10 políticas redundantes removidas
-- `auth.uid()` avaliado 1x por query nas tabelas mais acessadas
-- EXISTS com JOIN nos profiles para máximo uso de índices
-- 2 indexes adicionais para notification tables
+Add the 9 new fields to `PaymentSettings` interface and `defaultSettings`.
 
-## Arquivo
-- 1 migration SQL via migration tool
+## `src/components/admin/BillingAutomationSettings.tsx`
+
+- Import `Tabs, TabsList, TabsTrigger, TabsContent`
+- Add 9 new fields to `FormData` type and `defaultFormData`
+- Replace lines 248-304 (gateway hint + 2 template textareas) with a `<Tabs>` component:
+  - 3 tabs: Manual, Conexa, Asaas
+  - Each tab: Switch for `{gw}_billing_enabled` + 2 Textareas for `{gw}_template_reminder` / `{gw}_template_overdue` + variable badges
+  - Manual tab: extra note about PIX instead of `{link_pagamento}`
+- Update `useEffect` sync and `insertVariable` to handle per-gateway fields
+- Update `handleSave` (already saves full `formData`, just needs the new fields included)
+
+## `src/components/admin/ClientForm.tsx`
+
+- Add `billing_automation_enabled: true` to `initialFormData`
+- Populate from `client.billing_automation_enabled` in the editing `useEffect`
+- Add Switch in the "Configurações de Cobrança" section (after line 661, before the gateway-only hint)
+- Include `billing_automation_enabled` in the `data` object of `handleSubmit`
+
+## Files changed
+1. 1 SQL migration (schema + data backfill)
+2. `src/hooks/usePaymentGateway.tsx`
+3. `src/components/admin/BillingAutomationSettings.tsx`
+4. `src/components/admin/ClientForm.tsx`
 
