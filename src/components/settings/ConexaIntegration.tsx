@@ -18,6 +18,7 @@ export function ConexaIntegration() {
   const [subdomain, setSubdomain] = useState("");
   const [productId, setProductId] = useState("");
   const [companyId, setCompanyId] = useState("");
+  const [unitId, setUnitId] = useState("");
   const [gatewayActive, setGatewayActive] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const initialized = useRef(false);

@@ -492,6 +492,7 @@ export type Database = {
           conexa_enabled: boolean | null
           conexa_subdomain: string | null
           conexa_token: string | null
+          conexa_unit_id: number | null
           conexa_webhook_token: string | null
           created_at: string | null
           default_fine_percentage: number | null
@@ -525,6 +526,7 @@ export type Database = {
           conexa_enabled?: boolean | null
           conexa_subdomain?: string | null
           conexa_token?: string | null
+          conexa_unit_id?: number | null
           conexa_webhook_token?: string | null
           created_at?: string | null
           default_fine_percentage?: number | null
@@ -558,6 +560,7 @@ export type Database = {
           conexa_enabled?: boolean | null
           conexa_subdomain?: string | null
           conexa_token?: string | null
+          conexa_unit_id?: number | null
           conexa_webhook_token?: string | null
           created_at?: string | null
           default_fine_percentage?: number | null
