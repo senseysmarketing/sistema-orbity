@@ -1,28 +1,26 @@
 
 
-# Mostrar Data/Hora de Pagamento ao Lado do Badge "Pago"
+# Travas de Concorrência — usePaymentMiddleware + useSubscription
 
-## Problema Identificado
+## Resumo
+Adicionar `isCheckingRef` em ambos os hooks para impedir chamadas concorrentes (inclusive em Strict Mode double-mount), e aumentar o TTL do cache do PaymentMiddleware para `Infinity`. Remover revalidação stale desnecessária.
 
-1. **Dados ausentes**: O pagamento de teste (R$5, Cantinho da Prata via Conexa) tem `paid_at = NULL` no banco. Apenas `paid_date = '2026-04-14'` está preenchido. O tooltip atual depende de `paid_at`, então não mostra nada.
-2. **UI**: O tooltip exige hover e não é visível de imediato. O usuário quer um texto visível ao lado do badge.
+## Alterações
 
-## Correções
+### 1. `src/hooks/usePaymentMiddleware.tsx`
+- Mudar TTL do `useCache` de `3 * 60 * 1000` para `Infinity`
+- Adicionar `isCheckingRef = useRef(false)` como guard no início de `checkPaymentStatus`
+- Se `isCheckingRef.current === true`, retornar imediatamente (sem setar loading)
+- Setar `isCheckingRef.current = true` antes do RPC, `false` no `finally`
+- Remover o bloco de revalidação stale (linhas 144-148: `if (cached.isStale) { setTimeout(...) }`) — com TTL Infinity nunca fica stale
 
-### 1. `CashFlowTable.tsx` — Texto visível ao lado do badge
-- Remover a lógica de Tooltip para o status PAID
-- Mostrar o badge "Pago" seguido de um `<span>` com texto pequeno (`text-xs text-muted-foreground`) exibindo a data/hora
-- Se `paidAt` contém horário (ISO timestamp), mostrar "14/04/2026 às 13:39"
-- Se só tem `paid_date` (fallback, sem horário), mostrar apenas "14/04/2026"
-- Layout: `<div className="flex items-center gap-2">{badge}<span>...</span></div>`
+### 2. `src/hooks/useSubscription.tsx`
+- Adicionar `isCheckingRef = useRef(false)` como guard no início de `checkSubscription`
+- Se `isCheckingRef.current === true`, retornar imediatamente
+- Setar `isCheckingRef.current = true` antes do invoke, `false` no `finally`
+- Isso impede que o double-mount do Strict Mode ou o useEffect de agency dispare 2 chamadas simultâneas
 
-### 2. `useFinancialMetrics.tsx` — Fallback mais robusto no mapeamento
-- A linha `paidAt: (p as any).paid_at || p.paid_date || undefined` já faz fallback para `paid_date`, mas `paid_date` é apenas uma data (sem hora). O código na UI precisa detectar se é timestamp completo ou só data para formatar adequadamente.
-
-### 3. Verificar se expenses e salaries também mapeiam `paidAt`
-- Garantir que os mapeamentos de expenses e salaries no `unifiedCashFlow` também passem `paid_at` / `paid_date` para o `CashFlowItem`.
-
-## Arquivo alterado
-- `src/components/admin/CommandCenter/CashFlowTable.tsx`
-- `src/hooks/useFinancialMetrics.tsx` (se expenses/salaries não mapeiam paidAt)
+## Arquivos alterados
+1. `src/hooks/usePaymentMiddleware.tsx`
+2. `src/hooks/useSubscription.tsx`
 
