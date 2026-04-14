@@ -1,84 +1,66 @@
 
 
-# Correção: Cards HeroMetrics desalinhados com Fluxo de Caixa
-
-## Diagnóstico com dados reais
-
-Confirmei via query que existem **3 clientes cancelados em abril** com pagamentos `pending` no mês:
-- ANZ Imóveis: R$ 1.490 (cancelled_at: 01/04)
-- Ayub Malach: R$ 1.090 (cancelled_at: 01/04)
-- T&B Negócios: R$ 597 (cancelled_at: 01/04)
-- **Total: R$ 3.177** (exatamente o valor de Churn exibido)
-
-### Bug 1: Faturamento inflado (R$ 34.878 vs R$ 31.701)
-`expectedRevenue` soma TODOS os pagamentos não-cancelados do mês, incluindo os de clientes inativos. Mas o Fluxo de Caixa filtra por `wasClientActiveInMonth`, excluindo esses 3 clientes. Diferença = R$ 3.177.
-
-### Bug 2: Inadimplência fantasma (R$ 2.390 no card, 0 no fluxo)
-Dois problemas combinados:
-- `overdueAmount` inclui pagamentos de clientes inativos que o fluxo de caixa não mostra
-- O filtro "Atrasados" do fluxo de caixa só mostra `status === 'OVERDUE'`, ignorando items `PENDING` com vencimento passado
-
-### Bug 3: Filtro "Atrasados" incompleto no Fluxo de Caixa
-Na `CashFlowTable.tsx` linha 46: `item.status === 'OVERDUE'` — só mostra items já marcados como "overdue" no banco, ignorando pendentes vencidos.
+# Correção Conexa: Payload Flat sem companyId no /sale
 
 ## Alterações
 
-### 1. `src/hooks/useFinancialMetrics.tsx`
+### 1. Migration SQL
+Adicionar coluna `conexa_unit_id` (INTEGER) à tabela `agency_payment_settings`.
 
-**expectedRevenue** (linhas 321-326): Filtrar por `wasClientActiveInMonth`, alinhando com o fluxo de caixa:
+### 2. `src/components/settings/ConexaIntegration.tsx`
+- Novo state `unitId`, carregado de `settings.conexa_unit_id`
+- Novo campo "ID da Unidade (Conexa)" com dica: "Encontrado em Config > Unidades > Ações > Exibir no painel Conexa"
+- Salvar `conexa_unit_id` no `handleSave`
 
+### 3. `supabase/functions/create-gateway-charge/index.ts`
+
+**Validação** (bloco conexa, após linha 314): Adicionar check para `conexa_unit_id`:
 ```typescript
-const expectedRevenue = useMemo(() => {
-  return paymentsInMonth
-    .filter(p => {
-      if (p.status === 'cancelled') return false;
-      const client = clients.find(c => c.id === p.client_id);
-      return client && wasClientActiveInMonth(client, selectedMonth);
-    })
-    .reduce((sum, p) => sum + p.amount, 0);
-}, [paymentsInMonth, clients, selectedMonth]);
-```
-
-**overdueAmount** (linhas 312-318): Mesmo filtro de cliente ativo:
-
-```typescript
-const overdueAmount = useMemo(() => {
-  return paymentsInMonth
-    .filter(p => {
-      if (!['overdue', 'pending'].includes(p.status)) return false;
-      if (p.due_date >= today) return false;
-      const client = clients.find(c => c.id === p.client_id);
-      return client && wasClientActiveInMonth(client, selectedMonth);
-    })
-    .reduce((sum, p) => sum + p.amount, 0);
-}, [paymentsInMonth, clients, selectedMonth, today]);
-```
-
-### 2. `src/components/admin/CommandCenter/CashFlowTable.tsx`
-
-**Filtro "Atrasados"** (linha 46): Incluir items PENDING com vencimento passado:
-
-```typescript
-if (filter === 'overdue') {
-  const todayStr = new Date().toISOString().split('T')[0];
-  return item.status === 'OVERDUE' || 
-    (item.status === 'PENDING' && item.dueDate < todayStr);
+if (!settings.conexa_unit_id) {
+  return jsonResponse({ error: "ID da Unidade do Conexa não configurado..." }, 422);
 }
 ```
 
-**overdueCount** (linha 59): Mesma lógica para o contador no botão:
-
+**`ensureConexaCustomer`** (linha 120-123): Payload mínimo com `companyId` (= `unitId`) + `name` apenas:
 ```typescript
-const todayStr = new Date().toISOString().split('T')[0];
-const overdueCount = cashFlow.filter(i => 
-  i.status === 'OVERDUE' || (i.status === 'PENDING' && i.dueDate < todayStr)
-).length;
+const payload = {
+  companyId: normalizedCompanyId,
+  name: client.name,
+};
+```
+Já está assim — sem mudança necessária. Apenas trocar o parâmetro chamado na invocação (linha 325) de `settings.conexa_company_id` para `settings.conexa_unit_id`.
+
+**`createConexaSale`** (linhas 150-188): Refatorar completamente:
+- Remover parâmetro `companyId` da assinatura
+- Payload flat **SEM `companyId`**, **SEM `items[]`**:
+```typescript
+const body: Record<string, unknown> = {
+  customerId: parseInt(customerId, 10),
+  productId,
+  quantity: 1,
+  amount,
+  referenceDate: new Date().toISOString(),
+  notes: _description || undefined,
+};
 ```
 
-## Resultado esperado
+**Chamada** (linhas 329-338): Remover o último argumento `settings.conexa_company_id`:
+```typescript
+const conexaResponse = await createConexaSale(
+  conexaCustomerId, amount, due_date, description,
+  settings.conexa_default_product_id,
+  conexaBaseUrl, settings.conexa_api_key
+);
+```
 
-- Card "Faturamento" mostrará R$ 31.701 (igual ao fluxo de caixa)
-- Card "Inadimplência" mostrará apenas atrasos de clientes ativos
-- Botão "Atrasados" no fluxo de caixa mostrará pendentes vencidos
-- Tudo consistente entre cards e tabela
+**Error handling**: Na catch de `createConexaSale`, detectar mensagem de "product" + "company/unit" para retornar erro amigável sobre produto e unidade divergentes.
+
+### 4. Deploy
+Redeployar `create-gateway-charge`.
+
+## Resumo das diferenças vs. plano anterior
+- `companyId` **removido** do body de POST `/sale` (a API rejeita esse campo)
+- `companyId` **mantido** apenas no POST `/customer` (usando `conexa_unit_id`)
+- Campo `amount` em vez de `unitPrice` dentro de `items`
+- Formato flat (sem array `items`)
 
