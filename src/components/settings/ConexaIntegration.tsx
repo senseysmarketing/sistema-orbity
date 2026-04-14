@@ -19,6 +19,8 @@ export function ConexaIntegration() {
   const [productId, setProductId] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [unitId, setUnitId] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [receivingMethodId, setReceivingMethodId] = useState("");
   const [gatewayActive, setGatewayActive] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const initialized = useRef(false);
