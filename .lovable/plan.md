@@ -1,75 +1,32 @@
 
 
-# Faturamento Híbrido Conexa: Venda + Cobrança (Full-Stack)
-
-## Resumo
-Implementar o fluxo de dois passos do Conexa (POST /sale -> POST /charge -> GET /charge/{id}) com suporte a faturamento automático e manual, gerenciamento correto de IDs e atualização de status.
+# Enriquecer payload POST /customer do Conexa
 
 ## Alterações
 
-### 1. Nova Edge Function `invoice-conexa-sale`
-**Arquivo**: `supabase/functions/invoice-conexa-sale/index.ts`
+### Arquivo: `supabase/functions/create-gateway-charge/index.ts`
 
-Recebe `{ payment_id }`. Fluxo:
-- Autentica via JWT do header Authorization
-- Busca o `client_payment` pelo ID (via adminClient) com `conexa_charge_id` preenchido
-- Busca `agency_payment_settings` pela `agency_id` do pagamento
-- POST `{baseUrl}/charge` com body `{ salesIds: [parseInt(conexa_charge_id, 10)], dueDate, notes }`
-- Resposta 201 retorna `{ id: chargeId }`
-- GET `{baseUrl}/charge/{chargeId}` para obter `chargeUrl` e `billetUrl`
-- UPDATE `client_payments`: sobrescrever `conexa_charge_id` com o novo chargeId, salvar `conexa_invoice_url = chargeUrl`, `conexa_pix_copy_paste = billetUrl`, forçar `status = 'pending'`
-- Retorna sucesso com URLs
-- Erros da API Conexa são repassados ao frontend
+**1. Expandir SELECT de clients** (linha ~304):
+Adicionar campos de endereço e contato:
+```
+"id, name, email, document, contact, asaas_customer_id, conexa_customer_id, zip_code, street, number, neighborhood, city, state, complement"
+```
 
-### 2. Refatoração da `create-gateway-charge`
-**Arquivo**: `supabase/functions/create-gateway-charge/index.ts`
+**2. Reescrever `ensureConexaCustomer`** (linhas 105-147):
 
-- Aceitar novo campo `auto_invoice` no body (default `true`)
-- Após criar a venda Conexa (POST /sale):
-  - Se `auto_invoice === true`: executar internamente POST /charge -> GET /charge/{id} -> popular `conexa_charge_id` com chargeId final (sobrescrevendo o saleId), `conexa_invoice_url` e `conexa_pix_copy_paste`
-  - Se `auto_invoice === false`: salvar o saleId em `conexa_charge_id` temporariamente (sem URLs)
-- Extrair helper `invoiceConexaSale(saleId, dueDate, notes, baseUrl, apiKey)` reutilizável nas duas funções
+Expandir assinatura do parâmetro `client` para incluir todos os campos (email, document, contact, zip_code, street, number, neighborhood, city, state, complement, conexa_customer_id).
 
-### 3. `supabase/config.toml`
-Adicionar `[functions.invoice-conexa-sale]` com `verify_jwt = false`
+Substituir o payload simples `{ companyId, name }` pela lógica completa:
 
-### 4. Toggle no PaymentSheet (formulário de criação)
-**Arquivo**: `src/components/admin/PaymentSheet.tsx`
+- **Telefone**: limpar não-dígitos, remover DDI 55 se >11 dígitos, truncar para últimos 11 dígitos
+- **Endereço**: montar objeto `address` somente se `zip_code` existir, com `additionalDetails` mapeado de `complement`
+- **Documento**: roteamento dinâmico — se >11 dígitos vai para `legalPerson.cnpj`, senão `naturalPerson.cpf`
+- **Emails**: `emailsFinancialMessages` e `emailsMessage` como arrays com o email do cliente
 
-- Novo state `autoInvoice` (default `true`)
-- Mostrar Switch "Faturar Automaticamente" apenas quando `billingType === 'conexa'` e for criação (nao edição)
-- Passar `auto_invoice` no payload do `createPaymentHook`
+**3. Deploy** da edge function `create-gateway-charge`.
 
-### 5. Hook `useCreatePayment` - propagar `auto_invoice`
-**Arquivo**: `src/hooks/useCreatePayment.ts`
-
-- Adicionar `auto_invoice?: boolean` na interface `CreatePaymentData`
-- Incluir `auto_invoice` no payload enviado à edge function
-
-### 6. Propagar `conexa_invoice_url` e `conexa_charge_id` no CashFlowItem
-**Arquivo**: `src/hooks/useFinancialMetrics.tsx`
-
-- Adicionar `invoiceUrl?: string` e `conexaChargeId?: string` na interface `CashFlowItem`
-- No mapeamento de payments, preencher `invoiceUrl` com `conexa_invoice_url || invoice_url` e `conexaChargeId` com `conexa_charge_id`
-
-### 7. Botão "Emitir Fatura Conexa" no CashFlowTable
-**Arquivo**: `src/components/admin/CommandCenter/CashFlowTable.tsx`
-
-- No DropdownMenu, adicionar opção "Emitir Fatura Conexa"
-- Visível se: `billingType === 'conexa'` E `!invoiceUrl` E `conexaChargeId` presente E status !== PAID/CANCELLED
-- Ao clicar: `supabase.functions.invoke('invoice-conexa-sale', { body: { payment_id: item.sourceId } })`
-- State `isInvoicing` para loading + toast de sucesso/erro + refetch dados
-
-## Regras de Negócio Críticas
-- **Sobrescrita de ID**: `conexa_charge_id` começa com saleId, é substituído pelo chargeId após POST /charge
-- **Status**: Forçar `status = 'pending'` após faturamento bem-sucedido
-- **Parse**: `salesIds: [parseInt(saleId, 10)]` no payload do /charge
-- **Erros**: Mensagens da API Conexa repassadas ao frontend
-
-## Resumo de arquivos
-- 1 nova edge function (`invoice-conexa-sale`)
-- 1 edge function refatorada (`create-gateway-charge`)
-- 1 config (`config.toml`)
-- 4 arquivos frontend (PaymentSheet, useCreatePayment, CashFlowTable, useFinancialMetrics)
+## Resumo
+- 1 arquivo alterado (`create-gateway-charge/index.ts`)
+- 2 pontos de edição: SELECT dos clients + função `ensureConexaCustomer`
 - 0 migrations
 
