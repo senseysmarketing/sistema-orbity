@@ -281,7 +281,7 @@ export default function ContractPreview({ data, onComplete }: ContractPreviewPro
       if (payments.length > 0) {
         const { error: paymentsError } = await supabase
           .from("client_payments")
-          .upsert(payments, { onConflict: 'agency_id,client_id,extract_month_immutable(due_date)', ignoreDuplicates: true });
+          .insert(payments);
 
         if (paymentsError) throw paymentsError;
       }
