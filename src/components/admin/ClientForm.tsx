@@ -16,6 +16,27 @@ import { usePaymentGateway } from "@/hooks/usePaymentGateway";
 import { Loader2, Info, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+// Validação de CPF
+function validateCPF(cpf: string): boolean {
+  const digits = cpf.replace(/\D/g, '');
+  if (digits.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(digits)) return false;
+
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(digits[i]) * (10 - i);
+  let remainder = (sum * 10) % 11;
+  if (remainder === 10) remainder = 0;
+  if (remainder !== parseInt(digits[9])) return false;
+
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(digits[i]) * (11 - i);
+  remainder = (sum * 10) % 11;
+  if (remainder === 10) remainder = 0;
+  if (remainder !== parseInt(digits[10])) return false;
+
+  return true;
+}
+
 // Máscaras
 function formatDocument(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 14);
@@ -89,6 +110,8 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
   
   const [loading, setLoading] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [documentError, setDocumentError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({ ...initialFormData });
 
@@ -150,9 +173,68 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
       setCepLoading(false);
     }
   };
+  const fetchCnpjData = async (cnpj: string) => {
+    setCnpjLoading(true);
+    setDocumentError(null);
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const cep = (data.cep || '').replace(/\D/g, '');
+      setFormData(prev => ({
+        ...prev,
+        name: data.nome_fantasia || data.razao_social || prev.name,
+        zip_code: cep ? formatCep(cep) : prev.zip_code,
+        street: data.logradouro || prev.street,
+        number: data.numero || prev.number,
+        complement: data.complemento || prev.complement,
+        neighborhood: data.bairro || prev.neighborhood,
+        city: data.municipio || prev.city,
+        state: data.uf || prev.state,
+      }));
+      toast({
+        title: "CNPJ encontrado",
+        description: `Dados de "${data.nome_fantasia || data.razao_social}" importados.`,
+      });
+    } catch {
+      toast({
+        title: "CNPJ não encontrado",
+        description: "Preencha os dados manualmente.",
+        variant: "destructive",
+      });
+    } finally {
+      setCnpjLoading(false);
+    }
+  };
+
+  const handleDocumentChange = (value: string) => {
+    const formatted = formatDocument(value);
+    const digits = formatted.replace(/\D/g, '');
+    setFormData(prev => ({ ...prev, document: formatted }));
+    
+    if (digits.length === 11) {
+      setDocumentError(validateCPF(digits) ? null : "CPF inválido");
+    } else if (digits.length === 14) {
+      setDocumentError(null);
+      fetchCnpjData(digits);
+    } else {
+      setDocumentError(null);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const docDigits = formData.document.replace(/\D/g, '');
+    if (docDigits.length === 11 && !validateCPF(docDigits)) {
+      toast({
+        title: "CPF inválido",
+        description: "Verifique o número do documento antes de salvar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     
     if (formData.has_loyalty && (!formData.contract_start_date || !formData.contract_end_date)) {
       toast({
@@ -469,13 +551,21 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="document">CPF/CNPJ</Label>
-                  <Input
-                    id="document"
-                    value={formData.document}
-                    onChange={(e) => setFormData({ ...formData, document: formatDocument(e.target.value) })}
-                    placeholder="000.000.000-00"
-                    className={isEditing && !formData.document.replace(/\D/g, '') ? 'border-amber-500 focus-visible:ring-amber-500' : ''}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="document"
+                      value={formData.document}
+                      onChange={(e) => handleDocumentChange(e.target.value)}
+                      placeholder="000.000.000-00"
+                      className={`${isEditing && !formData.document.replace(/\D/g, '') ? 'border-amber-500 focus-visible:ring-amber-500' : ''} ${documentError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    />
+                    {cnpjLoading && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                  {documentError && (
+                    <p className="text-xs text-destructive">{documentError}</p>
+                  )}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="zip_code">CEP</Label>
