@@ -404,7 +404,7 @@ export default function Admin() {
         paidExpenses={metrics.paidBurnRate}
         projectedProfit={metrics.projectedProfit}
         profitMargin={metrics.profitMargin}
-        overdueAmount={metrics.delinquencyRate}
+        overdueAmount={metrics.overdueAmount}
         overdueRate={metrics.overdueRate}
         isLoading={metrics.isLoading}
       />
