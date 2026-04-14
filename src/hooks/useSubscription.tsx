@@ -102,6 +102,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const checkSubscription = async (forceRefresh = false) => {
     if (!user) return;
 
+    // Concurrency guard: prevent duplicate simultaneous calls
+    if (isCheckingRef.current) return;
+
     const cacheKey = `subscription_${user.id}_${currentAgency?.id}`;
     
     // Check cache first unless forcing refresh
@@ -114,6 +117,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    isCheckingRef.current = true;
     const isRefreshing = refreshing;
     if (!isRefreshing) setRefreshing(true);
 

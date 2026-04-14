@@ -54,6 +54,8 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
       setLoading(false);
       return;
     }
+    // Concurrency guard: prevent duplicate simultaneous calls
+    if (isCheckingRef.current) return;
 
     console.log('[PaymentMiddleware] Checking for agency:', currentAgency.id);
 
