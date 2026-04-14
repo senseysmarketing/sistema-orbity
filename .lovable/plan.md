@@ -1,76 +1,81 @@
 
 
-# Dual WhatsApp Instance Support (General + Billing)
+# Cross-Instance Automation Pausing + Lead Resolution
 
 ## Resumo
-Permitir duas instancias WhatsApp por agencia (general + billing), com roteamento inteligente, webhook atualizado e UI com toggle para numero exclusivo de cobranca.
+Refatorar `findActiveAutomations` para buscar por `agency_id` (cross-instance) e garantir que o lead seja resolvido globalmente antes de tentar pausar automações.
 
-## 1. SQL Migration
+## Alterações em `supabase/functions/whatsapp-webhook/index.ts`
 
-```sql
--- Add purpose column
-ALTER TABLE whatsapp_accounts ADD COLUMN purpose text NOT NULL DEFAULT 'general';
+### 1. Refatorar `findActiveAutomations` (linhas 98-118)
 
--- Drop existing unique constraint on agency_id (currently 1 account per agency)
-ALTER TABLE whatsapp_accounts DROP CONSTRAINT whatsapp_accounts_agency_id_key;
+Mudar assinatura de `(supabase, accountId, conversationId, leadId)` para `(supabase, agencyId, conversationId, leadId)`.
 
--- New composite unique: 1 account per agency per purpose
-CREATE UNIQUE INDEX whatsapp_accounts_agency_purpose_idx ON whatsapp_accounts (agency_id, purpose);
+- **Busca por conversationId**: manter filtro por `conversation_id` (sem filtro de `account_id` — conversas são únicas por ID)
+- **Busca por leadId (cross-instance)**: remover `.eq('account_id', ...)` e buscar automações ativas por `lead_id` em QUALQUER conta da agência, usando um join ou subquery:
+  - Buscar todos os `account_id`s da agência: `SELECT id FROM whatsapp_accounts WHERE agency_id = agencyId`
+  - Filtrar automações `.in('account_id', agencyAccountIds).eq('lead_id', leadId).in('status', ['active', 'processing'])`
 
--- Unique instance_name globally (avoid Evolution API conflicts)
-CREATE UNIQUE INDEX whatsapp_accounts_instance_name_idx ON whatsapp_accounts (instance_name);
+### 2. Resolução global do Lead (antes da conversa — linhas 318-381)
 
--- Add toggle to agency_payment_settings
-ALTER TABLE agency_payment_settings ADD COLUMN use_separate_billing_whatsapp boolean NOT NULL DEFAULT false;
+O código atual já faz `find_lead_by_normalized_phone` com `agency_id` quando não encontra conversa (linha 330). Porém, quando **encontra** a conversa mas ela não tem `lead_id`, ele já resolve o lead (linha 370).
+
+**Ajuste necessário**: Mesmo quando a conversa É encontrada COM `lead_id`, precisamos garantir que o `lead_id` esteja disponível. O código atual já faz isso (linha 326 prioriza conversas com `lead_id`).
+
+**Ajuste adicional para billing**: Quando a mensagem chega no número de billing e NÃO existe conversa nessa instância, o código já busca o lead globalmente via RPC (linha 330). O lead é encontrado, mas a conversa é criada na instância de billing. O `lead_id` fica disponível para `findActiveAutomations`. **Isso já funciona.**
+
+O ponto crítico é apenas garantir que, se o lead não foi encontrado via conversa, façamos a busca RPC **antes** de chamar `findActiveAutomations`. O código atual já faz isso. Nenhuma mudança estrutural no fluxo de resolução de lead é necessária.
+
+### 3. Atualizar chamadas a `findActiveAutomations` (linhas 419 e 445)
+
+Trocar `account.id` por `account.agency_id` nas duas chamadas:
+
+```typescript
+// Linha 419 (customer reply)
+const automations = await findActiveAutomations(
+  supabase, account.agency_id, conversation.id, conversation.lead_id
+);
+
+// Linha 445 (operator takeover)
+const automations = await findActiveAutomations(
+  supabase, account.agency_id, conversation.id, conversation.lead_id
+);
 ```
 
-## 2. Edge Function: `whatsapp-connect/index.ts`
+### Implementação da nova `findActiveAutomations`
 
-- Accept optional `purpose` param (default `'general'`) from request body
-- Change `generateInstanceName` to: `orbity_{agency8}_{purpose}` (e.g. `orbity_7bef1258_billing`)
-- Change upsert `onConflict` from `'agency_id'` to `'agency_id,purpose'`
-- Include `purpose` in upsert data
-- All actions (status, disconnect, refresh_qr, check_webhook) must accept `purpose` and filter by `agency_id + purpose` instead of just `agency_id`
+```typescript
+async function findActiveAutomations(
+  supabase: any, agencyId: string, conversationId: string, leadId: string | null
+): Promise<{ id: string }[]> {
+  // 1. By conversation (scoped, fast)
+  const { data: byConv } = await supabase
+    .from('whatsapp_automation_control').select('id')
+    .eq('conversation_id', conversationId)
+    .in('status', ['active', 'processing']).limit(10);
 
-## 3. Edge Function: `whatsapp-webhook/index.ts`
+  if (byConv && byConv.length > 0) return byConv;
+  if (!leadId) return [];
 
-- The webhook already finds accounts by `instance_name` (line 187-189), which is unique per purpose. No structural change needed -- it already routes correctly since each instance has a unique name.
-- After migration, the `instance_name` contains the purpose suffix, so messages are naturally saved under the correct `account_id`.
+  // 2. By lead across ALL accounts in the agency (cross-instance)
+  const { data: agencyAccounts } = await supabase
+    .from('whatsapp_accounts').select('id')
+    .eq('agency_id', agencyId);
 
-## 4. Hook: `useWhatsApp.tsx`
+  if (!agencyAccounts || agencyAccounts.length === 0) return [];
 
-- Accept optional `purpose` parameter (default `'general'`)
-- Add `.eq('purpose', purpose)` to account query (line 60)
-- Pass `purpose` to all edge function calls (connect, disconnect, status, refresh_qr, check_webhook)
-- Update query keys to include `purpose` for cache isolation: `['whatsapp-account', agencyId, purpose]`
-- `sendMessage` already uses `account.id` which is purpose-specific, no change needed there
+  const accountIds = agencyAccounts.map((a: any) => a.id);
 
-## 5. UI: `WhatsAppIntegration.tsx`
+  const { data: byLead } = await supabase
+    .from('whatsapp_automation_control').select('id')
+    .in('account_id', accountIds)
+    .eq('lead_id', leadId)
+    .in('status', ['active', 'processing']).limit(10);
 
-- Fetch `use_separate_billing_whatsapp` from `agency_payment_settings`
-- Add Switch at top: "Usar numero exclusivo para cobrancas financeiras"
-- Toggle upserts `use_separate_billing_whatsapp` on `agency_payment_settings`
-- Extract current card into a reusable `WhatsAppInstanceCard` component accepting `purpose` and `title` props
-- When OFF: render one card (purpose='general', title="WhatsApp Principal")
-- When ON: render two cards side by side:
-  - Card 1: purpose='general', title="Atendimento & Automacoes"
-  - Card 2: purpose='billing', title="Financeiro & Cobranca"
-- Each card uses its own `useWhatsApp(purpose)` instance
+  return byLead || [];
+}
+```
 
-## 6. Edge Function: `process-billing-reminders/index.ts`
-
-- After fetching `settings`, check `settings.use_separate_billing_whatsapp`
-- If true: query `whatsapp_accounts` with `.eq('purpose', 'billing')` first; if not found/connected, fall back to `'general'`
-- If false: query with `.eq('purpose', 'general')` (current behavior, line 100-105)
-
-## 7. WhatsAppChat.tsx (visual indicator)
-
-- No changes needed for MVP. The chat component already uses the `general` purpose hook. Billing messages are sent by the system (edge function), not via the CRM chat. Adding a visual badge for billing-origin messages can be a follow-up enhancement.
-
-## Arquivos alterados
-1. SQL migration (new)
-2. `supabase/functions/whatsapp-connect/index.ts`
-3. `supabase/functions/process-billing-reminders/index.ts`
-4. `src/hooks/useWhatsApp.tsx`
-5. `src/components/settings/WhatsAppIntegration.tsx`
+## Arquivo alterado
+1. `supabase/functions/whatsapp-webhook/index.ts`
 
