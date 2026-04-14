@@ -56,7 +56,7 @@ const defaultFormData: FormData = {
 };
 
 export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomationSettingsProps) {
-  const { settings, isAsaasActive, isConexaActive, updateSettings, isSaving } = usePaymentGateway();
+  const { settings, updateSettings, isSaving } = usePaymentGateway();
   const { account, isConnected } = useWhatsApp();
   const { toast } = useToast();
 
