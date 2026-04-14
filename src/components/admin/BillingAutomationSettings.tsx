@@ -42,6 +42,7 @@ const defaultFormData: FormData = {
   discount_days_before: 0,
   conexa_subdomain: null,
   conexa_default_product_id: null,
+  conexa_company_id: null,
 };
 
 export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomationSettingsProps) {
@@ -71,6 +72,7 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
         discount_days_before: settings.discount_days_before ?? 0,
         conexa_subdomain: settings.conexa_subdomain ?? null,
         conexa_default_product_id: settings.conexa_default_product_id ?? null,
+        conexa_company_id: settings.conexa_company_id ?? null,
       });
     }
   }, [settings]);
