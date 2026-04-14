@@ -129,11 +129,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         // Eventos silenciosos que não devem causar re-render da árvore inteira
-        const silentEvents = ['TOKEN_REFRESHED'];
+        const silentEvents = ['TOKEN_REFRESHED', 'INITIAL_SESSION'];
         
         if (silentEvents.includes(event)) {
-          console.log('[Auth] Token refreshed silently, skipping state update');
+          console.log('[Auth] Silent event:', event, '— updating ref only');
           sessionRef.current = newSession;
+          // Ensure loading clears on INITIAL_SESSION
+          if (event === 'INITIAL_SESSION') setLoading(false);
           return;
         }
         
@@ -141,8 +143,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const newUserId = newSession?.user?.id || null;
         const currentUserId = currentUserIdRef.current;
         
-        if (newUserId !== currentUserId || event === 'SIGNED_IN') {
-          console.log('[Auth] User changed or SIGNED_IN:', currentUserId, '->', newUserId);
+        if (newUserId !== currentUserId) {
+          // User actually changed — full state update + profile fetch
+          console.log('[Auth] User changed:', currentUserId, '->', newUserId);
           currentUserIdRef.current = newUserId;
           sessionRef.current = newSession;
           
@@ -168,6 +171,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } else {
             setProfile(null);
           }
+        } else {
+          // Same user (e.g. SIGNED_IN on tab refocus) — update ref silently
+          console.log('[Auth] Same user, silent ref update for event:', event);
+          sessionRef.current = newSession;
         }
         
         setLoading(false);
