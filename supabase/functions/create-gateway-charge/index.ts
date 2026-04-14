@@ -314,20 +314,23 @@ Deno.serve(async (req) => {
         if (!settings.conexa_default_product_id) {
           return jsonResponse({ error: "ID do Produto Padrão do Conexa não configurado. Vá em Configurações > Integrações." }, 422);
         }
+        if (!settings.conexa_unit_id) {
+          return jsonResponse({ error: "ID da Unidade do Conexa não configurado. Vá em Configurações > Integrações e preencha o campo 'ID da Unidade'." }, 422);
+        }
 
         const conexaBaseUrl = `https://${settings.conexa_subdomain}.conexa.app/index.php/api/v2`;
 
-        // Ensure customer exists in Conexa
+        // Ensure customer exists in Conexa (uses unit_id as companyId)
         const conexaCustomerId = await ensureConexaCustomer(
           client,
           conexaBaseUrl,
           settings.conexa_api_key,
           adminClient,
           client_id,
-          settings.conexa_company_id
+          settings.conexa_unit_id
         );
 
-        // Create sale in Conexa
+        // Create sale in Conexa (flat payload, no companyId)
         const conexaResponse = await createConexaSale(
           conexaCustomerId,
           amount,
@@ -335,8 +338,7 @@ Deno.serve(async (req) => {
           description,
           settings.conexa_default_product_id,
           conexaBaseUrl,
-          settings.conexa_api_key,
-          settings.conexa_company_id
+          settings.conexa_api_key
         );
 
         // POST /sale returns { "id": 12345 } with status notBilled
