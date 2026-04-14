@@ -13,6 +13,7 @@ interface WhatsAppAccount {
   status: string;
   phone_number: string | null;
   qr_code: string | null;
+  purpose: string;
 }
 
 interface WhatsAppMessage {
@@ -44,20 +45,21 @@ interface AutomationControl {
   next_execution_at: string | null;
 }
 
-export function useWhatsApp() {
+export function useWhatsApp(purpose: string = 'general') {
   const { currentAgency } = useAgency();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Get WhatsApp account for current agency
+  // Get WhatsApp account for current agency and purpose
   const { data: account, isLoading: isLoadingAccount } = useQuery({
-    queryKey: ['whatsapp-account', currentAgency?.id],
+    queryKey: ['whatsapp-account', currentAgency?.id, purpose],
     queryFn: async () => {
       if (!currentAgency?.id) return null;
       const { data, error } = await supabase
         .from('whatsapp_accounts')
         .select('*')
         .eq('agency_id', currentAgency.id)
+        .eq('purpose', purpose)
         .maybeSingle();
       if (error) throw error;
       return data as WhatsAppAccount | null;
@@ -74,6 +76,7 @@ export function useWhatsApp() {
         body: {
           action: 'connect',
           agency_id: currentAgency?.id,
+          purpose,
         },
       });
       if (error) throw error;
@@ -81,7 +84,7 @@ export function useWhatsApp() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-account'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-account', currentAgency?.id, purpose] });
     },
     onError: (error: Error) => {
       toast({ title: 'Erro ao conectar WhatsApp', description: error.message, variant: 'destructive' });
@@ -92,13 +95,13 @@ export function useWhatsApp() {
   const disconnect = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('whatsapp-connect', {
-        body: { action: 'disconnect', agency_id: currentAgency?.id },
+        body: { action: 'disconnect', agency_id: currentAgency?.id, purpose },
       });
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-account'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-account', currentAgency?.id, purpose] });
       toast({ title: 'WhatsApp desconectado' });
     },
   });
@@ -107,13 +110,13 @@ export function useWhatsApp() {
   const checkStatus = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('whatsapp-connect', {
-        body: { action: 'status', agency_id: currentAgency?.id },
+        body: { action: 'status', agency_id: currentAgency?.id, purpose },
       });
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-account'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-account', currentAgency?.id, purpose] });
     },
   });
 
@@ -121,7 +124,7 @@ export function useWhatsApp() {
   const checkWebhook = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('whatsapp-connect', {
-        body: { action: 'check_webhook', agency_id: currentAgency?.id },
+        body: { action: 'check_webhook', agency_id: currentAgency?.id, purpose },
       });
       if (error) throw error;
       return data;
@@ -142,13 +145,13 @@ export function useWhatsApp() {
   const refreshQR = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('whatsapp-connect', {
-        body: { action: 'refresh_qr', agency_id: currentAgency?.id },
+        body: { action: 'refresh_qr', agency_id: currentAgency?.id, purpose },
       });
       if (error) throw error;
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-account'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-account', currentAgency?.id, purpose] });
     },
   });
 

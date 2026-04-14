@@ -519,6 +519,7 @@ export type Database = {
           reminder_overdue_days: number | null
           reminder_overdue_enabled: boolean | null
           updated_at: string | null
+          use_separate_billing_whatsapp: boolean
           whatsapp_template_overdue: string | null
           whatsapp_template_reminder: string | null
         }
@@ -564,6 +565,7 @@ export type Database = {
           reminder_overdue_days?: number | null
           reminder_overdue_enabled?: boolean | null
           updated_at?: string | null
+          use_separate_billing_whatsapp?: boolean
           whatsapp_template_overdue?: string | null
           whatsapp_template_reminder?: string | null
         }
@@ -609,6 +611,7 @@ export type Database = {
           reminder_overdue_days?: number | null
           reminder_overdue_enabled?: boolean | null
           updated_at?: string | null
+          use_separate_billing_whatsapp?: boolean
           whatsapp_template_overdue?: string | null
           whatsapp_template_reminder?: string | null
         }
@@ -6630,6 +6633,7 @@ export type Database = {
           id: string
           instance_name: string
           phone_number: string | null
+          purpose: string
           qr_code: string | null
           sending_schedule: Json | null
           status: string | null
@@ -6644,6 +6648,7 @@ export type Database = {
           id?: string
           instance_name: string
           phone_number?: string | null
+          purpose?: string
           qr_code?: string | null
           sending_schedule?: Json | null
           status?: string | null
@@ -6658,6 +6663,7 @@ export type Database = {
           id?: string
           instance_name?: string
           phone_number?: string | null
+          purpose?: string
           qr_code?: string | null
           sending_schedule?: Json | null
           status?: string | null
@@ -6667,21 +6673,21 @@ export type Database = {
           {
             foreignKeyName: "whatsapp_accounts_agency_id_fkey"
             columns: ["agency_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "agencies"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "whatsapp_accounts_agency_id_fkey"
             columns: ["agency_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "master_agency_overview"
             referencedColumns: ["agency_id"]
           },
           {
             foreignKeyName: "whatsapp_accounts_agency_id_fkey"
             columns: ["agency_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
           },
