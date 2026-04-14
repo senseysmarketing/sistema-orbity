@@ -30,14 +30,34 @@ interface CashFlowTableProps {
   selectedMonth: string;
   className?: string;
   onEditExpenseById?: (expenseId: string) => void;
+  onRefetch?: () => void;
 }
 
-export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, agencyId, selectedMonth, className, onEditExpenseById }: CashFlowTableProps) {
+export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, agencyId, selectedMonth, className, onEditExpenseById, onRefetch }: CashFlowTableProps) {
+  const { toast } = useToast();
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [cancelDialogItem, setCancelDialogItem] = useState<CashFlowItem | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
+  const [invoicingId, setInvoicingId] = useState<string | null>(null);
+
+  const handleInvoiceConexaSale = async (item: CashFlowItem) => {
+    setInvoicingId(item.sourceId);
+    try {
+      const { data, error } = await supabase.functions.invoke('invoice-conexa-sale', {
+        body: { payment_id: item.sourceId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "✅ Fatura emitida!", description: "Cobrança gerada com sucesso no Conexa." });
+      onRefetch?.();
+    } catch (err: any) {
+      toast({ title: "Erro ao emitir fatura", description: err.message, variant: "destructive" });
+    } finally {
+      setInvoicingId(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     const today = new Date();
