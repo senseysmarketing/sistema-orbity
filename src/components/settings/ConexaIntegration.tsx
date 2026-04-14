@@ -29,6 +29,7 @@ export function ConexaIntegration() {
       setSubdomain(settings.conexa_subdomain || "");
       setProductId(settings.conexa_default_product_id ? String(settings.conexa_default_product_id) : "");
       setCompanyId(settings.conexa_company_id ? String(settings.conexa_company_id) : "");
+      setUnitId((settings as any).conexa_unit_id ? String((settings as any).conexa_unit_id) : "");
       setGatewayActive(settings.conexa_enabled ?? false);
       initialized.current = true;
     }
@@ -41,8 +42,9 @@ export function ConexaIntegration() {
         conexa_subdomain: subdomain || null,
         conexa_default_product_id: productId ? parseInt(productId, 10) : null,
         conexa_company_id: companyId ? parseInt(companyId, 10) : null,
+        conexa_unit_id: unitId ? parseInt(unitId, 10) : null,
         conexa_enabled: gatewayActive,
-      });
+      } as any);
       toast({ title: "Configurações salvas!", description: gatewayActive ? "Conexa habilitado como gateway." : "Conexa desabilitado." });
     } catch {
       // error handled by hook
@@ -169,6 +171,22 @@ export function ConexaIntegration() {
             type="number"
             value={companyId}
             onChange={(e) => setCompanyId(e.target.value)}
+            placeholder="Ex: 1"
+            min="1"
+          />
+        </div>
+
+        {/* ID da Unidade (Conexa) */}
+        <div className="space-y-2">
+          <Label htmlFor="conexa-unit-id">ID da Unidade (Conexa)</Label>
+          <p className="text-xs text-muted-foreground">
+            Encontrado em Config &gt; Unidades &gt; Ações &gt; Exibir no seu painel Conexa. Obrigatório para criação de clientes e vendas.
+          </p>
+          <Input
+            id="conexa-unit-id"
+            type="number"
+            value={unitId}
+            onChange={(e) => setUnitId(e.target.value)}
             placeholder="Ex: 1"
             min="1"
           />
