@@ -252,6 +252,14 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
           <DialogDescription>
             {client ? 'Edite as informações do cliente.' : 'Adicione um novo cliente ao sistema.'}
           </DialogDescription>
+          {isEditing && missingGatewayFields && (
+            <Alert variant="destructive" className="mt-2 border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400 [&>svg]:text-amber-500">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                Preencha os campos destacados (CPF/CNPJ e CEP) para garantir compatibilidade com os gateways de pagamento.
+              </AlertDescription>
+            </Alert>
+          )}
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <ScrollArea className="flex-1 overflow-auto px-1">
