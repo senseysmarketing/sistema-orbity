@@ -1,59 +1,35 @@
 
 
-# Timestamp de Pagamento — Tooltip no Badge "Pago"
+# Hard Delete de Registros Cancelados no Fluxo de Caixa
 
 ## Resumo
-Adicionar coluna `paid_at` (timestamptz) nas tabelas, capturar o timestamp completo no webhook, e exibir via Tooltip no Badge "Pago" do CashFlowTable.
-
-## Ordem de execução (crítica)
-1. Migration primeiro (banco)
-2. Código frontend (interface + UI)
-3. Edge Function por último (deploy)
+Adicionar botão "Excluir Registro" no menu de contexto (apenas para itens CANCELLED), com AlertDialog de confirmação e deleção permanente via Supabase client.
 
 ## Alterações
 
-### 1. Migration SQL
-```sql
-ALTER TABLE client_payments ADD COLUMN IF NOT EXISTS paid_at timestamptz;
-ALTER TABLE expenses ADD COLUMN IF NOT EXISTS paid_at timestamptz;
-ALTER TABLE salaries ADD COLUMN IF NOT EXISTS paid_at timestamptz;
-```
+### 1. `src/components/admin/CommandCenter/CashFlowTable.tsx`
 
-### 2. `supabase/functions/payment-webhook/index.ts` (linhas 151-155)
-Substituir o bloco `if (newStatus === "paid")` para capturar timestamp completo:
-```typescript
-if (newStatus === "paid") {
-  updateData.amount_paid = value;
-  updateData.gateway_fee = Math.round((value - netValue) * 100) / 100;
-
-  let paidTimestamp: string;
-  if (gateway === "conexa") {
-    paidTimestamp = body.paymentOperationDate || body.paymentDate || new Date().toISOString();
-  } else {
-    paidTimestamp = body.payment?.paymentDate || new Date().toISOString();
-  }
-
-  updateData.paid_at = paidTimestamp;
-  updateData.paid_date = paidTimestamp.split("T")[0];
-}
-```
-
-### 3. `src/hooks/useFinancialMetrics.tsx`
-- Adicionar `paidAt?: string` na interface `CashFlowItem` (linha 99)
-- No mapeamento de payments (linha 391), adicionar:
-  ```typescript
-  paidAt: (p as any).paid_at || p.paid_date || undefined,
+- Importar `Trash2` do lucide-react e `useQueryClient` do @tanstack/react-query
+- Adicionar estado `deleteDialogItem` (similar ao `cancelDialogItem` existente)
+- Adicionar estado `isDeletingItem` para loading
+- Criar função `handleConfirmDelete` que:
+  - Mapeia `sourceType` para tabela: `client_payment` → `client_payments`, `expense` → `expenses`, `salary` → `salaries`
+  - Executa `supabase.from(table).delete().eq('id', item.sourceId)`
+  - Em sucesso: toast de sucesso + `queryClient.invalidateQueries()` para refresh
+  - Em erro: toast destructive
+- No DropdownMenu, após o item "Cancelar / Perdoar", adicionar:
   ```
+  {item.status === 'CANCELLED' && (
+    <DropdownMenuItem className="text-destructive" onClick={() => setDeleteDialogItem(item)}>
+      <Trash2 /> Excluir Registro
+    </DropdownMenuItem>
+  )}
+  ```
+- Adicionar novo AlertDialog para confirmação de exclusão (título: "Excluir permanentemente?", descrição sobre irreversibilidade, botões "Cancelar" e "Sim, excluir")
 
-### 4. `src/components/admin/CommandCenter/CashFlowTable.tsx`
-- Importar `Tooltip, TooltipContent, TooltipProvider, TooltipTrigger` do shadcn
-- Alterar `statusBadge` para aceitar `paidAt` opcional. Quando `PAID` e `paidAt` existir, envolver Badge em Tooltip com "Pago em dd/MM/yyyy às HH:mm"
-- Envolver o conteúdo da tabela em `<TooltipProvider>`
-- Atualizar chamada na linha 190: `statusBadge(item.status, item.paidAt)`
+### Nenhuma migration necessária
+A deleção usa o Supabase client direto com as tabelas existentes. O `sourceId` já contém o ID original do registro.
 
 ## Arquivos alterados
-- 1 migration (3 ALTER TABLEs)
-- `supabase/functions/payment-webhook/index.ts`
-- `src/hooks/useFinancialMetrics.tsx`
-- `src/components/admin/CommandCenter/CashFlowTable.tsx`
+- `src/components/admin/CommandCenter/CashFlowTable.tsx` (único arquivo)
 
