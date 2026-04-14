@@ -17,6 +17,7 @@ export function ConexaIntegration() {
   const [apiKey, setApiKey] = useState("");
   const [subdomain, setSubdomain] = useState("");
   const [productId, setProductId] = useState("");
+  const [companyId, setCompanyId] = useState("");
   const [gatewayActive, setGatewayActive] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const initialized = useRef(false);
@@ -26,6 +27,7 @@ export function ConexaIntegration() {
       setApiKey(settings.conexa_api_key || "");
       setSubdomain(settings.conexa_subdomain || "");
       setProductId(settings.conexa_default_product_id ? String(settings.conexa_default_product_id) : "");
+      setCompanyId(settings.conexa_company_id ? String(settings.conexa_company_id) : "");
       setGatewayActive(settings.conexa_enabled ?? false);
       initialized.current = true;
     }
@@ -37,6 +39,7 @@ export function ConexaIntegration() {
         conexa_api_key: apiKey || null,
         conexa_subdomain: subdomain || null,
         conexa_default_product_id: productId ? parseInt(productId, 10) : null,
+        conexa_company_id: companyId ? parseInt(companyId, 10) : null,
         conexa_enabled: gatewayActive,
       });
       toast({ title: "Configurações salvas!", description: gatewayActive ? "Conexa habilitado como gateway." : "Conexa desabilitado." });
@@ -150,6 +153,22 @@ export function ConexaIntegration() {
             value={productId}
             onChange={(e) => setProductId(e.target.value)}
             placeholder="Ex: 123"
+            min="1"
+          />
+        </div>
+
+        {/* ID da Empresa (Company ID) */}
+        <div className="space-y-2">
+          <Label htmlFor="conexa-company-id">ID da Empresa (Company ID)</Label>
+          <p className="text-xs text-muted-foreground">
+            ID numérico da empresa no Conexa. Encontre em Configurações &gt; Empresa no painel.
+          </p>
+          <Input
+            id="conexa-company-id"
+            type="number"
+            value={companyId}
+            onChange={(e) => setCompanyId(e.target.value)}
+            placeholder="Ex: 1"
             min="1"
           />
         </div>
