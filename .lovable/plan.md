@@ -1,78 +1,42 @@
 
 
-# Fase 2 — Edge Function `process-billing-reminders`
+# Refatoracao UX: Elevar ferramentas para FloatingActionBar
 
 ## Resumo
-Criar a Edge Function que roda diariamente via pg_cron, varre pagamentos pendentes, aplica templates multi-gateway e envia via WhatsApp com deduplicação.
+Remover botoes de gestao dos componentes internos e centraliza-los na FloatingActionBar, com estados orquestrados no Admin.tsx.
 
-## 1. Edge Function `supabase/functions/process-billing-reminders/index.ts`
+## Alteracoes
 
-### Fluxo
-1. Calcular `TODAY` forçando timezone `America/Sao_Paulo`
-2. Buscar todas as `agency_payment_settings` com `notify_via_whatsapp = true`
-3. Para cada agência (try/catch isolado):
-   - Buscar `whatsapp_accounts` com `status = 'connected'`
-   - Se não há conta conectada, skip
-   - Buscar `client_payments` com status `pending`, JOIN com `clients` onde `billing_automation_enabled = true` e `contact IS NOT NULL`
-   - Classificar cada pagamento:
-     - **Reminder**: `due_date = TODAY` (se `reminder_due_date_enabled`) OU `due_date = TODAY + reminder_before_days` (se `reminder_before_enabled`)
-     - **Overdue**: `due_date = TODAY - reminder_overdue_days` (se `reminder_overdue_enabled`)
-   - Resolver gateway: `payment.billing_type` → fallback `settings.active_gateway` → fallback `'manual'`
-   - Verificar toggle `{gateway}_billing_enabled === true`
-   - Selecionar template `{gateway}_template_reminder` ou `{gateway}_template_overdue`
-   - Se template vazio, skip
+### 1. AdvancedFinancialSheet.tsx
+- Remover: estado `billingRulerOpen`, import `BillingAutomationSettings`, import `Bell`, import `Button`, botao "Regua de Cobranca" (linhas 176-184), componente `<BillingAutomationSettings>` (linha 187)
 
-4. Substituir variáveis (EXATAMENTE como na UI — `TEMPLATE_VARS`):
-   - `{nome_cliente}` → `client.name`
-   - `{valor}` → `payment.amount` formatado BRL (ex: `R$ 1.500,00`)
-   - `{data_vencimento}` → `payment.due_date` formatado DD/MM/YYYY
-   - `{link_pagamento}` → `payment.invoice_url` ou `payment.conexa_invoice_url` ou vazio
+### 2. ClientProfitabilityCard.tsx
+- Remover: prop `onOpenManagement` da interface e destructuring, bloco condicional do botao "Gerenciar Carteira" (linhas 41-45), import `Button`
 
-5. Deduplicação via `notification_tracking`:
-   - `notification_type = 'billing_reminder:YYYY-MM-DD'` ou `'billing_overdue:YYYY-MM-DD'`
-   - `entity_id = payment.id`
-   - `user_id` = placeholder (usar agency owner ou um UUID fixo do sistema)
-   - Se já existe registro para hoje, skip
+### 3. CashFlowTable.tsx
+- Remover: estado `expenseSheetOpen`, import `AdvancedExpenseSheet`, botao "Central de Despesas" (linhas 324-326), componente `<AdvancedExpenseSheet>` (linhas 403-411)
+- O titulo "Top Categorias de Custo" fica sem botao ao lado
 
-6. Enviar via fetch para `whatsapp-send`:
-   - URL: `${SUPABASE_URL}/functions/v1/whatsapp-send`
-   - Header: `Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
-   - Body: `{ account_id, phone_number: client.contact, message }`
+### 4. FloatingActionBar.tsx
+- Adicionar 3 props opcionais: `onOpenPortfolio`, `onOpenBillingRuler`, `onOpenExpenseCentral`
+- Importar `Users`, `Bell` de lucide-react (Receipt ja existe)
+- Inserir 3 botoes de gestao (variant="outline", size="sm") entre o month selector e os botoes de criacao, com labels em `<span className="hidden md:inline">`
+- Ordem: Gerenciar Carteira (Users) | Regua de Cobranca (Bell) | Central de Despesas (Receipt)
+- Separador visual via `border-r pr-2` no grupo de gestao
 
-7. Rate limit: `await sleep(1000)` entre envios
+### 5. Admin.tsx
+- Adicionar estados: `isBillingRulerOpen`, `isExpenseCentralOpen`
+- Importar `BillingAutomationSettings` e `AdvancedExpenseSheet`
+- Passar novas props ao FloatingActionBar: `onOpenPortfolio`, `onOpenBillingRuler`, `onOpenExpenseCentral`
+- Remover `onOpenManagement` do ClientProfitabilityCard
+- Renderizar ao lado do ClientManagementSheet:
+  - `<BillingAutomationSettings open={isBillingRulerOpen} onOpenChange={setIsBillingRulerOpen} />`
+  - `<AdvancedExpenseSheet open={isExpenseCentralOpen} onOpenChange={setIsExpenseCentralOpen} cashFlow={metrics.unifiedCashFlow} expensesByCategory={metrics.expensesByCategory} agencyId={currentAgency?.id || ""} selectedMonth={selectedMonth} onEditExpense={handleEditExpenseById} />`
 
-### Guardrails
-- **Timezone**: `new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })` → `YYYY-MM-DD`
-- **Auth**: Service role key no header do fetch interno
-- **Isolamento**: try/catch por agência E por pagamento, com `console.error` detalhado
-- **Variáveis**: Exatamente `{nome_cliente}`, `{valor}`, `{data_vencimento}`, `{link_pagamento}` (da UI)
-
-## 2. Config
-
-Adicionar em `supabase/config.toml`:
-```toml
-[functions.process-billing-reminders]
-verify_jwt = false
-```
-
-## 3. pg_cron (via SQL insert, não migration)
-
-```sql
-SELECT cron.schedule(
-  'process-billing-reminders-daily',
-  '0 12 * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://ovookkywclrqfmtumelw.supabase.co/functions/v1/process-billing-reminders',
-    headers := '{"Content-Type":"application/json","Authorization":"Bearer <ANON_KEY>"}'::jsonb,
-    body := '{"source":"cron"}'::jsonb
-  ) AS request_id;
-  $$
-);
-```
-
-## Arquivos
-1. `supabase/functions/process-billing-reminders/index.ts` (novo)
-2. `supabase/config.toml` (adicionar entry)
-3. SQL insert para pg_cron (via supabase insert tool)
+## Arquivos alterados
+1. `src/components/admin/CommandCenter/AdvancedFinancialSheet.tsx`
+2. `src/components/admin/CommandCenter/ClientProfitabilityCard.tsx`
+3. `src/components/admin/CommandCenter/CashFlowTable.tsx`
+4. `src/components/admin/CommandCenter/FloatingActionBar.tsx`
+5. `src/pages/Admin.tsx`
 
