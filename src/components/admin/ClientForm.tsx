@@ -112,6 +112,8 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
   const [cepLoading, setCepLoading] = useState(false);
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const [documentError, setDocumentError] = useState<string | null>(null);
+  
+  const [formData, setFormData] = useState({ ...initialFormData });
 
   const isEditing = !!client;
   const missingGatewayFields = isEditing && (
