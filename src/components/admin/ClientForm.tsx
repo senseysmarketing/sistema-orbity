@@ -13,7 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
 import { usePaymentGateway } from "@/hooks/usePaymentGateway";
-import { Loader2, Info } from "lucide-react";
+import { Loader2, Info, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Máscaras
 function formatDocument(value: string): string {
@@ -90,6 +91,11 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
   const [cepLoading, setCepLoading] = useState(false);
   
   const [formData, setFormData] = useState({ ...initialFormData });
+
+  const isEditing = !!client;
+  const missingGatewayFields = isEditing && (
+    !formData.document.replace(/\D/g, '') || !formData.zip_code.replace(/\D/g, '')
+  );
 
   useEffect(() => {
     if (client) {
