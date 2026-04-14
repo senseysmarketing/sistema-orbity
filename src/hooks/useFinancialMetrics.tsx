@@ -307,15 +307,16 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     return paidRevenue - totalGatewayFees;
   }, [paymentsInMonth, totalGatewayFees]);
 
-  // Delinquency (overdue amount)
-  const delinquencyRate = useMemo(() => {
+  // Overdue amount (real delinquency: pending or overdue with due_date < today)
+  const today = new Date().toISOString().split('T')[0];
+  const overdueAmount = useMemo(() => {
     return paymentsInMonth
-      .filter(p => {
-        const client = clients.find(c => c.id === p.client_id);
-        return p.status === 'overdue' && client && wasClientActiveInMonth(client, selectedMonth);
-      })
+      .filter(p =>
+        (p.status === 'overdue' || p.status === 'pending') &&
+        p.due_date < today
+      )
       .reduce((sum, p) => sum + p.amount, 0);
-  }, [paymentsInMonth, clients, selectedMonth]);
+  }, [paymentsInMonth, today]);
 
   // DRE / Cash Flow metrics for HeroMetrics
   const expectedRevenue = useMemo(() => {
@@ -326,7 +327,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
 
   const projectedProfit = expectedRevenue - burnRate;
   const profitMargin = expectedRevenue > 0 ? (projectedProfit / expectedRevenue) * 100 : 0;
-  const overdueRate = expectedRevenue > 0 ? (delinquencyRate / expectedRevenue) * 100 : 0;
+  const overdueRate = expectedRevenue > 0 ? (overdueAmount / expectedRevenue) * 100 : 0;
 
   // Expenses by category (exclude cancelled)
   const expensesByCategory = useMemo((): CategoryTotal[] => {
@@ -515,7 +516,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     paidRevenue,
     realProfitability,
     realProfitabilityMargin,
-    delinquencyRate,
+    delinquencyRate: overdueAmount,
+    overdueAmount,
     totalGatewayFees,
     totalNetRevenue,
 
