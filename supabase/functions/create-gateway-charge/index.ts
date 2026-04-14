@@ -107,26 +107,48 @@ async function ensureConexaCustomer(
   baseUrl: string,
   apiKey: string,
   adminClient: ReturnType<typeof createClient>,
-  clientId: string
+  clientId: string,
+  companyId?: number | null
 ): Promise<string> {
   if (client.conexa_customer_id) return client.conexa_customer_id;
 
   const payload: Record<string, unknown> = { name: client.name };
-  if (client.email) payload.email = client.email;
-  if (client.document) payload.cpfCnpj = client.document;
+  if (companyId) payload.companyId = companyId;
 
-  const res = await fetch(`${baseUrl}/customer`, {
+  // Try with all fields first, then fallback without optional fields
+  const fullPayload = { ...payload };
+  if (client.email) fullPayload.email = client.email;
+  if (client.document) fullPayload.cpfCnpj = client.document;
+
+  let res = await fetch(`${baseUrl}/customer`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(fullPayload),
   });
 
+  // If failed due to field validation (email/cpfCnpj not available), retry with minimal payload
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Conexa customer creation failed (${res.status}): ${err}`);
+    const errText = await res.text();
+    if (res.status === 400 && errText.includes("does not exist or is not available")) {
+      console.log("[create-gateway-charge] Retrying Conexa customer creation with minimal fields");
+      res = await fetch(`${baseUrl}/customer`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const retryErr = await res.text();
+        throw new Error(`Conexa customer creation failed (${res.status}): ${retryErr}`);
+      }
+    } else {
+      throw new Error(`Conexa customer creation failed (${res.status}): ${errText}`);
+    }
   }
 
   const data = await res.json();
@@ -312,7 +334,8 @@ Deno.serve(async (req) => {
           conexaBaseUrl,
           settings.conexa_api_key,
           adminClient,
-          client_id
+          client_id,
+          settings.conexa_company_id
         );
 
         // Create sale in Conexa
