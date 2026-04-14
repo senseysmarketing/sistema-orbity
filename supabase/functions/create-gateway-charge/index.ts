@@ -284,7 +284,10 @@ Deno.serve(async (req) => {
       agency_id,
       status,
       paid_date,
+      auto_invoice,
     } = await req.json();
+
+    const shouldAutoInvoice = auto_invoice !== false; // default true
 
     if (!client_id || !amount || !due_date || !agency_id) {
       return jsonResponse(
@@ -402,8 +405,24 @@ Deno.serve(async (req) => {
         );
 
         // POST /sale returns { "id": 12345 } with status notBilled
-        conexa_charge_id = conexaResponse.id ? String(conexaResponse.id) : null;
-        // invoice_url and pix will be populated later via webhook or manual billing in Conexa
+        const saleId = conexaResponse.id ? String(conexaResponse.id) : null;
+
+        if (saleId && shouldAutoInvoice) {
+          // Auto-invoice: create charge immediately
+          const chargeResult = await createConexaCharge(
+            saleId,
+            due_date,
+            description,
+            conexaBaseUrl,
+            settings.conexa_api_key
+          );
+          conexa_charge_id = chargeResult.chargeId;
+          conexa_invoice_url = chargeResult.chargeUrl;
+          conexa_pix_copy_paste = chargeResult.billetUrl;
+        } else {
+          // Save sale ID temporarily — will be overwritten when invoiced manually
+          conexa_charge_id = saleId;
+        }
       }
     }
 
