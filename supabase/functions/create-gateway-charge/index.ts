@@ -112,43 +112,28 @@ async function ensureConexaCustomer(
 ): Promise<string> {
   if (client.conexa_customer_id) return client.conexa_customer_id;
 
-  const payload: Record<string, unknown> = { name: client.name };
-  if (companyId) payload.companyId = companyId;
+  const normalizedCompanyId = Number(companyId);
+  if (!Number.isInteger(normalizedCompanyId) || normalizedCompanyId <= 0) {
+    throw new Error("Conexa Company ID não configurado para esta agência.");
+  }
 
-  // Try with all fields first, then fallback without optional fields
-  const fullPayload = { ...payload };
-  if (client.email) fullPayload.email = client.email;
-  if (client.document) fullPayload.cpfCnpj = client.document;
+  const payload: Record<string, unknown> = {
+    name: client.name,
+    companyId: normalizedCompanyId,
+  };
 
-  let res = await fetch(`${baseUrl}/customer`, {
+  const res = await fetch(`${baseUrl}/customer`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify(fullPayload),
+    body: JSON.stringify(payload),
   });
 
-  // If failed due to field validation (email/cpfCnpj not available), retry with minimal payload
   if (!res.ok) {
     const errText = await res.text();
-    if (res.status === 400 && errText.includes("does not exist or is not available")) {
-      console.log("[create-gateway-charge] Retrying Conexa customer creation with minimal fields");
-      res = await fetch(`${baseUrl}/customer`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const retryErr = await res.text();
-        throw new Error(`Conexa customer creation failed (${res.status}): ${retryErr}`);
-      }
-    } else {
-      throw new Error(`Conexa customer creation failed (${res.status}): ${errText}`);
-    }
+    throw new Error(`Conexa customer creation failed (${res.status}): ${errText}`);
   }
 
   const data = await res.json();
