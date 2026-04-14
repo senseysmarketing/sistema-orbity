@@ -94,12 +94,18 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
       case 'PAID': {
         const badge = <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300 hover:bg-emerald-100">Pago</Badge>;
         if (paidAt) {
-          const d = new Date(paidAt);
           const hasTime = paidAt.includes('T') || paidAt.includes(' ');
-          const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-          const formatted = hasTime
-            ? `${dateStr} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-            : dateStr;
+          let formatted: string;
+          if (hasTime) {
+            const d = new Date(paidAt);
+            const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+            const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+            formatted = `${dateStr} às ${timeStr}`;
+          } else {
+            // Date-only string like "2026-04-14" — parse manually to avoid UTC shift
+            const [y, m, day] = paidAt.split('-');
+            formatted = `${day}/${m}/${y}`;
+          }
           return (
             <div className="flex items-center gap-2">
               {badge}
