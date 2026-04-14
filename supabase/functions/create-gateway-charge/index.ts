@@ -23,7 +23,7 @@ async function ensureAsaasCustomer(
   client: { name: string; email: string | null; document: string | null; asaas_customer_id: string | null },
   baseUrl: string,
   apiKey: string,
-  adminClient: ReturnType<typeof createClient>,
+  adminClient: any,
   clientId: string
 ): Promise<string> {
   if (client.asaas_customer_id) return client.asaas_customer_id;
@@ -106,7 +106,7 @@ async function ensureConexaCustomer(
   client: { name: string; email: string | null; document: string | null; conexa_customer_id: string | null },
   baseUrl: string,
   apiKey: string,
-  adminClient: ReturnType<typeof createClient>,
+  adminClient: any,
   clientId: string,
   companyId?: number | null
 ): Promise<string> {
