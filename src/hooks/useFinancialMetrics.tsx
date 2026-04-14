@@ -267,9 +267,20 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   // Burn rate
   const burnRate = totalExpenses + totalPayroll;
 
-  // Profitability
+  // Profitability (accrual / competência)
   const profitability = totalMRR - burnRate;
   const profitabilityMargin = totalMRR > 0 ? (profitability / totalMRR) * 100 : 0;
+
+  // Paid revenue (cash / caixa)
+  const paidRevenue = useMemo(() => {
+    return paymentsInMonth
+      .filter(p => p.status === 'paid')
+      .reduce((sum, p) => sum + (p.amount_paid || p.amount || 0), 0);
+  }, [paymentsInMonth]);
+
+  // Real profitability (cash basis)
+  const realProfitability = paidRevenue - burnRate;
+  const realProfitabilityMargin = paidRevenue > 0 ? (realProfitability / paidRevenue) * 100 : 0;
 
   // Gateway fees and net revenue from paid payments in month
   const totalGatewayFees = useMemo(() => {
@@ -479,6 +490,9 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     burnRate,
     profitability,
     profitabilityMargin,
+    paidRevenue,
+    realProfitability,
+    realProfitabilityMargin,
     delinquencyRate,
     totalGatewayFees,
     totalNetRevenue,

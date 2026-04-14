@@ -402,6 +402,8 @@ export default function Admin() {
         burnRate={metrics.burnRate}
         profitability={metrics.profitability}
         profitabilityMargin={metrics.profitabilityMargin}
+        realProfitability={metrics.realProfitability}
+        realProfitabilityMargin={metrics.realProfitabilityMargin}
         delinquencyRate={metrics.delinquencyRate}
         isLoading={metrics.isLoading}
       />
