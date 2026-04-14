@@ -103,7 +103,20 @@ async function createAsaasPayment(
 // --------------- Conexa v2 helpers ---------------
 
 async function ensureConexaCustomer(
-  client: { name: string; conexa_customer_id: string | null },
+  client: {
+    name: string;
+    email: string | null;
+    document: string | null;
+    contact: string | null;
+    conexa_customer_id: string | null;
+    zip_code: string | null;
+    street: string | null;
+    number: string | null;
+    neighborhood: string | null;
+    city: string | null;
+    state: string | null;
+    complement: string | null;
+  },
   baseUrl: string,
   apiKey: string,
   adminClient: any,
@@ -116,10 +129,48 @@ async function ensureConexaCustomer(
     throw new Error("ID da Unidade do Conexa não configurado para esta agência.");
   }
 
-  const payload: Record<string, unknown> = {
+  // 1. Clean and identify document (CPF vs CNPJ)
+  const cleanDocument = client.document?.replace(/\D/g, '') || '';
+  const isCnpj = cleanDocument.length > 11;
+
+  // 2. Clean phone — API requires 10-11 digits, strip DDI 55
+  let cleanPhone = client.contact?.replace(/\D/g, '') || '';
+  if (cleanPhone.startsWith('55') && cleanPhone.length > 11) {
+    cleanPhone = cleanPhone.substring(2);
+  }
+  if (cleanPhone.length > 11) {
+    cleanPhone = cleanPhone.slice(-11);
+  }
+
+  // 3. Address payload (only if zip_code exists)
+  const addressPayload = client.zip_code ? {
+    address: {
+      zipCode: client.zip_code.replace(/\D/g, ''),
+      street: client.street || '',
+      number: client.number || 'S/N',
+      neighborhood: client.neighborhood || '',
+      city: client.city || '',
+      state: client.state || '',
+      additionalDetails: client.complement || '',
+    },
+  } : {};
+
+  // 4. Build final body per Conexa API v2 spec
+  const customerBody: Record<string, unknown> = {
     companyId: unitId,
     name: client.name,
+    emailsFinancialMessages: client.email ? [client.email] : undefined,
+    emailsMessage: client.email ? [client.email] : undefined,
+    cellNumber: cleanPhone || undefined,
+    ...addressPayload,
+    ...(cleanDocument && isCnpj
+      ? { legalPerson: { cnpj: client.document } }
+      : cleanDocument
+        ? { naturalPerson: { cpf: client.document } }
+        : {}),
   };
+
+  console.log("[Conexa] Creating customer with body:", JSON.stringify(customerBody));
 
   const res = await fetch(`${baseUrl}/customer`, {
     method: "POST",
@@ -127,7 +178,7 @@ async function ensureConexaCustomer(
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(customerBody),
   });
 
   if (!res.ok) {
@@ -301,7 +352,7 @@ Deno.serve(async (req) => {
     // 3. Fetch client data (user-scoped for RLS)
     const { data: client, error: clientError } = await userClient
       .from("clients")
-      .select("id, name, email, document, asaas_customer_id, conexa_customer_id")
+      .select("id, name, email, document, contact, asaas_customer_id, conexa_customer_id, zip_code, street, number, neighborhood, city, state, complement")
       .eq("id", client_id)
       .single();
 
