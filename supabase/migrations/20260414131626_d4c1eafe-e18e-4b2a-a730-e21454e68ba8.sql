@@ -1,0 +1,1 @@
+ALTER TABLE public.agency_payment_settings ADD COLUMN IF NOT EXISTS conexa_company_id integer DEFAULT NULL;
