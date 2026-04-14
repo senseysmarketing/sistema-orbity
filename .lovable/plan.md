@@ -1,26 +1,43 @@
 
 
-# Travas de Concorrência — usePaymentMiddleware + useSubscription
+# Fix Auth Loop — Surgical Correction to onAuthStateChange
 
-## Resumo
-Adicionar `isCheckingRef` em ambos os hooks para impedir chamadas concorrentes (inclusive em Strict Mode double-mount), e aumentar o TTL do cache do PaymentMiddleware para `Infinity`. Remover revalidação stale desnecessária.
+## Root Cause
+Line 144 in `useAuth.tsx`:
+```typescript
+if (newUserId !== currentUserId || event === 'SIGNED_IN') {
+```
+The `|| event === 'SIGNED_IN'` condition **defeats the entire dedup mechanism**. Supabase fires `SIGNED_IN` on tab refocus, token refresh fallbacks, and session recovery — all with the same user ID. Each triggers `setSession()` + `setUser()` + profile fetch, causing 1800+ auth requests.
 
-## Alterações
+## Fix (single file: `src/hooks/useAuth.tsx`)
 
-### 1. `src/hooks/usePaymentMiddleware.tsx`
-- Mudar TTL do `useCache` de `3 * 60 * 1000` para `Infinity`
-- Adicionar `isCheckingRef = useRef(false)` como guard no início de `checkPaymentStatus`
-- Se `isCheckingRef.current === true`, retornar imediatamente (sem setar loading)
-- Setar `isCheckingRef.current = true` antes do RPC, `false` no `finally`
-- Remover o bloco de revalidação stale (linhas 144-148: `if (cached.isStale) { setTimeout(...) }`) — com TTL Infinity nunca fica stale
+### Change 1: Expand `silentEvents` to include `INITIAL_SESSION`
+`INITIAL_SESSION` is fired on mount alongside `getSession()` — processing both is redundant.
 
-### 2. `src/hooks/useSubscription.tsx`
-- Adicionar `isCheckingRef = useRef(false)` como guard no início de `checkSubscription`
-- Se `isCheckingRef.current === true`, retornar imediatamente
-- Setar `isCheckingRef.current = true` antes do invoke, `false` no `finally`
-- Isso impede que o double-mount do Strict Mode ou o useEffect de agency dispare 2 chamadas simultâneas
+### Change 2: Remove `|| event === 'SIGNED_IN'` from the guard
+Replace the condition with a pure dedup check:
+```typescript
+if (newUserId !== currentUserId) {
+```
+When user ID is the same, only update the session ref silently (no state update, no re-render).
 
-## Arquivos alterados
-1. `src/hooks/usePaymentMiddleware.tsx`
-2. `src/hooks/useSubscription.tsx`
+### Change 3: Handle same-user SIGNED_IN silently
+For `SIGNED_IN` where the user hasn't changed (e.g., tab refocus), update `sessionRef.current` without calling `setSession`/`setUser` — identical to the TOKEN_REFRESHED path.
+
+### Resulting logic flow:
+```text
+onAuthStateChange(event, session):
+  SIGNED_OUT / null session → clear all state, return
+  TOKEN_REFRESHED / INITIAL_SESSION → update ref only, return
+  newUserId === currentUserId → update session ref only, return  (THIS KILLS THE LOOP)
+  newUserId !== currentUserId → full state update + profile fetch (only on actual user change)
+```
+
+### Change 4: Remove redundant `getSession()` race
+The `getSession().then(...)` block at line 178 races with `onAuthStateChange`. With the listener already handling `SIGNED_IN`, the getSession block only needs to handle the case where the listener hasn't fired yet. Add a guard: if `currentUserIdRef.current` is already set and matches, skip entirely (already implemented but the SIGNED_IN bypass was undoing it).
+
+## Impact
+- Auth requests drop from 1800+ to ~2-3 per session (one SIGNED_IN + one getSession)
+- Profile fetch: exactly once per login
+- Zero re-renders from token refreshes or tab focus events
 
