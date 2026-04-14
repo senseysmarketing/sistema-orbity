@@ -1,32 +1,51 @@
 
 
-# Enriquecer payload POST /customer do Conexa
+# Ciclo de Vida do Pagamento: Webhook Fix + Liquidação Conexa
+
+## Resumo
+Três correções para fechar o ciclo financeiro: fix na math do webhook, novos campos de configuração para baixa Conexa, e implementação da liquidação manual via PATCH /charge/settle.
 
 ## Alterações
 
-### Arquivo: `supabase/functions/create-gateway-charge/index.ts`
+### 1. Correção Matemática no Webhook
+**Arquivo**: `supabase/functions/payment-webhook/index.ts` (linha 138)
 
-**1. Expandir SELECT de clients** (linha ~304):
-Adicionar campos de endereço e contato:
+Trocar `updateData.amount_paid = netValue` por `updateData.amount_paid = value` para registrar o valor bruto pago pelo cliente (incluindo juros/multa). O `gateway_fee` continua calculado como `value - netValue`.
+
+### 2. Migration: Novos campos em `agency_payment_settings`
+```sql
+ALTER TABLE public.agency_payment_settings
+  ADD COLUMN IF NOT EXISTS conexa_account_id integer,
+  ADD COLUMN IF NOT EXISTS conexa_receiving_method_id integer;
 ```
-"id, name, email, document, contact, asaas_customer_id, conexa_customer_id, zip_code, street, number, neighborhood, city, state, complement"
+
+### 3. UI: Campos no ConexaIntegration.tsx
+- Adicionar states `accountId` e `receivingMethodId`
+- Dois novos Inputs: "ID da Conta Bancária Padrão" e "ID do Meio de Recebimento Padrão"
+- Incluir `conexa_account_id` e `conexa_receiving_method_id` no `handleSave`
+
+### 4. Implementar Liquidação Conexa no settle-gateway-payment
+**Arquivo**: `supabase/functions/settle-gateway-payment/index.ts` (linhas 120-122)
+
+Substituir o TODO por:
+- Buscar `conexa_subdomain`, `conexa_api_key`, `conexa_account_id`, `conexa_receiving_method_id` das settings
+- PATCH `https://{subdomain}.conexa.app/index.php/api/v2/charge/settle/{conexa_charge_id}` com payload:
+```json
+{
+  "settlementDate": paidDate,
+  "receivingMethod": { "id": conexa_receiving_method_id, "installmentsQuantity": 1 },
+  "accountId": conexa_account_id,
+  "paidAmount": paidAmount,
+  "sendEmail": false
+}
 ```
+- Em caso de falha, retornar 502 bloqueando a atualização local
 
-**2. Reescrever `ensureConexaCustomer`** (linhas 105-147):
+### 5. Deploy
+Deploy individual de `payment-webhook` e `settle-gateway-payment`.
 
-Expandir assinatura do parâmetro `client` para incluir todos os campos (email, document, contact, zip_code, street, number, neighborhood, city, state, complement, conexa_customer_id).
-
-Substituir o payload simples `{ companyId, name }` pela lógica completa:
-
-- **Telefone**: limpar não-dígitos, remover DDI 55 se >11 dígitos, truncar para últimos 11 dígitos
-- **Endereço**: montar objeto `address` somente se `zip_code` existir, com `additionalDetails` mapeado de `complement`
-- **Documento**: roteamento dinâmico — se >11 dígitos vai para `legalPerson.cnpj`, senão `naturalPerson.cpf`
-- **Emails**: `emailsFinancialMessages` e `emailsMessage` como arrays com o email do cliente
-
-**3. Deploy** da edge function `create-gateway-charge`.
-
-## Resumo
-- 1 arquivo alterado (`create-gateway-charge/index.ts`)
-- 2 pontos de edição: SELECT dos clients + função `ensureConexaCustomer`
-- 0 migrations
+## Resumo de arquivos
+- 1 migration (2 colunas novas)
+- 2 edge functions alteradas (webhook + settle)
+- 1 componente frontend (ConexaIntegration.tsx)
 
