@@ -1,73 +1,59 @@
 
 
-# Ajustes UX do ClientForm.tsx
+# Timestamp de Pagamento — Tooltip no Badge "Pago"
 
 ## Resumo
-Reordenar campos (CPF/CNPJ primeiro), mapear email/telefone da BrasilAPI, e corrigir bug do CEP re-fetching no onBlur.
+Adicionar coluna `paid_at` (timestamptz) nas tabelas, capturar o timestamp completo no webhook, e exibir via Tooltip no Badge "Pago" do CashFlowTable.
 
-## Alterações (1 arquivo: `ClientForm.tsx`)
+## Ordem de execução (crítica)
+1. Migration primeiro (banco)
+2. Código frontend (interface + UI)
+3. Edge Function por último (deploy)
 
-### 1. Reordenação dos campos (linhas 354-650)
+## Alterações
 
-Nova ordem das seções:
-
-**Dados Principais:**
-1. CPF/CNPJ (com spinner) — movido do final para o topo
-2. Nome / Status (grid 2 cols)
-3. E-mail / Contato WhatsApp (grid 2 cols)
-
-**Endereço:**
-4. CEP (com spinner)
-5. Rua / Número
-6. Complemento / Bairro / Cidade
-7. Estado
-
-**Serviço e Contrato:**
-8. Serviço / Data de Início
-9. Fidelidade toggle + datas contrato
-10. Observações
-
-**Configurações de Cobrança:**
-11. Valor Mensal / Dia Vencimento / Forma Faturamento
-
-O separador e cabeçalho "Dados de Faturamento" (linhas 546-549) serão removidos. O bloco de endereço ganha seu próprio cabeçalho "Endereço".
-
-### 2. Mapeamento completo da BrasilAPI
-
-Atualizar `fetchCnpjData` (linha 184) para incluir:
-```typescript
-setFormData(prev => ({
-  ...prev,
-  name: data.nome_fantasia || data.razao_social || prev.name,
-  email: data.email || prev.email,
-  contact: data.ddd_telefone_1 ? formatPhone(data.ddd_telefone_1.replace(/\D/g, '')) : prev.contact,
-  zip_code: cep ? formatCep(cep) : prev.zip_code,
-  street: data.logradouro || prev.street,
-  number: data.numero || prev.number,
-  complement: data.complemento || prev.complement,
-  neighborhood: data.bairro || prev.neighborhood,
-  city: data.municipio || prev.city,
-  state: data.uf || prev.state,
-}));
+### 1. Migration SQL
+```sql
+ALTER TABLE client_payments ADD COLUMN IF NOT EXISTS paid_at timestamptz;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS paid_at timestamptz;
+ALTER TABLE salaries ADD COLUMN IF NOT EXISTS paid_at timestamptz;
 ```
 
-### 3. Correção do bug do CEP (re-fetch indevido)
-
-- Novo state: `lastFetchedCep` (string, inicializado como `''`)
-- No `useEffect` do client (modo edição, linha 123): setar `lastFetchedCep` com o CEP existente do cliente
-- No `fetchCnpjData`: após preencher CEP, setar `lastFetchedCep` com o CEP retornado
-- No `onBlur` do CEP (linha 577): mudar de `() => fetchAddressByCep(formData.zip_code)` para:
+### 2. `supabase/functions/payment-webhook/index.ts` (linhas 151-155)
+Substituir o bloco `if (newStatus === "paid")` para capturar timestamp completo:
 ```typescript
-onBlur={() => {
-  const cleanCep = formData.zip_code.replace(/\D/g, '');
-  if (cleanCep.length === 8 && cleanCep !== lastFetchedCep) {
-    fetchAddressByCep(formData.zip_code);
-    setLastFetchedCep(cleanCep);
+if (newStatus === "paid") {
+  updateData.amount_paid = value;
+  updateData.gateway_fee = Math.round((value - netValue) * 100) / 100;
+
+  let paidTimestamp: string;
+  if (gateway === "conexa") {
+    paidTimestamp = body.paymentOperationDate || body.paymentDate || new Date().toISOString();
+  } else {
+    paidTimestamp = body.payment?.paymentDate || new Date().toISOString();
   }
-}}
+
+  updateData.paid_at = paidTimestamp;
+  updateData.paid_date = paidTimestamp.split("T")[0];
+}
 ```
-- Também setar `lastFetchedCep` dentro de `fetchAddressByCep` após sucesso
+
+### 3. `src/hooks/useFinancialMetrics.tsx`
+- Adicionar `paidAt?: string` na interface `CashFlowItem` (linha 99)
+- No mapeamento de payments (linha 391), adicionar:
+  ```typescript
+  paidAt: (p as any).paid_at || p.paid_date || undefined,
+  ```
+
+### 4. `src/components/admin/CommandCenter/CashFlowTable.tsx`
+- Importar `Tooltip, TooltipContent, TooltipProvider, TooltipTrigger` do shadcn
+- Alterar `statusBadge` para aceitar `paidAt` opcional. Quando `PAID` e `paidAt` existir, envolver Badge em Tooltip com "Pago em dd/MM/yyyy às HH:mm"
+- Envolver o conteúdo da tabela em `<TooltipProvider>`
+- Atualizar chamada na linha 190: `statusBadge(item.status, item.paidAt)`
 
 ## Arquivos alterados
-- `src/components/admin/ClientForm.tsx` — 1 arquivo, 0 migrations
+- 1 migration (3 ALTER TABLEs)
+- `supabase/functions/payment-webhook/index.ts`
+- `src/hooks/useFinancialMetrics.tsx`
+- `src/components/admin/CommandCenter/CashFlowTable.tsx`
 
