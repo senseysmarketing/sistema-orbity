@@ -222,8 +222,19 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
     }
   };
 
-
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const docDigits = formData.document.replace(/\D/g, '');
+    if (docDigits.length === 11 && !validateCPF(docDigits)) {
+      toast({
+        title: "CPF inválido",
+        description: "Verifique o número do documento antes de salvar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     
     if (formData.has_loyalty && (!formData.contract_start_date || !formData.contract_end_date)) {
       toast({
