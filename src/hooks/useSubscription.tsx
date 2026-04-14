@@ -67,6 +67,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [refreshing, setRefreshing] = useState(false);
   const [showRefreshAlert, setShowRefreshAlert] = useState(false);
   const [_lastCheckTime, setLastCheckTime] = useState(0);
+  const isCheckingRef = useRef(false);
   
   // Refs para controlar visibilidade sem causar re-renders
   const wasVisibleRef = useRef(true);
@@ -137,6 +138,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       setCurrentSubscription(fallbackData);
       cache.set(cacheKey, fallbackData, { ttl: 30000 }); // Short cache for errors
     } finally {
+      isCheckingRef.current = false;
       if (!isRefreshing) setRefreshing(false);
       if (loading) setLoading(false);
     }

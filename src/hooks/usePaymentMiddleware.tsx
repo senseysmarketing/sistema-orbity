@@ -29,11 +29,12 @@ const PaymentMiddlewareContext = createContext<PaymentMiddlewareContextType | un
 export function PaymentMiddlewareProvider({ children }: { children: ReactNode }) {
   const { user, profile } = useAuth();
   const { currentAgency } = useAgency();
-  const cache = useCache<PaymentStatus>(3 * 60 * 1000);
+  const cache = useCache<PaymentStatus>(Infinity);
   
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(VALID_DEFAULT);
   const [loading, setLoading] = useState(true);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isCheckingRef = useRef(false);
 
   const isSuperAdmin = profile?.role === 'super_admin';
   const isAgencyAdmin = profile?.role === 'agency_admin';
@@ -75,6 +76,7 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
       setLoading(false);
     }, RPC_TIMEOUT_MS);
 
+    isCheckingRef.current = true;
     try {
       const { data: isValid, error } = await supabase.rpc('is_agency_subscription_valid', {
         agency_uuid: currentAgency.id
@@ -121,6 +123,7 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
       setPaymentStatus(VALID_DEFAULT);
       cache.set(cacheKey, VALID_DEFAULT, { ttl: 30000 });
     } finally {
+      isCheckingRef.current = false;
       setLoading(false);
     }
   };
@@ -140,12 +143,6 @@ export function PaymentMiddlewareProvider({ children }: { children: ReactNode })
       } else {
         setPaymentStatus(cached.data || VALID_DEFAULT);
         setLoading(false);
-        
-        if (cached.isStale) {
-          setTimeout(() => {
-            checkPaymentStatus(true);
-          }, 1000);
-        }
       }
     } else {
       // No user or agency yet — don't hang, set valid default
