@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { MarkAsPaidPopover } from "./MarkAsPaidPopover";
 import { AdvancedFinancialSheet } from "./AdvancedFinancialSheet";
-import { AdvancedExpenseSheet } from "./AdvancedExpenseSheet";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { CashFlowItem, CategoryTotal } from "@/hooks/useFinancialMetrics";
@@ -44,7 +44,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
   const [deleteDialogItem, setDeleteDialogItem] = useState<CashFlowItem | null>(null);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
+  
   const [invoicingId, setInvoicingId] = useState<string | null>(null);
 
   const handleInvoiceConexaSale = async (item: CashFlowItem) => {
@@ -319,12 +319,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
       {expensesByCategory.length > 0 && (
         <Card className="mt-4">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Top Categorias de Custo</CardTitle>
-              <Button variant="outline" size="sm" onClick={() => setExpenseSheetOpen(true)}>
-                Central de Despesas
-              </Button>
-            </div>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Top Categorias de Custo</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {expensesByCategory.slice(0, 5).map((cat, i) => {
@@ -400,15 +395,6 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
         selectedMonth={selectedMonth}
       />
 
-      <AdvancedExpenseSheet
-        open={expenseSheetOpen}
-        onOpenChange={setExpenseSheetOpen}
-        cashFlow={cashFlow}
-        expensesByCategory={expensesByCategory}
-        agencyId={agencyId}
-        selectedMonth={selectedMonth}
-        onEditExpense={onEditExpenseById}
-      />
     </div>
     </TooltipProvider>
   );

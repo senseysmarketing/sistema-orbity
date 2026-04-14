@@ -34,6 +34,8 @@ import { CashFlowTable } from "@/components/admin/CommandCenter/CashFlowTable";
 import { ClientProfitabilityCard } from "@/components/admin/CommandCenter/ClientProfitabilityCard";
 import { TeamSection } from "@/components/admin/CommandCenter/TeamSection";
 import { ClientManagementSheet } from "@/components/admin/CommandCenter/ClientManagementSheet";
+import { BillingAutomationSettings } from "@/components/admin/BillingAutomationSettings";
+import { AdvancedExpenseSheet } from "@/components/admin/CommandCenter/AdvancedExpenseSheet";
 
 export default function Admin() {
   const { profile } = useAuth();
@@ -82,6 +84,8 @@ export default function Admin() {
   const [hasEnsuredCurrentMonthPayments, setHasEnsuredCurrentMonthPayments] = useState(false);
   const [clientManagementOpen, setClientManagementOpen] = useState(false);
   const [firstPaymentClient, setFirstPaymentClient] = useState<any>(null);
+  const [isBillingRulerOpen, setIsBillingRulerOpen] = useState(false);
+  const [isExpenseCentralOpen, setIsExpenseCentralOpen] = useState(false);
 
   const hasAccess = profile?.role === 'agency_admin';
 
@@ -394,6 +398,9 @@ export default function Admin() {
         onNewClient={() => { setSelectedClient(null); setClientFormOpen(true); }}
         onNewExpense={() => { setSelectedExpense(null); setExpenseFormOpen(true); }}
         onNewPayment={() => { setSelectedPayment(null); setPreselectedClientForPayment(null); setPaymentFormOpen(true); }}
+        onOpenPortfolio={() => setClientManagementOpen(true)}
+        onOpenBillingRuler={() => setIsBillingRulerOpen(true)}
+        onOpenExpenseCentral={() => setIsExpenseCentralOpen(true)}
       />
 
       {/* Hero Metrics */}
@@ -440,7 +447,6 @@ export default function Admin() {
           clients={metrics.clientProfitability}
           allClients={metrics.clients}
           selectedMonth={selectedMonth}
-          onOpenManagement={() => setClientManagementOpen(true)}
         />
       </div>
 
@@ -461,6 +467,18 @@ export default function Admin() {
         clients={metrics.clients}
         selectedMonth={selectedMonth}
         agencyId={currentAgency?.id || ""}
+      />
+
+      <BillingAutomationSettings open={isBillingRulerOpen} onOpenChange={setIsBillingRulerOpen} />
+
+      <AdvancedExpenseSheet
+        open={isExpenseCentralOpen}
+        onOpenChange={setIsExpenseCentralOpen}
+        cashFlow={metrics.unifiedCashFlow}
+        expensesByCategory={metrics.expensesByCategory}
+        agencyId={currentAgency?.id || ""}
+        selectedMonth={selectedMonth}
+        onEditExpense={handleEditExpenseById}
       />
 
       {/* ============ FORMS (Dialog-based, standalone) ============ */}
