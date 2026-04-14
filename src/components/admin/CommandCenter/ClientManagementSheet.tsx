@@ -202,6 +202,19 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
                               : "Sem valor"}
                           </p>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-primary"
+                          onClick={() => handleEditClient(client)}
+                          disabled={loadingClientId === client.id}
+                        >
+                          {loadingClientId === client.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Pencil className="h-4 w-4" />
+                          )}
+                        </Button>
                         {!client.active && (
                           <Button
                             variant="ghost"
