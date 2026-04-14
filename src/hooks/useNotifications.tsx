@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAgency } from '@/hooks/useAgency';
@@ -29,7 +29,21 @@ export interface Notification {
   action_type?: string;
 }
 
-export function useNotifications() {
+interface NotificationContextType {
+  notifications: Notification[];
+  loading: boolean;
+  unreadCount: number;
+  fetchNotifications: () => Promise<void>;
+  markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  archiveNotification: (id: string) => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
+  enableDoNotDisturb: (hours: number) => Promise<void>;
+}
+
+const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+
+export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -68,7 +82,6 @@ export function useNotifications() {
   }, [currentAgency?.id, toast]);
 
   const markAsRead = useCallback(async (id: string) => {
-    // Optimistic update
     const prevNotifications = notifications;
     const prevUnread = unreadCount;
     const notification = notifications.find(n => n.id === id);
@@ -86,7 +99,6 @@ export function useNotifications() {
       .eq('id', id);
 
     if (error) {
-      // Revert on error
       setNotifications(prevNotifications);
       setUnreadCount(prevUnread);
       console.error('Error marking notification as read:', error);
@@ -101,7 +113,6 @@ export function useNotifications() {
   const markAllAsRead = useCallback(async () => {
     if (!currentAgency?.id) return;
     
-    // Optimistic
     const prevNotifications = notifications;
     setNotifications(prev =>
       prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
@@ -129,7 +140,6 @@ export function useNotifications() {
   }, [currentAgency?.id, notifications, toast]);
 
   const archiveNotification = useCallback(async (id: string) => {
-    // Optimistic
     const prevNotifications = notifications;
     const prevUnread = unreadCount;
     const notification = notifications.find(n => n.id === id);
@@ -183,6 +193,7 @@ export function useNotifications() {
     }
   }, [notifications, unreadCount, toast]);
 
+  // Single WebSocket channel + fetch
   useEffect(() => {
     if (!currentAgency?.id) return;
 
@@ -196,7 +207,7 @@ export function useNotifications() {
           event: '*',
           schema: 'public',
           table: 'notifications',
-          filter: `agency_id=eq.${currentAgency?.id}`,
+          filter: `agency_id=eq.${currentAgency.id}`,
         },
         () => {
           fetchNotifications();
@@ -219,7 +230,7 @@ export function useNotifications() {
         .from('notification_preferences')
         .upsert({
           user_id: user.id,
-          agency_id: currentAgency?.id,
+          agency_id: currentAgency.id,
           do_not_disturb_until: endTime.toISOString(),
         }, {
           onConflict: 'user_id'
@@ -241,15 +252,27 @@ export function useNotifications() {
     }
   }, [user, currentAgency?.id, toast]);
 
-  return {
-    notifications,
-    loading,
-    unreadCount,
-    fetchNotifications,
-    markAsRead,
-    markAllAsRead,
-    archiveNotification,
-    deleteNotification,
-    enableDoNotDisturb,
-  };
+  return (
+    <NotificationContext.Provider value={{
+      notifications,
+      loading,
+      unreadCount,
+      fetchNotifications,
+      markAsRead,
+      markAllAsRead,
+      archiveNotification,
+      deleteNotification,
+      enableDoNotDisturb,
+    }}>
+      {children}
+    </NotificationContext.Provider>
+  );
+}
+
+export function useNotifications() {
+  const context = useContext(NotificationContext);
+  if (context === undefined) {
+    throw new Error('useNotifications must be used within a NotificationProvider');
+  }
+  return context;
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, createContext, useContext, ReactNode } from 'react';
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage, Messaging } from 'firebase/messaging';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,28 +17,21 @@ const firebaseConfig = {
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
-// Helper function to detect PWA standalone mode (critical for iOS push)
 const isStandalone = (): boolean => {
-  // iOS standalone (navigator.standalone is iOS-specific)
   if ((navigator as any).standalone === true) return true;
-  // Android/Desktop PWA via display-mode media query
   if (window.matchMedia('(display-mode: standalone)').matches) return true;
-  // Fallback for fullscreen PWA mode
   if (window.matchMedia('(display-mode: fullscreen)').matches) return true;
   return false;
 };
 
-// Helper to detect iOS
 const isIOS = (): boolean => {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
 };
 
-// Helper to detect Android
 const isAndroid = (): boolean => {
   return /android/i.test(navigator.userAgent);
 };
 
-// Helper para gerar identificador único do tipo de dispositivo
 const getDeviceType = (): string => {
   const ios = isIOS();
   const android = isAndroid();
@@ -49,7 +42,22 @@ const getDeviceType = (): string => {
   return standalone ? 'desktop-pwa' : 'desktop-browser';
 };
 
-export function usePushNotifications() {
+interface PushNotificationContextType {
+  permission: NotificationPermission;
+  token: string | null;
+  isSupported: boolean;
+  isLoading: boolean;
+  hasFirebaseConfig: boolean;
+  isStandaloneMode: boolean;
+  isIOS: boolean;
+  isAndroid: boolean;
+  requestPermission: () => Promise<string | null>;
+  disablePushNotifications: () => Promise<void>;
+}
+
+const PushNotificationContext = createContext<PushNotificationContextType | undefined>(undefined);
+
+export function PushNotificationProvider({ children }: { children: ReactNode }) {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [token, setToken] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState(false);
@@ -64,17 +72,14 @@ export function usePushNotifications() {
   const saveTokenRef = useRef<(token: string) => Promise<void>>();
   const toastRef = useRef(toast);
   
-  // Memoizar detecção de plataforma (só calcula uma vez - user agent não muda durante sessão)
   const platformInfo = useMemo(() => ({
     isIOS: isIOS(),
     isAndroid: isAndroid(),
     isStandalone: isStandalone(),
   }), []);
   
-  // Manter refs atualizadas
   toastRef.current = toast;
 
-  // Check if Firebase config is available
   const hasFirebaseConfig = Boolean(
     firebaseConfig.apiKey && 
     firebaseConfig.projectId && 
@@ -82,22 +87,18 @@ export function usePushNotifications() {
     VAPID_KEY
   );
 
-  // Check support and initialize
   useEffect(() => {
     const checkSupport = async () => {
-      // Check standalone mode
       const standalone = isStandalone();
       setIsStandaloneMode(standalone);
       console.log('[Push] Standalone mode:', standalone);
 
-      // Check if browser supports push notifications
       if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
         console.log('[Push] Browser does not support push notifications');
         setIsSupported(false);
         return;
       }
 
-      // Check if Firebase config is available
       if (!hasFirebaseConfig) {
         console.log('[Push] Firebase config not available');
         setIsSupported(false);
@@ -107,20 +108,17 @@ export function usePushNotifications() {
       setIsSupported(true);
       setPermission(Notification.permission);
 
-      // Register service worker with explicit scope
       try {
         const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
           scope: '/',
         });
         console.log('[Push] Service worker registered:', registration.scope);
 
-        // Forçar ativação se estiver esperando
         if (registration.waiting) {
           console.log('[Push] SW waiting, sending SKIP_WAITING');
           registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         }
 
-        // Aguardar até que o SW esteja ativo
         if (registration.installing) {
           console.log('[Push] SW installing, waiting for activation...');
           await new Promise<void>((resolve) => {
@@ -131,12 +129,10 @@ export function usePushNotifications() {
                 resolve();
               }
             });
-            // Timeout fallback
             setTimeout(resolve, 5000);
           });
         }
 
-        // Send Firebase config to service worker
         if (registration.active) {
           registration.active.postMessage({
             type: 'FIREBASE_CONFIG',
@@ -151,31 +147,24 @@ export function usePushNotifications() {
     checkSupport();
   }, [hasFirebaseConfig]);
 
-  // Initialize Firebase app (singleton)
   const getFirebaseApp = useCallback(() => {
     if (firebaseAppRef.current) return firebaseAppRef.current;
-    
     const apps = getApps();
     if (apps.length > 0) {
       firebaseAppRef.current = apps[0];
     } else {
       firebaseAppRef.current = initializeApp(firebaseConfig);
     }
-    
     return firebaseAppRef.current;
   }, []);
 
-  // Get Firebase messaging instance
   const getFirebaseMessaging = useCallback(() => {
     if (messagingRef.current) return messagingRef.current;
-    
     const app = getFirebaseApp();
     messagingRef.current = getMessaging(app);
-    
     return messagingRef.current;
   }, [getFirebaseApp]);
 
-  // Save token to Supabase
   const saveToken = useCallback(async (fcmToken: string) => {
     if (!user || !currentAgency) {
       console.log('[Push] Cannot save token - no user or agency');
@@ -191,16 +180,15 @@ export function usePushNotifications() {
       userAgent: navigator.userAgent,
       platform: navigator.platform,
       language: navigator.language,
-      standalone: standalone,
+      standalone,
       displayMode: standalone ? 'standalone' : 'browser',
       isIOS: ios,
       isAndroid: android,
-      deviceType: deviceType,
+      deviceType,
       generatedAt: new Date().toISOString(),
     };
 
     try {
-      // Step 1: Verificar se o token já existe (ativo ou inativo)
       const { data: existingToken } = await supabase
         .from('push_subscriptions')
         .select('id, is_active')
@@ -208,7 +196,6 @@ export function usePushNotifications() {
         .eq('fcm_token', fcmToken)
         .maybeSingle();
 
-      // Step 2: Se token existe mas está INATIVO, REATIVAR explicitamente
       if (existingToken && !existingToken.is_active) {
         console.log('[Push] Reativando token existente que estava inativo');
         const { error: reactivateError } = await supabase
@@ -223,26 +210,21 @@ export function usePushNotifications() {
         
         if (!reactivateError) {
           console.log(`[Push] Token reativado com sucesso para ${deviceType}`);
-          return; // Token já salvo e reativado
+          return;
         } else {
           console.warn('[Push] Erro ao reativar token:', reactivateError);
         }
       }
 
-      // Step 3: Buscar tokens ATIVOS do usuário para desativar duplicados do mesmo dispositivo
       const { data: activeTokens } = await supabase
         .from('push_subscriptions')
         .select('id, fcm_token, device_info')
         .eq('user_id', user.id)
         .eq('is_active', true);
 
-      // Step 4: Desativar apenas tokens do MESMO tipo de dispositivo (exceto o atual)
       if (activeTokens && activeTokens.length > 0) {
         const tokensToDeactivate = activeTokens.filter(sub => {
-          // Se é o mesmo token, não desativa
           if (sub.fcm_token === fcmToken) return false;
-          
-          // Verifica se é do mesmo tipo de dispositivo
           const existingDeviceType = (sub.device_info as any)?.deviceType;
           return existingDeviceType === deviceType;
         });
@@ -262,7 +244,6 @@ export function usePushNotifications() {
         }
       }
 
-      // Step 5: Upsert the new token with deviceType no device_info
       const { error } = await supabase.from('push_subscriptions').upsert({
         user_id: user.id,
         agency_id: currentAgency.id,
@@ -286,10 +267,8 @@ export function usePushNotifications() {
     }
   }, [user, currentAgency]);
 
-  // Manter ref atualizada para evitar dependência instável no useEffect
   saveTokenRef.current = saveToken;
 
-  // Request permission and get token
   const requestPermission = useCallback(async () => {
     if (!isSupported) {
       toast({
@@ -300,7 +279,6 @@ export function usePushNotifications() {
       return null;
     }
 
-    // CRITICAL: On iOS, push notifications ONLY work from installed PWA
     const ios = isIOS();
     const standalone = isStandalone();
     
@@ -316,7 +294,6 @@ export function usePushNotifications() {
     setIsLoading(true);
 
     try {
-      // Request notification permission
       const result = await Notification.requestPermission();
       setPermission(result);
 
@@ -329,7 +306,6 @@ export function usePushNotifications() {
         return null;
       }
 
-      // Get FCM token with explicit service worker registration
       const messaging = getFirebaseMessaging();
       const swRegistration = await navigator.serviceWorker.ready;
       
@@ -345,9 +321,7 @@ export function usePushNotifications() {
       }
 
       console.log('[Push] FCM token obtained:', fcmToken.substring(0, 20) + '...');
-      console.log('[Push] Token context - iOS:', ios, ', Standalone:', standalone);
       
-      // Save token to database
       await saveToken(fcmToken);
       setToken(fcmToken);
 
@@ -372,7 +346,6 @@ export function usePushNotifications() {
     }
   }, [isSupported, getFirebaseMessaging, saveToken, toast]);
 
-  // Disable push notifications
   const disablePushNotifications = useCallback(async () => {
     if (!user || !token) return;
 
@@ -395,7 +368,6 @@ export function usePushNotifications() {
     }
   }, [user, token, toast]);
 
-  // Listen for foreground messages
   useEffect(() => {
     if (!isSupported || permission !== 'granted' || !hasFirebaseConfig) return;
 
@@ -405,13 +377,11 @@ export function usePushNotifications() {
       const unsubscribe = onMessage(messaging, (payload) => {
         console.log('[Push] Foreground message received:', payload);
         
-        // Show toast for foreground messages (usar ref para evitar dependência instável)
         toastRef.current({
           title: payload.notification?.title || 'Nova notificação',
           description: payload.notification?.body,
         });
 
-        // Optionally play sound
         if (payload.data?.play_sound === 'true') {
           const audio = new Audio('/notification.mp3');
           audio.volume = 0.5;
@@ -425,9 +395,7 @@ export function usePushNotifications() {
     }
   }, [isSupported, permission, hasFirebaseConfig, getFirebaseMessaging]);
 
-  // Load existing token on mount
   useEffect(() => {
-    // Flag para evitar execuções duplicadas durante a mesma sessão
     let didLoad = false;
     
     const loadExistingToken = async () => {
@@ -448,7 +416,6 @@ export function usePushNotifications() {
         if (existingToken) {
           console.log('[Push] Existing token found');
           setToken(existingToken);
-          // Usar ref para evitar dependência instável
           if (saveTokenRef.current) {
             await saveTokenRef.current(existingToken);
           }
@@ -461,20 +428,32 @@ export function usePushNotifications() {
     loadExistingToken();
     
     return () => {
-      didLoad = true; // Cancelar se desmontar
+      didLoad = true;
     };
   }, [user?.id, isSupported, permission, hasFirebaseConfig, getFirebaseMessaging]);
 
-  return {
-    permission,
-    token,
-    isSupported,
-    isLoading,
-    hasFirebaseConfig,
-    isStandaloneMode,
-    isIOS: platformInfo.isIOS,
-    isAndroid: platformInfo.isAndroid,
-    requestPermission,
-    disablePushNotifications,
-  };
+  return (
+    <PushNotificationContext.Provider value={{
+      permission,
+      token,
+      isSupported,
+      isLoading,
+      hasFirebaseConfig,
+      isStandaloneMode,
+      isIOS: platformInfo.isIOS,
+      isAndroid: platformInfo.isAndroid,
+      requestPermission,
+      disablePushNotifications,
+    }}>
+      {children}
+    </PushNotificationContext.Provider>
+  );
+}
+
+export function usePushNotifications() {
+  const context = useContext(PushNotificationContext);
+  if (context === undefined) {
+    throw new Error('usePushNotifications must be used within a PushNotificationProvider');
+  }
+  return context;
 }

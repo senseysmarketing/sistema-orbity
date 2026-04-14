@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Search, Bell, Calendar as CalendarIcon, Flag, CheckCircle2, List as ListIcon, FolderPlus } from 'lucide-react';
 import { Reminder, useReminders } from '@/hooks/useReminders';
-import { useReminderLists } from '@/hooks/useReminderLists';
+import { useReminderLists, ReminderListsProvider } from '@/hooks/useReminderLists';
 import { useBrowserNotifications } from '@/hooks/useBrowserNotifications';
 import { ReminderFormDialog } from '@/components/reminders/ReminderFormDialog';
 import { ReminderCard } from '@/components/reminders/ReminderCard';
@@ -14,7 +14,7 @@ import { CreateListDialog } from '@/components/reminders/CreateListDialog';
 import { isToday, isTomorrow, isPast, isThisWeek, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 
-export default function Reminders() {
+function RemindersContent() {
   const { reminders, loading, toggleReminder, deleteReminder, createReminder, updateReminder } = useReminders();
   const { lists } = useReminderLists();
   const { permission, requestPermission, showNotification } = useBrowserNotifications();
@@ -27,14 +27,12 @@ export default function Reminders() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [createListOpen, setCreateListOpen] = useState(false);
 
-  // Request notification permission on mount
   useEffect(() => {
     if (permission === 'default') {
       requestPermission();
     }
   }, []);
 
-  // Check for pending notifications
   useEffect(() => {
     const checkNotifications = () => {
       const now = new Date();
@@ -62,8 +60,8 @@ export default function Reminders() {
       });
     };
 
-    const interval = setInterval(checkNotifications, 60000); // Check every minute
-    checkNotifications(); // Check immediately
+    const interval = setInterval(checkNotifications, 60000);
+    checkNotifications();
 
     return () => clearInterval(interval);
   }, [reminders, showNotification]);
@@ -71,7 +69,6 @@ export default function Reminders() {
   const filteredReminders = useMemo(() => {
     let filtered = reminders;
 
-    // Filter by search
     if (search) {
       filtered = filtered.filter(r =>
         r.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -79,12 +76,10 @@ export default function Reminders() {
       );
     }
 
-    // Filter by list
     if (selectedList) {
       filtered = filtered.filter(r => r.list_id === selectedList);
     }
 
-    // Filter by type
     switch (selectedFilter) {
       case 'today':
         filtered = filtered.filter(r =>
@@ -183,7 +178,6 @@ export default function Reminders() {
     
     await updateReminder(detailsReminder.id, { subtasks: updatedSubtasks });
     
-    // Atualiza o reminder local para o diálogo
     setDetailsReminder({
       ...detailsReminder,
       subtasks: updatedSubtasks
@@ -432,5 +426,13 @@ export default function Reminders() {
         onOpenChange={setCreateListOpen}
       />
     </div>
+  );
+}
+
+export default function Reminders() {
+  return (
+    <ReminderListsProvider>
+      <RemindersContent />
+    </ReminderListsProvider>
   );
 }
