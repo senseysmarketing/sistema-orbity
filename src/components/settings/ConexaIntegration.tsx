@@ -8,9 +8,27 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { DollarSign, Eye, EyeOff, Save, Loader2, Copy, Check, Webhook } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { DollarSign, Eye, EyeOff, Save, Loader2, Copy, Check, Webhook, RefreshCw } from "lucide-react";
 import { usePaymentGateway } from "@/hooks/usePaymentGateway";
 import { useToast } from "@/hooks/use-toast";
+
+function generateRandomKey(length = 16): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  return Array.from(crypto.getRandomValues(new Uint8Array(length)))
+    .map((b) => chars[b % chars.length])
+    .join("");
+}
 
 export function ConexaIntegration() {
   const { settings, isLoading, updateSettings, isSaving } = usePaymentGateway();
@@ -39,15 +57,14 @@ export function ConexaIntegration() {
       setUnitId((settings as any).conexa_unit_id ? String((settings as any).conexa_unit_id) : "");
       setAccountId((settings as any).conexa_account_id ? String((settings as any).conexa_account_id) : "");
       setReceivingMethodId((settings as any).conexa_receiving_method_id ? String((settings as any).conexa_receiving_method_id) : "");
-      setWebhookToken(settings.conexa_webhook_token || "");
+      const existingToken = settings.conexa_webhook_token || "";
+      setWebhookToken(existingToken || generateRandomKey());
       setGatewayActive(settings.conexa_enabled ?? false);
       initialized.current = true;
     }
   }, [settings]);
 
-  const webhookUrl = webhookToken
-    ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook?gateway=conexa&agency_id=${settings?.agency_id || ''}&secret=${encodeURIComponent(webhookToken)}`
-    : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook?gateway=conexa&agency_id=${settings?.agency_id || ''}&secret=SUA_CHAVE_AQUI`;
+  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook?gateway=conexa&agency_id=${settings?.agency_id || ""}&secret=${encodeURIComponent(webhookToken)}`;
 
   const handleCopyUrl = async () => {
     try {
@@ -58,6 +75,11 @@ export function ConexaIntegration() {
     } catch {
       toast({ title: "Erro ao copiar", variant: "destructive" });
     }
+  };
+
+  const handleRegenerateKey = () => {
+    setWebhookToken(generateRandomKey());
+    toast({ title: "Nova chave gerada!", description: "Lembre-se de atualizar a URL no painel do Conexa." });
   };
 
   const handleSave = async () => {
@@ -130,69 +152,87 @@ export function ConexaIntegration() {
 
         <Separator />
 
-        {/* Subdomínio */}
-        <div className="space-y-2">
-          <Label htmlFor="conexa-subdomain">Subdomínio do Conexa</Label>
-          <p className="text-xs text-muted-foreground">
-            Se você acessa <strong>minhaagencia.conexa.app</strong>, digite apenas <strong>minhaagencia</strong>
-          </p>
-          <Input
-            id="conexa-subdomain"
-            type="text"
-            value={subdomain}
-            onChange={(e) => setSubdomain(e.target.value.trim().toLowerCase())}
-            placeholder="minhaagencia"
-          />
-        </div>
-
-        {/* Token de Acesso */}
-        <div className="space-y-2">
-          <Label htmlFor="conexa-token">Token de Acesso (Conexa)</Label>
-          <p className="text-xs text-muted-foreground">
-            Gere em Config &gt; Integrações &gt; API/Token no painel do Conexa
-          </p>
-          <div className="relative">
+        {/* Grid 2 colunas: Subdomínio + Token de Acesso */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="conexa-subdomain">Subdomínio do Conexa</Label>
+            <p className="text-xs text-muted-foreground">
+              Se acessa <strong>minhaagencia.conexa.app</strong>, digite <strong>minhaagencia</strong>
+            </p>
             <Input
-              id="conexa-token"
-              type={showKey ? "text" : "password"}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Cole seu Application Token aqui"
-              className="pr-10"
+              id="conexa-subdomain"
+              type="text"
+              value={subdomain}
+              onChange={(e) => setSubdomain(e.target.value.trim().toLowerCase())}
+              placeholder="minhaagencia"
             />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-              onClick={() => setShowKey(!showKey)}
-            >
-              {showKey ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="conexa-token">Token de Acesso (Conexa)</Label>
+            <p className="text-xs text-muted-foreground">
+              Gere em Config &gt; Integrações &gt; API/Token no painel
+            </p>
+            <div className="relative">
+              <Input
+                id="conexa-token"
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Cole seu Application Token"
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                onClick={() => setShowKey(!showKey)}
+              >
+                {showKey ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* ID do Produto Padrão */}
-        <div className="space-y-2">
-          <Label htmlFor="conexa-product-id">ID do Produto Padrão</Label>
-          <p className="text-xs text-muted-foreground">
-            ID numérico do produto genérico cadastrado no Conexa (ex: "Serviços de Agência"). Encontre em Produtos no painel.
-          </p>
-          <Input
-            id="conexa-product-id"
-            type="number"
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-            placeholder="Ex: 123"
-            min="1"
-          />
+        {/* Grid 2 colunas: Unit ID + Product ID */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="conexa-unit-id">ID da Unidade</Label>
+            <p className="text-xs text-muted-foreground">
+              Config &gt; Unidades &gt; Ações &gt; Exibir no painel Conexa
+            </p>
+            <Input
+              id="conexa-unit-id"
+              type="number"
+              value={unitId}
+              onChange={(e) => setUnitId(e.target.value)}
+              placeholder="Ex: 1"
+              min="1"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="conexa-product-id">ID do Produto Padrão</Label>
+            <p className="text-xs text-muted-foreground">
+              ID numérico do produto genérico cadastrado no Conexa
+            </p>
+            <Input
+              id="conexa-product-id"
+              type="number"
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+              placeholder="Ex: 123"
+              min="1"
+            />
+          </div>
         </div>
 
-        {/* ID da Empresa (Company ID) */}
+        {/* Company ID sozinho */}
         <div className="space-y-2">
           <Label htmlFor="conexa-company-id">ID da Empresa (Company ID)</Label>
           <p className="text-xs text-muted-foreground">
-            ID numérico da empresa no Conexa. Encontre em Configurações &gt; Empresa no painel.
+            Encontre em Configurações &gt; Empresa no painel Conexa
           </p>
           <Input
             id="conexa-company-id"
@@ -204,84 +244,55 @@ export function ConexaIntegration() {
           />
         </div>
 
-        {/* ID da Unidade (Conexa) */}
-        <div className="space-y-2">
-          <Label htmlFor="conexa-unit-id">ID da Unidade (Conexa)</Label>
-          <p className="text-xs text-muted-foreground">
-            Encontrado em Config &gt; Unidades &gt; Ações &gt; Exibir no seu painel Conexa. Obrigatório para criação de clientes e vendas.
-          </p>
-          <Input
-            id="conexa-unit-id"
-            type="number"
-            value={unitId}
-            onChange={(e) => setUnitId(e.target.value)}
-            placeholder="Ex: 1"
-            min="1"
-          />
-        </div>
-
         <Separator />
 
-        {/* Configurações de Baixa Manual */}
-        <div className="space-y-2">
-          <Label htmlFor="conexa-account-id">ID da Conta Bancária Padrão</Label>
-          <p className="text-xs text-muted-foreground">
-            ID numérico da conta bancária para baixa manual. Encontre em Financeiro &gt; Contas no painel Conexa.
-          </p>
-          <Input
-            id="conexa-account-id"
-            type="number"
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            placeholder="Ex: 1"
-            min="1"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="conexa-receiving-method-id">ID do Meio de Recebimento Padrão</Label>
-          <p className="text-xs text-muted-foreground">
-            ID numérico do meio de recebimento para baixa manual. Encontre em Financeiro &gt; Meios de Recebimento no painel Conexa.
-          </p>
-          <Input
-            id="conexa-receiving-method-id"
-            type="number"
-            value={receivingMethodId}
-            onChange={(e) => setReceivingMethodId(e.target.value)}
-            placeholder="Ex: 1"
-            min="1"
-          />
-        </div>
-
-        <Separator />
-
-        {/* Webhook Security Key */}
+        {/* Chave de Segurança do Webhook - Auto-gerada */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Webhook className="h-4 w-4 text-muted-foreground" />
-            <Label htmlFor="conexa-webhook-token">Chave de Segurança do Webhook (Defina uma senha)</Label>
+            <Label htmlFor="conexa-webhook-token">Chave de Segurança do Webhook</Label>
           </div>
-          <div className="relative">
-            <Input
-              id="conexa-webhook-token"
-              type={showWebhookToken ? "text" : "password"}
-              value={webhookToken}
-              onChange={(e) => setWebhookToken(e.target.value)}
-              placeholder="Digite uma senha segura (ex: minha_senha_123)"
-              className="pr-10"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-              onClick={() => setShowWebhookToken(!showWebhookToken)}
-            >
-              {showWebhookToken ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
-            </Button>
+          <div className="relative flex gap-2">
+            <div className="relative flex-1">
+              <Input
+                id="conexa-webhook-token"
+                type={showWebhookToken ? "text" : "password"}
+                value={webhookToken}
+                readOnly
+                className="pr-10 bg-muted font-mono text-sm"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                onClick={() => setShowWebhookToken(!showWebhookToken)}
+              >
+                {showWebhookToken ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+              </Button>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button type="button" variant="outline" size="icon" className="shrink-0" title="Gerar nova chave">
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Regerar chave de segurança?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Ao regerar a chave, a URL do webhook será alterada. Você precisará atualizar a URL nas <strong>duas conexões</strong> configuradas no painel do Conexa para não perder a sincronização de pagamentos.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRegenerateKey}>Regerar Chave</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
           <p className="text-xs text-muted-foreground">
-            Defina qualquer senha aqui. Você usará essa mesma senha na URL do webhook ao configurar no painel do Conexa. Ela garante que as notificações de pagamento sejam autênticas.
+            Chave gerada automaticamente. Já está embutida na URL do webhook abaixo.
           </p>
         </div>
 
@@ -297,7 +308,7 @@ export function ConexaIntegration() {
               <div className="space-y-4 pt-2">
                 <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
                   <AlertDescription className="text-xs text-blue-800 dark:text-blue-300">
-                    O Conexa exige a criação de <strong>duas conexões</strong> separadas para receber notificações automáticas de pagamentos e cancelamentos. A segurança é garantida pela chave que você definiu acima, já embutida na URL.
+                    O Conexa exige a criação de <strong>duas conexões</strong> separadas para receber notificações automáticas de pagamentos e cancelamentos. A segurança é garantida pela chave gerada automaticamente, já embutida na URL.
                   </AlertDescription>
                 </Alert>
 
@@ -309,12 +320,12 @@ export function ConexaIntegration() {
                   <li>
                     <strong className="text-foreground">Conexão 1 — Pagamentos:</strong> Clique em{" "}
                     <strong className="text-foreground">Nova Conexão</strong> &gt;{" "}
-                    <strong className="text-foreground">Personalizado</strong>. Cole a URL abaixo no campo URL. Em{" "}
+                    <strong className="text-foreground">Personalizado</strong>. Cole a URL abaixo. Em{" "}
                     <strong className="text-foreground">Eventos de Cobrança</strong>, marque{" "}
                     <strong className="text-foreground">Quitação</strong>. Salve.
                   </li>
                   <li>
-                    <strong className="text-foreground">Conexão 2 — Cancelamentos:</strong> Crie outra conexão personalizada. Cole a <strong className="text-foreground">mesma URL</strong>. Em{" "}
+                    <strong className="text-foreground">Conexão 2 — Cancelamentos:</strong> Crie outra conexão. Cole a <strong className="text-foreground">mesma URL</strong>. Em{" "}
                     <strong className="text-foreground">Eventos de Cobrança</strong>, marque{" "}
                     <strong className="text-foreground">Alteração de status</strong>. Salve.
                   </li>
@@ -340,11 +351,54 @@ export function ConexaIntegration() {
                         )}
                       </Button>
                     </div>
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      ⚠️ Defina a chave de segurança acima antes de copiar a URL. Ela já está embutida na URL como parâmetro <code className="bg-muted px-1 py-0.5 rounded">secret</code>.
-                    </p>
                   </li>
                 </ol>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Configurações de Baixa Manual - Accordion */}
+          <AccordionItem value="manual-settlement" className="border rounded-lg px-4 mt-2">
+            <AccordionTrigger className="text-sm font-medium hover:no-underline">
+              <span className="flex items-center gap-2">
+                ⚙️ Configurações de Baixa Manual (Opcional)
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-4 pt-2">
+                <p className="text-xs text-muted-foreground">
+                  Configure estes IDs apenas se desejar que as baixas manuais feitas no Orbity sejam sincronizadas com o Conexa.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="conexa-account-id">ID da Conta Bancária Padrão</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Financeiro &gt; Contas no painel Conexa
+                    </p>
+                    <Input
+                      id="conexa-account-id"
+                      type="number"
+                      value={accountId}
+                      onChange={(e) => setAccountId(e.target.value)}
+                      placeholder="Ex: 1"
+                      min="1"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="conexa-receiving-method-id">ID do Meio de Recebimento</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Financeiro &gt; Meios de Recebimento no painel Conexa
+                    </p>
+                    <Input
+                      id="conexa-receiving-method-id"
+                      type="number"
+                      value={receivingMethodId}
+                      onChange={(e) => setReceivingMethodId(e.target.value)}
+                      placeholder="Ex: 1"
+                      min="1"
+                    />
+                  </div>
+                </div>
               </div>
             </AccordionContent>
           </AccordionItem>
