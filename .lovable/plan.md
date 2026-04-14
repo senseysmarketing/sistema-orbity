@@ -1,67 +1,78 @@
 
 
-# Fase 1 — Régua de Cobrança Multi-Gateway
+# Fase 2 — Edge Function `process-billing-reminders`
 
-## Migration SQL
+## Resumo
+Criar a Edge Function que roda diariamente via pg_cron, varre pagamentos pendentes, aplica templates multi-gateway e envia via WhatsApp com deduplicação.
 
-Add 9 columns to `agency_payment_settings` and 1 to `clients`, then copy existing template data based on the active gateway:
+## 1. Edge Function `supabase/functions/process-billing-reminders/index.ts`
 
-```sql
--- New columns
-ALTER TABLE agency_payment_settings
-  ADD COLUMN manual_billing_enabled boolean DEFAULT false,
-  ADD COLUMN manual_template_reminder text,
-  ADD COLUMN manual_template_overdue text,
-  ADD COLUMN conexa_billing_enabled boolean DEFAULT false,
-  ADD COLUMN conexa_template_reminder text,
-  ADD COLUMN conexa_template_overdue text,
-  ADD COLUMN asaas_billing_enabled boolean DEFAULT false,
-  ADD COLUMN asaas_template_reminder text,
-  ADD COLUMN asaas_template_overdue text;
+### Fluxo
+1. Calcular `TODAY` forçando timezone `America/Sao_Paulo`
+2. Buscar todas as `agency_payment_settings` com `notify_via_whatsapp = true`
+3. Para cada agência (try/catch isolado):
+   - Buscar `whatsapp_accounts` com `status = 'connected'`
+   - Se não há conta conectada, skip
+   - Buscar `client_payments` com status `pending`, JOIN com `clients` onde `billing_automation_enabled = true` e `contact IS NOT NULL`
+   - Classificar cada pagamento:
+     - **Reminder**: `due_date = TODAY` (se `reminder_due_date_enabled`) OU `due_date = TODAY + reminder_before_days` (se `reminder_before_enabled`)
+     - **Overdue**: `due_date = TODAY - reminder_overdue_days` (se `reminder_overdue_enabled`)
+   - Resolver gateway: `payment.billing_type` → fallback `settings.active_gateway` → fallback `'manual'`
+   - Verificar toggle `{gateway}_billing_enabled === true`
+   - Selecionar template `{gateway}_template_reminder` ou `{gateway}_template_overdue`
+   - Se template vazio, skip
 
-ALTER TABLE clients ADD COLUMN billing_automation_enabled boolean DEFAULT true;
+4. Substituir variáveis (EXATAMENTE como na UI — `TEMPLATE_VARS`):
+   - `{nome_cliente}` → `client.name`
+   - `{valor}` → `payment.amount` formatado BRL (ex: `R$ 1.500,00`)
+   - `{data_vencimento}` → `payment.due_date` formatado DD/MM/YYYY
+   - `{link_pagamento}` → `payment.invoice_url` ou `payment.conexa_invoice_url` ou vazio
 
--- Retrocompatibilidade: copy old global templates to the active gateway's columns
-UPDATE agency_payment_settings
-SET
-  manual_template_reminder = CASE WHEN active_gateway = 'manual' THEN whatsapp_template_reminder END,
-  manual_template_overdue  = CASE WHEN active_gateway = 'manual' THEN whatsapp_template_overdue END,
-  conexa_template_reminder = CASE WHEN active_gateway = 'conexa' THEN whatsapp_template_reminder END,
-  conexa_template_overdue  = CASE WHEN active_gateway = 'conexa' THEN whatsapp_template_overdue END,
-  asaas_template_reminder  = CASE WHEN active_gateway = 'asaas'  THEN whatsapp_template_reminder END,
-  asaas_template_overdue   = CASE WHEN active_gateway = 'asaas'  THEN whatsapp_template_overdue END,
-  -- Also enable billing for whichever gateway had templates
-  manual_billing_enabled = CASE WHEN active_gateway = 'manual' AND whatsapp_template_reminder IS NOT NULL THEN true ELSE false END,
-  conexa_billing_enabled = CASE WHEN active_gateway = 'conexa' AND whatsapp_template_reminder IS NOT NULL THEN true ELSE false END,
-  asaas_billing_enabled  = CASE WHEN active_gateway = 'asaas'  AND whatsapp_template_reminder IS NOT NULL THEN true ELSE false END
-WHERE whatsapp_template_reminder IS NOT NULL OR whatsapp_template_overdue IS NOT NULL;
+5. Deduplicação via `notification_tracking`:
+   - `notification_type = 'billing_reminder:YYYY-MM-DD'` ou `'billing_overdue:YYYY-MM-DD'`
+   - `entity_id = payment.id`
+   - `user_id` = placeholder (usar agency owner ou um UUID fixo do sistema)
+   - Se já existe registro para hoje, skip
+
+6. Enviar via fetch para `whatsapp-send`:
+   - URL: `${SUPABASE_URL}/functions/v1/whatsapp-send`
+   - Header: `Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+   - Body: `{ account_id, phone_number: client.contact, message }`
+
+7. Rate limit: `await sleep(1000)` entre envios
+
+### Guardrails
+- **Timezone**: `new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })` → `YYYY-MM-DD`
+- **Auth**: Service role key no header do fetch interno
+- **Isolamento**: try/catch por agência E por pagamento, com `console.error` detalhado
+- **Variáveis**: Exatamente `{nome_cliente}`, `{valor}`, `{data_vencimento}`, `{link_pagamento}` (da UI)
+
+## 2. Config
+
+Adicionar em `supabase/config.toml`:
+```toml
+[functions.process-billing-reminders]
+verify_jwt = false
 ```
 
-## `src/hooks/usePaymentGateway.tsx`
+## 3. pg_cron (via SQL insert, não migration)
 
-Add the 9 new fields to `PaymentSettings` interface and `defaultSettings`.
+```sql
+SELECT cron.schedule(
+  'process-billing-reminders-daily',
+  '0 12 * * *',
+  $$
+  SELECT net.http_post(
+    url := 'https://ovookkywclrqfmtumelw.supabase.co/functions/v1/process-billing-reminders',
+    headers := '{"Content-Type":"application/json","Authorization":"Bearer <ANON_KEY>"}'::jsonb,
+    body := '{"source":"cron"}'::jsonb
+  ) AS request_id;
+  $$
+);
+```
 
-## `src/components/admin/BillingAutomationSettings.tsx`
-
-- Import `Tabs, TabsList, TabsTrigger, TabsContent`
-- Add 9 new fields to `FormData` type and `defaultFormData`
-- Replace lines 248-304 (gateway hint + 2 template textareas) with a `<Tabs>` component:
-  - 3 tabs: Manual, Conexa, Asaas
-  - Each tab: Switch for `{gw}_billing_enabled` + 2 Textareas for `{gw}_template_reminder` / `{gw}_template_overdue` + variable badges
-  - Manual tab: extra note about PIX instead of `{link_pagamento}`
-- Update `useEffect` sync and `insertVariable` to handle per-gateway fields
-- Update `handleSave` (already saves full `formData`, just needs the new fields included)
-
-## `src/components/admin/ClientForm.tsx`
-
-- Add `billing_automation_enabled: true` to `initialFormData`
-- Populate from `client.billing_automation_enabled` in the editing `useEffect`
-- Add Switch in the "Configurações de Cobrança" section (after line 661, before the gateway-only hint)
-- Include `billing_automation_enabled` in the `data` object of `handleSubmit`
-
-## Files changed
-1. 1 SQL migration (schema + data backfill)
-2. `src/hooks/usePaymentGateway.tsx`
-3. `src/components/admin/BillingAutomationSettings.tsx`
-4. `src/components/admin/ClientForm.tsx`
+## Arquivos
+1. `supabase/functions/process-billing-reminders/index.ts` (novo)
+2. `supabase/config.toml` (adicionar entry)
+3. SQL insert para pg_cron (via supabase insert tool)
 
