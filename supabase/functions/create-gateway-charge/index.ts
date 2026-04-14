@@ -435,7 +435,7 @@ Deno.serve(async (req) => {
         const conexaBaseUrl = `https://${settings.conexa_subdomain}.conexa.app/index.php/api/v2`;
 
         // Ensure customer exists in Conexa (uses unit_id as companyId)
-        const conexaCustomerId = await ensureConexaCustomer(
+        let conexaCustomerId = await ensureConexaCustomer(
           client,
           conexaBaseUrl,
           settings.conexa_api_key,
@@ -445,15 +445,49 @@ Deno.serve(async (req) => {
         );
 
         // Create sale in Conexa (flat payload, no companyId)
-        const conexaResponse = await createConexaSale(
-          conexaCustomerId,
-          amount,
-          due_date,
-          description,
-          settings.conexa_default_product_id,
-          conexaBaseUrl,
-          settings.conexa_api_key
-        );
+        let conexaResponse;
+        try {
+          conexaResponse = await createConexaSale(
+            conexaCustomerId,
+            amount,
+            due_date,
+            description,
+            settings.conexa_default_product_id,
+            conexaBaseUrl,
+            settings.conexa_api_key
+          );
+        } catch (saleError: any) {
+          // If customer doesn't exist in Conexa anymore, clear stale ID and retry
+          if (saleError.message?.includes("Customer does not exist")) {
+            console.warn("[Conexa] Stale customer ID detected, re-creating customer...");
+            await adminClient
+              .from("clients")
+              .update({ conexa_customer_id: null })
+              .eq("id", client_id);
+
+            // Force re-creation by passing client with null conexa_customer_id
+            conexaCustomerId = await ensureConexaCustomer(
+              { ...client, conexa_customer_id: null },
+              conexaBaseUrl,
+              settings.conexa_api_key,
+              adminClient,
+              client_id,
+              settings.conexa_unit_id
+            );
+
+            conexaResponse = await createConexaSale(
+              conexaCustomerId,
+              amount,
+              due_date,
+              description,
+              settings.conexa_default_product_id,
+              conexaBaseUrl,
+              settings.conexa_api_key
+            );
+          } else {
+            throw saleError;
+          }
+        }
 
         // POST /sale returns { "id": 12345 } with status notBilled
         const saleId = conexaResponse.id ? String(conexaResponse.id) : null;
