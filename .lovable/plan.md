@@ -1,51 +1,52 @@
 
 
-# Ciclo de Vida do Pagamento: Webhook Fix + Liquidação Conexa
-
-## Resumo
-Três correções para fechar o ciclo financeiro: fix na math do webhook, novos campos de configuração para baixa Conexa, e implementação da liquidação manual via PATCH /charge/settle.
+# Webhook Setup UX + Validação de Segurança Conexa
 
 ## Alterações
 
-### 1. Correção Matemática no Webhook
-**Arquivo**: `supabase/functions/payment-webhook/index.ts` (linha 138)
+### 1. `src/components/settings/ConexaIntegration.tsx`
 
-Trocar `updateData.amount_paid = netValue` por `updateData.amount_paid = value` para registrar o valor bruto pago pelo cliente (incluindo juros/multa). O `gateway_fee` continua calculado como `value - netValue`.
+**Novos imports**: `Accordion, AccordionContent, AccordionItem, AccordionTrigger` do shadcn, `Alert, AlertDescription` do shadcn, `Copy, Check, Webhook` do lucide-react, `useState` para `copied` e `webhookToken` states.
 
-### 2. Migration: Novos campos em `agency_payment_settings`
-```sql
-ALTER TABLE public.agency_payment_settings
-  ADD COLUMN IF NOT EXISTS conexa_account_id integer,
-  ADD COLUMN IF NOT EXISTS conexa_receiving_method_id integer;
+**Novos states**:
+- `webhookToken` (string) -- inicializado de `settings.conexa_webhook_token`
+- `showWebhookToken` (boolean) -- toggle show/hide
+- `copied` (boolean) -- feedback visual do botão copiar
+
+**URL dinâmica do webhook**:
+```typescript
+const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook?gateway=conexa&agency_id=${settings?.agency_id || ''}`;
+```
+`settings.agency_id` ja existe no objeto retornado pelo hook.
+
+**Novos elementos na UI** (após os campos de Baixa Manual, antes do botão Salvar):
+
+1. **Campo "Token do Webhook (Conexa)"** -- input password/text com toggle, mapeado para `webhookToken`
+   - Helper text: "Este token e gerado pelo Conexa apos voce salvar a configuracao do Webhook la no painel deles. Ele garante que as notificacoes de pagamento sejam autenticas."
+
+2. **Accordion "Como configurar os Webhooks automaticos"** com passo a passo:
+   - Passo 1: Acesse Configuracoes > Integracoes > Webhooks
+   - Passo 2: Clique em Nova Conexao > Personalizado
+   - Passo 3: Input ReadOnly com a URL + botao Copy com feedback (icone Check por 2s)
+   - Passo 4: Marque eventos: Cobranca Paga/Liquidada, Cobranca Cancelada, Venda Cancelada
+   - Passo 5: Copie o token gerado e cole no campo acima
+
+**handleSave**: adicionar `conexa_webhook_token: webhookToken || null`
+
+### 2. `supabase/functions/payment-webhook/index.ts` (linha 72)
+
+Atualizar leitura do token Conexa para suportar ambos os headers:
+```typescript
+const receivedToken =
+  req.headers.get("x-conexa-token") ||
+  req.headers.get("authorization")?.replace("Bearer ", "");
 ```
 
-### 3. UI: Campos no ConexaIntegration.tsx
-- Adicionar states `accountId` e `receivingMethodId`
-- Dois novos Inputs: "ID da Conta Bancária Padrão" e "ID do Meio de Recebimento Padrão"
-- Incluir `conexa_account_id` e `conexa_receiving_method_id` no `handleSave`
-
-### 4. Implementar Liquidação Conexa no settle-gateway-payment
-**Arquivo**: `supabase/functions/settle-gateway-payment/index.ts` (linhas 120-122)
-
-Substituir o TODO por:
-- Buscar `conexa_subdomain`, `conexa_api_key`, `conexa_account_id`, `conexa_receiving_method_id` das settings
-- PATCH `https://{subdomain}.conexa.app/index.php/api/v2/charge/settle/{conexa_charge_id}` com payload:
-```json
-{
-  "settlementDate": paidDate,
-  "receivingMethod": { "id": conexa_receiving_method_id, "installmentsQuantity": 1 },
-  "accountId": conexa_account_id,
-  "paidAmount": paidAmount,
-  "sendEmail": false
-}
-```
-- Em caso de falha, retornar 502 bloqueando a atualização local
-
-### 5. Deploy
-Deploy individual de `payment-webhook` e `settle-gateway-payment`.
+### 3. Deploy
+Deploy individual de `payment-webhook`.
 
 ## Resumo de arquivos
-- 1 migration (2 colunas novas)
-- 2 edge functions alteradas (webhook + settle)
-- 1 componente frontend (ConexaIntegration.tsx)
+- 1 componente frontend (`ConexaIntegration.tsx`)
+- 1 edge function (`payment-webhook` -- 1 linha)
+- 0 migrations
 
