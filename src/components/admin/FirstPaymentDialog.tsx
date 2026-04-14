@@ -87,12 +87,6 @@ export function FirstPaymentDialog({ isOpen, onClose, client }: FirstPaymentDial
       due_date: dueDateStr,
       description: description || null,
       billing_type: billingType,
-      financial_rules: {
-        fine_percentage: gatewaySettings.default_fine_percentage,
-        interest_percentage: gatewaySettings.default_interest_percentage,
-        discount_percentage: gatewaySettings.discount_percentage,
-        discount_days_before: gatewaySettings.discount_days_before,
-      },
     });
 
     if (result && syncDueDate) {
