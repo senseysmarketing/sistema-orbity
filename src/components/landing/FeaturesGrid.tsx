@@ -56,7 +56,7 @@ const features = [
 export function FeaturesGrid({ onOpenApplication }: { onOpenApplication?: () => void }) {
 
   return (
-    <section className="py-20">
+    <section id="features" className="py-20">
       <div className="container mx-auto px-4">
         <motion.div
           className="text-center mb-16"

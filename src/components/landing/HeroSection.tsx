@@ -25,7 +25,7 @@ export function HeroSection({ onOpenScheduling }: HeroSectionProps) {
   const navigate = useNavigate();
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-[#1c102f]/15 via-background to-violet-500/10 py-24 md:py-36">
+    <section className="relative overflow-hidden bg-gradient-to-br from-[#1c102f]/15 via-background to-violet-500/10 pt-32 md:pt-44 pb-24 md:pb-36">
       <div className="container mx-auto px-4">
         <div className="flex flex-col items-center text-center max-w-5xl mx-auto space-y-8">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="inline-block px-4 py-2 bg-[#1c102f]/15 rounded-full border border-[#1c102f]/30">
