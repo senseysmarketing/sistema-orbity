@@ -202,7 +202,11 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
           .update(data)
           .eq('id', client.id);
         if (error) throw error;
-        savedClientId = client.id;
+
+        // TODO: Sync updated client data with payment gateway
+        // If client has conexa_customer_id or asaas_customer_id,
+        // call supabase.functions.invoke('sync-gateway-customer', { body: { clientId: client.id, agencyId: currentAgency?.id } })
+        // to update address/document on the external provider.
       } else {
         const { data: newClientData, error: clientError } = await supabase
           .from('clients')
