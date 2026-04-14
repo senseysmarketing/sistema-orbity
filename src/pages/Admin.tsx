@@ -434,6 +434,7 @@ export default function Admin() {
           agencyId={currentAgency?.id || ""}
           selectedMonth={selectedMonth}
           onEditExpenseById={handleEditExpenseById}
+          onRefetch={metrics.refetchAll}
         />
         <ClientProfitabilityCard
           clients={metrics.clientProfitability}

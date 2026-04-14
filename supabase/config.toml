@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.create-gateway-charge]
 verify_jwt = false
+
+[functions.invoice-conexa-sale]
+verify_jwt = false

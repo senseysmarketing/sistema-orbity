@@ -180,7 +180,6 @@ async function createConexaSale(
 
   if (!res.ok) {
     const err = await res.text();
-    // Detect product/unit mismatch
     if (err.includes("product") && (err.includes("company") || err.includes("unit"))) {
       throw new Error(`O produto configurado não pertence à mesma unidade do cliente no Conexa. Verifique se o ID do Produto Padrão está cadastrado na unidade correta. Erro original: ${err}`);
     }
@@ -188,6 +187,67 @@ async function createConexaSale(
   }
 
   return await res.json();
+}
+
+/**
+ * Creates a Conexa Charge from an existing Sale, then fetches the charge URL.
+ */
+async function createConexaCharge(
+  saleId: string,
+  dueDate: string,
+  notes: string | null,
+  baseUrl: string,
+  apiKey: string
+): Promise<{ chargeId: string; chargeUrl: string | null; billetUrl: string | null }> {
+  const chargeBody = {
+    salesIds: [parseInt(saleId, 10)],
+    dueDate,
+    notes: notes || undefined,
+  };
+
+  console.log("[Conexa] Creating charge with body:", JSON.stringify(chargeBody));
+
+  const chargeRes = await fetch(`${baseUrl}/charge`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(chargeBody),
+  });
+
+  if (!chargeRes.ok) {
+    const errText = await chargeRes.text();
+    throw new Error(`Erro ao criar cobrança no Conexa (${chargeRes.status}): ${errText}`);
+  }
+
+  const chargeData = await chargeRes.json();
+  const chargeId = String(chargeData.id);
+
+  console.log("[Conexa] Charge created with ID:", chargeId);
+
+  // GET /charge/{chargeId} to retrieve URLs
+  const getRes = await fetch(`${baseUrl}/charge/${chargeId}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
+
+  let chargeUrl: string | null = null;
+  let billetUrl: string | null = null;
+
+  if (getRes.ok) {
+    const chargeDetail = await getRes.json();
+    chargeUrl = chargeDetail.chargeUrl || null;
+    billetUrl = chargeDetail.billetUrl || null;
+    console.log("[Conexa] Charge URLs:", { chargeUrl, billetUrl });
+  } else {
+    const errText = await getRes.text();
+    console.warn("[Conexa] Could not fetch charge details:", errText);
+  }
+
+  return { chargeId, chargeUrl, billetUrl };
 }
 
 // --------------- Main handler ---------------
@@ -224,7 +284,10 @@ Deno.serve(async (req) => {
       agency_id,
       status,
       paid_date,
+      auto_invoice,
     } = await req.json();
+
+    const shouldAutoInvoice = auto_invoice !== false; // default true
 
     if (!client_id || !amount || !due_date || !agency_id) {
       return jsonResponse(
@@ -342,8 +405,24 @@ Deno.serve(async (req) => {
         );
 
         // POST /sale returns { "id": 12345 } with status notBilled
-        conexa_charge_id = conexaResponse.id ? String(conexaResponse.id) : null;
-        // invoice_url and pix will be populated later via webhook or manual billing in Conexa
+        const saleId = conexaResponse.id ? String(conexaResponse.id) : null;
+
+        if (saleId && shouldAutoInvoice) {
+          // Auto-invoice: create charge immediately
+          const chargeResult = await createConexaCharge(
+            saleId,
+            due_date,
+            description,
+            conexaBaseUrl,
+            settings.conexa_api_key
+          );
+          conexa_charge_id = chargeResult.chargeId;
+          conexa_invoice_url = chargeResult.chargeUrl;
+          conexa_pix_copy_paste = chargeResult.billetUrl;
+        } else {
+          // Save sale ID temporarily — will be overwritten when invoiced manually
+          conexa_charge_id = saleId;
+        }
       }
     }
 

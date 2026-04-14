@@ -11,6 +11,7 @@ interface CreatePaymentData {
   billing_type?: string;
   status?: "pending" | "paid" | "overdue";
   paid_date?: string | null;
+  auto_invoice?: boolean;
 }
 
 interface UpdatePaymentData extends CreatePaymentData {
@@ -30,7 +31,7 @@ export function useCreatePayment() {
 
     setLoading(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         client_id: data.client_id,
         amount: data.amount,
         due_date: data.due_date,
@@ -40,6 +41,10 @@ export function useCreatePayment() {
         paid_date: data.paid_date || null,
         agency_id: currentAgency.id,
       };
+
+      if (data.auto_invoice !== undefined) {
+        payload.auto_invoice = data.auto_invoice;
+      }
 
       const { data: result, error } = await supabase.functions.invoke(
         "create-gateway-charge",

@@ -60,6 +60,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const [status, setStatus] = useState("pending");
   const [description, setDescription] = useState("");
   const [billingType, setBillingType] = useState("manual");
+  const [autoInvoice, setAutoInvoice] = useState(true);
   const totalAmount = useMemo(() => {
     return Math.max(0, baseValue + additions - discounts);
   }, [baseValue, additions, discounts]);
@@ -156,6 +157,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
           status: status as "pending" | "paid" | "overdue",
           description: description || null,
           billing_type: billingType,
+          auto_invoice: billingType === 'conexa' ? autoInvoice : undefined,
         });
         if (!result) { setLoading(false); return; }
       }
@@ -399,6 +401,25 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Auto Invoice Toggle for Conexa (creation only) */}
+              {billingType === 'conexa' && !isEditing && (
+                <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-3">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="auto-invoice" className="text-sm font-medium cursor-pointer">
+                      Faturar Automaticamente
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Gera o boleto/link de pagamento imediatamente ao criar a venda
+                    </p>
+                  </div>
+                  <Switch
+                    id="auto-invoice"
+                    checked={autoInvoice}
+                    onCheckedChange={setAutoInvoice}
+                  />
+                </div>
+              )}
 
               {/* Upsell/Downsell Switch */}
               {totalAmount !== baseValue && (
