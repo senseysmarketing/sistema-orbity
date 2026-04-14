@@ -114,15 +114,15 @@ export default function Admin() {
       status: 'pending' as const,
     }));
 
-    const upsertMissing = async () => {
+    const insertMissing = async () => {
       const { error } = await supabase
         .from('client_payments')
-        .upsert(rows, { onConflict: 'agency_id,client_id,extract_month_immutable(due_date)', ignoreDuplicates: true });
+        .insert(rows);
       if (error) console.error('Erro ao gerar pagamentos:', error);
       setHasEnsuredCurrentMonthPayments(true);
       metrics.refetchAll();
     };
-    upsertMissing();
+    insertMissing();
   }, [metrics.clients, metrics.paymentsAll, currentAgency?.id, hasEnsuredCurrentMonthPayments]);
 
   // ============ HANDLERS ============
