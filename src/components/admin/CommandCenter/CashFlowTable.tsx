@@ -212,6 +212,15 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                                   Editar Detalhes
                                 </DropdownMenuItem>
                               )}
+                              {item.billingType === 'conexa' && !item.invoiceUrl && item.conexaChargeId && item.status !== 'PAID' && item.status !== 'CANCELLED' && (
+                                <DropdownMenuItem
+                                  onClick={() => handleInvoiceConexaSale(item)}
+                                  disabled={invoicingId === item.sourceId}
+                                >
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  {invoicingId === item.sourceId ? 'Emitindo...' : 'Emitir Fatura Conexa'}
+                                </DropdownMenuItem>
+                              )}
                               {item.status !== 'PAID' && item.status !== 'CANCELLED' && onCancelItem && (
                                 <DropdownMenuItem
                                   className="text-destructive focus:text-destructive"
