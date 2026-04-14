@@ -551,13 +551,21 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="document">CPF/CNPJ</Label>
-                  <Input
-                    id="document"
-                    value={formData.document}
-                    onChange={(e) => setFormData({ ...formData, document: formatDocument(e.target.value) })}
-                    placeholder="000.000.000-00"
-                    className={isEditing && !formData.document.replace(/\D/g, '') ? 'border-amber-500 focus-visible:ring-amber-500' : ''}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="document"
+                      value={formData.document}
+                      onChange={(e) => handleDocumentChange(e.target.value)}
+                      placeholder="000.000.000-00"
+                      className={`${isEditing && !formData.document.replace(/\D/g, '') ? 'border-amber-500 focus-visible:ring-amber-500' : ''} ${documentError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    />
+                    {cnpjLoading && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                  {documentError && (
+                    <p className="text-xs text-destructive">{documentError}</p>
+                  )}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="zip_code">CEP</Label>
