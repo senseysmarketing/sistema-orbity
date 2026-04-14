@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -95,13 +95,16 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
         const badge = <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300 hover:bg-emerald-100">Pago</Badge>;
         if (paidAt) {
           const d = new Date(paidAt);
-          const formatted = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-            + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          const hasTime = paidAt.includes('T') || paidAt.includes(' ');
+          const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          const formatted = hasTime
+            ? `${dateStr} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+            : dateStr;
           return (
-            <Tooltip>
-              <TooltipTrigger asChild>{badge}</TooltipTrigger>
-              <TooltipContent><p>Pago em {formatted}</p></TooltipContent>
-            </Tooltip>
+            <div className="flex items-center gap-2">
+              {badge}
+              <span className="text-xs text-muted-foreground">{formatted}</span>
+            </div>
           );
         }
         return badge;

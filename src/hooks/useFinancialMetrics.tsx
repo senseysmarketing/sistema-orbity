@@ -405,6 +405,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         status: mapStatus(e.status),
         sourceType: 'expense',
         sourceId: e.id,
+        paidAt: (e as any).paid_at || e.paid_date || undefined,
       });
     });
 
@@ -419,6 +420,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         status: mapStatus(s.status),
         sourceType: 'salary',
         sourceId: s.id,
+        paidAt: (s as any).paid_at || s.paid_date || undefined,
       });
     });
 
