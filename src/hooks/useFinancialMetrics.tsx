@@ -94,6 +94,8 @@ export interface CashFlowItem {
   sourceType: 'client_payment' | 'expense' | 'salary';
   sourceId: string;
   billingType?: string;
+  invoiceUrl?: string;
+  conexaChargeId?: string;
 }
 
 export interface ClientProfitabilityItem {
@@ -385,6 +387,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         sourceType: 'client_payment',
         sourceId: p.id,
         billingType: (p as any).billing_type || 'manual',
+        invoiceUrl: (p as any).conexa_invoice_url || (p as any).invoice_url || undefined,
+        conexaChargeId: (p as any).conexa_charge_id || undefined,
       });
     });
 

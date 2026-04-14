@@ -400,6 +400,25 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                 </Select>
               </div>
 
+              {/* Auto Invoice Toggle for Conexa (creation only) */}
+              {billingType === 'conexa' && !isEditing && (
+                <div className="flex items-center justify-between rounded-lg border border-primary/20 bg-primary/5 p-3">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="auto-invoice" className="text-sm font-medium cursor-pointer">
+                      Faturar Automaticamente
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Gera o boleto/link de pagamento imediatamente ao criar a venda
+                    </p>
+                  </div>
+                  <Switch
+                    id="auto-invoice"
+                    checked={autoInvoice}
+                    onCheckedChange={setAutoInvoice}
+                  />
+                </div>
+              )}
+
               {/* Upsell/Downsell Switch */}
               {totalAmount !== baseValue && (
                 <TooltipProvider>
