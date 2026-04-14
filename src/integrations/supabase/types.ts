@@ -1451,6 +1451,7 @@ export type Database = {
           gateway_fee: number | null
           id: string
           invoice_url: string | null
+          paid_at: string | null
           paid_date: string | null
           pix_copy_paste: string | null
           status: Database["public"]["Enums"]["payment_status"]
@@ -1472,6 +1473,7 @@ export type Database = {
           gateway_fee?: number | null
           id?: string
           invoice_url?: string | null
+          paid_at?: string | null
           paid_date?: string | null
           pix_copy_paste?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
@@ -1493,6 +1495,7 @@ export type Database = {
           gateway_fee?: number | null
           id?: string
           invoice_url?: string | null
+          paid_at?: string | null
           paid_date?: string | null
           pix_copy_paste?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
@@ -2358,6 +2361,7 @@ export type Database = {
           is_fixed: boolean
           name: string
           notification_sent_at: string | null
+          paid_at: string | null
           paid_date: string | null
           parent_expense_id: string | null
           recurrence_day: number | null
@@ -2383,6 +2387,7 @@ export type Database = {
           is_fixed?: boolean
           name: string
           notification_sent_at?: string | null
+          paid_at?: string | null
           paid_date?: string | null
           parent_expense_id?: string | null
           recurrence_day?: number | null
@@ -2408,6 +2413,7 @@ export type Database = {
           is_fixed?: boolean
           name?: string
           notification_sent_at?: string | null
+          paid_at?: string | null
           paid_date?: string | null
           parent_expense_id?: string | null
           recurrence_day?: number | null
@@ -4963,6 +4969,7 @@ export type Database = {
           employee_id: string | null
           employee_name: string
           id: string
+          paid_at: string | null
           paid_date: string | null
           status: Database["public"]["Enums"]["payment_status"]
           updated_at: string
@@ -4976,6 +4983,7 @@ export type Database = {
           employee_id?: string | null
           employee_name: string
           id?: string
+          paid_at?: string | null
           paid_date?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
@@ -4989,6 +4997,7 @@ export type Database = {
           employee_id?: string | null
           employee_name?: string
           id?: string
+          paid_at?: string | null
           paid_date?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           updated_at?: string
