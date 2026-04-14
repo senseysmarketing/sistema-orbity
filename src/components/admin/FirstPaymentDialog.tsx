@@ -22,7 +22,7 @@ interface FirstPaymentDialogProps {
 
 export function FirstPaymentDialog({ isOpen, onClose, client }: FirstPaymentDialogProps) {
   const { createPayment, loading } = useCreatePayment();
-  const { enabledGateways, settings: gatewaySettings } = usePaymentGateway();
+  const { enabledGateways } = usePaymentGateway();
 
   const [amount, setAmount] = useState(0);
   const [description, setDescription] = useState("");
