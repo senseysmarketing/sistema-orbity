@@ -481,18 +481,24 @@ export type Database = {
           active_gateway: string
           agency_id: string
           asaas_api_key: string | null
+          asaas_billing_enabled: boolean | null
           asaas_enabled: boolean | null
           asaas_sandbox: boolean | null
+          asaas_template_overdue: string | null
+          asaas_template_reminder: string | null
           asaas_webhook_token: string | null
           block_access_days: number | null
           block_access_enabled: boolean | null
           conexa_account_id: number | null
           conexa_api_key: string | null
+          conexa_billing_enabled: boolean | null
           conexa_company_id: number | null
           conexa_default_product_id: number | null
           conexa_enabled: boolean | null
           conexa_receiving_method_id: number | null
           conexa_subdomain: string | null
+          conexa_template_overdue: string | null
+          conexa_template_reminder: string | null
           conexa_token: string | null
           conexa_unit_id: number | null
           conexa_webhook_token: string | null
@@ -502,6 +508,9 @@ export type Database = {
           discount_days_before: number | null
           discount_percentage: number | null
           id: string
+          manual_billing_enabled: boolean | null
+          manual_template_overdue: string | null
+          manual_template_reminder: string | null
           notify_via_email: boolean | null
           notify_via_whatsapp: boolean | null
           reminder_before_days: number | null
@@ -517,18 +526,24 @@ export type Database = {
           active_gateway?: string
           agency_id: string
           asaas_api_key?: string | null
+          asaas_billing_enabled?: boolean | null
           asaas_enabled?: boolean | null
           asaas_sandbox?: boolean | null
+          asaas_template_overdue?: string | null
+          asaas_template_reminder?: string | null
           asaas_webhook_token?: string | null
           block_access_days?: number | null
           block_access_enabled?: boolean | null
           conexa_account_id?: number | null
           conexa_api_key?: string | null
+          conexa_billing_enabled?: boolean | null
           conexa_company_id?: number | null
           conexa_default_product_id?: number | null
           conexa_enabled?: boolean | null
           conexa_receiving_method_id?: number | null
           conexa_subdomain?: string | null
+          conexa_template_overdue?: string | null
+          conexa_template_reminder?: string | null
           conexa_token?: string | null
           conexa_unit_id?: number | null
           conexa_webhook_token?: string | null
@@ -538,6 +553,9 @@ export type Database = {
           discount_days_before?: number | null
           discount_percentage?: number | null
           id?: string
+          manual_billing_enabled?: boolean | null
+          manual_template_overdue?: string | null
+          manual_template_reminder?: string | null
           notify_via_email?: boolean | null
           notify_via_whatsapp?: boolean | null
           reminder_before_days?: number | null
@@ -553,18 +571,24 @@ export type Database = {
           active_gateway?: string
           agency_id?: string
           asaas_api_key?: string | null
+          asaas_billing_enabled?: boolean | null
           asaas_enabled?: boolean | null
           asaas_sandbox?: boolean | null
+          asaas_template_overdue?: string | null
+          asaas_template_reminder?: string | null
           asaas_webhook_token?: string | null
           block_access_days?: number | null
           block_access_enabled?: boolean | null
           conexa_account_id?: number | null
           conexa_api_key?: string | null
+          conexa_billing_enabled?: boolean | null
           conexa_company_id?: number | null
           conexa_default_product_id?: number | null
           conexa_enabled?: boolean | null
           conexa_receiving_method_id?: number | null
           conexa_subdomain?: string | null
+          conexa_template_overdue?: string | null
+          conexa_template_reminder?: string | null
           conexa_token?: string | null
           conexa_unit_id?: number | null
           conexa_webhook_token?: string | null
@@ -574,6 +598,9 @@ export type Database = {
           discount_days_before?: number | null
           discount_percentage?: number | null
           id?: string
+          manual_billing_enabled?: boolean | null
+          manual_template_overdue?: string | null
+          manual_template_reminder?: string | null
           notify_via_email?: boolean | null
           notify_via_whatsapp?: boolean | null
           reminder_before_days?: number | null
@@ -1537,6 +1564,7 @@ export type Database = {
           active: boolean
           agency_id: string | null
           asaas_customer_id: string | null
+          billing_automation_enabled: boolean | null
           cancelled_at: string | null
           city: string | null
           complement: string | null
@@ -1573,6 +1601,7 @@ export type Database = {
           active?: boolean
           agency_id?: string | null
           asaas_customer_id?: string | null
+          billing_automation_enabled?: boolean | null
           cancelled_at?: string | null
           city?: string | null
           complement?: string | null
@@ -1609,6 +1638,7 @@ export type Database = {
           active?: boolean
           agency_id?: string | null
           asaas_customer_id?: string | null
+          billing_automation_enabled?: boolean | null
           cancelled_at?: string | null
           city?: string | null
           complement?: string | null

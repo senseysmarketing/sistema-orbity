@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Bell, Clock, AlertTriangle, ShieldAlert, Save, Loader2, Info, Mail, MessageCircle, CheckCircle2, AlertCircle, Percent } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePaymentGateway, PaymentSettings } from "@/hooks/usePaymentGateway";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { useToast } from "@/hooks/use-toast";
@@ -43,10 +44,19 @@ const defaultFormData: FormData = {
   conexa_subdomain: null,
   conexa_default_product_id: null,
   conexa_company_id: null,
+  manual_billing_enabled: false,
+  manual_template_reminder: null,
+  manual_template_overdue: null,
+  conexa_billing_enabled: false,
+  conexa_template_reminder: null,
+  conexa_template_overdue: null,
+  asaas_billing_enabled: false,
+  asaas_template_reminder: null,
+  asaas_template_overdue: null,
 };
 
 export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomationSettingsProps) {
-  const { settings, isAsaasActive, isConexaActive, updateSettings, isSaving } = usePaymentGateway();
+  const { settings, updateSettings, isSaving } = usePaymentGateway();
   const { account, isConnected } = useWhatsApp();
   const { toast } = useToast();
 
@@ -73,6 +83,15 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
         conexa_subdomain: settings.conexa_subdomain ?? null,
         conexa_default_product_id: settings.conexa_default_product_id ?? null,
         conexa_company_id: settings.conexa_company_id ?? null,
+        manual_billing_enabled: settings.manual_billing_enabled ?? false,
+        manual_template_reminder: settings.manual_template_reminder ?? null,
+        manual_template_overdue: settings.manual_template_overdue ?? null,
+        conexa_billing_enabled: settings.conexa_billing_enabled ?? false,
+        conexa_template_reminder: settings.conexa_template_reminder ?? null,
+        conexa_template_overdue: settings.conexa_template_overdue ?? null,
+        asaas_billing_enabled: settings.asaas_billing_enabled ?? false,
+        asaas_template_reminder: settings.asaas_template_reminder ?? null,
+        asaas_template_overdue: settings.asaas_template_overdue ?? null,
       });
     }
   }, [settings]);
@@ -91,8 +110,8 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
     }
   };
 
-  const insertVariable = (field: 'whatsapp_template_reminder' | 'whatsapp_template_overdue', variable: string) => {
-    updateField(field, (formData[field] || '') + variable);
+  const insertVariable = (field: keyof FormData, variable: string) => {
+    updateField(field, ((formData[field] as string) || '') + variable);
   };
 
   return (
@@ -245,63 +264,85 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
 
           <Separator />
 
-          {/* Gateway contextual hint */}
-          <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950 p-3">
-            <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
-            <p className="text-xs text-blue-700 dark:text-blue-300">
-              {isAsaasActive
-                ? "Gateway Asaas ativo — use a variável {link_pagamento} para incluir o link de cobrança automático."
-                : isConexaActive
-                ? "Gateway Conexa ativo — use a variável {link_pagamento} para incluir o link de cobrança automático."
-                : "Gateway Manual ativo — inclua sua chave PIX ou dados bancários diretamente no texto do template."}
-            </p>
-          </div>
+          {/* Templates por Gateway */}
+          <Tabs defaultValue="manual" className="w-full">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="manual">Manual</TabsTrigger>
+              <TabsTrigger value="conexa">Conexa</TabsTrigger>
+              <TabsTrigger value="asaas">Asaas</TabsTrigger>
+            </TabsList>
 
-          {/* Template: Reminder */}
-          <div className="space-y-2">
-            <Label className="font-medium">Template para Lembretes (Antes/No Dia)</Label>
-            <Textarea
-              value={formData.whatsapp_template_reminder || ''}
-              onChange={e => updateField('whatsapp_template_reminder', e.target.value || null)}
-              placeholder="Olá {nome_cliente}, sua fatura no valor de {valor} vence em {data_vencimento}..."
-              rows={4}
-            />
-            <div className="flex flex-wrap gap-1">
-              {TEMPLATE_VARS.map(v => (
-                <Badge
-                  key={v}
-                  variant="outline"
-                  className="cursor-pointer hover:bg-primary/10 text-xs"
-                  onClick={() => insertVariable('whatsapp_template_reminder', v)}
-                >
-                  {v}
-                </Badge>
-              ))}
-            </div>
-          </div>
+            {(['manual', 'conexa', 'asaas'] as const).map(gw => {
+              const enabledKey = `${gw}_billing_enabled` as keyof FormData;
+              const reminderKey = `${gw}_template_reminder` as keyof FormData;
+              const overdueKey = `${gw}_template_overdue` as keyof FormData;
+              const label = gw === 'manual' ? 'Manual' : gw === 'conexa' ? 'Conexa' : 'Asaas';
 
-          {/* Template: Overdue */}
-          <div className="space-y-2">
-            <Label className="font-medium">Template para Atrasos (Cobrança)</Label>
-            <Textarea
-              value={formData.whatsapp_template_overdue || ''}
-              onChange={e => updateField('whatsapp_template_overdue', e.target.value || null)}
-              placeholder="Olá {nome_cliente}, identificamos que sua fatura de {valor} está em atraso..."
-              rows={4}
-            />
-            <div className="flex flex-wrap gap-1">
-              {TEMPLATE_VARS.map(v => (
-                <Badge
-                  key={v}
-                  variant="outline"
-                  className="cursor-pointer hover:bg-primary/10 text-xs"
-                  onClick={() => insertVariable('whatsapp_template_overdue', v)}
-                >
-                  {v}
-                </Badge>
-              ))}
-            </div>
-          </div>
+              return (
+                <TabsContent key={gw} value={gw} className="space-y-4 mt-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="font-medium text-sm">Ativar envio para cobranças {label}</Label>
+                    <Switch
+                      checked={!!formData[enabledKey]}
+                      onCheckedChange={v => updateField(enabledKey, v)}
+                    />
+                  </div>
+
+                  {gw === 'manual' && (
+                    <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                      <Info className="h-4 w-4 text-amber-600" />
+                      <AlertDescription className="text-xs text-amber-700 dark:text-amber-300">
+                        No modo Manual, a variável <code className="font-mono bg-amber-100 dark:bg-amber-900 px-1 rounded">{'{link_pagamento}'}</code> não gera boleto — inclua sua chave PIX diretamente no texto.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {gw !== 'manual' && (
+                    <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950 p-3">
+                      <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        Use <code className="font-mono bg-blue-100 dark:bg-blue-900 px-1 rounded">{'{link_pagamento}'}</code> para incluir o link de cobrança automático do {label}.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label className="font-medium text-sm">Template para Lembretes (Antes/No Dia)</Label>
+                    <Textarea
+                      value={(formData[reminderKey] as string) || ''}
+                      onChange={e => updateField(reminderKey, e.target.value || null)}
+                      placeholder="Olá {nome_cliente}, sua fatura no valor de {valor} vence em {data_vencimento}..."
+                      rows={3}
+                    />
+                    <div className="flex flex-wrap gap-1">
+                      {TEMPLATE_VARS.map(v => (
+                        <Badge key={v} variant="outline" className="cursor-pointer hover:bg-primary/10 text-xs" onClick={() => insertVariable(reminderKey, v)}>
+                          {v}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="font-medium text-sm">Template para Atrasos (Cobrança)</Label>
+                    <Textarea
+                      value={(formData[overdueKey] as string) || ''}
+                      onChange={e => updateField(overdueKey, e.target.value || null)}
+                      placeholder="Olá {nome_cliente}, identificamos que sua fatura de {valor} está em atraso..."
+                      rows={3}
+                    />
+                    <div className="flex flex-wrap gap-1">
+                      {TEMPLATE_VARS.map(v => (
+                        <Badge key={v} variant="outline" className="cursor-pointer hover:bg-primary/10 text-xs" onClick={() => insertVariable(overdueKey, v)}>
+                          {v}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </TabsContent>
+              );
+            })}
+          </Tabs>
 
           <Separator />
 

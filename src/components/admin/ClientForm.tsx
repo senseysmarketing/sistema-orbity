@@ -100,6 +100,7 @@ const initialFormData = {
   city: '',
   state: '',
   default_billing_type: 'manual',
+  billing_automation_enabled: true,
 };
 
 export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCreated }: ClientFormProps) {
@@ -144,6 +145,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
         city: client.city || '',
         state: client.state || '',
         default_billing_type: client.default_billing_type || 'manual',
+        billing_automation_enabled: client.billing_automation_enabled ?? true,
       });
       // Set lastFetchedCep to avoid re-fetching existing CEP on blur
       const existingCep = (client.zip_code || '').replace(/\D/g, '');
@@ -287,6 +289,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
         city: formData.city || null,
         state: formData.state || null,
         default_billing_type: formData.default_billing_type,
+        billing_automation_enabled: formData.billing_automation_enabled,
       };
 
       let savedClientId: string | undefined;
@@ -658,6 +661,17 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor="billing_automation_enabled" className="font-medium text-sm">Cobrança Automática</Label>
+                  <p className="text-xs text-muted-foreground">Permitir que este cliente receba lembretes automáticos de vencimento e atraso via WhatsApp/E-mail.</p>
+                </div>
+                <Switch
+                  id="billing_automation_enabled"
+                  checked={formData.billing_automation_enabled}
+                  onCheckedChange={(v) => setFormData({ ...formData, billing_automation_enabled: v })}
+                />
               </div>
               {enabledGateways.length <= 1 && (
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
