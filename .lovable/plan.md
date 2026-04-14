@@ -1,42 +1,76 @@
 
 
-# Refatoracao UX: Elevar ferramentas para FloatingActionBar
+# Dual WhatsApp Instance Support (General + Billing)
 
 ## Resumo
-Remover botoes de gestao dos componentes internos e centraliza-los na FloatingActionBar, com estados orquestrados no Admin.tsx.
+Permitir duas instancias WhatsApp por agencia (general + billing), com roteamento inteligente, webhook atualizado e UI com toggle para numero exclusivo de cobranca.
 
-## Alteracoes
+## 1. SQL Migration
 
-### 1. AdvancedFinancialSheet.tsx
-- Remover: estado `billingRulerOpen`, import `BillingAutomationSettings`, import `Bell`, import `Button`, botao "Regua de Cobranca" (linhas 176-184), componente `<BillingAutomationSettings>` (linha 187)
+```sql
+-- Add purpose column
+ALTER TABLE whatsapp_accounts ADD COLUMN purpose text NOT NULL DEFAULT 'general';
 
-### 2. ClientProfitabilityCard.tsx
-- Remover: prop `onOpenManagement` da interface e destructuring, bloco condicional do botao "Gerenciar Carteira" (linhas 41-45), import `Button`
+-- Drop existing unique constraint on agency_id (currently 1 account per agency)
+ALTER TABLE whatsapp_accounts DROP CONSTRAINT whatsapp_accounts_agency_id_key;
 
-### 3. CashFlowTable.tsx
-- Remover: estado `expenseSheetOpen`, import `AdvancedExpenseSheet`, botao "Central de Despesas" (linhas 324-326), componente `<AdvancedExpenseSheet>` (linhas 403-411)
-- O titulo "Top Categorias de Custo" fica sem botao ao lado
+-- New composite unique: 1 account per agency per purpose
+CREATE UNIQUE INDEX whatsapp_accounts_agency_purpose_idx ON whatsapp_accounts (agency_id, purpose);
 
-### 4. FloatingActionBar.tsx
-- Adicionar 3 props opcionais: `onOpenPortfolio`, `onOpenBillingRuler`, `onOpenExpenseCentral`
-- Importar `Users`, `Bell` de lucide-react (Receipt ja existe)
-- Inserir 3 botoes de gestao (variant="outline", size="sm") entre o month selector e os botoes de criacao, com labels em `<span className="hidden md:inline">`
-- Ordem: Gerenciar Carteira (Users) | Regua de Cobranca (Bell) | Central de Despesas (Receipt)
-- Separador visual via `border-r pr-2` no grupo de gestao
+-- Unique instance_name globally (avoid Evolution API conflicts)
+CREATE UNIQUE INDEX whatsapp_accounts_instance_name_idx ON whatsapp_accounts (instance_name);
 
-### 5. Admin.tsx
-- Adicionar estados: `isBillingRulerOpen`, `isExpenseCentralOpen`
-- Importar `BillingAutomationSettings` e `AdvancedExpenseSheet`
-- Passar novas props ao FloatingActionBar: `onOpenPortfolio`, `onOpenBillingRuler`, `onOpenExpenseCentral`
-- Remover `onOpenManagement` do ClientProfitabilityCard
-- Renderizar ao lado do ClientManagementSheet:
-  - `<BillingAutomationSettings open={isBillingRulerOpen} onOpenChange={setIsBillingRulerOpen} />`
-  - `<AdvancedExpenseSheet open={isExpenseCentralOpen} onOpenChange={setIsExpenseCentralOpen} cashFlow={metrics.unifiedCashFlow} expensesByCategory={metrics.expensesByCategory} agencyId={currentAgency?.id || ""} selectedMonth={selectedMonth} onEditExpense={handleEditExpenseById} />`
+-- Add toggle to agency_payment_settings
+ALTER TABLE agency_payment_settings ADD COLUMN use_separate_billing_whatsapp boolean NOT NULL DEFAULT false;
+```
+
+## 2. Edge Function: `whatsapp-connect/index.ts`
+
+- Accept optional `purpose` param (default `'general'`) from request body
+- Change `generateInstanceName` to: `orbity_{agency8}_{purpose}` (e.g. `orbity_7bef1258_billing`)
+- Change upsert `onConflict` from `'agency_id'` to `'agency_id,purpose'`
+- Include `purpose` in upsert data
+- All actions (status, disconnect, refresh_qr, check_webhook) must accept `purpose` and filter by `agency_id + purpose` instead of just `agency_id`
+
+## 3. Edge Function: `whatsapp-webhook/index.ts`
+
+- The webhook already finds accounts by `instance_name` (line 187-189), which is unique per purpose. No structural change needed -- it already routes correctly since each instance has a unique name.
+- After migration, the `instance_name` contains the purpose suffix, so messages are naturally saved under the correct `account_id`.
+
+## 4. Hook: `useWhatsApp.tsx`
+
+- Accept optional `purpose` parameter (default `'general'`)
+- Add `.eq('purpose', purpose)` to account query (line 60)
+- Pass `purpose` to all edge function calls (connect, disconnect, status, refresh_qr, check_webhook)
+- Update query keys to include `purpose` for cache isolation: `['whatsapp-account', agencyId, purpose]`
+- `sendMessage` already uses `account.id` which is purpose-specific, no change needed there
+
+## 5. UI: `WhatsAppIntegration.tsx`
+
+- Fetch `use_separate_billing_whatsapp` from `agency_payment_settings`
+- Add Switch at top: "Usar numero exclusivo para cobrancas financeiras"
+- Toggle upserts `use_separate_billing_whatsapp` on `agency_payment_settings`
+- Extract current card into a reusable `WhatsAppInstanceCard` component accepting `purpose` and `title` props
+- When OFF: render one card (purpose='general', title="WhatsApp Principal")
+- When ON: render two cards side by side:
+  - Card 1: purpose='general', title="Atendimento & Automacoes"
+  - Card 2: purpose='billing', title="Financeiro & Cobranca"
+- Each card uses its own `useWhatsApp(purpose)` instance
+
+## 6. Edge Function: `process-billing-reminders/index.ts`
+
+- After fetching `settings`, check `settings.use_separate_billing_whatsapp`
+- If true: query `whatsapp_accounts` with `.eq('purpose', 'billing')` first; if not found/connected, fall back to `'general'`
+- If false: query with `.eq('purpose', 'general')` (current behavior, line 100-105)
+
+## 7. WhatsAppChat.tsx (visual indicator)
+
+- No changes needed for MVP. The chat component already uses the `general` purpose hook. Billing messages are sent by the system (edge function), not via the CRM chat. Adding a visual badge for billing-origin messages can be a follow-up enhancement.
 
 ## Arquivos alterados
-1. `src/components/admin/CommandCenter/AdvancedFinancialSheet.tsx`
-2. `src/components/admin/CommandCenter/ClientProfitabilityCard.tsx`
-3. `src/components/admin/CommandCenter/CashFlowTable.tsx`
-4. `src/components/admin/CommandCenter/FloatingActionBar.tsx`
-5. `src/pages/Admin.tsx`
+1. SQL migration (new)
+2. `supabase/functions/whatsapp-connect/index.ts`
+3. `supabase/functions/process-billing-reminders/index.ts`
+4. `src/hooks/useWhatsApp.tsx`
+5. `src/components/settings/WhatsAppIntegration.tsx`
 
