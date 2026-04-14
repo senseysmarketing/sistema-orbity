@@ -1,48 +1,35 @@
 
 
-# Correção: Lucratividade usando regime errado
+# Correção: Lucratividade de Caixa com burnRate inconsistente
 
 ## Problema
 
-A **Lucratividade** no Hero Metrics está sendo calculada como:
+A lucratividade de caixa está usando:
+- **Receita**: apenas pagamentos com `status === 'paid'` ✅
+- **Custos**: TODOS os custos (pagos + pendentes + vencidos) ❌
 
-```
-profitability = totalMRR - burnRate
-```
-
-Onde `totalMRR` é a soma dos `monthly_value` de todos os clientes ativos (receita **contratada/prevista**), não a receita **efetivamente recebida**. Isso gera um número enganoso — mostra R$ 891 positivo quando na realidade só foram recebidos R$ 5.921 contra R$ 32.458 de custos.
+Isso gera -R$ 26.537 porque compara R$ 5.921 recebidos contra R$ 32.458 de custos totais.
 
 ## Solução
 
-Exibir **duas visões** da lucratividade no card, alinhado com a lógica de Regime de Caixa vs Competência que o sistema já documenta no `FinancialMetricsHelp`:
-
-1. **Lucratividade Real (Caixa)** = Receita efetivamente paga no mês (`status === 'paid'`) - Custos pagos
-2. **Lucratividade Prevista (Competência)** = MRR contratado - Custos totais (o cálculo atual)
-
-O valor principal exibido será o de **Caixa** (real), com o de Competência como texto secundário.
+Criar um `paidBurnRate` que soma apenas despesas e salários com `status === 'paid'`, e usá-lo no cálculo de `realProfitability`.
 
 ## Alterações
 
 | Arquivo | O que muda |
 |---------|-----------|
-| `src/hooks/useFinancialMetrics.tsx` | Adicionar `paidRevenue` (soma de `amount_paid` dos pagamentos `paid` no mês) e `realProfitability` = `paidRevenue - burnRate` |
-| `src/components/admin/CommandCenter/HeroMetrics.tsx` | Card "Lucratividade" exibe `realProfitability` como valor principal, com subtexto "Previsto: R$ X" mostrando a lucratividade por competência |
-| `src/pages/Admin.tsx` | Passar os novos campos para `HeroMetrics` |
+| `src/hooks/useFinancialMetrics.tsx` | Criar `paidExpenses`, `paidPayroll`, `paidBurnRate` (filtrando `status === 'paid'`). Usar `paidBurnRate` em `realProfitability` |
 
-## Detalhes técnicos
-
-No `useFinancialMetrics.tsx`, já existe o filtro `paymentsInMonth.filter(p => p.status === 'paid')` para gateway fees. Reutilizar essa lógica para calcular a receita efetiva, priorizando `amount_paid` sobre `amount` (conforme memória de resiliência).
+### Lógica
 
 ```typescript
-const paidRevenue = paymentsInMonth
-  .filter(p => p.status === 'paid')
-  .reduce((sum, p) => sum + (p.amount_paid || p.amount || 0), 0);
+const paidExpenses = expenses.filter(e => e.status === 'paid').reduce((sum, e) => sum + e.amount, 0);
+const paidPayroll = salaries.filter(s => s.status === 'paid').reduce((sum, s) => sum + s.amount, 0);
+const paidBurnRate = paidExpenses + paidPayroll;
 
-const realProfitability = paidRevenue - burnRate;
+const realProfitability = paidRevenue - paidBurnRate;
+const realProfitabilityMargin = paidRevenue > 0 ? (realProfitability / paidRevenue) * 100 : 0;
 ```
 
-O card de Lucratividade mostrará:
-- **Valor grande**: `realProfitability` (regime de caixa)
-- **Badge**: margem % sobre `paidRevenue`
-- **Subtexto**: "Previsto: R$ X" (regime de competência, o cálculo atual MRR - burnRate)
+A lucratividade **Prevista** (competência) continua usando `burnRate` total vs MRR — sem alteração.
 
