@@ -45,7 +45,9 @@ export function ConexaIntegration() {
     }
   }, [settings]);
 
-  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook?gateway=conexa&agency_id=${settings?.agency_id || ''}`;
+  const webhookUrl = webhookToken
+    ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook?gateway=conexa&agency_id=${settings?.agency_id || ''}&secret=${encodeURIComponent(webhookToken)}`
+    : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook?gateway=conexa&agency_id=${settings?.agency_id || ''}&secret=SUA_CHAVE_AQUI`;
 
   const handleCopyUrl = async () => {
     try {
@@ -253,11 +255,11 @@ export function ConexaIntegration() {
 
         <Separator />
 
-        {/* Webhook Token */}
+        {/* Webhook Security Key */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Webhook className="h-4 w-4 text-muted-foreground" />
-            <Label htmlFor="conexa-webhook-token">Token do Webhook (Conexa)</Label>
+            <Label htmlFor="conexa-webhook-token">Chave de Segurança do Webhook (Defina uma senha)</Label>
           </div>
           <div className="relative">
             <Input
@@ -265,7 +267,7 @@ export function ConexaIntegration() {
               type={showWebhookToken ? "text" : "password"}
               value={webhookToken}
               onChange={(e) => setWebhookToken(e.target.value)}
-              placeholder="Cole o token gerado pelo Conexa aqui"
+              placeholder="Digite uma senha segura (ex: minha_senha_123)"
               className="pr-10"
             />
             <Button
@@ -279,7 +281,7 @@ export function ConexaIntegration() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Este token é gerado pelo Conexa após você salvar a configuração do Webhook lá no painel deles. Ele garante que as notificações de pagamento sejam autênticas.
+            Defina qualquer senha aqui. Você usará essa mesma senha na URL do webhook ao configurar no painel do Conexa. Ela garante que as notificações de pagamento sejam autênticas.
           </p>
         </div>
 
@@ -295,7 +297,7 @@ export function ConexaIntegration() {
               <div className="space-y-4 pt-2">
                 <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
                   <AlertDescription className="text-xs text-blue-800 dark:text-blue-300">
-                    Os webhooks permitem que o Conexa notifique o Orbity automaticamente quando um pagamento é recebido, cancelado ou liquidado. Siga os passos abaixo para configurá-los.
+                    O Conexa exige a criação de <strong>duas conexões</strong> separadas para receber notificações automáticas de pagamentos e cancelamentos. A segurança é garantida pela chave que você definiu acima, já embutida na URL.
                   </AlertDescription>
                 </Alert>
 
@@ -305,11 +307,19 @@ export function ConexaIntegration() {
                     <strong className="text-foreground">Configurações &gt; Integrações &gt; Webhooks</strong>.
                   </li>
                   <li>
-                    Clique em <strong className="text-foreground">Nova Conexão</strong> e escolha a opção{" "}
-                    <strong className="text-foreground">Personalizado</strong>.
+                    <strong className="text-foreground">Conexão 1 — Pagamentos:</strong> Clique em{" "}
+                    <strong className="text-foreground">Nova Conexão</strong> &gt;{" "}
+                    <strong className="text-foreground">Personalizado</strong>. Cole a URL abaixo no campo URL. Em{" "}
+                    <strong className="text-foreground">Eventos de Cobrança</strong>, marque{" "}
+                    <strong className="text-foreground">Quitação</strong>. Salve.
                   </li>
                   <li>
-                    <span>Copie a URL abaixo e cole no campo <strong className="text-foreground">"URL"</strong> do Conexa:</span>
+                    <strong className="text-foreground">Conexão 2 — Cancelamentos:</strong> Crie outra conexão personalizada. Cole a <strong className="text-foreground">mesma URL</strong>. Em{" "}
+                    <strong className="text-foreground">Eventos de Cobrança</strong>, marque{" "}
+                    <strong className="text-foreground">Alteração de status</strong>. Salve.
+                  </li>
+                  <li>
+                    <span>Copie a URL abaixo e cole no campo <strong className="text-foreground">"URL"</strong> de cada conexão:</span>
                     <div className="mt-2 flex gap-2">
                       <Input
                         readOnly
@@ -330,19 +340,9 @@ export function ConexaIntegration() {
                         )}
                       </Button>
                     </div>
-                  </li>
-                  <li>
-                    Marque os seguintes <strong className="text-foreground">Eventos</strong> na lista do Conexa:
-                    <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-                      <li>Cobrança Paga / Liquidada (<code className="text-xs bg-muted px-1 py-0.5 rounded">charge.settled</code>)</li>
-                      <li>Cobrança Cancelada (<code className="text-xs bg-muted px-1 py-0.5 rounded">charge.cancelled</code>)</li>
-                      <li>Venda Cancelada (<code className="text-xs bg-muted px-1 py-0.5 rounded">sale.cancelled</code>)</li>
-                    </ul>
-                  </li>
-                  <li>
-                    Salve a conexão no Conexa. Uma janela mostrará um{" "}
-                    <strong className="text-foreground">Token de Segurança</strong>. Copie-o e cole no campo{" "}
-                    <strong className="text-foreground">"Token do Webhook"</strong> logo acima aqui no Orbity e salve!
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      ⚠️ Defina a chave de segurança acima antes de copiar a URL. Ela já está embutida na URL como parâmetro <code className="bg-muted px-1 py-0.5 rounded">secret</code>.
+                    </p>
                   </li>
                 </ol>
               </div>
