@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { LandingHeader } from "@/components/landing/LandingHeader";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { ProblemSection } from "@/components/landing/ProblemSection";
 import { FeaturesGrid } from "@/components/landing/FeaturesGrid";
@@ -55,6 +56,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <LandingHeader />
       <HeroSection onOpenApplication={openApplication} onOpenScheduling={openScheduling} />
       <ProblemSection />
       <FeaturesGrid onOpenApplication={openApplication} />
