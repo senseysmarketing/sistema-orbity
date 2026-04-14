@@ -333,7 +333,8 @@ Deno.serve(async (req) => {
           description,
           settings.conexa_default_product_id,
           conexaBaseUrl,
-          settings.conexa_api_key
+          settings.conexa_api_key,
+          settings.conexa_company_id
         );
 
         // POST /sale returns { "id": 12345 } with status notBilled
