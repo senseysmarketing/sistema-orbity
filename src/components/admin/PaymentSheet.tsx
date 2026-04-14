@@ -60,6 +60,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const [status, setStatus] = useState("pending");
   const [description, setDescription] = useState("");
   const [billingType, setBillingType] = useState("manual");
+  const [autoInvoice, setAutoInvoice] = useState(true);
   const totalAmount = useMemo(() => {
     return Math.max(0, baseValue + additions - discounts);
   }, [baseValue, additions, discounts]);
@@ -156,6 +157,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
           status: status as "pending" | "paid" | "overdue",
           description: description || null,
           billing_type: billingType,
+          auto_invoice: billingType === 'conexa' ? autoInvoice : undefined,
         });
         if (!result) { setLoading(false); return; }
       }
