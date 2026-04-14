@@ -40,6 +40,8 @@ const defaultFormData: FormData = {
   default_interest_percentage: 1.00,
   discount_percentage: 0.00,
   discount_days_before: 0,
+  conexa_subdomain: null,
+  conexa_default_product_id: null,
 };
 
 export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomationSettingsProps) {
@@ -67,6 +69,8 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
         default_interest_percentage: settings.default_interest_percentage ?? 1.00,
         discount_percentage: settings.discount_percentage ?? 0.00,
         discount_days_before: settings.discount_days_before ?? 0,
+        conexa_subdomain: settings.conexa_subdomain ?? null,
+        conexa_default_product_id: settings.conexa_default_product_id ?? null,
       });
     }
   }, [settings]);
