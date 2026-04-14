@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -84,9 +85,23 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
   const todayStr = new Date().toISOString().split('T')[0];
   const overdueCount = cashFlow.filter(i => i.status === 'OVERDUE' || (i.status === 'PENDING' && i.dueDate < todayStr)).length;
 
-  const statusBadge = (status: string) => {
+  const statusBadge = (status: string, paidAt?: string) => {
     switch (status) {
-      case 'PAID': return <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300 hover:bg-emerald-100">Pago</Badge>;
+      case 'PAID': {
+        const badge = <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300 hover:bg-emerald-100">Pago</Badge>;
+        if (paidAt) {
+          const d = new Date(paidAt);
+          const formatted = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>{badge}</TooltipTrigger>
+              <TooltipContent><p>Pago em {formatted}</p></TooltipContent>
+            </Tooltip>
+          );
+        }
+        return badge;
+      }
       case 'OVERDUE': return <Badge variant="destructive">Atrasado</Badge>;
       case 'CANCELLED': return <Badge className="bg-muted text-muted-foreground hover:bg-muted">Cancelado</Badge>;
       default: return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300 hover:bg-amber-100">Pendente</Badge>;
@@ -187,7 +202,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                       <TableCell className="text-sm text-muted-foreground">
                         {new Date(item.dueDate + 'T00:00:00').toLocaleDateString('pt-BR')}
                       </TableCell>
-                      <TableCell>{statusBadge(item.status)}</TableCell>
+                      <TableCell>{statusBadge(item.status, item.paidAt)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
                           {item.status !== 'PAID' && item.status !== 'CANCELLED' && (

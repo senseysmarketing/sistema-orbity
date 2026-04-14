@@ -151,7 +151,16 @@ Deno.serve(async (req) => {
     if (newStatus === "paid") {
       updateData.amount_paid = value;
       updateData.gateway_fee = Math.round((value - netValue) * 100) / 100;
-      updateData.paid_date = new Date().toISOString().split("T")[0];
+
+      let paidTimestamp: string;
+      if (gateway === "conexa") {
+        paidTimestamp = body.paymentOperationDate || body.paymentDate || new Date().toISOString();
+      } else {
+        paidTimestamp = body.payment?.paymentDate || new Date().toISOString();
+      }
+
+      updateData.paid_at = paidTimestamp;
+      updateData.paid_date = paidTimestamp.split("T")[0];
     }
 
     const { error: updateError } = await supabase
