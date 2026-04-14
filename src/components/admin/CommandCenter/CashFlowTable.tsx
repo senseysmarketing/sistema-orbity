@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText, ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { MarkAsPaidPopover } from "./MarkAsPaidPopover";
@@ -210,6 +210,12 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                                 <DropdownMenuItem onClick={() => onEditItem(item)}>
                                   <Pencil className="h-4 w-4 mr-2" />
                                   Editar Detalhes
+                                </DropdownMenuItem>
+                              )}
+                              {item.invoiceUrl && (
+                                <DropdownMenuItem onClick={() => window.open(item.invoiceUrl, '_blank')}>
+                                  <ExternalLink className="h-4 w-4 mr-2" />
+                                  Ver Fatura
                                 </DropdownMenuItem>
                               )}
                               {item.billingType === 'conexa' && !item.invoiceUrl && item.conexaChargeId && item.status !== 'PAID' && item.status !== 'CANCELLED' && (
