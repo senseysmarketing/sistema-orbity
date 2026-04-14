@@ -13,8 +13,8 @@ function getEvolutionConfig() {
   return { apiUrl, apiKey };
 }
 
-function generateInstanceName(agencyId: string): string {
-  return `orbity_${agencyId.substring(0, 8)}`;
+function generateInstanceName(agencyId: string, purpose: string): string {
+  return `orbity_${agencyId.substring(0, 8)}_${purpose}`;
 }
 
 async function configureWebhook(apiUrl: string, apiKey: string, instanceName: string) {
@@ -77,7 +77,8 @@ serve(async (req) => {
     );
     if (authError || !user) throw new Error('Unauthorized');
 
-    const { action, agency_id } = await req.json();
+    const { action, agency_id, purpose: rawPurpose } = await req.json();
+    const purpose = rawPurpose || 'general';
 
     // Verify user belongs to agency
     const { data: membership } = await supabase
@@ -96,7 +97,7 @@ serve(async (req) => {
 
     switch (action) {
       case 'connect': {
-        const instanceName = generateInstanceName(agency_id);
+        const instanceName = generateInstanceName(agency_id, purpose);
 
         // Save account info
         const { data: account, error: upsertError } = await supabase
@@ -107,7 +108,8 @@ serve(async (req) => {
             api_url: apiUrl,
             api_key: apiKey,
             status: 'connecting',
-          }, { onConflict: 'agency_id' })
+            purpose,
+          }, { onConflict: 'agency_id,purpose' })
           .select()
           .single();
 
@@ -178,6 +180,7 @@ serve(async (req) => {
           .from('whatsapp_accounts')
           .select('*')
           .eq('agency_id', agency_id)
+          .eq('purpose', purpose)
           .single();
 
         if (!account) {
@@ -254,6 +257,7 @@ serve(async (req) => {
           .from('whatsapp_accounts')
           .select('*')
           .eq('agency_id', agency_id)
+          .eq('purpose', purpose)
           .single();
 
         if (account) {
@@ -285,6 +289,7 @@ serve(async (req) => {
           .from('whatsapp_accounts')
           .select('*')
           .eq('agency_id', agency_id)
+          .eq('purpose', purpose)
           .single();
 
         if (!account) throw new Error('No WhatsApp account found');
@@ -327,6 +332,7 @@ serve(async (req) => {
           .from('whatsapp_accounts')
           .select('*')
           .eq('agency_id', agency_id)
+          .eq('purpose', purpose)
           .single();
 
         if (!account) throw new Error('No WhatsApp account found');

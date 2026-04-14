@@ -59,6 +59,45 @@ function resolveGateway(
   return "manual";
 }
 
+// ── Resolve WhatsApp account for billing ─────────────────────────────
+
+async function resolveBillingWaAccount(
+  supabase: any,
+  agencyId: string,
+  useSeparateBilling: boolean
+): Promise<string | null> {
+  if (useSeparateBilling) {
+    // Try billing-specific instance first
+    const { data: billingAccounts } = await supabase
+      .from("whatsapp_accounts")
+      .select("id")
+      .eq("agency_id", agencyId)
+      .eq("purpose", "billing")
+      .eq("status", "connected")
+      .limit(1);
+
+    if (billingAccounts && billingAccounts.length > 0) {
+      return billingAccounts[0].id;
+    }
+    console.log(`[billing-reminders] Agency ${agencyId}: billing instance not connected, falling back to general`);
+  }
+
+  // Fallback to general
+  const { data: generalAccounts } = await supabase
+    .from("whatsapp_accounts")
+    .select("id")
+    .eq("agency_id", agencyId)
+    .eq("purpose", "general")
+    .eq("status", "connected")
+    .limit(1);
+
+  if (generalAccounts && generalAccounts.length > 0) {
+    return generalAccounts[0].id;
+  }
+
+  return null;
+}
+
 // ── Main ─────────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -96,19 +135,14 @@ serve(async (req) => {
       const agencyId = settings.agency_id;
 
       try {
-        // 2. Check for connected WhatsApp account
-        const { data: waAccounts } = await supabase
-          .from("whatsapp_accounts")
-          .select("id")
-          .eq("agency_id", agencyId)
-          .eq("status", "connected")
-          .limit(1);
+        // 2. Resolve WhatsApp account with smart routing
+        const useSeparateBilling = settings.use_separate_billing_whatsapp === true;
+        const waAccountId = await resolveBillingWaAccount(supabase, agencyId, useSeparateBilling);
 
-        if (!waAccounts || waAccounts.length === 0) {
+        if (!waAccountId) {
           console.log(`[billing-reminders] Agency ${agencyId}: no connected WhatsApp, skipping`);
           continue;
         }
-        const waAccountId = waAccounts[0].id;
 
         // 3. Check if at least one gateway billing is enabled
         const manualOn = settings.manual_billing_enabled === true;
@@ -263,7 +297,6 @@ serve(async (req) => {
               totalErrors++;
             } else {
               // Insert dedup tracking
-              // Use a system UUID as user_id placeholder
               const systemUserId = "00000000-0000-0000-0000-000000000000";
               await supabase.from("notification_tracking").insert({
                 user_id: systemUserId,
