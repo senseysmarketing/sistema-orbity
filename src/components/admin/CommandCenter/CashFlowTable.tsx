@@ -116,6 +116,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
   };
 
   return (
+    <TooltipProvider>
     <div className={className}>
       <Card>
         <CardHeader className="pb-3">
@@ -338,5 +339,6 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
         onEditExpense={onEditExpenseById}
       />
     </div>
+    </TooltipProvider>
   );
 }
