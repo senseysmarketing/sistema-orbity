@@ -34,6 +34,15 @@ export interface PaymentSettings {
   default_interest_percentage: number;
   discount_percentage: number;
   discount_days_before: number;
+  manual_billing_enabled: boolean;
+  manual_template_reminder: string | null;
+  manual_template_overdue: string | null;
+  conexa_billing_enabled: boolean;
+  conexa_template_reminder: string | null;
+  conexa_template_overdue: string | null;
+  asaas_billing_enabled: boolean;
+  asaas_template_reminder: string | null;
+  asaas_template_overdue: string | null;
 }
 
 const defaultSettings: Omit<PaymentSettings, 'id' | 'agency_id'> = {
@@ -64,6 +73,15 @@ const defaultSettings: Omit<PaymentSettings, 'id' | 'agency_id'> = {
   default_interest_percentage: 1.00,
   discount_percentage: 0.00,
   discount_days_before: 0,
+  manual_billing_enabled: false,
+  manual_template_reminder: null,
+  manual_template_overdue: null,
+  conexa_billing_enabled: false,
+  conexa_template_reminder: null,
+  conexa_template_overdue: null,
+  asaas_billing_enabled: false,
+  asaas_template_reminder: null,
+  asaas_template_overdue: null,
 };
 
 export function usePaymentGateway() {
