@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -107,11 +107,11 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
   const { currentAgency } = useAgency();
   const { enabledGateways } = usePaymentGateway();
   
-  
   const [loading, setLoading] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const [documentError, setDocumentError] = useState<string | null>(null);
+  const [lastFetchedCep, setLastFetchedCep] = useState('');
   
   const [formData, setFormData] = useState({ ...initialFormData });
 
@@ -145,8 +145,14 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
         state: client.state || '',
         default_billing_type: client.default_billing_type || 'manual',
       });
+      // Set lastFetchedCep to avoid re-fetching existing CEP on blur
+      const existingCep = (client.zip_code || '').replace(/\D/g, '');
+      if (existingCep.length === 8) {
+        setLastFetchedCep(existingCep);
+      }
     } else {
       setFormData({ ...initialFormData });
+      setLastFetchedCep('');
     }
   }, [client]);
 
@@ -166,6 +172,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
           city: data.localidade || prev.city,
           state: data.uf || prev.state,
         }));
+        setLastFetchedCep(cleanCep);
       }
     } catch (error) {
       console.error('Erro ao buscar CEP:', error);
@@ -173,6 +180,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
       setCepLoading(false);
     }
   };
+
   const fetchCnpjData = async (cnpj: string) => {
     setCnpjLoading(true);
     setDocumentError(null);
@@ -184,6 +192,8 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
       setFormData(prev => ({
         ...prev,
         name: data.nome_fantasia || data.razao_social || prev.name,
+        email: data.email || prev.email,
+        contact: data.ddd_telefone_1 ? formatPhone(data.ddd_telefone_1.replace(/\D/g, '')) : prev.contact,
         zip_code: cep ? formatCep(cep) : prev.zip_code,
         street: data.logradouro || prev.street,
         number: data.numero || prev.number,
@@ -192,6 +202,10 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
         city: data.municipio || prev.city,
         state: data.uf || prev.state,
       }));
+      // Mark CEP as already fetched to prevent re-fetch on blur
+      if (cep.length === 8) {
+        setLastFetchedCep(cep);
+      }
       toast({
         title: "CNPJ encontrado",
         description: `Dados de "${data.nome_fantasia || data.razao_social}" importados.`,
@@ -235,7 +249,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
       return;
     }
 
-    
     if (formData.has_loyalty && (!formData.contract_start_date || !formData.contract_end_date)) {
       toast({
         title: "Campos obrigatórios",
@@ -284,11 +297,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
           .update(data)
           .eq('id', client.id);
         if (error) throw error;
-
-        // TODO: Sync updated client data with payment gateway
-        // If client has conexa_customer_id or asaas_customer_id,
-        // call supabase.functions.invoke('sync-gateway-customer', { body: { clientId: client.id, agencyId: currentAgency?.id } })
-        // to update address/document on the external provider.
       } else {
         const { data: newClientData, error: clientError } = await supabase
           .from('clients')
@@ -299,7 +307,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
         if (clientError) throw clientError;
         savedClientId = newClientData?.id;
 
-        // Delegate first payment to FirstPaymentDialog via callback
         if (newClientData && onClientCreated) {
           onSuccess();
           onOpenChange(false);
@@ -316,8 +323,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
 
       onSuccess();
       onOpenChange(false);
-      
-      
       setFormData({ ...initialFormData });
     } catch (error: any) {
       toast({
@@ -354,6 +359,27 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
               {/* ── Seção 1: Dados Principais ── */}
               <h3 className="text-sm font-medium text-muted-foreground">Dados Principais</h3>
 
+              {/* CPF/CNPJ — primeiro campo */}
+              <div className="grid gap-2">
+                <Label htmlFor="document">CPF/CNPJ</Label>
+                <div className="relative">
+                  <Input
+                    id="document"
+                    value={formData.document}
+                    onChange={(e) => handleDocumentChange(e.target.value)}
+                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                    className={`${isEditing && !formData.document.replace(/\D/g, '') ? 'border-amber-500 focus-visible:ring-amber-500' : ''} ${documentError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  />
+                  {cnpjLoading && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+                {documentError && (
+                  <p className="text-xs text-destructive">{documentError}</p>
+                )}
+              </div>
+
+              {/* Nome / Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="name">Nome *</Label>
@@ -377,6 +403,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
                 </div>
               </div>
 
+              {/* E-mail / Contato */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="email">E-mail de Faturamento</Label>
@@ -400,6 +427,102 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
                   <p className="text-xs text-muted-foreground">Receberá links de pagamento e avisos.</p>
                 </div>
               </div>
+
+              {/* ── Seção 2: Endereço ── */}
+              <Separator className="my-4" />
+              <h3 className="text-sm font-medium text-muted-foreground">Endereço</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="zip_code">CEP</Label>
+                  <div className="relative">
+                    <Input
+                      id="zip_code"
+                      value={formData.zip_code}
+                      onChange={(e) => setFormData({ ...formData, zip_code: formatCep(e.target.value) })}
+                      onBlur={() => {
+                        const cleanCep = formData.zip_code.replace(/\D/g, '');
+                        if (cleanCep.length === 8 && cleanCep !== lastFetchedCep) {
+                          fetchAddressByCep(formData.zip_code);
+                        }
+                      }}
+                      placeholder="00000-000"
+                      className={isEditing && !formData.zip_code.replace(/\D/g, '') ? 'border-amber-500 focus-visible:ring-amber-500' : ''}
+                    />
+                    {cepLoading && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="street">Rua</Label>
+                  <Input
+                    id="street"
+                    value={formData.street}
+                    onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                    placeholder="Logradouro"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="number">Número</Label>
+                  <Input
+                    id="number"
+                    value={formData.number}
+                    onChange={(e) => setFormData({ ...formData, number: e.target.value })}
+                    placeholder="Nº"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="complement">Complemento</Label>
+                  <Input
+                    id="complement"
+                    value={formData.complement}
+                    onChange={(e) => setFormData({ ...formData, complement: e.target.value })}
+                    placeholder="Sala, Andar..."
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="neighborhood">Bairro</Label>
+                  <Input
+                    id="neighborhood"
+                    value={formData.neighborhood}
+                    onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
+                    placeholder="Bairro"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="city">Cidade</Label>
+                  <Input
+                    id="city"
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    placeholder="Cidade"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="state">Estado</Label>
+                  <Input
+                    id="state"
+                    value={formData.state}
+                    onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase().slice(0, 2) })}
+                    placeholder="UF"
+                    maxLength={2}
+                  />
+                </div>
+              </div>
+
+              {/* ── Seção 3: Serviço e Contrato ── */}
+              <Separator className="my-4" />
+              <h3 className="text-sm font-medium text-muted-foreground">Serviço e Contrato</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
@@ -483,7 +606,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
                 />
               </div>
 
-              {/* ── Seção 2: Configurações de Cobrança ── */}
+              {/* ── Seção 4: Configurações de Cobrança ── */}
               <Separator className="my-4" />
               <h3 className="text-sm font-medium text-muted-foreground mb-3">Configurações de Cobrança</h3>
 
@@ -542,112 +665,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
                   Apenas faturamento manual ativo. Configure gateways em Configurações &gt; Integrações.
                 </p>
               )}
-
-              {/* ── Seção 3: Dados de Faturamento ── */}
-              <Separator className="my-4" />
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Dados de Faturamento</h3>
-              <p className="text-xs text-muted-foreground mb-3">Necessários para emissão de cobranças via Asaas/Conexa</p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="document">CPF/CNPJ</Label>
-                  <div className="relative">
-                    <Input
-                      id="document"
-                      value={formData.document}
-                      onChange={(e) => handleDocumentChange(e.target.value)}
-                      placeholder="000.000.000-00"
-                      className={`${isEditing && !formData.document.replace(/\D/g, '') ? 'border-amber-500 focus-visible:ring-amber-500' : ''} ${documentError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                    />
-                    {cnpjLoading && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
-                  </div>
-                  {documentError && (
-                    <p className="text-xs text-destructive">{documentError}</p>
-                  )}
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="zip_code">CEP</Label>
-                  <div className="relative">
-                    <Input
-                      id="zip_code"
-                      value={formData.zip_code}
-                      onChange={(e) => setFormData({ ...formData, zip_code: formatCep(e.target.value) })}
-                      onBlur={() => fetchAddressByCep(formData.zip_code)}
-                      placeholder="00000-000"
-                      className={isEditing && !formData.zip_code.replace(/\D/g, '') ? 'border-amber-500 focus-visible:ring-amber-500' : ''}
-                    />
-                    {cepLoading && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="grid gap-2 md:col-span-2">
-                  <Label htmlFor="street">Rua</Label>
-                  <Input
-                    id="street"
-                    value={formData.street}
-                    onChange={(e) => setFormData({ ...formData, street: e.target.value })}
-                    placeholder="Logradouro"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="number">Número</Label>
-                  <Input
-                    id="number"
-                    value={formData.number}
-                    onChange={(e) => setFormData({ ...formData, number: e.target.value })}
-                    placeholder="Nº"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="complement">Complemento</Label>
-                  <Input
-                    id="complement"
-                    value={formData.complement}
-                    onChange={(e) => setFormData({ ...formData, complement: e.target.value })}
-                    placeholder="Sala, Andar..."
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="neighborhood">Bairro</Label>
-                  <Input
-                    id="neighborhood"
-                    value={formData.neighborhood}
-                    onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
-                    placeholder="Bairro"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="city">Cidade</Label>
-                  <Input
-                    id="city"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="Cidade"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="state">Estado</Label>
-                  <Input
-                    id="state"
-                    value={formData.state}
-                    onChange={(e) => setFormData({ ...formData, state: e.target.value.toUpperCase().slice(0, 2) })}
-                    placeholder="UF"
-                    maxLength={2}
-                  />
-                </div>
-              </div>
 
             </div>
           </ScrollArea>
