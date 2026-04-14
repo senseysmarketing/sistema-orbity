@@ -66,7 +66,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showRefreshAlert, setShowRefreshAlert] = useState(false);
-  const [lastCheckTime, setLastCheckTime] = useState(0);
+  const [_lastCheckTime, setLastCheckTime] = useState(0);
   
   // Refs para controlar visibilidade sem causar re-renders
   const wasVisibleRef = useRef(true);
