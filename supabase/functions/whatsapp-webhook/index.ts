@@ -96,22 +96,34 @@ async function validateSignature(req: Request, body: string): Promise<boolean> {
 }
 
 /**
- * Finds active/processing automations for a conversation, with a lead_id fallback.
+ * Finds active/processing automations for a conversation, with a cross-instance lead_id fallback.
+ * Uses agencyId to search across ALL WhatsApp accounts (general + billing) belonging to the agency.
  */
 async function findActiveAutomations(
-  supabase: any, accountId: string, conversationId: string, leadId: string | null
+  supabase: any, agencyId: string, conversationId: string, leadId: string | null
 ): Promise<{ id: string }[]> {
+  // 1. By conversation (scoped, fast)
   const { data: byConv } = await supabase
     .from('whatsapp_automation_control').select('id')
-    .eq('account_id', accountId).eq('conversation_id', conversationId)
+    .eq('conversation_id', conversationId)
     .in('status', ['active', 'processing']).limit(10);
 
   if (byConv && byConv.length > 0) return byConv;
   if (!leadId) return [];
 
+  // 2. By lead across ALL accounts in the agency (cross-instance)
+  const { data: agencyAccounts } = await supabase
+    .from('whatsapp_accounts').select('id')
+    .eq('agency_id', agencyId);
+
+  if (!agencyAccounts || agencyAccounts.length === 0) return [];
+
+  const accountIds = agencyAccounts.map((a: any) => a.id);
+
   const { data: byLead } = await supabase
     .from('whatsapp_automation_control').select('id')
-    .eq('account_id', accountId).eq('lead_id', leadId)
+    .in('account_id', accountIds)
+    .eq('lead_id', leadId)
     .in('status', ['active', 'processing']).limit(10);
 
   return byLead || [];
@@ -417,7 +429,7 @@ serve(async (req) => {
 
         // Stop active automations when customer replies
         const automations = await findActiveAutomations(
-          supabase, account.id, conversation.id, conversation.lead_id
+          supabase, account.agency_id, conversation.id, conversation.lead_id
         );
 
         for (const automation of automations) {
@@ -443,7 +455,7 @@ serve(async (req) => {
       } else if (!existingMsg) {
         // Operator sent from phone directly — pause automation
         const automations = await findActiveAutomations(
-          supabase, account.id, conversation.id, conversation.lead_id
+          supabase, account.agency_id, conversation.id, conversation.lead_id
         );
 
         for (const automation of automations) {
