@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -7,7 +7,8 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText, ExternalLink } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText, ExternalLink, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { MarkAsPaidPopover } from "./MarkAsPaidPopover";
@@ -36,9 +37,12 @@ interface CashFlowTableProps {
 
 export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, agencyId, selectedMonth, className, onEditExpenseById, onRefetch }: CashFlowTableProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [cancelDialogItem, setCancelDialogItem] = useState<CashFlowItem | null>(null);
+  const [deleteDialogItem, setDeleteDialogItem] = useState<CashFlowItem | null>(null);
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
   const [invoicingId, setInvoicingId] = useState<string | null>(null);
@@ -114,6 +118,33 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
     }
     setCancelDialogItem(null);
   };
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteDialogItem) return;
+    setIsDeletingItem(true);
+    const tableMap: Record<string, string> = {
+      client_payment: 'client_payments',
+      expense: 'expenses',
+      salary: 'salaries',
+    };
+    const table = tableMap[deleteDialogItem.sourceType];
+    if (!table) {
+      toast({ title: "Erro", description: "Tipo de registro desconhecido.", variant: "destructive" });
+      setIsDeletingItem(false);
+      setDeleteDialogItem(null);
+      return;
+    }
+    const { error } = await supabase.from(table).delete().eq('id', deleteDialogItem.sourceId);
+    if (error) {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Registro excluído", description: "O item foi removido permanentemente." });
+      queryClient.invalidateQueries();
+      onRefetch?.();
+    }
+    setIsDeletingItem(false);
+    setDeleteDialogItem(null);
+  }, [deleteDialogItem, toast, queryClient, onRefetch]);
 
   return (
     <TooltipProvider>
@@ -252,6 +283,15 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                                   Cancelar / Perdoar
                                 </DropdownMenuItem>
                               )}
+                              {item.status === 'CANCELLED' && (
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => setDeleteDialogItem(item)}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Excluir Registro
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -315,6 +355,28 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
               disabled={isCancellingItem}
             >
               {isCancellingItem ? 'Cancelando...' : 'Confirmar Cancelamento'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteDialogItem} onOpenChange={(open) => { if (!open && !isDeletingItem) setDeleteDialogItem(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O registro "{deleteDialogItem?.title}" será removido permanentemente do seu banco de dados e deixará de aparecer no fluxo de caixa.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingItem}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeletingItem}
+            >
+              {isDeletingItem ? 'Excluindo...' : 'Sim, excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
