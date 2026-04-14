@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.uniq_client_payment_month_idx;
