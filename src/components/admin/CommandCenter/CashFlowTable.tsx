@@ -43,7 +43,10 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
     in7Days.setDate(today.getDate() + 7);
 
     return cashFlow.filter(item => {
-      if (filter === 'overdue') return item.status === 'OVERDUE';
+      if (filter === 'overdue') {
+        const todayStr = new Date().toISOString().split('T')[0];
+        return item.status === 'OVERDUE' || (item.status === 'PENDING' && item.dueDate < todayStr);
+      }
       if (filter === 'next7') {
         const d = new Date(item.dueDate);
         return d >= today && d <= in7Days && item.status !== 'PAID' && item.status !== 'CANCELLED';
@@ -56,7 +59,8 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
   }, [cashFlow, filter, searchTerm]);
 
   const totalExpenses = expensesByCategory.reduce((s, c) => s + c.total, 0) || 1;
-  const overdueCount = cashFlow.filter(i => i.status === 'OVERDUE').length;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const overdueCount = cashFlow.filter(i => i.status === 'OVERDUE' || (i.status === 'PENDING' && i.dueDate < todayStr)).length;
 
   const statusBadge = (status: string) => {
     switch (status) {

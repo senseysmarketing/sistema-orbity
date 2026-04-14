@@ -311,19 +311,25 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   const today = new Date().toISOString().split('T')[0];
   const overdueAmount = useMemo(() => {
     return paymentsInMonth
-      .filter(p =>
-        (p.status === 'overdue' || p.status === 'pending') &&
-        p.due_date < today
-      )
+      .filter(p => {
+        if (!['overdue', 'pending'].includes(p.status)) return false;
+        if (p.due_date >= today) return false;
+        const client = clients.find(c => c.id === p.client_id);
+        return client && wasClientActiveInMonth(client, selectedMonth);
+      })
       .reduce((sum, p) => sum + p.amount, 0);
-  }, [paymentsInMonth, today]);
+  }, [paymentsInMonth, today, clients, selectedMonth]);
 
   // DRE / Cash Flow metrics for HeroMetrics
   const expectedRevenue = useMemo(() => {
     return paymentsInMonth
-      .filter(p => p.status !== 'cancelled')
+      .filter(p => {
+        if (p.status === 'cancelled') return false;
+        const client = clients.find(c => c.id === p.client_id);
+        return client && wasClientActiveInMonth(client, selectedMonth);
+      })
       .reduce((sum, p) => sum + p.amount, 0);
-  }, [paymentsInMonth]);
+  }, [paymentsInMonth, clients, selectedMonth]);
 
   const projectedProfit = expectedRevenue - burnRate;
   const profitMargin = expectedRevenue > 0 ? (projectedProfit / expectedRevenue) * 100 : 0;
