@@ -150,17 +150,17 @@ async function ensureConexaCustomer(
 async function createConexaSale(
   customerId: string,
   amount: number,
-  dueDate: string,
-  description: string | null,
+  _dueDate: string,
+  _description: string | null,
   productId: number,
   baseUrl: string,
-  apiKey: string
+  apiKey: string,
+  companyId: number
 ) {
   const body: Record<string, unknown> = {
     customerId: parseInt(customerId, 10),
-    dueDate,
-    description: description || "Cobrança",
-    products: [
+    companyId,
+    items: [
       {
         productId,
         quantity: 1,
@@ -168,6 +168,8 @@ async function createConexaSale(
       },
     ],
   };
+
+  console.log("[Conexa] Creating sale with body:", JSON.stringify(body));
 
   const res = await fetch(`${baseUrl}/sale`, {
     method: "POST",
