@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
 import { AlertTriangle, TrendingUp, Users } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import type { ClientProfitabilityItem } from "@/hooks/useFinancialMetrics";
@@ -11,11 +10,10 @@ interface ClientProfitabilityCardProps {
   clients: ClientProfitabilityItem[];
   allClients?: Client[];
   selectedMonth?: string;
-  onOpenManagement?: () => void;
   className?: string;
 }
 
-export function ClientProfitabilityCard({ clients, allClients, selectedMonth, onOpenManagement, className }: ClientProfitabilityCardProps) {
+export function ClientProfitabilityCard({ clients, allClients, selectedMonth, className }: ClientProfitabilityCardProps) {
   const { activeCount, lostMRR } = useMemo(() => {
     if (!allClients || !selectedMonth) return { activeCount: 0, lostMRR: 0 };
     const [year, month] = selectedMonth.split('-').map(Number);
@@ -33,17 +31,10 @@ export function ClientProfitabilityCard({ clients, allClients, selectedMonth, on
   return (
     <Card className={className}>
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            Rentabilidade por Cliente
-          </CardTitle>
-          {onOpenManagement && (
-            <Button variant="outline" size="sm" onClick={onOpenManagement}>
-              Gerenciar Carteira
-            </Button>
-          )}
-        </div>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          Rentabilidade por Cliente
+        </CardTitle>
         {allClients && selectedMonth && (
           <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
             <span className="flex items-center gap-1">

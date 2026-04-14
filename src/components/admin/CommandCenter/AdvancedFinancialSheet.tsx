@@ -5,9 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, DollarSign, Calendar, BarChart3, AlertTriangle, Target, Bell } from "lucide-react";
-import { BillingAutomationSettings } from "@/components/admin/BillingAutomationSettings";
+import { TrendingUp, TrendingDown, DollarSign, Calendar, BarChart3, AlertTriangle, Target } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useAdvancedAnalytics } from "@/hooks/useAdvancedAnalytics";
 import type { CashFlowItem, CategoryTotal } from "@/hooks/useFinancialMetrics";
@@ -24,7 +22,6 @@ interface AdvancedFinancialSheetProps {
 export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesByCategory, agencyId, selectedMonth }: AdvancedFinancialSheetProps) {
   const defaultYear = selectedMonth.split('-')[0];
   const [selectedYear, setSelectedYear] = useState(defaultYear);
-  const [billingRulerOpen, setBillingRulerOpen] = useState(false);
 
   const currentRealYear = new Date().getFullYear();
   const yearOptions = [currentRealYear - 2, currentRealYear - 1, currentRealYear].map(String);
@@ -172,19 +169,7 @@ export function AdvancedFinancialSheet({ open, onOpenChange, cashFlow, expensesB
               </CardContent>
             </Card>
           )}
-
-          {/* Billing Ruler trigger */}
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => setBillingRulerOpen(true)}
-          >
-            <Bell className="h-4 w-4 mr-2" />
-            Régua de Cobrança
-          </Button>
         </div>
-
-        <BillingAutomationSettings open={billingRulerOpen} onOpenChange={setBillingRulerOpen} />
       </SheetContent>
     </Sheet>
   );
