@@ -516,7 +516,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     paidRevenue,
     realProfitability,
     realProfitabilityMargin,
-    delinquencyRate,
+    delinquencyRate: overdueAmount,
+    overdueAmount,
     totalGatewayFees,
     totalNetRevenue,
 
