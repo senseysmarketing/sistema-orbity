@@ -487,7 +487,9 @@ export type Database = {
           block_access_days: number | null
           block_access_enabled: boolean | null
           conexa_api_key: string | null
+          conexa_default_product_id: number | null
           conexa_enabled: boolean | null
+          conexa_subdomain: string | null
           conexa_token: string | null
           conexa_webhook_token: string | null
           created_at: string | null
@@ -517,7 +519,9 @@ export type Database = {
           block_access_days?: number | null
           block_access_enabled?: boolean | null
           conexa_api_key?: string | null
+          conexa_default_product_id?: number | null
           conexa_enabled?: boolean | null
+          conexa_subdomain?: string | null
           conexa_token?: string | null
           conexa_webhook_token?: string | null
           created_at?: string | null
@@ -547,7 +551,9 @@ export type Database = {
           block_access_days?: number | null
           block_access_enabled?: boolean | null
           conexa_api_key?: string | null
+          conexa_default_product_id?: number | null
           conexa_enabled?: boolean | null
+          conexa_subdomain?: string | null
           conexa_token?: string | null
           conexa_webhook_token?: string | null
           created_at?: string | null
