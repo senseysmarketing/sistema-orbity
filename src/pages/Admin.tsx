@@ -398,13 +398,14 @@ export default function Admin() {
 
       {/* Hero Metrics */}
       <HeroMetrics
-        totalMRR={metrics.totalMRR}
-        burnRate={metrics.burnRate}
-        profitability={metrics.profitability}
-        profitabilityMargin={metrics.profitabilityMargin}
-        realProfitability={metrics.realProfitability}
-        realProfitabilityMargin={metrics.realProfitabilityMargin}
-        delinquencyRate={metrics.delinquencyRate}
+        expectedRevenue={metrics.expectedRevenue}
+        receivedRevenue={metrics.paidRevenue}
+        expectedExpenses={metrics.burnRate}
+        paidExpenses={metrics.paidBurnRate}
+        projectedProfit={metrics.projectedProfit}
+        profitMargin={metrics.profitMargin}
+        overdueAmount={metrics.delinquencyRate}
+        overdueRate={metrics.overdueRate}
         isLoading={metrics.isLoading}
       />
 
