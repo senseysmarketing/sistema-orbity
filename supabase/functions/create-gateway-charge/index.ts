@@ -160,7 +160,7 @@ async function createConexaSale(
     productId,
     quantity: 1,
     amount,
-    referenceDate: new Date().toISOString(),
+    referenceDate: new Date().toISOString().replace(/\.\d{3}Z$/, '+00:00'),
   };
 
   if (_description) {
