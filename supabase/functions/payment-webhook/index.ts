@@ -69,7 +69,9 @@ Deno.serve(async (req) => {
       }
     } else {
       const expectedToken = settings.conexa_webhook_token;
-      const receivedToken = req.headers.get("x-conexa-token");
+      const receivedToken =
+        req.headers.get("x-conexa-token") ||
+        req.headers.get("authorization")?.replace("Bearer ", "");
       if (!expectedToken || receivedToken !== expectedToken) {
         console.warn(`[payment-webhook] Invalid Conexa token for agency ${agencyId}`);
         return new Response("Unauthorized", { status: 401 });
