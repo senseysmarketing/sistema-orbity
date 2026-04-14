@@ -1,0 +1,1 @@
+ALTER TABLE public.agency_payment_settings ADD COLUMN conexa_unit_id INTEGER;
