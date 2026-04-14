@@ -46,7 +46,6 @@ async function ensureAsaasCustomer(
   const data = await res.json();
   const customerId: string = data.id;
 
-  // Persist on clients table (service role to bypass RLS)
   await adminClient
     .from("clients")
     .update({ asaas_customer_id: customerId })
@@ -68,11 +67,10 @@ async function createAsaasPayment(
     customer: customerId,
     billingType: "UNDEFINED",
     value: amount,
-    dueDate, // yyyy-MM-dd
+    dueDate,
     description: description || "Cobrança",
   };
 
-  // Financial rules
   const fine = settings.default_fine_percentage as number | null;
   const interest = settings.default_interest_percentage as number | null;
   const discountPct = settings.discount_percentage as number | null;
@@ -102,13 +100,11 @@ async function createAsaasPayment(
   return await res.json();
 }
 
-// --------------- Conexa helpers ---------------
-// NOTE: Conexa API base URL is a placeholder. Replace with the real endpoint
-// once the Conexa API documentation/credentials are confirmed.
-const CONEXA_BASE_URL = "https://api.conexapay.com.br";
+// --------------- Conexa v2 helpers ---------------
 
 async function ensureConexaCustomer(
   client: { name: string; email: string | null; document: string | null; conexa_customer_id: string | null },
+  baseUrl: string,
   apiKey: string,
   adminClient: ReturnType<typeof createClient>,
   clientId: string
@@ -119,7 +115,7 @@ async function ensureConexaCustomer(
   if (client.email) payload.email = client.email;
   if (client.document) payload.cpfCnpj = client.document;
 
-  const res = await fetch(`${CONEXA_BASE_URL}/v1/customers`, {
+  const res = await fetch(`${baseUrl}/customer`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -134,7 +130,7 @@ async function ensureConexaCustomer(
   }
 
   const data = await res.json();
-  const customerId: string = data.id;
+  const customerId: string = String(data.id);
 
   await adminClient
     .from("clients")
@@ -144,21 +140,29 @@ async function ensureConexaCustomer(
   return customerId;
 }
 
-async function createConexaCharge(
+async function createConexaSale(
   customerId: string,
   amount: number,
   dueDate: string,
   description: string | null,
+  productId: number,
+  baseUrl: string,
   apiKey: string
 ) {
   const body: Record<string, unknown> = {
-    customerId,
-    amount,
+    customerId: parseInt(customerId, 10),
     dueDate,
     description: description || "Cobrança",
+    products: [
+      {
+        productId,
+        quantity: 1,
+        unitPrice: amount,
+      },
+    ],
   };
 
-  const res = await fetch(`${CONEXA_BASE_URL}/v1/charges`, {
+  const res = await fetch(`${baseUrl}/sale`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -169,7 +173,7 @@ async function createConexaCharge(
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Conexa charge creation failed (${res.status}): ${err}`);
+    throw new Error(`Conexa sale creation failed (${res.status}): ${err}`);
   }
 
   return await res.json();
@@ -244,7 +248,6 @@ Deno.serve(async (req) => {
 
     // 4. Gateway routing
     if (effectiveBillingType === "asaas" || effectiveBillingType === "conexa") {
-      // Fetch agency payment settings (admin to bypass RLS)
       const { data: settings, error: settingsError } = await adminClient
         .from("agency_payment_settings")
         .select("*")
@@ -267,7 +270,6 @@ Deno.serve(async (req) => {
           ? "https://sandbox.asaas.com/api"
           : "https://api.asaas.com";
 
-        // 4a. Ensure customer exists in Asaas
         const customerId = await ensureAsaasCustomer(
           client,
           baseUrl,
@@ -276,7 +278,6 @@ Deno.serve(async (req) => {
           client_id
         );
 
-        // 4b. Create payment
         const asaasResponse = await createAsaasPayment(
           customerId,
           amount,
@@ -287,24 +288,51 @@ Deno.serve(async (req) => {
           settings.asaas_api_key
         );
 
-        // 4c. Capture response data
         asaas_payment_id = asaasResponse.id || null;
         invoice_url = asaasResponse.invoiceUrl || null;
         pix_copy_paste = asaasResponse.pixCopiaECola || null;
+
       } else if (effectiveBillingType === "conexa") {
+        // Validate all required Conexa settings
         if (!settings.conexa_api_key) {
-          return jsonResponse({ error: "Conexa API key not configured" }, 422);
+          return jsonResponse({ error: "Token de acesso do Conexa não configurado. Vá em Configurações > Integrações." }, 422);
+        }
+        if (!settings.conexa_subdomain) {
+          return jsonResponse({ error: "Subdomínio do Conexa não configurado. Vá em Configurações > Integrações." }, 422);
+        }
+        if (!settings.conexa_default_product_id) {
+          return jsonResponse({ error: "ID do Produto Padrão do Conexa não configurado. Vá em Configurações > Integrações." }, 422);
         }
 
-        // TODO: Conexa API integration pending — real base URL needed.
-        // For now, we insert the payment locally with billing_type='conexa'
-        // but skip the gateway call. The user will need to create the charge
-        // manually in Conexa until the API endpoint is confirmed.
-        console.warn("Conexa gateway integration pending: inserting locally without gateway call");
+        const conexaBaseUrl = `https://${settings.conexa_subdomain}.conexa.app/index.php/api/v2`;
+
+        // Ensure customer exists in Conexa
+        const conexaCustomerId = await ensureConexaCustomer(
+          client,
+          conexaBaseUrl,
+          settings.conexa_api_key,
+          adminClient,
+          client_id
+        );
+
+        // Create sale in Conexa
+        const conexaResponse = await createConexaSale(
+          conexaCustomerId,
+          amount,
+          due_date,
+          description,
+          settings.conexa_default_product_id,
+          conexaBaseUrl,
+          settings.conexa_api_key
+        );
+
+        // POST /sale returns { "id": 12345 } with status notBilled
+        conexa_charge_id = conexaResponse.id ? String(conexaResponse.id) : null;
+        // invoice_url and pix will be populated later via webhook or manual billing in Conexa
       }
     }
 
-    // 5. INSERT into client_payments (always via admin to guarantee write)
+    // 5. INSERT into client_payments
     const insertPayload = {
       client_id,
       amount,
