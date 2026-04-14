@@ -469,6 +469,18 @@ export default function Admin() {
         agencyId={currentAgency?.id || ""}
       />
 
+      <BillingAutomationSettings open={isBillingRulerOpen} onOpenChange={setIsBillingRulerOpen} />
+
+      <AdvancedExpenseSheet
+        open={isExpenseCentralOpen}
+        onOpenChange={setIsExpenseCentralOpen}
+        cashFlow={metrics.unifiedCashFlow}
+        expensesByCategory={metrics.expensesByCategory}
+        agencyId={currentAgency?.id || ""}
+        selectedMonth={selectedMonth}
+        onEditExpense={handleEditExpenseById}
+      />
+
       {/* ============ FORMS (Dialog-based, standalone) ============ */}
       <ClientForm
         open={clientFormOpen}
