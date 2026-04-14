@@ -118,8 +118,57 @@ Deno.serve(async (req) => {
           });
         }
       } else if (payment.conexa_charge_id) {
-        // TODO: Implement Conexa settlement when API docs are available
-        console.warn("Conexa sync requested but not yet implemented");
+        const { data: cxSettings, error: cxSettingsError } = await adminClient
+          .from("agency_payment_settings")
+          .select("conexa_subdomain, conexa_api_key, conexa_account_id, conexa_receiving_method_id")
+          .eq("agency_id", payment.agency_id)
+          .single();
+
+        if (cxSettingsError || !cxSettings?.conexa_api_key || !cxSettings?.conexa_subdomain) {
+          return new Response(JSON.stringify({ error: "Conexa API key or subdomain not configured for this agency" }), {
+            status: 422,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        if (!cxSettings.conexa_account_id || !cxSettings.conexa_receiving_method_id) {
+          return new Response(JSON.stringify({ error: "Conexa account ID or receiving method ID not configured" }), {
+            status: 422,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const conexaUrl = `https://${cxSettings.conexa_subdomain}.conexa.app/index.php/api/v2/charge/settle/${payment.conexa_charge_id}`;
+
+        const conexaResponse = await fetch(conexaUrl, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${cxSettings.conexa_api_key}`,
+          },
+          body: JSON.stringify({
+            settlementDate: paidDate,
+            receivingMethod: {
+              id: cxSettings.conexa_receiving_method_id,
+              installmentsQuantity: 1,
+            },
+            accountId: cxSettings.conexa_account_id,
+            paidAmount: paidAmount,
+            sendEmail: false,
+          }),
+        });
+
+        if (!conexaResponse.ok) {
+          const conexaError = await conexaResponse.text();
+          console.error("Conexa settle error:", conexaResponse.status, conexaError);
+          return new Response(JSON.stringify({
+            error: "Failed to settle payment on Conexa",
+            details: conexaError,
+          }), {
+            status: 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
     }
 

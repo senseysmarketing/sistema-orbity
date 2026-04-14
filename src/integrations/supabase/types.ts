@@ -486,10 +486,12 @@ export type Database = {
           asaas_webhook_token: string | null
           block_access_days: number | null
           block_access_enabled: boolean | null
+          conexa_account_id: number | null
           conexa_api_key: string | null
           conexa_company_id: number | null
           conexa_default_product_id: number | null
           conexa_enabled: boolean | null
+          conexa_receiving_method_id: number | null
           conexa_subdomain: string | null
           conexa_token: string | null
           conexa_unit_id: number | null
@@ -520,10 +522,12 @@ export type Database = {
           asaas_webhook_token?: string | null
           block_access_days?: number | null
           block_access_enabled?: boolean | null
+          conexa_account_id?: number | null
           conexa_api_key?: string | null
           conexa_company_id?: number | null
           conexa_default_product_id?: number | null
           conexa_enabled?: boolean | null
+          conexa_receiving_method_id?: number | null
           conexa_subdomain?: string | null
           conexa_token?: string | null
           conexa_unit_id?: number | null
@@ -554,10 +558,12 @@ export type Database = {
           asaas_webhook_token?: string | null
           block_access_days?: number | null
           block_access_enabled?: boolean | null
+          conexa_account_id?: number | null
           conexa_api_key?: string | null
           conexa_company_id?: number | null
           conexa_default_product_id?: number | null
           conexa_enabled?: boolean | null
+          conexa_receiving_method_id?: number | null
           conexa_subdomain?: string | null
           conexa_token?: string | null
           conexa_unit_id?: number | null

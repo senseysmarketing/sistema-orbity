@@ -19,6 +19,8 @@ export function ConexaIntegration() {
   const [productId, setProductId] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [unitId, setUnitId] = useState("");
+  const [accountId, setAccountId] = useState("");
+  const [receivingMethodId, setReceivingMethodId] = useState("");
   const [gatewayActive, setGatewayActive] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const initialized = useRef(false);
@@ -30,6 +32,8 @@ export function ConexaIntegration() {
       setProductId(settings.conexa_default_product_id ? String(settings.conexa_default_product_id) : "");
       setCompanyId(settings.conexa_company_id ? String(settings.conexa_company_id) : "");
       setUnitId((settings as any).conexa_unit_id ? String((settings as any).conexa_unit_id) : "");
+      setAccountId((settings as any).conexa_account_id ? String((settings as any).conexa_account_id) : "");
+      setReceivingMethodId((settings as any).conexa_receiving_method_id ? String((settings as any).conexa_receiving_method_id) : "");
       setGatewayActive(settings.conexa_enabled ?? false);
       initialized.current = true;
     }
@@ -43,6 +47,8 @@ export function ConexaIntegration() {
         conexa_default_product_id: productId ? parseInt(productId, 10) : null,
         conexa_company_id: companyId ? parseInt(companyId, 10) : null,
         conexa_unit_id: unitId ? parseInt(unitId, 10) : null,
+        conexa_account_id: accountId ? parseInt(accountId, 10) : null,
+        conexa_receiving_method_id: receivingMethodId ? parseInt(receivingMethodId, 10) : null,
         conexa_enabled: gatewayActive,
       } as any);
       toast({ title: "Configurações salvas!", description: gatewayActive ? "Conexa habilitado como gateway." : "Conexa desabilitado." });
@@ -187,6 +193,39 @@ export function ConexaIntegration() {
             type="number"
             value={unitId}
             onChange={(e) => setUnitId(e.target.value)}
+            placeholder="Ex: 1"
+            min="1"
+          />
+        </div>
+
+        <Separator />
+
+        {/* Configurações de Baixa Manual */}
+        <div className="space-y-2">
+          <Label htmlFor="conexa-account-id">ID da Conta Bancária Padrão</Label>
+          <p className="text-xs text-muted-foreground">
+            ID numérico da conta bancária para baixa manual. Encontre em Financeiro &gt; Contas no painel Conexa.
+          </p>
+          <Input
+            id="conexa-account-id"
+            type="number"
+            value={accountId}
+            onChange={(e) => setAccountId(e.target.value)}
+            placeholder="Ex: 1"
+            min="1"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="conexa-receiving-method-id">ID do Meio de Recebimento Padrão</Label>
+          <p className="text-xs text-muted-foreground">
+            ID numérico do meio de recebimento para baixa manual. Encontre em Financeiro &gt; Meios de Recebimento no painel Conexa.
+          </p>
+          <Input
+            id="conexa-receiving-method-id"
+            type="number"
+            value={receivingMethodId}
+            onChange={(e) => setReceivingMethodId(e.target.value)}
             placeholder="Ex: 1"
             min="1"
           />

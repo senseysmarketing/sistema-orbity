@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
     const updateData: Record<string, unknown> = { status: newStatus };
 
     if (newStatus === "paid") {
-      updateData.amount_paid = netValue;
+      updateData.amount_paid = value;
       updateData.gateway_fee = Math.round((value - netValue) * 100) / 100;
       updateData.paid_date = new Date().toISOString().split("T")[0];
     }
