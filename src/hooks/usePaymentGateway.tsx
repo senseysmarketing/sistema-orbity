@@ -27,6 +27,8 @@ export interface PaymentSettings {
   notify_via_whatsapp: boolean;
   asaas_webhook_token: string | null;
   conexa_webhook_token: string | null;
+  conexa_subdomain: string | null;
+  conexa_default_product_id: number | null;
   default_fine_percentage: number;
   default_interest_percentage: number;
   discount_percentage: number;
@@ -54,6 +56,8 @@ const defaultSettings: Omit<PaymentSettings, 'id' | 'agency_id'> = {
   notify_via_whatsapp: true,
   asaas_webhook_token: null,
   conexa_webhook_token: null,
+  conexa_subdomain: null,
+  conexa_default_product_id: null,
   default_fine_percentage: 2.00,
   default_interest_percentage: 1.00,
   discount_percentage: 0.00,

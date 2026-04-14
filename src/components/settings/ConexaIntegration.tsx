@@ -15,6 +15,8 @@ export function ConexaIntegration() {
   const { toast } = useToast();
 
   const [apiKey, setApiKey] = useState("");
+  const [subdomain, setSubdomain] = useState("");
+  const [productId, setProductId] = useState("");
   const [gatewayActive, setGatewayActive] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const initialized = useRef(false);
@@ -22,6 +24,8 @@ export function ConexaIntegration() {
   useEffect(() => {
     if (settings && !initialized.current) {
       setApiKey(settings.conexa_api_key || "");
+      setSubdomain(settings.conexa_subdomain || "");
+      setProductId(settings.conexa_default_product_id ? String(settings.conexa_default_product_id) : "");
       setGatewayActive(settings.conexa_enabled ?? false);
       initialized.current = true;
     }
@@ -31,6 +35,8 @@ export function ConexaIntegration() {
     try {
       await updateSettings({
         conexa_api_key: apiKey || null,
+        conexa_subdomain: subdomain || null,
+        conexa_default_product_id: productId ? parseInt(productId, 10) : null,
         conexa_enabled: gatewayActive,
       });
       toast({ title: "Configurações salvas!", description: gatewayActive ? "Conexa habilitado como gateway." : "Conexa desabilitado." });
@@ -39,7 +45,7 @@ export function ConexaIntegration() {
     }
   };
 
-  const hasCredentials = !!apiKey.trim();
+  const hasCredentials = !!apiKey.trim() && !!subdomain.trim() && !!productId.trim();
 
   if (isLoading) {
     return (
@@ -90,6 +96,21 @@ export function ConexaIntegration() {
 
         <Separator />
 
+        {/* Subdomínio */}
+        <div className="space-y-2">
+          <Label htmlFor="conexa-subdomain">Subdomínio do Conexa</Label>
+          <p className="text-xs text-muted-foreground">
+            Se você acessa <strong>minhaagencia.conexa.app</strong>, digite apenas <strong>minhaagencia</strong>
+          </p>
+          <Input
+            id="conexa-subdomain"
+            type="text"
+            value={subdomain}
+            onChange={(e) => setSubdomain(e.target.value.trim().toLowerCase())}
+            placeholder="minhaagencia"
+          />
+        </div>
+
         {/* Token de Acesso */}
         <div className="space-y-2">
           <Label htmlFor="conexa-token">Token de Acesso (Conexa)</Label>
@@ -115,6 +136,22 @@ export function ConexaIntegration() {
               {showKey ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
             </Button>
           </div>
+        </div>
+
+        {/* ID do Produto Padrão */}
+        <div className="space-y-2">
+          <Label htmlFor="conexa-product-id">ID do Produto Padrão</Label>
+          <p className="text-xs text-muted-foreground">
+            ID numérico do produto genérico cadastrado no Conexa (ex: "Serviços de Agência"). Encontre em Produtos no painel.
+          </p>
+          <Input
+            id="conexa-product-id"
+            type="number"
+            value={productId}
+            onChange={(e) => setProductId(e.target.value)}
+            placeholder="Ex: 123"
+            min="1"
+          />
         </div>
 
         <Button onClick={handleSave} disabled={isSaving} className="w-full">
