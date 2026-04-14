@@ -134,7 +134,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
       setDeleteDialogItem(null);
       return;
     }
-    const { error } = await supabase.from(table).delete().eq('id', deleteDialogItem.sourceId);
+    const { error } = await (supabase.from(table as any).delete() as any).eq('id', deleteDialogItem.sourceId);
     if (error) {
       toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
     } else {
