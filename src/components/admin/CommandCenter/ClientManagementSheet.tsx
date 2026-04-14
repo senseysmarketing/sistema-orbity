@@ -10,11 +10,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash2, Pencil, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { ChurnAnalysis } from "@/components/admin/ChurnAnalysis";
+import { ClientForm } from "@/components/admin/ClientForm";
 import type { Client } from "@/hooks/useFinancialMetrics";
 
 interface ClientManagementSheetProps {
@@ -32,6 +33,30 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
   const [filter, setFilter] = useState("all");
   const [confirmClient, setConfirmClient] = useState<Client | null>(null);
   const [deleteClient, setDeleteClient] = useState<Client | null>(null);
+  const [editingClient, setEditingClient] = useState<any | null>(null);
+  const [loadingClientId, setLoadingClientId] = useState<string | null>(null);
+
+  const handleEditClient = async (client: Client) => {
+    setLoadingClientId(client.id);
+    try {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("*")
+        .eq("id", client.id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("Cliente não encontrado.");
+      setEditingClient(data);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao carregar cliente",
+        description: error.message || "Não foi possível carregar os detalhes do cliente. Verifique sua conexão.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingClientId(null);
+    }
+  };
 
   const filteredClients = useMemo(() => {
     if (filter === "active") return clients.filter(c => c.active);
