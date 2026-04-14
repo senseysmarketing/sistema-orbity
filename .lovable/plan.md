@@ -1,35 +1,36 @@
 
 
-# Correção: Lucratividade de Caixa com burnRate inconsistente
+# Refatoração: HeroMetrics com visão DRE/Fluxo de Caixa
 
 ## Problema
-
-A lucratividade de caixa está usando:
-- **Receita**: apenas pagamentos com `status === 'paid'` ✅
-- **Custos**: TODOS os custos (pagos + pendentes + vencidos) ❌
-
-Isso gera -R$ 26.537 porque compara R$ 5.921 recebidos contra R$ 32.458 de custos totais.
-
-## Solução
-
-Criar um `paidBurnRate` que soma apenas despesas e salários com `status === 'paid'`, e usá-lo no cálculo de `realProfitability`.
+Os cards misturam MRR (receita contratada) com fluxo de caixa real, gerando confusão ao cancelar faturas.
 
 ## Alterações
 
-| Arquivo | O que muda |
-|---------|-----------|
-| `src/hooks/useFinancialMetrics.tsx` | Criar `paidExpenses`, `paidPayroll`, `paidBurnRate` (filtrando `status === 'paid'`). Usar `paidBurnRate` em `realProfitability` |
+### 1. `src/hooks/useFinancialMetrics.tsx`
+Adicionar duas novas métricas calculadas e renomear exports:
 
-### Lógica
+- **`expectedRevenue`**: soma dos `amount` de `paymentsInMonth` com status != `cancelled` (faturamento real do mês)
+- **`receivedRevenue`**: já existe como `paidRevenue`
+- **`expectedExpenses`**: já existe como `burnRate` (totalExpenses + totalPayroll, excluindo cancelled)
+- **`paidExpensesCash`**: já existe como `paidBurnRate`
+- **`projectedProfit`**: `expectedRevenue - expectedExpenses`
+- **`profitMargin`**: `(projectedProfit / expectedRevenue) * 100`
+- **`overdueAmount`**: já existe como `delinquencyRate` (nome confuso, é valor absoluto)
+- **`overdueRate`**: `(overdueAmount / expectedRevenue) * 100`
 
-```typescript
-const paidExpenses = expenses.filter(e => e.status === 'paid').reduce((sum, e) => sum + e.amount, 0);
-const paidPayroll = salaries.filter(s => s.status === 'paid').reduce((sum, s) => sum + s.amount, 0);
-const paidBurnRate = paidExpenses + paidPayroll;
+Adicionar ao return: `expectedRevenue`, `projectedProfit`, `profitMargin`, `overdueRate`.
 
-const realProfitability = paidRevenue - paidBurnRate;
-const realProfitabilityMargin = paidRevenue > 0 ? (realProfitability / paidRevenue) * 100 : 0;
-```
+### 2. `src/components/admin/CommandCenter/HeroMetrics.tsx`
+Reescrever interface e cards conforme especificação:
 
-A lucratividade **Prevista** (competência) continua usando `burnRate` total vs MRR — sem alteração.
+| Card | Valor Principal | Badge |
+|------|----------------|-------|
+| Faturamento do Mês | `expectedRevenue` | Recebido: `receivedRevenue` (verde) |
+| Custos do Mês | `expectedExpenses` | Pago: `paidExpenses` (neutro) |
+| Lucratividade Projetada | `projectedProfit` | `profitMargin%` (verde/vermelho) |
+| Inadimplência (Atrasos) | `overdueAmount` | `overdueRate%` (vermelho se > 0) |
+
+### 3. `src/pages/Admin.tsx`
+Atualizar as props passadas ao `<HeroMetrics>` para usar as novas variáveis do hook.
 
