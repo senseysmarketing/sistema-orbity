@@ -6,12 +6,14 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3 } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { MarkAsPaidPopover } from "./MarkAsPaidPopover";
 import { AdvancedFinancialSheet } from "./AdvancedFinancialSheet";
 import { AdvancedExpenseSheet } from "./AdvancedExpenseSheet";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import type { CashFlowItem, CategoryTotal } from "@/hooks/useFinancialMetrics";
 
 type FilterType = 'all' | 'next7' | 'overdue';
