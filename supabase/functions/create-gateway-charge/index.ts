@@ -296,27 +296,11 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: "Conexa API key not configured" }, 422);
         }
 
-        // 4a. Ensure customer exists in Conexa
-        const customerId = await ensureConexaCustomer(
-          client,
-          settings.conexa_api_key,
-          adminClient,
-          client_id
-        );
-
-        // 4b. Create charge
-        const conexaResponse = await createConexaCharge(
-          customerId,
-          amount,
-          due_date,
-          description,
-          settings.conexa_api_key
-        );
-
-        // 4c. Capture response data
-        conexa_charge_id = conexaResponse.id || null;
-        conexa_invoice_url = conexaResponse.invoiceUrl || null;
-        conexa_pix_copy_paste = conexaResponse.pixCopiaECola || null;
+        // TODO: Conexa API integration pending — real base URL needed.
+        // For now, we insert the payment locally with billing_type='conexa'
+        // but skip the gateway call. The user will need to create the charge
+        // manually in Conexa until the API endpoint is confirmed.
+        console.warn("Conexa gateway integration pending: inserting locally without gateway call");
       }
     }
 
