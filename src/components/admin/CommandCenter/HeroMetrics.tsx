@@ -5,17 +5,28 @@ import { TrendingUp, TrendingDown, Calculator, AlertTriangle } from "lucide-reac
 import { formatCurrency } from "@/lib/utils";
 
 interface HeroMetricsProps {
-  totalMRR: number;
-  burnRate: number;
-  profitability: number;
-  profitabilityMargin: number;
-  realProfitability: number;
-  realProfitabilityMargin: number;
-  delinquencyRate: number;
+  expectedRevenue: number;
+  receivedRevenue: number;
+  expectedExpenses: number;
+  paidExpenses: number;
+  projectedProfit: number;
+  profitMargin: number;
+  overdueAmount: number;
+  overdueRate: number;
   isLoading: boolean;
 }
 
-export function HeroMetrics({ totalMRR, burnRate, profitability, profitabilityMargin, realProfitability = 0, realProfitabilityMargin = 0, delinquencyRate, isLoading }: HeroMetricsProps) {
+export function HeroMetrics({
+  expectedRevenue,
+  receivedRevenue,
+  expectedExpenses,
+  paidExpenses,
+  projectedProfit,
+  profitMargin,
+  overdueAmount,
+  overdueRate,
+  isLoading,
+}: HeroMetricsProps) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -34,42 +45,56 @@ export function HeroMetrics({ totalMRR, burnRate, profitability, profitabilityMa
 
   const metrics = [
     {
-      label: "Receita Recorrente (MRR)",
-      value: formatCurrency(totalMRR),
+      label: "Faturamento do Mês",
+      value: formatCurrency(expectedRevenue),
       icon: TrendingUp,
       iconColor: "text-emerald-600 dark:text-emerald-400",
       bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
       borderColor: "border-emerald-200 dark:border-emerald-800",
+      badge: (
+        <Badge variant="success" className="ml-2 text-xs">
+          Recebido: {formatCurrency(receivedRevenue)}
+        </Badge>
+      ),
     },
     {
-      label: "Burn Rate (Custos)",
-      value: formatCurrency(burnRate),
+      label: "Custos do Mês",
+      value: formatCurrency(expectedExpenses),
       icon: TrendingDown,
       iconColor: "text-rose-600 dark:text-rose-400",
       bgColor: "bg-rose-50 dark:bg-rose-950/30",
       borderColor: "border-rose-200 dark:border-rose-800",
-    },
-    {
-      label: "Lucratividade (Caixa)",
-      value: formatCurrency(realProfitability),
-      icon: Calculator,
-      iconColor: realProfitability >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400",
-      bgColor: realProfitability >= 0 ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-rose-50 dark:bg-rose-950/30",
-      borderColor: realProfitability >= 0 ? "border-emerald-200 dark:border-emerald-800" : "border-rose-200 dark:border-rose-800",
       badge: (
-        <Badge variant={realProfitability >= 0 ? "default" : "destructive"} className="ml-2 text-xs">
-          {realProfitabilityMargin.toFixed(1)}%
+        <Badge variant="secondary" className="ml-2 text-xs">
+          Pago: {formatCurrency(paidExpenses)}
         </Badge>
       ),
-      subtitle: `Previsto: ${formatCurrency(profitability)} (${profitabilityMargin.toFixed(1)}%)`,
     },
     {
-      label: "Inadimplência",
-      value: formatCurrency(delinquencyRate),
+      label: "Lucratividade Projetada",
+      value: formatCurrency(projectedProfit),
+      icon: Calculator,
+      iconColor: projectedProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400",
+      bgColor: projectedProfit >= 0 ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-rose-50 dark:bg-rose-950/30",
+      borderColor: projectedProfit >= 0 ? "border-emerald-200 dark:border-emerald-800" : "border-rose-200 dark:border-rose-800",
+      badge: (
+        <Badge variant={projectedProfit >= 0 ? "default" : "destructive"} className="ml-2 text-xs">
+          {profitMargin.toFixed(1)}%
+        </Badge>
+      ),
+    },
+    {
+      label: "Inadimplência (Atrasos)",
+      value: formatCurrency(overdueAmount),
       icon: AlertTriangle,
-      iconColor: delinquencyRate > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground",
-      bgColor: delinquencyRate > 0 ? "bg-amber-50 dark:bg-amber-950/30" : "bg-muted/30",
-      borderColor: delinquencyRate > 0 ? "border-amber-200 dark:border-amber-800" : "border-border",
+      iconColor: overdueAmount > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground",
+      bgColor: overdueAmount > 0 ? "bg-amber-50 dark:bg-amber-950/30" : "bg-muted/30",
+      borderColor: overdueAmount > 0 ? "border-amber-200 dark:border-amber-800" : "border-border",
+      badge: overdueAmount > 0 ? (
+        <Badge variant="destructive" className="ml-2 text-xs">
+          {overdueRate.toFixed(1)}%
+        </Badge>
+      ) : undefined,
     },
   ];
 
@@ -84,13 +109,10 @@ export function HeroMetrics({ totalMRR, burnRate, profitability, profitabilityMa
                 <m.icon className={`h-4 w-4 ${m.iconColor}`} />
               </div>
             </div>
-            <div className="flex items-baseline gap-1">
+            <div className="flex items-baseline gap-1 flex-wrap">
               <span className="text-2xl font-bold tracking-tight">{m.value}</span>
               {m.badge}
             </div>
-            {m.subtitle && (
-              <p className="text-xs text-muted-foreground mt-1.5">{m.subtitle}</p>
-            )}
           </CardContent>
         </Card>
       ))}

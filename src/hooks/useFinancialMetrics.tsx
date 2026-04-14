@@ -307,7 +307,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     return paidRevenue - totalGatewayFees;
   }, [paymentsInMonth, totalGatewayFees]);
 
-  // Delinquency
+  // Delinquency (overdue amount)
   const delinquencyRate = useMemo(() => {
     return paymentsInMonth
       .filter(p => {
@@ -316,6 +316,17 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       })
       .reduce((sum, p) => sum + p.amount, 0);
   }, [paymentsInMonth, clients, selectedMonth]);
+
+  // DRE / Cash Flow metrics for HeroMetrics
+  const expectedRevenue = useMemo(() => {
+    return paymentsInMonth
+      .filter(p => p.status !== 'cancelled')
+      .reduce((sum, p) => sum + p.amount, 0);
+  }, [paymentsInMonth]);
+
+  const projectedProfit = expectedRevenue - burnRate;
+  const profitMargin = expectedRevenue > 0 ? (projectedProfit / expectedRevenue) * 100 : 0;
+  const overdueRate = expectedRevenue > 0 ? (delinquencyRate / expectedRevenue) * 100 : 0;
 
   // Expenses by category (exclude cancelled)
   const expensesByCategory = useMemo((): CategoryTotal[] => {
@@ -507,6 +518,13 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     delinquencyRate,
     totalGatewayFees,
     totalNetRevenue,
+
+    // DRE metrics
+    expectedRevenue,
+    projectedProfit,
+    profitMargin,
+    overdueRate,
+    paidBurnRate,
 
     // Structured data
     unifiedCashFlow,
