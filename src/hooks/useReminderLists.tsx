@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,7 +15,18 @@ export interface ReminderList {
   updated_at: string;
 }
 
-export function useReminderLists() {
+interface ReminderListsContextType {
+  lists: ReminderList[];
+  loading: boolean;
+  createList: (list: Partial<ReminderList>) => Promise<void>;
+  updateList: (id: string, updates: Partial<ReminderList>) => Promise<void>;
+  deleteList: (id: string) => Promise<void>;
+  refetch: () => Promise<void>;
+}
+
+const ReminderListsContext = createContext<ReminderListsContextType | undefined>(undefined);
+
+export function ReminderListsProvider({ children }: { children: ReactNode }) {
   const [lists, setLists] = useState<ReminderList[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -137,12 +148,24 @@ export function useReminderLists() {
     }
   };
 
-  return {
-    lists,
-    loading,
-    createList,
-    updateList,
-    deleteList,
-    refetch: fetchLists,
-  };
+  return (
+    <ReminderListsContext.Provider value={{
+      lists,
+      loading,
+      createList,
+      updateList,
+      deleteList,
+      refetch: fetchLists,
+    }}>
+      {children}
+    </ReminderListsContext.Provider>
+  );
+}
+
+export function useReminderLists() {
+  const context = useContext(ReminderListsContext);
+  if (context === undefined) {
+    throw new Error('useReminderLists must be used within a ReminderListsProvider');
+  }
+  return context;
 }

@@ -14,6 +14,8 @@ import { NoAgencyScreen } from "@/components/agency/NoAgencyScreen";
 import { ConnectionErrorScreen } from "@/components/agency/ConnectionErrorScreen";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PushActivationBanner } from "@/components/notifications/PushActivationBanner";
+import { NotificationProvider } from "@/hooks/useNotifications";
+import { PushNotificationProvider } from "@/hooks/usePushNotifications";
 
 export function AppLayout() {
   const { user, loading: authLoading } = useAuth();
@@ -24,7 +26,6 @@ export function AppLayout() {
     setTheme(theme === "light" ? "dark" : "light");
   };
 
-  // Show loading while checking auth or agency
   if (authLoading || agencyLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -33,64 +34,60 @@ export function AppLayout() {
     );
   }
 
-  // Not authenticated -> redirect to login
   if (!user) {
     return <Navigate to="/" replace />;
   }
 
-  // Connection error -> show distinct error screen
   if (fetchError) {
     return <ConnectionErrorScreen onRetry={refreshAgencies} />;
   }
 
-  // Authenticated but has no agency -> show blocked screen
   if (hasNoAgency) {
     return <NoAgencyScreen />;
   }
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="min-h-screen flex w-full bg-background">
-        <AppSidebar />
-        
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Header with sidebar trigger and theme toggle */}
-          <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-card/50 backdrop-blur-sm flex-shrink-0 z-40">
-            <SidebarTrigger className="h-8 w-8" />
+    <NotificationProvider>
+      <PushNotificationProvider>
+        <SidebarProvider defaultOpen={true}>
+          <div className="min-h-screen flex w-full bg-background">
+            <AppSidebar />
             
-            <div className="flex items-center gap-2">
-              <NotificationBell />
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <header className="h-14 border-b border-border flex items-center justify-between px-4 bg-card/50 backdrop-blur-sm flex-shrink-0 z-40">
+                <SidebarTrigger className="h-8 w-8" />
+                
+                <div className="flex items-center gap-2">
+                  <NotificationBell />
+                  
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleTheme}
+                    className="h-9 w-9"
+                  >
+                    <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                    <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                    <span className="sr-only">Alternar tema</span>
+                  </Button>
+                </div>
+              </header>
               
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleTheme}
-                className="h-9 w-9"
-              >
-                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                <span className="sr-only">Alternar tema</span>
-              </Button>
+              <main className="flex-1 p-4 md:p-6 overflow-auto pb-20 md:pb-6">
+                <Outlet />
+              </main>
+              
+              <MobileBottomNav />
             </div>
-          </header>
+          </div>
           
-          {/* Main content */}
-          <main className="flex-1 p-4 md:p-6 overflow-auto pb-20 md:pb-6">
-            <Outlet />
-          </main>
+          <HelpButton />
+          <TourTooltip />
           
-          {/* Mobile Bottom Navigation */}
-          <MobileBottomNav />
-        </div>
-      </div>
-      
-      {/* Global components */}
-      <HelpButton />
-      <TourTooltip />
-      
-      {/* PWA & Notification banners - only shown when authenticated */}
-      <InstallPrompt />
-      <PushActivationBanner />
-    </SidebarProvider>
+          <InstallPrompt />
+          <PushActivationBanner />
+        </SidebarProvider>
+      </PushNotificationProvider>
+    </NotificationProvider>
   );
 }
