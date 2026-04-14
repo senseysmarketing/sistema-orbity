@@ -58,8 +58,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { currentAgency } = useAgency();
   const { isVisible, getTimeAway } = usePageVisibility();
-  const cache = useCache<SubscriptionStatus>(5 * 60 * 1000); // 5 minutes cache
-  const plansCache = useCache<SubscriptionPlan[]>(10 * 60 * 1000); // 10 minutes cache
+  const cache = useCache<SubscriptionStatus>(Infinity); // Cache forever per session
+  const plansCache = useCache<SubscriptionPlan[]>(Infinity); // Cache forever per session
   
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [currentSubscription, setCurrentSubscription] = useState<SubscriptionStatus | null>(null);
@@ -335,27 +335,24 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       fetchPlans();
       checkSubscription();
 
-      // Reduced frequency: check every 5 minutes
-      const interval = setInterval(() => {
-        const timeSinceLastCheck = Date.now() - lastCheckTime;
-        if (timeSinceLastCheck > 5 * 60 * 1000) {
-          checkSubscription();
-        }
-      }, 5 * 60 * 1000);
-      
-      return () => clearInterval(interval);
+      // No polling - subscription is checked once per session
+      // User can force refresh via refreshPlans()
     } else {
       setCurrentSubscription(null);
       setLoading(false);
     }
   }, [user]); // Removed isVisible to prevent re-renders on tab switch
 
-  // Check subscription when user changes agency
+  // Agency change: only check if cache doesn't have this agency yet
   useEffect(() => {
     if (user && currentAgency) {
-      checkSubscription();
+      const cacheKey = `subscription_${user.id}_${currentAgency.id}`;
+      const cached = cache.get(cacheKey);
+      if (!cached.exists) {
+        checkSubscription();
+      }
     }
-  }, [currentAgency]);
+  }, [currentAgency?.id]);
 
   return (
     <SubscriptionContext.Provider

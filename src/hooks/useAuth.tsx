@@ -174,9 +174,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // Check for existing session
+    // Check for existing session — skip profile fetch if listener already handled it
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      currentUserIdRef.current = existingSession?.user?.id || null;
+      const existingUserId = existingSession?.user?.id || null;
+      
+      // If the onAuthStateChange listener already set this user, skip redundant work
+      if (currentUserIdRef.current === existingUserId && existingUserId !== null) {
+        // Profile fetch already triggered by listener, just ensure loading is cleared
+        setLoading(false);
+        return;
+      }
+      
+      currentUserIdRef.current = existingUserId;
       sessionRef.current = existingSession;
       
       setSession(existingSession);

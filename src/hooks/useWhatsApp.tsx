@@ -167,8 +167,33 @@ export function useWhatsApp() {
     },
   });
 
-  // Get messages for a conversation
+  // Get messages for a conversation — uses Realtime instead of polling
   const useConversationMessages = (conversationId: string | null) => {
+    // Set up Realtime channel to invalidate on new messages
+    useEffect(() => {
+      if (!conversationId) return;
+
+      const channel = supabase
+        .channel(`whatsapp-messages-${conversationId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'whatsapp_messages',
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          () => {
+            queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', conversationId] });
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }, [conversationId]);
+
     return useQuery({
       queryKey: ['whatsapp-messages', conversationId],
       queryFn: async () => {
@@ -182,7 +207,7 @@ export function useWhatsApp() {
         return data as WhatsAppMessage[];
       },
       enabled: !!conversationId,
-      refetchInterval: 5000,
+      staleTime: 30_000,
     });
   };
 
