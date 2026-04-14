@@ -1,32 +1,75 @@
 
 
-# Remoção da Constraint Única + Ajuste de Upserts
+# Faturamento Híbrido Conexa: Venda + Cobrança (Full-Stack)
 
-## Problema
-O índice único `uniq_client_payment_month_idx` impede múltiplas cobranças para o mesmo cliente no mesmo mês, bloqueando casos reais de negócio (mensalidade + serviço avulso, refaturamento, etc.).
+## Resumo
+Implementar o fluxo de dois passos do Conexa (POST /sale -> POST /charge -> GET /charge/{id}) com suporte a faturamento automático e manual, gerenciamento correto de IDs e atualização de status.
 
 ## Alterações
 
-### 1. Migration SQL
-```sql
-DROP INDEX IF EXISTS public.uniq_client_payment_month_idx;
-```
-Isso remove a trava que causa o erro 500.
+### 1. Nova Edge Function `invoice-conexa-sale`
+**Arquivo**: `supabase/functions/invoice-conexa-sale/index.ts`
 
-### 2. Código — trocar `upsert` por `insert` (2 arquivos)
+Recebe `{ payment_id }`. Fluxo:
+- Autentica via JWT do header Authorization
+- Busca o `client_payment` pelo ID (via adminClient) com `conexa_charge_id` preenchido
+- Busca `agency_payment_settings` pela `agency_id` do pagamento
+- POST `{baseUrl}/charge` com body `{ salesIds: [parseInt(conexa_charge_id, 10)], dueDate, notes }`
+- Resposta 201 retorna `{ id: chargeId }`
+- GET `{baseUrl}/charge/{chargeId}` para obter `chargeUrl` e `billetUrl`
+- UPDATE `client_payments`: sobrescrever `conexa_charge_id` com o novo chargeId, salvar `conexa_invoice_url = chargeUrl`, `conexa_pix_copy_paste = billetUrl`, forçar `status = 'pending'`
+- Retorna sucesso com URLs
+- Erros da API Conexa são repassados ao frontend
 
-**`src/pages/Admin.tsx` (linha ~120)**: Trocar `.upsert(rows, { onConflict: ... })` por `.insert(rows)`. Como a constraint não existirá mais, o upsert perderia sentido. Para evitar duplicatas acidentais na geração automática mensal, adicionar um `SELECT` prévio que verifica se já existem pagamentos para aquele mês antes de inserir.
+### 2. Refatoração da `create-gateway-charge`
+**Arquivo**: `supabase/functions/create-gateway-charge/index.ts`
 
-**`src/components/contracts/ContractPreview.tsx` (linha ~283)**: Mesma troca — `.upsert(payments, { onConflict: ... })` por `.insert(payments)`.
+- Aceitar novo campo `auto_invoice` no body (default `true`)
+- Após criar a venda Conexa (POST /sale):
+  - Se `auto_invoice === true`: executar internamente POST /charge -> GET /charge/{id} -> popular `conexa_charge_id` com chargeId final (sobrescrevendo o saleId), `conexa_invoice_url` e `conexa_pix_copy_paste`
+  - Se `auto_invoice === false`: salvar o saleId em `conexa_charge_id` temporariamente (sem URLs)
+- Extrair helper `invoiceConexaSale(saleId, dueDate, notes, baseUrl, apiKey)` reutilizável nas duas funções
 
-### 3. Frontend — proteção contra double-submit
-O hook `useCreatePayment.ts` já usa `loading` state e `setLoading(true)` no início. Verificar que o botão que dispara `createPayment` está desabilitado com `disabled={loading}` — o código atual já faz isso corretamente (o botão passa `disabled={saving}` / `disabled={loading}`). Nenhuma alteração necessária aqui.
+### 3. `supabase/config.toml`
+Adicionar `[functions.invoice-conexa-sale]` com `verify_jwt = false`
 
-### 4. Edge Function
-A edge function `create-gateway-charge` usa `.insert()` direto (não upsert), então não precisa de alteração — o erro era causado pelo índice no banco.
+### 4. Toggle no PaymentSheet (formulário de criação)
+**Arquivo**: `src/components/admin/PaymentSheet.tsx`
 
-## Resumo
-- 1 migration (drop index)
-- 2 arquivos com troca de upsert → insert + check prévio
-- 0 mudanças na edge function
+- Novo state `autoInvoice` (default `true`)
+- Mostrar Switch "Faturar Automaticamente" apenas quando `billingType === 'conexa'` e for criação (nao edição)
+- Passar `auto_invoice` no payload do `createPaymentHook`
+
+### 5. Hook `useCreatePayment` - propagar `auto_invoice`
+**Arquivo**: `src/hooks/useCreatePayment.ts`
+
+- Adicionar `auto_invoice?: boolean` na interface `CreatePaymentData`
+- Incluir `auto_invoice` no payload enviado à edge function
+
+### 6. Propagar `conexa_invoice_url` e `conexa_charge_id` no CashFlowItem
+**Arquivo**: `src/hooks/useFinancialMetrics.tsx`
+
+- Adicionar `invoiceUrl?: string` e `conexaChargeId?: string` na interface `CashFlowItem`
+- No mapeamento de payments, preencher `invoiceUrl` com `conexa_invoice_url || invoice_url` e `conexaChargeId` com `conexa_charge_id`
+
+### 7. Botão "Emitir Fatura Conexa" no CashFlowTable
+**Arquivo**: `src/components/admin/CommandCenter/CashFlowTable.tsx`
+
+- No DropdownMenu, adicionar opção "Emitir Fatura Conexa"
+- Visível se: `billingType === 'conexa'` E `!invoiceUrl` E `conexaChargeId` presente E status !== PAID/CANCELLED
+- Ao clicar: `supabase.functions.invoke('invoice-conexa-sale', { body: { payment_id: item.sourceId } })`
+- State `isInvoicing` para loading + toast de sucesso/erro + refetch dados
+
+## Regras de Negócio Críticas
+- **Sobrescrita de ID**: `conexa_charge_id` começa com saleId, é substituído pelo chargeId após POST /charge
+- **Status**: Forçar `status = 'pending'` após faturamento bem-sucedido
+- **Parse**: `salesIds: [parseInt(saleId, 10)]` no payload do /charge
+- **Erros**: Mensagens da API Conexa repassadas ao frontend
+
+## Resumo de arquivos
+- 1 nova edge function (`invoice-conexa-sale`)
+- 1 edge function refatorada (`create-gateway-charge`)
+- 1 config (`config.toml`)
+- 4 arquivos frontend (PaymentSheet, useCreatePayment, CashFlowTable, useFinancialMetrics)
+- 0 migrations
 
