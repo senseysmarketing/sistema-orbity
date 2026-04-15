@@ -1,81 +1,72 @@
 
 
-# Cross-Instance Automation Pausing + Lead Resolution
+# Reformulacao da Hero Section com Mascote Orbi
 
 ## Resumo
-Refatorar `findActiveAutomations` para buscar por `agency_id` (cross-instance) e garantir que o lead seja resolvido globalmente antes de tentar pausar automações.
+Reescrever a Hero Section com fundo escuro roxo, mascote Orbi flutuante com glow, icones orbitantes, header adaptativo ao scroll, e layout split responsivo.
 
-## Alterações em `supabase/functions/whatsapp-webhook/index.ts`
+## Alteracoes
 
-### 1. Refatorar `findActiveAutomations` (linhas 98-118)
+### 1. Copiar mascote para o projeto
+- `lov-copy user-uploads://Design_sem_nome_2.png src/assets/orbi-mascot.png`
 
-Mudar assinatura de `(supabase, accountId, conversationId, leadId)` para `(supabase, agencyId, conversationId, leadId)`.
+### 2. `tailwind.config.ts` -- Adicionar keyframes
+- `float`: translateY(0) -> translateY(-12px) -> translateY(0), 3s ease-in-out infinite
+- `orbit`: rotate(0deg) -> rotate(360deg), 12s linear infinite (para icones decorativos)
 
-- **Busca por conversationId**: manter filtro por `conversation_id` (sem filtro de `account_id` — conversas são únicas por ID)
-- **Busca por leadId (cross-instance)**: remover `.eq('account_id', ...)` e buscar automações ativas por `lead_id` em QUALQUER conta da agência, usando um join ou subquery:
-  - Buscar todos os `account_id`s da agência: `SELECT id FROM whatsapp_accounts WHERE agency_id = agencyId`
-  - Filtrar automações `.in('account_id', agencyAccountIds).eq('lead_id', leadId).in('status', ['active', 'processing'])`
+### 3. `src/components/landing/HeroSection.tsx` -- Reescrita completa
 
-### 2. Resolução global do Lead (antes da conversa — linhas 318-381)
+**Layout**: Flex row em desktop (texto esquerda, Orbi direita), coluna em mobile (texto cima, Orbi baixo).
 
-O código atual já faz `find_lead_by_normalized_phone` com `agency_id` quando não encontra conversa (linha 330). Porém, quando **encontra** a conversa mas ela não tem `lead_id`, ele já resolve o lead (linha 370).
+**Fundo**: `bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-950` com SVG de constelacao a 5% opacity como elemento absoluto.
 
-**Ajuste necessário**: Mesmo quando a conversa É encontrada COM `lead_id`, precisamos garantir que o `lead_id` esteja disponível. O código atual já faz isso (linha 326 prioriza conversas com `lead_id`).
+**Textos** (todos brancos):
+- Badge: fundo branco/10, borda branca/20, texto branco
+- H1: "O Ecossistema Completo para Escalar a sua Agencia de Marketing." -- `text-4xl md:text-5xl lg:text-6xl tracking-tight font-bold text-white`
+- Sub-headline: "Tarefas, Campanhas, CRM integrado e Financeiro automatizado com WhatsApp. Tudo em um so lugar." -- `text-lg md:text-xl text-white/70`
 
-**Ajuste adicional para billing**: Quando a mensagem chega no número de billing e NÃO existe conversa nessa instância, o código já busca o lead globalmente via RPC (linha 330). O lead é encontrado, mas a conversa é criada na instância de billing. O `lead_id` fica disponível para `findActiveAutomations`. **Isso já funciona.**
+**Botoes**:
+- Primario: `bg-white text-purple-950 hover:bg-white/90`
+- Secundario: `border-white/30 text-white hover:bg-white/10`
 
-O ponto crítico é apenas garantir que, se o lead não foi encontrado via conversa, façamos a busca RPC **antes** de chamar `findActiveAutomations`. O código atual já faz isso. Nenhuma mudança estrutural no fluxo de resolução de lead é necessária.
+**Mascote Orbi**:
+- Import da imagem como modulo ES
+- `animate-float` + `drop-shadow-[0_0_30px_rgba(139,92,246,0.3)]`
+- Desktop: `max-w-md lg:max-w-lg`
+- Mobile: `max-w-[250px] mx-auto`
 
-### 3. Atualizar chamadas a `findActiveAutomations` (linhas 419 e 445)
+**Icones decorativos**: 3 icones (MessageCircle para WhatsApp, BarChart3, DollarSign) posicionados absolutos ao redor do Orbi com `opacity-30`, animacao orbit com delays escalonados.
 
-Trocar `account.id` por `account.agency_id` nas duas chamadas:
+**AgencyLogos**: Adaptar texto para `text-white/50` e `text-white/70`. Passar prop ou criar wrapper com classes claras.
 
-```typescript
-// Linha 419 (customer reply)
-const automations = await findActiveAutomations(
-  supabase, account.agency_id, conversation.id, conversation.lead_id
-);
+**Remocao**: Dashboard generico, imports LayoutDashboard/Users/TrendingUp/CheckSquare.
 
-// Linha 445 (operator takeover)
-const automations = await findActiveAutomations(
-  supabase, account.agency_id, conversation.id, conversation.lead_id
-);
-```
+### 4. `src/components/landing/AgencyLogos.tsx` -- Adaptar para fundo escuro
+- Mudar `text-muted-foreground` para `text-white/60` nos spans
+- Manter os icones (ja tem fundo escuro, ficam bem)
 
-### Implementação da nova `findActiveAutomations`
+### 5. `src/components/landing/LandingHeader.tsx` -- Header adaptativo ao scroll
 
-```typescript
-async function findActiveAutomations(
-  supabase: any, agencyId: string, conversationId: string, leadId: string | null
-): Promise<{ id: string }[]> {
-  // 1. By conversation (scoped, fast)
-  const { data: byConv } = await supabase
-    .from('whatsapp_automation_control').select('id')
-    .eq('conversation_id', conversationId)
-    .in('status', ['active', 'processing']).limit(10);
+**Novo estado**: `scrolled` via `useEffect` com listener de scroll (threshold ~50px).
 
-  if (byConv && byConv.length > 0) return byConv;
-  if (!leadId) return [];
+**Quando `scrolled = false`** (topo, sobre fundo escuro):
+- `bg-transparent border-transparent`
+- Logo: `text-white` (texto puro, sem gradient)
+- Nav links: `text-white/70 hover:text-white`
+- Botao Entrar: `text-white hover:bg-white/10`
+- Botao CTA: `bg-white text-purple-950`
+- Menu hamburger: `text-white`
 
-  // 2. By lead across ALL accounts in the agency (cross-instance)
-  const { data: agencyAccounts } = await supabase
-    .from('whatsapp_accounts').select('id')
-    .eq('agency_id', agencyId);
+**Quando `scrolled = true`**:
+- `bg-background/80 backdrop-blur-md border-border/50` (comportamento atual)
+- Cores voltam ao normal (escuras)
 
-  if (!agencyAccounts || agencyAccounts.length === 0) return [];
+**Transicao**: `transition-all duration-300` no header.
 
-  const accountIds = agencyAccounts.map((a: any) => a.id);
-
-  const { data: byLead } = await supabase
-    .from('whatsapp_automation_control').select('id')
-    .in('account_id', accountIds)
-    .eq('lead_id', leadId)
-    .in('status', ['active', 'processing']).limit(10);
-
-  return byLead || [];
-}
-```
-
-## Arquivo alterado
-1. `supabase/functions/whatsapp-webhook/index.ts`
+## Arquivos alterados
+1. `src/assets/orbi-mascot.png` (novo -- copiado do upload)
+2. `src/components/landing/HeroSection.tsx` (reescrita)
+3. `src/components/landing/AgencyLogos.tsx` (cores adaptadas)
+4. `src/components/landing/LandingHeader.tsx` (scroll-aware)
+5. `tailwind.config.ts` (keyframes float/orbit)
 
