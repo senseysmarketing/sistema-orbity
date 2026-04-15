@@ -6,9 +6,11 @@ import {
   DollarSign,
   Calendar,
   BarChart3,
+  CalendarCheck,
   ArrowRight,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import AgendaImg from "@/assets/landing/Agenda.jpg";
 
 const features = [
   {
@@ -47,6 +49,13 @@ const features = [
     description: "Dashboards de performance em tempo real para sua agência e clientes.",
     colSpan: "",
   },
+  {
+    icon: CalendarCheck,
+    title: "Agenda Inteligente",
+    description: "Integração bidirecional com o Google Calendar. Centralize as suas reuniões, follow-ups e eventos, tudo em um único ecrã.",
+    colSpan: "",
+    image: AgendaImg,
+  },
 ];
 
 export function FeaturesGrid({ onOpenApplication }: { onOpenApplication?: () => void }) {
@@ -75,17 +84,28 @@ export function FeaturesGrid({ onOpenApplication }: { onOpenApplication?: () => 
           {features.map((feature, index) => (
             <motion.div
               key={index}
-              className={`${feature.colSpan} bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden group hover:bg-white/10 hover:border-purple-500/30 transition-all duration-500 hover:shadow-[0_0_30px_rgba(139,92,246,0.2)] p-8`}
+              className={`${feature.colSpan} bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl overflow-hidden group hover:bg-white/10 hover:border-purple-500/30 transition-all duration-500 hover:shadow-[0_0_30px_rgba(139,92,246,0.2)] p-8 flex flex-col justify-between`}
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
             >
-              <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center mb-5 group-hover:scale-105 transition-transform duration-500">
-                <feature.icon className="w-7 h-7 text-violet-400" />
+              <div>
+                <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center mb-5 group-hover:scale-105 transition-transform duration-500">
+                  <feature.icon className="w-7 h-7 text-violet-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">{feature.title}</h3>
+                <p className="text-sm text-white/60 leading-relaxed">{feature.description}</p>
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">{feature.title}</h3>
-              <p className="text-sm text-white/60 leading-relaxed">{feature.description}</p>
+              {feature.image && (
+                <div className="mt-4 overflow-hidden rounded-2xl">
+                  <img
+                    src={feature.image}
+                    alt={feature.title}
+                    className="w-full h-auto rounded-2xl group-hover:scale-105 transition-transform duration-700"
+                  />
+                </div>
+              )}
             </motion.div>
           ))}
         </div>
