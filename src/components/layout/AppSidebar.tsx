@@ -127,7 +127,7 @@ export function AppSidebar() {
     isActive
   }: {
     isActive: boolean;
-  }) => isActive ? "bg-sidebar-accent text-sidebar-foreground font-medium border-r-2 border-blue-400" : "hover:bg-sidebar-muted text-sidebar-foreground/80 hover:text-sidebar-foreground";
+  }) => isActive ? "bg-white/15 text-white font-medium border-r-2 border-blue-400" : "hover:bg-white/10 text-white/80 hover:text-white";
   const getRoleLabel = (role: string) => {
     switch (role) {
       case 'agency_admin':
@@ -152,9 +152,9 @@ export function AppSidebar() {
     return undefined;
   };
 
-  return <Sidebar className={`${collapsed ? "w-14" : "w-64"} bg-sidebar border-r-0`} collapsible="icon">
+  return <Sidebar className={`${collapsed ? "w-14" : "w-64"} bg-gradient-to-b from-purple-950 via-purple-900 to-indigo-950 border-r-0`} collapsible="icon">
       {/* Header */}
-      <SidebarHeader className="border-b border-sidebar-border p-4 bg-sidebar">
+      <SidebarHeader className="border-b border-white/10 p-4 bg-transparent">
         {!collapsed && <div className="flex items-left justify-start">
             <img src={logoNew} alt="Logo" className="w-[122px] h-[32px] object-contain" />
           </div>}
@@ -163,7 +163,7 @@ export function AppSidebar() {
           </div>}
       </SidebarHeader>
 
-      <SidebarContent className="bg-sidebar">
+      <SidebarContent className="bg-transparent">
         {menuCategories.map((category) => (
           <SidebarGroup key={category.label}>
             <SidebarGroupLabel className="text-sidebar-foreground/70">
@@ -212,7 +212,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* Footer with user info */}
-      <SidebarFooter className="border-t border-sidebar-border p-4 bg-sidebar">
+      <SidebarFooter className="border-t border-white/10 p-4 bg-transparent">
         {!collapsed && profile && <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="w-full justify-start p-2 h-auto hover:bg-sidebar-muted text-sidebar-foreground">
