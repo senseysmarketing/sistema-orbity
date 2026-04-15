@@ -62,9 +62,30 @@ const defaultFormData: FormData = {
 export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomationSettingsProps) {
   const { settings, updateSettings, isSaving } = usePaymentGateway();
   const { account, isConnected } = useWhatsApp();
+  const { agencyId } = useAgency();
   const { toast } = useToast();
 
   const [formData, setFormData] = useState<FormData>(defaultFormData);
+
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: messageLogs, isLoading: isLoadingLogs } = useQuery({
+    queryKey: ['billing-message-logs', agencyId],
+    queryFn: async () => {
+      if (!agencyId) return [];
+      const { data, error } = await supabase
+        .from('billing_message_logs')
+        .select('id, client_id, payment_id, message_type, status, error_details, created_at, clients(name)')
+        .eq('agency_id', agencyId)
+        .gte('created_at', threeDaysAgo)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!agencyId && open,
+    staleTime: 5 * 60 * 1000,
+  });
 
   useEffect(() => {
     if (settings && settings.id) {
