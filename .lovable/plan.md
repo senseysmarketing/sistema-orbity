@@ -1,22 +1,15 @@
 
 
-# Aplicar gradiente roxo da landing page no menu lateral interno
+# Trocar imagem do Orbi no Hero da Landing Page
 
-## Resumo
-Substituir o fundo sólido (`bg-sidebar` / `#1c102f`) do `AppSidebar` por um gradiente vertical que vai do purple-950 ao indigo-950, harmonizando com a landing page.
+## Alterações
 
-## Alteração
+### 1. Copiar a nova imagem para o projeto
+- Copiar `user-uploads://Design_sem_nome_5.png` para `src/assets/orbi-mascot-new.png`
 
-### `src/components/layout/AppSidebar.tsx`
-- No `<Sidebar>` principal (linha 155): trocar `bg-sidebar` por `bg-gradient-to-b from-purple-950 via-purple-900 to-indigo-950`
-- No `<SidebarHeader>` (linha 157): trocar `bg-sidebar` por `bg-transparent`
-- No `<SidebarContent>` (~linha 165): trocar `bg-sidebar` por `bg-transparent`
-- No `<SidebarFooter>` (~linha 218): trocar `bg-sidebar` por `bg-transparent`
-- Ajustar o active state dos items: trocar `bg-sidebar-accent` por `bg-white/15` e o hover por `hover:bg-white/10` para combinar com o glassmorphism
-- Borders (header/footer): trocar `border-sidebar-border` por `border-white/10` para subtileza
+### 2. `src/components/landing/HeroSection.tsx`
+- Alterar o import da imagem: trocar `orbi-mascot.png` por `orbi-mascot-new.png`
+- Atualizar o `src` do `<img>` para usar a nova imagem
 
-Apenas o gradiente, sem SVGs. Direção `to-b` (top-to-bottom) que funciona melhor em elementos verticais como sidebars.
-
-## Ficheiro alterado
-1. `src/components/layout/AppSidebar.tsx`
+Apenas 1 ficheiro editado + 1 asset copiado.
 
