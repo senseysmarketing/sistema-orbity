@@ -1,18 +1,39 @@
 
 
-# Fix: Gradiente do sidebar sendo sobrescrito por bg-sidebar interno
+# Integrar webhook n8n no DemoSchedulingModal
 
-## Problema
-O componente `sidebar.tsx` (shadcn) tem `bg-sidebar` hardcoded em múltiplos elementos internos (linhas 144, 159, 209). Estas classes sobrepõem-se ao gradiente aplicado no `<Sidebar>` do `AppSidebar.tsx`, tornando-o invisível.
+## Alteração única
 
-## Solução
-Editar `src/components/ui/sidebar.tsx` para remover ou tornar transparente o `bg-sidebar` nos containers internos do sidebar, permitindo que o gradiente do `AppSidebar` seja visível.
+### `src/components/landing/DemoSchedulingModal.tsx`
+- Inserir bloco `try/catch` isolado após a linha 84 (após o `await supabase.from('orbity_leads').insert(...)`) e antes do `setDirection(1)`
+- O bloco faz `fetch POST` para `https://senseys-n8n.cloudfy.cloud/webhook/apresentacao-orbity` com o payload especificado
+- Em caso de falha, apenas `console.error` — fluxo continua para step 3
 
-### Alterações em `src/components/ui/sidebar.tsx`
-1. **Linha 144** — Inner div desktop: trocar `bg-sidebar` por `bg-transparent`
-2. **Linha 159** — Sheet mobile: trocar `bg-sidebar` por `bg-transparent`  
-3. **Linha 209** — Inner wrapper: trocar `bg-sidebar` por `bg-transparent`
+### Verificação de imports
+- `format` e `ptBR` já importados (linhas 10-11) ✓
+- `rawPhone` já definida no ficheiro (linha 22) ✓
 
-### Sem alterações em `AppSidebar.tsx`
-O gradiente já está correctamente aplicado (`bg-gradient-to-b from-purple-950 via-purple-900 to-indigo-950`). Apenas precisa de deixar de ser tapado.
+### Código a inserir (entre linhas 84 e 86)
+```typescript
+// Disparar Webhook para o n8n (não-bloqueante)
+try {
+  await fetch('https://senseys-n8n.cloudfy.cloud/webhook/apresentacao-orbity', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: name.trim(),
+      email: email.trim(),
+      phone: rawPhone(phone),
+      agency_name: agencyName.trim(),
+      scheduled_at: scheduledAt.toISOString(),
+      formatted_date: format(selectedDate, "dd/MM/yyyy", { locale: ptBR }),
+      formatted_hour: `${selectedHour.toString().padStart(2, "0")}:00`
+    }),
+  });
+} catch (webhookError) {
+  console.error('Erro ao disparar webhook do n8n:', webhookError);
+}
+```
+
+Nenhum outro ficheiro alterado.
 
