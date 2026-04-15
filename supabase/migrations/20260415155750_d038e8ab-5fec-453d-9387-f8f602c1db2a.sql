@@ -1,0 +1,1 @@
+ALTER TABLE public.employees ADD COLUMN eligible_for_ppr boolean NOT NULL DEFAULT true;

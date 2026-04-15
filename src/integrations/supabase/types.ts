@@ -2355,6 +2355,7 @@ export type Database = {
           agency_id: string
           base_salary: number
           created_at: string
+          eligible_for_ppr: boolean
           end_date: string | null
           id: string
           is_active: boolean
@@ -2368,6 +2369,7 @@ export type Database = {
           agency_id: string
           base_salary?: number
           created_at?: string
+          eligible_for_ppr?: boolean
           end_date?: string | null
           id?: string
           is_active?: boolean
@@ -2381,6 +2383,7 @@ export type Database = {
           agency_id?: string
           base_salary?: number
           created_at?: string
+          eligible_for_ppr?: boolean
           end_date?: string | null
           id?: string
           is_active?: boolean
