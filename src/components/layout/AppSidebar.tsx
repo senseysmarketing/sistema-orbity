@@ -127,7 +127,7 @@ export function AppSidebar() {
     isActive
   }: {
     isActive: boolean;
-  }) => isActive ? "bg-sidebar-accent text-sidebar-foreground font-medium border-r-2 border-blue-400" : "hover:bg-sidebar-muted text-sidebar-foreground/80 hover:text-sidebar-foreground";
+  }) => isActive ? "bg-white/15 text-white font-medium border-r-2 border-blue-400" : "hover:bg-white/10 text-white/80 hover:text-white";
   const getRoleLabel = (role: string) => {
     switch (role) {
       case 'agency_admin':
@@ -152,9 +152,9 @@ export function AppSidebar() {
     return undefined;
   };
 
-  return <Sidebar className={`${collapsed ? "w-14" : "w-64"} bg-sidebar border-r-0`} collapsible="icon">
+  return <Sidebar className={`${collapsed ? "w-14" : "w-64"} bg-gradient-to-b from-purple-950 via-purple-900 to-indigo-950 border-r-0`} collapsible="icon">
       {/* Header */}
-      <SidebarHeader className="border-b border-sidebar-border p-4 bg-sidebar">
+      <SidebarHeader className="border-b border-white/10 p-4 bg-transparent">
         {!collapsed && <div className="flex items-left justify-start">
             <img src={logoNew} alt="Logo" className="w-[122px] h-[32px] object-contain" />
           </div>}
@@ -163,10 +163,10 @@ export function AppSidebar() {
           </div>}
       </SidebarHeader>
 
-      <SidebarContent className="bg-sidebar">
+      <SidebarContent className="bg-transparent">
         {menuCategories.map((category) => (
           <SidebarGroup key={category.label}>
-            <SidebarGroupLabel className="text-sidebar-foreground/70">
+            <SidebarGroupLabel className="text-white/70">
               {category.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
@@ -194,7 +194,7 @@ export function AppSidebar() {
         {/* Painel de Controle - Only for Senseys agency admins */}
         {isMasterUser && (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-sidebar-foreground/70">Sistema</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-white/70">Sistema</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
@@ -212,24 +212,24 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* Footer with user info */}
-      <SidebarFooter className="border-t border-sidebar-border p-4 bg-sidebar">
+      <SidebarFooter className="border-t border-white/10 p-4 bg-transparent">
         {!collapsed && profile && <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="w-full justify-start p-2 h-auto hover:bg-sidebar-muted text-sidebar-foreground">
+              <Button variant="ghost" className="w-full justify-start p-2 h-auto hover:bg-white/10 text-white">
                 <div className="flex items-center space-x-3 w-full">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={profile.avatar_url || ""} />
-                    <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground text-xs">
+                    <AvatarFallback className="bg-white/15 text-white text-xs">
                       {getInitials(profile.name)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 text-left min-w-0">
-                    <p className="text-sm font-medium truncate text-sidebar-foreground">{profile.name}</p>
-                    <p className="text-xs text-sidebar-foreground/70">
+                    <p className="text-sm font-medium truncate text-white">{profile.name}</p>
+                    <p className="text-xs text-white/70">
                       {getRoleLabel(profile.role)}
                     </p>
                   </div>
-                  <ChevronDown className="h-4 w-4 text-sidebar-foreground/70" />
+                  <ChevronDown className="h-4 w-4 text-white/70" />
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -250,7 +250,7 @@ export function AppSidebar() {
         {collapsed && profile && <div className="flex justify-center">
             <Avatar className="h-8 w-8">
               <AvatarImage src={profile.avatar_url || ""} />
-              <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground text-xs">
+              <AvatarFallback className="bg-white/15 text-white text-xs">
                 {getInitials(profile.name)}
               </AvatarFallback>
             </Avatar>
