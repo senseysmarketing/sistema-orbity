@@ -1,30 +1,31 @@
 
 
-# Correção do Layout do Card "Atendimento & Automações"
+# Remover Toggle Sandbox do Asaas — Forçar Produção
 
-## Problema
-Quando o modo de duas instâncias está ativo, os cards ficam em grid de 2 colunas (`lg:grid-cols-2`), reduzindo a largura de cada card. Os três botões (Verificar Status, Reconfigurar Webhook, Desconectar) usam `sm:flex-row` e transbordam da área do card porque o espaço horizontal é insuficiente.
+## Contexto
+O erro `invalid_environment` ocorre porque `asaas_sandbox` está `true` no banco, mas a API key é de produção (`$aact_prod_...`). O toggle sandbox é desnecessário — quando o usuário cadastra sua key, já está pronto para produção.
 
-## Solução
+## Alterações
 
-### `src/components/settings/WhatsAppInstanceCard.tsx`
+### 1. `src/components/settings/AsaasIntegration.tsx`
+- Remover o state `sandbox` e o bloco de UI do toggle "Ambiente" (Sandbox/Produção)
+- No `handleSave`, enviar sempre `asaas_sandbox: false` (produção)
 
-Alterar o container dos botões de ação (linhas 163-202) para usar `flex-wrap` em vez de `sm:flex-row`, garantindo que os botões quebrem linha automaticamente quando o espaço é insuficiente:
+### 2. `supabase/functions/create-gateway-charge/index.ts`
+- Remover condicional sandbox. Usar sempre `https://api.asaas.com` como baseUrl
 
-- Trocar `flex-col sm:flex-row` por `flex-wrap` no div dos botões (linha 163)
-- Usar tamanho compacto nos botões para melhor encaixe em cards estreitos
+### 3. `supabase/functions/settle-gateway-payment/index.ts`
+- Mesmo ajuste: remover condicional, usar sempre URL de produção
+- Remover `asaas_sandbox` do select da query
 
-## Verificação de Conexão
+### 4. Corrigir dado atual no banco
+- O registro atual tem `asaas_sandbox: true`. O `handleSave` ao salvar com `asaas_sandbox: false` corrigirá automaticamente na próxima interação do usuário com o card do Asaas.
 
-A lógica de conexão, instância e roteamento está correta:
-- **`useWhatsApp` hook**: já filtra por `purpose` na query de `whatsapp_accounts`
-- **`whatsapp-connect` Edge Function**: gera instâncias com nome único por purpose (`orbity_{id}_general` / `orbity_{id}_billing`)
-- **`process-whatsapp-queue`**: usa o account vinculado ao registro de automação (correto)
-- **`capture-lead` / `facebook-leads`**: já filtram por `purpose = 'general'` (corrigido na sessão anterior)
-- **`process-billing-reminders`**: já faz fallback de `billing` para `general` corretamente
+### 5. Deploy das Edge Functions alteradas
+- Deploy de `create-gateway-charge` e `settle-gateway-payment`
 
-Não há problemas funcionais — apenas o ajuste visual dos botões.
-
-## Arquivo alterado
-- `src/components/settings/WhatsAppInstanceCard.tsx` — botões com `flex-wrap` e `gap-2`
+## Arquivos alterados
+1. `src/components/settings/AsaasIntegration.tsx`
+2. `supabase/functions/create-gateway-charge/index.ts`
+3. `supabase/functions/settle-gateway-payment/index.ts`
 
