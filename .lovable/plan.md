@@ -1,17 +1,21 @@
 
 
-# Alinhar DifferentialsSection e PricingSection com paleta roxa premium
+# Adicionar SVG constellation pattern ao fundo das secções
+
+O HeroSection já usa um padrão SVG "constellation" (pontos + linhas) com `opacity-[0.05]` para dar textura ao gradiente roxo. As secções DifferentialsSection e PricingSection (card spotlight) usam o mesmo gradiente mas sem este padrão — ficam "lisas".
 
 ## Alterações
 
 ### 1. `src/components/landing/DifferentialsSection.tsx`
-- **Fundo da secção** (linha 26): `bg-slate-950` → `bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-950`
-- **Cards** (linha 44): `bg-slate-900/50 border border-white/5` → `bg-white/5 backdrop-blur-md border border-white/10`; hover: `hover:bg-white/10` (manter `hover:border-purple-500/30` e restantes efeitos)
+- Adicionar `relative overflow-hidden` à `<section>`
+- Inserir o mesmo SVG constellation pattern do Hero (com um `id` diferente no pattern, ex: `constellation-diff`, para evitar conflito de IDs no DOM)
+- Opacidade: `opacity-[0.05]`
+- Adicionar `relative z-10` ao container interno para o conteúdo ficar acima do SVG
 
 ### 2. `src/components/landing/PricingSection.tsx`
-- **Spotlight Card** (linha 70): `bg-slate-950` → `bg-gradient-to-br from-purple-950 to-indigo-950`
-- **Anel glassmorphism**: Adicionar um `<div>` absoluto interior com `ring-1 ring-white/10 absolute inset-0 rounded-[2rem] pointer-events-none` para o efeito de vidro
-- **Shadow glow**: Reforçar para `shadow-[0_0_50px_rgba(139,92,246,0.25)]`
+- Dentro do Spotlight Card (já tem `relative overflow-hidden`), adicionar o SVG constellation com `id` único (ex: `constellation-pricing`)
+- Opacidade: `opacity-[0.05]`
+- O conteúdo já está naturalmente acima por stacking order
 
-Duas alterações cirúrgicas de classes CSS — sem mudanças de lógica ou estrutura.
+Ambos reutilizam o padrão exato do HeroSection — pontos brancos com linhas conectoras — apenas com IDs únicos.
 
