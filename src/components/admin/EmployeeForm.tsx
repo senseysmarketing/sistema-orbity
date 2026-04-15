@@ -17,6 +17,7 @@ interface Employee {
   is_active: boolean;
   start_date?: string;
   end_date?: string;
+  eligible_for_ppr?: boolean;
 }
 
 interface EmployeeFormProps {
@@ -37,6 +38,7 @@ export function EmployeeForm({ open, onOpenChange, onSuccess, employee }: Employ
     payment_day: '5',
     is_active: true,
     start_date: '',
+    eligible_for_ppr: true,
   });
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export function EmployeeForm({ open, onOpenChange, onSuccess, employee }: Employ
         payment_day: employee.payment_day?.toString() || '5',
         is_active: employee.is_active ?? true,
         start_date: employee.start_date ? employee.start_date.split('T')[0] : '',
+        eligible_for_ppr: employee.eligible_for_ppr ?? true,
       });
     } else {
       setFormData({
@@ -57,6 +60,7 @@ export function EmployeeForm({ open, onOpenChange, onSuccess, employee }: Employ
         payment_day: '5',
         is_active: true,
         start_date: '',
+        eligible_for_ppr: true,
       });
     }
   }, [employee, open]);
@@ -74,6 +78,7 @@ export function EmployeeForm({ open, onOpenChange, onSuccess, employee }: Employ
         is_active: formData.is_active,
         start_date: formData.start_date || null,
         agency_id: currentAgency?.id,
+        eligible_for_ppr: formData.eligible_for_ppr,
       };
 
       if (employee) {
@@ -203,6 +208,20 @@ export function EmployeeForm({ open, onOpenChange, onSuccess, employee }: Employ
                 id="is_active"
                 checked={formData.is_active}
                 onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="eligible_for_ppr">Elegível para PPR / Bônus</Label>
+                <p className="text-xs text-muted-foreground">
+                  Desmarque para sócios ou funcionários não participantes
+                </p>
+              </div>
+              <Switch
+                id="eligible_for_ppr"
+                checked={formData.eligible_for_ppr}
+                onCheckedChange={(checked) => setFormData({ ...formData, eligible_for_ppr: checked })}
               />
             </div>
           </div>
