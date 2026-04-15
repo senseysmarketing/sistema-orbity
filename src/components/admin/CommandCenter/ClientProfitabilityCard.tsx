@@ -29,7 +29,7 @@ export function ClientProfitabilityCard({ clients, allClients, selectedMonth, cl
   }, [allClients, selectedMonth]);
 
   return (
-    <Card className={className}>
+    <Card className={`${className} h-full flex flex-col overflow-hidden`}>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -50,7 +50,7 @@ export function ClientProfitabilityCard({ clients, allClients, selectedMonth, cl
           </div>
         )}
       </CardHeader>
-      <CardContent className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+      <CardContent className="space-y-3 flex-1 overflow-y-auto min-h-0">
         {clients.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">Nenhum cliente ativo</p>
         ) : (
