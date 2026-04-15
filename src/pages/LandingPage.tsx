@@ -59,8 +59,10 @@ export default function LandingPage() {
       <LandingHeader />
       <HeroSection onOpenApplication={openApplication} onOpenScheduling={openScheduling} />
       <ProblemSection />
-      <FeaturesGrid onOpenApplication={openApplication} />
-      <AIFeaturesSection />
+      <div className="bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-950">
+        <FeaturesGrid onOpenApplication={openApplication} />
+        <AIFeaturesSection />
+      </div>
       <DemoSection onOpenApplication={openApplication} />
       <IntegrationsSection />
       <DifferentialsSection />

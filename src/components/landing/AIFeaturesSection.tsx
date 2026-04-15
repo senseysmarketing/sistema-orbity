@@ -47,12 +47,7 @@ const cardVariants = {
 
 export function AIFeaturesSection() {
   return (
-    <section
-      className="relative py-24 overflow-hidden"
-      style={{
-        background: "radial-gradient(ellipse at 50% 0%, rgba(109,40,217,0.15) 0%, #1c102f 50%, #0f0a1a 100%)",
-      }}
-    >
+    <section className="pt-8 pb-24">
       <div className="container mx-auto px-4">
         <motion.div
           className="text-center mb-16"
@@ -84,10 +79,10 @@ export function AIFeaturesSection() {
             <motion.div
               key={feature.title}
               variants={cardVariants}
-              className="group relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-8 transition-all hover:border-violet-500/30 hover:shadow-lg hover:shadow-violet-500/10"
+              className="group relative rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-8 transition-all duration-500 hover:bg-white/10 hover:border-purple-500/30 hover:shadow-[0_0_30px_rgba(139,92,246,0.2)]"
             >
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-violet-500/15 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
                   <feature.icon className="w-6 h-6 text-violet-400" />
                 </div>
                 <span className="text-xs font-medium uppercase tracking-wider text-violet-400/70">
