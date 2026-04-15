@@ -23,8 +23,29 @@ const pillars = [
 
 export function DifferentialsSection() {
   return (
-    <section className="py-24 bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-950 text-white">
-      <div className="container mx-auto px-4">
+    <section className="relative overflow-hidden py-24 bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-950 text-white">
+      {/* Constellation pattern */}
+      <svg className="absolute inset-0 w-full h-full opacity-[0.05]" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="constellation-diff" x="0" y="0" width="200" height="200" patternUnits="userSpaceOnUse">
+            <circle cx="20" cy="20" r="1.5" fill="white" />
+            <circle cx="80" cy="50" r="1" fill="white" />
+            <circle cx="150" cy="30" r="2" fill="white" />
+            <circle cx="40" cy="120" r="1" fill="white" />
+            <circle cx="120" cy="100" r="1.5" fill="white" />
+            <circle cx="180" cy="150" r="1" fill="white" />
+            <circle cx="60" cy="180" r="1.5" fill="white" />
+            <circle cx="140" cy="170" r="1" fill="white" />
+            <line x1="20" y1="20" x2="80" y2="50" stroke="white" strokeWidth="0.3" />
+            <line x1="80" y1="50" x2="150" y2="30" stroke="white" strokeWidth="0.3" />
+            <line x1="120" y1="100" x2="180" y2="150" stroke="white" strokeWidth="0.3" />
+            <line x1="40" y1="120" x2="120" y2="100" stroke="white" strokeWidth="0.3" />
+            <line x1="60" y1="180" x2="140" y2="170" stroke="white" strokeWidth="0.3" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#constellation-diff)" />
+      </svg>
+      <div className="container mx-auto px-4 relative z-10">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-4">
             Criado por donos de agência.{" "}
