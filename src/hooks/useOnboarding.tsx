@@ -227,7 +227,8 @@ export function OnboardingProvider({ children, flow = 'default' }: OnboardingPro
         body: {
           companyData: onboardingData.companyData,
           planSlug: onboardingData.planSlug,
-          adminUser: onboardingData.adminUser
+          adminUser: onboardingData.adminUser,
+          flow: flow || 'trial'
         }
       });
 
