@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, CalendarDays, MessageCircle, BarChart3, DollarSign } from "lucide-react";
-import { AgencyLogos } from "./AgencyLogos";
+
 import { motion } from "framer-motion";
 import orbiMascot from "@/assets/orbi-mascot.png";
 
@@ -104,9 +104,8 @@ export function HeroSection({ onOpenScheduling }: HeroSectionProps) {
               className="space-y-3 pt-4"
             >
               <p className="text-sm text-white/50">
-                Usado por <strong className="text-white/80">100+ agências</strong> de marketing
+                Usado por <strong className="text-white/80">40+ agências</strong> de marketing
               </p>
-              <AgencyLogos />
             </motion.div>
           </div>
 
