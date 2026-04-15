@@ -1,60 +1,52 @@
 
 
-# Painel de Auditoria — Histórico de Envios de Cobrança
+# Correções no Módulo PPR — Regime de Caixa e Elegibilidade
 
-## 1. Migration — Tabela `billing_message_logs`
+## Resumo
+Duas correções de lógica de negócios: (1) trocar filtro de `due_date` para `paid_date` nas queries financeiras do PPR, e (2) adicionar flag `eligible_for_ppr` nos funcionários para excluir sócios da divisão do bônus.
 
-Criar tabela com RLS usando `user_belongs_to_agency` (confirmado existente no projeto):
+## 1. Migration — Nova coluna `eligible_for_ppr`
 
 ```sql
-CREATE TABLE public.billing_message_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  agency_id uuid NOT NULL REFERENCES public.agencies(id) ON DELETE CASCADE,
-  client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
-  payment_id uuid NOT NULL REFERENCES public.client_payments(id) ON DELETE CASCADE,
-  message_type text NOT NULL CHECK (message_type IN ('reminder', 'overdue')),
-  status text NOT NULL CHECK (status IN ('success', 'error')),
-  error_details text,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.billing_message_logs ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Agency members can view billing logs"
-  ON public.billing_message_logs FOR SELECT TO authenticated
-  USING (public.user_belongs_to_agency(agency_id));
-
-CREATE INDEX idx_billing_message_logs_agency_created
-  ON public.billing_message_logs (agency_id, created_at DESC);
+ALTER TABLE public.employees ADD COLUMN eligible_for_ppr boolean NOT NULL DEFAULT true;
 ```
 
-## 2. Edge Function — `process-billing-reminders/index.ts`
+Sem RLS adicional necessária — a tabela já tem políticas.
 
-Após cada tentativa de envio (linhas ~292-320), inserir log em `billing_message_logs` com **try/catch isolado** (Guardrail 2):
+## 2. PPRDashboard.tsx — Regime de Caixa
 
-- **Sucesso**: `{ agency_id: agencyId, client_id: payment.client_id, payment_id: payment.id, message_type: msgType, status: 'success' }`
-- **Erro de envio**: `{ ..., status: 'error', error_details: JSON.stringify(sendData) }`
-- **Catch do payment**: `{ ..., status: 'error', error_details: String(paymentErr) }`
+Na `fetchFinancialData` (linhas 179-205), trocar filtros e selects:
 
-Cada inserção envolvida em seu próprio try/catch para nunca interromper o loop.
+**client_payments** (tem `paid_date` e `amount_paid`):
+- Select: `"amount, amount_paid"` 
+- Filtro: `.gte("paid_date", monthStart).lte("paid_date", monthEnd)`
+- Reduce: `sum + (p.amount_paid || p.amount || 0)`
 
-## 3. UI — `BillingAutomationSettings.tsx`
+**expenses** (tem `paid_date`, sem `amount_paid`):
+- Filtro: `.gte("paid_date", monthStart).lte("paid_date", monthEnd)`
+- Reduce: mantém `sum + (e.amount || 0)` (sem coluna `amount_paid`)
 
-Abaixo do botão "Salvar Régua de Cobrança" (linha 431):
+**salaries** (tem `paid_date`, sem `amount_paid`):
+- Filtro: `.gte("paid_date", monthStart).lte("paid_date", monthEnd)`
+- Reduce: mantém `sum + (s.amount || 0)` (sem coluna `amount_paid`)
 
-- `<Separator className="my-6" />`
-- Título: "Histórico de Envios (Últimos 3 dias)" com ícone `History`
-- Importar `useAgency` para obter `agencyId`
-- Query Supabase: `billing_message_logs` filtrado por `agency_id`, `created_at >= 3 dias`, limit 50, order `created_at DESC`, join `clients(name)`
-- `<ScrollArea className="h-[250px]">` com lista compacta
-- Cada item: nome do cliente, data/hora (dd/MM HH:mm), tipo (Lembrete/Atraso)
-- `CheckCircle2` verde para success, `AlertCircle` vermelho para error
-- Error: `<Tooltip>` com `error_details` (Guardrail 3: já tem `TooltipProvider` importado)
-- Empty state amigável
+## 3. PPRDashboard.tsx — Filtro de elegibilidade
+
+Na `fetchEmployees` (linha 152), adicionar:
+```typescript
+.eq("eligible_for_ppr", true)
+```
+
+## 4. EmployeeForm.tsx — Switch de elegibilidade
+
+- Adicionar `eligible_for_ppr: true` ao state `formData`
+- Preencher com `employee.eligible_for_ppr` ao editar
+- Incluir no objeto `data` do submit
+- Novo Switch na UI: "Elegível para PPR / Bônus" com descrição "Desmarque para sócios ou funcionários não participantes"
+- Imports `Switch` e `Label` já existem no arquivo
 
 ## Arquivos alterados
-1. **Migration SQL** — nova tabela + RLS + index
-2. **`supabase/functions/process-billing-reminders/index.ts`** — inserções de log resilientes
-3. **`src/components/admin/BillingAutomationSettings.tsx`** — seção de histórico
-4. **Deploy** da edge function
+1. **Migration SQL** — `ALTER TABLE employees ADD COLUMN eligible_for_ppr`
+2. **`src/components/goals/PPRDashboard.tsx`** — `paid_date` + `amount_paid` + filtro elegibilidade
+3. **`src/components/admin/EmployeeForm.tsx`** — switch PPR
 
