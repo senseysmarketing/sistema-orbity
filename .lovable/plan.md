@@ -1,16 +1,22 @@
 
 
-# Adicionar textura de constelação e alinhar larguras dos cards
+# Aplicar gradiente roxo da landing page no menu lateral interno
 
-## Alterações
+## Resumo
+Substituir o fundo sólido (`bg-sidebar` / `#1c102f`) do `AppSidebar` por um gradiente vertical que vai do purple-950 ao indigo-950, harmonizando com a landing page.
 
-### 1. `src/pages/LandingPage.tsx`
-- Adicionar o mesmo SVG de constelação (constellation pattern) da HeroSection ao wrapper `div` que envolve FeaturesGrid + AIFeaturesSection
-- Wrapper precisa de `relative overflow-hidden` para conter o SVG absolute
+## Alteração
 
-### 2. `src/components/landing/FeaturesGrid.tsx`
-- Alterar `max-w-6xl` para `max-w-5xl` na grid, igualando ao `max-w-5xl` da AIFeaturesSection
+### `src/components/layout/AppSidebar.tsx`
+- No `<Sidebar>` principal (linha 155): trocar `bg-sidebar` por `bg-gradient-to-b from-purple-950 via-purple-900 to-indigo-950`
+- No `<SidebarHeader>` (linha 157): trocar `bg-sidebar` por `bg-transparent`
+- No `<SidebarContent>` (~linha 165): trocar `bg-sidebar` por `bg-transparent`
+- No `<SidebarFooter>` (~linha 218): trocar `bg-sidebar` por `bg-transparent`
+- Ajustar o active state dos items: trocar `bg-sidebar-accent` por `bg-white/15` e o hover por `hover:bg-white/10` para combinar com o glassmorphism
+- Borders (header/footer): trocar `border-sidebar-border` por `border-white/10` para subtileza
 
-### Detalhe técnico
-O SVG é copiado exatamente da HeroSection (linhas 19-38), com o mesmo pattern de pontos + linhas a `opacity-[0.05]`, posicionado `absolute inset-0`. O conteúdo dos componentes filhos mantém `relative z-10` implícito via `container`.
+Apenas o gradiente, sem SVGs. Direção `to-b` (top-to-bottom) que funciona melhor em elementos verticais como sidebars.
+
+## Ficheiro alterado
+1. `src/components/layout/AppSidebar.tsx`
 
