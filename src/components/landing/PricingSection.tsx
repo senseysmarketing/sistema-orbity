@@ -128,8 +128,8 @@ export function PricingSection({ onOpenScheduling }: PricingSectionProps) {
                 </Button>
                 <Button
                   size="lg"
-                  variant="outline"
-                  className="w-full text-base border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white h-12 rounded-xl"
+                  variant="ghost"
+                  className="w-full text-base border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white h-12 rounded-xl bg-transparent"
                   onClick={onOpenScheduling}
                 >
                   <CalendarDays className="mr-2 h-4 w-4" />
