@@ -1,31 +1,27 @@
 
 
-# Remover Toggle Sandbox do Asaas — Forçar Produção
+# Corrigir Scroll da Rentabilidade por Cliente
 
-## Contexto
-O erro `invalid_environment` ocorre porque `asaas_sandbox` está `true` no banco, mas a API key é de produção (`$aact_prod_...`). O toggle sandbox é desnecessário — quando o usuário cadastra sua key, já está pronto para produção.
+## Problema
+O `CardContent` tem `max-h-[500px]` fixo, o que corta a lista de clientes no meio. Com 23 clientes ativos, muitos ficam ocultos e o corte visual acontece abruptamente.
 
-## Alterações
+## Solução
 
-### 1. `src/components/settings/AsaasIntegration.tsx`
-- Remover o state `sandbox` e o bloco de UI do toggle "Ambiente" (Sandbox/Produção)
-- No `handleSave`, enviar sempre `asaas_sandbox: false` (produção)
+**`src/components/admin/CommandCenter/ClientProfitabilityCard.tsx`** (linha 53):
 
-### 2. `supabase/functions/create-gateway-charge/index.ts`
-- Remover condicional sandbox. Usar sempre `https://api.asaas.com` como baseUrl
+Remover o `max-h-[500px]` fixo e substituir por uma altura mais generosa ou usar `flex-1 overflow-y-auto` para que o scroll ocupe todo o espaço disponível do card.
 
-### 3. `supabase/functions/settle-gateway-payment/index.ts`
-- Mesmo ajuste: remover condicional, usar sempre URL de produção
-- Remover `asaas_sandbox` do select da query
+Trocar:
+```
+className="space-y-3 max-h-[500px] overflow-y-auto"
+```
+Por:
+```
+className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto"
+```
 
-### 4. Corrigir dado atual no banco
-- O registro atual tem `asaas_sandbox: true`. O `handleSave` ao salvar com `asaas_sandbox: false` corrigirá automaticamente na próxima interação do usuário com o card do Asaas.
+Isso faz o scroll se adaptar à altura da tela, garantindo que a lista não corte no meio e permita rolar até o último cliente.
 
-### 5. Deploy das Edge Functions alteradas
-- Deploy de `create-gateway-charge` e `settle-gateway-payment`
-
-## Arquivos alterados
-1. `src/components/settings/AsaasIntegration.tsx`
-2. `supabase/functions/create-gateway-charge/index.ts`
-3. `supabase/functions/settle-gateway-payment/index.ts`
+## Arquivo alterado
+- `src/components/admin/CommandCenter/ClientProfitabilityCard.tsx`
 
