@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, CalendarDays, MessageCircle, BarChart3, DollarSign } from "lucide-react";
-import { AgencyLogos } from "./AgencyLogos";
+
 import { motion } from "framer-motion";
 import orbiMascot from "@/assets/orbi-mascot.png";
 
