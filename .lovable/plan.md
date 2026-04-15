@@ -1,47 +1,23 @@
 
 
-# Webhook Condicional — Disparo apenas para Trial
+# Adicionar fundo amarelo claro na logo do Conexa
 
-## Resumo
-Duas alterações: (1) passar `flow` no body do frontend, (2) condicionar o webhook na Edge Function.
+## O que será feito
+Adicionar uma classe de background amarelo claro (`bg-amber-50` ou `bg-yellow-100`) no container `div` que envolve a logo do Conexa, tanto na landing page quanto no card de integração interno. Isso dará o mesmo estilo visual da logo do Facebook (fundo colorido suave com ícone centralizado).
 
-## 1. Frontend — `src/hooks/useOnboarding.tsx`
+## Alterações
 
-A variável `flow` já está no escopo do `OnboardingProvider` (recebida como prop). Basta adicioná-la ao body na linha 230:
-
-```typescript
-body: {
-  companyData: onboardingData.companyData,
-  planSlug: onboardingData.planSlug,
-  adminUser: onboardingData.adminUser,
-  flow: flow || 'trial'
-}
+### 1. `src/components/landing/IntegrationsSection.tsx` (linha 158)
+Adicionar `bg-amber-100` ao container da logo:
+```html
+<div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center bg-amber-100">
 ```
 
-Não é necessário ler da URL — `flow` já é uma variável do closure.
-
-## 2. Edge Function — `supabase/functions/agency-onboarding/index.ts`
-
-**Interface** (linha 14-27): Adicionar `flow?: string;` à `OnboardingRequest`.
-
-**Extração** (linha 43): Incluir `flow` no destructuring.
-
-**Log inicial** (linha 45-49): Adicionar `flow` ao log.
-
-**Step 8** (linhas 227-274): Envolver em condicional:
-```typescript
-if (flow === 'trial' || !flow) {
-  // bloco webhook existente
-  // + adicionar flow: flow || 'trial' ao webhookPayload
-} else {
-  logStep("Webhook ignorado - Fluxo de assinatura direta", { flow });
-}
+### 2. `src/components/settings/ConexaIntegration.tsx` (linha 122)
+Adicionar `bg-amber-100` ao container da logo:
+```html
+<div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden bg-amber-100">
 ```
 
-**Deploy** da edge function após alteração.
-
-## Arquivos alterados
-1. `src/hooks/useOnboarding.tsx` — adiciona `flow` ao body
-2. `supabase/functions/agency-onboarding/index.ts` — condicional + payload atualizado
-3. Deploy da edge function
+Duas linhas alteradas, efeito puramente visual.
 
