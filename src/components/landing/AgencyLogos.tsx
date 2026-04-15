@@ -1,17 +1,15 @@
 export function AgencyLogos() {
   return (
     <div className="flex items-center gap-6 flex-wrap">
-      {/* Impulso Digital */}
       <div className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
-        <div className="w-8 h-8 rounded-lg bg-[#1c102f] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 19V5M5 12l7-7 7 7" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
-        <span className="text-sm font-medium text-muted-foreground">Impulso Digital</span>
+        <span className="text-sm font-medium text-white/60">Impulso Digital</span>
       </div>
 
-      {/* Agência Rocket */}
       <div className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-purple-800 flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2">
@@ -19,30 +17,27 @@ export function AgencyLogos() {
             <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
-        <span className="text-sm font-medium text-muted-foreground">Rocket Agency</span>
+        <span className="text-sm font-medium text-white/60">Rocket Agency</span>
       </div>
 
-      {/* DigitalFlow */}
       <div className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1c102f] to-violet-700 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M22 12h-4l-3 9L9 3l-3 9H2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
-        <span className="text-sm font-medium text-muted-foreground">DigitalFlow</span>
+        <span className="text-sm font-medium text-white/60">DigitalFlow</span>
       </div>
 
-      {/* Marketing Pro */}
       <div className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-700 to-[#1c102f] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-700 to-purple-900 flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M18 20V10M12 20V4M6 20v-6" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
-        <span className="text-sm font-medium text-muted-foreground">Marketing Pro</span>
+        <span className="text-sm font-medium text-white/60">Marketing Pro</span>
       </div>
 
-      {/* Growth Labs */}
       <div className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
         <div className="w-8 h-8 rounded-lg bg-violet-800 flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2">
@@ -50,7 +45,7 @@ export function AgencyLogos() {
             <circle cx="12" cy="12" r="4"/>
           </svg>
         </div>
-        <span className="text-sm font-medium text-muted-foreground">Growth Labs</span>
+        <span className="text-sm font-medium text-white/60">Growth Labs</span>
       </div>
     </div>
   );
