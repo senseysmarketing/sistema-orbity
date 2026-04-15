@@ -83,7 +83,7 @@ export default function LandingPage() {
         <FeaturesGrid onOpenApplication={openApplication} />
         <AIFeaturesSection />
       </div>
-      <DemoSection onOpenApplication={openApplication} />
+      <DemoSection />
       <IntegrationsSection />
       <DifferentialsSection />
       <PricingSection onOpenScheduling={openScheduling} />
