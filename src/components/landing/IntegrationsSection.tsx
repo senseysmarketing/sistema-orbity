@@ -1,7 +1,8 @@
-import { Shield, Lock, Eye, ArrowRight, MessageCircle, BarChart3 } from "lucide-react";
+import { Shield, Lock, Eye, ArrowRight, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import asaasLogo from "@/assets/asaas-logo.png";
+import conexaLogo from "@/assets/conexa-logo.png";
 
 export function IntegrationsSection() {
   const navigate = useNavigate();
@@ -154,8 +155,8 @@ export function IntegrationsSection() {
           {/* Conexa */}
           <div className="bg-card border rounded-xl p-8 space-y-4 hover:shadow-lg transition-shadow">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                <BarChart3 className="w-8 h-8 text-orange-600" />
+              <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center">
+                <img src={conexaLogo} alt="Conexa" className="w-14 h-14 object-contain rounded-xl" />
               </div>
               <div>
                 <h3 className="text-xl font-bold">Conexa</h3>

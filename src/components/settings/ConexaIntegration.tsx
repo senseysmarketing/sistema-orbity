@@ -19,7 +19,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { DollarSign, Eye, EyeOff, Save, Loader2, Copy, Check, Webhook, RefreshCw } from "lucide-react";
+import { Eye, EyeOff, Save, Loader2, Copy, Check, Webhook, RefreshCw } from "lucide-react";
+import conexaLogo from "@/assets/conexa-logo.png";
 import { usePaymentGateway } from "@/hooks/usePaymentGateway";
 import { useToast } from "@/hooks/use-toast";
 
@@ -118,8 +119,8 @@ export function ConexaIntegration() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900">
-              <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden">
+              <img src={conexaLogo} alt="Conexa" className="h-10 w-10 object-contain rounded-lg" />
             </div>
             <div>
               <CardTitle className="text-base">Conexa</CardTitle>
