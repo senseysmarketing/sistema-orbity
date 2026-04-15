@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle, AlertTriangle, Link2, CreditCard } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
+import whatsappLogo from "@/assets/whatsapp-logo.png";
 
 interface WhatsAppInstanceCardProps {
   purpose: 'general' | 'billing';
@@ -116,8 +117,12 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
       <CardHeader className="p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex items-center gap-3">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconBgClass} flex-shrink-0`}>
-              <IconComponent className={`h-5 w-5 ${iconTextClass}`} />
+            <div className={`flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden ${iconBgClass} flex-shrink-0`}>
+              {purpose === 'general' ? (
+                <img src={whatsappLogo} alt="WhatsApp" className="h-6 w-6 object-contain" />
+              ) : (
+                <IconComponent className={`h-5 w-5 ${iconTextClass}`} />
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">

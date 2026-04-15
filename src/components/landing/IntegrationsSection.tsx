@@ -1,8 +1,9 @@
-import { Shield, Lock, Eye, ArrowRight, MessageCircle } from "lucide-react";
+import { Shield, Lock, Eye, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import asaasLogo from "@/assets/asaas-logo.png";
 import conexaLogo from "@/assets/conexa-logo.png";
+import whatsappLogo from "@/assets/whatsapp-logo.png";
 
 export function IntegrationsSection() {
   const navigate = useNavigate();
@@ -93,8 +94,8 @@ export function IntegrationsSection() {
           {/* WhatsApp Multi-Instância */}
           <div className="bg-card border rounded-xl p-8 space-y-4 hover:shadow-lg transition-shadow">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-green-500/10 flex items-center justify-center">
-                <MessageCircle className="w-8 h-8 text-green-600" />
+              <div className="w-14 h-14 rounded-xl bg-green-100 flex items-center justify-center overflow-hidden">
+                <img src={whatsappLogo} alt="WhatsApp" className="w-9 h-9 object-contain" />
               </div>
               <div>
                 <h3 className="text-xl font-bold">WhatsApp Multi-Instância</h3>
