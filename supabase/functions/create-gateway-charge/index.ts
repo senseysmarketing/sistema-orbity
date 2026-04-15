@@ -391,9 +391,7 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: "Asaas API key not configured" }, 422);
         }
 
-        const baseUrl = settings.asaas_sandbox
-          ? "https://sandbox.asaas.com/api"
-          : "https://api.asaas.com";
+        const baseUrl = "https://api.asaas.com";
 
         const customerId = await ensureAsaasCustomer(
           client,

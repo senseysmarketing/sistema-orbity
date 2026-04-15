@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
       if (payment.asaas_payment_id) {
         const { data: settings, error: settingsError } = await adminClient
           .from("agency_payment_settings")
-          .select("asaas_api_key, asaas_sandbox")
+          .select("asaas_api_key")
           .eq("agency_id", payment.agency_id)
           .single();
 
@@ -87,9 +87,7 @@ Deno.serve(async (req) => {
           });
         }
 
-        const baseUrl = settings.asaas_sandbox
-          ? "https://sandbox.asaas.com/api"
-          : "https://api.asaas.com";
+        const baseUrl = "https://api.asaas.com";
 
         const asaasUrl = `${baseUrl}/v3/payments/${payment.asaas_payment_id}/receiveInCash`;
 
