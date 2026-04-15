@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, CalendarDays, MessageCircle, BarChart3, DollarSign } from "lucide-react";
 
 import { motion } from "framer-motion";
-import orbiMascot from "@/assets/orbi-mascot.png";
+import orbiMascot from "@/assets/orbi-mascot-new.png";
 
 interface HeroSectionProps {
   onOpenApplication?: () => void;
