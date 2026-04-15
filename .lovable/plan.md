@@ -1,16 +1,23 @@
 
 
-# Ajustes na Hero Section
+# Substituir Logo Texto por Imagem no Header
 
-## 1. Substituir imagem do mascote Orbi
-- Copiar `user-uploads://Design_sem_nome_3.png` para `src/assets/orbi-mascot.png` (sobrescrever a atual)
+## Resumo
+Trocar o texto "Orbity" no cabeçalho por a imagem do logo (`LogoPNG01-3.png`). Como o logo é branco sobre fundo transparente, ele funciona perfeitamente no estado não-scrolled (fundo escuro). No estado scrolled (fundo claro), será necessário aplicar um filtro de inversão ou usar uma versão escura.
 
-## 2. Corrigir botao "Agendar Apresentacao"
-O botao outline esta com `border-white/30 text-white` mas visualmente aparece todo branco. Adicionar `bg-transparent` explicitamente para garantir fundo transparente, e reforcar o estilo do outline.
+## Alterações
 
-Classe corrigida: `text-lg border-white/30 text-white bg-transparent hover:bg-white/10 hover:border-white/50`
+### 1. Copiar logo para o projeto
+- `lov-copy user-uploads://LogoPNG01-3.png src/assets/orbity-logo-white.png`
+
+### 2. `src/components/landing/LandingHeader.tsx`
+- Importar a imagem: `import orbityLogo from "@/assets/orbity-logo-white.png"`
+- Substituir o `<button>` com texto "Orbity" (linhas 39-48) por um `<button>` contendo `<img>`:
+  - `<img src={orbityLogo} alt="Orbity" className="h-8 transition-all duration-300" />`
+  - Quando `scrolled = true` (fundo claro): aplicar `brightness(0)` via classe para tornar o logo escuro — `style={{ filter: scrolled ? 'brightness(0)' : 'none' }}`
+  - Quando `scrolled = false` (fundo escuro): logo branco original, sem filtro
 
 ## Arquivos alterados
-1. `src/assets/orbi-mascot.png` (substituido pela nova imagem)
-2. `src/components/landing/HeroSection.tsx` (ajuste no className do botao)
+1. `src/assets/orbity-logo-white.png` (novo)
+2. `src/components/landing/LandingHeader.tsx` (substituir texto por imagem)
 
