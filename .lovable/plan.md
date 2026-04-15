@@ -1,41 +1,35 @@
 
 
-# Atualizar dados da Agência Demonstração Orbity
+# Redesign "Quiet Luxury" — DemoSection + IntegrationsSection
 
-## Contexto
-A agência `546ccfe0-6fd5-4e57-840b-c7781383d770` tem dados de Janeiro 2026. Tudo precisa ser atualizado para parecer um sistema em uso ativo em Abril 2026.
+## 1. `src/components/landing/DemoSection.tsx` — Reescrita completa
 
-## Estado Atual
-- **Clientes**: 12 ativos (ok, bom volume)
-- **Leads**: 25, todos com `created_at` de Jan/2026
-- **Tarefas**: 48, com `due_date` de Jan/2026
-- **Reuniões**: 13, todas de Jan/2026
-- **Equipe**: Apenas 1 utilizador ("Usuário Demonstração")
+Substituir todo o conteúdo por um componente minimalista Apple-style:
 
-## Alterações (via insert tool — são UPDATEs de dados)
+- **Fundo**: `bg-slate-50`, `pt-20 pb-0 px-4` (sem padding inferior para fundir)
+- **Imports**: Remover `Eye`, `Sparkles`, `DemoCarousel`. Manter apenas `Badge` e `ArrowRight`
+- **Header**: Badge discreto em slate, H2 com `tracking-tight text-slate-900` e `md:text-5xl`, subtítulo `text-slate-600`
+- **Video Container**:
+  - Wrapper `relative group max-w-5xl`
+  - Glow div atrás: `from-purple-600/15 to-indigo-600/15 blur-2xl opacity-40 group-hover:opacity-70`
+  - Container principal: `aspect-video rounded-[2rem] border-slate-200/80 shadow-[0_20px_50px_rgba(0,0,0,0.1),0_10px_15px_rgba(0,0,0,0.05)]`
+  - Hover: `transition-transform duration-700 ease-out hover:scale-[1.01]`
+  - Conteúdo: `<img src="/placeholder.svg" />` como placeholder 16:9
+- **CTA removido** (já existe no IntegrationsSection)
 
-### 1. Atualizar Leads (25 registos)
-- Redistribuir `created_at` entre Março e Abril 2026
-- Manter os status variados (new, contacted, meeting, proposal, won, lost)
+## 2. `src/components/landing/IntegrationsSection.tsx` — Linha 13
 
-### 2. Atualizar Tarefas (~20 mais relevantes)
-- Mover `due_date` para Abril 2026 (algumas passadas, algumas hoje, algumas futuras)
-- Variar status: todo, in_progress, em_revisao, done, completed
-- Garantir que há tarefas para esta semana
+Trocar:
+```
+py-20 bg-slate-50/50 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] relative
+```
+Por:
+```
+pt-0 pb-20 bg-slate-50 relative
+```
 
-### 3. Atualizar Reuniões (13 registos)
-- Colocar ~4 como concluídas (semana passada)
-- Colocar ~5 como agendadas (próximos dias/semana)
-- Atualizar `start_time` e `end_time` para Abril 2026
+Remove textura de pontos e padding-top para fusão contínua.
 
-### 4. Equipa — Limitação
-- Não é possível criar utilizadores reais via SQL (requer `auth.users`). Para adicionar membros à equipe seria necessário registar contas reais no Supabase Auth.
-- **Alternativa**: posso inserir perfis "fictícios" directamente na tabela `profiles` + `agency_users` com UUIDs gerados, mas estes não terão login funcional. Servem apenas para visualização na lista de equipe.
-- Recomendo criar 3-4 membros fictícios: um gestor de tráfego, um designer, um social media manager.
-
-## Execução
-Serão ~5-6 chamadas de UPDATE via insert tool, agrupadas por tabela. Nenhuma alteração de schema necessária.
-
-## Ficheiros alterados
-Nenhum ficheiro de código — apenas dados no banco de dados.
+## Resultado
+Bloco único e contínuo em `bg-slate-50`: vídeo 16:9 premium com glow sutil → cards de integrações sem quebra visual.
 
