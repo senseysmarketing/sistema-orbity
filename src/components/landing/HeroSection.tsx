@@ -89,7 +89,7 @@ export function HeroSection({ onOpenScheduling }: HeroSectionProps) {
               <Button
                 size="lg"
                 variant="outline"
-                className="text-lg border-white/30 text-white hover:bg-white/10 hover:border-white/50"
+                className="text-lg bg-transparent border-white/30 text-white hover:bg-white/10 hover:border-white/50"
                 onClick={onOpenScheduling}
               >
                 <CalendarDays className="mr-2 h-5 w-5" />
