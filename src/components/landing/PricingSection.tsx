@@ -67,8 +67,9 @@ export function PricingSection({ onOpenScheduling }: PricingSectionProps) {
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
-            <div className="group bg-slate-950 rounded-[2rem] p-10 relative overflow-hidden border border-purple-500/30 shadow-[0_0_50px_rgba(139,92,246,0.15)] hover:border-purple-500/60 transition-all duration-500">
+            <div className="group bg-gradient-to-br from-purple-950 to-indigo-950 rounded-[2rem] p-10 relative overflow-hidden border border-purple-500/30 shadow-[0_0_50px_rgba(139,92,246,0.25)] hover:border-purple-500/60 transition-all duration-500">
               {/* Glow accent */}
+              <div className="ring-1 ring-white/10 absolute inset-0 rounded-[2rem] pointer-events-none" />
               <div className="absolute -top-24 -right-24 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
               {/* Toggle Mensal / Anual */}
