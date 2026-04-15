@@ -1,8 +1,9 @@
-import { Shield, Lock, Eye, ArrowRight, MessageCircle } from "lucide-react";
+import { Shield, Lock, Eye, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import asaasLogo from "@/assets/asaas-logo.png";
 import conexaLogo from "@/assets/conexa-logo.png";
+import whatsappLogo from "@/assets/whatsapp-logo.png";
 
 export function IntegrationsSection() {
   const navigate = useNavigate();

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle, AlertTriangle, Link2, CreditCard } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
+import whatsappLogo from "@/assets/whatsapp-logo.png";
 
 interface WhatsAppInstanceCardProps {
   purpose: 'general' | 'billing';
