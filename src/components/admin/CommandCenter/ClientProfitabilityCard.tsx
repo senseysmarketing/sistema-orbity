@@ -50,7 +50,7 @@ export function ClientProfitabilityCard({ clients, allClients, selectedMonth, cl
           </div>
         )}
       </CardHeader>
-      <CardContent className="space-y-3 max-h-[500px] overflow-y-auto">
+      <CardContent className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
         {clients.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">Nenhum cliente ativo</p>
         ) : (
