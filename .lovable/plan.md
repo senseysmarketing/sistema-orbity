@@ -1,44 +1,30 @@
 
 
-# Restaurar Automação WhatsApp CRM
+# Correção do Layout do Card "Atendimento & Automações"
 
-## Alterações
+## Problema
+Quando o modo de duas instâncias está ativo, os cards ficam em grid de 2 colunas (`lg:grid-cols-2`), reduzindo a largura de cada card. Os três botões (Verificar Status, Reconfigurar Webhook, Desconectar) usam `sm:flex-row` e transbordam da área do card porque o espaço horizontal é insuficiente.
 
-### 1. Filtro `purpose = 'general'` nas Edge Functions
+## Solução
 
-**`supabase/functions/capture-lead/index.ts`** (linha 31):
-Adicionar `.eq('purpose', 'general')` antes do `.maybeSingle()` na query de `whatsapp_accounts`.
+### `src/components/settings/WhatsAppInstanceCard.tsx`
 
-**`supabase/functions/facebook-leads/index.ts`** (linha 586):
-Mesmo filtro `.eq('purpose', 'general')` antes do `.maybeSingle()`.
+Alterar o container dos botões de ação (linhas 163-202) para usar `flex-wrap` em vez de `sm:flex-row`, garantindo que os botões quebrem linha automaticamente quando o espaço é insuficiente:
 
-### 2. Cron Job — Limpar antigo e criar novo
+- Trocar `flex-col sm:flex-row` por `flex-wrap` no div dos botões (linha 163)
+- Usar tamanho compacto nos botões para melhor encaixe em cards estreitos
 
-Executar via SQL insert tool (não migration):
+## Verificação de Conexão
 
-```sql
--- Limpar jobs antigos
-SELECT cron.unschedule('process-whatsapp-queue');
+A lógica de conexão, instância e roteamento está correta:
+- **`useWhatsApp` hook**: já filtra por `purpose` na query de `whatsapp_accounts`
+- **`whatsapp-connect` Edge Function**: gera instâncias com nome único por purpose (`orbity_{id}_general` / `orbity_{id}_billing`)
+- **`process-whatsapp-queue`**: usa o account vinculado ao registro de automação (correto)
+- **`capture-lead` / `facebook-leads`**: já filtram por `purpose = 'general'` (corrigido na sessão anterior)
+- **`process-billing-reminders`**: já faz fallback de `billing` para `general` corretamente
 
--- Criar novo job a cada 2 minutos
-SELECT cron.schedule(
-  'process-whatsapp-queue',
-  '*/2 * * * *',
-  $$
-  SELECT net.http_post(
-    url:='https://ovookkywclrqfmtumelw.supabase.co/functions/v1/process-whatsapp-queue',
-    headers:='{"Content-Type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92b29ra3l3Y2xycWZtdHVtZWx3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1NjkyMjUsImV4cCI6MjA3NDE0NTIyNX0.NoHXndIJVUZ_dV5pEGZWfw2RUlEutBrgKaIDdlOazHs"}'::jsonb,
-    body:='{}'::jsonb
-  ) as request_id;
-  $$
-);
-```
+Não há problemas funcionais — apenas o ajuste visual dos botões.
 
-### 3. Deploy das Edge Functions
-Deploy de `capture-lead` e `facebook-leads`.
-
-## Arquivos alterados
-1. `supabase/functions/capture-lead/index.ts`
-2. `supabase/functions/facebook-leads/index.ts`
-3. SQL insert para cron job
+## Arquivo alterado
+- `src/components/settings/WhatsAppInstanceCard.tsx` — botões com `flex-wrap` e `gap-2`
 
