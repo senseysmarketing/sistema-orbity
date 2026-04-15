@@ -15,14 +15,12 @@ export function AsaasIntegration() {
   const { toast } = useToast();
 
   const [apiKey, setApiKey] = useState("");
-  const [sandbox, setSandbox] = useState(true);
   const [gatewayActive, setGatewayActive] = useState(false);
   const [showKey, setShowKey] = useState(false);
 
   useEffect(() => {
     if (settings) {
       setApiKey(settings.asaas_api_key || "");
-      setSandbox(settings.asaas_sandbox ?? true);
       setGatewayActive(settings.asaas_enabled ?? false);
     }
   }, [settings]);
@@ -31,7 +29,7 @@ export function AsaasIntegration() {
     try {
       await updateSettings({
         asaas_api_key: apiKey || null,
-        asaas_sandbox: sandbox,
+        asaas_sandbox: false,
         asaas_enabled: gatewayActive,
       });
       toast({ title: "Configurações salvas!", description: gatewayActive ? "Asaas habilitado como gateway." : "Asaas desabilitado." });
