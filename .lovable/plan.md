@@ -1,29 +1,44 @@
 
 
-# Correção do Formulário de Cliente
-
-## Problema 1: Estado persistente ao reabrir modal
-O `useEffect` que reseta o formulário depende apenas de `[client]`. Quando o usuário fecha o modal de "Novo Cliente" e reabre, `client` permanece `null` nas duas vezes, então o reset não executa e os dados digitados permanecem.
-
-**Solução**: Adicionar `open` como dependência do `useEffect`. Quando `open` muda para `true` e `client` é `null`, resetar o formulário para `initialFormData`.
-
-## Problema 2: Campos obrigatórios faltantes
-Atualmente apenas o campo "Nome" é obrigatório. Os campos CPF/CNPJ, E-mail, WhatsApp e CEP são opcionais, o que pode causar falhas na geração de cobranças e envio de notificações.
-
-**Solução**: Adicionar validação obrigatória (tanto no HTML quanto no `handleSubmit`) para:
-- **CPF/CNPJ** — mínimo 11 dígitos (CPF) ou 14 (CNPJ)
-- **E-mail de Faturamento** — campo `required`
-- **Contato (WhatsApp)** — mínimo 10 dígitos
-- **CEP** — 8 dígitos exatos
-
-Adicionar asteriscos (*) nos labels desses campos e uma validação consolidada no `handleSubmit` que exibe toast com mensagem descritiva antes de submeter.
+# Restaurar Automação WhatsApp CRM
 
 ## Alterações
 
-### `src/components/admin/ClientForm.tsx`
-1. **useEffect (linha 124)**: Adicionar `open` às dependências. Quando `open === true && !client`, resetar form e limpar erros.
-2. **Labels**: Adicionar `*` nos labels de CPF/CNPJ, E-mail, WhatsApp e CEP.
-3. **Inputs**: Adicionar `required` nos inputs de email e contact.
-4. **handleSubmit**: Adicionar bloco de validação antes do submit que verifica se document, email, contact e zip_code estão preenchidos, exibindo toast de erro caso contrário.
-5. **Remover alerta condicional** de `missingGatewayFields` (agora desnecessário pois os campos são sempre obrigatórios).
+### 1. Filtro `purpose = 'general'` nas Edge Functions
+
+**`supabase/functions/capture-lead/index.ts`** (linha 31):
+Adicionar `.eq('purpose', 'general')` antes do `.maybeSingle()` na query de `whatsapp_accounts`.
+
+**`supabase/functions/facebook-leads/index.ts`** (linha 586):
+Mesmo filtro `.eq('purpose', 'general')` antes do `.maybeSingle()`.
+
+### 2. Cron Job — Limpar antigo e criar novo
+
+Executar via SQL insert tool (não migration):
+
+```sql
+-- Limpar jobs antigos
+SELECT cron.unschedule('process-whatsapp-queue');
+
+-- Criar novo job a cada 2 minutos
+SELECT cron.schedule(
+  'process-whatsapp-queue',
+  '*/2 * * * *',
+  $$
+  SELECT net.http_post(
+    url:='https://ovookkywclrqfmtumelw.supabase.co/functions/v1/process-whatsapp-queue',
+    headers:='{"Content-Type":"application/json","Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92b29ra3l3Y2xycWZtdHVtZWx3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1NjkyMjUsImV4cCI6MjA3NDE0NTIyNX0.NoHXndIJVUZ_dV5pEGZWfw2RUlEutBrgKaIDdlOazHs"}'::jsonb,
+    body:='{}'::jsonb
+  ) as request_id;
+  $$
+);
+```
+
+### 3. Deploy das Edge Functions
+Deploy de `capture-lead` e `facebook-leads`.
+
+## Arquivos alterados
+1. `supabase/functions/capture-lead/index.ts`
+2. `supabase/functions/facebook-leads/index.ts`
+3. SQL insert para cron job
 
