@@ -1,43 +1,60 @@
 
 
-# Implementar UI de Webhook no AsaasIntegration.tsx
+# Painel de Auditoria — Histórico de Envios de Cobrança
 
-## Arquivo alterado
-`src/components/settings/AsaasIntegration.tsx` — reescrita completa
+## 1. Migration — Tabela `billing_message_logs`
 
-## Alterações
+Criar tabela com RLS usando `user_belongs_to_agency` (confirmado existente no projeto):
 
-### 1. Novos imports
-- `Alert, AlertDescription` de `@/components/ui/alert`
-- `Copy, Info, CheckCircle2` de `lucide-react`
-- `useAgency` de `@/hooks/useAgency`
+```sql
+CREATE TABLE public.billing_message_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  agency_id uuid NOT NULL REFERENCES public.agencies(id) ON DELETE CASCADE,
+  client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  payment_id uuid NOT NULL REFERENCES public.client_payments(id) ON DELETE CASCADE,
+  message_type text NOT NULL CHECK (message_type IN ('reminder', 'overdue')),
+  status text NOT NULL CHECK (status IN ('success', 'error')),
+  error_details text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 
-### 2. Novos estados e lógica
-- `webhookToken` / `showWebhookToken` — estado para o token do webhook
-- `agencyId` via `useAgency().currentAgency?.id`
-- URL dinâmica: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook?gateway=asaas&agency_id=${agencyId}`
-- Se `agencyId` não existir, exibe skeleton no lugar da URL
-- `handleCopyUrl` — copia URL para clipboard com feedback via toast
-- `handleSave` inclui `asaas_webhook_token: webhookToken || null`
-- `useEffect` preenche `webhookToken` com `settings.asaas_webhook_token`
+ALTER TABLE public.billing_message_logs ENABLE ROW LEVEL SECURITY;
 
-### 3. Nova seção de Webhook (abaixo da API Key)
-- Separator
-- Título com ícone Info: "Configuração de Webhook (Retorno de Pagamento)"
-- Input read-only com URL + botão Copiar
-- Input password com toggle para Token de Autenticação
+CREATE POLICY "Agency members can view billing logs"
+  ON public.billing_message_logs FOR SELECT TO authenticated
+  USING (public.user_belongs_to_agency(agency_id));
 
-### 4. Painel de instruções (Alert azul claro)
-Guia numerado com 6 passos:
-1. Acessar Menu → Integrações → Webhooks → "Criar Webhook"
-2. Nomear e colar URL
-3. Gerar token no Asaas, colar no Orbity
-4. Manter fila de sincronização e webhook ativados
-5. **⚠️ IMPORTANTE** — Selecionar eventos obrigatórios com badges mono: `PAYMENT_CREATED`, `PAYMENT_UPDATED`, `PAYMENT_CONFIRMED`, `PAYMENT_RECEIVED`, `PAYMENT_OVERDUE`, `PAYMENT_DELETED`, `PAYMENT_REFUNDED` (cada um com descrição)
-6. Salvar em ambos os lados
+CREATE INDEX idx_billing_message_logs_agency_created
+  ON public.billing_message_logs (agency_id, created_at DESC);
+```
 
-### 5. Botão "Salvar e Conectar" (sem alteração)
+## 2. Edge Function — `process-billing-reminders/index.ts`
 
-## Nenhuma migração de banco necessária
-O campo `asaas_webhook_token` já existe na tabela `agency_payment_settings`.
+Após cada tentativa de envio (linhas ~292-320), inserir log em `billing_message_logs` com **try/catch isolado** (Guardrail 2):
+
+- **Sucesso**: `{ agency_id: agencyId, client_id: payment.client_id, payment_id: payment.id, message_type: msgType, status: 'success' }`
+- **Erro de envio**: `{ ..., status: 'error', error_details: JSON.stringify(sendData) }`
+- **Catch do payment**: `{ ..., status: 'error', error_details: String(paymentErr) }`
+
+Cada inserção envolvida em seu próprio try/catch para nunca interromper o loop.
+
+## 3. UI — `BillingAutomationSettings.tsx`
+
+Abaixo do botão "Salvar Régua de Cobrança" (linha 431):
+
+- `<Separator className="my-6" />`
+- Título: "Histórico de Envios (Últimos 3 dias)" com ícone `History`
+- Importar `useAgency` para obter `agencyId`
+- Query Supabase: `billing_message_logs` filtrado por `agency_id`, `created_at >= 3 dias`, limit 50, order `created_at DESC`, join `clients(name)`
+- `<ScrollArea className="h-[250px]">` com lista compacta
+- Cada item: nome do cliente, data/hora (dd/MM HH:mm), tipo (Lembrete/Atraso)
+- `CheckCircle2` verde para success, `AlertCircle` vermelho para error
+- Error: `<Tooltip>` com `error_details` (Guardrail 3: já tem `TooltipProvider` importado)
+- Empty state amigável
+
+## Arquivos alterados
+1. **Migration SQL** — nova tabela + RLS + index
+2. **`supabase/functions/process-billing-reminders/index.ts`** — inserções de log resilientes
+3. **`src/components/admin/BillingAutomationSettings.tsx`** — seção de histórico
+4. **Deploy** da edge function
 
