@@ -24,6 +24,7 @@ interface OnboardingRequest {
     email: string;
     password: string;
   };
+  flow?: string;
 }
 
 serve(async (req) => {
@@ -40,12 +41,13 @@ serve(async (req) => {
   try {
     logStep("Starting agency onboarding");
 
-    const { companyData, planSlug, adminUser }: OnboardingRequest = await req.json();
+    const { companyData, planSlug, adminUser, flow }: OnboardingRequest = await req.json();
     
     logStep("Received onboarding data", { 
       companyName: companyData.name, 
       planSlug, 
-      adminEmail: adminUser.email 
+      adminEmail: adminUser.email,
+      flow: flow || 'not_specified'
     });
 
     // Step 1: Create or get admin user
@@ -224,53 +226,46 @@ serve(async (req) => {
 
     if (onboardingError) throw new Error(`Failed to create onboarding record: ${onboardingError.message}`);
 
-    // Step 8: Disparar webhook para n8n (boas-vindas)
-    logStep("Disparando webhook para n8n");
-    try {
-      const webhookPayload = {
-        // Dados do usuário administrador
-        admin_name: adminUser.name,
-        admin_email: adminUser.email,
-        
-        // Dados da empresa
-        company_name: companyData.name,
-        company_description: companyData.description || '',
-        company_email: companyData.contactEmail,
-        company_phone: companyData.contactPhone || '',
-        
-        // Dados da agência criada
-        agency_id: agencyId,
-        agency_slug: agencySlug,
-        
-        // Dados do plano
-        plan_slug: planSlug,
-        
-        // Timestamps
-        trial_start: new Date().toISOString(),
-        trial_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        created_at: new Date().toISOString()
-      };
+    // Step 8: Disparar webhook para n8n (boas-vindas) — apenas para trial
+    if (flow === 'trial' || !flow) {
+      logStep("Disparando webhook para n8n (flow trial)");
+      try {
+        const webhookPayload = {
+          admin_name: adminUser.name,
+          admin_email: adminUser.email,
+          company_name: companyData.name,
+          company_description: companyData.description || '',
+          company_email: companyData.contactEmail,
+          company_phone: companyData.contactPhone || '',
+          agency_id: agencyId,
+          agency_slug: agencySlug,
+          plan_slug: planSlug,
+          flow: flow || 'trial',
+          trial_start: new Date().toISOString(),
+          trial_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          created_at: new Date().toISOString()
+        };
 
-      const webhookResponse = await fetch(
-        "https://senseys-n8n.cloudfy.cloud/webhook/onboarding-orbity",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(webhookPayload)
-        }
-      );
-      
-      logStep("Webhook enviado com sucesso", { 
-        status: webhookResponse.status,
-        ok: webhookResponse.ok 
-      });
-    } catch (webhookError) {
-      // Log do erro mas não falha o onboarding
-      logStep("Erro ao enviar webhook (não crítico)", { 
-        error: webhookError instanceof Error ? webhookError.message : String(webhookError) 
-      });
+        const webhookResponse = await fetch(
+          "https://senseys-n8n.cloudfy.cloud/webhook/onboarding-orbity",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(webhookPayload)
+          }
+        );
+        
+        logStep("Webhook enviado com sucesso", { 
+          status: webhookResponse.status,
+          ok: webhookResponse.ok 
+        });
+      } catch (webhookError) {
+        logStep("Erro ao enviar webhook (não crítico)", { 
+          error: webhookError instanceof Error ? webhookError.message : String(webhookError) 
+        });
+      }
+    } else {
+      logStep("Webhook ignorado - Fluxo de assinatura direta", { flow });
     }
 
     logStep("Onboarding completed successfully");
