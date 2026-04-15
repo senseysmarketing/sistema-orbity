@@ -1,55 +1,34 @@
 
 
-# Bento Grid + Premium UI + Privacidade — IntegrationsSection
+# Substituir "Cadastrar Nova Agência" por botões de copiar links de onboarding
 
-## Resumo
-Reestruturar a secção com Bento Grid (WhatsApp destaque full-width + 4 cards normais em 2x2), aplicar polimento visual premium, badges "Novo", textura pontilhada de fundo, e integrar a secção de Privacidade de forma compacta e elegante.
+## O que muda
+Remover o botão e dialog `CreateAgencyDialog` da tabela de agências e substituir por dois botões compactos que copiam os links de onboarding para o clipboard:
 
-## Estrutura final
-```text
-┌─────────────────────────────────────────────────┐
-│         WhatsApp Multi-Instância (Novo)         │  ← full-width, layout horizontal
-└─────────────────────────────────────────────────┘
-┌──────────────────────┐  ┌──────────────────────┐
-│   Meta Business      │  │  Google Calendar     │
-└──────────────────────┘  └──────────────────────┘
-┌──────────────────────┐  ┌──────────────────────┐
-│   Asaas (Novo)       │  │   Conexa (Novo)      │
-└──────────────────────┘  └──────────────────────┘
-┌─────────────────────────────────────────────────┐
-│  🔒 Compromisso com sua Privacidade (compacto)  │  ← inline banner, full-width
-└─────────────────────────────────────────────────┘
-          [ Comece a Integrar Agora ]
-```
+1. **Link Assinatura Direta** → `{origin}/onboarding?flow=direct_monthly` (usuário cadastra e paga)
+2. **Link Trial Gratuito** → `{origin}/onboarding?flow=trial` (7 dias grátis)
 
-## Alterações em `src/components/landing/IntegrationsSection.tsx`
+## Alterações
 
-### 1. Import adicional
-- Adicionar `import { Badge } from "@/components/ui/badge";`
+### 1. `src/components/master/AgenciesTable.tsx`
+- Remover import do `CreateAgencyDialog`
+- Adicionar imports: `Copy`, `Check` do lucide-react
+- Na linha 180 onde está `{onCreated && <CreateAgencyDialog onCreated={onCreated} />}`, substituir por dois botões:
+  - Botão "Copiar Link Assinatura" (ícone Copy, variante outline) — copia `${window.location.origin}/onboarding?flow=direct_monthly`
+  - Botão "Copiar Link Trial" (ícone Copy, variante outline) — copia `${window.location.origin}/onboarding?flow=trial`
+  - Feedback visual: ícone muda para Check por 2s após copiar
+- Adicionar estado local para controlar qual botão foi copiado
 
-### 2. Fundo da secção
-- Substituir gradiente por: `bg-slate-50/50 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] relative`
+### 2. `src/pages/Master.tsx`
+- Remover a prop `onCreated={refreshAgencies}` do `AgenciesTable` (já não é necessária)
 
-### 3. Grelha: `grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto`
-- WhatsApp como primeiro card com `md:col-span-2`, layout interno `flex-col md:flex-row` (ícone+título à esquerda, bullets à direita)
-- 4 cards normais (Meta, Google Calendar, Asaas, Conexa) em 2x2
+### 3. `src/components/master/AgenciesTable.tsx` (interface)
+- Remover a prop `onCreated` da interface `AgenciesTableProps` (ou mantê-la opcional e não usada — preferível remover)
 
-### 4. Polimento visual (todos os cards)
-- Classes: `group bg-white border border-gray-100 hover:border-primary/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 rounded-2xl` (igual ao `rounded-2xl` da AIFeaturesSection)
-- Ícones: `group-hover:scale-110 transition-transform duration-300`
+### 4. Arquivo `CreateAgencyDialog.tsx`
+- Pode ser mantido no código por agora (não será importado em lugar nenhum), ou removido para limpeza
 
-### 5. Badges "Novo"
-- Nos títulos de WhatsApp, Asaas e Conexa: `<Badge variant="secondary" className="ml-2 text-xs bg-primary/10 text-primary hover:bg-primary/20">Novo</Badge>`
-
-### 6. Privacidade (compacta, integrada na grelha)
-- Manter a secção de Privacidade mas como um banner horizontal compacto (`md:col-span-2`) dentro da mesma grelha, logo abaixo dos 4 cards
-- Layout: ícone Shield pequeno à esquerda, texto resumido ao centro, 3 badges (Criptografado, Sem rastreamento, LGPD) à direita
-- Estilo: `bg-white/80 border border-gray-100 rounded-2xl p-5` (mais leve, sem o destaque pesado anterior)
-- Reduzir o texto para uma linha mais concisa, mantendo a mensagem essencial
-
-### 7. Botão CTA
-- Manter abaixo da grelha, sem alterações
-
-## Arquivo alterado
-1. `src/components/landing/IntegrationsSection.tsx` — reescrita completa
+## Resultado visual
+Em vez de um botão escuro "Cadastrar Nova Agência", aparecerão dois botões mais leves ao lado dos status cards:
+- `[📋 Link Assinatura]` `[📋 Link Trial]`
 
