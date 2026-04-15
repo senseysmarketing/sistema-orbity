@@ -83,6 +83,25 @@ export function DemoSchedulingModal({ open, onOpenChange }: DemoSchedulingModalP
         status: 'reuniao_agendada',
       } as any);
 
+      // Disparar Webhook para o n8n (não-bloqueante)
+      try {
+        await fetch('https://senseys-n8n.cloudfy.cloud/webhook/apresentacao-orbity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name.trim(),
+            email: email.trim(),
+            phone: rawPhone(phone),
+            agency_name: agencyName.trim(),
+            scheduled_at: scheduledAt.toISOString(),
+            formatted_date: format(selectedDate, "dd/MM/yyyy", { locale: ptBR }),
+            formatted_hour: `${selectedHour.toString().padStart(2, "0")}:00`
+          }),
+        });
+      } catch (webhookError) {
+        console.error('Erro ao disparar webhook do n8n:', webhookError);
+      }
+
       setDirection(1);
       setStep(3);
     } catch (error) {
