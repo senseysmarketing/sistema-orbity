@@ -9,12 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Bell, Clock, AlertTriangle, Save, Loader2, Info, Mail, MessageCircle, CheckCircle2, AlertCircle, Percent } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Bell, Clock, AlertTriangle, Save, Loader2, Info, Mail, MessageCircle, CheckCircle2, AlertCircle, Percent, History, Inbox } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePaymentGateway, PaymentSettings } from "@/hooks/usePaymentGateway";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
+import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BillingAutomationSettingsProps {
   open: boolean;
@@ -58,9 +62,31 @@ const defaultFormData: FormData = {
 export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomationSettingsProps) {
   const { settings, updateSettings, isSaving } = usePaymentGateway();
   const { account, isConnected } = useWhatsApp();
+  const { currentAgency } = useAgency();
   const { toast } = useToast();
+  const agencyId = currentAgency?.id;
 
   const [formData, setFormData] = useState<FormData>(defaultFormData);
+
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data: messageLogs = [], isLoading: isLoadingLogs } = useQuery({
+    queryKey: ['billing-message-logs', agencyId],
+    queryFn: async () => {
+      if (!agencyId) return [];
+      const { data, error } = await supabase
+        .from('billing_message_logs' as any)
+        .select('id, client_id, payment_id, message_type, status, error_details, created_at, clients(name)')
+        .eq('agency_id', agencyId)
+        .gte('created_at', threeDaysAgo)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data as any[]) || [];
+    },
+    enabled: !!agencyId && open,
+    staleTime: 5 * 60 * 1000,
+  });
 
   useEffect(() => {
     if (settings && settings.id) {
@@ -429,6 +455,69 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
             {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Salvar Régua de Cobrança
           </Button>
+
+          <Separator className="my-6" />
+
+          {/* Histórico de Envios */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-primary" />
+              <Label className="font-semibold text-sm">Histórico de Envios (Últimos 3 dias)</Label>
+            </div>
+
+            <ScrollArea className="h-[250px] w-full rounded-md border p-3">
+              {isLoadingLogs ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : messageLogs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center gap-2 py-8">
+                  <Inbox className="h-8 w-8 text-muted-foreground/50" />
+                  <p className="text-sm text-muted-foreground">Nenhum envio registrado nos últimos 3 dias.</p>
+                  <p className="text-xs text-muted-foreground/70">Os registros aparecerão aqui quando a régua de cobrança disparar mensagens automaticamente.</p>
+                </div>
+              ) : (
+                <TooltipProvider>
+                  <div className="space-y-2">
+                    {messageLogs.map((log: any) => {
+                      const clientName = (log.clients as any)?.name || 'Cliente desconhecido';
+                      const createdAt = new Date(log.created_at);
+                      const dateStr = createdAt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                      const timeStr = createdAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                      const typeLabel = log.message_type === 'reminder' ? 'Lembrete' : 'Atraso';
+                      const isError = log.status === 'error';
+
+                      return (
+                        <div key={log.id} className="flex items-center gap-2 py-1.5 border-b border-border/50 last:border-0">
+                          {isError ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <AlertCircle className="h-4 w-4 text-destructive shrink-0 cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="max-w-[280px]">
+                                <p className="text-xs font-mono break-all">{log.error_details || 'Erro desconhecido'}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium truncate">{clientName}</p>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] shrink-0">
+                            {typeLabel}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                            {dateStr} {timeStr}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </TooltipProvider>
+              )}
+            </ScrollArea>
+          </div>
         </div>
       </SheetContent>
     </Sheet>

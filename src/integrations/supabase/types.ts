@@ -952,6 +952,75 @@ export type Database = {
           },
         ]
       }
+      billing_message_logs: {
+        Row: {
+          agency_id: string
+          client_id: string
+          created_at: string
+          error_details: string | null
+          id: string
+          message_type: string
+          payment_id: string
+          status: string
+        }
+        Insert: {
+          agency_id: string
+          client_id: string
+          created_at?: string
+          error_details?: string | null
+          id?: string
+          message_type: string
+          payment_id: string
+          status: string
+        }
+        Update: {
+          agency_id?: string
+          client_id?: string
+          created_at?: string
+          error_details?: string | null
+          id?: string
+          message_type?: string
+          payment_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_message_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_message_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "billing_message_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "billing_message_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_message_logs_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "client_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bonus_periods: {
         Row: {
           agency_id: string

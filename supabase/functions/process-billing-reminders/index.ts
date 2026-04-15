@@ -295,6 +295,20 @@ serve(async (req) => {
                 sendData
               );
               totalErrors++;
+
+              // Guardrail 2: isolated log insert
+              try {
+                await supabase.from("billing_message_logs").insert({
+                  agency_id: agencyId,
+                  client_id: payment.client_id,
+                  payment_id: payment.id,
+                  message_type: msgType,
+                  status: "error",
+                  error_details: JSON.stringify(sendData),
+                });
+              } catch (logErr) {
+                console.error(`[billing-reminders] Failed to write error log:`, logErr);
+              }
             } else {
               // Insert dedup tracking
               const systemUserId = "00000000-0000-0000-0000-000000000000";
@@ -308,6 +322,19 @@ serve(async (req) => {
               console.log(
                 `[billing-reminders] ✅ Sent ${msgType} to ${phone} for payment ${payment.id}`
               );
+
+              // Guardrail 2: isolated log insert
+              try {
+                await supabase.from("billing_message_logs").insert({
+                  agency_id: agencyId,
+                  client_id: payment.client_id,
+                  payment_id: payment.id,
+                  message_type: msgType,
+                  status: "success",
+                });
+              } catch (logErr) {
+                console.error(`[billing-reminders] Failed to write success log:`, logErr);
+              }
             }
 
             // Rate limit: 1s between sends
@@ -318,6 +345,20 @@ serve(async (req) => {
               paymentErr
             );
             totalErrors++;
+
+            // Guardrail 2: isolated log insert for catch errors
+            try {
+              await supabase.from("billing_message_logs").insert({
+                agency_id: agencyId,
+                client_id: payment.client_id,
+                payment_id: payment.id,
+                message_type: msgType,
+                status: "error",
+                error_details: String(paymentErr),
+              });
+            } catch (logErr) {
+              console.error(`[billing-reminders] Failed to write catch log:`, logErr);
+            }
           }
         }
       } catch (agencyErr) {
