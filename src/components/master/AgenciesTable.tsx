@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useMaster } from '@/hooks/useMaster';
 import { AgencyDetailsSheet } from '@/components/master/AgencyDetailsSheet';
-import { CreateAgencyDialog } from '@/components/master/CreateAgencyDialog';
+
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import {
   MoreHorizontal, Eye, Pause, Play, RefreshCw,
   CheckCircle2, AlertTriangle, XCircle, Ban, Search,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Copy, Check,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -22,11 +22,39 @@ import { ptBR } from 'date-fns/locale';
 
 const ITEMS_PER_PAGE = 10;
 
-interface AgenciesTableProps {
-  onCreated?: () => void;
+function CopyOnboardingLinks() {
+  const [copied, setCopied] = useState<'subscription' | 'trial' | null>(null);
+
+  const handleCopy = async (flow: string, type: 'subscription' | 'trial') => {
+    const url = `${window.location.origin}/onboarding?flow=${flow}`;
+    await navigator.clipboard.writeText(url);
+    setCopied(type);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  return (
+    <div className="flex gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handleCopy('direct_monthly', 'subscription')}
+      >
+        {copied === 'subscription' ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <Copy className="h-4 w-4 mr-2" />}
+        Link Assinatura
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handleCopy('trial', 'trial')}
+      >
+        {copied === 'trial' ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <Copy className="h-4 w-4 mr-2" />}
+        Link Trial
+      </Button>
+    </div>
+  );
 }
 
-export function AgenciesTable({ onCreated }: AgenciesTableProps) {
+export function AgenciesTable() {
   const { agencies, loading, refreshAgencies, suspendAgency, reactivateAgency, getStatusCounts } = useMaster();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedAgency, setSelectedAgency] = useState<typeof agencies[0] | null>(null);
@@ -177,7 +205,7 @@ export function AgenciesTable({ onCreated }: AgenciesTableProps) {
             </div>
           ))}
         </div>
-        {onCreated && <CreateAgencyDialog onCreated={onCreated} />}
+        <CopyOnboardingLinks />
       </div>
 
       <Card>

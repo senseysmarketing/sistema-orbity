@@ -14,7 +14,7 @@ import { isMasterAgencyAdmin } from '@/lib/masterAccess';
 
 export default function Master() {
   const navigate = useNavigate();
-  const { loading, refreshAgencies } = useMaster();
+  const { loading } = useMaster();
   const { currentAgency, agencyRole, loading: agencyLoading } = useAgency();
 
   const hasAccess = isMasterAgencyAdmin(currentAgency?.id, agencyRole);
@@ -65,7 +65,7 @@ export default function Master() {
         </TabsList>
 
         <TabsContent value="agencies" className="space-y-6">
-          <AgenciesTable onCreated={refreshAgencies} />
+          <AgenciesTable />
         </TabsContent>
 
         <TabsContent value="leads" className="space-y-6">
