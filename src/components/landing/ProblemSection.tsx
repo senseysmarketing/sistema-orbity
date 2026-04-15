@@ -25,7 +25,7 @@ export function ProblemSection() {
   const navigate = useNavigate();
 
   return (
-    <section className="py-20 bg-slate-50/50">
+    <section className="py-20 bg-slate-50">
       <div className="container mx-auto px-4">
         <motion.div
           className="text-center mb-16"
