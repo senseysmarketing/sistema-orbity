@@ -1,4 +1,4 @@
-import { Shield, Lock, Eye, ArrowRight } from "lucide-react";
+import { Shield, Lock, Eye, ArrowRight, MessageCircle, CreditCard, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
@@ -18,7 +18,7 @@ export function IntegrationsSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto mb-16">
           {/* Meta Integration */}
           <div className="bg-card border rounded-xl p-8 space-y-4 hover:shadow-lg transition-shadow">
             <div className="flex items-center gap-4">
@@ -85,6 +85,98 @@ export function IntegrationsSection() {
               <li className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                 Escolha qual calendário sincronizar
+              </li>
+            </ul>
+          </div>
+          {/* WhatsApp Multi-Instância */}
+          <div className="bg-card border rounded-xl p-8 space-y-4 hover:shadow-lg transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-xl bg-green-500/10 flex items-center justify-center">
+                <MessageCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold">WhatsApp Multi-Instância</h3>
+                <p className="text-muted-foreground">Atendimento & Cobrança</p>
+              </div>
+            </div>
+            <ul className="space-y-2 text-muted-foreground">
+              <li className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Robô de atendimento e funil (CRM)
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Disparos automáticos da régua de cobrança
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Até dois números simultâneos por agência
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Histórico de conversas centralizado
+              </li>
+            </ul>
+          </div>
+
+          {/* Asaas */}
+          <div className="bg-card border rounded-xl p-8 space-y-4 hover:shadow-lg transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <CreditCard className="w-8 h-8 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold">Asaas</h3>
+                <p className="text-muted-foreground">Gateway de Pagamentos</p>
+              </div>
+            </div>
+            <ul className="space-y-2 text-muted-foreground">
+              <li className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Geração automática de Pix e Boletos
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Conciliação financeira em tempo real
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Links de pagamento dinâmicos
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Acionamento automático de cobranças
+              </li>
+            </ul>
+          </div>
+
+          {/* Conexa */}
+          <div className="bg-card border rounded-xl p-8 space-y-4 hover:shadow-lg transition-shadow">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                <BarChart3 className="w-8 h-8 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold">Conexa</h3>
+                <p className="text-muted-foreground">Gestão Financeira Integrada</p>
+              </div>
+            </div>
+            <ul className="space-y-2 text-muted-foreground">
+              <li className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Sincronização automática de faturas
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Rastreamento de clientes inadimplentes
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Cobrança de faturas atrasadas via WhatsApp
+              </li>
+              <li className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                Gestão centralizada de recebimentos
               </li>
             </ul>
           </div>
