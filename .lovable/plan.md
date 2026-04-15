@@ -1,23 +1,18 @@
 
 
-# Substituir Logo Texto por Imagem no Header
+# Expandir IntegrationsSection com 3 novos cards
 
-## Resumo
-Trocar o texto "Orbity" no cabeçalho por a imagem do logo (`LogoPNG01-3.png`). Como o logo é branco sobre fundo transparente, ele funciona perfeitamente no estado não-scrolled (fundo escuro). No estado scrolled (fundo claro), será necessário aplicar um filtro de inversão ou usar uma versão escura.
+## Alterações em `src/components/landing/IntegrationsSection.tsx`
 
-## Alterações
+1. **Imports**: Adicionar `MessageCircle`, `CreditCard`, `BarChart3` do lucide-react
+2. **Grid**: Alterar container para `lg:grid-cols-3 max-w-7xl`
+3. **3 novos cards** inseridos após Google Calendar, mesma estrutura Tailwind existente:
+   - **WhatsApp Multi-Instância** — MessageCircle green-600, bg-green-500/10, subtítulo "Atendimento & Cobrança"
+   - **Asaas** — CreditCard blue-600, bg-blue-500/10, subtítulo "Gateway de Pagamentos"
+   - **Conexa** — BarChart3 orange-600, bg-orange-500/10, subtítulo "Gestão Financeira Integrada"
 
-### 1. Copiar logo para o projeto
-- `lov-copy user-uploads://LogoPNG01-3.png src/assets/orbity-logo-white.png`
+Cada card com 4 bullets usando dot pattern existente. Conteúdo exatamente conforme especificado pelo utilizador.
 
-### 2. `src/components/landing/LandingHeader.tsx`
-- Importar a imagem: `import orbityLogo from "@/assets/orbity-logo-white.png"`
-- Substituir o `<button>` com texto "Orbity" (linhas 39-48) por um `<button>` contendo `<img>`:
-  - `<img src={orbityLogo} alt="Orbity" className="h-8 transition-all duration-300" />`
-  - Quando `scrolled = true` (fundo claro): aplicar `brightness(0)` via classe para tornar o logo escuro — `style={{ filter: scrolled ? 'brightness(0)' : 'none' }}`
-  - Quando `scrolled = false` (fundo escuro): logo branco original, sem filtro
-
-## Arquivos alterados
-1. `src/assets/orbity-logo-white.png` (novo)
-2. `src/components/landing/LandingHeader.tsx` (substituir texto por imagem)
+## Arquivo alterado
+- `src/components/landing/IntegrationsSection.tsx`
 
