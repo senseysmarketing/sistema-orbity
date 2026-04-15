@@ -13,8 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
 import { usePaymentGateway } from "@/hooks/usePaymentGateway";
-import { Loader2, Info, AlertTriangle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Info } from "lucide-react";
 
 // Validação de CPF
 function validateCPF(cpf: string): boolean {
