@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 
 export function DemoSection() {
   return (
-    <section className="pt-20 pb-0 px-4 bg-slate-50">
+    <section className="pt-20 pb-20 px-4 bg-slate-50">
       <div className="container mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
