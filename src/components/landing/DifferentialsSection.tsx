@@ -23,7 +23,7 @@ const pillars = [
 
 export function DifferentialsSection() {
   return (
-    <section className="py-24 bg-slate-950 text-white">
+    <section className="py-24 bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-950 text-white">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-4">
@@ -41,7 +41,7 @@ export function DifferentialsSection() {
           {pillars.map((pillar, index) => (
             <div
               key={index}
-              className="bg-slate-900/50 border border-white/5 rounded-[2rem] p-8 lg:p-10 hover:bg-slate-900 hover:border-purple-500/30 transition-all duration-300 hover:-translate-y-2 group"
+              className="bg-white/5 backdrop-blur-md border border-white/10 rounded-[2rem] p-8 lg:p-10 hover:bg-white/10 hover:border-purple-500/30 transition-all duration-300 hover:-translate-y-2 group"
             >
               <div className="bg-purple-500/10 p-4 rounded-2xl w-fit mb-6 group-hover:scale-110 transition-transform duration-300">
                 <pillar.icon className="text-purple-400 w-7 h-7" />
