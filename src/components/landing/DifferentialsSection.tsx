@@ -1,79 +1,55 @@
-import { Check, Shield, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { Rocket, ShieldCheck, TrendingUp } from "lucide-react";
 
-const differentials = [
+const pillars = [
   {
-    title: "Integrações Nativas",
-    description: "Conexão direta com Meta (Facebook/Instagram Ads) e Google Calendar sem ferramentas terceiras."
+    icon: Rocket,
+    title: "Onboarding Premium",
+    description:
+      "Esqueça os tutoriais intermináveis. A nossa equipa acompanha os seus primeiros passos para garantir que a sua agência está configurada e pronta a faturar em tempo recorde.",
   },
   {
-    title: "Interface 100% Brasileira",
-    description: "Desenvolvido pensando em agências brasileiras, com nosso idioma, moeda e cultura."
+    icon: ShieldCheck,
+    title: "Ecossistema Blindado",
+    description:
+      "Dados centralizados, processos à prova de falhas e permissões granulares. A sua equipa e os seus clientes operam num ambiente 100% focado em conversão.",
   },
   {
-    title: "Seus Dados Protegidos",
-    description: "Utilizamos seus dados apenas para o funcionamento das integrações. Nunca vendemos ou compartilhamos suas informações."
+    icon: TrendingUp,
+    title: "Evolução Contínua",
+    description:
+      "O Orbity não é estático. Lançamos atualizações semanais baseadas no que realmente funciona nas trincheiras do mercado de agências atual.",
   },
-  {
-    title: "Multi-agência",
-    description: "Gerencie várias agências em uma única conta. Ideal para holdings e franquias."
-  },
-  {
-    title: "Tudo em Um Lugar",
-    description: "CRM, Social Media, Tráfego, Financeiro, Tarefas e Agenda em uma única plataforma."
-  },
-  {
-    title: "Suporte Humanizado",
-    description: "Atendimento real e personalizado. Sem bots, sem filas intermináveis."
-  }
 ];
 
 export function DifferentialsSection() {
-  const navigate = useNavigate();
-
   return (
-    <section className="py-20 bg-gradient-to-br from-[#1c102f]/10 via-background to-violet-500/10">
+    <section className="py-24 bg-slate-950 text-white">
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Por que escolher{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#1c102f] to-violet-600">nossa plataforma</span>?
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-4">
+            Criado por donos de agência.{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-violet-500">
+              Desenvolvido para escalar.
+            </span>
           </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Diferenciais que fazem a diferença no dia a dia da sua agência
+          <p className="text-xl text-slate-400 max-w-3xl mx-auto">
+            Não somos apenas mais um software. Somos o padrão operacional das agências que dominam o mercado.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {differentials.map((differential, index) => (
-            <div 
-              key={index} 
-              className="flex gap-4 animate-fade-in"
-              style={{ animationDelay: `${index * 0.1}s` }}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          {pillars.map((pillar, index) => (
+            <div
+              key={index}
+              className="bg-slate-900/50 border border-white/5 rounded-[2rem] p-8 lg:p-10 hover:bg-slate-900 hover:border-purple-500/30 transition-all duration-300 hover:-translate-y-2 group"
             >
-              <div className="flex-shrink-0">
-                <div className="w-10 h-10 rounded-full bg-[#1c102f]/15 flex items-center justify-center border border-[#1c102f]/30">
-                  <Check className="w-5 h-5 text-[#1c102f] dark:text-violet-400" />
-                </div>
+              <div className="bg-purple-500/10 p-4 rounded-2xl w-fit mb-6 group-hover:scale-110 transition-transform duration-300">
+                <pillar.icon className="text-purple-400 w-7 h-7" />
               </div>
-              <div className="space-y-2">
-                <h3 className="font-semibold text-lg">{differential.title}</h3>
-                <p className="text-muted-foreground">{differential.description}</p>
-              </div>
+              <h3 className="text-xl font-semibold text-white mb-4">{pillar.title}</h3>
+              <p className="text-slate-400 leading-relaxed">{pillar.description}</p>
             </div>
           ))}
-        </div>
-
-        <div className="text-center mt-12">
-          <Button 
-            size="lg" 
-            className="bg-[#1c102f] hover:bg-[#1c102f]/90 text-white"
-            onClick={() => navigate("/onboarding")}
-          >
-            Faça Parte Dessa Mudança
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
         </div>
       </div>
     </section>
