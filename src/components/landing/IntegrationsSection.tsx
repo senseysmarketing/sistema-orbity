@@ -1,6 +1,7 @@
-import { Shield, Lock, Eye, ArrowRight, MessageCircle, CreditCard, BarChart3 } from "lucide-react";
+import { Shield, Lock, Eye, ArrowRight, MessageCircle, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import asaasLogo from "@/assets/asaas-logo.png";
 
 export function IntegrationsSection() {
   const navigate = useNavigate();
