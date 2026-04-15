@@ -71,7 +71,7 @@ export function BlockedAccessScreen({ onRetry, reason = 'payment' }: BlockedAcce
               
               <div className="space-y-3">
                 <Button 
-                  onClick={() => window.open('https://wa.me/5511999999999?text=Olá, o acesso da minha agência foi suspenso e preciso de ajuda.', '_blank')}
+                  onClick={() => window.open('https://wa.me/5516994481535?text=Olá, o acesso da minha agência foi suspenso e preciso de ajuda.', '_blank')}
                   className="w-full bg-green-600 hover:bg-green-700"
                 >
                   <MessageCircle className="mr-2 h-4 w-4" />
@@ -252,7 +252,7 @@ export function BlockedAccessScreen({ onRetry, reason = 'payment' }: BlockedAcce
                 )}
 
                 <Button 
-                  onClick={() => window.open('https://wa.me/5511999999999?text=Olá, preciso de ajuda com minha assinatura.', '_blank')}
+                  onClick={() => window.open('https://wa.me/5516994481535?text=Olá, preciso de ajuda com minha assinatura.', '_blank')}
                   className={`w-full ${(isFirstAccess || isTrialExpired) ? '' : 'bg-green-600 hover:bg-green-700'}`}
                   variant={(isFirstAccess || isTrialExpired) ? 'outline' : 'default'}
                 >

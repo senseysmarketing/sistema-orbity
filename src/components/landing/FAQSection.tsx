@@ -48,7 +48,7 @@ export function FAQSection({ onOpenScheduling }: FAQSectionProps) {
   const navigate = useNavigate();
 
   const openWhatsApp = () => {
-    const phoneNumber = "551631841908";
+    const phoneNumber = "5516994481535";
     const message = "Olá! Tenho uma dúvida sobre a Orbity.";
     window.open(`https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`, "_blank");
   };

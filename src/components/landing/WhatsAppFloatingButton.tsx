@@ -1,7 +1,7 @@
 import { MessageCircle } from "lucide-react";
 
 export function WhatsAppFloatingButton() {
-  const phoneNumber = "551631841908"; // (16) 3184-1908
+  const phoneNumber = "5516994481535"; // (16) 99448-1535
   const message = "Olá! Gostaria de saber mais sobre a Orbity.";
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`;
 
