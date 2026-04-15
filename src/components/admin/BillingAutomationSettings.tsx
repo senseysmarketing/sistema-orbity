@@ -9,12 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Bell, Clock, AlertTriangle, Save, Loader2, Info, Mail, MessageCircle, CheckCircle2, AlertCircle, Percent } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Bell, Clock, AlertTriangle, Save, Loader2, Info, Mail, MessageCircle, CheckCircle2, AlertCircle, Percent, History, Inbox } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePaymentGateway, PaymentSettings } from "@/hooks/usePaymentGateway";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
+import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface BillingAutomationSettingsProps {
   open: boolean;
