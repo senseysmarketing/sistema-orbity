@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, ArrowRight, LogIn } from "lucide-react";
+import orbityLogo from "@/assets/orbity-logo-white.png";
 
 const navLinks = [
   { label: "Funcionalidades", href: "#features" },
@@ -36,15 +37,13 @@ export function LandingHeader() {
     >
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         {/* Logo */}
-        <button
-          onClick={scrollToTop}
-          className={`text-xl font-bold transition-colors duration-300 ${
-            scrolled
-              ? "text-transparent bg-clip-text bg-gradient-to-r from-[#1c102f] to-violet-600"
-              : "text-white"
-          }`}
-        >
-          Orbity
+        <button onClick={scrollToTop}>
+          <img
+            src={orbityLogo}
+            alt="Orbity"
+            className="h-8 transition-all duration-300"
+            style={{ filter: scrolled ? 'brightness(0)' : 'none' }}
+          />
         </button>
 
         {/* Desktop Nav */}
