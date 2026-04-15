@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge";
+import { Monitor } from "lucide-react";
 
 export function DemoSection() {
   return (
@@ -6,9 +6,10 @@ export function DemoSection() {
       <div className="container mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          <Badge className="mb-4 bg-slate-200/60 text-slate-600 border-slate-300/50 hover:bg-slate-200">
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/10 text-purple-600 border border-purple-200/50 text-sm font-medium mb-6">
+            <Monitor className="w-4 h-4" />
             Conheça o Sistema
-          </Badge>
+          </span>
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-slate-900 mb-4">
             Veja o Sistema{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#1c102f] to-purple-600">
