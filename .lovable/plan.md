@@ -1,24 +1,47 @@
 
 
-# Atualizar Número de WhatsApp da Orbity
+# Webhook Condicional — Disparo apenas para Trial
 
-## Contexto
-O número atual `(16) 3184-1908` (551631841908) precisa ser substituído por `(16) 99448-1535` (5516994481535) em todos os pontos de contato.
+## Resumo
+Duas alterações: (1) passar `flow` no body do frontend, (2) condicionar o webhook na Edge Function.
 
-## Alterações
+## 1. Frontend — `src/hooks/useOnboarding.tsx`
 
-### Arquivos com o número antigo da Orbity (landing page)
+A variável `flow` já está no escopo do `OnboardingProvider` (recebida como prop). Basta adicioná-la ao body na linha 230:
 
-1. **`src/components/landing/WhatsAppFloatingButton.tsx`** (linha 4)
-   - Trocar `"551631841908"` por `"5516994481535"` e atualizar comentário
+```typescript
+body: {
+  companyData: onboardingData.companyData,
+  planSlug: onboardingData.planSlug,
+  adminUser: onboardingData.adminUser,
+  flow: flow || 'trial'
+}
+```
 
-2. **`src/components/landing/FAQSection.tsx`** (linha 51)
-   - Trocar `"551631841908"` por `"5516994481535"`
+Não é necessário ler da URL — `flow` já é uma variável do closure.
 
-### Arquivo com número placeholder genérico
+## 2. Edge Function — `supabase/functions/agency-onboarding/index.ts`
 
-3. **`src/components/payment/BlockedAccessScreen.tsx`** (linhas 74 e 255)
-   - Trocar `5511999999999` por `5516994481535` nos dois botões de suporte WhatsApp
+**Interface** (linha 14-27): Adicionar `flow?: string;` à `OnboardingRequest`.
 
-Todas as demais ocorrências de `wa.me` são dinâmicas (CRM leads, pipeline) e não precisam de alteração.
+**Extração** (linha 43): Incluir `flow` no destructuring.
+
+**Log inicial** (linha 45-49): Adicionar `flow` ao log.
+
+**Step 8** (linhas 227-274): Envolver em condicional:
+```typescript
+if (flow === 'trial' || !flow) {
+  // bloco webhook existente
+  // + adicionar flow: flow || 'trial' ao webhookPayload
+} else {
+  logStep("Webhook ignorado - Fluxo de assinatura direta", { flow });
+}
+```
+
+**Deploy** da edge function após alteração.
+
+## Arquivos alterados
+1. `src/hooks/useOnboarding.tsx` — adiciona `flow` ao body
+2. `supabase/functions/agency-onboarding/index.ts` — condicional + payload atualizado
+3. Deploy da edge function
 
