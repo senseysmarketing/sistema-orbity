@@ -14,7 +14,7 @@ import { isMasterAgencyAdmin } from '@/lib/masterAccess';
 
 export default function Master() {
   const navigate = useNavigate();
-  const { loading, refreshAgencies } = useMaster();
+  const { loading } = useMaster();
   const { currentAgency, agencyRole, loading: agencyLoading } = useAgency();
 
   const hasAccess = isMasterAgencyAdmin(currentAgency?.id, agencyRole);
