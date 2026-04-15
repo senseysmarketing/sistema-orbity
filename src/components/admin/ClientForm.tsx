@@ -13,8 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAgency } from "@/hooks/useAgency";
 import { usePaymentGateway } from "@/hooks/usePaymentGateway";
-import { Loader2, Info, AlertTriangle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Info } from "lucide-react";
 
 // Validação de CPF
 function validateCPF(cpf: string): boolean {
@@ -117,11 +116,9 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
   const [formData, setFormData] = useState({ ...initialFormData });
 
   const isEditing = !!client;
-  const missingGatewayFields = isEditing && (
-    !formData.document.replace(/\D/g, '') || !formData.zip_code.replace(/\D/g, '')
-  );
 
   useEffect(() => {
+    if (!open) return;
     if (client) {
       setFormData({
         name: client.name || '',
@@ -147,7 +144,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
         default_billing_type: client.default_billing_type || 'manual',
         billing_automation_enabled: client.billing_automation_enabled ?? true,
       });
-      // Set lastFetchedCep to avoid re-fetching existing CEP on blur
       const existingCep = (client.zip_code || '').replace(/\D/g, '');
       if (existingCep.length === 8) {
         setLastFetchedCep(existingCep);
@@ -156,7 +152,8 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
       setFormData({ ...initialFormData });
       setLastFetchedCep('');
     }
-  }, [client]);
+    setDocumentError(null);
+  }, [client, open]);
 
   const fetchAddressByCep = async (cep: string) => {
     const cleanCep = cep.replace(/\D/g, '');
@@ -242,10 +239,35 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
     e.preventDefault();
 
     const docDigits = formData.document.replace(/\D/g, '');
+    const contactDigits = formData.contact.replace(/\D/g, '');
+    const cepDigits = formData.zip_code.replace(/\D/g, '');
+    const missingFields: string[] = [];
+
+    if (!docDigits || (docDigits.length !== 11 && docDigits.length !== 14)) {
+      missingFields.push("CPF/CNPJ válido");
+    }
     if (docDigits.length === 11 && !validateCPF(docDigits)) {
       toast({
         title: "CPF inválido",
         description: "Verifique o número do documento antes de salvar.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!formData.email.trim()) {
+      missingFields.push("E-mail de Faturamento");
+    }
+    if (!contactDigits || contactDigits.length < 10) {
+      missingFields.push("Contato (WhatsApp)");
+    }
+    if (!cepDigits || cepDigits.length !== 8) {
+      missingFields.push("CEP");
+    }
+
+    if (missingFields.length > 0) {
+      toast({
+        title: "Campos obrigatórios",
+        description: `Preencha corretamente: ${missingFields.join(", ")}`,
         variant: "destructive",
       });
       return;
@@ -346,14 +368,6 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
           <DialogDescription>
             {client ? 'Edite as informações do cliente.' : 'Adicione um novo cliente ao sistema.'}
           </DialogDescription>
-          {isEditing && missingGatewayFields && (
-            <Alert variant="destructive" className="mt-2 border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400 [&>svg]:text-amber-500">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription className="text-xs">
-                Preencha os campos destacados (CPF/CNPJ e CEP) para garantir compatibilidade com os gateways de pagamento.
-              </AlertDescription>
-            </Alert>
-          )}
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
           <ScrollArea className="flex-1 overflow-auto px-1">
@@ -364,7 +378,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
 
               {/* CPF/CNPJ — primeiro campo */}
               <div className="grid gap-2">
-                <Label htmlFor="document">CPF/CNPJ</Label>
+                <Label htmlFor="document">CPF/CNPJ *</Label>
                 <div className="relative">
                   <Input
                     id="document"
@@ -409,23 +423,25 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
               {/* E-mail / Contato */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="email">E-mail de Faturamento</Label>
+                  <Label htmlFor="email">E-mail de Faturamento *</Label>
                   <Input
                     id="email"
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="cliente@empresa.com"
+                    required
                   />
                   <p className="text-xs text-muted-foreground">Receberá faturas e notas fiscais automáticas.</p>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="contact">Contato (WhatsApp)</Label>
+                  <Label htmlFor="contact">Contato (WhatsApp) *</Label>
                   <Input
                     id="contact"
                     value={formData.contact}
                     onChange={(e) => setFormData({ ...formData, contact: formatPhone(e.target.value) })}
                     placeholder="(00) 00000-0000"
+                    required
                   />
                   <p className="text-xs text-muted-foreground">Receberá links de pagamento e avisos.</p>
                 </div>
@@ -437,7 +453,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="zip_code">CEP</Label>
+                  <Label htmlFor="zip_code">CEP *</Label>
                   <div className="relative">
                     <Input
                       id="zip_code"
