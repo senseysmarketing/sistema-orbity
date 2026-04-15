@@ -1,80 +1,39 @@
-
-import { Eye, ArrowRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { DemoCarousel } from "./DemoCarousel";
 
-export function DemoSection({ onOpenApplication }: { onOpenApplication?: () => void }) {
-
+export function DemoSection() {
   return (
-    <section className="py-20 px-4 bg-gradient-to-b from-background via-[#1c102f]/5 to-background">
+    <section className="pt-20 pb-0 px-4 bg-slate-50">
       <div className="container mx-auto">
         {/* Header */}
-        <div className="text-center mb-10">
-          <Badge className="mb-4 bg-[#1c102f]/10 text-[#1c102f] border-[#1c102f]/20 hover:bg-[#1c102f]/20">
-            <Sparkles className="h-3 w-3 mr-1" />
+        <div className="text-center mb-12">
+          <Badge className="mb-4 bg-slate-200/60 text-slate-600 border-slate-300/50 hover:bg-slate-200">
             Conheça o Sistema
           </Badge>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-slate-900 mb-4">
             Veja o Sistema{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#1c102f] to-purple-600">
               por Dentro
             </span>
           </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Navegue pelas principais funcionalidades e descubra como a Orbity 
+          <p className="text-slate-600 max-w-2xl mx-auto text-lg">
+            Navegue pelas principais funcionalidades e descubra como a Orbity
             pode transformar a gestão da sua agência.
           </p>
         </div>
 
-        {/* Demo Container */}
-        <div className="relative max-w-4xl mx-auto">
-          {/* Badge de Demo */}
-          <div className="absolute -top-3 right-4 z-20">
-            <Badge className="bg-[#1c102f] text-white px-3 py-1 shadow-lg">
-              <Eye className="h-3 w-3 mr-1" />
-              Preview do Sistema
-            </Badge>
+        {/* Video Showcase */}
+        <div className="relative group w-full max-w-5xl mx-auto">
+          {/* Glow */}
+          <div className="absolute -inset-1 bg-gradient-to-r from-purple-600/15 to-indigo-600/15 rounded-[2.5rem] blur-2xl -z-10 opacity-40 group-hover:opacity-70 transition-opacity duration-500" />
+
+          {/* Container */}
+          <div className="w-full aspect-video rounded-[2rem] overflow-hidden border border-slate-200/80 shadow-[0_20px_50px_rgba(0,0,0,0.1),0_10px_15px_rgba(0,0,0,0.05)] transition-transform duration-700 ease-out hover:scale-[1.01] bg-slate-100">
+            <img
+              src="/placeholder.svg"
+              alt="Demonstração Orbity"
+              className="w-full h-full object-cover"
+            />
           </div>
-
-          {/* Browser Chrome */}
-          <div className="bg-gray-100 dark:bg-gray-800 rounded-t-xl p-3 flex items-center gap-3 border border-b-0 border-gray-200 dark:border-gray-700">
-            <div className="flex gap-1.5">
-              <div className="w-3 h-3 rounded-full bg-red-400" />
-              <div className="w-3 h-3 rounded-full bg-yellow-400" />
-              <div className="w-3 h-3 rounded-full bg-green-400" />
-            </div>
-            <div className="flex-1 bg-white dark:bg-gray-700 rounded-lg px-4 py-1.5 text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
-              <div className="h-4 w-4 rounded bg-[#1c102f]/20 flex items-center justify-center">
-                <span className="text-[8px] font-bold text-[#1c102f]">O</span>
-              </div>
-              https://orbityapp.com.br/
-            </div>
-          </div>
-
-          {/* Carousel Content */}
-          <div className="bg-background rounded-b-xl border border-t-0 border-gray-200 dark:border-gray-700 overflow-hidden shadow-2xl p-6 md:p-8">
-            <DemoCarousel />
-          </div>
-
-          {/* Decorative elements */}
-          <div className="absolute -bottom-4 -left-4 w-24 h-24 bg-[#1c102f]/10 rounded-full blur-2xl" />
-          <div className="absolute -top-4 -right-4 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl" />
-        </div>
-
-        {/* CTA */}
-        <div className="text-center mt-10">
-          <p className="text-sm text-muted-foreground mb-4">
-            Gostou do que viu? Comece agora mesmo!
-          </p>
-          <Button 
-            size="lg" 
-            className="bg-[#1c102f] hover:bg-[#1c102f]/90 text-white gap-2"
-            onClick={onOpenApplication}
-          >
-            Agende uma Demonstração
-            <ArrowRight className="h-4 w-4" />
-          </Button>
         </div>
       </div>
     </section>
