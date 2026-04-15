@@ -7,7 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { DollarSign, Eye, EyeOff, Save, Loader2, Copy, Info, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, Save, Loader2, Copy, Info, CheckCircle2 } from "lucide-react";
+import asaasLogo from "@/assets/asaas-logo.png";
 import { usePaymentGateway } from "@/hooks/usePaymentGateway";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
@@ -88,8 +89,8 @@ export function AsaasIntegration() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900">
-              <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden">
+              <img src={asaasLogo} alt="Asaas" className="h-10 w-10 object-cover rounded-lg" />
             </div>
             <div>
               <CardTitle className="text-base">Asaas</CardTitle>
