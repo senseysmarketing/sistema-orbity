@@ -149,7 +149,8 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
       .from("employees")
       .select("id, name, role")
       .eq("agency_id", agencyId!)
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("eligible_for_ppr", true);
     setEmployees((data || []) as unknown as Employee[]);
   };
 
@@ -179,28 +180,28 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
       const [paymentsRes, expensesRes, salariesRes] = await Promise.all([
         supabase
           .from("client_payments")
-          .select("amount")
+          .select("amount, amount_paid")
           .eq("agency_id", agencyId)
           .eq("status", "paid")
-          .gte("due_date", monthStart)
-          .lte("due_date", monthEnd),
+          .gte("paid_date", monthStart)
+          .lte("paid_date", monthEnd),
         supabase
           .from("expenses")
           .select("amount")
           .eq("agency_id", agencyId)
           .eq("status", "paid")
-          .gte("due_date", monthStart)
-          .lte("due_date", monthEnd),
+          .gte("paid_date", monthStart)
+          .lte("paid_date", monthEnd),
         supabase
           .from("salaries")
           .select("amount")
           .eq("agency_id", agencyId)
           .eq("status", "paid")
-          .gte("due_date", monthStart)
-          .lte("due_date", monthEnd),
+          .gte("paid_date", monthStart)
+          .lte("paid_date", monthEnd),
       ]);
 
-      const revenue = (paymentsRes.data || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+      const revenue = (paymentsRes.data || []).reduce((sum, p: any) => sum + (p.amount_paid || p.amount || 0), 0);
       const expensesTotal = (expensesRes.data || []).reduce((sum, e) => sum + (e.amount || 0), 0);
       const salariesTotal = (salariesRes.data || []).reduce((sum, s) => sum + (s.amount || 0), 0);
       const netProfit = revenue - expensesTotal - salariesTotal;
