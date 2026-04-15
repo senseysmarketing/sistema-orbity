@@ -155,7 +155,7 @@ export function IntegrationsSection() {
           {/* Conexa */}
           <div className="bg-card border rounded-xl p-8 space-y-4 hover:shadow-lg transition-shadow">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center">
+              <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center bg-amber-100">
                 <img src={conexaLogo} alt="Conexa" className="w-14 h-14 object-contain rounded-xl" />
               </div>
               <div>

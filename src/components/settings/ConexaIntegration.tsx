@@ -119,7 +119,7 @@ export function ConexaIntegration() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden bg-amber-100">
               <img src={conexaLogo} alt="Conexa" className="h-10 w-10 object-contain rounded-lg" />
             </div>
             <div>
