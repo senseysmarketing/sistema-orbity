@@ -60,7 +60,7 @@ export function HeroSection({ onOpenScheduling }: HeroSectionProps) {
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-300 to-purple-200">
                 Escalar a sua Agência
               </span>{" "}
-              de Marketing.
+              de Marketing
             </motion.h1>
 
             <motion.p
