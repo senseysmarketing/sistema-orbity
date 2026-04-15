@@ -123,8 +123,8 @@ export function IntegrationsSection() {
           {/* Asaas */}
           <div className="bg-card border rounded-xl p-8 space-y-4 hover:shadow-lg transition-shadow">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <CreditCard className="w-8 h-8 text-blue-600" />
+              <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center">
+                <img src={asaasLogo} alt="Asaas" className="w-14 h-14 object-cover rounded-xl" />
               </div>
               <div>
                 <h3 className="text-xl font-bold">Asaas</h3>
