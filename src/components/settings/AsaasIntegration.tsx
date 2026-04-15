@@ -113,23 +113,7 @@ export function AsaasIntegration() {
           </div>
         </div>
 
-        {/* Sandbox Switch */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="asaas-sandbox" className="text-sm cursor-pointer">Ambiente</Label>
-            <p className="text-xs text-muted-foreground">
-              {sandbox ? "Sandbox (testes)" : "Produção (cobranças reais)"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">{sandbox ? "Sandbox" : "Produção"}</span>
-            <Switch
-              id="asaas-sandbox"
-              checked={!sandbox}
-              onCheckedChange={(v) => setSandbox(!v)}
-            />
-          </div>
-        </div>
+
 
         <Button onClick={handleSave} disabled={isSaving} className="w-full">
           {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
