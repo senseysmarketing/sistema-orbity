@@ -10,7 +10,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import AgendaImg from "@/assets/landing/Agenda.jpg";
+
 
 const features = [
   {
@@ -54,7 +54,7 @@ const features = [
     title: "Agenda Inteligente",
     description: "Integração bidirecional com o Google Calendar. Centralize as suas reuniões, follow-ups e eventos, tudo em um único ecrã.",
     colSpan: "",
-    image: AgendaImg,
+    
   },
 ];
 
@@ -97,15 +97,6 @@ export function FeaturesGrid({ onOpenApplication }: { onOpenApplication?: () => 
                 <h3 className="text-xl font-semibold text-white mb-2">{feature.title}</h3>
                 <p className="text-sm text-white/60 leading-relaxed">{feature.description}</p>
               </div>
-              {feature.image && (
-                <div className="mt-4 overflow-hidden rounded-2xl">
-                  <img
-                    src={feature.image}
-                    alt={feature.title}
-                    className="w-full h-auto rounded-2xl group-hover:scale-105 transition-transform duration-700"
-                  />
-                </div>
-              )}
             </motion.div>
           ))}
         </div>
