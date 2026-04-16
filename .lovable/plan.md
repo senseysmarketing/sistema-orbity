@@ -1,21 +1,18 @@
 
+# Ajustes UX no PricingSection: Toggle Mensal + Animação de Preço
 
-# Adicionar SVG constellation pattern ao fundo das secções
+## Alterações em `src/components/landing/PricingSection.tsx`
 
-O HeroSection já usa um padrão SVG "constellation" (pontos + linhas) com `opacity-[0.05]` para dar textura ao gradiente roxo. As secções DifferentialsSection e PricingSection (card spotlight) usam o mesmo gradiente mas sem este padrão — ficam "lisas".
+### 1. Estado inicial → Mensal (linha 22)
+- `useState(true)` → `useState(false)`
 
-## Alterações
+### 2. Animação no bloco de preço (linhas ~119-133)
+- Envolver o div do preço + subtítulo com:
+  - `key={isAnnual ? 'annual' : 'monthly'}` para forçar remontagem
+  - Classes: `animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-500 ease-out`
 
-### 1. `src/components/landing/DifferentialsSection.tsx`
-- Adicionar `relative overflow-hidden` à `<section>`
-- Inserir o mesmo SVG constellation pattern do Hero (com um `id` diferente no pattern, ex: `constellation-diff`, para evitar conflito de IDs no DOM)
-- Opacidade: `opacity-[0.05]`
-- Adicionar `relative z-10` ao container interno para o conteúdo ficar acima do SVG
+### 3. Guardrail: Badge "Poupa R$ 1.200/ano"
+- O badge condicional `{isAnnual && (<span>...Poupa R$ 1.200/ano...</span>)}` permanece intacto fora do bloco animado, junto ao toggle — sem qualquer alteração
 
-### 2. `src/components/landing/PricingSection.tsx`
-- Dentro do Spotlight Card (já tem `relative overflow-hidden`), adicionar o SVG constellation com `id` único (ex: `constellation-pricing`)
-- Opacidade: `opacity-[0.05]`
-- O conteúdo já está naturalmente acima por stacking order
-
-Ambos reutilizam o padrão exato do HeroSection — pontos brancos com linhas conectoras — apenas com IDs únicos.
-
+### Ficheiro alterado
+- `src/components/landing/PricingSection.tsx` — 2 edições cirúrgicas (linha 22 + bloco de preço)
