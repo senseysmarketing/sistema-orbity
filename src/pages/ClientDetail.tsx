@@ -74,20 +74,20 @@ export default function ClientDetail() {
     queryFn: async () => {
       if (!id || !currentAgency?.id) return null;
 
-      const [tasksResult, meetingsResult, credentialsResult, creativeResult] = await Promise.all([
+        const [tasksResult, meetingsResult, credentialsResult, npsResult] = await Promise.all([
         supabase
           .from("task_clients")
           .select("tasks!inner(id, title, status, priority, due_date)")
           .eq("client_id", id)
           .eq("tasks.agency_id", currentAgency.id)
-          .not("tasks.status", "in", '("done","cancelled")')
+          .not("tasks.status", "in", '("done","cancelled","completed")')
           .limit(8),
         supabase
           .from("meeting_clients")
           .select("meetings!inner(id, title, start_time, status, outcome, meeting_type)")
           .eq("client_id", id)
           .order("meetings(start_time)", { ascending: false })
-          .limit(5),
+          .limit(10),
         supabase
           .from("client_credentials")
           .select("id, platform, username, password, url")
@@ -95,14 +95,11 @@ export default function ClientDetail() {
           .eq("agency_id", currentAgency.id)
           .limit(5),
         supabase
-          .from("task_clients")
-          .select("tasks!inner(id, title, attachments, task_type, updated_at)")
-          .eq("client_id", id)
-          .eq("tasks.agency_id", currentAgency.id)
-          .eq("tasks.task_type", "redes_sociais")
-          .not("tasks.attachments", "is", null)
-          .order("tasks(updated_at)", { ascending: false })
-          .limit(1),
+          .from("nps_responses")
+          .select("score")
+          .eq("agency_id", currentAgency.id)
+          .order("response_date", { ascending: false })
+          .limit(50),
       ]);
 
       const tasks = (tasksResult.data || []).map((r: any) => r.tasks).filter(Boolean);
@@ -114,24 +111,12 @@ export default function ClientDetail() {
 
       const credentials = credentialsResult.data || [];
 
-      let latestCreative: { title: string; imageUrl: string } | null = null;
-      if (creativeResult.data && creativeResult.data.length > 0) {
-        const task = (creativeResult.data[0] as any).tasks;
-        if (task?.attachments) {
-          const attachments = Array.isArray(task.attachments) ? task.attachments : [];
-          const firstImage = attachments.find(
-            (a: any) => typeof a === "string" || (a?.url && /\.(jpg|jpeg|png|webp|gif)/i.test(a.url))
-          );
-          if (firstImage) {
-            latestCreative = {
-              title: task.title || "Criativo",
-              imageUrl: typeof firstImage === "string" ? firstImage : firstImage.url,
-            };
-          }
-        }
-      }
+      // Match NPS by client name (nps_responses has client_name, not client_id)
+      let npsScore: number | undefined = undefined;
+      // We'll resolve this after client is available - store all NPS for now
+      const allNps = npsResult.data || [];
 
-      return { tasks, meetings, credentials, latestCreative };
+      return { tasks, meetings, credentials, allNps };
     },
     enabled: !!id && !!currentAgency?.id,
     staleTime: 3 * 60 * 1000,

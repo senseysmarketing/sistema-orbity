@@ -230,8 +230,9 @@ export default function Clients() {
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
                     <ClientHealthScore
-                      startDate={client.start_date}
-                      pendingTaskCount={taskCountsMap?.[client.id] || 0}
+                      client={client}
+                      tasks={[]}
+                      meetings={[]}
                     />
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
