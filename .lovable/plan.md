@@ -1,146 +1,74 @@
 
 
-# Módulo NPS Completo — Implementação com 4 Guardrails
+# NPS Personalização Total + Tabs + 3 Guardrails de Segurança
 
-## Migrações de Banco de Dados
+## 1. Migration: Adicionar colunas de personalização + RLS restritiva
 
-### Migration 1: Tabelas `nps_tokens` e `nps_settings` + alterações em `nps_responses`
+Adicionar 8 colunas à `nps_settings` e criar policy anon restritiva:
 
 ```sql
--- 1. Adicionar client_id à nps_responses (nullable para retrocompatibilidade)
-ALTER TABLE public.nps_responses 
-  ADD COLUMN IF NOT EXISTS client_id uuid REFERENCES public.clients(id) ON DELETE SET NULL;
--- period_id já existe mas é NOT NULL e referencia bonus_periods.
--- Adicionar coluna period text para ciclo NPS (ex: 'Q1-2026')
-ALTER TABLE public.nps_responses 
-  ADD COLUMN IF NOT EXISTS period text;
--- Tornar period_id nullable para respostas via Magic Link
-ALTER TABLE public.nps_responses ALTER COLUMN period_id DROP NOT NULL;
+ALTER TABLE public.nps_settings
+  ADD COLUMN IF NOT EXISTS whatsapp_enabled boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS whatsapp_template text DEFAULT 'Olá {{client_name}}! 👋
 
--- 2. Tabela nps_tokens com coluna period
-CREATE TABLE public.nps_tokens (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  agency_id uuid NOT NULL REFERENCES public.agencies(id) ON DELETE CASCADE,
-  client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
-  period text NOT NULL,
-  expires_at timestamptz NOT NULL DEFAULT (now() + interval '7 days'),
-  is_used boolean NOT NULL DEFAULT false,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE public.nps_tokens ENABLE ROW LEVEL SECURITY;
+Gostaríamos de saber como está a nossa parceria. Avalie-nos em 30 segundos:
 
--- RLS: Members view
-CREATE POLICY "Members view tokens" ON public.nps_tokens 
-  FOR SELECT USING (public.user_belongs_to_agency(agency_id));
--- RLS: Admins insert
-CREATE POLICY "Admins insert tokens" ON public.nps_tokens 
-  FOR INSERT WITH CHECK (public.is_agency_admin(agency_id));
--- RLS: Public read token by ID (para formulário público)
-CREATE POLICY "Public read any token" ON public.nps_tokens 
-  FOR SELECT TO anon USING (true);
--- GUARDRAIL 1: Public UPDATE para invalidar token após uso
-CREATE POLICY "Public update token" ON public.nps_tokens 
-  FOR UPDATE USING (is_used = false) WITH CHECK (is_used = true);
+🔗 {{nps_link}}
 
--- 3. Tabela nps_settings
-CREATE TABLE public.nps_settings (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  agency_id uuid NOT NULL REFERENCES public.agencies(id) ON DELETE CASCADE UNIQUE,
-  frequency text NOT NULL DEFAULT 'quarterly',
-  auto_send boolean NOT NULL DEFAULT false,
-  whatsapp_instance_id uuid REFERENCES public.whatsapp_accounts(id),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE public.nps_settings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Members view nps settings" ON public.nps_settings 
-  FOR SELECT USING (public.user_belongs_to_agency(agency_id));
-CREATE POLICY "Admins manage nps settings" ON public.nps_settings 
-  FOR ALL USING (public.is_agency_admin(agency_id));
+Sua opinião é muito importante! 💙',
+  ADD COLUMN IF NOT EXISTS survey_title text DEFAULT 'Olá, {{client_name}}!',
+  ADD COLUMN IF NOT EXISTS survey_message text DEFAULT 'Como está nossa parceria?',
+  ADD COLUMN IF NOT EXISTS main_question text DEFAULT 'De 0 a 10, o quanto você recomendaria nossos serviços?',
+  ADD COLUMN IF NOT EXISTS feedback_label_promoter text DEFAULT 'Ficamos muito felizes! O que mais gostou?',
+  ADD COLUMN IF NOT EXISTS feedback_label_neutral text DEFAULT 'Obrigado! O que faltou para a nota ser 10?',
+  ADD COLUMN IF NOT EXISTS feedback_label_detractor text DEFAULT 'Sentimos muito por isso. O que podemos fazer IMEDIATAMENTE para resolver o seu problema?';
 
--- 4. Policy para INSERT público em nps_responses (via token válido)
-CREATE POLICY "Public insert nps via token" ON public.nps_responses 
-  FOR INSERT TO anon WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.nps_tokens t 
-      WHERE t.client_id = nps_responses.client_id 
-      AND t.is_used = false 
-      AND t.expires_at > now()
-    )
-  );
--- Policy para SELECT público limitado (apenas por client_id do token)
-CREATE POLICY "Public read own nps" ON public.nps_responses 
-  FOR SELECT TO anon USING (
-    EXISTS (
-      SELECT 1 FROM public.nps_tokens t 
-      WHERE t.client_id = nps_responses.client_id
-    )
-  );
+-- GUARDRAIL 1: Política RESTRITIVA — só lê settings se existir token não-usado da mesma agência
+CREATE POLICY "Public read nps settings via token" ON public.nps_settings
+  FOR SELECT TO anon 
+  USING (EXISTS (SELECT 1 FROM public.nps_tokens t WHERE t.agency_id = nps_settings.agency_id AND t.is_used = false));
 ```
 
----
+## 2. NPSPage.tsx — Refactoring para Tabs
 
-## Ficheiros Criados
+Substituir o layout actual por 4 abas usando `Tabs`/`TabsList`/`TabsTrigger`/`TabsContent`:
 
-### `src/pages/NPSPage.tsx` — Dashboard de Gestão NPS
+- **Aba "Dashboard"** (default): Métricas + lista de clientes (código existente)
+- **Aba "WhatsApp"**:
+  - Toggle `whatsapp_enabled` ("Ativar Disparos")
+  - Seletor de instância (mostrando nome real + telefone)
+  - Textarea para `whatsapp_template` com nota sobre `{{client_name}}` e `{{nps_link}}`
+  - Botão "Enviar Pesquisa Agora": **disabled** se `whatsapp_enabled === false` OU sem instância
+  - `handleSendSurvey` verifica `settings?.whatsapp_enabled` antes de executar
+  - Mensagem construída substituindo `{{client_name}}` e `{{nps_link}}` no template
+- **Aba "Personalizar"**:
+  - Inputs para `survey_title`, `survey_message`, `main_question`
+  - 3 inputs coloridos para feedback (promotor/neutro/detrator)
+  - Botão "Salvar Personalização" → UPDATE em `nps_settings` + `toast.success("Configurações atualizadas com sucesso!")`
+- **Aba "Configurações"**: Frequência + toggle auto_send
 
-- **Dashboard**: NPS Geral (% promotores - % detratores), cards de distribuição (Promotores/Neutros/Detratores), gráfico de barras coloridas
-- **Lista de clientes**: Status da última pesquisa por cliente (Respondeu / Pendente / Não enviado)
-- **Configurações de Ciclo**: Seletor de frequência (Trimestral padrão, Mensal, Semestral), salva em `nps_settings`
-- **WhatsApp Config**: Toggle "Envio Automático", seletor de instância mostrando `instance_name` e `phone_number` reais (GUARDRAIL 4)
-- **Botão "Enviar Pesquisa Agora"**: Gera tokens com `period` correcto (ex: Q2-2026) e envia via `supabase.functions.invoke('whatsapp-send')`
+O `saveSettings` mutation será expandido para aceitar todos os novos campos.
 
-### `src/pages/PublicNPSSurvey.tsx` — Formulário Público
+## 3. PublicNPSSurvey.tsx — Textos Dinâmicos
 
-- Rota pública `/nps-survey?t=UUID`
-- Valida token (exists, not used, not expired), faz join com `clients(name)` e `agencies(name)`
-- Régua 0-10 com botões coloridos (0-6 vermelho, 7-8 amarelo, 9-10 verde)
-- **GUARDRAIL 2 — Feedback dinâmico**:
-  - Nota null → campo oculto
-  - ≥ 9: "Ficamos muito felizes! O que mais gostou?"
-  - 7-8: "Obrigado! O que faltou para a nota ser 10?"
-  - ≤ 6: Borda/fundo avermelhado + "Sentimos muito por isso. O que podemos fazer IMEDIATAMENTE para resolver o seu problema?"
-- Guia rápido visual explicando cada faixa
-- **GUARDRAIL 3 — Submissão inteligente**:
-  - INSERT em `nps_responses` com `client_id`, `client_name`, `score`, `category`, `comment`, `period` (do token), `agency_id`, `period_id` = null
-  - UPDATE `nps_tokens` SET `is_used = true`
-  - Se score ≤ 6: INSERT em `notifications` para todos os admins da agência: "🚨 Alerta de Churn: Cliente [Nome] deu nota [Nota] no NPS."
-  - Tela de agradecimento
+- Após validar o token, buscar `nps_settings` da agência:
+  ```typescript
+  const { data: agencySettings } = await anonClient
+    .from("nps_settings")
+    .select("survey_title, survey_message, main_question, feedback_label_promoter, feedback_label_neutral, feedback_label_detractor")
+    .eq("agency_id", token.agency_id)
+    .maybeSingle();
+  ```
+- Guardar num state `surveyConfig` com fallbacks para os defaults
+- **GUARDRAIL 2**: Aplicar `.replace(/\{\{client_name\}\}/g, clientName)` nos campos `survey_title` e `survey_message`
+- Substituir `getFeedbackConfig()` hardcoded para usar os labels da config
+- Todos os textos estáticos do formulário passam a ser dinâmicos
 
----
+## Ficheiros alterados
 
-## Ficheiros Alterados
-
-### `src/components/layout/AppSidebar.tsx`
-- Importar `MessageSquareHeart` do lucide-react
-- Adicionar item "NPS" na categoria "Administração" **antes** de "Metas & Bônus":
-```typescript
-{ title: "NPS", url: "/dashboard/nps", icon: MessageSquareHeart }
-```
-
-### `src/App.tsx`
-- Importar `NPSPage` e `PublicNPSSurvey`
-- Rota protegida: `<Route path="nps" element={<NPSPage />} />`
-- Rota pública: `<Route path="/nps-survey" element={<PublicNPSSurvey />} />`
-
-### `src/components/clients/ClientHealthScore.tsx`
-- Alterar penalidade NPS Detrator de -30 para **-50 pontos**:
-```typescript
-else if (npsScore <= 6) score -= 50;
-```
-
-### `src/pages/ClientDetail.tsx`
-- Na query NPS, buscar também por `client_id` (não apenas `client_name`)
-- Priorizar match por `client_id`, fallback por `client_name`
-
----
-
-## Resumo dos 4 Guardrails
-
-| # | Guardrail | Implementação |
-|---|-----------|---------------|
-| 1 | RLS UPDATE para tokens | Policy `FOR UPDATE USING (is_used = false) WITH CHECK (is_used = true)` |
-| 2 | Feedback dinâmico | Campo de texto reage à nota com cor e texto contextual |
-| 3 | Period no submit + alerta churn | Grava `period` do token + INSERT em `notifications` se ≤ 6 |
-| 4 | Nome real da instância WhatsApp | Exibe `instance_name` e `phone_number` de `whatsapp_accounts` |
+| Ficheiro | Acção |
+|----------|-------|
+| Migration SQL | ADD COLUMN x8 + RLS policy restritiva |
+| `src/pages/NPSPage.tsx` | Refactor completo → 4 Tabs + lógica de save + trava WhatsApp |
+| `src/pages/PublicNPSSurvey.tsx` | Buscar `nps_settings`, substituir hardcoded, `{{client_name}}` replace |
 
