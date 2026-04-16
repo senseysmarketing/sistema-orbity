@@ -1,24 +1,75 @@
 
 
-# Reorganizar header da listagem de Clientes
+# Health Score Dinâmico — Algoritmo Real
 
-## Alteração
-Mover badges e botões (Gerenciar Carteira, Novo Cliente) do header para a linha dos filtros, e mudar o botão "Novo Cliente" de `variant="create"` para `variant="default"` (cor escura como o botão "Ativos").
+## Resumo
+Substituir o Health Score estático (baseado em meses/grade A-D) por um algoritmo numérico 0-100 com dados reais de tarefas, reuniões e NPS. Gauge visual SVG com cores e mensagem de acção.
 
-## Ficheiro: `src/pages/Clients.tsx`
+---
 
-**Header (linhas 88-117):** Remover os badges e botões, ficando apenas o título e descrição.
+## Ficheiros alterados
 
-**Filtros (linhas 119-140):** Unificar tudo numa única linha:
-- Search input (esquerda)
-- Botões de filtro (Todos, Ativos, Inativos)
-- Espaçador flex
-- Badges (ativos/inativos)
-- Botão "Gerenciar Carteira" (outline)
-- Botão "Novo Cliente" — trocar `variant="create"` para `variant="default"` (bg escuro, igual ao "Ativos")
+### 1. `src/components/clients/ClientHealthScore.tsx` — Reescrita completa
 
-Layout: `flex flex-wrap items-center gap-3` para acomodar todos os elementos na mesma linha, com wrap em mobile.
+**Nova interface:**
+```typescript
+interface ClientHealthScoreProps {
+  client: any;
+  tasks: any[];
+  meetings: any[];
+  npsScore?: number | null;
+  variant?: "badge" | "circle";
+}
+```
 
-## Resultado visual
-Linha única: `[🔍 Buscar...] [Todos] [Ativos] [Inativos]  ——  [23 ativos] [28 inativos] [Gerenciar Carteira] [+ Novo Cliente]`
+**Algoritmo `calculateDynamicScore()`:**
+- Base: 100 pontos
+- **Tarefas atrasadas** (due_date < hoje & status ≠ done): −10 por cada, máx −40
+- **Reuniões**: se última reunião > 30 dias atrás E sem reuniões futuras → −20
+- **NPS**: ≥ 9 → +10 | ≤ 6 → −30
+- Clamp final entre 0 e 100
+
+**Faixas de cor/texto:**
+| Faixa | Cor | Label | Mensagem |
+|-------|-----|-------|----------|
+| 80-100 | Emerald | Excelente | "Cliente saudável e engajado. Oportunidade para upsell." |
+| 50-79 | Amber | Atenção | "Alguns atrasos ou falta de alinhamento. Agende uma reunião." |
+| 0-49 | Red | Crítico | "Ação Imediata: Cliente em alto risco de cancelamento." |
+
+**Visual (variant="circle"):** Gauge SVG circular (arco de 270°) com score numérico ao centro, cor dinâmica, label e mensagem abaixo. O badge variant usa a mesma lógica de cor.
+
+### 2. `src/pages/ClientDetail.tsx` — Injeção de dados
+
+**Query NPS:** Adicionar ao bloco `Promise.all` do `dashboardData`:
+```typescript
+supabase
+  .from("nps_responses")
+  .select("score")
+  .eq("agency_id", currentAgency.id)
+  .eq("client_name", client?.name || "")
+  .order("response_date", { ascending: false })
+  .limit(1)
+```
+Nota: `nps_responses` não tem `client_id`, usa `client_name` (text match).
+
+**Props atualizadas:**
+```tsx
+<ClientHealthScore
+  client={client}
+  tasks={tasks}
+  meetings={meetings}
+  npsScore={npsScore}
+  variant="circle"
+/>
+```
+
+A query de NPS depende de `client?.name`, então será adicionada como query separada (não no Promise.all inicial, que roda antes de `client` estar disponível — ou condicional dentro do mesmo).
+
+---
+
+## Guardrails
+- Zero alteração no banco de dados
+- NPS match por `client_name` (campo existente) — sem migration
+- Se NPS não encontrado, passa `undefined` (sem penalização)
+- Score clamped 0-100, nunca NaN
 
