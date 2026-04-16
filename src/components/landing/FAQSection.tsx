@@ -5,8 +5,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
-import { ArrowRight, MessageCircle, CalendarDays } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 
 const faqs = [
   {
@@ -39,14 +38,7 @@ const faqs = [
   }
 ];
 
-interface FAQSectionProps {
-  onOpenApplication?: () => void;
-  onOpenScheduling?: () => void;
-}
-
-export function FAQSection({ onOpenScheduling }: FAQSectionProps) {
-  const navigate = useNavigate();
-
+export function FAQSection() {
   const openWhatsApp = () => {
     const phoneNumber = "5516994481535";
     const message = "Olá! Tenho uma dúvida sobre a Orbity.";
@@ -54,40 +46,47 @@ export function FAQSection({ onOpenScheduling }: FAQSectionProps) {
   };
 
   return (
-    <section id="faq" className="py-20">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">Perguntas Frequentes</h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">Tire suas dúvidas sobre a plataforma</p>
-        </div>
+    <section id="faq" className="bg-white py-24">
+      <div className="grid lg:grid-cols-12 gap-12 lg:gap-24 max-w-7xl mx-auto px-4">
+        {/* Coluna Esquerda - Sticky */}
+        <aside className="lg:col-span-4 lg:sticky lg:top-32 h-fit">
+          <h2 className="text-4xl font-bold tracking-tight text-slate-900 mb-4">
+            Perguntas Frequentes
+          </h2>
+          <p className="text-lg text-slate-500 mb-10">
+            Tudo o que precisa de saber sobre o Orbity.
+          </p>
 
-        <div className="max-w-3xl mx-auto">
-          <Accordion type="single" collapsible className="w-full">
+          <div className="border border-slate-200 rounded-2xl p-6 bg-slate-50">
+            <p className="font-semibold text-slate-900 mb-1">Ainda tem dúvidas?</p>
+            <p className="text-sm text-slate-500 mb-4">
+              A nossa equipa está pronta para ajudar.
+            </p>
+            <Button variant="outline" className="w-full" onClick={openWhatsApp}>
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Falar com Especialista
+            </Button>
+          </div>
+        </aside>
+
+        {/* Coluna Direita - Accordion */}
+        <div className="lg:col-span-8">
+          <Accordion type="single" collapsible className="w-full space-y-4">
             {faqs.map((faq, index) => (
-              <AccordionItem key={index} value={`item-${index}`}>
-                <AccordionTrigger className="text-left">{faq.question}</AccordionTrigger>
-                <AccordionContent className="text-muted-foreground">{faq.answer}</AccordionContent>
+              <AccordionItem
+                key={index}
+                value={`item-${index}`}
+                className="bg-slate-50 border border-slate-100 rounded-2xl px-6 overflow-hidden border-b-0 data-[state=open]:bg-white data-[state=open]:shadow-md data-[state=open]:border-purple-500/20 data-[state=open]:ring-1 data-[state=open]:ring-purple-500/10 transition-all duration-300"
+              >
+                <AccordionTrigger className="font-semibold text-slate-900 hover:no-underline [&>svg]:transition-transform [&>svg]:duration-300">
+                  {faq.question}
+                </AccordionTrigger>
+                <AccordionContent className="text-slate-600 leading-relaxed">
+                  {faq.answer}
+                </AccordionContent>
               </AccordionItem>
             ))}
           </Accordion>
-        </div>
-
-        <div className="text-center mt-12">
-          <p className="text-muted-foreground mb-4">Ainda tem dúvidas? Fale conosco!</p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-[#1c102f] hover:bg-[#1c102f]/90 text-white" onClick={() => navigate('/onboarding?flow=trial')}>
-              Começar Teste Grátis
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button size="lg" variant="outline" onClick={onOpenScheduling}>
-              <CalendarDays className="mr-2 h-5 w-5" />
-              Agendar Apresentação
-            </Button>
-            <Button size="lg" variant="outline" onClick={openWhatsApp}>
-              Falar no WhatsApp
-              <MessageCircle className="ml-2 h-5 w-5" />
-            </Button>
-          </div>
         </div>
       </div>
     </section>
