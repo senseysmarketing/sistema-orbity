@@ -1647,6 +1647,7 @@ export type Database = {
           created_at: string
           default_billing_type: string | null
           document: string | null
+          drive_folder_url: string | null
           due_date: number | null
           email: string | null
           has_loyalty: boolean
@@ -1684,6 +1685,7 @@ export type Database = {
           created_at?: string
           default_billing_type?: string | null
           document?: string | null
+          drive_folder_url?: string | null
           due_date?: number | null
           email?: string | null
           has_loyalty?: boolean
@@ -1721,6 +1723,7 @@ export type Database = {
           created_at?: string
           default_billing_type?: string | null
           document?: string | null
+          drive_folder_url?: string | null
           due_date?: number | null
           email?: string | null
           has_loyalty?: boolean
