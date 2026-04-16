@@ -672,16 +672,7 @@ export const MeetingFormDialog = ({
             </div>
           </div>
 
-          {/* Duration */}
-          <div className="space-y-2">
-            <Label>Duração Rápida</Label>
-            <MeetingDurationSelector
-              selectedDuration={selectedDuration}
-              onSelect={handleDurationSelect}
-            />
-          </div>
-
-          {/* Date and Time */}
+          {/* Date and Duration side by side */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="start_time">Data/Hora Início *</Label>
@@ -695,14 +686,23 @@ export const MeetingFormDialog = ({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="end_time">Data/Hora Fim *</Label>
-              <Input
-                id="end_time"
-                type="datetime-local"
-                value={formData.end_time}
-                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                required
-              />
+              <Label htmlFor="duration">Duração *</Label>
+              <Select
+                value={selectedDuration ? String(selectedDuration) : ""}
+                onValueChange={(v) => handleDurationSelect(Number(v))}
+              >
+                <SelectTrigger id="duration">
+                  <SelectValue placeholder="Selecione a duração" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="15">15 minutos</SelectItem>
+                  <SelectItem value="30">30 minutos</SelectItem>
+                  <SelectItem value="45">45 minutos</SelectItem>
+                  <SelectItem value="60">1 hora</SelectItem>
+                  <SelectItem value="90">1 hora e 30 minutos</SelectItem>
+                  <SelectItem value="120">2 horas</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
