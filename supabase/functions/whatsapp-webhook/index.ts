@@ -542,13 +542,40 @@ serve(async (req) => {
           }
         })();
 
-        // Run pause + lead promotion in parallel for zero added latency
-        await Promise.all([
-          pauseAutomations,
-          shouldPromote
-            ? promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id)
-            : Promise.resolve(),
-        ]);
+        // Anti-Bot Shield: detect auto-replies (< 10s after our last sent message)
+        const AUTO_REPLY_THRESHOLD_SEC = 10;
+        let isAutoReply = false;
+
+        try {
+          const { data: lastSent } = await supabase
+            .from('whatsapp_messages')
+            .select('created_at')
+            .eq('conversation_id', conversation.id)
+            .eq('is_from_me', true)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (lastSent?.created_at) {
+            const diffSec = (Date.now() - new Date(lastSent.created_at).getTime()) / 1000;
+            if (diffSec < AUTO_REPLY_THRESHOLD_SEC) {
+              isAutoReply = true;
+              console.log(`[Anti-Bot Shield] Auto-reply detected. Delta: ${diffSec.toFixed(2)}s — skipping pause + CRM Vivo`);
+            }
+          }
+        } catch (e) {
+          console.error('[Anti-Bot Shield] check failed, treating as human (fail-open):', e);
+        }
+
+        if (!isAutoReply) {
+          // Run pause + lead promotion in parallel for zero added latency
+          await Promise.all([
+            pauseAutomations,
+            shouldPromote
+              ? promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id)
+              : Promise.resolve(),
+          ]);
+        }
       } else if (!existingMsg) {
         // Operator sent from phone directly — pause automation
         const automations = await findActiveAutomations(
