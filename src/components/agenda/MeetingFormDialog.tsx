@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { format, addMinutes } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
-import { MeetingDurationSelector } from "./MeetingDurationSelector";
+
 import { MeetingConflictAlert } from "./MeetingConflictAlert";
 import { MeetingTemplateSelector } from "./MeetingTemplateSelector";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
