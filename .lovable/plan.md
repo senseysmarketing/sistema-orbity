@@ -1,127 +1,86 @@
 
 
-# Implementação: Persistir + Exibir número WhatsApp (com Guardrails)
+# Padronizar UX de Webhook: Conexa igual ao Asaas + correção da etapa 5
 
-## Verificações prévias (read-only)
-1. Confirmar nome real da tabela: `whatsapp_accounts` vs `whatsapp_instances` via `src/integrations/supabase/types.ts`
-2. Confirmar estrutura do hook `useWhatsApp` para identificar onde aplicar invalidação/update otimista
-3. Confirmar payload da Evolution v2 no webhook handler atual
+## Investigação necessária
+1. Ver o componente atual do Asaas para replicar o estilo do bloco azul de instruções
+2. Ver o componente atual do Conexa que usa um Accordion colapsável
+3. Identificar a etapa 5 do Asaas que está quebrando linha
+<lov-tool-use id="toolu_vrtx_01SecbNKUiGUV1LdTkhTXp6v" name="code--search_files" integration-id="code" data="{\"query\": \"Como configurar o Webhook\", \"include_patterns\": \"*.tsx\"}">
+</lov-tool-use>
 
-## Implementação
+<lov-tool-use id="toolu_vrtx_018Xf3ygd8ZvJ45G63FCnBNm" name="code--search_files" integration-id="code" data="{\"query\": \"Como configurar o Webhook\", \"include_patterns\": \"*.tsx\"}">
+</lov-tool-use>
 
-### Guardrail 1 — Nome correto da tabela
-Após leitura dos `types.ts`, usar o nome confirmado em **todos** os `supabase.from(...)` das Edge Functions. Se for `whatsapp_accounts` (como já usado em `whatsapp-connect`), manter. Se divergir, corrigir antes de deploy.
+<lov-tool-use id="toolu_vrtx_015NEAo7pa4bDdtQ7czyiVG7" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/settings/AsaasIntegration.tsx\", \"lines\": \"180-280\"}">
+</lov-tool-use>
 
-### Backend — `supabase/functions/whatsapp-connect/index.ts`
+<lov-tool-use id="toolu_vrtx_017Dk774JnriYDRn7txW9jmH" name="code--search_files" integration-id="code" data="{\"query\": \"Como configurar os Webhooks automáticos\", \"include_patterns\": \"*.tsx\"}">
+</lov-tool-use>
 
-No `case 'status'`, quando `isConnected === true` e `phone_number` ausente:
+<lov-tool-use id="toolu_vrtx_01CvBVt72JRah6vvADn4Gnxm" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/settings/ConexaIntegration.tsx\", \"lines\": \"280-400\"}">
+</lov-tool-use>
+Tenho contexto suficiente.
 
-```ts
-let connectedPhone = account.phone_number;
+<lov-plan>
 
-if (!connectedPhone) {
-  try {
-    const instRes = await fetch(
-      `${effectiveUrl}/instance/fetchInstances?instanceName=${instanceName}`,
-      { headers: { 'apikey': effectiveKey } }
-    );
-    const instData = await instRes.json();
-    const arr = Array.isArray(instData) ? instData : [instData];
-    const rawJid = arr[0]?.ownerJid 
-      || arr[0]?.instance?.owner 
-      || arr[0]?.owner 
-      || arr[0]?.instance?.wuid;
-    
-    if (rawJid) {
-      // SANITIZAÇÃO ESTRITA (Guardrail 2)
-      connectedPhone = String(rawJid).split('@')[0].replace(/\D/g, '');
-    }
-  } catch (e) {
-    console.log('fetchInstances failed:', e.message);
-  }
-}
+# Padronizar guia de Webhook do Conexa + corrigir alinhamento da etapa 5 do Asaas
 
-await supabase
-  .from('<TABELA_CONFIRMADA>')
-  .update({
-    status: 'connected',
-    qr_code: null,
-    ...(connectedPhone ? { phone_number: connectedPhone } : {}),
-  })
-  .eq('id', account.id);
-```
+## 1) Conexa — guia visível por padrão (estilo Asaas)
 
-**Retornar `phone_number: connectedPhone` no JSON da resposta** — essencial para o Guardrail 3.
+Em `src/components/settings/ConexaIntegration.tsx`:
 
-### Backend — `supabase/functions/whatsapp-webhook/index.ts`
-
-No handler de `connection.update` quando `state === 'open'`:
-
-```ts
-const rawPhonePayload = data?.wuid || data?.owner || data?.sender;
-if (rawPhonePayload) {
-  // SANITIZAÇÃO ESTRITA (Guardrail 2)
-  const cleanPhone = String(rawPhonePayload).split('@')[0].replace(/\D/g, '');
-  if (cleanPhone) {
-    await supabase
-      .from('<TABELA_CONFIRMADA>')
-      .update({ status: 'connected', phone_number: cleanPhone, qr_code: null })
-      .eq('agency_id', agencyId)
-      .eq('purpose', purpose); // se aplicável
-  }
-}
-```
-
-### Frontend — `useWhatsApp.tsx` (Guardrail 3 — Reatividade)
-
-Localizar `checkStatus` e `connect` mutations. Após a resposta, fazer **update otimista** do cache do React Query:
-
-```ts
-checkStatus: useMutation({
-  mutationFn: async () => { /* ... */ },
-  onSuccess: (result) => {
-    if (result?.status === 'connected' && result?.phone_number) {
-      // Update otimista IMEDIATO no cache
-      queryClient.setQueryData(['whatsapp-account', purpose], (old: any) => ({
-        ...old,
-        status: 'connected',
-        phone_number: result.phone_number,
-        qr_code: null,
-      }));
-    }
-    // Invalidação como fallback
-    queryClient.invalidateQueries({ queryKey: ['whatsapp-account', purpose] });
-  },
-})
-```
-
-### Frontend — `WhatsAppInstanceCard.tsx`
-
-Melhorar fallback durante sincronização:
+- **Remover** o `AccordionItem value="webhook-instructions"` (envoltório recolhível).
+- **Substituir** por um `<Alert>` sempre visível com o mesmo padrão visual do Asaas (fundo azul claro, ícone `Info`, título azul forte, lista decimal abaixo):
 
 ```tsx
-{account?.phone_number 
-  ? `Número: ${formatPhoneDisplay(account.phone_number)}`
-  : isConnected 
-    ? "Sincronizando número..." 
-    : "Aguardando número conectado..."}
+<Alert className="mt-2 bg-blue-50/50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
+  <Info className="h-4 w-4 text-blue-500" />
+  <AlertDescription className="text-xs space-y-3 ml-2">
+    <p className="font-semibold text-sm text-blue-800 dark:text-blue-300">
+      Como configurar o Webhook no Conexa
+    </p>
+    <ol className="space-y-2 list-decimal list-outside pl-5 text-muted-foreground">
+      <li>Acesse <strong>Configurações → Integrações → Webhooks</strong>.</li>
+      <li><strong>Conexão 1 — Pagamentos:</strong> Nova Conexão → Personalizado. Cole a URL abaixo. Em Eventos de Cobrança marque <strong>Quitação</strong>.</li>
+      <li><strong>Conexão 2 — Cancelamentos:</strong> Nova conexão com a mesma URL. Marque <strong>Alteração de status</strong>.</li>
+      <li>Cole esta URL no campo "URL" das duas conexões:
+        <div className="mt-2 flex gap-2">{/* Input readOnly + Copy button */}</div>
+      </li>
+    </ol>
+  </AlertDescription>
+</Alert>
 ```
 
-## Comportamento garantido
+- O `AccordionItem` de **Baixa Manual (Opcional)** permanece colapsável.
+- Garantir import de `Info` do `lucide-react` (se ausente).
 
-| Cenário | Antes | Depois |
-|---------|-------|--------|
-| Conexão nova via QR | Phone NULL eternamente | Phone capturado em ≤5s via polling + setQueryData |
-| Reconexão via webhook | Sem update | Persistido com sanitização estrita |
-| Tela durante sync | "Aguardando número..." (eterno) | "Sincronizando..." → número real (sem F5) |
-| Régua/NPS | "WhatsApp da Agência" / instance_name | Número formatado |
-| Erro de tabela | Risco de 500 | Nome confirmado antes do deploy |
+## 2) Asaas — corrigir alinhamento da etapa 5
+
+Em `src/components/settings/AsaasIntegration.tsx` (linhas 209–235):
+
+**Causa**: a `<ol>` usa `list-inside` + `space-y-2`, e a etapa 5 contém um bloco `flex` aninhado seguido de outro `<div>` com chips, o que quebra a inline com o marcador "5." e empurra o conteúdo para a linha de baixo.
+
+**Correção**: trocar `list-inside` por `list-outside pl-5` em toda a `<ol>` e remover o wrapper `<div className="flex items-start gap-1">` da etapa 5 (deixar o texto direto como `<span>`, igual às demais etapas):
+
+```tsx
+<ol className="space-y-2 list-decimal list-outside pl-5 text-muted-foreground">
+  ...
+  <li className="leading-relaxed">
+    <span>⚠️ <strong>IMPORTANTE — Eventos para Cobranças:</strong> Marque estritamente estas opções:</span>
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {/* chips */}
+    </div>
+  </li>
+  ...
+</ol>
+```
+
+Com `list-outside`, o número fica numa "gutter" fixa à esquerda e qualquer conteúdo block-level dentro do `<li>` (como o grid de chips) alinha-se corretamente sob o texto, sem deslocar o "5.".
 
 ## Ficheiros alterados
-- `supabase/functions/whatsapp-connect/index.ts` (fetchInstances + retorno phone)
-- `supabase/functions/whatsapp-webhook/index.ts` (captura + sanitização em connection.update)
-- `src/hooks/useWhatsApp.tsx` (setQueryData otimista no onSuccess)
-- `src/components/settings/WhatsAppInstanceCard.tsx` (fallback "Sincronizando...")
+- `src/components/settings/ConexaIntegration.tsx` — substituir Accordion do webhook por Alert estilo Asaas.
+- `src/components/settings/AsaasIntegration.tsx` — `list-outside pl-5` + simplificar wrapper da etapa 5.
 
-Sem migration. Sem alteração de schema.
+Sem migração, sem mudança de lógica.
 
