@@ -58,6 +58,9 @@ import { useTaskStatuses } from "@/hooks/useTaskStatuses";
 import { useTaskTypes } from "@/hooks/useTaskTypes";
 import { useClientRelations } from "@/hooks/useClientRelations";
 import { replaceTemplateVariables, calculateDueDate } from "@/lib/templateVariables";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 
 interface AssignedUser {
   user_id: string;
@@ -103,6 +106,47 @@ interface Client {
   name: string;
 }
 
+
+const taskFormSchema = z.object({
+  title: z.string().min(1, "Título obrigatório"),
+  description: z.string().nullable().optional().default(""),
+  status: z.string().default("todo"),
+  priority: z.enum(["low", "medium", "high"]).default("medium"),
+  assigned_to: z.string().default("unassigned"),
+  assigned_users: z.array(z.string()).default([]),
+  client_ids: z.array(z.string()).default([]),
+  due_date: z.string().nullable().optional().default(""),
+  subtasks: z.array(z.any()).default([]),
+  attachments: z.array(z.any()).default([]),
+  task_type: z.string().min(1, "Tipo obrigatório"),
+  platform: z.string().nullable().optional().default(""),
+  post_type: z.string().nullable().optional().default(""),
+  post_date: z.string().nullable().optional().default(""),
+  hashtags: z.string().nullable().optional().default(""),
+  creative_instructions: z.string().nullable().optional().default(""),
+});
+
+type TaskFormValues = z.infer<typeof taskFormSchema>;
+
+const taskFormDefaults: TaskFormValues = {
+  title: "",
+  description: "",
+  status: "todo",
+  priority: "medium",
+  assigned_to: "unassigned",
+  assigned_users: [],
+  client_ids: [],
+  due_date: "",
+  subtasks: [],
+  attachments: [],
+  task_type: "",
+  platform: "",
+  post_type: "",
+  post_date: "",
+  hashtags: "",
+  creative_instructions: "",
+};
+
 export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -139,41 +183,11 @@ export default function Tasks() {
     return copy;
   };
 
-  const [newTask, setNewTask] = useState<{
-    title: string;
-    description: string;
-    status: string;
-    priority: "low" | "medium" | "high";
-    assigned_to: string;
-    assigned_users: string[];
-    client_ids: string[];
-    due_date: string;
-    subtasks: Subtask[];
-    attachments: Attachment[];
-    task_type: string;
-    platform: string;
-    post_type: string;
-    post_date: string;
-    hashtags: string;
-    creative_instructions: string;
-  }>({
-    title: "",
-    description: "",
-    status: "todo",
-    priority: "medium",
-    assigned_to: "unassigned",
-    assigned_users: [],
-    client_ids: [],
-    due_date: "",
-    subtasks: [],
-    attachments: [],
-    task_type: "",
-    platform: "",
-    post_type: "",
-    post_date: "",
-    hashtags: "",
-    creative_instructions: "",
+  const form = useForm<TaskFormValues>({
+    resolver: zodResolver(taskFormSchema),
+    defaultValues: taskFormDefaults,
   });
+  const newTask = form.watch();
 
   const { updateClientRelations } = useClientRelations();
 
@@ -230,16 +244,35 @@ export default function Tasks() {
     if (!currentAgency) return;
 
     try {
-      const { data, error } = await supabase
-        .from("tasks")
-        .select("*, task_clients(client_id), task_assignments(user_id)")
-        .eq("agency_id", currentAgency.id)
-        .eq("archived", false)
-        .order("created_at", { ascending: false });
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      if (error) throw error;
+      const selectFields = "*, task_clients(client_id), task_assignments(user_id)";
 
-      const rawTasks = data || [];
+      const [openResult, doneResult] = await Promise.all([
+        supabase
+          .from("tasks")
+          .select(selectFields)
+          .eq("agency_id", currentAgency.id)
+          .eq("archived", false)
+          .neq("status", "done")
+          .order("created_at", { ascending: false })
+          .limit(300),
+        supabase
+          .from("tasks")
+          .select(selectFields)
+          .eq("agency_id", currentAgency.id)
+          .eq("archived", false)
+          .eq("status", "done")
+          .gte("updated_at", thirtyDaysAgo.toISOString())
+          .order("created_at", { ascending: false })
+          .limit(50),
+      ]);
+
+      if (openResult.error) throw openResult.error;
+      if (doneResult.error) throw doneResult.error;
+
+      const rawTasks = [...(openResult.data || []), ...(doneResult.data || [])];
 
       // Extract unique user_ids from assignments
       const allUserIds = new Set<string>();
@@ -593,24 +626,7 @@ export default function Tasks() {
         description: "Tarefa criada com sucesso!",
       });
 
-      setNewTask({
-        title: "",
-        description: "",
-        status: "todo",
-        priority: "medium",
-        assigned_to: "unassigned",
-        assigned_users: [],
-        client_ids: [],
-        due_date: "",
-        subtasks: [],
-        attachments: [],
-        task_type: "",
-        platform: "",
-        post_type: "",
-        post_date: "",
-        hashtags: "",
-        creative_instructions: "",
-      });
+      form.reset(taskFormDefaults);
       setIsDialogOpen(false);
       fetchTasks();
     } catch (error: any) {
@@ -635,30 +651,23 @@ export default function Tasks() {
     // Validate status - fallback to "todo" if template status is invalid/deleted
     const status = isValidStatus(template.default_status) ? template.default_status : "todo";
 
-    setNewTask({
-      title: replaceTemplateVariables(template.default_title, context),
-      description: replaceTemplateVariables(template.default_description, context),
-      status,
-      priority: template.default_priority as "low" | "medium" | "high",
-      assigned_to: "unassigned",
-      assigned_users: template.auto_assign_creator && profile?.user_id 
-        ? [profile.user_id] 
-        : [],
-      client_ids: template.default_client_id ? [template.default_client_id] : [],
-      due_date: calculateDueDate(template.due_date_offset_days),
-      subtasks: template.subtasks.map((st) => ({
-        ...st,
-        id: crypto.randomUUID(),
-        completed: false,
-      })),
-      attachments: [],
-      task_type: (template as any).default_task_type || "",
-      platform: "",
-      post_type: "",
-      post_date: "",
-      hashtags: "",
-      creative_instructions: "",
-    });
+    // Guardrail 3: Use setValue to preserve user-filled fields
+    form.setValue("title", replaceTemplateVariables(template.default_title, context), { shouldValidate: true });
+    form.setValue("description", replaceTemplateVariables(template.default_description, context), { shouldValidate: true });
+    form.setValue("status", status, { shouldValidate: true });
+    form.setValue("priority", template.default_priority as "low" | "medium" | "high", { shouldValidate: true });
+    form.setValue("assigned_to", "unassigned");
+    form.setValue("assigned_users", template.auto_assign_creator && profile?.user_id ? [profile.user_id] : []);
+    form.setValue("client_ids", template.default_client_id ? [template.default_client_id] : []);
+    form.setValue("due_date", calculateDueDate(template.due_date_offset_days));
+    form.setValue("subtasks", template.subtasks.map((st) => ({
+      ...st,
+      id: crypto.randomUUID(),
+      completed: false,
+    })));
+    if ((template as any).default_task_type) {
+      form.setValue("task_type", (template as any).default_task_type, { shouldValidate: true });
+    }
 
     incrementUsageCount(template.id);
     setIsTemplateSelectorOpen(false);
@@ -673,7 +682,7 @@ export default function Tasks() {
 
   const handleEditTask = (task: Task) => {
     setSelectedTask(task);
-    setNewTask({
+    form.reset({
       title: task.title,
       description: task.description || "",
       status: task.status as any,
@@ -835,7 +844,7 @@ export default function Tasks() {
   const handleDuplicateTask = (task: Task) => {
     const taskAssignedUsers = getAssignedUsers(task.id);
     
-    setNewTask({
+    form.reset({
       title: `${task.title} (Cópia)`,
       description: task.description || '',
       status: 'todo',
@@ -989,13 +998,7 @@ export default function Tasks() {
               if (!open) {
                 setCreateStep(1);
               } else if (!selectedTask) {
-                setNewTask({
-                  title: "", description: "", status: "todo", priority: "medium",
-                  assigned_to: "unassigned", assigned_users: [], client_ids: [],
-                  due_date: "", subtasks: [], attachments: [], task_type: "",
-                  platform: "", post_type: "", post_date: "", hashtags: "",
-                  creative_instructions: "",
-                });
+                form.reset(taskFormDefaults);
                 setCreateStep(1);
               }
             }}>
@@ -1063,20 +1066,18 @@ export default function Tasks() {
                         )
                         .map((p) => p.user_id);
                     }
-                    setNewTask((prev) => ({
-                      ...prev,
-                      title: result.title || prev.title,
-                      description: result.description || prev.description,
-                      priority: result.priority || prev.priority,
-                      task_type: result.suggested_type || prev.task_type,
-                      client_ids: matchedClientIds.length > 0 ? matchedClientIds : prev.client_ids,
-                      assigned_users: matchedUserIds.length > 0 ? matchedUserIds : prev.assigned_users,
-                      ...(result.suggested_date ? { due_date: result.suggested_date.split("T")[0] } : {}),
-                      ...(result.platform ? { platform: result.platform } : {}),
-                      ...(result.post_type ? { post_type: result.post_type } : {}),
-                      ...(result.hashtags?.length ? { hashtags: result.hashtags.join(", ") } : {}),
-                      ...(result.creative_instructions ? { creative_instructions: result.creative_instructions } : {}),
-                    }));
+                    // Guardrail 3: Use setValue to preserve user-filled fields
+                    if (result.title) form.setValue("title", result.title, { shouldValidate: true });
+                    if (result.description) form.setValue("description", result.description, { shouldValidate: true });
+                    if (result.priority) form.setValue("priority", result.priority, { shouldValidate: true });
+                    if (result.suggested_type) form.setValue("task_type", result.suggested_type, { shouldValidate: true });
+                    if (matchedClientIds.length > 0) form.setValue("client_ids", matchedClientIds);
+                    if (matchedUserIds.length > 0) form.setValue("assigned_users", matchedUserIds);
+                    if (result.suggested_date) form.setValue("due_date", result.suggested_date.split("T")[0]);
+                    if (result.platform) form.setValue("platform", result.platform);
+                    if (result.post_type) form.setValue("post_type", result.post_type);
+                    if (result.hashtags?.length) form.setValue("hashtags", result.hashtags.join(", "));
+                    if (result.creative_instructions) form.setValue("creative_instructions", result.creative_instructions);
                     setCreateStep(2);
                   }
                 }}
@@ -1104,7 +1105,7 @@ export default function Tasks() {
                       <Input
                         id="title"
                         value={newTask.title}
-                        onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                        onChange={(e) => form.setValue("title", e.target.value)}
                         placeholder="Digite o título da tarefa"
                       />
                     </div>
@@ -1113,7 +1114,7 @@ export default function Tasks() {
                       <Textarea
                         id="description"
                         value={newTask.description}
-                        onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                        onChange={(e) => form.setValue("description", e.target.value)}
                         placeholder="Digite a descrição da tarefa"
                         rows={3}
                       />
@@ -1122,7 +1123,7 @@ export default function Tasks() {
                       <Label htmlFor="task_type">Tipo *</Label>
                       <Select
                         value={newTask.task_type}
-                        onValueChange={(value) => setNewTask({ ...newTask, task_type: value })}
+                        onValueChange={(value) => form.setValue("task_type", value)}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o tipo" />
@@ -1144,7 +1145,7 @@ export default function Tasks() {
                           <Label>Plataforma</Label>
                           <Select
                             value={newTask.platform}
-                            onValueChange={(value) => setNewTask({ ...newTask, platform: value })}
+                            onValueChange={(value) => form.setValue("platform", value)}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione a plataforma" />
@@ -1163,7 +1164,7 @@ export default function Tasks() {
                           <Label>Tipo de Conteúdo</Label>
                           <Select
                             value={newTask.post_type}
-                            onValueChange={(value) => setNewTask({ ...newTask, post_type: value })}
+                            onValueChange={(value) => form.setValue("post_type", value)}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione o tipo" />
@@ -1214,7 +1215,7 @@ export default function Tasks() {
                         <Label htmlFor="status">Status</Label>
                         <Select
                           value={newTask.status}
-                          onValueChange={(value: any) => setNewTask({ ...newTask, status: value })}
+                          onValueChange={(value: any) => form.setValue("status", value)}
                         >
                           <SelectTrigger>
                             <SelectValue />
@@ -1232,7 +1233,7 @@ export default function Tasks() {
                         <Label htmlFor="priority">Prioridade</Label>
                         <Select
                           value={newTask.priority}
-                          onValueChange={(value: any) => setNewTask({ ...newTask, priority: value })}
+                          onValueChange={(value: any) => form.setValue("priority", value)}
                         >
                           <SelectTrigger>
                             <SelectValue />
@@ -1251,7 +1252,7 @@ export default function Tasks() {
                         id="due_date"
                         type="date"
                         value={newTask.due_date}
-                        onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+                        onChange={(e) => form.setValue("due_date", e.target.value)}
                       />
                     </div>
 
@@ -1263,14 +1264,14 @@ export default function Tasks() {
                           <Input
                             type="date"
                             value={newTask.post_date}
-                            onChange={(e) => setNewTask({ ...newTask, post_date: e.target.value })}
+                            onChange={(e) => form.setValue("post_date", e.target.value)}
                           />
                         </div>
                         <div className="grid gap-2">
                           <Label>Hashtags</Label>
                           <Input
                             value={newTask.hashtags}
-                            onChange={(e) => setNewTask({ ...newTask, hashtags: e.target.value })}
+                            onChange={(e) => form.setValue("hashtags", e.target.value)}
                             placeholder="Ex: #marketing, #design, #social"
                           />
                         </div>
@@ -1282,7 +1283,7 @@ export default function Tasks() {
                         <Label>Instruções Criativas</Label>
                         <Textarea
                           value={newTask.creative_instructions}
-                          onChange={(e) => setNewTask({ ...newTask, creative_instructions: e.target.value })}
+                          onChange={(e) => form.setValue("creative_instructions", e.target.value)}
                           placeholder="Instruções de arte, roteiro, textos na arte, CTAs..."
                           rows={3}
                         />
@@ -1294,7 +1295,7 @@ export default function Tasks() {
                         <MultiClientSelector
                           clients={clients}
                           selectedClientIds={newTask.client_ids}
-                          onSelectionChange={(ids) => setNewTask({ ...newTask, client_ids: ids })}
+                          onSelectionChange={(ids) => form.setValue("client_ids", ids)}
                           placeholder="Selecionar clientes..."
                         />
                       </div>
@@ -1303,7 +1304,7 @@ export default function Tasks() {
                         <MultiUserSelector
                           users={profiles}
                           selectedUserIds={newTask.assigned_users}
-                          onSelectionChange={(userIds) => setNewTask({ ...newTask, assigned_users: userIds })}
+                          onSelectionChange={(userIds) => form.setValue("assigned_users", userIds)}
                           placeholder="Selecionar usuários..."
                           emptyText="Nenhum usuário disponível."
                         />
@@ -1350,13 +1351,13 @@ export default function Tasks() {
                     />
                     <SubtaskManager
                       subtasks={newTask.subtasks}
-                      onChange={(subtasks) => setNewTask({ ...newTask, subtasks })}
+                      onChange={(subtasks) => form.setValue("subtasks", subtasks)}
                     />
                     <div className="grid gap-2">
                       <Label>Anexos</Label>
                       <FileAttachments
                         attachments={newTask.attachments}
-                        onChange={(attachments) => setNewTask({ ...newTask, attachments })}
+                        onChange={(attachments) => form.setValue("attachments", attachments)}
                         bucket="task-attachments"
                         entityId={selectedTask?.id}
                       />
@@ -1658,7 +1659,7 @@ export default function Tasks() {
               <Input
                 id="edit-title"
                 value={newTask.title}
-                onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                onChange={(e) => form.setValue("title", e.target.value)}
                 placeholder="Digite o título da tarefa"
               />
             </div>
@@ -1667,7 +1668,7 @@ export default function Tasks() {
               <Textarea
                 id="edit-description"
                 value={newTask.description}
-                onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                onChange={(e) => form.setValue("description", e.target.value)}
                 placeholder="Digite a descrição da tarefa"
                 rows={3}
               />
@@ -1677,7 +1678,7 @@ export default function Tasks() {
                 <Label htmlFor="edit-status">Status</Label>
                 <Select
                   value={newTask.status}
-                  onValueChange={(value: any) => setNewTask({ ...newTask, status: value })}
+                  onValueChange={(value: any) => form.setValue("status", value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1695,7 +1696,7 @@ export default function Tasks() {
                 <Label htmlFor="edit-priority">Prioridade</Label>
                 <Select
                   value={newTask.priority}
-                  onValueChange={(value: any) => setNewTask({ ...newTask, priority: value })}
+                  onValueChange={(value: any) => form.setValue("priority", value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -1712,7 +1713,7 @@ export default function Tasks() {
               <Label htmlFor="edit-task_type">Tipo *</Label>
               <Select
                 value={newTask.task_type}
-                onValueChange={(value) => setNewTask({ ...newTask, task_type: value })}
+                onValueChange={(value) => form.setValue("task_type", value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o tipo" />
@@ -1735,7 +1736,7 @@ export default function Tasks() {
                     <Label>Plataforma</Label>
                     <Select
                       value={newTask.platform}
-                      onValueChange={(value) => setNewTask({ ...newTask, platform: value })}
+                      onValueChange={(value) => form.setValue("platform", value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione a plataforma" />
@@ -1754,7 +1755,7 @@ export default function Tasks() {
                     <Label>Tipo de Conteúdo</Label>
                     <Select
                       value={newTask.post_type}
-                      onValueChange={(value) => setNewTask({ ...newTask, post_type: value })}
+                      onValueChange={(value) => form.setValue("post_type", value)}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o tipo" />
@@ -1774,14 +1775,14 @@ export default function Tasks() {
                   <Input
                     type="date"
                     value={newTask.post_date}
-                    onChange={(e) => setNewTask({ ...newTask, post_date: e.target.value })}
+                    onChange={(e) => form.setValue("post_date", e.target.value)}
                   />
                 </div>
                 <div className="grid gap-2">
                   <Label>Hashtags</Label>
                   <Input
                     value={newTask.hashtags}
-                    onChange={(e) => setNewTask({ ...newTask, hashtags: e.target.value })}
+                    onChange={(e) => form.setValue("hashtags", e.target.value)}
                     placeholder="Ex: #marketing, #design, #social"
                   />
                 </div>
@@ -1793,7 +1794,7 @@ export default function Tasks() {
                 <Label>Instruções Criativas</Label>
                 <Textarea
                   value={newTask.creative_instructions}
-                  onChange={(e) => setNewTask({ ...newTask, creative_instructions: e.target.value })}
+                  onChange={(e) => form.setValue("creative_instructions", e.target.value)}
                   placeholder="Instruções de arte, roteiro, textos na arte, CTAs..."
                   rows={3}
                 />
@@ -1806,7 +1807,7 @@ export default function Tasks() {
                 <MultiUserSelector
                   users={profiles}
                   selectedUserIds={newTask.assigned_users}
-                  onSelectionChange={(userIds) => setNewTask({ ...newTask, assigned_users: userIds })}
+                  onSelectionChange={(userIds) => form.setValue("assigned_users", userIds)}
                   placeholder="Selecionar usuários..."
                   emptyText="Nenhum usuário disponível."
                 />
@@ -1816,7 +1817,7 @@ export default function Tasks() {
                 <MultiClientSelector
                   clients={clients}
                   selectedClientIds={newTask.client_ids}
-                  onSelectionChange={(ids) => setNewTask({ ...newTask, client_ids: ids })}
+                  onSelectionChange={(ids) => form.setValue("client_ids", ids)}
                   placeholder="Selecionar clientes..."
                 />
               </div>
@@ -1827,18 +1828,18 @@ export default function Tasks() {
                 id="edit-due_date"
                 type="date"
                 value={newTask.due_date}
-                onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
+                onChange={(e) => form.setValue("due_date", e.target.value)}
               />
             </div>
             <SubtaskManager
               subtasks={newTask.subtasks}
-              onChange={(subtasks) => setNewTask({ ...newTask, subtasks })}
+              onChange={(subtasks) => form.setValue("subtasks", subtasks)}
             />
             <div className="grid gap-2">
               <Label>Anexos</Label>
               <FileAttachments
                 attachments={newTask.attachments}
-                onChange={(attachments) => setNewTask({ ...newTask, attachments })}
+                onChange={(attachments) => form.setValue("attachments", attachments)}
                 bucket="task-attachments"
               />
             </div>
