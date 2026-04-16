@@ -110,7 +110,7 @@ export function PricingSection({ onOpenScheduling }: PricingSectionProps) {
                   className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                     isAnnual
                       ? "bg-white text-slate-900"
-                      : "text-slate-400 hover:text-white"
+                      : "text-slate-400 hover:text-white border border-white/20"
                   }`}
                 >
                   Anual
