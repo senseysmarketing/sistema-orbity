@@ -44,13 +44,14 @@ interface LeadsKanbanProps {
   onDelete: (leadId: string) => void;
   onUpdate: () => void;
   onView?: (lead: Lead) => void;
+  onScheduleMeeting?: (lead: Lead) => void;
   onLeadMove?: (leadId: string, newStatus: string) => void;
   hiddenColumns?: Set<string>;
   onToggleColumn?: (columnId: string) => void;
   onShowAllColumns?: () => void;
 }
 
-export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadMove, hiddenColumns, onToggleColumn, onShowAllColumns }: LeadsKanbanProps) {
+export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onScheduleMeeting, onLeadMove, hiddenColumns, onToggleColumn, onShowAllColumns }: LeadsKanbanProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
   const [lossDialogOpen, setLossDialogOpen] = useState(false);
@@ -332,6 +333,7 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
               onEdit={onEdit}
               onDelete={onDelete}
               onView={onView}
+              onScheduleMeeting={onScheduleMeeting}
               onToggleVisibility={() => onToggleColumn?.(statusKey)}
               getPriorityColor={getPriorityColor}
               getPriorityLabel={getPriorityLabel}
@@ -349,6 +351,7 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onLeadM
             lead={draggedLead}
             onEdit={onEdit}
             onDelete={onDelete}
+            onScheduleMeeting={onScheduleMeeting}
             getPriorityColor={getPriorityColor}
             getPriorityLabel={getPriorityLabel}
             getUrgencyLevel={getUrgencyLevel}

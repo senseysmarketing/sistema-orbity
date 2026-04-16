@@ -37,6 +37,7 @@ interface LeadKanbanColumnProps {
   onEdit: (lead: Lead) => void;
   onDelete: (leadId: string) => void;
   onView?: (lead: Lead) => void;
+  onScheduleMeeting?: (lead: Lead) => void;
   onToggleVisibility?: () => void;
   getPriorityColor: (priority: string) => string;
   getPriorityLabel: (priority: string) => string;
@@ -54,6 +55,7 @@ export function LeadKanbanColumn({
   onEdit,
   onDelete,
   onView,
+  onScheduleMeeting,
   onToggleVisibility,
   getPriorityColor,
   getPriorityLabel,
@@ -108,6 +110,7 @@ export function LeadKanbanColumn({
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onView={onView}
+                  onScheduleMeeting={onScheduleMeeting}
                   getPriorityColor={getPriorityColor}
                   getPriorityLabel={getPriorityLabel}
                   getUrgencyLevel={getUrgencyLevel}
