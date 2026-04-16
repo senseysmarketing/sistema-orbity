@@ -116,6 +116,8 @@ export const MeetingFormDialog = ({
   const [reminderHoursBefore, setReminderHoursBefore] = useState<number>(2);
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const lastAutoFilledClientIdRef = useRef<string | null>(null);
+  // Tracks the email of the last auto-inserted external participant (so we can remove only it on change)
+  const lastAutoParticipantEmailRef = useRef<string | null>(null);
 
   // Phone mask helper (BR)
   const formatPhoneBR = (value: string): string => {
@@ -173,7 +175,7 @@ export const MeetingFormDialog = ({
       if (!currentAgency?.id) return [];
       const { data } = await supabase
         .from("clients")
-        .select("id, name, contact")
+        .select("id, name, contact, email")
         .eq("agency_id", currentAgency.id)
         .eq("active", true);
       const realClients = data || [];
@@ -190,7 +192,7 @@ export const MeetingFormDialog = ({
       if (!currentAgency?.id) return [];
       const { data } = await supabase
         .from("leads")
-        .select("id, name, phone, created_at")
+        .select("id, name, email, phone, created_at")
         .eq("agency_id", currentAgency.id)
         .order("created_at", { ascending: false });
       return data || [];
@@ -307,32 +309,74 @@ export const MeetingFormDialog = ({
   useEffect(() => {
     if (!leads.length && !clients.length) return;
 
-    // Lead has absolute priority
+    // ---- Phone auto-fill ----
+    let phoneHandled = false;
     if (formData.lead_id) {
       const lead = leads.find((l: any) => l.id === formData.lead_id) as any;
       if (lead?.phone) {
         setClientWhatsapp(normalizeAndFormatPhone(lead.phone));
         lastAutoFilledClientIdRef.current = `lead:${formData.lead_id}`;
-        return;
+        phoneHandled = true;
       }
     }
 
-    // Fallback to first real client
-    const realIds = separateVirtualClients(selectedClientIds).realClientIds;
-    const firstClientId = realIds[0];
-    if (!firstClientId) {
-      lastAutoFilledClientIdRef.current = null;
-      return;
+    if (!phoneHandled) {
+      const realIds = separateVirtualClients(selectedClientIds).realClientIds;
+      const firstClientId = realIds[0];
+      if (!firstClientId) {
+        lastAutoFilledClientIdRef.current = null;
+      } else if (lastAutoFilledClientIdRef.current !== firstClientId) {
+        const client = clients.find((c: any) => c.id === firstClientId) as any;
+        if (client?.contact) {
+          setClientWhatsapp(normalizeAndFormatPhone(client.contact));
+          lastAutoFilledClientIdRef.current = firstClientId;
+        } else if (client) {
+          setClientWhatsapp("");
+          lastAutoFilledClientIdRef.current = firstClientId;
+        }
+      }
     }
-    if (lastAutoFilledClientIdRef.current === firstClientId) return;
-    const client = clients.find((c: any) => c.id === firstClientId) as any;
-    if (client?.contact) {
-      setClientWhatsapp(normalizeAndFormatPhone(client.contact));
-      lastAutoFilledClientIdRef.current = firstClientId;
-    } else if (client) {
-      setClientWhatsapp("");
-      lastAutoFilledClientIdRef.current = firstClientId;
+
+    // ---- External participant auto-fill (Lead > Client precedence) ----
+    let newParticipant: { name: string; email: string } | null = null;
+
+    if (formData.lead_id) {
+      const lead = leads.find((l: any) => l.id === formData.lead_id) as any;
+      if (lead?.email) {
+        newParticipant = { name: (lead.name || "Contato").trim(), email: lead.email.trim() };
+      }
+    } else {
+      const realIds = separateVirtualClients(selectedClientIds).realClientIds;
+      const firstClientId = realIds[0];
+      if (firstClientId) {
+        const client = clients.find((c: any) => c.id === firstClientId) as any;
+        if (client?.email) {
+          newParticipant = { name: (client.name || "Contato").trim(), email: client.email.trim() };
+        }
+      }
     }
+
+    // Snapshot ref BEFORE setState (pure updater)
+    const previousAutoEmail = lastAutoParticipantEmailRef.current;
+
+    setExternalParticipants(prev => {
+      // Remove only the previously auto-inserted entry (preserve manual entries)
+      const filtered = previousAutoEmail
+        ? prev.filter(p => p.email.trim().toLowerCase() !== previousAutoEmail.toLowerCase())
+        : prev;
+
+      if (newParticipant) {
+        const newEmailLower = newParticipant.email.toLowerCase();
+        const alreadyExists = filtered.some(p => p.email.trim().toLowerCase() === newEmailLower);
+        if (!alreadyExists) {
+          return [...filtered, newParticipant];
+        }
+      }
+      return filtered;
+    });
+
+    // Mutate ref OUTSIDE the updater
+    lastAutoParticipantEmailRef.current = newParticipant?.email.toLowerCase() ?? null;
   }, [formData.lead_id, selectedClientIds, leads, clients]);
 
   const handleDurationSelect = (minutes: number) => {
@@ -512,6 +556,7 @@ export const MeetingFormDialog = ({
     setClientWhatsapp("");
     setReminderHoursBefore(2);
     lastAutoFilledClientIdRef.current = null;
+    lastAutoParticipantEmailRef.current = null;
   };
 
   const addExternalParticipant = () => {
