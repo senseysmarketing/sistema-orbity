@@ -9,7 +9,7 @@ import { DemoSection } from "@/components/landing/DemoSection";
 import { IntegrationsSection } from "@/components/landing/IntegrationsSection";
 import { DifferentialsSection } from "@/components/landing/DifferentialsSection";
 import { PricingSection } from "@/components/landing/PricingSection";
-import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
+
 import { FAQSection } from "@/components/landing/FAQSection";
 import { CTASection } from "@/components/landing/CTASection";
 import { LandingFooter } from "@/components/landing/LandingFooter";
@@ -87,8 +87,7 @@ export default function LandingPage() {
       <IntegrationsSection />
       <DifferentialsSection />
       <PricingSection onOpenScheduling={openScheduling} />
-      <TestimonialsSection />
-      <FAQSection onOpenApplication={openApplication} onOpenScheduling={openScheduling} />
+      <FAQSection />
       <CTASection onOpenApplication={openApplication} onOpenScheduling={openScheduling} />
       <LandingFooter />
       <WhatsAppFloatingButton />
