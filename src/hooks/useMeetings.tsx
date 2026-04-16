@@ -31,6 +31,9 @@ export interface Meeting {
   updated_at: string;
   cancelled_reason?: string;
   sync_to_google_calendar?: boolean;
+  whatsapp_reminder_enabled?: boolean;
+  client_whatsapp?: string | null;
+  reminder_hours_before?: number;
   organizer?: { name: string; email: string };
   client?: { name: string };
   lead?: { name: string };
@@ -89,6 +92,9 @@ export const useMeetings = () => {
           client_id: meeting.client_id,
           lead_id: meeting.lead_id,
           sync_to_google_calendar: meeting.sync_to_google_calendar ?? false,
+          whatsapp_reminder_enabled: meeting.whatsapp_reminder_enabled ?? false,
+          client_whatsapp: meeting.client_whatsapp ?? null,
+          reminder_hours_before: meeting.reminder_hours_before ?? 2,
           agency_id: currentAgency.id,
           organizer_id: user.id,
           created_by: user.id,

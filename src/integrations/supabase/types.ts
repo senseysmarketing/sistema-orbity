@@ -3342,6 +3342,7 @@ export type Database = {
           agency_id: string
           cancelled_reason: string | null
           client_id: string | null
+          client_whatsapp: string | null
           created_at: string
           created_by: string
           description: string | null
@@ -3360,17 +3361,20 @@ export type Database = {
           organizer_id: string
           outcome: Database["public"]["Enums"]["meeting_outcome"] | null
           participants: Json | null
+          reminder_hours_before: number
           start_time: string
           status: Database["public"]["Enums"]["meeting_status"]
           sync_to_google_calendar: boolean | null
           title: string
           updated_at: string
+          whatsapp_reminder_enabled: boolean
         }
         Insert: {
           action_items?: Json | null
           agency_id: string
           cancelled_reason?: string | null
           client_id?: string | null
+          client_whatsapp?: string | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -3389,17 +3393,20 @@ export type Database = {
           organizer_id: string
           outcome?: Database["public"]["Enums"]["meeting_outcome"] | null
           participants?: Json | null
+          reminder_hours_before?: number
           start_time: string
           status?: Database["public"]["Enums"]["meeting_status"]
           sync_to_google_calendar?: boolean | null
           title: string
           updated_at?: string
+          whatsapp_reminder_enabled?: boolean
         }
         Update: {
           action_items?: Json | null
           agency_id?: string
           cancelled_reason?: string | null
           client_id?: string | null
+          client_whatsapp?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
@@ -3418,11 +3425,13 @@ export type Database = {
           organizer_id?: string
           outcome?: Database["public"]["Enums"]["meeting_outcome"] | null
           participants?: Json | null
+          reminder_hours_before?: number
           start_time?: string
           status?: Database["public"]["Enums"]["meeting_status"]
           sync_to_google_calendar?: boolean | null
           title?: string
           updated_at?: string
+          whatsapp_reminder_enabled?: boolean
         }
         Relationships: [
           {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
-import { Plus, X, Wand2, Calendar, Users, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, X, Wand2, Calendar, Users, Check, ChevronsUpDown, MessageCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -107,6 +108,23 @@ export const MeetingFormDialog = ({
   const [participantsPopoverOpen, setParticipantsPopoverOpen] = useState(false);
   const [leadsPopoverOpen, setLeadsPopoverOpen] = useState(false);
 
+  // WhatsApp reminder state
+  const [whatsappReminderEnabled, setWhatsappReminderEnabled] = useState(false);
+  const [clientWhatsapp, setClientWhatsapp] = useState("");
+  const [reminderHoursBefore, setReminderHoursBefore] = useState<number>(2);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const lastAutoFilledClientIdRef = useRef<string | null>(null);
+
+  // Phone mask helper (BR)
+  const formatPhoneBR = (value: string): string => {
+    const digits = (value || "").replace(/\D/g, "").slice(0, 11);
+    if (digits.length === 0) return "";
+    if (digits.length <= 2) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  };
+
   // Initialize sync checkbox based on Google Calendar connection
   useEffect(() => {
     if (isConnected && isSyncEnabled && !meeting) {
@@ -138,12 +156,12 @@ export const MeetingFormDialog = ({
   });
 
   const { data: clients = [] } = useQuery({
-    queryKey: ["clients", currentAgency?.id],
+    queryKey: ["clients-with-contact", currentAgency?.id],
     queryFn: async () => {
       if (!currentAgency?.id) return [];
       const { data } = await supabase
         .from("clients")
-        .select("id, name")
+        .select("id, name, contact")
         .eq("agency_id", currentAgency.id)
         .eq("active", true);
       const realClients = data || [];
@@ -213,6 +231,11 @@ export const MeetingFormDialog = ({
         setExternalParticipants(meeting.external_participants || []);
         setSelectedParticipants(meeting.participants || []);
         setSyncToGoogleCalendar(meeting.sync_to_google_calendar ?? false);
+        // Restore WhatsApp reminder fields (edit mode: full restore)
+        setWhatsappReminderEnabled(meeting.whatsapp_reminder_enabled ?? false);
+        setClientWhatsapp(meeting.client_whatsapp ?? "");
+        setReminderHoursBefore(meeting.reminder_hours_before ?? 2);
+        lastAutoFilledClientIdRef.current = null;
       } else if (duplicateFrom) {
         const now = new Date();
         now.setMinutes(0, 0, 0);
@@ -241,6 +264,11 @@ export const MeetingFormDialog = ({
         setSelectedParticipants(duplicateFrom.participants || []);
         setSelectedDuration([15, 30, 45, 60, 90, 120].includes(duration) ? duration : null);
         setSyncToGoogleCalendar(isConnected && isSyncEnabled);
+        // Guardrail 2: copy enabled + hours, but NEVER copy phone (auto-fill from current client)
+        setWhatsappReminderEnabled(duplicateFrom.whatsapp_reminder_enabled ?? false);
+        setClientWhatsapp("");
+        setReminderHoursBefore(duplicateFrom.reminder_hours_before ?? 2);
+        lastAutoFilledClientIdRef.current = null;
       } else if (prefilledDateTime) {
         const startDate = new Date(prefilledDateTime.date);
         startDate.setHours(prefilledDateTime.hour, 0, 0, 0);
@@ -261,6 +289,26 @@ export const MeetingFormDialog = ({
     
     loadMeetingData();
   }, [meeting, prefilledDateTime, duplicateFrom, open]);
+
+  // Auto-fill client WhatsApp when selected client changes
+  useEffect(() => {
+    const realIds = separateVirtualClients(selectedClientIds).realClientIds;
+    const firstClientId = realIds[0];
+    if (!firstClientId) {
+      lastAutoFilledClientIdRef.current = null;
+      return;
+    }
+    if (lastAutoFilledClientIdRef.current === firstClientId) return;
+    const client = clients.find((c: any) => c.id === firstClientId) as any;
+    if (client && client.contact) {
+      setClientWhatsapp(formatPhoneBR(client.contact));
+      lastAutoFilledClientIdRef.current = firstClientId;
+    } else if (client) {
+      // Client selected but has no contact: clear and remember
+      setClientWhatsapp("");
+      lastAutoFilledClientIdRef.current = firstClientId;
+    }
+  }, [selectedClientIds, clients]);
 
   const handleDurationSelect = (minutes: number) => {
     setSelectedDuration(minutes);
@@ -328,6 +376,13 @@ export const MeetingFormDialog = ({
       }
     }
 
+    // Guardrail 1: WhatsApp reminder strict validation
+    if (whatsappReminderEnabled && clientWhatsapp.replace(/\D/g, "").length < 10) {
+      toast.error("Por favor, preencha o WhatsApp do cliente para enviar o lembrete.");
+      phoneInputRef.current?.focus();
+      return;
+    }
+
     const startDate = new Date(formData.start_time);
     const endDate = new Date(formData.end_time);
 
@@ -341,6 +396,9 @@ export const MeetingFormDialog = ({
       is_internal: separateVirtualClients(selectedClientIds).isInternal,
       lead_id: formData.lead_id || null,
       sync_to_google_calendar: syncToGoogleCalendar,
+      whatsapp_reminder_enabled: whatsappReminderEnabled,
+      client_whatsapp: whatsappReminderEnabled ? clientWhatsapp : null,
+      reminder_hours_before: reminderHoursBefore,
     };
 
     try {
@@ -403,6 +461,10 @@ export const MeetingFormDialog = ({
     setSelectedParticipants([]);
     setSelectedDuration(60);
     setSyncToGoogleCalendar(isConnected && isSyncEnabled);
+    setWhatsappReminderEnabled(false);
+    setClientWhatsapp("");
+    setReminderHoursBefore(2);
+    lastAutoFilledClientIdRef.current = null;
   };
 
   const addExternalParticipant = () => {
@@ -786,6 +848,60 @@ export const MeetingFormDialog = ({
               <p className="text-sm text-muted-foreground text-center py-2">
                 Nenhum participante externo adicionado
               </p>
+            )}
+          </div>
+
+          {/* WhatsApp Reminder Section */}
+          <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="whatsapp-reminder" className="flex items-center gap-2 text-base font-medium">
+                  <MessageCircle className="h-4 w-4 text-green-600/80" />
+                  Lembrete Automático
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Ative para enviar um lembrete via WhatsApp ao cliente antes da reunião.
+                </p>
+              </div>
+              <Switch
+                id="whatsapp-reminder"
+                checked={whatsappReminderEnabled}
+                onCheckedChange={setWhatsappReminderEnabled}
+              />
+            </div>
+
+            {whatsappReminderEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div className="space-y-2">
+                  <Label htmlFor="client-whatsapp">Telefone do Cliente</Label>
+                  <Input
+                    id="client-whatsapp"
+                    ref={phoneInputRef}
+                    placeholder="(11) 99999-9999"
+                    value={clientWhatsapp}
+                    onChange={(e) => setClientWhatsapp(formatPhoneBR(e.target.value))}
+                    maxLength={15}
+                    inputMode="tel"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reminder-hours">Avisar com antecedência</Label>
+                  <Select
+                    value={String(reminderHoursBefore)}
+                    onValueChange={(v) => setReminderHoursBefore(Number(v))}
+                  >
+                    <SelectTrigger id="reminder-hours">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 hora antes</SelectItem>
+                      <SelectItem value="2">2 horas antes</SelectItem>
+                      <SelectItem value="12">12 horas antes</SelectItem>
+                      <SelectItem value="24">24 horas antes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             )}
           </div>
 
