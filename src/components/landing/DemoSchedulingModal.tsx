@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { trackLead } from "@/lib/metaPixel";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,11 @@ export function DemoSchedulingModal({ open, onOpenChange }: DemoSchedulingModalP
       } catch (webhookError) {
         console.error('Erro ao disparar webhook do n8n:', webhookError);
       }
+
+      trackLead({
+        content_name: 'Agendamento de Demonstração',
+        content_category: 'Reunião',
+      });
 
       setDirection(1);
       setStep(3);
