@@ -96,12 +96,17 @@ export default {
           from: { transform: "rotate(0deg) translateX(80px) rotate(0deg)" },
           to: { transform: "rotate(360deg) translateX(80px) rotate(-360deg)" },
         },
+        glow: {
+          "0%, 100%": { opacity: "0.4", filter: "drop-shadow(0 0 6px rgb(168 85 247 / 0.4))" },
+          "50%": { opacity: "1", filter: "drop-shadow(0 0 12px rgb(168 85 247 / 0.8))" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         float: "float 3s ease-in-out infinite",
         orbit: "orbit 12s linear infinite",
+        glow: "glow 2s ease-in-out infinite",
       },
     },
   },
