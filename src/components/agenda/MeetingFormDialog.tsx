@@ -108,6 +108,23 @@ export const MeetingFormDialog = ({
   const [participantsPopoverOpen, setParticipantsPopoverOpen] = useState(false);
   const [leadsPopoverOpen, setLeadsPopoverOpen] = useState(false);
 
+  // WhatsApp reminder state
+  const [whatsappReminderEnabled, setWhatsappReminderEnabled] = useState(false);
+  const [clientWhatsapp, setClientWhatsapp] = useState("");
+  const [reminderHoursBefore, setReminderHoursBefore] = useState<number>(2);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const lastAutoFilledClientIdRef = useRef<string | null>(null);
+
+  // Phone mask helper (BR)
+  const formatPhoneBR = (value: string): string => {
+    const digits = (value || "").replace(/\D/g, "").slice(0, 11);
+    if (digits.length === 0) return "";
+    if (digits.length <= 2) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  };
+
   // Initialize sync checkbox based on Google Calendar connection
   useEffect(() => {
     if (isConnected && isSyncEnabled && !meeting) {
