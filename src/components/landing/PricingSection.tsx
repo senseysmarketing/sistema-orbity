@@ -19,7 +19,7 @@ const features = [
 ];
 
 export function PricingSection({ onOpenScheduling }: PricingSectionProps) {
-  const [isAnnual, setIsAnnual] = useState(true);
+  const [isAnnual, setIsAnnual] = useState(false);
   const navigate = useNavigate();
 
   return (
@@ -123,7 +123,7 @@ export function PricingSection({ onOpenScheduling }: PricingSectionProps) {
               </div>
 
               {/* Preço */}
-              <div className="text-center mb-8">
+              <div key={isAnnual ? 'annual' : 'monthly'} className="text-center mb-8 animate-in fade-in zoom-in-95 slide-in-from-bottom-2 duration-500 ease-out">
                 <div className="flex items-baseline justify-center gap-1">
                   <span className="text-slate-400 text-lg">R$</span>
                   <span className="text-6xl font-bold text-white tabular-nums">
