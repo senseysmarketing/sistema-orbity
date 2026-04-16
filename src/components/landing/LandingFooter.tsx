@@ -1,64 +1,76 @@
 import { useNavigate } from "react-router-dom";
-import { Facebook, Instagram, Linkedin, Twitter } from "lucide-react";
-import { motion } from "framer-motion";
+import { Instagram, Linkedin } from "lucide-react";
+import orbityLogo from "@/assets/orbity-logo.png";
 
 export function LandingFooter() {
   const navigate = useNavigate();
 
+  const scrollTo = (hash: string) => {
+    navigate("/lp");
+    setTimeout(() => {
+      document.querySelector(hash)?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  };
+
   return (
-    <motion.footer
-      className="bg-muted/30 border-t py-12"
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.6 }}
-    >
-      <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          <div className="space-y-4">
-            <h3 className="font-bold text-lg">Plataforma</h3>
-            <div className="flex flex-col space-y-2">
-              <button onClick={() => navigate("/lp")} className="text-muted-foreground hover:text-foreground text-left transition-colors">Início</button>
-              <button onClick={() => navigate("/lp#features")} className="text-muted-foreground hover:text-foreground text-left transition-colors">Funcionalidades</button>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <h3 className="font-bold text-lg">Empresa</h3>
-            <div className="flex flex-col space-y-2">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Sobre</a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Blog</a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Contato</a>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <h3 className="font-bold text-lg">Suporte</h3>
-            <div className="flex flex-col space-y-2">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Central de Ajuda</a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Documentação</a>
-              <button onClick={() => navigate("/auth")} className="text-muted-foreground hover:text-foreground text-left transition-colors">Login</button>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <h3 className="font-bold text-lg">Redes Sociais</h3>
-            <div className="flex gap-4">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors"><Facebook className="w-5 h-5" /></a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors"><Instagram className="w-5 h-5" /></a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors"><Linkedin className="w-5 h-5" /></a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors"><Twitter className="w-5 h-5" /></a>
-            </div>
+    <footer className="bg-white border-t border-slate-200">
+      <div className="max-w-7xl mx-auto px-4 py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+        {/* Coluna 1 — Marca */}
+        <div className="space-y-4">
+          <img src={orbityLogo} alt="Orbity" className="h-8" />
+          <p className="text-sm text-slate-500 mt-4">
+            O padrão operacional das agências de elite.
+          </p>
+          <div className="flex gap-4 mt-4">
+            <a href="#" className="text-slate-400 hover:text-purple-600 transition-colors">
+              <Instagram className="w-5 h-5" />
+            </a>
+            <a href="#" className="text-slate-400 hover:text-purple-600 transition-colors">
+              <Linkedin className="w-5 h-5" />
+            </a>
           </div>
         </div>
-        <div className="border-t pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-muted-foreground">© 2025 Orbity. Todos os direitos reservados.</p>
-            <div className="flex gap-6 text-sm">
-              <button onClick={() => navigate("/privacy-policy")} className="text-muted-foreground hover:text-foreground transition-colors">Privacidade</button>
-              <button onClick={() => navigate("/privacy-policy")} className="text-muted-foreground hover:text-foreground transition-colors">Termos</button>
-              <button onClick={() => navigate("/privacy-policy")} className="text-muted-foreground hover:text-foreground transition-colors">LGPD</button>
-            </div>
-          </div>
+
+        {/* Coluna 2 — Produto */}
+        <div>
+          <h4 className="font-semibold text-slate-900 mb-4">Produto</h4>
+          <ul className="space-y-3">
+            <li><button onClick={() => scrollTo("#features")} className="text-slate-600 hover:text-slate-900 transition-colors">Funcionalidades</button></li>
+            <li><button onClick={() => scrollTo("#integrations")} className="text-slate-600 hover:text-slate-900 transition-colors">Integrações</button></li>
+            <li><button onClick={() => scrollTo("#pricing")} className="text-slate-600 hover:text-slate-900 transition-colors">Preços</button></li>
+            <li><a href="#" className="text-slate-600 hover:text-slate-900 transition-colors">Atualizações</a></li>
+          </ul>
+        </div>
+
+        {/* Coluna 3 — Empresa */}
+        <div>
+          <h4 className="font-semibold text-slate-900 mb-4">Empresa</h4>
+          <ul className="space-y-3">
+            <li><a href="#" className="text-slate-600 hover:text-slate-900 transition-colors">Sobre nós</a></li>
+            <li><a href="#" className="text-slate-600 hover:text-slate-900 transition-colors">Contato</a></li>
+            <li><a href="#" className="text-slate-600 hover:text-slate-900 transition-colors">Programa de Parceiros</a></li>
+          </ul>
+        </div>
+
+        {/* Coluna 4 — Legal */}
+        <div>
+          <h4 className="font-semibold text-slate-900 mb-4">Legal</h4>
+          <ul className="space-y-3">
+            <li><a href="#" className="text-slate-600 hover:text-slate-900 transition-colors">Termos de Uso</a></li>
+            <li><a href="#" className="text-slate-600 hover:text-slate-900 transition-colors">Política de Privacidade</a></li>
+            <li><a href="#" className="text-slate-600 hover:text-slate-900 transition-colors">Central de Ajuda</a></li>
+          </ul>
         </div>
       </div>
-    </motion.footer>
+
+      {/* Barra de Compliance */}
+      <div className="max-w-7xl mx-auto px-4 pb-8">
+        <div className="pt-8 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-400">
+          <span>© 2026 Orbity (by Senseys). Todos os direitos reservados.</span>
+          <span>CNPJ: 51.912.584/0001-02</span>
+          <span>Desenvolvido com tecnologia de ponta no Brasil.</span>
+        </div>
+      </div>
+    </footer>
   );
 }
