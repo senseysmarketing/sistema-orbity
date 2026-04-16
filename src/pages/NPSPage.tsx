@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { formatPhoneDisplay } from "@/lib/formatPhoneDisplay";
 
 function getCurrentPeriod(): string {
   const now = new Date();
@@ -466,15 +467,18 @@ export default function NPSPage() {
                     <SelectContent>
                       {whatsappInstances.map((inst: any) => (
                         <SelectItem key={inst.id} value={inst.id}>
-                          {inst.instance_name} {inst.phone_number ? `(${inst.phone_number})` : ""}
+                          {inst.phone_number ? formatPhoneDisplay(inst.phone_number) : inst.instance_name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 ) : whatsappInstances.length === 1 ? (
                   <div className="p-3 rounded-lg border bg-muted/30 text-sm">
-                    <span className="font-medium">{whatsappInstances[0].instance_name}</span>
-                    {whatsappInstances[0].phone_number && <span className="text-muted-foreground"> ({whatsappInstances[0].phone_number})</span>}
+                    <span className="font-medium">
+                      {whatsappInstances[0].phone_number
+                        ? formatPhoneDisplay(whatsappInstances[0].phone_number)
+                        : whatsappInstances[0].instance_name}
+                    </span>
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">Nenhuma instância conectada</p>
