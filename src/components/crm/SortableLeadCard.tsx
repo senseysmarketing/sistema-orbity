@@ -9,6 +9,7 @@ import {
   DollarSign, Clock, Target, AlertTriangle, GripVertical, 
   MessageCircle
 } from "lucide-react";
+// Calendar already imported above for Reunião button
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { LeadScoring } from "./LeadScoring";
@@ -63,6 +64,7 @@ interface SortableLeadCardProps {
   onEdit: (lead: Lead) => void;
   onDelete: (leadId: string) => void;
   onView?: (lead: Lead) => void;
+  onScheduleMeeting?: (lead: Lead) => void;
   getPriorityColor: (priority: string) => string;
   getPriorityLabel: (priority: string) => string;
   getUrgencyLevel: (lead: Lead) => { level: string; label: string; color: string };
@@ -76,6 +78,7 @@ export function SortableLeadCard({
   onEdit,
   onDelete,
   onView,
+  onScheduleMeeting,
   getPriorityColor,
   getPriorityLabel,
   getUrgencyLevel,
@@ -147,7 +150,7 @@ export function SortableLeadCard({
         <GripVertical className="h-4 w-4" />
       </button>
       <Card
-        className={`transition-all duration-200 cursor-pointer select-none border-[#5a35a0] ${
+        className={`group transition-all duration-200 cursor-pointer select-none border-[#5a35a0] ${
           isDragging 
             ? 'shadow-2xl border-primary/50' 
             : 'hover:shadow-lg hover:shadow-purple-900/30 hover:scale-[1.02] hover:brightness-110'
@@ -263,16 +266,35 @@ export function SortableLeadCard({
             </div>
           )}
 
-          {/* WhatsApp Badge - substitui a barra de score */}
-          {lead.phone ? (
-            <Badge 
-              variant="outline" 
-              className="w-full justify-center gap-1.5 py-1.5 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 cursor-pointer"
-              onClick={handleWhatsAppClick}
+          {/* Action buttons — discreet, hover-only on desktop, always visible on mobile */}
+          {(lead.phone || onScheduleMeeting) ? (
+            <div
+              className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300"
+              onPointerDown={(e) => e.stopPropagation()}
             >
-              <MessageCircle className="h-3.5 w-3.5" />
-              WhatsApp
-            </Badge>
+              {lead.phone && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 h-8 text-xs text-white/80 hover:text-white bg-transparent border-white/20 hover:bg-white/10"
+                  onClick={(e) => { e.stopPropagation(); handleWhatsAppClick(e); }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <MessageCircle className="h-3.5 w-3.5 mr-1" /> WhatsApp
+                </Button>
+              )}
+              {onScheduleMeeting && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 h-8 text-xs text-white/80 hover:text-white bg-transparent border-white/20 hover:bg-white/10"
+                  onClick={(e) => { e.stopPropagation(); onScheduleMeeting(lead); }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <Calendar className="h-3.5 w-3.5 mr-1" /> Reunião
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="pt-1">
               <LeadScoring lead={lead} showLabel={false} />
