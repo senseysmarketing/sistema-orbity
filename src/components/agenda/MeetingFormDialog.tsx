@@ -14,7 +14,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
-import { Plus, X, Wand2, Calendar, Users, Check, ChevronsUpDown, MessageCircle } from "lucide-react";
+import { Plus, X, Wand2, Calendar, Users, Check, ChevronsUpDown, MessageCircle, Settings2, ChevronDown, Info } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -125,6 +126,16 @@ export const MeetingFormDialog = ({
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
   };
 
+  // Guardrail 1: Sanitize CRM phones (strip BR DDI 55) before applying mask
+  const normalizeAndFormatPhone = (rawPhone: string): string => {
+    if (!rawPhone) return "";
+    let cleaned = rawPhone.replace(/\D/g, "");
+    if (cleaned.startsWith("55") && (cleaned.length === 12 || cleaned.length === 13)) {
+      cleaned = cleaned.substring(2);
+    }
+    return formatPhoneBR(cleaned);
+  };
+
   // Initialize sync checkbox based on Google Calendar connection
   useEffect(() => {
     if (isConnected && isSyncEnabled && !meeting) {
@@ -178,7 +189,7 @@ export const MeetingFormDialog = ({
       if (!currentAgency?.id) return [];
       const { data } = await supabase
         .from("leads")
-        .select("id, name, created_at")
+        .select("id, name, phone, created_at")
         .eq("agency_id", currentAgency.id)
         .order("created_at", { ascending: false });
       return data || [];
@@ -290,8 +301,22 @@ export const MeetingFormDialog = ({
     loadMeetingData();
   }, [meeting, prefilledDateTime, duplicateFrom, open]);
 
-  // Auto-fill client WhatsApp when selected client changes
+  // Guardrail 2: Centralized auto-fill — single effect, explicit precedence Lead > Client.
+  // Eliminates race conditions between multiple effects.
   useEffect(() => {
+    if (!leads.length && !clients.length) return;
+
+    // Lead has absolute priority
+    if (formData.lead_id) {
+      const lead = leads.find((l: any) => l.id === formData.lead_id) as any;
+      if (lead?.phone) {
+        setClientWhatsapp(normalizeAndFormatPhone(lead.phone));
+        lastAutoFilledClientIdRef.current = `lead:${formData.lead_id}`;
+        return;
+      }
+    }
+
+    // Fallback to first real client
     const realIds = separateVirtualClients(selectedClientIds).realClientIds;
     const firstClientId = realIds[0];
     if (!firstClientId) {
@@ -300,15 +325,14 @@ export const MeetingFormDialog = ({
     }
     if (lastAutoFilledClientIdRef.current === firstClientId) return;
     const client = clients.find((c: any) => c.id === firstClientId) as any;
-    if (client && client.contact) {
-      setClientWhatsapp(formatPhoneBR(client.contact));
+    if (client?.contact) {
+      setClientWhatsapp(normalizeAndFormatPhone(client.contact));
       lastAutoFilledClientIdRef.current = firstClientId;
     } else if (client) {
-      // Client selected but has no contact: clear and remember
       setClientWhatsapp("");
       lastAutoFilledClientIdRef.current = firstClientId;
     }
-  }, [selectedClientIds, clients]);
+  }, [formData.lead_id, selectedClientIds, leads, clients]);
 
   const handleDurationSelect = (minutes: number) => {
     setSelectedDuration(minutes);
@@ -424,6 +448,28 @@ export const MeetingFormDialog = ({
         // Save client relations for new meeting
         if (createdMeeting?.id) {
           await updateClientRelations("meeting", createdMeeting.id, separateVirtualClients(selectedClientIds).realClientIds);
+        }
+
+        // CRM automation: if linked to a lead, move it to "scheduled" + log history (fire-and-forget)
+        if (formData.lead_id && currentAgency?.id && user?.id) {
+          try {
+            await supabase
+              .from("leads")
+              .update({ status: "scheduled" })
+              .eq("id", formData.lead_id);
+
+            await supabase.from("lead_history").insert({
+              lead_id: formData.lead_id,
+              agency_id: currentAgency.id,
+              user_id: user.id,
+              action_type: "meeting_scheduled",
+              field_name: "meeting",
+              new_value: `${formData.title} — ${format(new Date(formData.start_time), "dd/MM/yyyy 'às' HH:mm")}`,
+            });
+            toast.success("Lead movido para 'Agendamentos' no CRM");
+          } catch (err) {
+            console.error("CRM sync failed (non-blocking):", err);
+          }
         }
         
         // Sync to Google Calendar after creation
@@ -570,9 +616,14 @@ export const MeetingFormDialog = ({
                     aria-expanded={leadsPopoverOpen}
                     className="w-full justify-between font-normal"
                   >
-                    {formData.lead_id
-                      ? leads.find((l) => l.id === formData.lead_id)?.name
-                      : "Selecione um lead..."}
+                    {formData.lead_id ? (
+                      <span className="flex items-center gap-2 truncate">
+                        <Badge variant="outline" className="border-green-600/40 text-green-700 dark:text-green-400 px-1.5 py-0 text-[10px] h-4">Lead</Badge>
+                        <span className="truncate">{leads.find((l) => l.id === formData.lead_id)?.name}</span>
+                      </span>
+                    ) : (
+                      "Selecione um lead..."
+                    )}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -611,6 +662,12 @@ export const MeetingFormDialog = ({
                   </Command>
                 </PopoverContent>
               </Popover>
+              {formData.lead_id && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1.5 mt-1">
+                  <Info className="h-3 w-3 shrink-0" />
+                  Ao salvar, este lead será movido automaticamente para "Agendamentos" no CRM.
+                </p>
+              )}
             </div>
           </div>
 
@@ -650,65 +707,136 @@ export const MeetingFormDialog = ({
 
           {conflicts.length > 0 && <MeetingConflictAlert conflicts={conflicts} />}
 
-          {/* Location and Meet Link */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="location">Local</Label>
-              <Input
-                id="location"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                placeholder="Endereço ou sala"
-                maxLength={500}
-              />
-            </div>
+          {/* Configurações de Acesso e Notificação */}
+          <Collapsible className="rounded-lg border bg-muted/20">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/40 transition-colors rounded-lg [&[data-state=open]>svg]:rotate-180"
+              >
+                <span className="flex items-center gap-2">
+                  <Settings2 className="h-4 w-4 text-primary" />
+                  Configurações de Acesso e Notificação
+                </span>
+                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-4 pb-4 pt-1 space-y-4">
+              {/* Location and Meet Link */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="location">Local</Label>
+                  <Input
+                    id="location"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    placeholder="Endereço ou sala"
+                    maxLength={500}
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="google_meet_link">Link Google Meet</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="google_meet_link"
-                  value={formData.google_meet_link}
-                  onChange={(e) => setFormData({ ...formData, google_meet_link: e.target.value })}
-                  placeholder="https://meet.google.com/..."
-                  maxLength={500}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={generateGoogleMeetLink}
-                  title="Gerar link"
-                >
-                  <Wand2 className="h-4 w-4" />
-                </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="google_meet_link">Link Google Meet</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="google_meet_link"
+                      value={formData.google_meet_link}
+                      onChange={(e) => setFormData({ ...formData, google_meet_link: e.target.value })}
+                      placeholder="https://meet.google.com/..."
+                      maxLength={500}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={generateGoogleMeetLink}
+                      title="Gerar link"
+                    >
+                      <Wand2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Google Calendar Sync Option */}
-          {isConnected && (
-            <div className="flex items-start space-x-3 p-3 rounded-lg bg-muted/50 border">
-              <Checkbox
-                id="sync_google_calendar"
-                checked={syncToGoogleCalendar}
-                onCheckedChange={(checked) => setSyncToGoogleCalendar(checked === true)}
-              />
-              <div className="space-y-1">
-                <Label
-                  htmlFor="sync_google_calendar"
-                  className="text-sm font-medium cursor-pointer flex items-center gap-2"
-                >
-                  <Calendar className="h-4 w-4 text-primary" />
-                  Sincronizar com Google Calendar
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Calendário: {calendars.find(c => c.id === selectedCalendarId)?.summary || "Principal"}
-                </p>
+              {/* Google Calendar Sync Option */}
+              {isConnected && (
+                <div className="flex items-start space-x-3 p-3 rounded-lg bg-muted/50 border">
+                  <Checkbox
+                    id="sync_google_calendar"
+                    checked={syncToGoogleCalendar}
+                    onCheckedChange={(checked) => setSyncToGoogleCalendar(checked === true)}
+                  />
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="sync_google_calendar"
+                      className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                    >
+                      <Calendar className="h-4 w-4 text-primary" />
+                      Sincronizar com Google Calendar
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Calendário: {calendars.find(c => c.id === selectedCalendarId)?.summary || "Principal"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* WhatsApp Reminder Section */}
+              <div className="space-y-3 rounded-lg border p-4 bg-background">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="whatsapp-reminder" className="flex items-center gap-2 text-base font-medium">
+                      <MessageCircle className="h-4 w-4 text-green-600/80" />
+                      Lembrete Automático
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Ative para enviar um lembrete via WhatsApp ao cliente antes da reunião.
+                    </p>
+                  </div>
+                  <Switch
+                    id="whatsapp-reminder"
+                    checked={whatsappReminderEnabled}
+                    onCheckedChange={setWhatsappReminderEnabled}
+                  />
+                </div>
+
+                {whatsappReminderEnabled && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="client-whatsapp">Telefone do Cliente</Label>
+                      <Input
+                        id="client-whatsapp"
+                        ref={phoneInputRef}
+                        placeholder="(11) 99999-9999"
+                        value={clientWhatsapp}
+                        onChange={(e) => setClientWhatsapp(formatPhoneBR(e.target.value))}
+                        maxLength={15}
+                        inputMode="tel"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reminder-hours">Avisar com antecedência</Label>
+                      <Select
+                        value={String(reminderHoursBefore)}
+                        onValueChange={(v) => setReminderHoursBefore(Number(v))}
+                      >
+                        <SelectTrigger id="reminder-hours">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1 hora antes</SelectItem>
+                          <SelectItem value="2">2 horas antes</SelectItem>
+                          <SelectItem value="12">12 horas antes</SelectItem>
+                          <SelectItem value="24">24 horas antes</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* Internal Participants (Team Members) */}
           <div className="space-y-3">
@@ -848,60 +976,6 @@ export const MeetingFormDialog = ({
               <p className="text-sm text-muted-foreground text-center py-2">
                 Nenhum participante externo adicionado
               </p>
-            )}
-          </div>
-
-          {/* WhatsApp Reminder Section */}
-          <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="whatsapp-reminder" className="flex items-center gap-2 text-base font-medium">
-                  <MessageCircle className="h-4 w-4 text-green-600/80" />
-                  Lembrete Automático
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Ative para enviar um lembrete via WhatsApp ao cliente antes da reunião.
-                </p>
-              </div>
-              <Switch
-                id="whatsapp-reminder"
-                checked={whatsappReminderEnabled}
-                onCheckedChange={setWhatsappReminderEnabled}
-              />
-            </div>
-
-            {whatsappReminderEnabled && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <div className="space-y-2">
-                  <Label htmlFor="client-whatsapp">Telefone do Cliente</Label>
-                  <Input
-                    id="client-whatsapp"
-                    ref={phoneInputRef}
-                    placeholder="(11) 99999-9999"
-                    value={clientWhatsapp}
-                    onChange={(e) => setClientWhatsapp(formatPhoneBR(e.target.value))}
-                    maxLength={15}
-                    inputMode="tel"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="reminder-hours">Avisar com antecedência</Label>
-                  <Select
-                    value={String(reminderHoursBefore)}
-                    onValueChange={(v) => setReminderHoursBefore(Number(v))}
-                  >
-                    <SelectTrigger id="reminder-hours">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 hora antes</SelectItem>
-                      <SelectItem value="2">2 horas antes</SelectItem>
-                      <SelectItem value="12">12 horas antes</SelectItem>
-                      <SelectItem value="24">24 horas antes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
             )}
           </div>
 
