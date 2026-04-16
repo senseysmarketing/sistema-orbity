@@ -31,6 +31,9 @@ export interface Meeting {
   updated_at: string;
   cancelled_reason?: string;
   sync_to_google_calendar?: boolean;
+  whatsapp_reminder_enabled?: boolean;
+  client_whatsapp?: string | null;
+  reminder_hours_before?: number;
   organizer?: { name: string; email: string };
   client?: { name: string };
   lead?: { name: string };
