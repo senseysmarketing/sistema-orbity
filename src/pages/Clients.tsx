@@ -92,14 +92,27 @@ export default function Clients() {
             Gerencie informações, tarefas e acessos dos seus clientes
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="gap-1">
-            <Users className="h-3 w-3" />
-            {activeCount} ativos
-          </Badge>
-          <Badge variant="secondary" className="gap-1">
-            {inactiveCount} inativos
-          </Badge>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="gap-1">
+              <Users className="h-3 w-3" />
+              {activeCount} ativos
+            </Badge>
+            <Badge variant="secondary" className="gap-1">
+              {inactiveCount} inativos
+            </Badge>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => {
+            navigate("/dashboard/admin");
+            toast({ title: "Gerenciar Carteira", description: "Acesse a gestão completa no Centro de Comando." });
+          }}>
+            <Briefcase className="h-4 w-4 mr-1" />
+            Gerenciar Carteira
+          </Button>
+          <Button variant="create" size="sm" onClick={() => setClientFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Novo Cliente
+          </Button>
         </div>
       </div>
 
@@ -239,6 +252,15 @@ export default function Clients() {
           </Table>
         </div>
       )}
+      {/* Client Form Dialog */}
+      <ClientForm
+        open={clientFormOpen}
+        onOpenChange={setClientFormOpen}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["clients-list"] });
+          setClientFormOpen(false);
+        }}
+      />
     </div>
   );
 }
