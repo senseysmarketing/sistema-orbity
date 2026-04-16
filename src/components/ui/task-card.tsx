@@ -113,7 +113,7 @@ export function TaskCard({
 
   return (
     <div 
-      className="p-3 md:p-4 rounded-lg border border-[#5a35a0] cursor-pointer hover:shadow-lg hover:shadow-purple-900/30 hover:brightness-110 transition-all"
+      className="p-3 md:p-4 rounded-lg border border-[#5a35a0] cursor-pointer hover:shadow-lg hover:shadow-purple-900/30 hover:brightness-110 hover:scale-[1.02] hover:-translate-y-0.5 transition-all duration-300 ease-out"
       onClick={(e) => onClick?.(e)}
       style={{ backgroundColor: '#4c2882' }}
     >
