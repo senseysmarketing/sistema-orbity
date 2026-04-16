@@ -46,7 +46,7 @@ export function FAQSection() {
   };
 
   return (
-    <section id="faq" className="bg-white py-24">
+    <section id="faq" className="bg-slate-50 py-24">
       <div className="grid lg:grid-cols-12 gap-12 lg:gap-24 max-w-7xl mx-auto px-4">
         {/* Coluna Esquerda - Sticky */}
         <aside className="lg:col-span-4 lg:sticky lg:top-32 h-fit">
@@ -57,7 +57,7 @@ export function FAQSection() {
             Tudo o que precisa de saber sobre o Orbity.
           </p>
 
-          <div className="border border-slate-200 rounded-2xl p-6 bg-slate-50">
+          <div className="border border-slate-200 rounded-2xl p-6 bg-white">
             <p className="font-semibold text-slate-900 mb-1">Ainda tem dúvidas?</p>
             <p className="text-sm text-slate-500 mb-4">
               A nossa equipa está pronta para ajudar.
@@ -76,7 +76,7 @@ export function FAQSection() {
               <AccordionItem
                 key={index}
                 value={`item-${index}`}
-                className="bg-slate-50 border border-slate-100 rounded-2xl px-6 overflow-hidden border-b-0 data-[state=open]:bg-white data-[state=open]:shadow-md data-[state=open]:border-purple-500/20 data-[state=open]:ring-1 data-[state=open]:ring-purple-500/10 transition-all duration-300"
+                className="bg-white border border-slate-200 rounded-2xl px-6 overflow-hidden border-b-0 data-[state=open]:bg-white data-[state=open]:shadow-md data-[state=open]:border-purple-500/20 data-[state=open]:ring-1 data-[state=open]:ring-purple-500/10 transition-all duration-300"
               >
                 <AccordionTrigger className="font-semibold text-slate-900 hover:no-underline [&>svg]:transition-transform [&>svg]:duration-300">
                   {faq.question}
