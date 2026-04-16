@@ -26,7 +26,7 @@ import {
   Copy,
   Edit2,
   ExternalLink,
-  Image,
+  
   Key,
   Phone,
   Plus,
@@ -96,7 +96,7 @@ export default function ClientDetail() {
           .limit(5),
         supabase
           .from("nps_responses")
-          .select("score")
+          .select("score, client_name")
           .eq("agency_id", currentAgency.id)
           .order("response_date", { ascending: false })
           .limit(50),
