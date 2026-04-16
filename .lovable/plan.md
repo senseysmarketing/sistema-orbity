@@ -1,68 +1,151 @@
 
 
-# Implementação Final: Hub de Configurações CRM
+# Flow Cadence + Live Preview + 3 melhorias UX
 
-## Refinamentos aprovados
-1. **Hover de ícone**: `group` no Card + `text-muted-foreground transition-colors group-hover:text-primary` no ícone
-2. **Separator** entre `MetaIntegrationConfig` e `WebhooksManager` na gaveta de Integrações
-3. **`h-full`** nos cards para alinhamento uniforme do grid
+## Verificações rápidas necessárias antes da implementação
 
-## Estrutura final do `CRMSettings.tsx`
+1. **`profiles.phone`**: preciso confirmar se existe coluna de telefone em `profiles` (o plano fala em `user.phone || profiles.phone`).
+2. **Spintax**: aplicar regex `/\{([^{}]+)\}/g` apenas em substrings sem `{{...}}` para não conflitar com variáveis. Estratégia: processar **primeiro** `{{var}}` → valor real, **depois** `{...|...}` → primeira opção.
+
+## Implementação
+
+### 1. `WhatsAppPreview` (interno)
 
 ```tsx
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
-import { Separator } from "@/components/ui/separator";
-import { GitMerge, Target, MessageCircle, Link2, DollarSign } from "lucide-react";
-import { CustomStatusManager } from "./CustomStatusManager";
-import { LeadScoringConfig } from "./LeadScoringConfig";
-import { WhatsAppTemplateManager } from "./WhatsAppTemplateManager";
-import { MetaIntegrationConfig } from "./MetaIntegrationConfig";
-import { WebhooksManager } from "./WebhooksManager";
-import { ManualInvestmentManager } from "./ManualInvestmentManager";
+function renderPreview(text: string): string {
+  // Etapa 1: substituir variáveis {{nome}}, {{empresa}}, etc.
+  let out = text
+    .replace(/\{\{nome\}\}/g, "Gabriel")
+    .replace(/\{\{empresa\}\}/g, "Senseys")
+    .replace(/\{\{email\}\}/g, "gabriel@senseys.com.br")
+    .replace(/\{\{telefone\}\}/g, "(11) 99999-9999")
+    .replace(/\{\{formulario:([^}]+)\}\}/g, (_, k) => `[${k.replace(/_/g, " ")}]`);
+  
+  // Etapa 2: Spintax {opção1|opção2|opção3} → primeira opção
+  out = out.replace(/\{([^{}]+)\}/g, (_, opts) => opts.split('|')[0].trim());
+  
+  return out;
+}
 ```
 
-### 5 Cards no grid
+UI do balão:
+- Wrapper "telemóvel": `bg-muted/30 rounded-2xl p-4`
+- Header: avatar + "Gabriel" + status "online"
+- Balão alinhado à direita: `bg-[#dcf8c6] dark:bg-[#005c4b] rounded-2xl rounded-tr-sm px-4 py-2 max-w-[80%] ml-auto whitespace-pre-wrap`
+- Timestamp + ✓✓ azul
 
-| # | Card | Ícone | Sheet width | Conteúdo |
-|---|------|-------|-------------|----------|
-| 1 | Status do Funil | `GitMerge` | `sm:max-w-[600px]` | `<CustomStatusManager />` |
-| 2 | Qualificação de Leads | `Target` | `sm:max-w-[700px]` | `<LeadScoringConfig />` |
-| 3 | Cadência de WhatsApp | `MessageCircle` | `sm:max-w-[800px]` | `<WhatsAppTemplateManager />` |
-| 4 | Fontes & Integrações | `Link2` | `sm:max-w-[800px]` | `Meta` + `<Separator className="my-6" />` + `Webhooks` |
-| 5 | Investimentos Manuais | `DollarSign` | `sm:max-w-[600px]` | `<ManualInvestmentManager />` |
+### 2. Timeline com delay no conector
 
-### Padrão do Card (SheetTrigger)
+Estrutura de cada par de etapas:
+```
+●  Etapa 1
+│
+│  ⏱ Aguardar 1h         ← badge sobre a linha
+│
+●  Etapa 2
+```
+
+Render:
 ```tsx
-<Sheet>
-  <SheetTrigger asChild>
-    <Card className="group h-full hover:border-primary/50 transition-colors cursor-pointer">
-      <CardHeader>
-        <Icon className="h-6 w-6 text-muted-foreground transition-colors group-hover:text-primary mb-2" />
-        <CardTitle className="text-base">Título</CardTitle>
-        <CardDescription>Descrição</CardDescription>
-      </CardHeader>
-    </Card>
-  </SheetTrigger>
-  <SheetContent side="right" className="sm:max-w-[XXX] overflow-y-auto">
-    <SheetHeader className="mb-6">
-      <SheetTitle>Título</SheetTitle>
-      <SheetDescription>Contexto</SheetDescription>
-    </SheetHeader>
-    {/* Componente filho */}
-  </SheetContent>
-</Sheet>
+{templates.map((t, i) => (
+  <div key={t.id}>
+    <TimelineNode template={t} active={...} onClick={...} />
+    {i < templates.length - 1 && (
+      <div className="relative flex items-center justify-center py-3 ml-3">
+        <div className="absolute inset-y-0 left-0 border-l-2 border-dashed border-muted" />
+        <Badge variant="outline" className="bg-background relative z-10 text-xs gap-1">
+          <Clock className="h-3 w-3" />
+          Aguardar {formatDelay(templates[i+1].delay_minutes)}
+        </Badge>
+      </div>
+    )}
+  </div>
+))}
 ```
 
-### Grid container
+### 3. Botão "Enviar teste para mim"
+
+Localização: dentro do card do Editor, ao lado do botão Salvar.
+
+Lógica:
 ```tsx
-<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+const sendTest = useMutation({
+  mutationFn: async () => {
+    // 1. Buscar telefone do utilizador
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('phone')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    const phone = profile?.phone;
+    if (!phone) throw new Error('Configure seu telefone no perfil para receber testes');
+    
+    // 2. Renderizar preview (com variáveis + spintax) para enviar conteúdo realista
+    const renderedMessage = renderPreview(activeTemplate.content);
+    
+    // 3. Chamar whatsapp-send via hook existente
+    await sendMessage.mutateAsync({
+      phone_number: phone,
+      message: `🧪 [TESTE] ${renderedMessage}`,
+    });
+  },
+  onSuccess: () => toast({ title: 'Mensagem de teste enviada!' }),
+  onError: (e) => toast({ title: 'Erro', description: e.message, variant: 'destructive' }),
+});
 ```
 
-`items-stretch` (default do grid) + `h-full` nos cards garantem altura uniforme sem distorção.
+UI: `<Button variant="outline" size="sm"><Send className="h-4 w-4 mr-2" />Enviar teste para mim</Button>`
+
+Disabled quando: sem `activeTemplate`, sem conta WhatsApp conectada, ou conteúdo vazio.
+
+### 4. Layout final
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Header + Badges (Pausa auto + Anti-Bot)                  │
+├──────────────────────────────────────────────────────────┤
+│ SendingSchedule + AllowedSources (grid 2)                │
+├──────────────────────────────────────────────────────────┤
+│ Tabs: [Saudação] [Follow-up]                             │
+│ ┌────────────┬───────────────────────────────────┐       │
+│ │ col-span-4 │ col-span-8                        │       │
+│ │            │                                   │       │
+│ │ Timeline   │ ┌─ Editor ────────────────────┐   │       │
+│ │ ● Etapa 1  │ │ Textarea + variáveis        │   │       │
+│ │ │⏱ 1h     │ │ Delay + Switch              │   │       │
+│ │ ● Etapa 2  │ │ [Enviar teste] [Salvar]     │   │       │
+│ │ │⏱ 24h    │ └─────────────────────────────┘   │       │
+│ │ ● Etapa 3  │                                   │       │
+│ │ + Add      │ ┌─ 📱 Live Preview ───────────┐   │       │
+│ │            │ │ [Avatar] Gabriel · online   │   │       │
+│ │            │ │           ┌──────────────┐  │   │       │
+│ │            │ │           │ Olá Gabriel! │  │   │       │
+│ │            │ │           └──────────────┘  │   │       │
+│ │            │ │                  10:42 ✓✓   │   │       │
+│ │            │ └─────────────────────────────┘   │       │
+│ └────────────┴───────────────────────────────────┘       │
+└──────────────────────────────────────────────────────────┘
+```
+
+## Guardrails
+
+| # | Garantia | Como |
+|---|----------|------|
+| 1 | Spintax não interfere com variáveis | Processamento em 2 etapas: `{{var}}` antes de `{spintax}` |
+| 2 | Telefone ausente | Toast claro "Configure seu telefone no perfil" |
+| 3 | Mensagem teste identificável | Prefixo `🧪 [TESTE]` |
+| 4 | Variáveis reais | Usa `{{nome}}`/`{{empresa}}` (sistema real) |
+| 5 | Timeline temporal clara | Badge `⏱ Aguardar Xh` no conector vertical |
+| 6 | Sem perda de feature | VariableInserter, delay, switch ativo, save preservados |
+| 7 | Empty states | Timeline vazia → CTA "+ Adicionar primeira etapa"; sem ativo → placeholder |
+
+## Confirmação prévia
+
+Antes de codar, vou abrir `WhatsAppTemplateManager.tsx` completo + verificar `profiles.phone` no schema. Se a coluna não existir, uso `whatsapp_accounts.phone_number` da agência como fallback (envio para o próprio número conectado, útil para teste técnico).
 
 ## Ficheiro alterado
-- `src/components/crm/CRMSettings.tsx` (refatoração completa, ~140 linhas)
+- `src/components/crm/WhatsAppTemplateManager.tsx` (refatoração completa, ~400 linhas)
 
-Sem migration. Sem mudança em componentes filhos.
+Sem migration. Sem mudança em queries/hooks.
 
