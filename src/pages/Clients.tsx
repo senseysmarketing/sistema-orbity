@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { Input } from "@/components/ui/input";
@@ -16,16 +16,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Users, Building2, ChevronRight, Phone, Mail } from "lucide-react";
+import { Search, Users, Building2, ChevronRight, Phone, Mail, Plus, Briefcase } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ClientHealthScore } from "@/components/clients/ClientHealthScore";
+import { ClientForm } from "@/components/admin/ClientForm";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Clients() {
   const navigate = useNavigate();
   const { currentAgency } = useAgency();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("active");
+  const [clientFormOpen, setClientFormOpen] = useState(false);
 
   const { data: clients, isLoading } = useQuery({
     queryKey: ["clients-list", currentAgency?.id],
