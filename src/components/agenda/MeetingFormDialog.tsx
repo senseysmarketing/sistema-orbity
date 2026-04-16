@@ -616,9 +616,14 @@ export const MeetingFormDialog = ({
                     aria-expanded={leadsPopoverOpen}
                     className="w-full justify-between font-normal"
                   >
-                    {formData.lead_id
-                      ? leads.find((l) => l.id === formData.lead_id)?.name
-                      : "Selecione um lead..."}
+                    {formData.lead_id ? (
+                      <span className="flex items-center gap-2 truncate">
+                        <Badge variant="outline" className="border-green-600/40 text-green-700 dark:text-green-400 px-1.5 py-0 text-[10px] h-4">Lead</Badge>
+                        <span className="truncate">{leads.find((l) => l.id === formData.lead_id)?.name}</span>
+                      </span>
+                    ) : (
+                      "Selecione um lead..."
+                    )}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
