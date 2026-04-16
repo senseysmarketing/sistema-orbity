@@ -231,6 +231,11 @@ export const MeetingFormDialog = ({
         setExternalParticipants(meeting.external_participants || []);
         setSelectedParticipants(meeting.participants || []);
         setSyncToGoogleCalendar(meeting.sync_to_google_calendar ?? false);
+        // Restore WhatsApp reminder fields (edit mode: full restore)
+        setWhatsappReminderEnabled(meeting.whatsapp_reminder_enabled ?? false);
+        setClientWhatsapp(meeting.client_whatsapp ?? "");
+        setReminderHoursBefore(meeting.reminder_hours_before ?? 2);
+        lastAutoFilledClientIdRef.current = null;
       } else if (duplicateFrom) {
         const now = new Date();
         now.setMinutes(0, 0, 0);
