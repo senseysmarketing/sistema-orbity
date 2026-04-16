@@ -17,7 +17,7 @@ export function LandingFooter() {
       <div className="max-w-7xl mx-auto px-4 py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         {/* Coluna 1 — Marca */}
         <div className="space-y-4">
-          <img src={orbityLogo} alt="Orbity" className="h-8" />
+          <img src={orbityLogo} alt="Orbity" className="h-8 brightness-0" />
           <p className="text-sm text-slate-500 mt-4">
             O padrão operacional das agências de elite.
           </p>
