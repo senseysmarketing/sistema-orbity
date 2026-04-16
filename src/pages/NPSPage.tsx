@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { formatPhoneDisplay } from "@/lib/formatPhoneDisplay";
 
 function getCurrentPeriod(): string {
   const now = new Date();
