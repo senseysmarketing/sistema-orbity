@@ -264,6 +264,11 @@ export const MeetingFormDialog = ({
         setSelectedParticipants(duplicateFrom.participants || []);
         setSelectedDuration([15, 30, 45, 60, 90, 120].includes(duration) ? duration : null);
         setSyncToGoogleCalendar(isConnected && isSyncEnabled);
+        // Guardrail 2: copy enabled + hours, but NEVER copy phone (auto-fill from current client)
+        setWhatsappReminderEnabled(duplicateFrom.whatsapp_reminder_enabled ?? false);
+        setClientWhatsapp("");
+        setReminderHoursBefore(duplicateFrom.reminder_hours_before ?? 2);
+        lastAutoFilledClientIdRef.current = null;
       } else if (prefilledDateTime) {
         const startDate = new Date(prefilledDateTime.date);
         startDate.setHours(prefilledDateTime.hour, 0, 0, 0);
