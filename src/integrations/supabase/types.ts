@@ -4300,28 +4300,52 @@ export type Database = {
           agency_id: string
           auto_send: boolean
           created_at: string
+          feedback_label_detractor: string | null
+          feedback_label_neutral: string | null
+          feedback_label_promoter: string | null
           frequency: string
           id: string
+          main_question: string | null
+          survey_message: string | null
+          survey_title: string | null
           updated_at: string
+          whatsapp_enabled: boolean
           whatsapp_instance_id: string | null
+          whatsapp_template: string | null
         }
         Insert: {
           agency_id: string
           auto_send?: boolean
           created_at?: string
+          feedback_label_detractor?: string | null
+          feedback_label_neutral?: string | null
+          feedback_label_promoter?: string | null
           frequency?: string
           id?: string
+          main_question?: string | null
+          survey_message?: string | null
+          survey_title?: string | null
           updated_at?: string
+          whatsapp_enabled?: boolean
           whatsapp_instance_id?: string | null
+          whatsapp_template?: string | null
         }
         Update: {
           agency_id?: string
           auto_send?: boolean
           created_at?: string
+          feedback_label_detractor?: string | null
+          feedback_label_neutral?: string | null
+          feedback_label_promoter?: string | null
           frequency?: string
           id?: string
+          main_question?: string | null
+          survey_message?: string | null
+          survey_title?: string | null
           updated_at?: string
+          whatsapp_enabled?: boolean
           whatsapp_instance_id?: string | null
+          whatsapp_template?: string | null
         }
         Relationships: [
           {
