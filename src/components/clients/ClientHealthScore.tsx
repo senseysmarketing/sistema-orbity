@@ -1,89 +1,178 @@
 import { Badge } from "@/components/ui/badge";
-import { differenceInMonths } from "date-fns";
+import { isBefore, startOfDay, differenceInDays, parseISO } from "date-fns";
 
 interface ClientHealthScoreProps {
-  startDate?: string | null;
-  pendingTaskCount?: number;
+  client: any;
+  tasks: any[];
+  meetings: any[];
+  npsScore?: number | null;
   variant?: "badge" | "circle";
 }
 
 type ScoreLevel = {
   label: string;
-  grade: string;
   color: string;
+  strokeColor: string;
   bgColor: string;
   borderColor: string;
+  message: string;
 };
 
-function calculateScore(startDate?: string | null, pendingTaskCount?: number): ScoreLevel {
-  const months = startDate ? differenceInMonths(new Date(), new Date(startDate)) : 0;
-  const pending = pendingTaskCount || 0;
+function calculateDynamicScore(
+  tasks: any[],
+  meetings: any[],
+  npsScore?: number | null
+): number {
+  let score = 100;
+  const today = startOfDay(new Date());
 
-  let level: "excellent" | "good" | "attention" | "new";
+  // Tarefas atrasadas: -10 cada, máx -40
+  const overdueTasks = tasks.filter((t) => {
+    if (!t.due_date) return false;
+    if (t.status === "done" || t.status === "cancelled" || t.status === "completed") return false;
+    return isBefore(parseISO(t.due_date), today);
+  });
+  score -= Math.min(overdueTasks.length * 10, 40);
 
-  if (months >= 12) level = "excellent";
-  else if (months >= 6) level = "good";
-  else if (months >= 3) level = "attention";
-  else level = "new";
-
-  // Override: >5 pending tasks caps score at "attention"
-  if (pending > 5 && (level === "excellent" || level === "good")) {
-    level = "attention";
+  // Reuniões: se última > 30 dias E sem futuras → -20
+  if (meetings.length > 0) {
+    const sortedMeetings = [...meetings].sort((a, b) =>
+      new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+    );
+    const lastMeetingDate = new Date(sortedMeetings[0].start_time);
+    const daysSinceLast = differenceInDays(today, lastMeetingDate);
+    const hasFutureMeeting = sortedMeetings.some(
+      (m) => new Date(m.start_time) > today
+    );
+    if (daysSinceLast > 30 && !hasFutureMeeting) {
+      score -= 20;
+    }
+  } else {
+    // Sem reuniões registadas → penalização
+    score -= 20;
   }
 
-  const scores: Record<string, ScoreLevel> = {
-    excellent: {
-      label: "Excelente",
-      grade: "A",
-      color: "text-emerald-700 dark:text-emerald-300",
-      bgColor: "bg-emerald-100 dark:bg-emerald-900/40",
-      borderColor: "border-emerald-200 dark:border-emerald-800",
-    },
-    good: {
-      label: "Bom",
-      grade: "B",
-      color: "text-sky-700 dark:text-sky-300",
-      bgColor: "bg-sky-100 dark:bg-sky-900/40",
-      borderColor: "border-sky-200 dark:border-sky-800",
-    },
-    attention: {
-      label: "Atenção",
-      grade: "C",
-      color: "text-amber-700 dark:text-amber-300",
-      bgColor: "bg-amber-100 dark:bg-amber-900/40",
-      borderColor: "border-amber-200 dark:border-amber-800",
-    },
-    new: {
-      label: "Novo",
-      grade: "D",
-      color: "text-slate-600 dark:text-slate-300",
-      bgColor: "bg-slate-100 dark:bg-slate-800/40",
-      borderColor: "border-slate-200 dark:border-slate-700",
-    },
-  };
+  // NPS
+  if (npsScore != null) {
+    if (npsScore >= 9) score += 10;
+    else if (npsScore <= 6) score -= 30;
+  }
 
-  return scores[level];
+  return Math.max(0, Math.min(100, score));
 }
 
-export function ClientHealthScore({ startDate, pendingTaskCount, variant = "badge" }: ClientHealthScoreProps) {
-  const score = calculateScore(startDate, pendingTaskCount);
+function getScoreLevel(score: number): ScoreLevel {
+  if (score >= 80) {
+    return {
+      label: "Excelente",
+      color: "text-emerald-600",
+      strokeColor: "#10b981",
+      bgColor: "bg-emerald-100",
+      borderColor: "border-emerald-200",
+      message: "Cliente saudável e engajado. Oportunidade para upsell.",
+    };
+  }
+  if (score >= 50) {
+    return {
+      label: "Atenção",
+      color: "text-amber-600",
+      strokeColor: "#f59e0b",
+      bgColor: "bg-amber-100",
+      borderColor: "border-amber-200",
+      message: "Alguns atrasos ou falta de alinhamento. Agende uma reunião.",
+    };
+  }
+  return {
+    label: "Crítico",
+    color: "text-red-600",
+    strokeColor: "#ef4444",
+    bgColor: "bg-red-100",
+    borderColor: "border-red-200",
+    message: "Ação Imediata: Cliente em alto risco de cancelamento.",
+  };
+}
+
+function HealthGauge({ score, level }: { score: number; level: ScoreLevel }) {
+  const radius = 54;
+  const strokeWidth = 10;
+  const center = 64;
+  // 270° arc
+  const totalAngle = 270;
+  const startAngle = 135; // starts at bottom-left
+  const circumference = (totalAngle / 360) * 2 * Math.PI * radius;
+  const filled = (score / 100) * circumference;
+
+  const polarToCartesian = (angle: number) => {
+    const rad = (angle * Math.PI) / 180;
+    return {
+      x: center + radius * Math.cos(rad),
+      y: center + radius * Math.sin(rad),
+    };
+  };
+
+  const startPoint = polarToCartesian(startAngle);
+  const endAngle = startAngle + totalAngle;
+  const endPoint = polarToCartesian(endAngle);
+  const largeArc = totalAngle > 180 ? 1 : 0;
+
+  const bgPath = `M ${startPoint.x} ${startPoint.y} A ${radius} ${radius} 0 ${largeArc} 1 ${endPoint.x} ${endPoint.y}`;
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative" style={{ width: 128, height: 128 }}>
+        <svg width="128" height="128" viewBox="0 0 128 128">
+          {/* Background arc */}
+          <path
+            d={bgPath}
+            fill="none"
+            stroke="#e5e7eb"
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+          />
+          {/* Filled arc */}
+          <path
+            d={bgPath}
+            fill="none"
+            stroke={level.strokeColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={`${circumference}`}
+            strokeDashoffset={circumference - filled}
+            className="transition-all duration-700 ease-out"
+          />
+        </svg>
+        {/* Center text */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ paddingTop: 8 }}>
+          <span className={`text-3xl font-bold ${level.color}`}>{score}</span>
+          <span className={`text-xs font-medium ${level.color}`}>{level.label}</span>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground text-center max-w-[200px] leading-relaxed">
+        {level.message}
+      </p>
+    </div>
+  );
+}
+
+export function ClientHealthScore({
+  client: _client,
+  tasks,
+  meetings,
+  npsScore,
+  variant = "badge",
+}: ClientHealthScoreProps) {
+  const score = calculateDynamicScore(tasks, meetings, npsScore);
+  const level = getScoreLevel(score);
 
   if (variant === "circle") {
-    return (
-      <div className="flex flex-col items-center gap-2">
-        <div className={`flex h-20 w-20 items-center justify-center rounded-full border-4 ${score.borderColor} ${score.bgColor}`}>
-          <span className={`text-3xl font-bold ${score.color}`}>{score.grade}</span>
-        </div>
-        <span className={`text-sm font-medium ${score.color}`}>{score.label}</span>
-      </div>
-    );
+    return <HealthGauge score={score} level={level} />;
   }
 
   return (
-    <Badge className={`${score.bgColor} ${score.color} ${score.borderColor} border font-medium hover:opacity-90`}>
-      {score.label}
+    <Badge className={`${level.bgColor} ${level.color} ${level.borderColor} border font-medium hover:opacity-90`}>
+      {level.label} ({score})
     </Badge>
   );
 }
 
-export { calculateScore };
+export { calculateDynamicScore, getScoreLevel };

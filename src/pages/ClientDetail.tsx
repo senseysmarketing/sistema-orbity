@@ -26,7 +26,7 @@ import {
   Copy,
   Edit2,
   ExternalLink,
-  Image,
+  
   Key,
   Phone,
   Plus,
@@ -74,20 +74,20 @@ export default function ClientDetail() {
     queryFn: async () => {
       if (!id || !currentAgency?.id) return null;
 
-      const [tasksResult, meetingsResult, credentialsResult, creativeResult] = await Promise.all([
+        const [tasksResult, meetingsResult, credentialsResult, npsResult] = await Promise.all([
         supabase
           .from("task_clients")
           .select("tasks!inner(id, title, status, priority, due_date)")
           .eq("client_id", id)
           .eq("tasks.agency_id", currentAgency.id)
-          .not("tasks.status", "in", '("done","cancelled")')
+          .not("tasks.status", "in", '("done","cancelled","completed")')
           .limit(8),
         supabase
           .from("meeting_clients")
           .select("meetings!inner(id, title, start_time, status, outcome, meeting_type)")
           .eq("client_id", id)
           .order("meetings(start_time)", { ascending: false })
-          .limit(5),
+          .limit(10),
         supabase
           .from("client_credentials")
           .select("id, platform, username, password, url")
@@ -95,14 +95,11 @@ export default function ClientDetail() {
           .eq("agency_id", currentAgency.id)
           .limit(5),
         supabase
-          .from("task_clients")
-          .select("tasks!inner(id, title, attachments, task_type, updated_at)")
-          .eq("client_id", id)
-          .eq("tasks.agency_id", currentAgency.id)
-          .eq("tasks.task_type", "redes_sociais")
-          .not("tasks.attachments", "is", null)
-          .order("tasks(updated_at)", { ascending: false })
-          .limit(1),
+          .from("nps_responses")
+          .select("score, client_name")
+          .eq("agency_id", currentAgency.id)
+          .order("response_date", { ascending: false })
+          .limit(50),
       ]);
 
       const tasks = (tasksResult.data || []).map((r: any) => r.tasks).filter(Boolean);
@@ -114,24 +111,10 @@ export default function ClientDetail() {
 
       const credentials = credentialsResult.data || [];
 
-      let latestCreative: { title: string; imageUrl: string } | null = null;
-      if (creativeResult.data && creativeResult.data.length > 0) {
-        const task = (creativeResult.data[0] as any).tasks;
-        if (task?.attachments) {
-          const attachments = Array.isArray(task.attachments) ? task.attachments : [];
-          const firstImage = attachments.find(
-            (a: any) => typeof a === "string" || (a?.url && /\.(jpg|jpeg|png|webp|gif)/i.test(a.url))
-          );
-          if (firstImage) {
-            latestCreative = {
-              title: task.title || "Criativo",
-              imageUrl: typeof firstImage === "string" ? firstImage : firstImage.url,
-            };
-          }
-        }
-      }
+      // Match NPS by client name (nps_responses has client_name, not client_id)
+      const allNps = npsResult.data || [];
 
-      return { tasks, meetings, credentials, latestCreative };
+      return { tasks, meetings, credentials, allNps };
     },
     enabled: !!id && !!currentAgency?.id,
     staleTime: 3 * 60 * 1000,
@@ -246,7 +229,9 @@ export default function ClientDetail() {
   const tasks = dashboardData?.tasks || [];
   const meetings = dashboardData?.meetings || [];
   const credentials = dashboardData?.credentials || [];
-  const latestCreative = dashboardData?.latestCreative;
+  const allNps = dashboardData?.allNps || [];
+  const matchedNps = allNps.find((n: any) => n.client_name === client.name);
+  const npsScore = matchedNps?.score ?? undefined;
   const monthsActive = client.start_date ? differenceInMonths(new Date(), new Date(client.start_date)) : 0;
 
   const nextMeeting = meetings.find((m: any) => new Date(m.start_time) > new Date());
@@ -392,8 +377,10 @@ export default function ClientDetail() {
           <div className="bg-white border rounded-xl shadow-sm p-5 flex flex-col items-center">
             <h3 className="text-sm font-semibold text-muted-foreground mb-3">Saúde do Cliente</h3>
             <ClientHealthScore
-              startDate={client.start_date}
-              pendingTaskCount={tasks.length}
+              client={client}
+              tasks={tasks}
+              meetings={meetings}
+              npsScore={npsScore}
               variant="circle"
             />
             <div className="grid grid-cols-3 gap-4 mt-4 w-full text-center">
@@ -587,31 +574,6 @@ export default function ClientDetail() {
             )}
           </div>
 
-          {/* Latest Creative */}
-          <div className="bg-white border rounded-xl shadow-sm p-4">
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-              <Image className="h-4 w-4" />
-              Último Criativo
-            </h3>
-            {latestCreative ? (
-              <div className="space-y-2">
-                <div className="rounded-lg overflow-hidden bg-slate-100 aspect-video flex items-center justify-center">
-                  <img
-                    src={latestCreative.imageUrl}
-                    alt={latestCreative.title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground truncate">{latestCreative.title}</p>
-              </div>
-            ) : (
-              <div className="rounded-lg bg-slate-100 aspect-video flex flex-col items-center justify-center gap-2">
-                <Image className="h-8 w-8 text-muted-foreground/40" />
-                <p className="text-xs text-muted-foreground">Nenhum criativo recente</p>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
