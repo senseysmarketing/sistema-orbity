@@ -157,6 +157,11 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
       console.error("Error updating subtask:", error);
       // Reverter em caso de erro
       setSubtasks(subtasks);
+      toast({
+        title: "Erro ao atualizar subtarefa",
+        description: "Tente novamente.",
+        variant: "destructive",
+      });
     }
   };
 
