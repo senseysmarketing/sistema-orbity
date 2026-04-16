@@ -376,6 +376,13 @@ export const MeetingFormDialog = ({
       }
     }
 
+    // Guardrail 1: WhatsApp reminder strict validation
+    if (whatsappReminderEnabled && clientWhatsapp.replace(/\D/g, "").length < 10) {
+      toast.error("Por favor, preencha o WhatsApp do cliente para enviar o lembrete.");
+      phoneInputRef.current?.focus();
+      return;
+    }
+
     const startDate = new Date(formData.start_time);
     const endDate = new Date(formData.end_time);
 
@@ -389,6 +396,9 @@ export const MeetingFormDialog = ({
       is_internal: separateVirtualClients(selectedClientIds).isInternal,
       lead_id: formData.lead_id || null,
       sync_to_google_calendar: syncToGoogleCalendar,
+      whatsapp_reminder_enabled: whatsappReminderEnabled,
+      client_whatsapp: whatsappReminderEnabled ? clientWhatsapp : null,
+      reminder_hours_before: reminderHoursBefore,
     };
 
     try {
