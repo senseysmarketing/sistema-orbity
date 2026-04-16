@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { OnboardingProvider, useOnboarding } from '@/hooks/useOnboarding';
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
 import { CompanyDataStep } from '@/components/onboarding/CompanyDataStep';
