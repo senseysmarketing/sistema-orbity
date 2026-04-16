@@ -85,40 +85,16 @@ export default function Clients() {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Clientes</h1>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Gerencie informações, tarefas e acessos dos seus clientes
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="gap-1">
-              <Users className="h-3 w-3" />
-              {activeCount} ativos
-            </Badge>
-            <Badge variant="secondary" className="gap-1">
-              {inactiveCount} inativos
-            </Badge>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => {
-            navigate("/dashboard/admin");
-            toast({ title: "Gerenciar Carteira", description: "Acesse a gestão completa no Centro de Comando." });
-          }}>
-            <Briefcase className="h-4 w-4 mr-1" />
-            Gerenciar Carteira
-          </Button>
-          <Button variant="create" size="sm" onClick={() => setClientFormOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Novo Cliente
-          </Button>
-        </div>
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Clientes</h1>
+        <p className="text-sm md:text-base text-muted-foreground">
+          Gerencie informações, tarefas e acessos dos seus clientes
+        </p>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center">
-        <div className="relative flex-1 max-w-sm">
+      {/* Filters + Actions */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar cliente..."
@@ -136,6 +112,26 @@ export default function Clients() {
           </Button>
           <Button variant={filter === "inactive" ? "default" : "outline"} size="sm" onClick={() => setFilter("inactive")}>
             Inativos
+          </Button>
+        </div>
+        <div className="flex items-center gap-3 ml-auto">
+          <Badge variant="outline" className="gap-1">
+            <Users className="h-3 w-3" />
+            {activeCount} ativos
+          </Badge>
+          <Badge variant="secondary" className="gap-1">
+            {inactiveCount} inativos
+          </Badge>
+          <Button variant="outline" size="sm" onClick={() => {
+            navigate("/dashboard/admin");
+            toast({ title: "Gerenciar Carteira", description: "Acesse a gestão completa no Centro de Comando." });
+          }}>
+            <Briefcase className="h-4 w-4 mr-1" />
+            Gerenciar Carteira
+          </Button>
+          <Button variant="default" size="sm" onClick={() => setClientFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Novo Cliente
           </Button>
         </div>
       </div>
