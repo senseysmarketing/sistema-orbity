@@ -156,12 +156,12 @@ export const MeetingFormDialog = ({
   });
 
   const { data: clients = [] } = useQuery({
-    queryKey: ["clients", currentAgency?.id],
+    queryKey: ["clients-with-contact", currentAgency?.id],
     queryFn: async () => {
       if (!currentAgency?.id) return [];
       const { data } = await supabase
         .from("clients")
-        .select("id, name")
+        .select("id, name, contact")
         .eq("agency_id", currentAgency.id)
         .eq("active", true);
       const realClients = data || [];
