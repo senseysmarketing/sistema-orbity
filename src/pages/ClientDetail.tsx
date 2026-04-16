@@ -17,7 +17,7 @@ import {
   ExternalLink,
   Image,
   Key,
-  MessageSquare,
+  
   Phone,
   Sparkles,
   Video,
