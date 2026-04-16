@@ -4221,33 +4221,39 @@ export type Database = {
         Row: {
           agency_id: string
           category: string
+          client_id: string | null
           client_name: string
           comment: string | null
           created_at: string
           id: string
-          period_id: string
+          period: string | null
+          period_id: string | null
           response_date: string
           score: number
         }
         Insert: {
           agency_id: string
           category: string
+          client_id?: string | null
           client_name: string
           comment?: string | null
           created_at?: string
           id?: string
-          period_id: string
+          period?: string | null
+          period_id?: string | null
           response_date?: string
           score: number
         }
         Update: {
           agency_id?: string
           category?: string
+          client_id?: string | null
           client_name?: string
           comment?: string | null
           created_at?: string
           id?: string
-          period_id?: string
+          period?: string | null
+          period_id?: string | null
           response_date?: string
           score?: number
         }
@@ -4274,10 +4280,135 @@ export type Database = {
             referencedColumns: ["agency_id"]
           },
           {
+            foreignKeyName: "nps_responses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "nps_responses_period_id_fkey"
             columns: ["period_id"]
             isOneToOne: false
             referencedRelation: "bonus_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nps_settings: {
+        Row: {
+          agency_id: string
+          auto_send: boolean
+          created_at: string
+          frequency: string
+          id: string
+          updated_at: string
+          whatsapp_instance_id: string | null
+        }
+        Insert: {
+          agency_id: string
+          auto_send?: boolean
+          created_at?: string
+          frequency?: string
+          id?: string
+          updated_at?: string
+          whatsapp_instance_id?: string | null
+        }
+        Update: {
+          agency_id?: string
+          auto_send?: boolean
+          created_at?: string
+          frequency?: string
+          id?: string
+          updated_at?: string
+          whatsapp_instance_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nps_settings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nps_settings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "nps_settings_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "nps_settings_whatsapp_instance_id_fkey"
+            columns: ["whatsapp_instance_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nps_tokens: {
+        Row: {
+          agency_id: string
+          client_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          is_used: boolean
+          period: string
+        }
+        Insert: {
+          agency_id: string
+          client_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_used?: boolean
+          period: string
+        }
+        Update: {
+          agency_id?: string
+          client_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_used?: boolean
+          period?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nps_tokens_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nps_tokens_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "nps_tokens_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "nps_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
