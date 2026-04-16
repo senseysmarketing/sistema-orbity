@@ -1,148 +1,97 @@
 
 
-# Refatoração Técnica do Módulo de Tarefas
+# Upgrade Estrutural: Smart Table + Dashboard Unificado "Quiet Luxury"
 
 ## Resumo
-Três melhorias cirúrgicas: query paralela com filtro temporal, formulário com RHF+Zod, e toast de erro no optimistic UI das subtarefas.
+Reescrever `Clients.tsx` (cards para tabela), `ClientDetail.tsx` (tabs para Bento Grid escuro), criar `ClientHealthScore.tsx`, e adicionar animação glow ao Tailwind config.
 
 ---
 
-## Passo 1: Performance — Query paralela com `Promise.all`
+## Ficheiros alterados/criados
 
-**Ficheiro:** `src/pages/Tasks.tsx` — função `fetchTasks` (linhas 229-285)
+### 1. `src/pages/Clients.tsx` — Reescrita completa: Cards para Smart Table
 
-Substituir a query única por duas queries paralelas via `Promise.all`:
+**Query adicional:** Buscar contagem de tarefas pendentes por cliente via `task_clients` join para alimentar o Health Score dinâmico.
 
-```typescript
-const thirtyDaysAgo = new Date();
-thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-const [openResult, doneResult] = await Promise.all([
-  supabase
-    .from("tasks")
-    .select("*, task_clients(client_id), task_assignments(user_id)")
-    .eq("agency_id", currentAgency.id)
-    .eq("archived", false)
-    .neq("status", "done")
-    .order("created_at", { ascending: false })
-    .limit(300),
-  supabase
-    .from("tasks")
-    .select("*, task_clients(client_id), task_assignments(user_id)")
-    .eq("agency_id", currentAgency.id)
-    .eq("archived", false)
-    .eq("status", "done")
-    .gte("updated_at", thirtyDaysAgo.toISOString())
-    .order("created_at", { ascending: false })
-    .limit(50),
-]);
-
-if (openResult.error) throw openResult.error;
-if (doneResult.error) throw doneResult.error;
-
-const rawTasks = [...(openResult.data || []), ...(doneResult.data || [])];
+```
+const { data: taskCounts } = useQuery(["client-task-counts", agencyId], ...)
+→ SELECT task_clients.client_id, COUNT(*) FROM task_clients JOIN tasks ON ... WHERE status NOT IN ('done','cancelled') GROUP BY client_id
 ```
 
-O restante da lógica de enrichment (profiles, `_assignedUsers`) permanece idêntico, apenas opera sobre o array `rawTasks` combinado.
+**Layout da tabela:**
+- Container: `bg-slate-50 rounded-xl border overflow-hidden`
+- Colunas: Cliente (avatar+nome+serviço) | Contato | Status (Badge) | Health Score (Badge dinâmica) | Desde | Ação (ChevronRight)
+- Linhas: `hover:bg-slate-100/50 cursor-pointer transition-colors`
+- Skeleton: 6 linhas de tabela
 
----
+**Health Score dinâmico (Refinamento 4):**
+- Heurística base: tempo de casa (>12m=Excelente, 6-12=Bom, 3-6=Atenção, <3=Novo)
+- Override: se `pendingTasks > 5`, score nunca é "Excelente" — cai para "Atenção"
+- Cores: verde/amarelo/laranja/cinza
 
-## Passo 2: Estabilidade — React Hook Form + Zod
+### 2. `src/components/clients/ClientHealthScore.tsx` — Novo componente
 
-**Ficheiro:** `src/pages/Tasks.tsx`
+Props: `startDate`, `pendingTaskCount`
+Retorna Badge colorida com label e lógica combinada.
 
-### 2a. Schema Zod defensivo (novo bloco no topo do ficheiro)
-```typescript
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+### 3. `src/pages/ClientDetail.tsx` — Reescrita completa: Tabs para Dashboard Bento Grid
 
-const taskFormSchema = z.object({
-  title: z.string().min(1, "Título obrigatório"),
-  description: z.string().nullable().optional().default(""),
-  status: z.string().default("todo"),
-  priority: z.enum(["low", "medium", "high"]).default("medium"),
-  assigned_to: z.string().default("unassigned"),
-  assigned_users: z.array(z.string()).default([]),
-  client_ids: z.array(z.string()).default([]),
-  due_date: z.string().nullable().optional().default(""),
-  subtasks: z.array(z.any()).default([]),
-  attachments: z.array(z.any()).default([]),
-  task_type: z.string().min(1, "Tipo obrigatório"),
-  platform: z.string().nullable().optional().default(""),
-  post_type: z.string().nullable().optional().default(""),
-  post_date: z.string().nullable().optional().default(""),
-  hashtags: z.string().nullable().optional().default(""),
-  creative_instructions: z.string().nullable().optional().default(""),
-});
+**Queries inline paralelas** (Promise.all):
+1. Tarefas pendentes via `task_clients` join (limit 8)
+2. Reuniões recentes via `meeting_clients` join (limit 5)
+3. Credenciais via `client_credentials` (limit 5)
+4. Último criativo: buscar tarefa mais recente do tipo `redes_sociais` com `attachments IS NOT NULL` via `task_clients` join (limit 1) — extrair primeira URL do JSON de attachments
 
-type TaskFormValues = z.infer<typeof taskFormSchema>;
+**Tema:** `bg-gradient-to-br from-slate-950 via-purple-950/30 to-slate-950 -m-6 p-6 text-white`
+Cards internos: `bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl`
+
+**Layout Bento Grid:**
+
+**Mobile (ordem de prioridade — Refinamento 3):**
+1. Header (voltar + avatar + nome + badge + tempo de casa + botões WhatsApp/Drive)
+2. Resumo IA (Alert)
+3. Saúde do Cliente (círculo)
+4. Próximas Tarefas
+5. Vault de Acessos
+6. Reuniões
+7. Último Criativo
+
+**Desktop:** `grid grid-cols-1 lg:grid-cols-5 gap-4`
+- Esquerda (col-span-3): Tarefas + Reuniões + Último Criativo
+- Direita (col-span-2): Resumo IA + Saúde + Vault
+
+**Blocos:**
+
+- **Header**: Avatar grande, nome, badge status, tempo de casa, botões WhatsApp (`https://wa.me/` + contact) e Drive (`#`)
+- **Resumo IA (Refinamento 2)**: Texto dinâmico montado com variáveis reais ("Cliente ativo há X meses. Y tarefas pendentes. Próxima reunião em Z."). Ícone Sparkles com animação `animate-glow` (pulse roxo)
+- **Saúde do Cliente**: Círculo grande com nota A/B/C/D, usa `ClientHealthScore` internamente
+- **Próximas Tarefas**: Lista compacta (título + badge status + prioridade + due_date), botão "Ver todas"
+- **Vault de Acessos**: Lista compacta (plataforma + username + botão copiar senha), botão "Ver todos"
+- **Reuniões**: Lista compacta (título + data + badge status), botão "Agendar"
+- **Último Criativo (Refinamento 1)**: Card com imagem da primeira attachment da tarefa `redes_sociais` mais recente. Placeholder com ícone Image se não houver
+
+**Componentes existentes preservados** — não são deletados, apenas não usados nesta view.
+
+### 4. `tailwind.config.ts` — Adicionar animação glow
+
 ```
-
-Todos os campos opcionais usam `.nullable().optional().default()` para segurança máxima com dados nulos do Supabase.
-
-### 2b. Substituir `newTask` / `setNewTask` por `useForm`
-- Remover o `useState` de `newTask` (linhas 142-176)
-- Adicionar dentro do componente:
-```typescript
-const form = useForm<TaskFormValues>({
-  resolver: zodResolver(taskFormSchema),
-  defaultValues: { title: "", description: "", status: "todo", priority: "medium", ... }
-});
-```
-- Nos inputs, substituir `value={newTask.title}` por `{...form.register("title")}` para campos simples
-- Para Select, MultiUserSelector, MultiClientSelector, SubtaskManager, FileAttachments — usar `form.watch()` + `form.setValue()`
-- `handleCreateTask` e `handleUpdateTask` passam a usar `form.handleSubmit(onSubmit)`
-- Validação nativa do Zod elimina os checks manuais de `title.trim()` e `task_type`
-
-### 2c. AI Prefill com `setValue` (Guardrail 3)
-Na callback do AI (linhas 1066-1079), substituir `setNewTask((prev) => ...)` por iteração com `setValue`:
-```typescript
-if (result.title) form.setValue("title", result.title, { shouldValidate: true });
-if (result.description) form.setValue("description", result.description, { shouldValidate: true });
-if (result.priority) form.setValue("priority", result.priority, { shouldValidate: true });
-if (result.suggested_type) form.setValue("task_type", result.suggested_type, { shouldValidate: true });
-// ... mesma lógica para client_ids, assigned_users, due_date, platform, etc.
-```
-
-### 2d. Templates com `setValue` também
-Na função `applyTemplate` (linhas 625-672), substituir `setNewTask({...})` por iteração com `setValue` sobre cada campo do template, preservando campos já preenchidos pelo utilizador.
-
-### 2e. handleEditTask com `form.reset`
-Na função `handleEditTask` (linha 674), usar `form.reset(values)` pois é abertura de edição (não há dados do utilizador a preservar).
-
-### 2f. Dialog onOpenChange
-Ao abrir o dialog de criação (linhas 988-999), usar `form.reset(defaultValues)` pois é criação nova.
-
----
-
-## Passo 3: Toast de erro no Optimistic UI das subtarefas
-
-**Ficheiro:** `src/components/tasks/TaskDetailsDialog.tsx` — função `handleToggleSubtask` (linhas 139-161)
-
-Adicionar toast de erro no bloco catch:
-```typescript
-} catch (error) {
-  console.error("Error updating subtask:", error);
-  setSubtasks(subtasks); // já existe — reversão
-  toast({
-    title: "Erro ao atualizar subtarefa",
-    description: "Tente novamente.",
-    variant: "destructive",
-  });
+keyframes: {
+  glow: {
+    "0%, 100%": { opacity: "0.4", filter: "drop-shadow(0 0 6px rgb(168 85 247 / 0.4))" },
+    "50%": { opacity: "1", filter: "drop-shadow(0 0 12px rgb(168 85 247 / 0.8))" },
+  }
+},
+animation: {
+  glow: "glow 2s ease-in-out infinite",
 }
 ```
 
 ---
 
-## Ficheiros alterados
-1. `src/pages/Tasks.tsx` — query paralela + formulário RHF/Zod + setValue para AI/Templates
-2. `src/components/tasks/TaskDetailsDialog.tsx` — toast de erro no optimistic UI
-
-## Guardrails respeitados
-- `Promise.all` para paralelismo (Guardrail 1)
-- `.nullable().optional().default()` em todos campos opcionais (Guardrail 2)
-- `setValue` em vez de `reset` para AI Prefill e Templates (Guardrail 3)
-- dnd-kit intocado
-- Todos os campos existentes preservados no schema
+## Guardrails
+- Nenhuma alteração no banco de dados
+- Componentes existentes em `/components/clients/` preservados intactos
+- Rota `/dashboard/clients/:id` mantida
+- Queries com `.limit()` para segurança
+- `Promise.all` para queries paralelas no dashboard
 
