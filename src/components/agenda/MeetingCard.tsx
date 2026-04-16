@@ -55,9 +55,14 @@ export const MeetingCard = ({ meeting, onClick }: MeetingCardProps) => {
             <TypeIcon className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <div className="min-w-0 flex-1">
               <h4 className="font-semibold text-sm truncate">{meeting.title}</h4>
-              <p className="text-xs text-muted-foreground">
-                {format(toZonedTime(new Date(meeting.start_time), "America/Sao_Paulo"), "HH:mm", { locale: ptBR })}
-              </p>
+              <div className="flex items-center gap-1">
+                <p className="text-xs text-muted-foreground">
+                  {format(toZonedTime(new Date(meeting.start_time), "America/Sao_Paulo"), "HH:mm", { locale: ptBR })}
+                </p>
+                {meeting.whatsapp_reminder_enabled && (
+                  <MessageCircle className="h-3 w-3 text-green-600/70" aria-label="Lembrete WhatsApp ativo" />
+                )}
+              </div>
             </div>
           </div>
           <Badge variant="secondary" className="text-xs">
