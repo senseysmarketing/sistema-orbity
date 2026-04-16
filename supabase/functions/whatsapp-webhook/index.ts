@@ -6,6 +6,69 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+// ============================================================
+// CRM Vivo: auto-promote lead from initial column on first reply
+// ============================================================
+const INITIAL_STATUSES = new Set(['leads', 'new', 'novo']);
+
+function normalizeToCanonical(rawStatus: string | null | undefined): string {
+  if (!rawStatus) return 'leads';
+  const trimmed = String(rawStatus).trim();
+  if (!trimmed) return 'leads';
+  const key = trimmed
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, '_').replace(/-+/g, '_');
+  const map: Record<string, string> = {
+    leads: 'leads', lead: 'leads', new: 'leads', novo: 'leads',
+    em_contato: 'em_contato', emcontato: 'em_contato',
+    qualified: 'qualified', qualificados: 'qualified', qualificado: 'qualified',
+    scheduled: 'scheduled', agendamentos: 'scheduled', agendamento: 'scheduled',
+    meeting: 'meeting', reunioes: 'meeting', reuniao: 'meeting',
+    proposal: 'proposal', propostas: 'proposal', proposta: 'proposal',
+    won: 'won', vendas: 'won', venda: 'won', ganho: 'won', gained: 'won',
+    lost: 'lost', perdido: 'lost', perdida: 'lost', loss: 'lost',
+  };
+  return map[key] || trimmed;
+}
+
+async function promoteLeadOnReply(supabase: any, agencyId: string, leadId: string) {
+  try {
+    const { data: lead } = await supabase
+      .from('leads').select('status').eq('id', leadId).maybeSingle();
+    if (!lead) return;
+
+    const currentStatus = (lead.status || '').toString().trim().toLowerCase();
+    if (!INITIAL_STATUSES.has(currentStatus)) return; // não retrocede
+
+    const { data: statuses } = await supabase
+      .from('lead_statuses')
+      .select('name, order_position')
+      .eq('agency_id', agencyId)
+      .eq('is_active', true)
+      .order('order_position', { ascending: true });
+
+    let target = 'em_contato';
+    if (statuses && statuses.length >= 2) {
+      target = normalizeToCanonical(statuses[1].name);
+    }
+
+    await Promise.all([
+      supabase.from('leads').update({ status: target }).eq('id', leadId),
+      supabase.from('lead_history').insert({
+        lead_id: leadId,
+        agency_id: agencyId,
+        action_type: 'whatsapp_interaction',
+        description: 'Lead interagiu no WhatsApp. O cartão foi movido automaticamente para a próxima etapa.',
+      }),
+    ]);
+
+    console.log('[whatsapp-webhook] Lead promoted on reply', { leadId, from: currentStatus, to: target });
+  } catch (e) {
+    console.error('[whatsapp-webhook] promoteLeadOnReply error:', e);
+  }
+}
+
 /**
  * Normalizes a phone number to digits-only format for consistent lookups.
  */
@@ -440,31 +503,52 @@ serve(async (req) => {
       if (!isFromMe) {
         updateData.last_customer_message_at = timestamp;
 
-        // Stop active automations when customer replies
-        const automations = await findActiveAutomations(
-          supabase, account.agency_id, conversation.id, conversation.lead_id
+        // CRM Vivo: detect text or media to trigger lead promotion
+        const hasText = !!(content && content.trim().length > 0);
+        const hasMedia = !!(
+          msgContent?.audioMessage ||
+          msgContent?.imageMessage ||
+          msgContent?.videoMessage ||
+          msgContent?.documentMessage ||
+          msgContent?.stickerMessage
         );
+        const shouldPromote = !!(conversation.lead_id && (hasText || hasMedia));
 
-        for (const automation of automations) {
-          await supabase.from('whatsapp_automation_control').update({
-            status: 'responded',
-            conversation_state: 'customer_replied',
-            conversation_id: conversation.id,
-          }).eq('id', automation.id);
+        // Stop active automations when customer replies
+        const pauseAutomations = (async () => {
+          const automations = await findActiveAutomations(
+            supabase, account.agency_id, conversation.id, conversation.lead_id
+          );
 
-          await supabase.from('whatsapp_automation_logs').insert({
-            automation_id: automation.id,
-            account_id: account.id,
-            event: 'customer_replied_webhook',
-            details: { conversation_id: conversation.id, phone_number: phoneNumber },
-          });
-        }
+          for (const automation of automations) {
+            await supabase.from('whatsapp_automation_control').update({
+              status: 'responded',
+              conversation_state: 'customer_replied',
+              conversation_id: conversation.id,
+            }).eq('id', automation.id);
 
-        if (automations.length > 0) {
-          console.log('[whatsapp-webhook] Automation(s) responded - customer replied', {
-            count: automations.length, conversation_id: conversation.id,
-          });
-        }
+            await supabase.from('whatsapp_automation_logs').insert({
+              automation_id: automation.id,
+              account_id: account.id,
+              event: 'customer_replied_webhook',
+              details: { conversation_id: conversation.id, phone_number: phoneNumber },
+            });
+          }
+
+          if (automations.length > 0) {
+            console.log('[whatsapp-webhook] Automation(s) responded - customer replied', {
+              count: automations.length, conversation_id: conversation.id,
+            });
+          }
+        })();
+
+        // Run pause + lead promotion in parallel for zero added latency
+        await Promise.all([
+          pauseAutomations,
+          shouldPromote
+            ? promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id)
+            : Promise.resolve(),
+        ]);
       } else if (!existingMsg) {
         // Operator sent from phone directly — pause automation
         const automations = await findActiveAutomations(
