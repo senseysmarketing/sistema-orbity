@@ -1,21 +1,28 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { SendingScheduleManager } from "./SendingScheduleManager";
 import { AllowedSourcesManager } from "./AllowedSourcesManager";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageSquare, Plus, Trash2, Save, Clock, Loader2, Variable } from "lucide-react";
+import {
+  MessageSquare, Plus, Trash2, Save, Clock, Loader2, Variable,
+  Pause, Shield, Send, CheckCheck, Smartphone,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
+import { useWhatsApp } from "@/hooks/useWhatsApp";
+import { cn } from "@/lib/utils";
 
 interface Template {
   id?: string;
@@ -64,9 +71,38 @@ const FOLLOWUP_DELAY_OPTIONS = [
 ];
 
 function formatFieldName(key: string): string {
-  return key
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatDelay(min: number): string {
+  if (!min || min === 0) return "Imediato";
+  if (min < 60) return `${min} min`;
+  if (min < 1440) {
+    const h = min / 60;
+    return `${h % 1 === 0 ? h : h.toFixed(1)}h`;
+  }
+  const d = min / 1440;
+  return `${d % 1 === 0 ? d : d.toFixed(1)}d`;
+}
+
+/**
+ * Renderiza o preview do template substituindo:
+ *  1) Variáveis {{nome}}, {{empresa}}, {{email}}, {{telefone}}, {{formulario:campo}}
+ *  2) Spintax {opção1|opção2} → primeira opção
+ * A ordem garante que `{{...}}` é processado antes do regex de spintax `{...}`.
+ */
+function renderPreview(text: string): string {
+  let out = text
+    .replace(/\{\{nome\}\}/g, "Gabriel")
+    .replace(/\{\{empresa\}\}/g, "Senseys")
+    .replace(/\{\{email\}\}/g, "gabriel@senseys.com.br")
+    .replace(/\{\{telefone\}\}/g, "(11) 99999-9999")
+    .replace(/\{\{formulario:([^}]+)\}\}/g, (_, k: string) => `[${k.replace(/_/g, " ")}]`);
+
+  // Spintax: {a|b|c} → a (apenas substrings sem chaves duplas internas)
+  out = out.replace(/\{([^{}]+)\}/g, (_, opts: string) => opts.split('|')[0].trim());
+
+  return out;
 }
 
 function useFormFieldKeys(agencyId?: string) {
@@ -75,7 +111,6 @@ function useFormFieldKeys(agencyId?: string) {
     queryFn: async () => {
       if (!agencyId) return {} as Record<string, string[]>;
 
-      // 1) Integrations map: integration_id -> form_name
       const { data: integrations, error: intError } = await supabase
         .from('facebook_lead_integrations')
         .select('id, form_name')
@@ -87,7 +122,6 @@ function useFormFieldKeys(agencyId?: string) {
         integrationMap[integration.id] = integration.form_name;
       }
 
-      // 2) Sync log maps (when available)
       const { data: syncLogs, error: syncError } = await supabase
         .from('facebook_lead_sync_log')
         .select('lead_id, integration_id, facebook_lead_id')
@@ -100,17 +134,10 @@ function useFormFieldKeys(agencyId?: string) {
       for (const log of syncLogs || []) {
         const mappedFormName = integrationMap[log.integration_id];
         if (!mappedFormName) continue;
-
-        if (log.lead_id) {
-          leadIdToFormMap[log.lead_id] = mappedFormName;
-        }
-
-        if (log.facebook_lead_id) {
-          facebookLeadIdToFormMap[log.facebook_lead_id] = mappedFormName;
-        }
+        if (log.lead_id) leadIdToFormMap[log.lead_id] = mappedFormName;
+        if (log.facebook_lead_id) facebookLeadIdToFormMap[log.facebook_lead_id] = mappedFormName;
       }
 
-      // 3) Leads with custom fields from Facebook source
       const { data: leads, error: leadsError } = await supabase
         .from('leads')
         .select('id, custom_fields')
@@ -120,7 +147,6 @@ function useFormFieldKeys(agencyId?: string) {
         .limit(300);
       if (leadsError) throw leadsError;
 
-      // 4) Group variable keys by resolved form name
       const grouped: Record<string, Set<string>> = {};
 
       for (const row of leads || []) {
@@ -131,9 +157,7 @@ function useFormFieldKeys(agencyId?: string) {
         const cfLeadgenId = typeof cf.leadgen_id === 'string' ? cf.leadgen_id.trim() : '';
         const cfRef = typeof cf.REF === 'string'
           ? cf.REF.trim()
-          : typeof cf.ref === 'string'
-            ? cf.ref.trim()
-            : '';
+          : typeof cf.ref === 'string' ? cf.ref.trim() : '';
 
         const resolvedFormName =
           leadIdToFormMap[row.id] ||
@@ -155,7 +179,6 @@ function useFormFieldKeys(agencyId?: string) {
       for (const [name, keys] of Object.entries(grouped)) {
         result[name] = Array.from(keys).sort();
       }
-
       return result;
     },
     enabled: !!agencyId,
@@ -167,6 +190,7 @@ export function WhatsAppTemplateManager() {
   const { currentAgency } = useAgency();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { account, isConnected, sendMessage } = useWhatsApp('general');
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['whatsapp-templates', currentAgency?.id],
@@ -186,8 +210,14 @@ export function WhatsAppTemplateManager() {
 
   const { data: formFields = {} } = useFormFieldKeys(currentAgency?.id);
 
-  const greetingTemplates = templates.filter(t => t.phase === 'greeting');
-  const followupTemplates = templates.filter(t => t.phase === 'followup');
+  const greetingTemplates = useMemo(
+    () => templates.filter(t => t.phase === 'greeting').sort((a, b) => a.step_position - b.step_position),
+    [templates],
+  );
+  const followupTemplates = useMemo(
+    () => templates.filter(t => t.phase === 'followup').sort((a, b) => a.step_position - b.step_position),
+    [templates],
+  );
 
   const saveMutation = useMutation({
     mutationFn: async (template: Template) => {
@@ -241,19 +271,44 @@ export function WhatsAppTemplateManager() {
   const addTemplate = (phase: string) => {
     const existingCount = templates.filter(t => t.phase === phase).length;
     if (existingCount >= 3) {
-      toast({ title: 'Limite atingido', description: `Máximo de 3 etapas por fase`, variant: 'destructive' });
+      toast({ title: 'Limite atingido', description: 'Máximo de 3 etapas por fase', variant: 'destructive' });
       return;
     }
-
-    const newTemplate: Template = {
+    saveMutation.mutate({
       phase,
       step_position: existingCount + 1,
       message_template: '',
       delay_minutes: phase === 'greeting' ? (existingCount === 0 ? 0 : 1) : 1440,
       is_active: true,
-    };
+    });
+  };
 
-    saveMutation.mutate(newTemplate);
+  const handleSendTest = async (content: string) => {
+    if (!isConnected || !account?.phone_number) {
+      toast({
+        title: 'WhatsApp não conectado',
+        description: 'Conecte uma instância do WhatsApp antes de enviar testes.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!content.trim()) {
+      toast({ title: 'Mensagem vazia', variant: 'destructive' });
+      return;
+    }
+    try {
+      const rendered = renderPreview(content);
+      await sendMessage.mutateAsync({
+        phone_number: account.phone_number,
+        message: `🧪 [TESTE] ${rendered}`,
+      });
+      toast({
+        title: 'Teste enviado!',
+        description: `Mensagem enviada para ${account.phone_number}`,
+      });
+    } catch {
+      // Erro já tratado pelo hook sendMessage (toast destrutivo)
+    }
   };
 
   if (isLoading) {
@@ -273,22 +328,34 @@ export function WhatsAppTemplateManager() {
 
       <Separator />
 
-      <div>
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <MessageSquare className="h-5 w-5" />
-          Templates de Mensagens Automáticas
-        </h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configure as mensagens enviadas automaticamente para novos leads.
-          Use o botão <Variable className="inline h-3.5 w-3.5" /> no editor para inserir variáveis disponíveis.
-        </p>
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            Cadência de Mensagens
+          </h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            Configure o fluxo de mensagens automáticas. Veja em tempo real como cada mensagem ficará no telemóvel do lead.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="secondary" className="gap-1.5">
+            <Pause className="h-3 w-3" /> Pausa automática em caso de resposta
+          </Badge>
+          <Badge variant="secondary" className="gap-1.5">
+            <Shield className="h-3 w-3" /> Escudo Anti-Bot ativo
+          </Badge>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="p-4">
-          <TemplatePhaseSection
-            title="Saudação"
-            description="Mensagens enviadas imediatamente quando o lead entra no CRM"
+      <Tabs defaultValue="greeting" className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="greeting">Saudação</TabsTrigger>
+          <TabsTrigger value="followup">Follow-up</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="greeting" className="mt-4">
+          <PhaseFlow
             phase="greeting"
             templates={greetingTemplates}
             onSave={(t) => saveMutation.mutate(t)}
@@ -296,13 +363,14 @@ export function WhatsAppTemplateManager() {
             onAdd={() => addTemplate('greeting')}
             isSaving={saveMutation.isPending}
             formFields={formFields}
+            onSendTest={handleSendTest}
+            isSendingTest={sendMessage.isPending}
+            canSendTest={isConnected}
           />
-        </Card>
+        </TabsContent>
 
-        <Card className="p-4">
-          <TemplatePhaseSection
-            title="Follow-up"
-            description="Mensagens enviadas se o lead não responder"
+        <TabsContent value="followup" className="mt-4">
+          <PhaseFlow
             phase="followup"
             templates={followupTemplates}
             onSave={(t) => saveMutation.mutate(t)}
@@ -310,16 +378,17 @@ export function WhatsAppTemplateManager() {
             onAdd={() => addTemplate('followup')}
             isSaving={saveMutation.isPending}
             formFields={formFields}
+            onSendTest={handleSendTest}
+            isSendingTest={sendMessage.isPending}
+            canSendTest={isConnected}
           />
-        </Card>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
-function TemplatePhaseSection({
-  title,
-  description,
+function PhaseFlow({
   phase,
   templates,
   onSave,
@@ -327,9 +396,10 @@ function TemplatePhaseSection({
   onAdd,
   isSaving,
   formFields,
+  onSendTest,
+  isSendingTest,
+  canSendTest,
 }: {
-  title: string;
-  description: string;
   phase: string;
   templates: Template[];
   onSave: (t: Template) => void;
@@ -337,44 +407,222 @@ function TemplatePhaseSection({
   onAdd: () => void;
   isSaving: boolean;
   formFields: Record<string, string[]>;
+  onSendTest: (content: string) => void;
+  isSendingTest: boolean;
+  canSendTest: boolean;
 }) {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h4 className="text-sm font-semibold">{title}</h4>
-          <p className="text-xs text-muted-foreground">{description}</p>
-        </div>
-        {templates.length < 3 && (
-          <Button variant="outline" size="sm" onClick={onAdd}>
-            <Plus className="mr-1 h-3 w-3" />
-            Adicionar
-          </Button>
-        )}
-      </div>
+  const [activeId, setActiveId] = useState<string | null>(null);
 
-      {templates.length === 0 ? (
-        <Card>
-          <CardContent className="py-6 text-center text-sm text-muted-foreground">
-            Nenhum template configurado. Clique em "Adicionar" para criar.
+  // Auto-selecionar primeiro template quando lista muda
+  useEffect(() => {
+    if (templates.length === 0) {
+      setActiveId(null);
+      return;
+    }
+    if (!activeId || !templates.find(t => t.id === activeId)) {
+      setActiveId(templates[0].id ?? null);
+    }
+  }, [templates, activeId]);
+
+  const activeTemplate = templates.find(t => t.id === activeId) ?? null;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Coluna 1 — Timeline */}
+      <div className="lg:col-span-4">
+        <Card className="h-full">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-sm font-semibold">Fluxo</h4>
+              {templates.length < 3 && (
+                <Button variant="ghost" size="sm" onClick={onAdd} className="h-7 text-xs">
+                  <Plus className="mr-1 h-3 w-3" />
+                  Etapa
+                </Button>
+              )}
+            </div>
+
+            {templates.length === 0 ? (
+              <div className="text-center py-8 space-y-3">
+                <MessageSquare className="h-8 w-8 mx-auto text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma etapa configurada
+                </p>
+                <Button variant="outline" size="sm" onClick={onAdd}>
+                  <Plus className="mr-1 h-3 w-3" />
+                  Adicionar primeira etapa
+                </Button>
+              </div>
+            ) : (
+              <ScrollArea className="max-h-[600px] pr-2">
+                <div className="space-y-0">
+                  {templates.map((t, i) => (
+                    <div key={t.id ?? `new-${i}`}>
+                      <TimelineNode
+                        template={t}
+                        index={i}
+                        active={activeId === t.id}
+                        onClick={() => t.id && setActiveId(t.id)}
+                      />
+                      {i < templates.length - 1 && (
+                        <TimelineConnector delay={templates[i + 1].delay_minutes} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
           </CardContent>
         </Card>
-      ) : (
-        <div className="space-y-3">
-          {templates.map((template) => (
+      </div>
+
+      {/* Coluna 2 — Editor + Preview */}
+      <div className="lg:col-span-8 space-y-4">
+        {activeTemplate ? (
+          <>
             <TemplateEditor
-              key={template.id}
-              template={template}
+              key={activeTemplate.id}
+              template={activeTemplate}
               phase={phase}
               onSave={onSave}
               onDelete={onDelete}
               isSaving={isSaving}
               formFields={formFields}
+              onSendTest={onSendTest}
+              isSendingTest={isSendingTest}
+              canSendTest={canSendTest}
             />
-          ))}
-        </div>
-      )}
+            <WhatsAppPreview content={activeTemplate.message_template} />
+          </>
+        ) : (
+          <Card>
+            <CardContent className="py-12 text-center text-sm text-muted-foreground">
+              Selecione uma etapa do fluxo para editar.
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
+  );
+}
+
+function TimelineNode({
+  template,
+  index,
+  active,
+  onClick,
+}: {
+  template: Template;
+  index: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const preview = template.message_template.trim()
+    ? renderPreview(template.message_template).slice(0, 60)
+    : 'Mensagem vazia';
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full flex items-start gap-3 text-left rounded-lg p-2 transition-colors",
+        active ? "bg-accent" : "hover:bg-muted/50",
+      )}
+    >
+      <div className="relative flex flex-col items-center pt-0.5">
+        <div
+          className={cn(
+            "h-6 w-6 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-colors",
+            active
+              ? "bg-primary text-primary-foreground border-primary"
+              : template.is_active
+                ? "bg-background border-primary/40 text-primary"
+                : "bg-muted border-muted-foreground/30 text-muted-foreground",
+          )}
+        >
+          {index + 1}
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium">Etapa {template.step_position}</span>
+          {!template.is_active && (
+            <Badge variant="outline" className="text-[10px] h-4 px-1">Inativa</Badge>
+          )}
+        </div>
+        <p className={cn(
+          "text-xs truncate mt-0.5",
+          template.message_template.trim() ? "text-muted-foreground" : "text-muted-foreground/50 italic",
+        )}>
+          {preview}
+        </p>
+      </div>
+    </button>
+  );
+}
+
+function TimelineConnector({ delay }: { delay: number }) {
+  return (
+    <div className="relative flex items-center justify-start py-2 ml-[19px]">
+      <div className="absolute inset-y-0 left-0 border-l-2 border-dashed border-muted" />
+      <Badge variant="outline" className="bg-background relative z-10 text-[10px] gap-1 ml-3 h-5 px-1.5">
+        <Clock className="h-2.5 w-2.5" />
+        Aguardar {formatDelay(delay)}
+      </Badge>
+    </div>
+  );
+}
+
+function WhatsAppPreview({ content }: { content: string }) {
+  const rendered = content.trim() ? renderPreview(content) : '';
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+
+  return (
+    <Card>
+      <CardContent className="p-0 overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-muted/30">
+          <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs font-medium text-muted-foreground">Live Preview</span>
+        </div>
+
+        <div className="bg-muted/30 p-4 min-h-[200px]">
+          {/* Header do contato */}
+          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-border/50">
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-primary/10 text-primary text-xs">G</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-sm font-medium leading-tight">Gabriel</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">online</p>
+            </div>
+          </div>
+
+          {/* Balão */}
+          {rendered ? (
+            <div className="flex justify-end">
+              <div className="max-w-[85%] flex flex-col items-end">
+                <div className="bg-[#dcf8c6] dark:bg-[#005c4b] text-foreground dark:text-white rounded-2xl rounded-tr-sm px-3 py-2 shadow-sm">
+                  <p className="text-sm whitespace-pre-wrap break-words">{rendered}</p>
+                  <div className="flex items-center justify-end gap-1 mt-1">
+                    <span className="text-[10px] opacity-60">{hh}:{mm}</span>
+                    <CheckCheck className="h-3 w-3 text-blue-500" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-8">
+              <p className="text-xs text-muted-foreground italic">
+                Digite uma mensagem para ver o preview
+              </p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -449,6 +697,9 @@ function TemplateEditor({
   onDelete,
   isSaving,
   formFields,
+  onSendTest,
+  isSendingTest,
+  canSendTest,
 }: {
   template: Template;
   phase: string;
@@ -456,6 +707,9 @@ function TemplateEditor({
   onDelete: (id: string) => void;
   isSaving: boolean;
   formFields: Record<string, string[]>;
+  onSendTest: (content: string) => void;
+  isSendingTest: boolean;
+  canSendTest: boolean;
 }) {
   const [message, setMessage] = useState(template.message_template);
   const [delay, setDelay] = useState(template.delay_minutes.toString());
@@ -473,7 +727,6 @@ function TemplateEditor({
       const end = textarea.selectionEnd;
       const newMessage = message.slice(0, start) + variable + message.slice(end);
       setMessage(newMessage);
-      // Set cursor after inserted variable
       setTimeout(() => {
         textarea.focus();
         textarea.setSelectionRange(start + variable.length, start + variable.length);
@@ -487,16 +740,18 @@ function TemplateEditor({
     <Card>
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <Badge variant="secondary" className="text-xs">
-            Etapa {template.step_position}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              Etapa {template.step_position}
+            </Badge>
+            <Badge variant="outline" className="text-xs gap-1">
+              <Clock className="h-3 w-3" />
+              {formatDelay(template.delay_minutes)}
+            </Badge>
+          </div>
           <div className="flex items-center gap-2">
             <VariableInserter formFields={formFields} onInsert={handleInsertVariable} />
-            <Switch
-              checked={active}
-              onCheckedChange={setActive}
-              className="scale-75"
-            />
+            <Switch checked={active} onCheckedChange={setActive} className="scale-75" />
             {template.id && (
               <Button
                 variant="ghost"
@@ -515,11 +770,11 @@ function TemplateEditor({
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder={`Mensagem da etapa ${template.step_position}...`}
-          rows={3}
+          rows={5}
           className="text-sm"
         />
 
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
             <Label className="text-xs text-muted-foreground">Delay:</Label>
@@ -537,7 +792,22 @@ function TemplateEditor({
             </Select>
           </div>
 
-          {hasChanges && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onSendTest(message)}
+              disabled={isSendingTest || !message.trim() || !canSendTest}
+              title={!canSendTest ? 'Conecte o WhatsApp para enviar testes' : undefined}
+            >
+              {isSendingTest ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <Send className="mr-1 h-3 w-3" />
+              )}
+              Enviar teste
+            </Button>
+
             <Button
               size="sm"
               onClick={() => onSave({
@@ -546,12 +816,12 @@ function TemplateEditor({
                 delay_minutes: parseInt(delay) || 0,
                 is_active: active,
               })}
-              disabled={isSaving || !message}
+              disabled={isSaving || !message || !hasChanges}
             >
               <Save className="mr-1 h-3 w-3" />
               Salvar
             </Button>
-          )}
+          </div>
         </div>
       </CardContent>
     </Card>
