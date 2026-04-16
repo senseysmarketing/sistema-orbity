@@ -461,6 +461,10 @@ export const MeetingFormDialog = ({
     setSelectedParticipants([]);
     setSelectedDuration(60);
     setSyncToGoogleCalendar(isConnected && isSyncEnabled);
+    setWhatsappReminderEnabled(false);
+    setClientWhatsapp("");
+    setReminderHoursBefore(2);
+    lastAutoFilledClientIdRef.current = null;
   };
 
   const addExternalParticipant = () => {
