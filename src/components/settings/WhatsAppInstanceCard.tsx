@@ -160,7 +160,9 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                 <p className="text-xs sm:text-sm text-muted-foreground truncate">
                   {account?.phone_number
                     ? `Número: ${formatPhoneDisplay(account.phone_number)}`
-                    : "Aguardando número conectado..."}
+                    : isConnected
+                      ? "Sincronizando número..."
+                      : "Aguardando número conectado..."}
                 </p>
               </div>
             </div>

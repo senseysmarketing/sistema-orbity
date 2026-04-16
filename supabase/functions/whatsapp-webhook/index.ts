@@ -223,6 +223,19 @@ serve(async (req) => {
         const updateData: Record<string, any> = { status: newStatus };
         if (newStatus === 'connected') updateData.qr_code = null;
 
+        // Capture and persist phone number on connection (Guardrail 2: strict sanitization)
+        if (newStatus === 'connected') {
+          const rawPhonePayload = data?.wuid || data?.owner || data?.sender
+            || data?.instance?.wuid || data?.instance?.owner;
+          if (rawPhonePayload) {
+            const cleanPhone = String(rawPhonePayload).split('@')[0].replace(/\D/g, '');
+            if (cleanPhone) {
+              updateData.phone_number = cleanPhone;
+              console.log('[whatsapp-webhook] Phone captured from connection.update:', cleanPhone);
+            }
+          }
+        }
+
         await supabase.from('whatsapp_accounts').update(updateData).eq('id', account.id);
         console.log('[whatsapp-webhook] Connection status updated:', newStatus);
       } else {

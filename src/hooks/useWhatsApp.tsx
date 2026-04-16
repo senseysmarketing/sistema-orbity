@@ -115,7 +115,19 @@ export function useWhatsApp(purpose: string = 'general') {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      // Guardrail 3: Optimistic cache update for instant UI reactivity (no F5 needed)
+      if (result?.status === 'connected' && result?.phone_number) {
+        queryClient.setQueryData(
+          ['whatsapp-account', currentAgency?.id, purpose],
+          (old: WhatsAppAccount | null | undefined) => old ? ({
+            ...old,
+            status: 'connected',
+            phone_number: result.phone_number,
+            qr_code: null,
+          }) : old
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['whatsapp-account', currentAgency?.id, purpose] });
     },
   });
