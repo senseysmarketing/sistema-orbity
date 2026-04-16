@@ -7,6 +7,8 @@ import orbityLogo from "@/assets/orbity-logo-white.png";
 
 const navLinks = [
   { label: "Funcionalidades", href: "#features" },
+  { label: "Integrações", href: "#integrations" },
+  { label: "Diferenciais", href: "#differentials" },
   { label: "Preços", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
 ];
