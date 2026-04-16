@@ -290,6 +290,26 @@ export const MeetingFormDialog = ({
     loadMeetingData();
   }, [meeting, prefilledDateTime, duplicateFrom, open]);
 
+  // Auto-fill client WhatsApp when selected client changes
+  useEffect(() => {
+    const realIds = separateVirtualClients(selectedClientIds).realClientIds;
+    const firstClientId = realIds[0];
+    if (!firstClientId) {
+      lastAutoFilledClientIdRef.current = null;
+      return;
+    }
+    if (lastAutoFilledClientIdRef.current === firstClientId) return;
+    const client = clients.find((c: any) => c.id === firstClientId) as any;
+    if (client && client.contact) {
+      setClientWhatsapp(formatPhoneBR(client.contact));
+      lastAutoFilledClientIdRef.current = firstClientId;
+    } else if (client) {
+      // Client selected but has no contact: clear and remember
+      setClientWhatsapp("");
+      lastAutoFilledClientIdRef.current = firstClientId;
+    }
+  }, [selectedClientIds, clients]);
+
   const handleDurationSelect = (minutes: number) => {
     setSelectedDuration(minutes);
     if (formData.start_time) {
