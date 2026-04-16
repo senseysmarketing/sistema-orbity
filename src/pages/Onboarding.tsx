@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { OnboardingProvider, useOnboarding } from '@/hooks/useOnboarding';
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
 import { CompanyDataStep } from '@/components/onboarding/CompanyDataStep';
@@ -65,11 +65,13 @@ function OnboardingContent() {
       <div className="container mx-auto px-4 py-8">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
-            <img 
-              src={orbityLogo} 
-              alt="Orbity Logo" 
-              className="h-12 w-auto"
-            />
+            <Link to="/" className="inline-block">
+              <img 
+                src={orbityLogo} 
+                alt="Orbity Logo" 
+                className="h-12 w-auto cursor-pointer hover:opacity-80 transition-opacity"
+              />
+            </Link>
           </div>
           <div className="flex items-center justify-center space-x-2 mb-4">
             <Building2 className="h-6 w-6 text-primary" />
