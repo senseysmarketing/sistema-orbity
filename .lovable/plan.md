@@ -1,83 +1,68 @@
 
 
-# Escudo Anti-Bot: confirmação de schema e implementação
+# Implementação Final: Hub de Configurações CRM
 
-## Verificação do schema (executada)
+## Refinamentos aprovados
+1. **Hover de ícone**: `group` no Card + `text-muted-foreground transition-colors group-hover:text-primary` no ícone
+2. **Separator** entre `MetaIntegrationConfig` e `WebhooksManager` na gaveta de Integrações
+3. **`h-full`** nos cards para alinhamento uniforme do grid
 
-Consultei `information_schema.columns` para `whatsapp_messages`. Coluna real:
+## Estrutura final do `CRMSettings.tsx`
 
-```
-is_from_me  boolean  ✅
-```
-
-A coluna **é `is_from_me`** (não `from_me`). O plano original estava correto. O resto do código já usa `is_from_me` (ex.: linha do upsert da mensagem recebida no webhook e o componente `WhatsAppChat.tsx` que filtra `msg.is_from_me`).
-
-Portanto: **mantemos `.eq('is_from_me', true)`** — é o nome exato da coluna no banco.
-
-## Confirmação do fluxo de gravação
-
-A gravação da mensagem recebida acontece **antes** do bloco do Escudo Anti-Bot, via `supabase.from('whatsapp_messages').upsert(...)` com `is_from_me: false`. O escudo apenas envolve `Promise.all([pauseAutomations, promoteLeadOnReply])`.
-
-Resultado garantido para mensagens de bot:
-- ✅ Mensagem persistida em `whatsapp_messages` (vendedor vê no `WhatsAppChat.tsx`)
-- ✅ `last_customer_message_at` atualizado na conversation
-- ❌ Automações **não** são pausadas
-- ❌ Lead **não** é promovido no Kanban
-
-## Implementação
-
-Em `supabase/functions/whatsapp-webhook/index.ts`, dentro do bloco `if (!isFromMe)`, **após** o upsert da mensagem recebida e **antes** do `Promise.all`:
-
-```ts
-// Anti-Bot Shield: detect auto-replies (< 10s after our last sent message)
-const AUTO_REPLY_THRESHOLD_SEC = 10;
-let isAutoReply = false;
-
-try {
-  const { data: lastSent } = await supabase
-    .from('whatsapp_messages')
-    .select('created_at')
-    .eq('conversation_id', conversation.id)
-    .eq('is_from_me', true)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (lastSent?.created_at) {
-    const diffSec = (Date.now() - new Date(lastSent.created_at).getTime()) / 1000;
-    if (diffSec < AUTO_REPLY_THRESHOLD_SEC) {
-      isAutoReply = true;
-      console.log(`[Anti-Bot Shield] Auto-reply detected. Delta: ${diffSec.toFixed(2)}s — skipping pause + CRM Vivo`);
-    }
-  }
-} catch (e) {
-  console.error('[Anti-Bot Shield] check failed, treating as human (fail-open):', e);
-}
-
-if (!isAutoReply) {
-  await Promise.all([
-    pauseAutomations,
-    shouldPromote
-      ? promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id)
-      : Promise.resolve(),
-  ]);
-}
+```tsx
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
+import { GitMerge, Target, MessageCircle, Link2, DollarSign } from "lucide-react";
+import { CustomStatusManager } from "./CustomStatusManager";
+import { LeadScoringConfig } from "./LeadScoringConfig";
+import { WhatsAppTemplateManager } from "./WhatsAppTemplateManager";
+import { MetaIntegrationConfig } from "./MetaIntegrationConfig";
+import { WebhooksManager } from "./WebhooksManager";
+import { ManualInvestmentManager } from "./ManualInvestmentManager";
 ```
 
-## Guardrails finais
+### 5 Cards no grid
 
-| # | Garantia | Como |
-|---|----------|------|
-| 1 | Nome da coluna correto | `is_from_me` confirmado via schema |
-| 2 | Mensagem do bot visível | Upsert ocorre antes do escudo, fora do bloco condicional |
-| 3 | Sem retrocesso | Apenas pausa + promoção são puladas; gravação intacta |
-| 4 | Fail-open | Try/catch trata escudo como humano se query falhar |
-| 5 | Performance | 1 query indexada (~5-15ms) antes do Promise.all |
-| 6 | Threshold configurável | Constante `AUTO_REPLY_THRESHOLD_SEC = 10` |
-| 7 | Auditoria | Log `[Anti-Bot Shield]` com delta exato |
+| # | Card | Ícone | Sheet width | Conteúdo |
+|---|------|-------|-------------|----------|
+| 1 | Status do Funil | `GitMerge` | `sm:max-w-[600px]` | `<CustomStatusManager />` |
+| 2 | Qualificação de Leads | `Target` | `sm:max-w-[700px]` | `<LeadScoringConfig />` |
+| 3 | Cadência de WhatsApp | `MessageCircle` | `sm:max-w-[800px]` | `<WhatsAppTemplateManager />` |
+| 4 | Fontes & Integrações | `Link2` | `sm:max-w-[800px]` | `Meta` + `<Separator className="my-6" />` + `Webhooks` |
+| 5 | Investimentos Manuais | `DollarSign` | `sm:max-w-[600px]` | `<ManualInvestmentManager />` |
+
+### Padrão do Card (SheetTrigger)
+```tsx
+<Sheet>
+  <SheetTrigger asChild>
+    <Card className="group h-full hover:border-primary/50 transition-colors cursor-pointer">
+      <CardHeader>
+        <Icon className="h-6 w-6 text-muted-foreground transition-colors group-hover:text-primary mb-2" />
+        <CardTitle className="text-base">Título</CardTitle>
+        <CardDescription>Descrição</CardDescription>
+      </CardHeader>
+    </Card>
+  </SheetTrigger>
+  <SheetContent side="right" className="sm:max-w-[XXX] overflow-y-auto">
+    <SheetHeader className="mb-6">
+      <SheetTitle>Título</SheetTitle>
+      <SheetDescription>Contexto</SheetDescription>
+    </SheetHeader>
+    {/* Componente filho */}
+  </SheetContent>
+</Sheet>
+```
+
+### Grid container
+```tsx
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+```
+
+`items-stretch` (default do grid) + `h-full` nos cards garantem altura uniforme sem distorção.
 
 ## Ficheiro alterado
-- `supabase/functions/whatsapp-webhook/index.ts` (~20 linhas no bloco `!isFromMe`)
+- `src/components/crm/CRMSettings.tsx` (refatoração completa, ~140 linhas)
 
-Sem migration. Sem schema change.
+Sem migration. Sem mudança em componentes filhos.
 
