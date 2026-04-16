@@ -851,6 +851,60 @@ export const MeetingFormDialog = ({
             )}
           </div>
 
+          {/* WhatsApp Reminder Section */}
+          <div className="space-y-3 rounded-lg border p-4 bg-muted/30">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="whatsapp-reminder" className="flex items-center gap-2 text-base font-medium">
+                  <MessageCircle className="h-4 w-4 text-green-600/80" />
+                  Lembrete Automático
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Ative para enviar um lembrete via WhatsApp ao cliente antes da reunião.
+                </p>
+              </div>
+              <Switch
+                id="whatsapp-reminder"
+                checked={whatsappReminderEnabled}
+                onCheckedChange={setWhatsappReminderEnabled}
+              />
+            </div>
+
+            {whatsappReminderEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div className="space-y-2">
+                  <Label htmlFor="client-whatsapp">Telefone do Cliente</Label>
+                  <Input
+                    id="client-whatsapp"
+                    ref={phoneInputRef}
+                    placeholder="(11) 99999-9999"
+                    value={clientWhatsapp}
+                    onChange={(e) => setClientWhatsapp(formatPhoneBR(e.target.value))}
+                    maxLength={15}
+                    inputMode="tel"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reminder-hours">Avisar com antecedência</Label>
+                  <Select
+                    value={String(reminderHoursBefore)}
+                    onValueChange={(v) => setReminderHoursBefore(Number(v))}
+                  >
+                    <SelectTrigger id="reminder-hours">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 hora antes</SelectItem>
+                      <SelectItem value="2">2 horas antes</SelectItem>
+                      <SelectItem value="12">12 horas antes</SelectItem>
+                      <SelectItem value="24">24 horas antes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
