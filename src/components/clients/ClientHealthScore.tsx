@@ -155,7 +155,7 @@ function HealthGauge({ score, level }: { score: number; level: ScoreLevel }) {
 }
 
 export function ClientHealthScore({
-  client,
+  client: _client,
   tasks,
   meetings,
   npsScore,
