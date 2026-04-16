@@ -206,7 +206,7 @@ export function AsaasIntegration() {
           <AlertDescription className="text-xs space-y-3 ml-2">
             <p className="font-semibold text-sm text-blue-800 dark:text-blue-300">Como configurar o Webhook no Asaas</p>
 
-            <ol className="space-y-2 list-decimal list-inside text-muted-foreground">
+            <ol className="space-y-2 list-decimal list-outside pl-5 text-muted-foreground">
               <li className="leading-relaxed">
                 <span>No Asaas, acesse <strong className="text-foreground">Menu do Usuário → Integrações → Webhooks</strong> e clique em <strong className="text-foreground">"Criar Webhook"</strong>.</span>
               </li>
@@ -220,9 +220,7 @@ export function AsaasIntegration() {
                 <span>Mantenha a <strong className="text-foreground">Fila de sincronização</strong> e o <strong className="text-foreground">Webhook</strong> como <strong className="text-foreground">"Ativados"</strong>.</span>
               </li>
               <li className="leading-relaxed">
-                <div className="flex items-start gap-1">
-                  <span>⚠️ <strong className="text-foreground">IMPORTANTE — Eventos para Cobranças:</strong> Marque estritamente estas opções:</span>
-                </div>
+                <span>⚠️ <strong className="text-foreground">IMPORTANTE — Eventos para Cobranças:</strong> Marque estritamente estas opções:</span>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {webhookEvents.map((evt) => (
                     <div key={evt.code} className="flex items-center gap-1">
