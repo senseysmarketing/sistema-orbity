@@ -29,15 +29,14 @@ export default function SubscriptionSuccess() {
         });
         
         if (!error) {
-          // Disparar evento Purchase para Meta Pixel
+          const planPrice = planSlug === 'orbity_annual' ? 3564 : 397;
+          
           trackPurchase({
-            value: 0, // Valor será preenchido pelo plano selecionado
+            value: planPrice,
             currency: 'BRL',
             content_name: planSlug || 'subscription',
-            content_type: 'subscription'
           });
           
-          // Também disparar Lead pois completou o cadastro com pagamento
           trackLead({
             content_name: planSlug || 'paid_plan',
             content_category: 'Paid Subscription',
@@ -56,10 +55,9 @@ export default function SubscriptionSuccess() {
       } else if (sessionId) {
         // Regular subscription flow - upgrade de plano
         trackPurchase({
-          value: 0,
+          value: 397,
           currency: 'BRL',
           content_name: 'subscription_upgrade',
-          content_type: 'subscription'
         });
         
         setTimeout(() => {

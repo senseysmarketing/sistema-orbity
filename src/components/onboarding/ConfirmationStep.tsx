@@ -16,7 +16,7 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { trackViewContent } from '@/lib/metaPixel';
+import { trackViewContent, trackCompleteRegistration } from '@/lib/metaPixel';
 
 export function ConfirmationStep() {
   const { 
@@ -44,8 +44,13 @@ export function ConfirmationStep() {
 
   const handleSubmit = async () => {
     const success = await submitOnboarding();
-    if (success && flow === 'trial') {
-      navigate('/welcome');
+    if (success) {
+      const contentName = flow === 'trial' ? 'Trial 7 Dias'
+        : flow === 'direct_annual' ? 'Orbity Anual' : 'Orbity Mensal';
+      trackCompleteRegistration({ content_name: contentName, currency: 'BRL' });
+      if (flow === 'trial') {
+        navigate('/welcome');
+      }
     }
     // direct flows: redirect handled by initiateCheckout (window.open to checkout URL)
   };
