@@ -63,7 +63,7 @@ function calculateDynamicScore(
   // NPS
   if (npsScore != null) {
     if (npsScore >= 9) score += 10;
-    else if (npsScore <= 6) score -= 30;
+    else if (npsScore <= 6) score -= 50;
   }
 
   // Tempo de casa < 3 meses (onboarding): -10

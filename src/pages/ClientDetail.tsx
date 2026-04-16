@@ -105,7 +105,7 @@ export default function ClientDetail() {
           .eq("agency_id", currentAgency.id),
         supabase
           .from("nps_responses")
-          .select("score, client_name")
+          .select("score, client_name, client_id")
           .eq("agency_id", currentAgency.id)
           .order("response_date", { ascending: false })
           .limit(50),
@@ -285,7 +285,7 @@ export default function ClientDetail() {
   const meetings = dashboardData?.meetings || [];
   const credentials = dashboardData?.credentials || [];
   const allNps = dashboardData?.allNps || [];
-  const matchedNps = allNps.find((n: any) => n.client_name === client.name);
+  const matchedNps = allNps.find((n: any) => n.client_id === client.id) || allNps.find((n: any) => n.client_name === client.name);
   const npsScore = matchedNps?.score ?? undefined;
   const monthsActive = client.start_date ? differenceInMonths(new Date(), new Date(client.start_date)) : 0;
 
