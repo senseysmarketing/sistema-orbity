@@ -189,7 +189,7 @@ export const MeetingFormDialog = ({
       if (!currentAgency?.id) return [];
       const { data } = await supabase
         .from("leads")
-        .select("id, name, created_at")
+        .select("id, name, phone, created_at")
         .eq("agency_id", currentAgency.id)
         .order("created_at", { ascending: false });
       return data || [];
