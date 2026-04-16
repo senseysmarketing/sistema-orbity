@@ -112,8 +112,6 @@ export default function ClientDetail() {
       const credentials = credentialsResult.data || [];
 
       // Match NPS by client name (nps_responses has client_name, not client_id)
-      let npsScore: number | undefined = undefined;
-      // We'll resolve this after client is available - store all NPS for now
       const allNps = npsResult.data || [];
 
       return { tasks, meetings, credentials, allNps };
@@ -231,7 +229,9 @@ export default function ClientDetail() {
   const tasks = dashboardData?.tasks || [];
   const meetings = dashboardData?.meetings || [];
   const credentials = dashboardData?.credentials || [];
-  const latestCreative = dashboardData?.latestCreative;
+  const allNps = dashboardData?.allNps || [];
+  const matchedNps = allNps.find((n: any) => n.client_name === client.name);
+  const npsScore = matchedNps?.score ?? undefined;
   const monthsActive = client.start_date ? differenceInMonths(new Date(), new Date(client.start_date)) : 0;
 
   const nextMeeting = meetings.find((m: any) => new Date(m.start_time) > new Date());
@@ -377,8 +377,10 @@ export default function ClientDetail() {
           <div className="bg-white border rounded-xl shadow-sm p-5 flex flex-col items-center">
             <h3 className="text-sm font-semibold text-muted-foreground mb-3">Saúde do Cliente</h3>
             <ClientHealthScore
-              startDate={client.start_date}
-              pendingTaskCount={tasks.length}
+              client={client}
+              tasks={tasks}
+              meetings={meetings}
+              npsScore={npsScore}
               variant="circle"
             />
             <div className="grid grid-cols-3 gap-4 mt-4 w-full text-center">
@@ -572,31 +574,6 @@ export default function ClientDetail() {
             )}
           </div>
 
-          {/* Latest Creative */}
-          <div className="bg-white border rounded-xl shadow-sm p-4">
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-              <Image className="h-4 w-4" />
-              Último Criativo
-            </h3>
-            {latestCreative ? (
-              <div className="space-y-2">
-                <div className="rounded-lg overflow-hidden bg-slate-100 aspect-video flex items-center justify-center">
-                  <img
-                    src={latestCreative.imageUrl}
-                    alt={latestCreative.title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground truncate">{latestCreative.title}</p>
-              </div>
-            ) : (
-              <div className="rounded-lg bg-slate-100 aspect-video flex flex-col items-center justify-center gap-2">
-                <Image className="h-8 w-8 text-muted-foreground/40" />
-                <p className="text-xs text-muted-foreground">Nenhum criativo recente</p>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
