@@ -657,6 +657,12 @@ export const MeetingFormDialog = ({
                   </Command>
                 </PopoverContent>
               </Popover>
+              {formData.lead_id && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1.5 mt-1">
+                  <Info className="h-3 w-3 shrink-0" />
+                  Ao salvar, este lead será movido automaticamente para "Agendamentos" no CRM.
+                </p>
+              )}
             </div>
           </div>
 
