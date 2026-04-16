@@ -1,45 +1,45 @@
 
 
-# Card compacto que expande no hover
+# Hover scale sutil nos cards de tarefa
 
-## Problema
-Atualmente os botões existem no DOM mas com `opacity-0`, ocupando espaço vertical mesmo invisíveis → cria área vazia no card em repouso.
+## Análise
+O efeito que você notou no card do CRM é o `transition-all` aplicado no `<Card>` que, combinado com o crescimento da grid-row dos botões, dá uma sensação de "respiração" do card inteiro. Para os cards de tarefa (sem botões para expandir), vamos replicar apenas a parte sutil do "grow" — um leve scale + sombra no hover, mantendo a estética premium.
 
-## Solução
-Em `SortableLeadCard.tsx`, em vez de animar apenas `opacity`, animar **altura + opacidade** para que o espaço seja "cortado" em repouso e expanda suavemente no hover (desktop). No mobile, manter sempre visível (touch não tem hover).
+## Mudança
 
-### Técnica
-Usar `grid-template-rows` animado (truque CSS moderno e performático para animar height: auto):
+Em `src/components/ui/task-card.tsx` (componente base usado em Kanban e listas), adicionar ao `<Card>` raiz:
 
 ```tsx
-<div className="grid transition-all duration-300 ease-out 
-                grid-rows-[1fr] 
-                md:grid-rows-[0fr] md:group-hover:grid-rows-[1fr]
-                md:opacity-0 md:group-hover:opacity-100">
-  <div className="overflow-hidden">
-    <div className="flex gap-2 pt-1" onPointerDown={(e) => e.stopPropagation()}>
-      {/* WhatsApp + Reunião buttons (mantidos exatamente como estão) */}
-    </div>
-  </div>
-</div>
+className="... transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
 ```
 
-### Comportamento
-| Estado | Desktop | Mobile |
-|--------|---------|--------|
-| Repouso | Altura 0, sem espaço vazio | Botões visíveis |
-| Hover | Expande suave (300ms) revelando botões | (sem hover) |
-| Drag | Permanece colapsado | Permanece visível |
+### Detalhamento
+- `hover:scale-[1.02]` — crescimento sutil de 2% (não exagerado, mantém grid alinhado)
+- `hover:-translate-y-0.5` — leve "elevação" de 2px para sensação tátil
+- `hover:shadow-lg` — sombra maior reforça a elevação
+- `transition-all duration-300 ease-out` — animação suave idêntica à do CRM
+- Preservar todas as classes existentes (cores, padding, borders)
 
-### Detalhes
-- `grid-rows-[0fr] → [1fr]` é a forma canônica de animar `height: auto` no Tailwind/CSS puro
-- `overflow-hidden` no filho garante que o conteúdo seja "cortado" durante a transição
-- `pt-1` adiciona respiro apenas quando expandido (faz parte do conteúdo cortado)
-- Combina com `opacity` para fade-in elegante junto com a expansão
-- Mantém `onPointerDown stopPropagation` (anti-drag) e todos os handlers existentes
+### Aplicação
+- Apenas em `task-card.tsx` (componente compartilhado) → propaga automaticamente para:
+  - `SortableTaskCard` (Kanban de tarefas)
+  - Qualquer outra view que use `TaskCard`
+
+### Não alterar
+- `MyTasksList.tsx` (linhas de dashboard, não cards) — manter como está
+- `DemoTasksView.tsx` (landing demo) — manter como está
+- Lógica de drag (dnd-kit) — scale só no hover, não interfere com `isDragging` (que usa opacity)
+
+## Comportamento garantido
+| Cenário | Resultado |
+|---------|-----------|
+| Repouso | Card normal, sem alterações visuais |
+| Hover desktop | Cresce 2%, sobe 2px, sombra acentuada (300ms) |
+| Drag ativo | Opacity 0.5 prevalece, scale neutralizado |
+| Mobile/touch | Sem hover, comportamento inalterado |
 
 ## Ficheiro alterado
-- `src/components/crm/SortableLeadCard.tsx` (apenas o wrapper dos botões — ~10 linhas)
+- `src/components/ui/task-card.tsx` (apenas a className do `<Card>` raiz)
 
-Sem mudança em props, hooks ou outros componentes.
+Sem mudança em props, hooks, ou estrutura.
 
