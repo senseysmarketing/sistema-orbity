@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { getTemperatureLabel } from "@/lib/leadTemperature";
 import { normalizeLeadStatusToDb } from "@/lib/crm/leadStatus";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { MeetingFormDialog } from "@/components/agenda/MeetingFormDialog";
 
 function UnqualifiedLeadsWarning({ leads }: { leads: Lead[] }) {
   // Leads from Facebook that were never scored (null) or had no rules when they arrived (unconfigured)
@@ -106,6 +107,13 @@ export default function CRM() {
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [meetingDialogOpen, setMeetingDialogOpen] = useState(false);
+  const [meetingDefaultLeadId, setMeetingDefaultLeadId] = useState<string | undefined>();
+
+  const handleScheduleMeeting = (lead: Lead) => {
+    setMeetingDefaultLeadId(lead.id);
+    setMeetingDialogOpen(true);
+  };
   
   // Hidden columns state with localStorage persistence
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(() => {
@@ -559,6 +567,7 @@ export default function CRM() {
                     onDelete={handleLeadDelete}
                     onUpdate={fetchLeads}
                     onView={handleLeadView}
+                    onScheduleMeeting={handleScheduleMeeting}
                     onLeadMove={handleLeadMove}
                     hiddenColumns={hiddenColumns}
                     onToggleColumn={handleToggleColumn}
@@ -590,6 +599,16 @@ export default function CRM() {
         open={showLeadDetails}
         onOpenChange={setShowLeadDetails}
         onEdit={handleLeadEdit}
+      />
+
+      {/* Meeting scheduling from CRM card */}
+      <MeetingFormDialog
+        open={meetingDialogOpen}
+        onOpenChange={(open) => {
+          setMeetingDialogOpen(open);
+          if (!open) setMeetingDefaultLeadId(undefined);
+        }}
+        defaultLeadId={meetingDefaultLeadId}
       />
     </div>
   );
