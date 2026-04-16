@@ -301,8 +301,22 @@ export const MeetingFormDialog = ({
     loadMeetingData();
   }, [meeting, prefilledDateTime, duplicateFrom, open]);
 
-  // Auto-fill client WhatsApp when selected client changes
+  // Guardrail 2: Centralized auto-fill — single effect, explicit precedence Lead > Client.
+  // Eliminates race conditions between multiple effects.
   useEffect(() => {
+    if (!leads.length && !clients.length) return;
+
+    // Lead has absolute priority
+    if (formData.lead_id) {
+      const lead = leads.find((l: any) => l.id === formData.lead_id) as any;
+      if (lead?.phone) {
+        setClientWhatsapp(normalizeAndFormatPhone(lead.phone));
+        lastAutoFilledClientIdRef.current = `lead:${formData.lead_id}`;
+        return;
+      }
+    }
+
+    // Fallback to first real client
     const realIds = separateVirtualClients(selectedClientIds).realClientIds;
     const firstClientId = realIds[0];
     if (!firstClientId) {
@@ -311,15 +325,14 @@ export const MeetingFormDialog = ({
     }
     if (lastAutoFilledClientIdRef.current === firstClientId) return;
     const client = clients.find((c: any) => c.id === firstClientId) as any;
-    if (client && client.contact) {
-      setClientWhatsapp(formatPhoneBR(client.contact));
+    if (client?.contact) {
+      setClientWhatsapp(normalizeAndFormatPhone(client.contact));
       lastAutoFilledClientIdRef.current = firstClientId;
     } else if (client) {
-      // Client selected but has no contact: clear and remember
       setClientWhatsapp("");
       lastAutoFilledClientIdRef.current = firstClientId;
     }
-  }, [selectedClientIds, clients]);
+  }, [formData.lead_id, selectedClientIds, leads, clients]);
 
   const handleDurationSelect = (minutes: number) => {
     setSelectedDuration(minutes);
