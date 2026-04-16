@@ -23,7 +23,7 @@ const pillars = [
 
 export function DifferentialsSection() {
   return (
-    <section className="relative overflow-hidden py-24 bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-950 text-white">
+    <section id="differentials" className="relative overflow-hidden py-24 bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-950 text-white">
       {/* Constellation pattern */}
       <svg className="absolute inset-0 w-full h-full opacity-[0.05]" xmlns="http://www.w3.org/2000/svg">
         <defs>
