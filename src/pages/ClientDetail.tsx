@@ -17,7 +17,6 @@ import {
   ExternalLink,
   Image,
   Key,
-  
   Phone,
   Sparkles,
   Video,
@@ -31,7 +30,6 @@ export default function ClientDetail() {
   const { currentAgency } = useAgency();
   const { toast } = useToast();
 
-  // --- Main client query ---
   const { data: client, isLoading } = useQuery({
     queryKey: ["client-detail", id],
     queryFn: async () => {
@@ -43,14 +41,12 @@ export default function ClientDetail() {
     enabled: !!id,
   });
 
-  // --- Dashboard data (parallel) ---
   const { data: dashboardData } = useQuery({
     queryKey: ["client-dashboard", id, currentAgency?.id],
     queryFn: async () => {
       if (!id || !currentAgency?.id) return null;
 
       const [tasksResult, meetingsResult, credentialsResult, creativeResult] = await Promise.all([
-        // Pending tasks
         supabase
           .from("task_clients")
           .select("tasks!inner(id, title, status, priority, due_date)")
@@ -58,21 +54,18 @@ export default function ClientDetail() {
           .eq("tasks.agency_id", currentAgency.id)
           .not("tasks.status", "in", '("done","cancelled")')
           .limit(8),
-        // Recent meetings via junction
         supabase
           .from("meeting_clients")
           .select("meetings!inner(id, title, start_time, status, outcome, meeting_type)")
           .eq("client_id", id)
           .order("meetings(start_time)", { ascending: false })
           .limit(5),
-        // Credentials
         supabase
           .from("client_credentials")
           .select("id, platform, username, password, url")
           .eq("client_id", id)
           .eq("agency_id", currentAgency.id)
           .limit(5),
-        // Latest creative (redes_sociais task with attachments)
         supabase
           .from("task_clients")
           .select("tasks!inner(id, title, attachments, task_type, updated_at)")
@@ -85,8 +78,7 @@ export default function ClientDetail() {
       ]);
 
       const tasks = (tasksResult.data || []).map((r: any) => r.tasks).filter(Boolean);
-      
-      // Handle meetings - may fail due to order syntax, fallback gracefully
+
       let meetings: any[] = [];
       if (!meetingsResult.error && meetingsResult.data) {
         meetings = meetingsResult.data.map((r: any) => r.meetings).filter(Boolean);
@@ -122,22 +114,19 @@ export default function ClientDetail() {
     toast({ title: "Copiado!", description: "Senha copiada para a área de transferência." });
   };
 
-  // --- Loading state ---
   if (isLoading) {
     return (
-      <div className="bg-gradient-to-br from-slate-950 via-purple-950/30 to-slate-950 -m-6 p-6 min-h-screen">
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-10 w-10 rounded-full bg-white/10" />
-            <div className="space-y-2">
-              <Skeleton className="h-8 w-48 bg-white/10" />
-              <Skeleton className="h-4 w-32 bg-white/10" />
-            </div>
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-32" />
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            <Skeleton className="h-64 lg:col-span-3 bg-white/5 rounded-xl" />
-            <Skeleton className="h-64 lg:col-span-2 bg-white/5 rounded-xl" />
-          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <Skeleton className="h-64 lg:col-span-3 rounded-xl" />
+          <Skeleton className="h-64 lg:col-span-2 rounded-xl" />
         </div>
       </div>
     );
@@ -162,7 +151,6 @@ export default function ClientDetail() {
   const latestCreative = dashboardData?.latestCreative;
   const monthsActive = client.start_date ? differenceInMonths(new Date(), new Date(client.start_date)) : 0;
 
-  // AI Summary dynamic text
   const nextMeeting = meetings.find((m: any) => new Date(m.start_time) > new Date());
   const aiSummaryParts: string[] = [];
   if (client.start_date) {
@@ -187,9 +175,9 @@ export default function ClientDetail() {
     : "#";
 
   const priorityColors: Record<string, string> = {
-    high: "bg-red-500/20 text-red-300 border-red-500/30",
-    medium: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-    low: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+    high: "bg-red-100 text-red-700 border-red-200",
+    medium: "bg-amber-100 text-amber-700 border-amber-200",
+    low: "bg-emerald-100 text-emerald-700 border-emerald-200",
   };
 
   const statusLabels: Record<string, string> = {
@@ -200,27 +188,26 @@ export default function ClientDetail() {
   };
 
   const meetingStatusLabels: Record<string, { label: string; color: string }> = {
-    scheduled: { label: "Agendada", color: "bg-blue-500/20 text-blue-300" },
-    confirmed: { label: "Confirmada", color: "bg-emerald-500/20 text-emerald-300" },
-    completed: { label: "Realizada", color: "bg-purple-500/20 text-purple-300" },
-    cancelled: { label: "Cancelada", color: "bg-red-500/20 text-red-300" },
-    rescheduled: { label: "Reagendada", color: "bg-amber-500/20 text-amber-300" },
+    scheduled: { label: "Agendada", color: "bg-blue-100 text-blue-700" },
+    confirmed: { label: "Confirmada", color: "bg-emerald-100 text-emerald-700" },
+    completed: { label: "Realizada", color: "bg-purple-100 text-purple-700" },
+    cancelled: { label: "Cancelada", color: "bg-red-100 text-red-700" },
+    rescheduled: { label: "Reagendada", color: "bg-amber-100 text-amber-700" },
   };
 
   return (
-    <div className="bg-gradient-to-br from-slate-950 via-purple-950/30 to-slate-950 -m-6 p-6 min-h-screen text-white">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
-            className="text-white/70 hover:text-white hover:bg-white/10"
             onClick={() => navigate("/dashboard/clients")}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-purple-500/20 text-purple-300 text-xl font-bold border border-purple-500/30">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-purple-100 text-purple-700 text-xl font-bold border border-purple-200">
             {client.name.charAt(0).toUpperCase()}
           </div>
           <div>
@@ -229,14 +216,14 @@ export default function ClientDetail() {
               <Badge
                 className={
                   client.active
-                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                    : "bg-slate-500/20 text-slate-400 border-slate-500/30"
+                    ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                    : "bg-slate-100 text-slate-600 border-slate-200"
                 }
               >
                 {client.active ? "Ativo" : "Inativo"}
               </Badge>
             </div>
-            <div className="flex items-center gap-3 mt-1 text-sm text-white/50">
+            <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
               {client.service && <span>{client.service}</span>}
               {client.start_date && (
                 <span className="flex items-center gap-1">
@@ -259,7 +246,6 @@ export default function ClientDetail() {
           <Button
             size="sm"
             variant="outline"
-            className="border-white/20 text-white/80 hover:bg-white/10 hover:text-white"
             onClick={() => window.open("#", "_blank")}
           >
             <ExternalLink className="h-4 w-4 mr-1" />
@@ -268,17 +254,17 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      {/* Mobile: ordered priority / Desktop: Bento Grid */}
+      {/* Bento Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Right column on desktop — shows first on mobile */}
         <div className="lg:col-span-2 space-y-4 order-1 lg:order-2">
           {/* AI Summary */}
-          <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
+          <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
             <div className="flex items-start gap-3">
-              <Sparkles className="h-5 w-5 text-purple-400 mt-0.5 animate-glow shrink-0" />
+              <Sparkles className="h-5 w-5 text-purple-600 mt-0.5 animate-glow shrink-0" />
               <div>
-                <h3 className="text-sm font-semibold text-purple-300 mb-1">Resumo IA</h3>
-                <p className="text-sm text-white/70 leading-relaxed">
+                <h3 className="text-sm font-semibold text-purple-700 mb-1">Resumo IA</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   {aiSummaryParts.join(" ")}
                 </p>
               </div>
@@ -286,8 +272,8 @@ export default function ClientDetail() {
           </div>
 
           {/* Health Score */}
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-5 flex flex-col items-center">
-            <h3 className="text-sm font-semibold text-white/60 mb-3">Saúde do Cliente</h3>
+          <div className="bg-white border rounded-xl shadow-sm p-5 flex flex-col items-center">
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3">Saúde do Cliente</h3>
             <ClientHealthScore
               startDate={client.start_date}
               pendingTaskCount={tasks.length}
@@ -296,53 +282,53 @@ export default function ClientDetail() {
             <div className="grid grid-cols-3 gap-4 mt-4 w-full text-center">
               <div>
                 <p className="text-lg font-bold">{tasks.length}</p>
-                <p className="text-xs text-white/50">Pendentes</p>
+                <p className="text-xs text-muted-foreground">Pendentes</p>
               </div>
               <div>
                 <p className="text-lg font-bold">{meetings.length}</p>
-                <p className="text-xs text-white/50">Reuniões</p>
+                <p className="text-xs text-muted-foreground">Reuniões</p>
               </div>
               <div>
                 <p className="text-lg font-bold">{credentials.length}</p>
-                <p className="text-xs text-white/50">Acessos</p>
+                <p className="text-xs text-muted-foreground">Acessos</p>
               </div>
             </div>
           </div>
 
           {/* Vault */}
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+          <div className="bg-white border rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-white/60 flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
                 <Key className="h-4 w-4" />
                 Vault de Acessos
               </h3>
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-purple-300 hover:text-purple-200 hover:bg-white/5 h-7 text-xs"
+                className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-7 text-xs"
                 onClick={() => navigate(`/dashboard/clients/${id}`)}
               >
                 Ver todos
               </Button>
             </div>
             {credentials.length === 0 ? (
-              <p className="text-sm text-white/40 text-center py-4">Nenhum acesso salvo</p>
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum acesso salvo</p>
             ) : (
               <div className="space-y-2">
                 {credentials.map((cred: any) => (
                   <div
                     key={cred.id}
-                    className="flex items-center justify-between bg-white/5 rounded-lg p-2.5 group"
+                    className="flex items-center justify-between bg-slate-50 rounded-lg p-2.5 group"
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{cred.platform}</p>
-                      <p className="text-xs text-white/40 truncate">{cred.username || "—"}</p>
+                      <p className="text-xs text-muted-foreground truncate">{cred.username || "—"}</p>
                     </div>
                     {cred.password && (
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-white/40 hover:text-white hover:bg-white/10 shrink-0"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
                         onClick={(e) => {
                           e.stopPropagation();
                           copyToClipboard(cred.password);
@@ -361,35 +347,35 @@ export default function ClientDetail() {
         {/* Left column on desktop */}
         <div className="lg:col-span-3 space-y-4 order-2 lg:order-1">
           {/* Tasks */}
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+          <div className="bg-white border rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-white/60">Próximas Tarefas</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground">Próximas Tarefas</h3>
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-purple-300 hover:text-purple-200 hover:bg-white/5 h-7 text-xs"
+                className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-7 text-xs"
                 onClick={() => navigate("/dashboard/tasks")}
               >
                 Ver todas <ChevronRight className="h-3 w-3 ml-1" />
               </Button>
             </div>
             {tasks.length === 0 ? (
-              <p className="text-sm text-white/40 text-center py-6">Nenhuma tarefa pendente 🎉</p>
+              <p className="text-sm text-muted-foreground text-center py-6">Nenhuma tarefa pendente 🎉</p>
             ) : (
               <div className="space-y-1.5">
                 {tasks.map((task: any) => (
                   <div
                     key={task.id}
-                    className="flex items-center gap-3 bg-white/5 rounded-lg p-2.5 hover:bg-white/10 transition-colors"
+                    className="flex items-center gap-3 bg-slate-50 rounded-lg p-2.5 hover:bg-slate-100 transition-colors"
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{task.title}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-white/40">
+                        <span className="text-xs text-muted-foreground">
                           {statusLabels[task.status] || task.status}
                         </span>
                         {task.due_date && (
-                          <span className="text-xs text-white/30 flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             {format(new Date(task.due_date), "dd/MM", { locale: ptBR })}
                           </span>
@@ -408,36 +394,36 @@ export default function ClientDetail() {
           </div>
 
           {/* Meetings */}
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+          <div className="bg-white border rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-white/60">Últimas Reuniões</h3>
+              <h3 className="text-sm font-semibold text-muted-foreground">Últimas Reuniões</h3>
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-purple-300 hover:text-purple-200 hover:bg-white/5 h-7 text-xs"
+                className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-7 text-xs"
                 onClick={() => navigate("/dashboard/meetings")}
               >
                 Agendar <ChevronRight className="h-3 w-3 ml-1" />
               </Button>
             </div>
             {meetings.length === 0 ? (
-              <p className="text-sm text-white/40 text-center py-6">Nenhuma reunião registrada</p>
+              <p className="text-sm text-muted-foreground text-center py-6">Nenhuma reunião registrada</p>
             ) : (
               <div className="space-y-1.5">
                 {meetings.map((meeting: any) => {
                   const statusConf = meetingStatusLabels[meeting.status] || {
                     label: meeting.status,
-                    color: "bg-slate-500/20 text-slate-300",
+                    color: "bg-slate-100 text-slate-600",
                   };
                   return (
                     <div
                       key={meeting.id}
-                      className="flex items-center gap-3 bg-white/5 rounded-lg p-2.5"
+                      className="flex items-center gap-3 bg-slate-50 rounded-lg p-2.5"
                     >
-                      <Video className="h-4 w-4 text-white/30 shrink-0" />
+                      <Video className="h-4 w-4 text-muted-foreground shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{meeting.title}</p>
-                        <span className="text-xs text-white/40">
+                        <span className="text-xs text-muted-foreground">
                           {format(new Date(meeting.start_time), "dd/MM 'às' HH:mm", { locale: ptBR })}
                         </span>
                       </div>
@@ -452,14 +438,14 @@ export default function ClientDetail() {
           </div>
 
           {/* Latest Creative */}
-          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
-            <h3 className="text-sm font-semibold text-white/60 mb-3 flex items-center gap-2">
+          <div className="bg-white border rounded-xl shadow-sm p-4">
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
               <Image className="h-4 w-4" />
               Último Criativo
             </h3>
             {latestCreative ? (
               <div className="space-y-2">
-                <div className="rounded-lg overflow-hidden bg-black/30 aspect-video flex items-center justify-center">
+                <div className="rounded-lg overflow-hidden bg-slate-100 aspect-video flex items-center justify-center">
                   <img
                     src={latestCreative.imageUrl}
                     alt={latestCreative.title}
@@ -467,12 +453,12 @@ export default function ClientDetail() {
                     loading="lazy"
                   />
                 </div>
-                <p className="text-xs text-white/50 truncate">{latestCreative.title}</p>
+                <p className="text-xs text-muted-foreground truncate">{latestCreative.title}</p>
               </div>
             ) : (
-              <div className="rounded-lg bg-white/5 aspect-video flex flex-col items-center justify-center gap-2">
-                <Image className="h-8 w-8 text-white/20" />
-                <p className="text-xs text-white/30">Nenhum criativo recente</p>
+              <div className="rounded-lg bg-slate-100 aspect-video flex flex-col items-center justify-center gap-2">
+                <Image className="h-8 w-8 text-muted-foreground/40" />
+                <p className="text-xs text-muted-foreground">Nenhum criativo recente</p>
               </div>
             )}
           </div>
