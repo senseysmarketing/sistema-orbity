@@ -88,7 +88,7 @@ export default function LandingPage() {
       <DifferentialsSection />
       <PricingSection onOpenScheduling={openScheduling} />
       <FAQSection />
-      <CTASection onOpenApplication={openApplication} onOpenScheduling={openScheduling} />
+      <CTASection onOpenScheduling={openScheduling} />
       <LandingFooter />
       <WhatsAppFloatingButton />
       <ApplicationModal open={applicationOpen} onOpenChange={setApplicationOpen} />
