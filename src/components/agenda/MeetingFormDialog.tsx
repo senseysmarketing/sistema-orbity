@@ -116,6 +116,8 @@ export const MeetingFormDialog = ({
   const [reminderHoursBefore, setReminderHoursBefore] = useState<number>(2);
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const lastAutoFilledClientIdRef = useRef<string | null>(null);
+  // Tracks the email of the last auto-inserted external participant (so we can remove only it on change)
+  const lastAutoParticipantEmailRef = useRef<string | null>(null);
 
   // Phone mask helper (BR)
   const formatPhoneBR = (value: string): string => {
