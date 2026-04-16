@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Eye, EyeOff, Save, Loader2, Copy, Check, Webhook, RefreshCw } from "lucide-react";
+import { Eye, EyeOff, Save, Loader2, Copy, Check, Webhook, RefreshCw, Info } from "lucide-react";
 import conexaLogo from "@/assets/conexa-logo.png";
 import { usePaymentGateway } from "@/hooks/usePaymentGateway";
 import { useToast } from "@/hooks/use-toast";
