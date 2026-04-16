@@ -126,6 +126,16 @@ export const MeetingFormDialog = ({
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
   };
 
+  // Guardrail 1: Sanitize CRM phones (strip BR DDI 55) before applying mask
+  const normalizeAndFormatPhone = (rawPhone: string): string => {
+    if (!rawPhone) return "";
+    let cleaned = rawPhone.replace(/\D/g, "");
+    if (cleaned.startsWith("55") && (cleaned.length === 12 || cleaned.length === 13)) {
+      cleaned = cleaned.substring(2);
+    }
+    return formatPhoneBR(cleaned);
+  };
+
   // Initialize sync checkbox based on Google Calendar connection
   useEffect(() => {
     if (isConnected && isSyncEnabled && !meeting) {
