@@ -306,8 +306,8 @@ export function WhatsAppTemplateManager() {
         title: 'Teste enviado!',
         description: `Mensagem enviada para ${account.phone_number}`,
       });
-    } catch (e) {
-      // Erro já tratado pelo hook
+    } catch {
+      // Erro já tratado pelo hook sendMessage (toast destrutivo)
     }
   };
 
