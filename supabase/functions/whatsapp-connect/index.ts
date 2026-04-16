@@ -203,10 +203,41 @@ serve(async (req) => {
           const isConnected = statusData?.instance?.state === 'open';
           const newStatus = isConnected ? 'connected' : 'disconnected';
 
-          if (account.status !== newStatus) {
+          // Fetch and persist phone number when connected (Guardrail 2: strict sanitization)
+          let connectedPhone: string | null = account.phone_number;
+          if (isConnected && !connectedPhone) {
+            try {
+              const instRes = await fetch(
+                `${effectiveUrl}/instance/fetchInstances?instanceName=${instanceName}`,
+                { headers: { 'apikey': effectiveKey } }
+              );
+              const instData = await instRes.json();
+              const arr = Array.isArray(instData) ? instData : [instData];
+              const rawJid = arr[0]?.ownerJid
+                || arr[0]?.instance?.owner
+                || arr[0]?.owner
+                || arr[0]?.instance?.wuid
+                || arr[0]?.instance?.profileName?.id;
+
+              if (rawJid) {
+                const cleaned = String(rawJid).split('@')[0].replace(/\D/g, '');
+                if (cleaned) connectedPhone = cleaned;
+              }
+            } catch (e) {
+              console.log('[whatsapp-connect] fetchInstances failed:', e.message);
+            }
+          }
+
+          if (account.status !== newStatus || (isConnected && connectedPhone && connectedPhone !== account.phone_number)) {
+            const updatePayload: Record<string, any> = {
+              status: newStatus,
+              qr_code: isConnected ? null : account.qr_code,
+            };
+            if (isConnected && connectedPhone) updatePayload.phone_number = connectedPhone;
+
             await supabase
               .from('whatsapp_accounts')
-              .update({ status: newStatus, qr_code: isConnected ? null : account.qr_code })
+              .update(updatePayload)
               .eq('id', account.id);
           }
 
@@ -239,7 +270,7 @@ serve(async (req) => {
           return new Response(JSON.stringify({
             success: true,
             status: isConnected ? 'connected' : 'connecting',
-            phone_number: account.phone_number,
+            phone_number: connectedPhone,
             qr_code,
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         } catch (apiErr) {
