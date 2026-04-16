@@ -449,6 +449,28 @@ export const MeetingFormDialog = ({
         if (createdMeeting?.id) {
           await updateClientRelations("meeting", createdMeeting.id, separateVirtualClients(selectedClientIds).realClientIds);
         }
+
+        // CRM automation: if linked to a lead, move it to "scheduled" + log history (fire-and-forget)
+        if (formData.lead_id && currentAgency?.id && user?.id) {
+          try {
+            await supabase
+              .from("leads")
+              .update({ status: "scheduled" })
+              .eq("id", formData.lead_id);
+
+            await supabase.from("lead_history").insert({
+              lead_id: formData.lead_id,
+              agency_id: currentAgency.id,
+              user_id: user.id,
+              action_type: "meeting_scheduled",
+              field_name: "meeting",
+              new_value: `${formData.title} — ${format(new Date(formData.start_time), "dd/MM/yyyy 'às' HH:mm")}`,
+            });
+            toast.success("Lead movido para 'Agendamentos' no CRM");
+          } catch (err) {
+            console.error("CRM sync failed (non-blocking):", err);
+          }
+        }
         
         // Sync to Google Calendar after creation
         if (syncToGoogleCalendar && createdMeeting) {
