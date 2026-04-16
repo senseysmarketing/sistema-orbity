@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Eye, EyeOff, Save, Loader2, Copy, Check, Webhook, RefreshCw } from "lucide-react";
+import { Eye, EyeOff, Save, Loader2, Copy, Check, Webhook, RefreshCw, Info } from "lucide-react";
 import conexaLogo from "@/assets/conexa-logo.png";
 import { usePaymentGateway } from "@/hooks/usePaymentGateway";
 import { useToast } from "@/hooks/use-toast";
@@ -297,69 +297,56 @@ export function ConexaIntegration() {
           </p>
         </div>
 
-        {/* Webhook Instructions Accordion */}
+        {/* Webhook Setup Guide - Always visible (Asaas style) */}
+        <Alert className="mt-2 bg-blue-50/50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
+          <Info className="h-4 w-4 text-blue-500" />
+          <AlertDescription className="text-xs space-y-3 ml-2">
+            <p className="font-semibold text-sm text-blue-800 dark:text-blue-300">Como configurar o Webhook no Conexa</p>
+
+            <p className="text-muted-foreground">
+              O Conexa exige a criação de <strong className="text-foreground">duas conexões</strong> separadas para receber notificações automáticas de pagamentos e cancelamentos. A segurança é garantida pela chave gerada automaticamente, já embutida na URL.
+            </p>
+
+            <ol className="space-y-2 list-decimal list-outside pl-5 text-muted-foreground">
+              <li className="leading-relaxed">
+                Acesse seu painel do Conexa e vá em <strong className="text-foreground">Configurações → Integrações → Webhooks</strong>.
+              </li>
+              <li className="leading-relaxed">
+                <strong className="text-foreground">Conexão 1 — Pagamentos:</strong> Clique em <strong className="text-foreground">Nova Conexão</strong> → <strong className="text-foreground">Personalizado</strong>. Cole a URL abaixo. Em <strong className="text-foreground">Eventos de Cobrança</strong>, marque <strong className="text-foreground">Quitação</strong>. Salve.
+              </li>
+              <li className="leading-relaxed">
+                <strong className="text-foreground">Conexão 2 — Cancelamentos:</strong> Crie outra conexão. Cole a <strong className="text-foreground">mesma URL</strong>. Em <strong className="text-foreground">Eventos de Cobrança</strong>, marque <strong className="text-foreground">Alteração de status</strong>. Salve.
+              </li>
+              <li className="leading-relaxed">
+                <span>Copie a URL abaixo e cole no campo <strong className="text-foreground">"URL"</strong> de cada conexão:</span>
+                <div className="mt-2 flex gap-2">
+                  <Input
+                    readOnly
+                    value={webhookUrl}
+                    className="text-xs font-mono bg-muted"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={handleCopyUrl}
+                  >
+                    {copied ? (
+                      <Check className="h-4 w-4 text-emerald-600" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </li>
+            </ol>
+          </AlertDescription>
+        </Alert>
+
+        {/* Configurações de Baixa Manual - Accordion */}
         <Accordion type="single" collapsible className="w-full">
-          <AccordionItem value="webhook-instructions" className="border rounded-lg px-4">
-            <AccordionTrigger className="text-sm font-medium hover:no-underline">
-              <span className="flex items-center gap-2">
-                🔌 Como configurar os Webhooks automáticos
-              </span>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="space-y-4 pt-2">
-                <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
-                  <AlertDescription className="text-xs text-blue-800 dark:text-blue-300">
-                    O Conexa exige a criação de <strong>duas conexões</strong> separadas para receber notificações automáticas de pagamentos e cancelamentos. A segurança é garantida pela chave gerada automaticamente, já embutida na URL.
-                  </AlertDescription>
-                </Alert>
-
-                <ol className="list-decimal list-inside space-y-3 text-sm text-muted-foreground">
-                  <li>
-                    Acesse seu painel do Conexa e vá em{" "}
-                    <strong className="text-foreground">Configurações &gt; Integrações &gt; Webhooks</strong>.
-                  </li>
-                  <li>
-                    <strong className="text-foreground">Conexão 1 — Pagamentos:</strong> Clique em{" "}
-                    <strong className="text-foreground">Nova Conexão</strong> &gt;{" "}
-                    <strong className="text-foreground">Personalizado</strong>. Cole a URL abaixo. Em{" "}
-                    <strong className="text-foreground">Eventos de Cobrança</strong>, marque{" "}
-                    <strong className="text-foreground">Quitação</strong>. Salve.
-                  </li>
-                  <li>
-                    <strong className="text-foreground">Conexão 2 — Cancelamentos:</strong> Crie outra conexão. Cole a <strong className="text-foreground">mesma URL</strong>. Em{" "}
-                    <strong className="text-foreground">Eventos de Cobrança</strong>, marque{" "}
-                    <strong className="text-foreground">Alteração de status</strong>. Salve.
-                  </li>
-                  <li>
-                    <span>Copie a URL abaixo e cole no campo <strong className="text-foreground">"URL"</strong> de cada conexão:</span>
-                    <div className="mt-2 flex gap-2">
-                      <Input
-                        readOnly
-                        value={webhookUrl}
-                        className="text-xs font-mono bg-muted"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="shrink-0"
-                        onClick={handleCopyUrl}
-                      >
-                        {copied ? (
-                          <Check className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </li>
-                </ol>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Configurações de Baixa Manual - Accordion */}
-          <AccordionItem value="manual-settlement" className="border rounded-lg px-4 mt-2">
+          <AccordionItem value="manual-settlement" className="border rounded-lg px-4">
             <AccordionTrigger className="text-sm font-medium hover:no-underline">
               <span className="flex items-center gap-2">
                 ⚙️ Configurações de Baixa Manual (Opcional)
