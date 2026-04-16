@@ -266,34 +266,38 @@ export function SortableLeadCard({
             </div>
           )}
 
-          {/* Action buttons — discreet, hover-only on desktop, always visible on mobile */}
+          {/* Action buttons — collapse to 0 height on desktop, expand on hover; always visible on mobile */}
           {(lead.phone || onScheduleMeeting) ? (
             <div
-              className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300"
+              className="grid transition-all duration-300 ease-out grid-rows-[1fr] opacity-100 md:grid-rows-[0fr] md:opacity-0 md:group-hover:grid-rows-[1fr] md:group-hover:opacity-100"
               onPointerDown={(e) => e.stopPropagation()}
             >
-              {lead.phone && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 h-8 text-xs text-white/80 hover:text-white bg-transparent border-white/20 hover:bg-white/10"
-                  onClick={(e) => { e.stopPropagation(); handleWhatsAppClick(e); }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <MessageCircle className="h-3.5 w-3.5 mr-1" /> WhatsApp
-                </Button>
-              )}
-              {onScheduleMeeting && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 h-8 text-xs text-white/80 hover:text-white bg-transparent border-white/20 hover:bg-white/10"
-                  onClick={(e) => { e.stopPropagation(); onScheduleMeeting(lead); }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <Calendar className="h-3.5 w-3.5 mr-1" /> Reunião
-                </Button>
-              )}
+              <div className="overflow-hidden">
+                <div className="flex gap-2 pt-1">
+                  {lead.phone && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 h-8 text-xs text-white/80 hover:text-white bg-transparent border-white/20 hover:bg-white/10"
+                      onClick={(e) => { e.stopPropagation(); handleWhatsAppClick(e); }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      <MessageCircle className="h-3.5 w-3.5 mr-1" /> WhatsApp
+                    </Button>
+                  )}
+                  {onScheduleMeeting && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 h-8 text-xs text-white/80 hover:text-white bg-transparent border-white/20 hover:bg-white/10"
+                      onClick={(e) => { e.stopPropagation(); onScheduleMeeting(lead); }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      <Calendar className="h-3.5 w-3.5 mr-1" /> Reunião
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="pt-1">
