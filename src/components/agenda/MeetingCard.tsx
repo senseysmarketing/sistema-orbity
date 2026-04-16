@@ -13,7 +13,8 @@ import {
   PresentationIcon,
   MapPin,
   Video,
-  User
+  User,
+  MessageCircle
 } from "lucide-react";
 
 interface MeetingCardProps {
