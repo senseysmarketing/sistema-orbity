@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle, AlertTriangle, Link2, CreditCard } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
+import { formatPhoneDisplay } from "@/lib/formatPhoneDisplay";
 import whatsappLogo from "@/assets/whatsapp-logo.png";
 
 interface WhatsAppInstanceCardProps {
@@ -157,11 +158,10 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                   WhatsApp conectado
                 </p>
                 <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                  Instância: {account?.instance_name}
+                  {account?.phone_number
+                    ? `Número: ${formatPhoneDisplay(account.phone_number)}`
+                    : "Aguardando número conectado..."}
                 </p>
-                {account?.phone_number && (
-                  <p className="text-xs text-muted-foreground">{account.phone_number}</p>
-                )}
               </div>
             </div>
 

@@ -179,7 +179,7 @@ export function BillingAutomationSettings({ open, onOpenChange }: BillingAutomat
                     <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
                       <AlertDescription className="text-xs text-green-700 dark:text-green-300">
-                        Conectado como: {account?.phone_number || 'WhatsApp da Agência'}
+                        Conectado como: {formatPhoneDisplay(account?.phone_number) || 'Aguardando número...'}
                       </AlertDescription>
                     </Alert>
                   ) : (
