@@ -117,7 +117,7 @@ export default function Goals() {
 
   if (!activeProgram || showSelector) {
     return (
-      <div className="space-y-6 p-4 md:p-6">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Trophy className="h-6 w-6 text-primary" />
@@ -148,7 +148,7 @@ export default function Goals() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Trophy className="h-6 w-6 text-primary" />
