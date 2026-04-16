@@ -172,13 +172,13 @@ function HealthGauge({ score, level }: { score: number; level: ScoreLevel }) {
 }
 
 export function ClientHealthScore({
-  client: _client,
+  client,
   tasks,
   meetings,
   npsScore,
   variant = "badge",
 }: ClientHealthScoreProps) {
-  const score = calculateDynamicScore(tasks, meetings, npsScore);
+  const score = calculateDynamicScore(client, tasks, meetings, npsScore);
   const level = getScoreLevel(score);
 
   if (variant === "circle") {
