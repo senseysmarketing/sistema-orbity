@@ -1,97 +1,83 @@
 
 
-# CRM Vivo: transição automática com guardrails de mídia e auditoria limpa
+# Escudo Anti-Bot: confirmação de schema e implementação
 
-## Onde
-`supabase/functions/whatsapp-webhook/index.ts` — bloco `messages.upsert`, dentro do `if (!isFromMe)`.
+## Verificação do schema (executada)
 
-## Helper `promoteLeadOnReply` (novo)
+Consultei `information_schema.columns` para `whatsapp_messages`. Coluna real:
+
+```
+is_from_me  boolean  ✅
+```
+
+A coluna **é `is_from_me`** (não `from_me`). O plano original estava correto. O resto do código já usa `is_from_me` (ex.: linha do upsert da mensagem recebida no webhook e o componente `WhatsAppChat.tsx` que filtra `msg.is_from_me`).
+
+Portanto: **mantemos `.eq('is_from_me', true)`** — é o nome exato da coluna no banco.
+
+## Confirmação do fluxo de gravação
+
+A gravação da mensagem recebida acontece **antes** do bloco do Escudo Anti-Bot, via `supabase.from('whatsapp_messages').upsert(...)` com `is_from_me: false`. O escudo apenas envolve `Promise.all([pauseAutomations, promoteLeadOnReply])`.
+
+Resultado garantido para mensagens de bot:
+- ✅ Mensagem persistida em `whatsapp_messages` (vendedor vê no `WhatsAppChat.tsx`)
+- ✅ `last_customer_message_at` atualizado na conversation
+- ❌ Automações **não** são pausadas
+- ❌ Lead **não** é promovido no Kanban
+
+## Implementação
+
+Em `supabase/functions/whatsapp-webhook/index.ts`, dentro do bloco `if (!isFromMe)`, **após** o upsert da mensagem recebida e **antes** do `Promise.all`:
 
 ```ts
-const INITIAL_STATUSES = new Set(['leads', 'new', 'novo']);
+// Anti-Bot Shield: detect auto-replies (< 10s after our last sent message)
+const AUTO_REPLY_THRESHOLD_SEC = 10;
+let isAutoReply = false;
 
-async function promoteLeadOnReply(
-  supabase: any,
-  agencyId: string,
-  leadId: string
-) {
-  try {
-    // 1) Status atual
-    const { data: lead } = await supabase
-      .from('leads')
-      .select('status')
-      .eq('id', leadId)
-      .maybeSingle();
-    if (!lead) return;
+try {
+  const { data: lastSent } = await supabase
+    .from('whatsapp_messages')
+    .select('created_at')
+    .eq('conversation_id', conversation.id)
+    .eq('is_from_me', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-    const currentStatus = (lead.status || '').toString().trim().toLowerCase();
-    if (!INITIAL_STATUSES.has(currentStatus)) return; // não retrocede
-
-    // 2) Resolver alvo: 2º status da pipeline da agência
-    const { data: statuses } = await supabase
-      .from('lead_statuses')
-      .select('name, order_position')
-      .eq('agency_id', agencyId)
-      .eq('is_active', true)
-      .order('order_position', { ascending: true });
-
-    let target = 'em_contato'; // fallback canônico
-    if (statuses && statuses.length >= 2) {
-      target = normalizeToCanonical(statuses[1].name);
+  if (lastSent?.created_at) {
+    const diffSec = (Date.now() - new Date(lastSent.created_at).getTime()) / 1000;
+    if (diffSec < AUTO_REPLY_THRESHOLD_SEC) {
+      isAutoReply = true;
+      console.log(`[Anti-Bot Shield] Auto-reply detected. Delta: ${diffSec.toFixed(2)}s — skipping pause + CRM Vivo`);
     }
-
-    // 3) UPDATE + nota complementar (sem duplicar trigger)
-    await Promise.all([
-      supabase.from('leads').update({ status: target }).eq('id', leadId),
-      supabase.from('lead_history').insert({
-        lead_id: leadId,
-        agency_id: agencyId,
-        action_type: 'whatsapp_interaction',
-        description: 'Lead interagiu no WhatsApp. O cartão foi movido automaticamente para a próxima etapa.',
-      }),
-    ]);
-  } catch (e) {
-    console.error('[whatsapp-webhook] promoteLeadOnReply error:', e);
   }
+} catch (e) {
+  console.error('[Anti-Bot Shield] check failed, treating as human (fail-open):', e);
+}
+
+if (!isAutoReply) {
+  await Promise.all([
+    pauseAutomations,
+    shouldPromote
+      ? promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id)
+      : Promise.resolve(),
+  ]);
 }
 ```
 
-`normalizeToCanonical()` = versão inline do mapa de `src/lib/crm/leadStatus.ts` (Deno não importa de `src/`).
+## Guardrails finais
 
-## Chamada no handler (com guardrail de mídia)
-
-Logo após o bloco de pausa de automações:
-
-```ts
-const hasText = content && content.trim().length > 0;
-const hasMedia = !!(
-  msg.message?.audioMessage ||
-  msg.message?.imageMessage ||
-  msg.message?.videoMessage ||
-  msg.message?.documentMessage ||
-  msg.message?.stickerMessage
-);
-
-if (conversation.lead_id && (hasText || hasMedia)) {
-  await promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id);
-}
-```
-
-Executado em paralelo com a pausa de automações via `Promise.all([pauseAutomations(...), promoteLeadOnReply(...)])` para zero latência adicional.
-
-## Guardrails aplicados
-| # | Garantia | Implementação |
-|---|----------|---------------|
-| 1 | Áudio/imagem/vídeo/doc/sticker promovem | `hasText \|\| hasMedia` |
-| 2 | Sem duplicidade visual | `action_type='whatsapp_interaction'` (trigger usa `'status_changed'`) |
-| 3 | Não retrocede funil | Whitelist `['leads','new','novo']` |
-| 4 | Multi-agência | `lead_statuses` filtrado por `agency_id` |
-| 5 | Compat custom statuses | 2º por `order_position`, fallback `em_contato` |
-| 6 | Performance | `Promise.all` com pausa de automações |
-| 7 | Resiliência | try/catch fail-open |
+| # | Garantia | Como |
+|---|----------|------|
+| 1 | Nome da coluna correto | `is_from_me` confirmado via schema |
+| 2 | Mensagem do bot visível | Upsert ocorre antes do escudo, fora do bloco condicional |
+| 3 | Sem retrocesso | Apenas pausa + promoção são puladas; gravação intacta |
+| 4 | Fail-open | Try/catch trata escudo como humano se query falhar |
+| 5 | Performance | 1 query indexada (~5-15ms) antes do Promise.all |
+| 6 | Threshold configurável | Constante `AUTO_REPLY_THRESHOLD_SEC = 10` |
+| 7 | Auditoria | Log `[Anti-Bot Shield]` com delta exato |
 
 ## Ficheiro alterado
-- `supabase/functions/whatsapp-webhook/index.ts`
+- `supabase/functions/whatsapp-webhook/index.ts` (~20 linhas no bloco `!isFromMe`)
 
 Sem migration. Sem schema change.
 
