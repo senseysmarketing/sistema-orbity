@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageSquareHeart, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 
-// Use anon client for public access
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 const anonClient = createClient(supabaseUrl, supabaseAnonKey);
@@ -20,26 +19,41 @@ type TokenData = {
   agency_name: string;
 };
 
+type SurveyConfig = {
+  survey_title: string;
+  survey_message: string;
+  main_question: string;
+  feedback_label_promoter: string;
+  feedback_label_neutral: string;
+  feedback_label_detractor: string;
+};
+
+const DEFAULT_CONFIG: SurveyConfig = {
+  survey_title: "Olá, {{client_name}}!",
+  survey_message: "Como está nossa parceria?",
+  main_question: "De 0 a 10, o quanto você recomendaria nossos serviços?",
+  feedback_label_promoter: "Ficamos muito felizes! O que mais gostou?",
+  feedback_label_neutral: "Obrigado! O que faltou para a nota ser 10?",
+  feedback_label_detractor: "Sentimos muito por isso. O que podemos fazer IMEDIATAMENTE para resolver o seu problema?",
+};
+
 function getCategory(score: number): string {
   if (score >= 9) return "promoter";
   if (score >= 7) return "passive";
   return "detractor";
 }
 
-function getFeedbackConfig(score: number | null) {
+function getFeedbackStyle(score: number | null) {
   if (score === null) return null;
-  if (score >= 9) return {
-    placeholder: "Ficamos muito felizes! O que mais gostou?",
-    className: "border-emerald-300 bg-emerald-50 focus:border-emerald-500",
-  };
-  if (score >= 7) return {
-    placeholder: "Obrigado! O que faltou para a nota ser 10?",
-    className: "border-amber-300 bg-amber-50 focus:border-amber-500",
-  };
-  return {
-    placeholder: "Sentimos muito por isso. O que podemos fazer IMEDIATAMENTE para resolver o seu problema?",
-    className: "border-red-400 bg-red-50 focus:border-red-500",
-  };
+  if (score >= 9) return "border-emerald-300 bg-emerald-50 focus:border-emerald-500";
+  if (score >= 7) return "border-amber-300 bg-amber-50 focus:border-amber-500";
+  return "border-red-400 bg-red-50 focus:border-red-500";
+}
+
+function getFeedbackLabel(score: number, config: SurveyConfig): string {
+  if (score >= 9) return config.feedback_label_promoter;
+  if (score >= 7) return config.feedback_label_neutral;
+  return config.feedback_label_detractor;
 }
 
 function getScoreColor(score: number): string {
@@ -48,11 +62,16 @@ function getScoreColor(score: number): string {
   return "bg-red-500 hover:bg-red-600 text-white";
 }
 
+function replaceVars(text: string, clientName: string): string {
+  return text.replace(/\{\{client_name\}\}/g, clientName);
+}
+
 export default function PublicNPSSurvey() {
   const [searchParams] = useSearchParams();
   const tokenId = searchParams.get("t");
 
   const [tokenData, setTokenData] = useState<TokenData | null>(null);
+  const [surveyConfig, setSurveyConfig] = useState<SurveyConfig>(DEFAULT_CONFIG);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedScore, setSelectedScore] = useState<number | null>(null);
@@ -93,18 +112,37 @@ export default function PublicNPSSurvey() {
           return;
         }
 
-        // Fetch client and agency names
-        const [clientRes, agencyRes] = await Promise.all([
+        // Fetch client, agency names, and agency settings in parallel
+        const [clientRes, agencyRes, settingsRes] = await Promise.all([
           anonClient.from("clients").select("name").eq("id", token.client_id).single(),
           anonClient.from("agencies").select("name").eq("id", token.agency_id).single(),
+          anonClient
+            .from("nps_settings")
+            .select("survey_title, survey_message, main_question, feedback_label_promoter, feedback_label_neutral, feedback_label_detractor")
+            .eq("agency_id", token.agency_id)
+            .maybeSingle(),
         ]);
+
+        const clientName = clientRes.data?.name || "Cliente";
+
+        // Apply agency settings with fallbacks
+        if (settingsRes.data) {
+          setSurveyConfig({
+            survey_title: settingsRes.data.survey_title || DEFAULT_CONFIG.survey_title,
+            survey_message: settingsRes.data.survey_message || DEFAULT_CONFIG.survey_message,
+            main_question: settingsRes.data.main_question || DEFAULT_CONFIG.main_question,
+            feedback_label_promoter: settingsRes.data.feedback_label_promoter || DEFAULT_CONFIG.feedback_label_promoter,
+            feedback_label_neutral: settingsRes.data.feedback_label_neutral || DEFAULT_CONFIG.feedback_label_neutral,
+            feedback_label_detractor: settingsRes.data.feedback_label_detractor || DEFAULT_CONFIG.feedback_label_detractor,
+          });
+        }
 
         setTokenData({
           id: token.id,
           agency_id: token.agency_id,
           client_id: token.client_id,
           period: token.period,
-          client_name: clientRes.data?.name || "Cliente",
+          client_name: clientName,
           agency_name: agencyRes.data?.name || "Agência",
         });
       } catch {
@@ -122,7 +160,6 @@ export default function PublicNPSSurvey() {
     setSubmitting(true);
 
     try {
-      // 1. Insert NPS response
       const { error: insertError } = await anonClient
         .from("nps_responses")
         .insert({
@@ -138,16 +175,14 @@ export default function PublicNPSSurvey() {
 
       if (insertError) throw insertError;
 
-      // 2. Mark token as used
       await anonClient
         .from("nps_tokens")
         .update({ is_used: true })
         .eq("id", tokenData.id);
 
-      // 3. If detractor, insert churn alert notification for agency admins
+      // Churn alert for detractors
       if (selectedScore <= 6) {
         try {
-          // Fetch admin users of the agency
           const { data: admins } = await anonClient
             .from("agency_users")
             .select("user_id")
@@ -222,7 +257,11 @@ export default function PublicNPSSurvey() {
     );
   }
 
-  const feedbackConfig = getFeedbackConfig(selectedScore);
+  const clientName = tokenData?.client_name || "Cliente";
+  const renderedTitle = replaceVars(surveyConfig.survey_title, clientName);
+  const renderedMessage = replaceVars(surveyConfig.survey_message, clientName);
+  const feedbackStyle = getFeedbackStyle(selectedScore);
+  const feedbackLabel = selectedScore !== null ? getFeedbackLabel(selectedScore, surveyConfig) : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
@@ -231,10 +270,8 @@ export default function PublicNPSSurvey() {
           {/* Header */}
           <div className="text-center space-y-2">
             <MessageSquareHeart className="h-12 w-12 text-primary mx-auto" />
-            <h1 className="text-2xl font-bold">
-              Olá, {tokenData?.client_name}!
-            </h1>
-            <p className="text-muted-foreground">Como está nossa parceria?</p>
+            <h1 className="text-2xl font-bold">{renderedTitle}</h1>
+            <p className="text-muted-foreground">{renderedMessage}</p>
           </div>
 
           {/* Score Guide */}
@@ -258,9 +295,7 @@ export default function PublicNPSSurvey() {
 
           {/* Score Selector */}
           <div className="space-y-3">
-            <p className="text-sm font-medium text-center">
-              De 0 a 10, o quanto você recomendaria nossos serviços?
-            </p>
+            <p className="text-sm font-medium text-center">{surveyConfig.main_question}</p>
             <div className="grid grid-cols-11 gap-1">
               {Array.from({ length: 11 }, (_, i) => (
                 <button
@@ -285,13 +320,13 @@ export default function PublicNPSSurvey() {
           </div>
 
           {/* Dynamic Feedback */}
-          {feedbackConfig && (
+          {feedbackLabel && feedbackStyle && (
             <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
               <Textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder={feedbackConfig.placeholder}
-                className={`min-h-[100px] transition-colors ${feedbackConfig.className}`}
+                placeholder={feedbackLabel}
+                className={`min-h-[100px] transition-colors ${feedbackStyle}`}
                 rows={4}
               />
             </div>
