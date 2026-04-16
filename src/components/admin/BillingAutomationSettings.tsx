@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Bell, Clock, AlertTriangle, Save, Loader2, Info, Mail, MessageCircle, CheckCircle2, AlertCircle, Percent, History, Inbox } from "lucide-react";
+import { formatPhoneDisplay } from "@/lib/formatPhoneDisplay";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePaymentGateway, PaymentSettings } from "@/hooks/usePaymentGateway";
