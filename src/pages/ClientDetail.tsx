@@ -1,23 +1,33 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ClientHealthScore } from "@/components/clients/ClientHealthScore";
+import { ClientForm } from "@/components/admin/ClientForm";
+import { MeetingFormDialog } from "@/components/agenda/MeetingFormDialog";
+import { useAuth } from "@/hooks/useAuth";
 import {
   ArrowLeft,
   Building2,
   Calendar,
+  CalendarPlus,
   ChevronRight,
   Clock,
   Copy,
+  Edit2,
   ExternalLink,
   Image,
   Key,
   Phone,
+  Plus,
   Sparkles,
   Video,
 } from "lucide-react";
