@@ -1,45 +1,97 @@
 
 
-# Hover scale sutil nos cards de tarefa
+# CRM Vivo: transição automática com guardrails de mídia e auditoria limpa
 
-## Análise
-O efeito que você notou no card do CRM é o `transition-all` aplicado no `<Card>` que, combinado com o crescimento da grid-row dos botões, dá uma sensação de "respiração" do card inteiro. Para os cards de tarefa (sem botões para expandir), vamos replicar apenas a parte sutil do "grow" — um leve scale + sombra no hover, mantendo a estética premium.
+## Onde
+`supabase/functions/whatsapp-webhook/index.ts` — bloco `messages.upsert`, dentro do `if (!isFromMe)`.
 
-## Mudança
+## Helper `promoteLeadOnReply` (novo)
 
-Em `src/components/ui/task-card.tsx` (componente base usado em Kanban e listas), adicionar ao `<Card>` raiz:
+```ts
+const INITIAL_STATUSES = new Set(['leads', 'new', 'novo']);
 
-```tsx
-className="... transition-all duration-300 ease-out hover:scale-[1.02] hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
+async function promoteLeadOnReply(
+  supabase: any,
+  agencyId: string,
+  leadId: string
+) {
+  try {
+    // 1) Status atual
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('status')
+      .eq('id', leadId)
+      .maybeSingle();
+    if (!lead) return;
+
+    const currentStatus = (lead.status || '').toString().trim().toLowerCase();
+    if (!INITIAL_STATUSES.has(currentStatus)) return; // não retrocede
+
+    // 2) Resolver alvo: 2º status da pipeline da agência
+    const { data: statuses } = await supabase
+      .from('lead_statuses')
+      .select('name, order_position')
+      .eq('agency_id', agencyId)
+      .eq('is_active', true)
+      .order('order_position', { ascending: true });
+
+    let target = 'em_contato'; // fallback canônico
+    if (statuses && statuses.length >= 2) {
+      target = normalizeToCanonical(statuses[1].name);
+    }
+
+    // 3) UPDATE + nota complementar (sem duplicar trigger)
+    await Promise.all([
+      supabase.from('leads').update({ status: target }).eq('id', leadId),
+      supabase.from('lead_history').insert({
+        lead_id: leadId,
+        agency_id: agencyId,
+        action_type: 'whatsapp_interaction',
+        description: 'Lead interagiu no WhatsApp. O cartão foi movido automaticamente para a próxima etapa.',
+      }),
+    ]);
+  } catch (e) {
+    console.error('[whatsapp-webhook] promoteLeadOnReply error:', e);
+  }
+}
 ```
 
-### Detalhamento
-- `hover:scale-[1.02]` — crescimento sutil de 2% (não exagerado, mantém grid alinhado)
-- `hover:-translate-y-0.5` — leve "elevação" de 2px para sensação tátil
-- `hover:shadow-lg` — sombra maior reforça a elevação
-- `transition-all duration-300 ease-out` — animação suave idêntica à do CRM
-- Preservar todas as classes existentes (cores, padding, borders)
+`normalizeToCanonical()` = versão inline do mapa de `src/lib/crm/leadStatus.ts` (Deno não importa de `src/`).
 
-### Aplicação
-- Apenas em `task-card.tsx` (componente compartilhado) → propaga automaticamente para:
-  - `SortableTaskCard` (Kanban de tarefas)
-  - Qualquer outra view que use `TaskCard`
+## Chamada no handler (com guardrail de mídia)
 
-### Não alterar
-- `MyTasksList.tsx` (linhas de dashboard, não cards) — manter como está
-- `DemoTasksView.tsx` (landing demo) — manter como está
-- Lógica de drag (dnd-kit) — scale só no hover, não interfere com `isDragging` (que usa opacity)
+Logo após o bloco de pausa de automações:
 
-## Comportamento garantido
-| Cenário | Resultado |
-|---------|-----------|
-| Repouso | Card normal, sem alterações visuais |
-| Hover desktop | Cresce 2%, sobe 2px, sombra acentuada (300ms) |
-| Drag ativo | Opacity 0.5 prevalece, scale neutralizado |
-| Mobile/touch | Sem hover, comportamento inalterado |
+```ts
+const hasText = content && content.trim().length > 0;
+const hasMedia = !!(
+  msg.message?.audioMessage ||
+  msg.message?.imageMessage ||
+  msg.message?.videoMessage ||
+  msg.message?.documentMessage ||
+  msg.message?.stickerMessage
+);
+
+if (conversation.lead_id && (hasText || hasMedia)) {
+  await promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id);
+}
+```
+
+Executado em paralelo com a pausa de automações via `Promise.all([pauseAutomations(...), promoteLeadOnReply(...)])` para zero latência adicional.
+
+## Guardrails aplicados
+| # | Garantia | Implementação |
+|---|----------|---------------|
+| 1 | Áudio/imagem/vídeo/doc/sticker promovem | `hasText \|\| hasMedia` |
+| 2 | Sem duplicidade visual | `action_type='whatsapp_interaction'` (trigger usa `'status_changed'`) |
+| 3 | Não retrocede funil | Whitelist `['leads','new','novo']` |
+| 4 | Multi-agência | `lead_statuses` filtrado por `agency_id` |
+| 5 | Compat custom statuses | 2º por `order_position`, fallback `em_contato` |
+| 6 | Performance | `Promise.all` com pausa de automações |
+| 7 | Resiliência | try/catch fail-open |
 
 ## Ficheiro alterado
-- `src/components/ui/task-card.tsx` (apenas a className do `<Card>` raiz)
+- `supabase/functions/whatsapp-webhook/index.ts`
 
-Sem mudança em props, hooks, ou estrutura.
+Sem migration. Sem schema change.
 
