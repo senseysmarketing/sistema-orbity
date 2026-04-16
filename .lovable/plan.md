@@ -1,109 +1,127 @@
 
 
-# Auto-fill Participantes Externos — Implementação Bulletproof
+# Implementação: Persistir + Exibir número WhatsApp (com Guardrails)
 
-## Verificações prévias
-- Confirmar nome real da coluna de empresa em `clients` (`company_name` vs `company` vs `business_name`)
-- Confirmar nome do campo de participantes externos no state atual (`external_participants`, `participants_external`, etc.)
-- Confirmar se `leads` tem coluna `email`
+## Verificações prévias (read-only)
+1. Confirmar nome real da tabela: `whatsapp_accounts` vs `whatsapp_instances` via `src/integrations/supabase/types.ts`
+2. Confirmar estrutura do hook `useWhatsApp` para identificar onde aplicar invalidação/update otimista
+3. Confirmar payload da Evolution v2 no webhook handler atual
 
 ## Implementação
 
-### 1. Queries
-- Leads: `.select("id, name, email, phone")`
-- Clients: `.select("id, name, email, contact, <coluna_empresa_real>")`
+### Guardrail 1 — Nome correto da tabela
+Após leitura dos `types.ts`, usar o nome confirmado em **todos** os `supabase.from(...)` das Edge Functions. Se for `whatsapp_accounts` (como já usado em `whatsapp-connect`), manter. Se divergir, corrigir antes de deploy.
 
-### 2. Helper de formatação (acima do componente)
-```ts
-const formatParticipantIdentity = (
-  name: string,
-  email: string,
-  company?: string | null
-): string => {
-  if (!email) return "";
-  const cleanName = name?.trim() || "Contato";
-  const cleanEmail = email.trim();
-  return company?.trim()
-    ? `${cleanName} (${company.trim()}) <${cleanEmail}>`
-    : `${cleanName} <${cleanEmail}>`;
-};
-```
+### Backend — `supabase/functions/whatsapp-connect/index.ts`
 
-### 3. Ref de rastreamento
-```ts
-const lastAutoParticipantRef = useRef<string | null>(null);
-```
-
-### 4. Extensão do useEffect centralizado — estrutura segura
-
-Adicionar **após** a lógica de telefone existente, seguindo ESTRITAMENTE o padrão aprovado (mutação do ref **fora** do updater):
+No `case 'status'`, quando `isConnected === true` e `phone_number` ausente:
 
 ```ts
-// === AUTO-FILL DE PARTICIPANTES EXTERNOS ===
-let newIdentity = "";
+let connectedPhone = account.phone_number;
 
-if (formData.lead_id) {
-  const lead = leads.find(l => l.id === formData.lead_id);
-  if (lead?.email) {
-    newIdentity = formatParticipantIdentity(lead.name, lead.email);
-  }
-} else {
-  const clientId = selectedClientIds[0];
-  if (clientId && !clientId.startsWith("agency:")) {
-    const client = clients.find(c => c.id === clientId);
-    if (client?.email) {
-      newIdentity = formatParticipantIdentity(
-        client.name,
-        client.email,
-        client.company_name // ajustar conforme schema real
-      );
+if (!connectedPhone) {
+  try {
+    const instRes = await fetch(
+      `${effectiveUrl}/instance/fetchInstances?instanceName=${instanceName}`,
+      { headers: { 'apikey': effectiveKey } }
+    );
+    const instData = await instRes.json();
+    const arr = Array.isArray(instData) ? instData : [instData];
+    const rawJid = arr[0]?.ownerJid 
+      || arr[0]?.instance?.owner 
+      || arr[0]?.owner 
+      || arr[0]?.instance?.wuid;
+    
+    if (rawJid) {
+      // SANITIZAÇÃO ESTRITA (Guardrail 2)
+      connectedPhone = String(rawJid).split('@')[0].replace(/\D/g, '');
     }
+  } catch (e) {
+    console.log('fetchInstances failed:', e.message);
   }
 }
 
-// Snapshot do ref ANTES do setState (state updater puro)
-const currentAutoFill = lastAutoParticipantRef.current;
-
-setExternalParticipants(prev => {
-  const list = prev ? prev.split(",").map(s => s.trim()).filter(Boolean) : [];
-  
-  const filtered = currentAutoFill
-    ? list.filter(p => p !== currentAutoFill)
-    : list;
-  
-  if (newIdentity && !filtered.includes(newIdentity)) {
-    filtered.push(newIdentity);
-  }
-  
-  return filtered.join(", ");
-});
-
-// Mutação do ref FORA do updater
-lastAutoParticipantRef.current = newIdentity || null;
+await supabase
+  .from('<TABELA_CONFIRMADA>')
+  .update({
+    status: 'connected',
+    qr_code: null,
+    ...(connectedPhone ? { phone_number: connectedPhone } : {}),
+  })
+  .eq('id', account.id);
 ```
 
-### 5. Reset on close
-No `handleClose` / reset do form: `lastAutoParticipantRef.current = null;` para evitar leak entre aberturas.
+**Retornar `phone_number: connectedPhone` no JSON da resposta** — essencial para o Guardrail 3.
+
+### Backend — `supabase/functions/whatsapp-webhook/index.ts`
+
+No handler de `connection.update` quando `state === 'open'`:
+
+```ts
+const rawPhonePayload = data?.wuid || data?.owner || data?.sender;
+if (rawPhonePayload) {
+  // SANITIZAÇÃO ESTRITA (Guardrail 2)
+  const cleanPhone = String(rawPhonePayload).split('@')[0].replace(/\D/g, '');
+  if (cleanPhone) {
+    await supabase
+      .from('<TABELA_CONFIRMADA>')
+      .update({ status: 'connected', phone_number: cleanPhone, qr_code: null })
+      .eq('agency_id', agencyId)
+      .eq('purpose', purpose); // se aplicável
+  }
+}
+```
+
+### Frontend — `useWhatsApp.tsx` (Guardrail 3 — Reatividade)
+
+Localizar `checkStatus` e `connect` mutations. Após a resposta, fazer **update otimista** do cache do React Query:
+
+```ts
+checkStatus: useMutation({
+  mutationFn: async () => { /* ... */ },
+  onSuccess: (result) => {
+    if (result?.status === 'connected' && result?.phone_number) {
+      // Update otimista IMEDIATO no cache
+      queryClient.setQueryData(['whatsapp-account', purpose], (old: any) => ({
+        ...old,
+        status: 'connected',
+        phone_number: result.phone_number,
+        qr_code: null,
+      }));
+    }
+    // Invalidação como fallback
+    queryClient.invalidateQueries({ queryKey: ['whatsapp-account', purpose] });
+  },
+})
+```
+
+### Frontend — `WhatsAppInstanceCard.tsx`
+
+Melhorar fallback durante sincronização:
+
+```tsx
+{account?.phone_number 
+  ? `Número: ${formatPhoneDisplay(account.phone_number)}`
+  : isConnected 
+    ? "Sincronizando número..." 
+    : "Aguardando número conectado..."}
+```
 
 ## Comportamento garantido
-| Cenário | Resultado |
-|---------|-----------|
-| Selecionar Lead com email | Adiciona `Nome <email>` ao final |
-| Trocar Lead/Cliente | Remove anterior auto-inserido, adiciona novo |
-| Limpar seleção | Remove só o auto-fill, preserva manuais |
-| Lead/Cliente sem email | Não adiciona nada |
-| Cliente com empresa | Formata `Nome (Empresa) <email>` |
-| Participantes manuais | Sempre preservados |
-| Reabrir modal | Ref resetado, sem leak |
 
-## Guardrails aplicados
-1. **State updater puro** — ref nunca é mutado dentro do `setExternalParticipants`
-2. **Schema-safe** — coluna de empresa será confirmada antes do uso
-3. **Anti-leak** — ref limpo no fechamento do modal
-4. **Anti-duplicação** — `!filtered.includes(newIdentity)` antes de push
+| Cenário | Antes | Depois |
+|---------|-------|--------|
+| Conexão nova via QR | Phone NULL eternamente | Phone capturado em ≤5s via polling + setQueryData |
+| Reconexão via webhook | Sem update | Persistido com sanitização estrita |
+| Tela durante sync | "Aguardando número..." (eterno) | "Sincronizando..." → número real (sem F5) |
+| Régua/NPS | "WhatsApp da Agência" / instance_name | Número formatado |
+| Erro de tabela | Risco de 500 | Nome confirmado antes do deploy |
 
-## Ficheiro alterado
-- `src/components/agenda/MeetingFormDialog.tsx` (único)
+## Ficheiros alterados
+- `supabase/functions/whatsapp-connect/index.ts` (fetchInstances + retorno phone)
+- `supabase/functions/whatsapp-webhook/index.ts` (captura + sanitização em connection.update)
+- `src/hooks/useWhatsApp.tsx` (setQueryData otimista no onSuccess)
+- `src/components/settings/WhatsAppInstanceCard.tsx` (fallback "Sincronizando...")
 
-Sem migration, sem alteração de hooks.
+Sem migration. Sem alteração de schema.
 
