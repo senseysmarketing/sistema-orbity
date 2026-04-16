@@ -9,11 +9,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ClientHealthScore } from "@/components/clients/ClientHealthScore";
 import { ClientForm } from "@/components/admin/ClientForm";
 import { MeetingFormDialog } from "@/components/agenda/MeetingFormDialog";
+import { MeetingDetailsDialog } from "@/components/agenda/MeetingDetailsDialog";
+import { Meeting } from "@/hooks/useMeetings";
 import { useAuth } from "@/hooks/useAuth";
 import { DatePickerDemo } from "@/components/ui/date-picker";
 import {
@@ -26,11 +29,11 @@ import {
   Copy,
   Edit2,
   ExternalLink,
-  
   Key,
   Phone,
   Plus,
   Sparkles,
+  Trash2,
   Video,
 } from "lucide-react";
 import { format, differenceInMonths, formatDistanceToNow } from "date-fns";
@@ -49,6 +52,13 @@ export default function ClientDetail() {
   const [credentialDialogOpen, setCredentialDialogOpen] = useState(false);
   const [meetingDialogOpen, setMeetingDialogOpen] = useState(false);
   const [quickTaskDialogOpen, setQuickTaskDialogOpen] = useState(false);
+  const [allCredentialsOpen, setAllCredentialsOpen] = useState(false);
+  const [deletingCredId, setDeletingCredId] = useState<string | null>(null);
+  const [editingCredId, setEditingCredId] = useState<string | null>(null);
+
+  // Meeting details
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [meetingDetailsOpen, setMeetingDetailsOpen] = useState(false);
 
   // Credential form
   const [newCred, setNewCred] = useState({ platform: "", username: "", password: "" });
@@ -81,19 +91,18 @@ export default function ClientDetail() {
           .eq("client_id", id)
           .eq("tasks.agency_id", currentAgency.id)
           .not("tasks.status", "in", '("done","cancelled","completed")')
-          .limit(8),
+          .limit(20),
         supabase
           .from("meeting_clients")
-          .select("meetings!inner(id, title, start_time, status, outcome, meeting_type)")
+          .select("meetings!inner(*)")
           .eq("client_id", id)
           .order("meetings(start_time)", { ascending: false })
-          .limit(10),
+          .limit(20),
         supabase
           .from("client_credentials")
           .select("id, platform, username, password, url")
           .eq("client_id", id)
-          .eq("agency_id", currentAgency.id)
-          .limit(5),
+          .eq("agency_id", currentAgency.id),
         supabase
           .from("nps_responses")
           .select("score, client_name")
@@ -125,7 +134,7 @@ export default function ClientDetail() {
     toast({ title: "Copiado!", description: "Senha copiada para a área de transferência." });
   };
 
-  // --- Credential insert ---
+  // --- Credential insert/update ---
   const handleSaveCredential = async () => {
     if (!newCred.platform.trim()) {
       toast({ title: "Erro", description: "Informe a plataforma.", variant: "destructive" });
@@ -134,23 +143,49 @@ export default function ClientDetail() {
     if (!id || !currentAgency?.id || !user?.id) return;
     setSavingCred(true);
     try {
-      const { error } = await supabase.from("client_credentials").insert({
-        client_id: id,
-        agency_id: currentAgency.id,
-        platform: newCred.platform.trim(),
-        username: newCred.username.trim() || null,
-        password: newCred.password.trim() || null,
-        created_by: user.id,
-      });
-      if (error) throw error;
-      toast({ title: "Acesso salvo!", description: `Credencial de ${newCred.platform} adicionada.` });
+      if (editingCredId) {
+        const { error } = await supabase.from("client_credentials").update({
+          platform: newCred.platform.trim(),
+          username: newCred.username.trim() || null,
+          password: newCred.password.trim() || null,
+        }).eq("id", editingCredId);
+        if (error) throw error;
+        toast({ title: "Acesso atualizado!", description: `Credencial de ${newCred.platform} atualizada.` });
+      } else {
+        const { error } = await supabase.from("client_credentials").insert({
+          client_id: id,
+          agency_id: currentAgency.id,
+          platform: newCred.platform.trim(),
+          username: newCred.username.trim() || null,
+          password: newCred.password.trim() || null,
+          created_by: user.id,
+        });
+        if (error) throw error;
+        toast({ title: "Acesso salvo!", description: `Credencial de ${newCred.platform} adicionada.` });
+      }
       setNewCred({ platform: "", username: "", password: "" });
+      setEditingCredId(null);
       setCredentialDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["client-dashboard", id] });
     } catch (err: any) {
       toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
     } finally {
       setSavingCred(false);
+    }
+  };
+
+  // --- Credential delete ---
+  const handleDeleteCredential = async () => {
+    if (!deletingCredId) return;
+    try {
+      const { error } = await supabase.from("client_credentials").delete().eq("id", deletingCredId);
+      if (error) throw error;
+      toast({ title: "Acesso excluído", description: "Credencial removida com sucesso." });
+      queryClient.invalidateQueries({ queryKey: ["client-dashboard", id] });
+    } catch (err: any) {
+      toast({ title: "Erro ao excluir", description: err.message, variant: "destructive" });
+    } finally {
+      setDeletingCredId(null);
     }
   };
 
@@ -195,6 +230,26 @@ export default function ClientDetail() {
     }
   };
 
+  // --- Open edit credential ---
+  const openEditCredential = (cred: any) => {
+    setEditingCredId(cred.id);
+    setNewCred({ platform: cred.platform || "", username: cred.username || "", password: cred.password || "" });
+    setCredentialDialogOpen(true);
+  };
+
+  // --- Open meeting details ---
+  const openMeetingDetails = (meeting: any) => {
+    // Cast to Meeting type
+    const m: Meeting = {
+      ...meeting,
+      external_participants: meeting.external_participants as any,
+      action_items: meeting.action_items as any,
+      participants: meeting.participants as any,
+    };
+    setSelectedMeeting(m);
+    setMeetingDetailsOpen(true);
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -234,6 +289,12 @@ export default function ClientDetail() {
   const npsScore = matchedNps?.score ?? undefined;
   const monthsActive = client.start_date ? differenceInMonths(new Date(), new Date(client.start_date)) : 0;
 
+  const displayedTasks = tasks.slice(0, 5);
+  const extraTasks = tasks.length - 5;
+  const displayedMeetings = meetings.slice(0, 5);
+  const extraMeetings = meetings.length - 5;
+  const displayedCredentials = credentials.slice(0, 5);
+
   const nextMeeting = meetings.find((m: any) => new Date(m.start_time) > new Date());
   const aiSummaryParts: string[] = [];
   if (client.start_date) {
@@ -257,8 +318,8 @@ export default function ClientDetail() {
     ? `https://wa.me/${client.contact.replace(/\D/g, "")}`
     : "#";
 
-  // Drive link: check observations for a URL
-  const driveUrl = client.observations?.match(/https?:\/\/[^\s]+drive[^\s]*/i)?.[0] || "";
+  // Drive link: use dedicated column
+  const driveUrl = (client as any).drive_folder_url || "";
 
   const priorityColors: Record<string, string> = {
     high: "bg-red-100 text-red-700 border-red-200",
@@ -280,6 +341,59 @@ export default function ClientDetail() {
     cancelled: { label: "Cancelada", color: "bg-red-100 text-red-700" },
     rescheduled: { label: "Reagendada", color: "bg-amber-100 text-amber-700" },
   };
+
+  const renderCredentialItem = (cred: any, showActions = true) => (
+    <div
+      key={cred.id}
+      className="flex items-center justify-between bg-slate-50 rounded-lg p-2.5 group"
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-medium truncate">{cred.platform}</p>
+        <p className="text-xs text-muted-foreground truncate">{cred.username || "—"}</p>
+      </div>
+      <div className="flex items-center gap-0.5 shrink-0">
+        {cred.password && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              copyToClipboard(cred.password);
+            }}
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        {showActions && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={(e) => {
+                e.stopPropagation();
+                openEditCredential(cred);
+              }}
+            >
+              <Edit2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeletingCredId(cred.id);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -348,7 +462,7 @@ export default function ClientDetail() {
                 setEditFormOpen(true);
               }
             }}
-            title={driveUrl ? "Abrir Google Drive" : "Sem link configurado — clique para editar perfil"}
+            title={driveUrl ? "Abrir Google Drive" : "Sem link configurado — clique em Editar para adicionar"}
           >
             <ExternalLink className="h-4 w-4 mr-1" />
             Drive
@@ -411,49 +525,40 @@ export default function ClientDetail() {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                  onClick={() => setCredentialDialogOpen(true)}
+                  onClick={() => {
+                    setEditingCredId(null);
+                    setNewCred({ platform: "", username: "", password: "" });
+                    setCredentialDialogOpen(true);
+                  }}
                   title="Adicionar acesso"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-7 text-xs"
-                  onClick={() => navigate(`/dashboard/clients/${id}`)}
-                >
-                  Ver todos
-                </Button>
+                {credentials.length > 5 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-7 text-xs"
+                    onClick={() => setAllCredentialsOpen(true)}
+                  >
+                    Ver todos ({credentials.length})
+                  </Button>
+                )}
               </div>
             </div>
             {credentials.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">Nenhum acesso salvo</p>
             ) : (
               <div className="space-y-2">
-                {credentials.map((cred: any) => (
-                  <div
-                    key={cred.id}
-                    className="flex items-center justify-between bg-slate-50 rounded-lg p-2.5 group"
+                {displayedCredentials.map((cred: any) => renderCredentialItem(cred))}
+                {credentials.length > 5 && (
+                  <button
+                    className="w-full text-center text-xs text-purple-600 hover:text-purple-700 py-1"
+                    onClick={() => setAllCredentialsOpen(true)}
                   >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{cred.platform}</p>
-                      <p className="text-xs text-muted-foreground truncate">{cred.username || "—"}</p>
-                    </div>
-                    {cred.password && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyToClipboard(cred.password);
-                        }}
-                      >
-                        <Copy className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                    +{credentials.length - 5} mais
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -489,7 +594,7 @@ export default function ClientDetail() {
               <p className="text-sm text-muted-foreground text-center py-6">Nenhuma tarefa pendente 🎉</p>
             ) : (
               <div className="space-y-1.5">
-                {tasks.map((task: any) => (
+                {displayedTasks.map((task: any) => (
                   <div
                     key={task.id}
                     className="flex items-center gap-3 bg-slate-50 rounded-lg p-2.5 hover:bg-slate-100 transition-colors"
@@ -515,6 +620,11 @@ export default function ClientDetail() {
                     </Badge>
                   </div>
                 ))}
+                {extraTasks > 0 && (
+                  <p className="text-xs text-center text-muted-foreground pt-1">
+                    +{extraTasks} {extraTasks === 1 ? "tarefa" : "tarefas"}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -537,7 +647,7 @@ export default function ClientDetail() {
                   variant="ghost"
                   size="sm"
                   className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-7 text-xs"
-                  onClick={() => navigate("/dashboard/meetings")}
+                  onClick={() => navigate("/dashboard/agenda")}
                 >
                   Ver todas <ChevronRight className="h-3 w-3 ml-1" />
                 </Button>
@@ -547,7 +657,7 @@ export default function ClientDetail() {
               <p className="text-sm text-muted-foreground text-center py-6">Nenhuma reunião registrada</p>
             ) : (
               <div className="space-y-1.5">
-                {meetings.map((meeting: any) => {
+                {displayedMeetings.map((meeting: any) => {
                   const statusConf = meetingStatusLabels[meeting.status] || {
                     label: meeting.status,
                     color: "bg-slate-100 text-slate-600",
@@ -555,7 +665,8 @@ export default function ClientDetail() {
                   return (
                     <div
                       key={meeting.id}
-                      className="flex items-center gap-3 bg-slate-50 rounded-lg p-2.5"
+                      className="flex items-center gap-3 bg-slate-50 rounded-lg p-2.5 hover:bg-slate-100 transition-colors cursor-pointer"
+                      onClick={() => openMeetingDetails(meeting)}
                     >
                       <Video className="h-4 w-4 text-muted-foreground shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -570,6 +681,11 @@ export default function ClientDetail() {
                     </div>
                   );
                 })}
+                {extraMeetings > 0 && (
+                  <p className="text-xs text-center text-muted-foreground pt-1">
+                    +{extraMeetings} {extraMeetings === 1 ? "reunião" : "reuniões"}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -598,12 +714,24 @@ export default function ClientDetail() {
         defaultClientIds={id ? [id] : undefined}
       />
 
-      {/* Credential Dialog */}
-      <Dialog open={credentialDialogOpen} onOpenChange={setCredentialDialogOpen}>
+      {/* Meeting Details */}
+      <MeetingDetailsDialog
+        meeting={selectedMeeting}
+        open={meetingDetailsOpen}
+        onOpenChange={setMeetingDetailsOpen}
+      />
+
+      {/* Credential Dialog (Add/Edit) */}
+      <Dialog open={credentialDialogOpen} onOpenChange={(open) => {
+        setCredentialDialogOpen(open);
+        if (!open) { setEditingCredId(null); setNewCred({ platform: "", username: "", password: "" }); }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Novo Acesso</DialogTitle>
-            <DialogDescription>Adicione uma credencial ao vault de {client.name}.</DialogDescription>
+            <DialogTitle>{editingCredId ? "Editar Acesso" : "Novo Acesso"}</DialogTitle>
+            <DialogDescription>
+              {editingCredId ? "Atualize a credencial." : `Adicione uma credencial ao vault de ${client.name}.`}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -638,11 +766,40 @@ export default function ClientDetail() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setCredentialDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSaveCredential} disabled={savingCred}>
-              {savingCred ? "Salvando..." : "Salvar"}
+              {savingCred ? "Salvando..." : editingCredId ? "Atualizar" : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* All Credentials Dialog */}
+      <Dialog open={allCredentialsOpen} onOpenChange={setAllCredentialsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Todos os Acessos</DialogTitle>
+            <DialogDescription>{credentials.length} credenciais salvas para {client.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {credentials.map((cred: any) => renderCredentialItem(cred))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Credential Confirmation */}
+      <AlertDialog open={!!deletingCredId} onOpenChange={(open) => { if (!open) setDeletingCredId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir acesso?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A credencial será removida permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteCredential}>Excluir</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Quick Task Dialog */}
       <Dialog open={quickTaskDialogOpen} onOpenChange={setQuickTaskDialogOpen}>

@@ -87,6 +87,7 @@ const initialFormData = {
   start_date: '',
   due_date: '1',
   observations: '',
+  drive_folder_url: '',
   contract_start_date: null as string | null,
   contract_end_date: null as string | null,
   has_loyalty: true,
@@ -130,6 +131,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
         start_date: client.start_date || '',
         due_date: client.due_date?.toString() || '1',
         observations: client.observations || '',
+        drive_folder_url: client.drive_folder_url || '',
         contract_start_date: client.contract_start_date || null,
         contract_end_date: client.contract_end_date || null,
         has_loyalty: client.has_loyalty ?? true,
@@ -298,6 +300,7 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
         start_date: formData.start_date || null,
         due_date: parseInt(formData.due_date),
         observations: formData.observations,
+        drive_folder_url: formData.drive_folder_url.trim() || null,
         contract_start_date: formData.contract_start_date,
         contract_end_date: formData.contract_end_date,
         has_loyalty: formData.has_loyalty,
@@ -613,6 +616,16 @@ export function ClientForm({ open, onOpenChange, onSuccess, client, onClientCrea
                   </div>
                 </div>
               )}
+
+              <div className="grid gap-2">
+                <Label htmlFor="drive_folder_url">Link Google Drive</Label>
+                <Input
+                  id="drive_folder_url"
+                  value={formData.drive_folder_url}
+                  onChange={(e) => setFormData({ ...formData, drive_folder_url: e.target.value })}
+                  placeholder="https://drive.google.com/drive/folders/..."
+                />
+              </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="observations">Observações</Label>
