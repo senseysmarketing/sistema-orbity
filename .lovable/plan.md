@@ -1,56 +1,42 @@
 
 
-# Correções no ClientDetail — Reuniões, Drive, Vault e Limites
+# Corrigir Algoritmo de Health Score — Diferenciação Real
 
-## Problemas e soluções
+## Problema
+Todos os clientes mostram a mesma pontuação (80) porque:
+- A maioria não tem NPS registado → sem impacto
+- A maioria não tem reuniões → penalização fixa de -20 para todos
+- Sem tarefas atrasadas → sem penalização
+- O `client` (start_date) é ignorado no cálculo
+- As penalizações de reunião são agrupadas num único bloco (AND), não separadas
 
-### 1. Reuniões não clicáveis + rota errada
-- A rota do "Ver todas" aponta para `/dashboard/meetings` (inexistente). Corrigir para `/dashboard/agenda`.
-- Tornar cada reunião clicável: importar `MeetingDetailsDialog`, adicionar estado `selectedMeeting`/`detailsOpen`. Ao clicar numa reunião, buscar dados completos da meeting via query individual (o dashboard só traz campos limitados) e abrir o dialog.
-- Alternativa mais simples: expandir a query de meetings no `dashboardData` para trazer todos os campos necessários (`*` em vez de campos específicos), permitindo cast direto para `Meeting`.
+## Alterações no algoritmo (`ClientHealthScore.tsx`)
 
-### 2. Drive — campo dedicado na DB + formulário
-- Não existe coluna `drive_folder_url` na tabela `clients`. Criar via migration.
-- Adicionar campo "Link Google Drive" ao `ClientForm.tsx`.
-- No `ClientDetail`, usar `client.drive_folder_url` em vez do regex sobre `observations`.
+**Aceitar `client` no cálculo** (actualmente é `_client` e ignorado).
 
-### 3. Limitar itens exibidos
-- Tarefas: exibir no máximo **5** items no card (`.slice(0, 5)`). Mostrar badge "+X" se houver mais.
-- Reuniões: exibir no máximo **5** items no card (`.slice(0, 5)`). Mostrar badge "+X" se houver mais.
+Nova fórmula (base 100):
 
-### 4. Vault — editar, excluir e "Ver todos"
-- O botão "Ver todos" aponta para a própria página (`/dashboard/clients/${id}`). Não há rota separada de vault, então transformar num scroll/expand: ao clicar, mostrar todos os acessos num Dialog listando todas as credenciais com opções de editar e excluir.
-- Cada credencial no card: adicionar botões `Edit2` e `Trash2` (ghost, h-7 w-7).
-- Editar: reutilizar o dialog de credenciais preenchendo os campos e fazendo UPDATE.
-- Excluir: confirmar com AlertDialog e DELETE da `client_credentials`.
+| Factor | Condição | Impacto |
+|--------|----------|---------|
+| Tarefas atrasadas | due_date < hoje & status ≠ done | -10 por tarefa (máx -40) |
+| Última reunião > 30 dias | Qualquer reunião mais recente > 30 dias | -20 |
+| Sem próxima reunião agendada | Nenhuma reunião futura | -10 (separado) |
+| Sem reuniões nenhuma | Zero reuniões registadas | -20 |
+| NPS Promotor (9-10) | | +10 |
+| NPS Detrator (0-6) | | -30 |
+| Tempo de casa < 3 meses | client.start_date dentro de 90 dias | -10 (sensibilidade onboarding) |
 
----
+**Mudanças chave:**
+1. Separar penalizações de reunião: -20 para última > 30 dias, -10 para sem futura (podem acumular)
+2. Adicionar penalização de onboarding: -10 se cliente tem < 3 meses (usando `client.start_date`)
+3. Passar `client` para `calculateDynamicScore` em vez de ignorar
+4. Score continua clamped entre 0 e 100
+
+### Exemplo de diferenciação esperada:
+- Cliente com reunião recente + 0 tarefas atrasadas + > 3 meses → **90-100**
+- Cliente sem reuniões + 0 tarefas + < 3 meses → **60** (= 100 - 20 - 10 - 10)
+- Cliente com 3 tarefas atrasadas + última reunião há 40 dias → **50** (= 100 - 30 - 20)
 
 ## Ficheiros alterados
-
-### Migration SQL
-```sql
-ALTER TABLE clients ADD COLUMN IF NOT EXISTS drive_folder_url TEXT;
-```
-
-### `src/components/admin/ClientForm.tsx`
-- Adicionar campo Input "Link Google Drive" mapeado a `drive_folder_url`.
-
-### `src/pages/ClientDetail.tsx`
-- **Imports**: adicionar `MeetingDetailsDialog`, `Trash2`, `Edit2` (já importado), `AlertDialog`.
-- **Estado**: `selectedMeeting`, `detailsOpen`, `editingCred`, `deletingCredId`, `allCredentialsOpen`.
-- **Drive**: usar `client.drive_folder_url` em vez do regex.
-- **Meetings query**: expandir select para `meetings!inner(*)` para ter dados completos.
-- **Meetings route**: `/dashboard/meetings` → `/dashboard/agenda`.
-- **Meetings click**: cada item recebe `cursor-pointer` e `onClick` que abre `MeetingDetailsDialog`.
-- **Tasks/Meetings limit**: `.slice(0, 5)` com indicador "+N mais".
-- **Vault "Ver todos"**: abre dialog com lista completa (remove o limite de 5 da query).
-- **Vault edit**: ao clicar edit, preenche `newCred` com dados existentes e faz UPDATE em vez de INSERT.
-- **Vault delete**: AlertDialog de confirmação + DELETE.
-- **Render dialogs**: adicionar `MeetingDetailsDialog` e `AlertDialog` de exclusão de credencial.
-
-### Guardrails
-- Zero navegação para fora da página (excepto "Ver todas" para agenda)
-- Reutiliza `MeetingDetailsDialog` existente
-- Query de credenciais sem limite para poder listar todas no dialog expandido
+1. `src/components/clients/ClientHealthScore.tsx` — actualizar `calculateDynamicScore` com as novas regras
 
