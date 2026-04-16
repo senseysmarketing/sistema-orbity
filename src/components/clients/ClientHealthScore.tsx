@@ -19,6 +19,7 @@ type ScoreLevel = {
 };
 
 function calculateDynamicScore(
+  client: any,
   tasks: any[],
   meetings: any[],
   npsScore?: number | null
@@ -34,21 +35,28 @@ function calculateDynamicScore(
   });
   score -= Math.min(overdueTasks.length * 10, 40);
 
-  // Reuniões: se última > 30 dias E sem futuras → -20
+  // Reuniões — penalizações separadas e acumuláveis
   if (meetings.length > 0) {
-    const sortedMeetings = [...meetings].sort((a, b) =>
-      new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
-    );
-    const lastMeetingDate = new Date(sortedMeetings[0].start_time);
-    const daysSinceLast = differenceInDays(today, lastMeetingDate);
-    const hasFutureMeeting = sortedMeetings.some(
-      (m) => new Date(m.start_time) > today
-    );
-    if (daysSinceLast > 30 && !hasFutureMeeting) {
-      score -= 20;
+    const pastMeetings = meetings.filter((m) => new Date(m.start_time) <= today);
+    const futureMeetings = meetings.filter((m) => new Date(m.start_time) > today);
+
+    // Última reunião > 30 dias: -20
+    if (pastMeetings.length > 0) {
+      const sorted = [...pastMeetings].sort((a, b) =>
+        new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+      );
+      const daysSinceLast = differenceInDays(today, new Date(sorted[0].start_time));
+      if (daysSinceLast > 30) {
+        score -= 20;
+      }
+    }
+
+    // Sem próxima reunião agendada: -10
+    if (futureMeetings.length === 0) {
+      score -= 10;
     }
   } else {
-    // Sem reuniões registadas → penalização
+    // Sem reuniões nenhuma: -20
     score -= 20;
   }
 
@@ -56,6 +64,15 @@ function calculateDynamicScore(
   if (npsScore != null) {
     if (npsScore >= 9) score += 10;
     else if (npsScore <= 6) score -= 30;
+  }
+
+  // Tempo de casa < 3 meses (onboarding): -10
+  if (client?.start_date) {
+    const startDate = parseISO(client.start_date);
+    const daysActive = differenceInDays(today, startDate);
+    if (daysActive >= 0 && daysActive < 90) {
+      score -= 10;
+    }
   }
 
   return Math.max(0, Math.min(100, score));
