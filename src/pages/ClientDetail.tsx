@@ -9,11 +9,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ClientHealthScore } from "@/components/clients/ClientHealthScore";
 import { ClientForm } from "@/components/admin/ClientForm";
 import { MeetingFormDialog } from "@/components/agenda/MeetingFormDialog";
 import { useAuth } from "@/hooks/useAuth";
+import { DatePickerDemo } from "@/components/ui/date-picker";
 import {
   ArrowLeft,
   Building2,
@@ -39,6 +41,22 @@ export default function ClientDetail() {
   const navigate = useNavigate();
   const { currentAgency } = useAgency();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Dialog states
+  const [editFormOpen, setEditFormOpen] = useState(false);
+  const [credentialDialogOpen, setCredentialDialogOpen] = useState(false);
+  const [meetingDialogOpen, setMeetingDialogOpen] = useState(false);
+  const [quickTaskDialogOpen, setQuickTaskDialogOpen] = useState(false);
+
+  // Credential form
+  const [newCred, setNewCred] = useState({ platform: "", username: "", password: "" });
+  const [savingCred, setSavingCred] = useState(false);
+
+  // Quick task form
+  const [quickTask, setQuickTask] = useState({ title: "", task_type: "tarefa", due_date: undefined as Date | undefined });
+  const [savingTask, setSavingTask] = useState(false);
 
   const { data: client, isLoading } = useQuery({
     queryKey: ["client-detail", id],
@@ -124,6 +142,76 @@ export default function ClientDetail() {
     toast({ title: "Copiado!", description: "Senha copiada para a área de transferência." });
   };
 
+  // --- Credential insert ---
+  const handleSaveCredential = async () => {
+    if (!newCred.platform.trim()) {
+      toast({ title: "Erro", description: "Informe a plataforma.", variant: "destructive" });
+      return;
+    }
+    if (!id || !currentAgency?.id || !user?.id) return;
+    setSavingCred(true);
+    try {
+      const { error } = await supabase.from("client_credentials").insert({
+        client_id: id,
+        agency_id: currentAgency.id,
+        platform: newCred.platform.trim(),
+        username: newCred.username.trim() || null,
+        password: newCred.password.trim() || null,
+        created_by: user.id,
+      });
+      if (error) throw error;
+      toast({ title: "Acesso salvo!", description: `Credencial de ${newCred.platform} adicionada.` });
+      setNewCred({ platform: "", username: "", password: "" });
+      setCredentialDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["client-dashboard", id] });
+    } catch (err: any) {
+      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingCred(false);
+    }
+  };
+
+  // --- Quick Task insert ---
+  const handleSaveQuickTask = async () => {
+    if (!quickTask.title.trim()) {
+      toast({ title: "Erro", description: "Informe o título da tarefa.", variant: "destructive" });
+      return;
+    }
+    if (!id || !currentAgency?.id || !user?.id) return;
+    setSavingTask(true);
+    try {
+      const { data: taskData, error: taskError } = await supabase
+        .from("tasks")
+        .insert({
+          title: quickTask.title.trim(),
+          task_type: quickTask.task_type || "tarefa",
+          due_date: quickTask.due_date ? quickTask.due_date.toISOString() : null,
+          agency_id: currentAgency.id,
+          created_by: user.id,
+          status: "todo",
+        })
+        .select("id")
+        .single();
+      if (taskError) throw taskError;
+
+      // Link task to client
+      const { error: linkError } = await supabase.from("task_clients").insert({
+        task_id: taskData.id,
+        client_id: id,
+      });
+      if (linkError) throw linkError;
+
+      toast({ title: "Tarefa criada!", description: `"${quickTask.title}" vinculada ao cliente.` });
+      setQuickTask({ title: "", task_type: "tarefa", due_date: undefined });
+      setQuickTaskDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["client-dashboard", id] });
+    } catch (err: any) {
+      toast({ title: "Erro ao criar tarefa", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingTask(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -183,6 +271,9 @@ export default function ClientDetail() {
   const whatsappLink = client.contact
     ? `https://wa.me/${client.contact.replace(/\D/g, "")}`
     : "#";
+
+  // Drive link: check observations for a URL
+  const driveUrl = client.observations?.match(/https?:\/\/[^\s]+drive[^\s]*/i)?.[0] || "";
 
   const priorityColors: Record<string, string> = {
     high: "bg-red-100 text-red-700 border-red-200",
@@ -247,6 +338,14 @@ export default function ClientDetail() {
         <div className="flex items-center gap-2">
           <Button
             size="sm"
+            variant="outline"
+            onClick={() => setEditFormOpen(true)}
+          >
+            <Edit2 className="h-4 w-4 mr-1" />
+            Editar
+          </Button>
+          <Button
+            size="sm"
             className="bg-emerald-600 hover:bg-emerald-700 text-white"
             onClick={() => window.open(whatsappLink, "_blank")}
           >
@@ -256,7 +355,15 @@ export default function ClientDetail() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => window.open("#", "_blank")}
+            disabled={!driveUrl}
+            onClick={() => {
+              if (driveUrl) {
+                window.open(driveUrl, "_blank");
+              } else {
+                setEditFormOpen(true);
+              }
+            }}
+            title={driveUrl ? "Abrir Google Drive" : "Sem link configurado — clique para editar perfil"}
           >
             <ExternalLink className="h-4 w-4 mr-1" />
             Drive
@@ -312,14 +419,25 @@ export default function ClientDetail() {
                 <Key className="h-4 w-4" />
                 Vault de Acessos
               </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-7 text-xs"
-                onClick={() => navigate(`/dashboard/clients/${id}`)}
-              >
-                Ver todos
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  onClick={() => setCredentialDialogOpen(true)}
+                  title="Adicionar acesso"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-7 text-xs"
+                  onClick={() => navigate(`/dashboard/clients/${id}`)}
+                >
+                  Ver todos
+                </Button>
+              </div>
             </div>
             {credentials.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">Nenhum acesso salvo</p>
@@ -360,14 +478,25 @@ export default function ClientDetail() {
           <div className="bg-white border rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-muted-foreground">Próximas Tarefas</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-7 text-xs"
-                onClick={() => navigate("/dashboard/tasks")}
-              >
-                Ver todas <ChevronRight className="h-3 w-3 ml-1" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  onClick={() => setQuickTaskDialogOpen(true)}
+                  title="Criar tarefa rápida"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-7 text-xs"
+                  onClick={() => navigate("/dashboard/tasks")}
+                >
+                  Ver todas <ChevronRight className="h-3 w-3 ml-1" />
+                </Button>
+              </div>
             </div>
             {tasks.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">Nenhuma tarefa pendente 🎉</p>
@@ -407,14 +536,25 @@ export default function ClientDetail() {
           <div className="bg-white border rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-muted-foreground">Últimas Reuniões</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-7 text-xs"
-                onClick={() => navigate("/dashboard/meetings")}
-              >
-                Agendar <ChevronRight className="h-3 w-3 ml-1" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  onClick={() => setMeetingDialogOpen(true)}
+                  title="Agendar reunião"
+                >
+                  <CalendarPlus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 h-7 text-xs"
+                  onClick={() => navigate("/dashboard/meetings")}
+                >
+                  Ver todas <ChevronRight className="h-3 w-3 ml-1" />
+                </Button>
+              </div>
             </div>
             {meetings.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">Nenhuma reunião registrada</p>
@@ -474,6 +614,127 @@ export default function ClientDetail() {
           </div>
         </div>
       </div>
+
+      {/* ===== Dialogs ===== */}
+
+      {/* Edit Client */}
+      <ClientForm
+        open={editFormOpen}
+        onOpenChange={setEditFormOpen}
+        client={client}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["client-detail", id] });
+          queryClient.invalidateQueries({ queryKey: ["client-dashboard", id] });
+          setEditFormOpen(false);
+        }}
+      />
+
+      {/* Meeting with pre-selected client */}
+      <MeetingFormDialog
+        open={meetingDialogOpen}
+        onOpenChange={setMeetingDialogOpen}
+        defaultClientIds={id ? [id] : undefined}
+      />
+
+      {/* Credential Dialog */}
+      <Dialog open={credentialDialogOpen} onOpenChange={setCredentialDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Novo Acesso</DialogTitle>
+            <DialogDescription>Adicione uma credencial ao vault de {client.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cred-platform">Plataforma *</Label>
+              <Input
+                id="cred-platform"
+                placeholder="Ex: Instagram, TikTok, Google Ads"
+                value={newCred.platform}
+                onChange={(e) => setNewCred({ ...newCred, platform: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cred-username">Login / Usuário</Label>
+              <Input
+                id="cred-username"
+                placeholder="email@exemplo.com"
+                value={newCred.username}
+                onChange={(e) => setNewCred({ ...newCred, username: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cred-password">Senha</Label>
+              <Input
+                id="cred-password"
+                type="password"
+                placeholder="••••••••"
+                value={newCred.password}
+                onChange={(e) => setNewCred({ ...newCred, password: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCredentialDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveCredential} disabled={savingCred}>
+              {savingCred ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Task Dialog */}
+      <Dialog open={quickTaskDialogOpen} onOpenChange={setQuickTaskDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tarefa Rápida</DialogTitle>
+            <DialogDescription>Crie uma tarefa vinculada a {client.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="task-title">Título *</Label>
+              <Input
+                id="task-title"
+                placeholder="Ex: Criar artes para campanha"
+                value={quickTask.title}
+                onChange={(e) => setQuickTask({ ...quickTask, title: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo de Tarefa</Label>
+              <Select
+                value={quickTask.task_type}
+                onValueChange={(v) => setQuickTask({ ...quickTask, task_type: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tarefa">Tarefa</SelectItem>
+                  <SelectItem value="redes_sociais">Redes Sociais</SelectItem>
+                  <SelectItem value="trafego_pago">Tráfego Pago</SelectItem>
+                  <SelectItem value="design">Design</SelectItem>
+                  <SelectItem value="copy">Copy</SelectItem>
+                  <SelectItem value="reuniao">Reunião</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Data de Entrega</Label>
+              <DatePickerDemo
+                date={quickTask.due_date}
+                onDateChange={(d) => setQuickTask({ ...quickTask, due_date: d })}
+                placeholder="Selecione a data"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickTaskDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveQuickTask} disabled={savingTask}>
+              {savingTask ? "Criando..." : "Criar Tarefa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

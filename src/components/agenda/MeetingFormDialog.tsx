@@ -37,6 +37,7 @@ interface MeetingFormDialogProps {
   meeting?: Meeting | null;
   prefilledDateTime?: { date: Date; hour: number } | null;
   duplicateFrom?: Meeting | null;
+  defaultClientIds?: string[];
 }
 
 // Validation schemas
@@ -78,7 +79,8 @@ export const MeetingFormDialog = ({
   onOpenChange, 
   meeting, 
   prefilledDateTime,
-  duplicateFrom 
+  duplicateFrom,
+  defaultClientIds,
 }: MeetingFormDialogProps) => {
   const { createMeeting, updateMeeting, meetings } = useMeetings();
   const { currentAgency } = useAgency();
@@ -249,6 +251,9 @@ export const MeetingFormDialog = ({
           start_time: format(startDate, "yyyy-MM-dd'T'HH:mm"),
           end_time: format(endDate, "yyyy-MM-dd'T'HH:mm"),
         }));
+      } else if (open && defaultClientIds?.length) {
+        resetForm();
+        setSelectedClientIds(defaultClientIds);
       } else if (!open) {
         resetForm();
       }
