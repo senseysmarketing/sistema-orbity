@@ -139,24 +139,16 @@ export function SortableLeadCard({
       style={style}
       className="relative"
     >
-      <button
-        type="button"
-        aria-label="Arrastar"
-        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded p-1 text-white/50 hover:text-white/80 cursor-grab active:cursor-grabbing"
-        {...attributes}
-        {...listeners}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
       <Card
-        className={`group transition-all duration-200 cursor-pointer select-none border-[#5a35a0] ${
+        className={`group transition-all duration-200 cursor-grab active:cursor-grabbing select-none border-[#5a35a0] ${
           isDragging 
             ? 'shadow-2xl border-primary/50' 
-            : 'hover:shadow-lg hover:shadow-purple-900/30 hover:scale-[1.02] hover:brightness-110'
+            : 'hover:shadow-lg hover:shadow-purple-900/30 hover:brightness-110'
         }`}
         style={{ backgroundColor: '#4c2882' }}
         onClick={handleClick}
+        {...attributes}
+        {...listeners}
       >
       <CardContent className="p-3">
         <div className="space-y-2.5">
