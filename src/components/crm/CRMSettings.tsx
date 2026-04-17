@@ -10,7 +10,12 @@ import { MetaIntegrationConfig } from "./MetaIntegrationConfig";
 import { WebhooksManager } from "./WebhooksManager";
 import { ManualInvestmentManager } from "./ManualInvestmentManager";
 
-type View = "hub" | "status" | "scoring" | "whatsapp" | "sources" | "investments";
+export type CRMSettingsView = "hub" | "status" | "scoring" | "whatsapp" | "sources" | "investments";
+type View = CRMSettingsView;
+
+interface CRMSettingsProps {
+  onViewChange?: (view: CRMSettingsView) => void;
+}
 
 interface HubCardProps {
   icon: React.ComponentType<{ className?: string }>;
