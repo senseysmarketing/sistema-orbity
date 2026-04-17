@@ -13,6 +13,7 @@ import { LeadForm } from "@/components/crm/LeadForm";
 import { LeadDetailsDialog } from "@/components/crm/LeadDetailsDialog";
 import { CRMDashboard } from "@/components/crm/CRMDashboard";
 import { CRMSettings } from "@/components/crm/CRMSettings";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
