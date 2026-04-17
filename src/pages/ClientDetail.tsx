@@ -568,6 +568,17 @@ export default function ClientDetail() {
 
         {/* Left column on desktop */}
         <div className="lg:col-span-3 space-y-4 order-2 lg:order-1">
+          {/* Timeline */}
+          <div className="bg-white border rounded-xl shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold text-muted-foreground">
+                Linha do Tempo
+              </h3>
+            </div>
+            {id && <ClientTimeline clientId={id} />}
+          </div>
+
           {/* Tasks */}
           <div className="bg-white border rounded-xl shadow-sm p-4">
             <div className="flex items-center justify-between mb-3">
