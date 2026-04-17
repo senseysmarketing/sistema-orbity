@@ -4,12 +4,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, Save, Loader2, CalendarDays } from "lucide-react";
+import { Clock, Save, Loader2, CalendarDays, Briefcase, Sun, Infinity as InfinityIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface SendingSchedule {
   enabled: boolean;
@@ -78,7 +78,7 @@ export function SendingScheduleManager() {
     enabled !== savedSchedule.enabled ||
     startHour !== savedSchedule.start_hour ||
     endHour !== savedSchedule.end_hour ||
-    JSON.stringify(allowedDays.sort()) !== JSON.stringify([...savedSchedule.allowed_days].sort());
+    JSON.stringify([...allowedDays].sort()) !== JSON.stringify([...savedSchedule.allowed_days].sort());
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -110,6 +110,26 @@ export function SendingScheduleManager() {
     );
   };
 
+  const applyPreset = (preset: 'business' | 'extended' | 'always') => {
+    if (preset === 'business') {
+      setEnabled(true);
+      setStartHour(8);
+      setEndHour(18);
+      setAllowedDays([1, 2, 3, 4, 5]);
+    } else if (preset === 'extended') {
+      setEnabled(true);
+      setStartHour(8);
+      setEndHour(22);
+      setAllowedDays([0, 1, 2, 3, 4, 5, 6]);
+    } else {
+      // 24/7 → desliga restrição
+      setEnabled(false);
+      setStartHour(0);
+      setEndHour(23);
+      setAllowedDays([0, 1, 2, 3, 4, 5, 6]);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-4">
@@ -122,25 +142,36 @@ export function SendingScheduleManager() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <CalendarDays className="h-5 w-5" />
-            Horários de Envio
-          </h3>
-          <p className="text-sm text-muted-foreground mt-1">
-            Defina os dias e horários permitidos para envio automático de mensagens.
-          </p>
-        </div>
+      <div>
+        <h3 className="text-base font-semibold flex items-center gap-2">
+          <CalendarDays className="h-4 w-4" />
+          Horários de Envio
+        </h3>
+        <p className="text-xs text-muted-foreground mt-1">
+          Defina os dias e horários permitidos para envio automático.
+        </p>
       </div>
 
       <Card>
         <CardContent className="p-4 space-y-4">
-          <div className="flex items-center justify-between">
+          {/* Atalhos rápidos */}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => applyPreset('business')}>
+              <Briefcase className="h-3 w-3 mr-1" /> Comercial
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => applyPreset('extended')}>
+              <Sun className="h-3 w-3 mr-1" /> Estendido
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => applyPreset('always')}>
+              <InfinityIcon className="h-3 w-3 mr-1" /> 24/7
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between pt-1">
             <div className="space-y-0.5">
-              <Label className="text-sm font-medium">Restringir horários de envio</Label>
+              <Label className="text-sm font-medium">Restringir horários</Label>
               <p className="text-xs text-muted-foreground">
-                Mensagens fora do horário serão enviadas no próximo horário permitido
+                Mensagens fora do horário ficam em fila
               </p>
             </div>
             <Switch checked={enabled} onCheckedChange={setEnabled} />
@@ -148,54 +179,59 @@ export function SendingScheduleManager() {
 
           {enabled && (
             <>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1 space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Início</Label>
-                  <Select value={startHour.toString()} onValueChange={v => setStartHour(Number(v))}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {HOURS.map(h => (
-                        <SelectItem key={h} value={h.toString()}>
-                          {h.toString().padStart(2, '0')}:00
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex-1 space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Fim</Label>
-                  <Select value={endHour.toString()} onValueChange={v => setEndHour(Number(v))}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {HOURS.map(h => (
-                        <SelectItem key={h} value={h.toString()}>
-                          {h.toString().padStart(2, '0')}:00
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              {/* Linha horizontal: Clock | Start até End */}
+              <div className="flex items-center gap-3">
+                <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Select value={startHour.toString()} onValueChange={v => setStartHour(Number(v))}>
+                  <SelectTrigger className="h-9 flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HOURS.map(h => (
+                      <SelectItem key={h} value={h.toString()}>
+                        {h.toString().padStart(2, '0')}:00
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-xs text-muted-foreground shrink-0">até</span>
+                <Select value={endHour.toString()} onValueChange={v => setEndHour(Number(v))}>
+                  <SelectTrigger className="h-9 flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HOURS.map(h => (
+                      <SelectItem key={h} value={h.toString()}>
+                        {h.toString().padStart(2, '0')}:00
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
+              {/* Day pills */}
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Dias permitidos</Label>
-                <div className="flex flex-wrap gap-2">
-                  {DAYS_OF_WEEK.map(day => (
-                    <label
-                      key={day.value}
-                      className="flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Checkbox
-                        checked={allowedDays.includes(day.value)}
-                        onCheckedChange={() => toggleDay(day.value)}
-                      />
-                      <span className="text-sm">{day.label}</span>
-                    </label>
-                  ))}
+                <div className="flex gap-1.5 flex-wrap">
+                  {DAYS_OF_WEEK.map(day => {
+                    const isActive = allowedDays.includes(day.value);
+                    return (
+                      <button
+                        key={day.value}
+                        type="button"
+                        onClick={() => toggleDay(day.value)}
+                        className={cn(
+                          "h-9 w-9 rounded-full text-xs font-medium border transition-colors",
+                          isActive
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background text-muted-foreground border-input hover:bg-accent hover:text-foreground"
+                        )}
+                        aria-pressed={isActive}
+                      >
+                        {day.short}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

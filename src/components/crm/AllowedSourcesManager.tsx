@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Filter, Save, Loader2 } from "lucide-react";
+import {
+  Filter, Save, Loader2,
+  Hand, Globe, Share2, Mail, Phone, Users,
+  Calendar, Megaphone, Facebook, MoreHorizontal, Tag,
+  type LucideIcon,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const LEAD_SOURCES = [
   { value: "manual", label: "Manual" },
@@ -22,6 +25,20 @@ const LEAD_SOURCES = [
   { value: "facebook_ads", label: "Facebook Ads" },
   { value: "other", label: "Outro" },
 ];
+
+const SOURCE_ICONS: Record<string, LucideIcon> = {
+  manual: Hand,
+  website: Globe,
+  social_media: Share2,
+  email: Mail,
+  phone: Phone,
+  referral: Users,
+  event: Calendar,
+  advertisement: Megaphone,
+  facebook_leads: Facebook,
+  facebook_ads: Facebook,
+  other: MoreHorizontal,
+};
 
 export function AllowedSourcesManager() {
   const { currentAgency } = useAgency();
@@ -103,68 +120,72 @@ export function AllowedSourcesManager() {
 
   return (
     <div className="space-y-3">
-      <div>
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Filter className="h-5 w-5" />
-          Origens Permitidas
-        </h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Selecione de quais origens os leads terão automação disparada.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            Origens Permitidas
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Clique para ativar/desativar cada origem.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggleAll}
+          className="text-xs text-primary hover:underline shrink-0 mt-1"
+        >
+          {allSelected ? "Desmarcar todas" : "Selecionar todas"}
+        </button>
       </div>
 
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <label className="flex items-center gap-2 cursor-pointer border-b pb-3">
-            <Checkbox
-              checked={allSelected}
-              onCheckedChange={toggleAll}
-            />
-            <span className="text-sm font-medium">
-              {allSelected ? "Desmarcar todas" : "Selecionar todas"}
-            </span>
-          </label>
-
-          <div className="grid grid-cols-2 gap-2">
-            {LEAD_SOURCES.map(source => (
-              <label
-                key={source.value}
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <Checkbox
-                  checked={selectedSources.includes(source.value)}
-                  onCheckedChange={() => toggleSource(source.value)}
-                />
-                <span className="text-sm">{source.label}</span>
-              </label>
-            ))}
-          </div>
-
-          {noneSelected && (
-            <div className="p-2.5 rounded-md bg-muted/50 border">
-              <p className="text-xs text-muted-foreground">
-                Nenhuma origem selecionada = todas as origens serão aceitas
-              </p>
-            </div>
-          )}
-
-          {hasChanges && (
-            <Button
-              size="sm"
-              onClick={() => saveMutation.mutate()}
-              disabled={saveMutation.isPending}
-              className="w-full sm:w-auto"
-            >
-              {saveMutation.isPending ? (
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-              ) : (
-                <Save className="mr-1 h-3 w-3" />
+      <div className="flex flex-wrap gap-2">
+        {LEAD_SOURCES.map(source => {
+          const Icon = SOURCE_ICONS[source.value] ?? Tag;
+          const isActive = selectedSources.includes(source.value);
+          return (
+            <button
+              key={source.value}
+              type="button"
+              onClick={() => toggleSource(source.value)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all",
+                isActive
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-background text-muted-foreground border-input hover:border-primary/40 hover:text-foreground"
               )}
-              Salvar Origens
-            </Button>
+              aria-pressed={isActive}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {source.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {noneSelected && (
+        <div className="p-2.5 rounded-md bg-muted/50 border">
+          <p className="text-xs text-muted-foreground">
+            Nenhuma origem selecionada = todas as origens serão aceitas
+          </p>
+        </div>
+      )}
+
+      {hasChanges && (
+        <Button
+          size="sm"
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending}
+          className="w-full sm:w-auto"
+        >
+          {saveMutation.isPending ? (
+            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+          ) : (
+            <Save className="mr-1 h-3 w-3" />
           )}
-        </CardContent>
-      </Card>
+          Salvar Origens
+        </Button>
+      )}
     </div>
   );
 }
