@@ -1,50 +1,68 @@
 
 
-# DnD Trello-style com Mouse + Touch sensors separados
+# Auto-close popup Facebook + fix ReferenceError (com lock anti-race)
 
-## Mudanças
+## 1. `src/components/traffic/FacebookConnectionDialog.tsx`
 
-### 1. `src/components/crm/LeadsKanban.tsx`
-Substituir import e bloco `useSensors`:
-```tsx
-import { ..., MouseSensor, TouchSensor } from '@dnd-kit/core';
+Substituir o bloco `setInterval` atual (linhas ~152-200) por polling com **lock `isChecking`** + verify_connection ativo:
 
-const sensors = useSensors(
-  useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
-  useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
-);
+```ts
+let isChecking = false;
+pollId = window.setInterval(async () => {
+  if (authCompleted || isChecking) return;
+
+  isChecking = true;
+  try {
+    const { data } = await supabase.functions.invoke('facebook-auth', {
+      body: { action: 'verify_connection' }
+    });
+    if (data?.connected) {
+      authCompleted = true;
+      window.clearInterval(pollId!);
+      window.removeEventListener('message', messageHandler);
+      if (popup && !popup.closed) popup.close();
+      setProgress(100);
+      toast({ title: 'Conectado com sucesso!', description: 'Sua conta do Facebook foi conectada.' });
+      onSuccess();
+      setIsConnecting(false);
+      return;
+    }
+  } catch (err) {
+    console.warn('Polling verify error:', err);
+  } finally {
+    isChecking = false;
+  }
+
+  if (popup?.closed && !authCompleted) {
+    window.clearInterval(pollId!);
+    window.removeEventListener('message', messageHandler);
+    setIsConnecting(false);
+    setProgress(0);
+  }
+}, 3000);
 ```
-Remover `PointerSensor` do import se não usado em outro lugar.
 
-### 2. `src/pages/Tasks.tsx`
-Mesma substituição (atualmente tem `PointerSensor` com `distance: 3, tolerance: 5`).
+- Mantém `messageHandler` como fast-path (postMessage sub-segundo).
+- Remove a lógica redundante de `verify_connection` que estava no branch `popup.closed` antigo.
 
-### 3. `src/components/ui/sortable-task-card.tsx`
-- Remover `<button GripVertical>` lateral e import `GripVertical`.
-- Mover `{...attributes} {...listeners}` do botão para o `<div>` raiz (que já tem `setNodeRef`).
-- Adicionar `cursor-grab active:cursor-grabbing` no wrapper.
-- `handleClick` no `TaskCard` filho continua chamando `onViewDetails` — `distance: 5` no mouse garante que clique simples não dispara drag.
+## 2. `supabase/functions/facebook-auth/index.ts`
 
-### 4. `src/components/ui/sortable-personal-task-card.tsx`
-Revisão apenas — listeners já estão na raiz, sem ícone Grip. Confirmar que botões internos têm `e.stopPropagation()`.
-
-### 5. `src/components/crm/SortableLeadCard.tsx`
-Sem alteração estrutural (já refatorado anteriormente). Beneficia automaticamente do novo sensor.
+Localizar o bloco GET do callback OAuth (após `.upsert()` em `facebook_connections`) e renomear `insertErr` → `upsertErr` para alinhar com o nome real do destructure e eliminar o `ReferenceError`.
 
 ## Guardrails
 
-| # | Garantia | Aplicação |
-|---|---|---|
-| 1 | Scroll mobile preservado | `TouchSensor` com `delay: 250ms` — dedo deslizando faz scroll; pousado >250ms inicia drag. |
-| 2 | Clique abre detalhes (desktop) | `MouseSensor` com `distance: 5` — clique estático nunca aciona drag. |
-| 3 | Botões internos não disparam drag | Manter `onPointerDown={(e) => e.stopPropagation()}` e `onClick stopPropagation` em DropdownMenu, WhatsApp, Reunião, MoreHorizontal. |
-| 4 | Sem regressão visual | `cursor-grab active:cursor-grabbing` em todos os cards arrastáveis. |
+| # | Garantia |
+|---|---|
+| 1 | **Lock `isChecking`** previne overlap de requests em rede lenta. |
+| 2 | Auto-close em ≤3s após token salvo (polling ativo). |
+| 3 | `postMessage` continua como fast-path (sub-segundo). |
+| 4 | Cancelamento manual preservado — sem toast de erro. |
+| 5 | `clearInterval` + `removeEventListener` em todos os caminhos de saída. |
+| 6 | Edge function não quebra com `ReferenceError`. |
 
 ## Ficheiros alterados
-- `src/components/crm/LeadsKanban.tsx` (sensors)
-- `src/pages/Tasks.tsx` (sensors)
-- `src/components/ui/sortable-task-card.tsx` (remove Grip + listeners na raiz)
-- `src/components/ui/sortable-personal-task-card.tsx` (revisão)
+- `src/components/traffic/FacebookConnectionDialog.tsx`
+- `supabase/functions/facebook-auth/index.ts`
 
-Sem migrations. Sem mudanças em queries ou edge functions.
+Sem migrations. Sem novas secrets.
 
