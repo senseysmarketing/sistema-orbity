@@ -30,12 +30,14 @@ import {
   Edit2,
   ExternalLink,
   Key,
+  MessageSquare,
   Phone,
   Plus,
   Sparkles,
   Trash2,
   Video,
 } from "lucide-react";
+import { ClientTimeline } from "@/components/clients/ClientTimeline";
 import { format, differenceInMonths, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
