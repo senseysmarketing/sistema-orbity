@@ -60,14 +60,11 @@ function SettingCard({
 export function CRMSettings() {
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl md:text-2xl font-bold">Configurações do CRM</h2>
-        <p className="text-sm text-muted-foreground">
-          Personalize seu pipeline de vendas e integrações
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Personalize seu pipeline de vendas e integrações
+      </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+      <div className="grid grid-cols-1 gap-4 items-stretch">
         <SettingCard
           icon={GitMerge}
           title="Status do Funil"
