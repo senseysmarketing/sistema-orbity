@@ -203,7 +203,6 @@ export default function Tasks() {
   const { types, getTypeName, getTypeShortName, getTypeIcon, isValidType } = useTaskTypes();
 
   const sensors = useSensors(
-  const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: { distance: 5 },
     }),
