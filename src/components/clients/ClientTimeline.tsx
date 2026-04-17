@@ -13,6 +13,33 @@ import { toast } from "sonner";
 import { MessageSquare, Send, Phone, Mail, Video, FileText, Lightbulb, AlertCircle, Trash2 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+
+function NoteContent({ content }: { content: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = content.length > 280 || content.split("\n").length > 6;
+
+  return (
+    <>
+      <div className={cn("relative", !expanded && isLong && "max-h-32 overflow-hidden")}>
+        <p className="text-sm whitespace-pre-wrap">{content}</p>
+        {!expanded && isLong && (
+          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+        )}
+      </div>
+      {isLong && (
+        <Button
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-xs mt-1"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? "Ver menos" : "Ver mais"}
+        </Button>
+      )}
+    </>
+  );
+}
 
 interface ClientTimelineProps {
   clientId: string;
