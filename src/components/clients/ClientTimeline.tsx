@@ -190,7 +190,7 @@ export function ClientTimeline({ clientId }: ClientTimelineProps) {
           </CardContent>
         </Card>
       ) : (
-        <div className="relative">
+        <div className="relative max-h-[600px] overflow-y-auto pr-2">
           {/* Timeline line */}
           <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
 
@@ -202,7 +202,6 @@ export function ClientTimeline({ clientId }: ClientTimelineProps) {
 
               return (
                 <div key={note.id} className="relative pl-10 group">
-                  {/* Timeline dot */}
                   <div
                     className={`absolute left-2 top-4 h-5 w-5 rounded-full ${typeData.color} flex items-center justify-center ring-4 ring-background`}
                   >
@@ -242,7 +241,7 @@ export function ClientTimeline({ clientId }: ClientTimelineProps) {
                           )}
                         </div>
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                      <NoteContent content={note.content} />
                       <p className="text-xs text-muted-foreground mt-2">
                         {format(new Date(note.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                       </p>
