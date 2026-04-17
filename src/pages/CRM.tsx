@@ -115,6 +115,8 @@ export default function CRM() {
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
   const [showLeadForm, setShowLeadForm] = useState(false);
+  const [crmSettingsOpen, setCrmSettingsOpen] = useState(false);
+  const [crmSettingsView, setCrmSettingsView] = useState<CRMSettingsView>("hub");
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [meetingDialogOpen, setMeetingDialogOpen] = useState(false);
