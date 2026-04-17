@@ -12,7 +12,7 @@ import { LeadsList } from "@/components/crm/LeadsList";
 import { LeadForm } from "@/components/crm/LeadForm";
 import { LeadDetailsDialog } from "@/components/crm/LeadDetailsDialog";
 import { CRMDashboard } from "@/components/crm/CRMDashboard";
-import { CRMSettings } from "@/components/crm/CRMSettings";
+import { CRMSettings, type CRMSettingsView } from "@/components/crm/CRMSettings";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
