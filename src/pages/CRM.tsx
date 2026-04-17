@@ -98,7 +98,16 @@ export default function CRM() {
   const { refresh: refreshStatuses, mapDatabaseStatusToDisplay, getStatusConfig } = useLeadStatuses();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    // Guardrail: 'settings' was migrated to a Side Sheet — never restore it as a tab.
+    try {
+      const url = new URL(window.location.href);
+      const raw = url.searchParams.get('tab') ?? localStorage.getItem('crm:activeTab') ?? 'dashboard';
+      return raw === 'settings' ? 'dashboard' : raw;
+    } catch {
+      return 'dashboard';
+    }
+  });
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -383,40 +392,60 @@ export default function CRM() {
             Gestão comercial com funil de vendas e métricas de investimento
           </p>
         </div>
-        <Dialog open={showLeadForm} onOpenChange={(open) => {
-          setShowLeadForm(open);
-          if (!open) setSelectedLead(null);
-        }}>
-          <DialogTrigger asChild>
-            <Button variant="action" onClick={() => setSelectedLead(null)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Lead
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {selectedLead ? 'Editar Lead' : 'Novo Lead'}
-              </DialogTitle>
-              <DialogDescription>
-                Preencha as informações do lead
-              </DialogDescription>
-            </DialogHeader>
-            <LeadForm 
-              lead={selectedLead} 
-              onSave={handleLeadSave}
-              onCancel={() => {
-                setShowLeadForm(false);
-                setSelectedLead(null);
-              }}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" title="Configurações do CRM">
+                <Settings className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-full sm:max-w-[800px] md:max-w-[1000px] overflow-y-auto border-l">
+              <SheetHeader className="mb-6">
+                <SheetTitle className="text-2xl font-bold">Configurações do CRM</SheetTitle>
+              </SheetHeader>
+              <CRMSettings />
+            </SheetContent>
+          </Sheet>
+
+          <Dialog open={showLeadForm} onOpenChange={(open) => {
+            setShowLeadForm(open);
+            if (!open) setSelectedLead(null);
+          }}>
+            <DialogTrigger asChild>
+              <Button variant="action" onClick={() => setSelectedLead(null)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Novo Lead
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>
+                  {selectedLead ? 'Editar Lead' : 'Novo Lead'}
+                </DialogTitle>
+                <DialogDescription>
+                  Preencha as informações do lead
+                </DialogDescription>
+              </DialogHeader>
+              <LeadForm 
+                lead={selectedLead} 
+                onSave={handleLeadSave}
+                onCancel={() => {
+                  setShowLeadForm(false);
+                  setSelectedLead(null);
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {/* Main Tabs - 3 tabs: Dashboard, Pipeline, Settings */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+      {/* Main Tabs - 2 tabs: Dashboard, Pipeline (Settings moved to header Sheet) */}
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v === 'settings' ? 'dashboard' : v)}
+        className="space-y-4"
+      >
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="dashboard" className="flex-shrink-0 gap-1 md:gap-2">
             <TrendingUp className="h-4 w-4" />
             <span className="hidden sm:inline">Dashboard</span>
@@ -424,10 +453,6 @@ export default function CRM() {
           <TabsTrigger value="pipeline" className="flex-shrink-0 gap-1 md:gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Pipeline</span>
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex-shrink-0 gap-1 md:gap-2">
-            <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Configurações</span>
           </TabsTrigger>
         </TabsList>
 
@@ -588,10 +613,7 @@ export default function CRM() {
           </Card>
         </TabsContent>
 
-        {/* Settings Tab */}
-        <TabsContent value="settings" forceMount className={cn("space-y-4", activeTab !== "settings" && "hidden")}>
-          <CRMSettings />
-        </TabsContent>
+
       </Tabs>
 
       {/* Lead Details Dialog */}
