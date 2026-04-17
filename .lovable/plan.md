@@ -1,47 +1,67 @@
 
 
-# Sheet com largura dinâmica por view
+# Fix drag-and-drop dos cards de Lead
 
 ## Diagnóstico
 
-O `<SheetContent>` em `src/pages/CRM.tsx` (linha ~402) usa a largura padrão do componente sheet — que é `sm:max-w-sm` (~384px). Para hub/status/scoring isso é confortável, mas para `whatsapp` (que tem flow + editor + live preview lado a lado) e `sources` (Meta + Webhooks) fica espremido.
+Olhando `src/components/crm/SortableLeadCard.tsx`:
 
-A largura é controlada **no `SheetContent` pai** (`CRM.tsx`), não no `CRMSettings`. Mas o `CRMSettings` é quem sabe qual view está ativa. Solução: o `CRMSettings` expõe a view atual via callback, e o `CRM.tsx` aplica a classe de largura correspondente.
+1. O `useSortable` do dnd-kit está aplicado no `<div>` wrapper, mas os `{...listeners}` e `{...attributes}` estão **apenas no botão `GripVertical`** (linhas ~178-186).
+2. O `Card` interno tem `hover:scale-[1.02]` e `hover:brightness-110` — quando o cursor entra na zona do botão de arrastar (canto direito), o hover do Card é mantido, mas o `group-hover` faz a barra de botões (WhatsApp/Reunião) **expandir**, empurrando layout e fazendo o handle "fugir" do cursor.
+3. O `onClick` do Card chama `onView(lead)` — por isso não dá para simplesmente colocar listeners no Card inteiro sem conflito (qualquer clique abriria o lead).
 
-## Solução: largura responsiva por view
+## Solução: Card inteiro arrastável + ativação por delay
 
-### Mapa de larguras
-| View | Largura | Justificativa |
-|---|---|---|
-| `hub` | `sm:max-w-md` (~448px) | Grid de cards, leitura confortável |
-| `status` | `sm:max-w-lg` (~512px) | Lista de etapas |
-| `scoring` | `sm:max-w-2xl` (~672px) | Tabela de regras com colunas |
-| `whatsapp` | `sm:max-w-5xl` (~1024px) | Flow + Editor + Live Preview |
-| `sources` | `sm:max-w-3xl` (~768px) | Forms Meta + Webhooks |
-| `investments` | `sm:max-w-2xl` (~672px) | Tabela de investimentos |
+Usar o **`activationConstraint`** do dnd-kit para distinguir clique de arrasto:
 
-Transição suave com `transition-[max-width] duration-300`.
+- **PointerSensor com `activationConstraint: { delay: 200, tolerance: 8 }`** → segurar 200ms inicia drag; clique rápido abre o lead.
+- Mover `{...listeners} {...attributes}` para o **Card inteiro** (não mais o botão lateral).
+- **Remover** o botão `GripVertical` lateral (não é mais necessário).
+- Manter `cursor-grab active:cursor-grabbing` no Card.
+- O `handleClick` continua chamando `onView` — dnd-kit não dispara click se o pointer ultrapassar a tolerância/delay.
 
-### Mudanças
+### Onde está o sensor?
 
-**1. `src/components/crm/CRMSettings.tsx`**
-- Adicionar prop opcional `onViewChange?: (view: View) => void`.
-- Disparar callback no `useEffect([view])` (já existente) e no `setView` inicial.
+Buscar no `LeadKanban` (pai que monta `<DndContext>`). Provavelmente em `src/components/crm/LeadKanban.tsx` ou similar — preciso confirmar onde os sensors são configurados e ajustar o `activationConstraint`. Se já existir, troco. Se for o default (`PointerSensor` sem constraint), adiciono.
 
-**2. `src/pages/CRM.tsx`**
-- Adicionar `useState<View>('hub')` para rastrear a view atual do CRMSettings.
-- Mapa `viewWidthMap` com as classes acima.
-- Aplicar a classe ao `<SheetContent className={cn("overflow-y-auto transition-[max-width] duration-300", viewWidthMap[crmSettingsView])}>`.
-- Resetar para `'hub'` quando o sheet fechar (`onOpenChange`).
+### Bônus — corrigir o "encolher no hover"
 
-### Guardrails
-- **Sem nested sheets**: continuamos com 1 único Sheet pai.
-- **Mobile**: o `w-3/4` base do sheet (definido em `sheet.tsx`) garante que em telas pequenas fica fluido — `sm:max-w-*` só atua em ≥640px.
-- **Sem flicker**: `transition-[max-width]` faz o redimensionamento ser suave ao navegar entre views.
+O `hover:scale-[1.02]` no Card combinado com `group-hover` expandindo botões cria movimento visual estranho durante o drag attempt. Vou:
+- **Manter** `hover:shadow-lg` e `hover:brightness-110` (feedback visual sutil).
+- **Remover** `hover:scale-[1.02]` do Card (era a causa do "encolher/expandir" que dificultava mirar no handle).
+- Os botões WhatsApp/Reunião continuam aparecendo no `group-hover` via `grid-rows` (já está bom).
+
+## Mudanças
+
+### 1. `src/components/crm/SortableLeadCard.tsx`
+- Mover `{...attributes} {...listeners}` do `<button GripVertical>` para o `<Card>`.
+- Remover o `<button>` do GripVertical e o ícone do import.
+- Remover `hover:scale-[1.02]` do Card.
+- Adicionar `cursor-grab active:cursor-grabbing` ao Card.
+- O DropdownMenu trigger e os botões de ação (WhatsApp/Reunião) já têm `e.stopPropagation()` / `onPointerDown stopPropagation` — isso continua funcionando para impedir que cliques neles iniciem drag.
+
+### 2. Localizar e ajustar sensors do `<DndContext>` (provavelmente `LeadKanban.tsx`)
+```tsx
+const sensors = useSensors(
+  useSensor(PointerSensor, {
+    activationConstraint: { delay: 200, tolerance: 8 },
+  })
+);
+```
+- `delay: 200ms` → segurar para arrastar.
+- `tolerance: 8px` → cancela delay se mover muito antes (permite scroll natural).
+
+## Resultado
+
+- Card inteiro arrastável segurando 200ms.
+- Clique rápido abre detalhes do lead (sem regressão).
+- Handle lateral (`GripVertical`) removido — mais espaço útil.
+- Sem mais "encolhe ao passar o mouse" — bug do scale eliminado.
+- Botões WhatsApp/Reunião continuam aparecendo no hover sem interferir no drag.
 
 ## Ficheiros alterados
-- `src/components/crm/CRMSettings.tsx` (+1 prop, +1 chamada de callback)
-- `src/pages/CRM.tsx` (+1 state, +1 mapa, +1 classe dinâmica no SheetContent)
+- `src/components/crm/SortableLeadCard.tsx`
+- `src/components/crm/LeadKanban.tsx` (ou onde estiver o `DndContext`/`useSensors`) — apenas ajuste do `activationConstraint`.
 
-Sem migration. Sem mudanças em queries/edges/outros componentes.
+Sem migrations. Sem mudanças em queries.
 
