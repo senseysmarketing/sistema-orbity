@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, MouseSensor, TouchSensor, useSensor, useSensors, closestCenter } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -105,12 +105,12 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onSched
   );
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        delay: 200,
-        tolerance: 8,
-      },
-    })
+    useSensor(MouseSensor, {
+      activationConstraint: { distance: 5 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 5 },
+    }),
   );
 
   const getPriorityColor = (priority: string) => {

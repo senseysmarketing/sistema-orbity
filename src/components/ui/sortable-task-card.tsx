@@ -1,7 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { TaskCard } from './task-card';
-import { GripVertical } from "lucide-react";
 
 interface Task {
   id: string;
@@ -65,8 +64,7 @@ export function SortableTaskCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleClick = (e: React.MouseEvent) => {
-    // Só chama onViewDetails se não estiver arrastando
+  const handleClick = () => {
     if (!isDragging) {
       onViewDetails(task);
     }
@@ -77,17 +75,9 @@ export function SortableTaskCard({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className="relative"
+      {...listeners}
+      className="relative cursor-grab active:cursor-grabbing"
     >
-      <button
-        type="button"
-        aria-label="Arrastar"
-        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded p-1 text-white/50 hover:text-white/80 cursor-grab active:cursor-grabbing"
-        {...listeners}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
       <TaskCard
         task={task}
         getPriorityColor={getPriorityColor}
