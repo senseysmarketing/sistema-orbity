@@ -14,9 +14,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import {
   MessageSquare, Plus, Trash2, Save, Clock, Loader2, Variable,
-  Pause, Shield, Send, CheckCheck, Smartphone,
+  Pause, Shield, Send, CheckCheck, Smartphone, Settings,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
@@ -320,14 +321,7 @@ export function WhatsAppTemplateManager() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SendingScheduleManager />
-        <AllowedSourcesManager />
-      </div>
-
-      <Separator />
-
+    <div className="space-y-8">
       <div className="space-y-3">
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -384,6 +378,22 @@ export function WhatsAppTemplateManager() {
           />
         </TabsContent>
       </Tabs>
+
+      <Accordion type="single" collapsible className="border rounded-lg">
+        <AccordionItem value="global-config" className="border-0">
+          <AccordionTrigger className="px-4 hover:no-underline">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Settings className="h-4 w-4" />
+              Configurações Globais de Disparo
+            </div>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4 space-y-6">
+            <SendingScheduleManager />
+            <Separator />
+            <AllowedSourcesManager />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 }
