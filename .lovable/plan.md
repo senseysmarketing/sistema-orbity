@@ -1,74 +1,23 @@
 
 
-# Implementação: Mover Settings para Side Sheet + Guardrail de estado residual
-
-## Investigação rápida do estado `activeTab`
-
-Preciso confirmar como `activeTab` é inicializado em `src/pages/CRM.tsx` antes de aplicar o guardrail. Vou verificar:
-- Se há leitura de `searchParams` (`?tab=settings`)
-- Se há `localStorage` para persistência
-- Default atual (`'dashboard'`)
+# Ajustes na Sheet de Configurações do CRM
 
 ## Mudanças
 
-### 1. Imports (`src/pages/CRM.tsx`)
-- Adicionar `Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger` de `@/components/ui/sheet`
-- `Settings`, `Plus` já importados
+### 1. `src/pages/CRM.tsx` — Sheet mais estreito
+- Trocar `className="w-full sm:max-w-[800px] md:max-w-[1000px] overflow-y-auto border-l"` por `className="w-full sm:max-w-md overflow-y-auto border-l"` (largura tipo sidebar, ~28rem).
 
-### 2. Guardrail de estado residual
-Imediatamente após ler o valor inicial de `activeTab` (de `searchParams`/`localStorage`/default), aplicar:
+### 2. `src/components/crm/CRMSettings.tsx` — Layout vertical + remover título duplicado
+- Remover o bloco `<div>` com `<h2>Configurações do CRM</h2>` + descrição (linhas ~63-68). O `SheetHeader` no pai já mostra "Configurações do CRM".
+- **Opção A (escolhida)**: manter a descrição "Personalize seu pipeline de vendas e integrações" como subtítulo discreto antes do grid, pois dá contexto. Remover apenas o `<h2>`.
+- Trocar grid `grid-cols-1 md:grid-cols-2 lg:grid-cols-3` por `grid-cols-1` (cards empilhados verticalmente).
 
-```ts
-const rawTab = searchParams.get('tab') ?? localStorage.getItem('crm:activeTab') ?? 'dashboard';
-const initialTab = rawTab === 'settings' ? 'dashboard' : rawTab;
-const [activeTab, setActiveTab] = useState(initialTab);
-```
+## Resultado
+- Sheet ocupa ~448px (sm:max-w-md), liberando o resto da tela.
+- Cards empilhados verticalmente, um por linha, mantendo `h-full` irrelevante (já que cada card define sua altura natural).
+- Título "Configurações do CRM" aparece apenas uma vez (no `SheetHeader`).
 
-Também sanear em `useEffect` se `setActiveTab('settings')` for chamado externamente (defensivo): no `onValueChange` do `<Tabs>`, ignorar `'settings'`.
-
-Se a leitura atual for apenas `useState('dashboard')` sem persistência, o guardrail é trivial mas mantemos a checagem para futura compatibilidade.
-
-### 3. Tabs (linhas ~417-431)
-- `grid-cols-3` → `grid-cols-2`
-- Remover `<TabsTrigger value="settings">`
-
-### 4. Conteúdo (linhas ~590-593)
-- Remover bloco `<TabsContent value="settings">` inteiro
-
-### 5. Header — botão de engrenagem
-Envolver "Novo Lead" + Settings Sheet em `<div className="flex gap-2">`:
-
-```tsx
-<div className="flex gap-2">
-  <Sheet>
-    <SheetTrigger asChild>
-      <Button variant="outline" size="icon" title="Configurações do CRM">
-        <Settings className="h-4 w-4 text-muted-foreground" />
-      </Button>
-    </SheetTrigger>
-    <SheetContent side="right" className="w-full sm:max-w-[800px] md:max-w-[1000px] overflow-y-auto border-l">
-      <SheetHeader className="mb-6">
-        <SheetTitle className="text-2xl font-bold">Configurações do CRM</SheetTitle>
-      </SheetHeader>
-      <CRMSettings />
-    </SheetContent>
-  </Sheet>
-  {/* Dialog Novo Lead existente */}
-</div>
-```
-
-## Guardrails
-
-| # | Garantia | Como |
-|---|----------|------|
-| 1 | Sem ecrã em branco | `initialTab` reescreve `'settings'` → `'dashboard'` |
-| 2 | Defensivo no handler | `onValueChange` ignora valor `'settings'` |
-| 3 | Aninhamento Sheet ok | Radix Portals isolam z-index |
-| 4 | Sem perda de feature | Settings acessíveis via engrenagem |
-| 5 | Mobile | Sheet `w-full` em telas pequenas |
-
-## Ficheiro alterado
-- `src/pages/CRM.tsx` (5 edições pontuais: imports, init state guardrail, tabs grid, remove TabsTrigger, remove TabsContent, header com Sheet)
-
-Sem migration. Sem mudança em `CRMSettings.tsx`.
+## Ficheiros alterados
+- `src/pages/CRM.tsx` (1 linha — className do SheetContent)
+- `src/components/crm/CRMSettings.tsx` (remover h2 + ajustar grid)
 
