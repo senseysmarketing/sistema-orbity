@@ -491,13 +491,13 @@ export default function ClientDetail() {
 
           {/* Health Score */}
           <div className="bg-white border rounded-xl shadow-sm p-5 flex flex-col items-center">
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3">Saúde do Cliente</h3>
             <ClientHealthScore
               client={client}
               tasks={tasks}
               meetings={meetings}
               npsScore={npsScore}
               variant="circle"
+              showHeader
             />
             <div className="grid grid-cols-3 gap-4 mt-4 w-full text-center">
               <div>
