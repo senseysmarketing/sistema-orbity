@@ -163,7 +163,7 @@ export function SendingScheduleManager() {
               <Sun className="h-3 w-3 mr-1" /> Estendido
             </Button>
             <Button variant="outline" size="sm" onClick={() => applyPreset('always')}>
-              <Infinity className="h-3 w-3 mr-1" /> 24/7
+              <InfinityIcon className="h-3 w-3 mr-1" /> 24/7
             </Button>
           </div>
 
