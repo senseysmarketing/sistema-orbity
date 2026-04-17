@@ -10,7 +10,12 @@ import { MetaIntegrationConfig } from "./MetaIntegrationConfig";
 import { WebhooksManager } from "./WebhooksManager";
 import { ManualInvestmentManager } from "./ManualInvestmentManager";
 
-type View = "hub" | "status" | "scoring" | "whatsapp" | "sources" | "investments";
+export type CRMSettingsView = "hub" | "status" | "scoring" | "whatsapp" | "sources" | "investments";
+type View = CRMSettingsView;
+
+interface CRMSettingsProps {
+  onViewChange?: (view: CRMSettingsView) => void;
+}
 
 interface HubCardProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -34,16 +39,17 @@ function HubCard({ icon: Icon, title, description, onClick }: HubCardProps) {
   );
 }
 
-export function CRMSettings() {
+export function CRMSettings({ onViewChange }: CRMSettingsProps = {}) {
   const [view, setView] = useState<View>("hub");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Guardrail #2: reset scroll on view change
+  // Guardrail #2: reset scroll on view change + notify parent
   useEffect(() => {
+    onViewChange?.(view);
     containerRef.current?.scrollTo({ top: 0 });
     const dialog = containerRef.current?.closest('[role="dialog"]') as HTMLElement | null;
     dialog?.scrollTo({ top: 0 });
-  }, [view]);
+  }, [view, onViewChange]);
 
   if (view === "hub") {
     return (

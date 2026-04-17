@@ -12,7 +12,7 @@ import { LeadsList } from "@/components/crm/LeadsList";
 import { LeadForm } from "@/components/crm/LeadForm";
 import { LeadDetailsDialog } from "@/components/crm/LeadDetailsDialog";
 import { CRMDashboard } from "@/components/crm/CRMDashboard";
-import { CRMSettings } from "@/components/crm/CRMSettings";
+import { CRMSettings, type CRMSettingsView } from "@/components/crm/CRMSettings";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -115,6 +115,8 @@ export default function CRM() {
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
   const [showLeadForm, setShowLeadForm] = useState(false);
+  const [crmSettingsOpen, setCrmSettingsOpen] = useState(false);
+  const [crmSettingsView, setCrmSettingsView] = useState<CRMSettingsView>("hub");
   const [showLeadDetails, setShowLeadDetails] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [meetingDialogOpen, setMeetingDialogOpen] = useState(false);
@@ -393,17 +395,35 @@ export default function CRM() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Sheet>
+          <Sheet
+            open={crmSettingsOpen}
+            onOpenChange={(open) => {
+              setCrmSettingsOpen(open);
+              if (!open) setCrmSettingsView("hub");
+            }}
+          >
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" title="Configurações do CRM">
                 <Settings className="h-4 w-4 text-muted-foreground" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto border-l">
+            <SheetContent
+              side="right"
+              className={cn(
+                "w-full overflow-y-auto border-l transition-[max-width] duration-300",
+                {
+                  "sm:max-w-md": crmSettingsView === "hub",
+                  "sm:max-w-lg": crmSettingsView === "status",
+                  "sm:max-w-2xl": crmSettingsView === "scoring" || crmSettingsView === "investments",
+                  "sm:max-w-5xl": crmSettingsView === "whatsapp",
+                  "sm:max-w-3xl": crmSettingsView === "sources",
+                }
+              )}
+            >
               <SheetHeader className="mb-6">
                 <SheetTitle className="text-2xl font-bold">Configurações do CRM</SheetTitle>
               </SheetHeader>
-              <CRMSettings />
+              <CRMSettings onViewChange={setCrmSettingsView} />
             </SheetContent>
           </Sheet>
 
