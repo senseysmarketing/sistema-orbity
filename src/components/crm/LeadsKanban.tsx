@@ -107,8 +107,8 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onSched
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 3,
-        tolerance: 5,
+        delay: 200,
+        tolerance: 8,
       },
     })
   );
