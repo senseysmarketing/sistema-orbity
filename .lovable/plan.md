@@ -1,50 +1,56 @@
 
 
-# Limitar altura de notas + scroll vertical na timeline
+# Implementação Drill-down `CRMSettings` — 2 Guardrails
 
-## Mudanças em `src/components/clients/ClientTimeline.tsx`
+## Mudanças em `src/components/crm/CRMSettings.tsx`
 
-### 1. Notas longas: "Ver mais / Ver menos"
-- Criar componente interno `NoteContent` que recebe `content`.
-- Estado local `expanded` (default `false`).
-- Se `content.length > 280` (ou `> 6` quebras de linha): renderizar com `max-h-32 overflow-hidden` + gradiente de fade no fim, mais botão `Ver mais`.
-- Quando expandido: mostrar tudo + botão `Ver menos`.
-- Botão estilo `variant="link" size="sm"` discreto.
-
+### Estrutura
 ```tsx
-const LIMIT = 280;
-const isLong = content.length > LIMIT || content.split('\n').length > 6;
-const [expanded, setExpanded] = useState(false);
+type View = 'hub' | 'status' | 'scoring' | 'whatsapp' | 'sources' | 'investments';
+const [view, setView] = useState<View>('hub');
+const containerRef = useRef<HTMLDivElement>(null);
 
-<div className={cn("relative", !expanded && isLong && "max-h-32 overflow-hidden")}>
-  <p className="text-sm whitespace-pre-wrap">{content}</p>
-  {!expanded && isLong && (
-    <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent" />
-  )}
-</div>
-{isLong && (
-  <Button variant="link" size="sm" className="h-auto p-0 text-xs mt-1"
-    onClick={() => setExpanded(!expanded)}>
-    {expanded ? "Ver menos" : "Ver mais"}
-  </Button>
-)}
+// Guardrail #2: reset scroll ao trocar view
+useEffect(() => {
+  containerRef.current?.scrollTo({ top: 0 });
+  // fallback: subir o sheet pai também
+  containerRef.current?.closest('[role="dialog"]')?.scrollTo({ top: 0 });
+}, [view]);
 ```
 
-### 2. Scroll vertical na timeline
-- Envolver a lista de notas (o `<div className="relative">` que contém a linha + os cards) num container com `max-h-[600px] overflow-y-auto pr-2`.
-- O formulário de adicionar nota (Card no topo) **fica fora** do scroll para sempre estar acessível.
-- Vazio state também fora do scroll.
+### Hub view (`view === 'hub'`)
+Grid `grid-cols-1 gap-4` com 5 cards clicáveis (mesmos ícones/títulos/descrições atuais). Cada card: `onClick={() => setView('xxx')}`.
 
-### 3. Ajuste menor
-- Adicionar import `cn` de `@/lib/utils`.
+### Sub-view (`view !== 'hub'`)
+```tsx
+<div ref={containerRef}>
+  <Button variant="ghost" onClick={() => setView('hub')}
+    className="mb-6 -ml-2 text-muted-foreground hover:text-foreground">
+    <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+  </Button>
+  {/* ✅ Guardrail #1: SEM título/descrição extras — componente filho controla a sua tipografia */}
+  {view === 'status' && <CustomStatusManager />}
+  {view === 'scoring' && <LeadScoringConfig />}
+  {view === 'whatsapp' && <WhatsAppTemplateManager />}
+  {view === 'sources' && (<><MetaIntegrationConfig /><Separator className="my-6" /><WebhooksManager /></>)}
+  {view === 'investments' && <ManualInvestmentManager />}
+</div>
+```
 
-## Resultado
-- Notas longas mostram preview de ~5 linhas com gradiente + "Ver mais".
-- Lista da timeline tem altura máxima de 600px com scroll interno.
-- Formulário de criação sempre visível no topo.
+### Imports
+- Remover: `Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger`
+- Adicionar: `useState, useRef, useEffect, Button, ArrowLeft`
+- Manter: `Card, CardHeader, CardTitle, CardDescription, Separator` + ícones existentes + 5 managers
+
+## Guardrails
+
+| # | Garantia | Aplicação |
+|---|---|---|
+| 1 | Sem títulos duplicados | Sub-view renderiza apenas `<Button Voltar>` + filho. Nenhum `<h3>` extra. |
+| 2 | Reset de scroll | `useEffect([view])` rola `containerRef` e o `[role="dialog"]` pai para o topo. |
 
 ## Ficheiro alterado
-- `src/components/clients/ClientTimeline.tsx` (1 import + componente `NoteContent` + wrapper de scroll)
+- `src/components/crm/CRMSettings.tsx` (refatoração completa)
 
-Sem migration. Sem mudanças em queries.
+Sem migrations. Sem mudanças em queries/edges/outros componentes.
 
