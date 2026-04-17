@@ -110,7 +110,7 @@ serve(async (req) => {
                   ignoreDuplicates: false 
                 });
               if (!upsertErr) saved = true;
-              else console.warn('Error saving connection during callback:', insertErr);
+              else console.warn('Error saving connection during callback:', upsertErr);
             }
           }
         } else {
