@@ -399,7 +399,7 @@ export default function CRM() {
                 <Settings className="h-4 w-4 text-muted-foreground" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-full sm:max-w-[800px] md:max-w-[1000px] overflow-y-auto border-l">
+            <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto border-l">
               <SheetHeader className="mb-6">
                 <SheetTitle className="text-2xl font-bold">Configurações do CRM</SheetTitle>
               </SheetHeader>
