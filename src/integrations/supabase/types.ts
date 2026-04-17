@@ -1651,6 +1651,7 @@ export type Database = {
           due_date: number | null
           email: string | null
           has_loyalty: boolean
+          health_score_rules: Json | null
           id: string
           monthly_value: number | null
           name: string
@@ -1689,6 +1690,7 @@ export type Database = {
           due_date?: number | null
           email?: string | null
           has_loyalty?: boolean
+          health_score_rules?: Json | null
           id?: string
           monthly_value?: number | null
           name: string
@@ -1727,6 +1729,7 @@ export type Database = {
           due_date?: number | null
           email?: string | null
           has_loyalty?: boolean
+          health_score_rules?: Json | null
           id?: string
           monthly_value?: number | null
           name?: string
