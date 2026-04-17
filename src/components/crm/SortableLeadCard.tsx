@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { 
   MoreHorizontal, Edit, Trash2, Phone, Mail, Building, Calendar, 
-  DollarSign, Clock, Target, AlertTriangle, GripVertical, 
+  DollarSign, Clock, Target, AlertTriangle,
   MessageCircle
 } from "lucide-react";
 // Calendar already imported above for Reunião button
