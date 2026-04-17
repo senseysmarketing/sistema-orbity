@@ -13,6 +13,33 @@ import { toast } from "sonner";
 import { MessageSquare, Send, Phone, Mail, Video, FileText, Lightbulb, AlertCircle, Trash2 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+
+function NoteContent({ content }: { content: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = content.length > 280 || content.split("\n").length > 6;
+
+  return (
+    <>
+      <div className={cn("relative", !expanded && isLong && "max-h-32 overflow-hidden")}>
+        <p className="text-sm whitespace-pre-wrap">{content}</p>
+        {!expanded && isLong && (
+          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+        )}
+      </div>
+      {isLong && (
+        <Button
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-xs mt-1"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? "Ver menos" : "Ver mais"}
+        </Button>
+      )}
+    </>
+  );
+}
 
 interface ClientTimelineProps {
   clientId: string;
@@ -163,7 +190,7 @@ export function ClientTimeline({ clientId }: ClientTimelineProps) {
           </CardContent>
         </Card>
       ) : (
-        <div className="relative">
+        <div className="relative max-h-[600px] overflow-y-auto pr-2">
           {/* Timeline line */}
           <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
 
@@ -175,7 +202,6 @@ export function ClientTimeline({ clientId }: ClientTimelineProps) {
 
               return (
                 <div key={note.id} className="relative pl-10 group">
-                  {/* Timeline dot */}
                   <div
                     className={`absolute left-2 top-4 h-5 w-5 rounded-full ${typeData.color} flex items-center justify-center ring-4 ring-background`}
                   >
@@ -215,7 +241,7 @@ export function ClientTimeline({ clientId }: ClientTimelineProps) {
                           )}
                         </div>
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                      <NoteContent content={note.content} />
                       <p className="text-xs text-muted-foreground mt-2">
                         {format(new Date(note.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                       </p>
