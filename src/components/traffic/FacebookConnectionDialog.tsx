@@ -147,53 +147,45 @@ export function FacebookConnectionDialog({ onSuccess, onClose }: FacebookConnect
       popup = window.open(authUrl, 'fb_oauth', 'width=600,height=700');
       if (!popup) throw new Error('Não foi possível abrir a janela de autenticação');
 
-      // Detect user closing the popup before completion
+      // Active polling with lock to prevent overlapping requests
+      let isChecking = false;
       pollId = window.setInterval(async () => {
-        if (!popup) return;
-        if (popup.closed) {
-          if (pollId) window.clearInterval(pollId);
-          pollId = undefined;
+        if (authCompleted || isChecking) return;
 
-          // If we already handled auth success, just return.
-          if (authCompleted) {
-            console.log('Popup closed after completion');
-            return; // Do nothing, flow already finished
-          }
-
-          // Try to verify on the server if the connection was saved
-          try {
-            console.log('Popup closed before message. Verifying connection on server...');
-            setProgress(85);
-            const { data: verifyData, error: verifyError } = await supabase.functions.invoke('facebook-auth', {
-              body: { action: 'verify_connection' }
-            });
-
-            if (verifyError) {
-              console.warn('Verify connection error:', verifyError);
-            }
-
-            if (verifyData?.connected) {
-              console.log('Connection verified on server after popup close.');
-              authCompleted = true;
-              setProgress(100);
-              toast({
-                title: 'Conectado com sucesso!',
-                description: 'Sua conta do Facebook foi conectada.',
-              });
-              onSuccess();
-            } else {
-              console.log('Connection not verified; keeping dialog open for retry.');
-              // Do not show cancellation warning as requested
-            }
-          } catch (err) {
-            console.warn('Error verifying connection:', err);
-          } finally {
-            setIsConnecting(false);
-            setProgress(0);
+        isChecking = true;
+        try {
+          const { data } = await supabase.functions.invoke('facebook-auth', {
+            body: { action: 'verify_connection' }
+          });
+          if (data?.connected) {
+            authCompleted = true;
+            if (pollId) window.clearInterval(pollId);
             window.removeEventListener('message', messageHandler);
+            if (popup && !popup.closed) popup.close();
+            setProgress(100);
+            toast({
+              title: 'Conectado com sucesso!',
+              description: 'Sua conta do Facebook foi conectada.',
+            });
+            onSuccess();
+            setIsConnecting(false);
+            return;
           }
+        } catch (err) {
+          console.warn('Polling verify error:', err);
+        } finally {
+          isChecking = false;
         }
-      }, 500);
+
+        // Detect manual cancellation (popup closed without success)
+        if (popup?.closed && !authCompleted) {
+          if (pollId) window.clearInterval(pollId);
+          window.removeEventListener('message', messageHandler);
+          console.log('Popup fechado sem completar; mantém dialog para retry.');
+          setIsConnecting(false);
+          setProgress(0);
+        }
+      }, 3000);
     } catch (e: any) {
       console.error('Erro ao conectar Facebook:', e);
       setError(e.message || 'Erro ao iniciar autenticação com o Facebook');
