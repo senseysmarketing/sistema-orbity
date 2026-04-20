@@ -843,6 +843,10 @@ export default function Tasks() {
       post_date: task.post_date ? task.post_date.split("T")[0] : "",
       hashtags: task.hashtags?.join(", ") || "",
       creative_instructions: task.creative_instructions || "",
+      is_recurring: !!task.is_recurring,
+      recurrence_frequency: (task.recurrence_rule?.frequency as RecurrenceFrequency) || "weekly",
+      recurrence_interval: task.recurrence_rule?.interval || 1,
+      recurrence_days_of_week: task.recurrence_rule?.daysOfWeek || [],
     });
     setIsEditDialogOpen(true);
   };
@@ -899,6 +903,17 @@ export default function Tasks() {
         ? newTask.hashtags.split(",").map(h => h.trim()).filter(Boolean)
         : null;
 
+      const recurrenceRulePayload: RecurrenceRule | null = newTask.is_recurring
+        ? {
+            frequency: newTask.recurrence_frequency,
+            interval: Math.max(1, newTask.recurrence_interval || 1),
+            ...(newTask.recurrence_frequency === "weekly" &&
+            newTask.recurrence_days_of_week.length > 0
+              ? { daysOfWeek: newTask.recurrence_days_of_week }
+              : {}),
+          }
+        : null;
+
       const updates: any = {
         title: newTask.title,
         description: newTask.description,
@@ -917,6 +932,8 @@ export default function Tasks() {
         hashtags: hashtagsArrayEdit,
         creative_instructions: hasCreativeEdit ? (newTask.creative_instructions || null) : null,
         updated_by: profile?.user_id,
+        is_recurring: newTask.is_recurring,
+        recurrence_rule: recurrenceRulePayload as any,
       };
 
       // Reset notification_sent_at if due_date changed
@@ -924,12 +941,50 @@ export default function Tasks() {
         updates.notification_sent_at = null;
       }
 
+      const becameDone =
+        selectedTask.status !== "done" && newTask.status === "done";
+
       const { error } = await supabase
         .from("tasks")
         .update(updates)
         .eq("id", selectedTask.id);
 
       if (error) throw error;
+
+      // Recurring → spawn next occurrence atomically (after status update succeeds)
+      if (
+        becameDone &&
+        selectedTask.is_recurring &&
+        !selectedTask.next_occurrence_generated &&
+        selectedTask.due_date &&
+        (selectedTask.recurrence_rule || recurrenceRulePayload)
+      ) {
+        const ruleForNext = (recurrenceRulePayload || selectedTask.recurrence_rule) as RecurrenceRule;
+        const nextDue = computeNextDueDate(selectedTask.due_date, ruleForNext);
+        if (nextDue) {
+          const { error: rpcError } = await supabase.rpc(
+            "generate_next_recurring_task" as any,
+            { p_task_id: selectedTask.id, p_next_due_date: nextDue }
+          );
+          if (rpcError) {
+            // Rollback status change
+            await supabase
+              .from("tasks")
+              .update({ status: selectedTask.status })
+              .eq("id", selectedTask.id);
+            toast({
+              title: "Falha ao gerar próxima ocorrência",
+              description: rpcError.message,
+              variant: "destructive",
+            });
+            return;
+          }
+          toast({
+            title: "🔁 Próxima ocorrência criada",
+            description: formatDateBR(nextDue.split("T")[0]),
+          });
+        }
+      }
 
       if (selectedTask) {
         await assignUsersToTask(selectedTask.id, newTask.assigned_users);
