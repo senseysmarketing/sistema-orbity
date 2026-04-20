@@ -1,51 +1,58 @@
 
 
-# Atualizar `ManageSubscriptionDialog` — features ilimitadas (sync com Landing)
+# Filtro de clientes do Calendário Social — incluir "Agência (Interno)"
 
 ## Diagnóstico
-O dialog ainda mostra "5 usuários / 10 clientes / 500 tarefas" lendo `plan.max_users`, `plan.max_clients`, `plan.max_tasks`. Isso contradiz a memória **Unlimited Resource Model** (R$397/R$3564, sem limites) e o que a Landing (`PricingSection.tsx`) anuncia.
+Em `src/components/social-media/SocialMediaCalendar.tsx`, o popover "Clientes" lista apenas `clients` reais da tabela `clients`. Posts internos da agência (criados como tarefas `redes_sociais` sem `client_id`) ficam invisíveis ao filtro — não dá para isolá-los.
 
-## Mudança (apenas `src/components/subscription/ManageSubscriptionDialog.tsx`)
+Nas tarefas, isso já é resolvido via `getVirtualAgencyClient()` (`src/lib/virtualAgencyClient.ts`), que cria um pseudo-cliente com id `agency:{agencyId}` e nome `"{Agência} (Interno)"`.
 
-Substituir a lista dinâmica baseada em `max_*` por uma **lista estática idêntica à da Landing**:
+## Mudança (apenas `src/components/social-media/SocialMediaCalendar.tsx`)
 
+### 1. Imports
 ```ts
-const PLAN_FEATURES = [
-  "Membros ilimitados da equipa",
-  "CRM de Vendas & Pipeline",
-  "Automação de WhatsApp Multi-instância",
-  "Gestor de Redes Sociais com IA",
-  "Cobrança Automática (Asaas/Conexa)",
-  "Agenda sincronizada com Google Calendar",
-  "Onboarding Premium Dedicado",
-];
+import { getVirtualAgencyClient, isVirtualAgencyClient } from "@/lib/virtualAgencyClient";
 ```
 
-E no `<CardContent>` de cada plano, renderizar:
-```tsx
-{PLAN_FEATURES.map((f) => (
-  <div key={f} className="flex items-start gap-2">
-    <Check className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
-    <span className="text-sm">{f}</span>
-  </div>
-))}
+### 2. Lista de clientes do filtro — prepend do virtual
+Logo após o `useQuery` de `clients`, derivar a lista exibida no popover:
+```ts
+const clientsWithAgency = currentAgency
+  ? [getVirtualAgencyClient({ id: currentAgency.id, name: currentAgency.name }), ...clients]
+  : clients;
+```
+E renderizar `clientsWithAgency.map(...)` no popover (em vez de `clients.map`).
+
+### 3. Lógica de match em `getFilteredPostsForDate`
+Substituir:
+```ts
+const matchesClient = clientFilter.length === 0 || clientFilter.includes(task.client_id || '');
+```
+por:
+```ts
+const hasAgencyFilter = clientFilter.some(isVirtualAgencyClient);
+const realClientFilter = clientFilter.filter(id => !isVirtualAgencyClient(id));
+const isInternalPost = !task.client_id;
+
+const matchesClient =
+  clientFilter.length === 0 ||
+  (hasAgencyFilter && isInternalPost) ||
+  (task.client_id && realClientFilter.includes(task.client_id));
 ```
 
-## Remoções
-- Bloco de `plan.max_users`, `plan.max_clients`, `plan.max_tasks`.
-- Bloco condicional `plan.has_crm` (CRM já está como item permanente).
-- Item duplicado "Planner Social Media" (substituído por "Gestor de Redes Sociais com IA").
+### 4. Visual coerente
+Manter o mesmo `Checkbox + nome` do popover atual. O virtual aparecerá como **"{Nome da Agência} (Interno)"** no topo, igual à imagem `image-234.png` mostrada nas tarefas.
 
 ## Garantias
 | # | Garantia |
 |---|---|
-| 1 | Mesma lista de 7 features da Landing — coerência de marketing. |
-| 2 | Reflete o modelo **Unlimited Resource** (sem limites numéricos). |
-| 3 | Ambos os cards (Mensal e Anual) mostram exatamente as mesmas features — único diferencial é preço. |
-| 4 | Sem mudanças em hook, edge function, schema ou Stripe. |
+| 1 | Filtro "Agência (Interno)" sempre no topo, isolando posts internos. |
+| 2 | Pode combinar com clientes reais (multi-select OR). |
+| 3 | Sem mudanças em `useSocialMediaTasks`, schema, edges ou outras telas. |
+| 4 | Reutiliza o helper já existente — coerência com tarefas/reuniões. |
 
 ## Ficheiros alterados
-- `src/components/subscription/ManageSubscriptionDialog.tsx`
+- `src/components/social-media/SocialMediaCalendar.tsx`
 
-Sem migrations. Sem novas secrets.
+Sem migrations. Sem novas dependências.
 
