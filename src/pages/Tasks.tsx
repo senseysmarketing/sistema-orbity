@@ -131,6 +131,10 @@ const taskFormSchema = z.object({
   post_date: z.string().nullable().optional().default(""),
   hashtags: z.string().nullable().optional().default(""),
   creative_instructions: z.string().nullable().optional().default(""),
+  is_recurring: z.boolean().default(false),
+  recurrence_frequency: z.enum(["daily", "weekly", "monthly"]).default("weekly"),
+  recurrence_interval: z.number().int().min(1).default(1),
+  recurrence_days_of_week: z.array(z.number()).default([]),
 });
 
 type TaskFormValues = z.infer<typeof taskFormSchema>;
@@ -152,7 +156,124 @@ const taskFormDefaults: TaskFormValues = {
   post_date: "",
   hashtags: "",
   creative_instructions: "",
+  is_recurring: false,
+  recurrence_frequency: "weekly",
+  recurrence_interval: 1,
+  recurrence_days_of_week: [],
 };
+
+// Reusable Recurrence config block
+function RecurrenceFields({
+  values,
+  onChange,
+}: {
+  values: {
+    is_recurring: boolean;
+    recurrence_frequency: RecurrenceFrequency;
+    recurrence_interval: number;
+    recurrence_days_of_week: number[];
+  };
+  onChange: (patch: Partial<{
+    is_recurring: boolean;
+    recurrence_frequency: RecurrenceFrequency;
+    recurrence_interval: number;
+    recurrence_days_of_week: number[];
+  }>) => void;
+}) {
+  const dayLabels = ["D", "S", "T", "Q", "Q", "S", "S"];
+  const toggleDay = (idx: number) => {
+    const next = values.recurrence_days_of_week.includes(idx)
+      ? values.recurrence_days_of_week.filter((d) => d !== idx)
+      : [...values.recurrence_days_of_week, idx].sort();
+    onChange({ recurrence_days_of_week: next });
+  };
+  const unitLabel =
+    values.recurrence_frequency === "daily"
+      ? "dia(s)"
+      : values.recurrence_frequency === "weekly"
+      ? "semana(s)"
+      : "mês(es)";
+
+  return (
+    <div className="grid gap-3 rounded-md border bg-muted/40 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <RotateCw className="h-4 w-4 text-primary" />
+          <Label htmlFor="is-recurring" className="cursor-pointer">Tarefa recorrente</Label>
+        </div>
+        <Switch
+          id="is-recurring"
+          checked={values.is_recurring}
+          onCheckedChange={(checked) => onChange({ is_recurring: checked })}
+        />
+      </div>
+
+      {values.is_recurring && (
+        <div className="grid gap-3 pt-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Frequência</Label>
+              <Select
+                value={values.recurrence_frequency}
+                onValueChange={(v) => onChange({ recurrence_frequency: v as RecurrenceFrequency })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Diária</SelectItem>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                  <SelectItem value="monthly">Mensal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Repetir a cada</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  value={values.recurrence_interval}
+                  onChange={(e) =>
+                    onChange({ recurrence_interval: Math.max(1, parseInt(e.target.value) || 1) })
+                  }
+                  className="w-20"
+                />
+                <span className="text-sm text-muted-foreground">{unitLabel}</span>
+              </div>
+            </div>
+          </div>
+
+          {values.recurrence_frequency === "weekly" && (
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Dias da semana</Label>
+              <div className="flex gap-1.5">
+                {dayLabels.map((label, idx) => {
+                  const active = values.recurrence_days_of_week.includes(idx);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => toggleDay(idx)}
+                      className={cn(
+                        "h-8 w-8 rounded-md border text-xs font-medium transition-colors",
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background hover:bg-muted border-input"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
