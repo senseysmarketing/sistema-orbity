@@ -122,34 +122,12 @@ export function ManageSubscriptionDialog({ open, onOpenChange, mode = 'new' }: M
                 </CardHeader>
 
                 <CardContent className="space-y-2 pt-2">
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-500 shrink-0" />
-                    <span className="text-sm">
-                      {plan.max_users >= 999999 ? 'Usuários ilimitados' : `${plan.max_users} usuários`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-500 shrink-0" />
-                    <span className="text-sm">
-                      {plan.max_clients >= 999999 ? 'Clientes ilimitados' : `${plan.max_clients} clientes`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-500 shrink-0" />
-                    <span className="text-sm">
-                      {plan.max_tasks >= 999999 ? 'Tarefas ilimitadas' : `${plan.max_tasks} tarefas`}
-                    </span>
-                  </div>
-                  {plan.has_crm && (
-                    <div className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-green-500 shrink-0" />
-                      <span className="text-sm">Sistema CRM</span>
+                  {PLAN_FEATURES.map((f) => (
+                    <div key={f} className="flex items-start gap-2">
+                      <Check className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                      <span className="text-sm">{f}</span>
                     </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-500 shrink-0" />
-                    <span className="text-sm">Planner Social Media</span>
-                  </div>
+                  ))}
 
                   <Button
                     className="w-full mt-4"
