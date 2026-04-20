@@ -234,6 +234,35 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
     return null;
   };
 
+  const handleStopRecurrence = async () => {
+    if (!localTask) return;
+    setStoppingRecurrence(true);
+    try {
+      const parentScope = localTask.recurrence_parent_id ?? localTask.id;
+      const { error } = await supabase
+        .from("tasks")
+        .update({ is_recurring: false, next_occurrence_generated: true })
+        .or(`id.eq.${localTask.id},recurrence_parent_id.eq.${parentScope}`)
+        .neq("status", "done");
+      if (error) throw error;
+      toast({
+        title: "Recorrência interrompida",
+        description: "Esta tarefa não gerará mais ocorrências.",
+      });
+      setLocalTask({ ...localTask, is_recurring: false, next_occurrence_generated: true });
+      onTaskUpdate?.();
+    } catch (err: any) {
+      toast({
+        title: "Erro ao interromper recorrência",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setStoppingRecurrence(false);
+      setShowStopRecurrenceAlert(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
