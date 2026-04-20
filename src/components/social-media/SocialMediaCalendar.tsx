@@ -97,11 +97,10 @@ export function SocialMediaCalendar() {
 
       const hasAgencyFilter = clientFilter.some(isVirtualAgencyClient);
       const realClientFilter = clientFilter.filter(id => !isVirtualAgencyClient(id));
-      const isInternalPost = !task.client_id;
 
       const matchesClient =
         clientFilter.length === 0 ||
-        (hasAgencyFilter && isInternalPost) ||
+        (hasAgencyFilter && task.is_internal) ||
         (!!task.client_id && realClientFilter.includes(task.client_id));
 
       const matchesStatus = statusFilter === "all" || task.status === statusFilter;
@@ -133,6 +132,9 @@ export function SocialMediaCalendar() {
   const weekDaysDesktop = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
   const CompactTaskCard = ({ task, onClick }: { task: SocialMediaTask; onClick?: (e?: React.MouseEvent) => void }) => {
+    const displayClientName = task.is_internal
+      ? `${currentAgency?.name ?? 'Agência'} (Interno)`
+      : task.client_name;
     return (
       <div
         className="p-1.5 rounded border bg-card hover:bg-muted/50 cursor-pointer transition-colors text-left"
@@ -141,7 +143,7 @@ export function SocialMediaCalendar() {
         <p className="text-xs font-medium truncate">{task.title || 'Sem título'}</p>
         <div className="flex items-center gap-1 mt-0.5">
           {task.platform && <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">{task.platform}</Badge>}
-          {task.client_name && <span className="text-[9px] text-muted-foreground truncate">{task.client_name}</span>}
+          {displayClientName && <span className="text-[9px] text-muted-foreground truncate">{displayClientName}</span>}
         </div>
       </div>
     );
@@ -375,7 +377,9 @@ export function SocialMediaCalendar() {
                       <p className="font-medium text-sm">{task.title || 'Sem título'}</p>
                       <div className="flex items-center gap-2 mt-1.5">
                         {task.platform && <Badge variant="outline" className="text-xs">{task.platform}</Badge>}
-                        {task.client_name && <span className="text-xs text-muted-foreground">{task.client_name}</span>}
+                        {(task.is_internal ? `${currentAgency?.name ?? 'Agência'} (Interno)` : task.client_name) && (
+                          <span className="text-xs text-muted-foreground">{task.is_internal ? `${currentAgency?.name ?? 'Agência'} (Interno)` : task.client_name}</span>
+                        )}
                       </div>
                     </div>
                   ))}
