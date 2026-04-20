@@ -19,6 +19,7 @@ export interface SocialMediaTask {
   hashtags: string[] | null;
   creative_instructions?: string | null;
   archived: boolean;
+  is_internal: boolean;
   created_at: string;
   created_by: string;
   agency_id: string;
