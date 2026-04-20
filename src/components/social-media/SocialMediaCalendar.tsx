@@ -377,7 +377,9 @@ export function SocialMediaCalendar() {
                       <p className="font-medium text-sm">{task.title || 'Sem título'}</p>
                       <div className="flex items-center gap-2 mt-1.5">
                         {task.platform && <Badge variant="outline" className="text-xs">{task.platform}</Badge>}
-                        {task.client_name && <span className="text-xs text-muted-foreground">{task.client_name}</span>}
+                        {(task.is_internal ? `${currentAgency?.name ?? 'Agência'} (Interno)` : task.client_name) && (
+                          <span className="text-xs text-muted-foreground">{task.is_internal ? `${currentAgency?.name ?? 'Agência'} (Interno)` : task.client_name}</span>
+                        )}
                       </div>
                     </div>
                   ))}
