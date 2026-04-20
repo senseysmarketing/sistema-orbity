@@ -44,6 +44,44 @@ const cycleRange = (cycle: { start_date: string; end_date: string }) => ({
   to: endOfDay(parseISO(cycle.end_date)).toISOString(),
 });
 
+// G2 — Gauge semi-circular (Quiet Luxury): monocromático, traço fino, cor semântica só no arco preenchido
+function RevenueGauge({ progress, hasTarget }: { progress: number; hasTarget: boolean }) {
+  const radius = 80;
+  const circumference = Math.PI * radius; // semicírculo
+  const clamped = Math.max(0, Math.min(100, progress));
+  const offset = circumference - (clamped / 100) * circumference;
+  const stroke = !hasTarget
+    ? "hsl(var(--muted-foreground))"
+    : clamped >= 100
+    ? "hsl(var(--primary))"
+    : clamped >= 70
+    ? "hsl(142 71% 45%)"
+    : clamped >= 40
+    ? "hsl(38 92% 50%)"
+    : "hsl(var(--destructive))";
+  return (
+    <svg width="200" height="110" viewBox="0 0 200 110" className="overflow-visible">
+      <path
+        d="M 20 100 A 80 80 0 0 1 180 100"
+        fill="none"
+        stroke="hsl(var(--muted))"
+        strokeWidth="8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M 20 100 A 80 80 0 0 1 180 100"
+        fill="none"
+        stroke={stroke}
+        strokeWidth="8"
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        style={{ transition: "stroke-dashoffset 600ms ease, stroke 300ms ease" }}
+      />
+    </svg>
+  );
+}
+
 interface NpsResponse {
   id: string;
   client_name: string;
