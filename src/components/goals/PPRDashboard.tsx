@@ -551,8 +551,8 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
       {/* Period selector */}
       <div className="flex items-center gap-3 flex-wrap">
         <Select value={selectedPeriodId} onValueChange={setSelectedPeriodId}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Período" />
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Ciclo" />
           </SelectTrigger>
           <SelectContent>
             {periods.map((p) => (
@@ -565,7 +565,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
         {isAdmin && (
           <>
             <Button variant="outline" size="sm" onClick={handleCreatePeriod}>
-              <Plus className="h-4 w-4 mr-1" /> Novo Período
+              <Plus className="h-4 w-4 mr-1" /> Novo Ciclo
             </Button>
             <Button variant="ghost" size="sm" onClick={() => { setConfigMode("edit"); setShowConfig(true); }}>
               <Settings2 className="h-4 w-4 mr-1" /> Configurar
