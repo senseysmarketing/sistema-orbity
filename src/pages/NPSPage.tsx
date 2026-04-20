@@ -165,18 +165,29 @@ export default function NPSPage() {
     },
   });
 
-  // NPS calculation
+  // G1 — Filtra respostas pelo intervalo do ciclo ativo (com end-of-day blindado)
+  const filteredResponses = useMemo(() => {
+    if (!filterByCycle || !activeCycle) return responses;
+    const { from, to } = cycleRange(activeCycle);
+    return responses.filter((r: any) => {
+      if (!r.response_date) return false;
+      const ts = new Date(r.response_date).toISOString();
+      return ts >= from && ts <= to;
+    });
+  }, [responses, filterByCycle, activeCycle]);
+
+  // NPS calculation (sobre lista filtrada)
   const npsMetrics = useMemo(() => {
-    if (!responses.length) return { nps: 0, promoters: 0, neutrals: 0, detractors: 0, total: 0 };
-    const promoters = responses.filter((r: any) => r.score >= 9).length;
-    const neutrals = responses.filter((r: any) => r.score >= 7 && r.score <= 8).length;
-    const detractors = responses.filter((r: any) => r.score <= 6).length;
-    const total = responses.length;
+    if (!filteredResponses.length) return { nps: 0, promoters: 0, neutrals: 0, detractors: 0, total: 0 };
+    const promoters = filteredResponses.filter((r: any) => r.score >= 9).length;
+    const neutrals = filteredResponses.filter((r: any) => r.score >= 7 && r.score <= 8).length;
+    const detractors = filteredResponses.filter((r: any) => r.score <= 6).length;
+    const total = filteredResponses.length;
     const nps = Math.round(((promoters - detractors) / total) * 100);
     return { nps, promoters, neutrals, detractors, total };
-  }, [responses]);
+  }, [filteredResponses]);
 
-  // Client status map
+  // Client status map (sempre baseado em todas as respostas — independente do filtro de ciclo)
   const clientStatusMap = useMemo(() => {
     const map: Record<string, "responded" | "pending" | "not_sent"> = {};
     clients.forEach((c: any) => {
