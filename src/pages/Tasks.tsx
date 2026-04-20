@@ -1488,6 +1488,20 @@ export default function Tasks() {
                       />
                     </div>
 
+                    <RecurrenceFields
+                      values={{
+                        is_recurring: newTask.is_recurring,
+                        recurrence_frequency: newTask.recurrence_frequency,
+                        recurrence_interval: newTask.recurrence_interval,
+                        recurrence_days_of_week: newTask.recurrence_days_of_week,
+                      }}
+                      onChange={(patch) => {
+                        Object.entries(patch).forEach(([k, v]) =>
+                          form.setValue(k as any, v as any)
+                        );
+                      }}
+                    />
+
                     {/* Campos condicionais de Redes Sociais */}
                     {newTask.task_type === "redes_sociais" && (
                       <>
