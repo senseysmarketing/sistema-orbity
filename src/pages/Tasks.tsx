@@ -2077,6 +2077,19 @@ export default function Tasks() {
                 onChange={(e) => form.setValue("due_date", e.target.value)}
               />
             </div>
+            <RecurrenceFields
+              values={{
+                is_recurring: newTask.is_recurring,
+                recurrence_frequency: newTask.recurrence_frequency,
+                recurrence_interval: newTask.recurrence_interval,
+                recurrence_days_of_week: newTask.recurrence_days_of_week,
+              }}
+              onChange={(patch) => {
+                Object.entries(patch).forEach(([k, v]) =>
+                  form.setValue(k as any, v as any)
+                );
+              }}
+            />
             <SubtaskManager
               subtasks={newTask.subtasks}
               onChange={(subtasks) => form.setValue("subtasks", subtasks)}
