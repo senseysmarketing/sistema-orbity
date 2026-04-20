@@ -16,7 +16,8 @@ import {
   Calendar,
   MessageSquare,
   TrendingUp,
-  DollarSign
+  DollarSign,
+  BarChart3
 } from 'lucide-react';
 
 interface HelpCenterProps {
@@ -25,13 +26,14 @@ interface HelpCenterProps {
 }
 
 const quickGuides = [
-  { icon: LayoutDashboard, title: 'Dashboard', description: 'Visão geral de métricas e atividades', color: 'text-blue-500', route: '/' },
-  { icon: Users, title: 'CRM - Leads', description: 'Gestão completa do funil de vendas', color: 'text-green-500', route: '/crm' },
-  { icon: CheckSquare, title: 'Tarefas', description: 'Organize e acompanhe o trabalho da equipe', color: 'text-orange-500', route: '/tasks' },
-  { icon: Calendar, title: 'Agenda', description: 'Agende reuniões e eventos', color: 'text-purple-500', route: '/agenda' },
-  { icon: MessageSquare, title: 'Social Media', description: 'Planejamento de conteúdo', color: 'text-pink-500', route: '/social-media' },
-  { icon: TrendingUp, title: 'Tráfego Pago', description: 'Monitore campanhas do Facebook Ads', color: 'text-red-500', route: '/traffic' },
-  { icon: DollarSign, title: 'Financeiro', description: 'Controle de receitas e despesas', color: 'text-emerald-500', route: '/admin' },
+  { icon: LayoutDashboard, title: 'Dashboard', description: 'Visão geral de métricas e atividades', color: 'text-blue-500', route: '/dashboard' },
+  { icon: Users, title: 'CRM - Leads', description: 'Gestão completa do funil de vendas', color: 'text-green-500', route: '/dashboard/crm' },
+  { icon: CheckSquare, title: 'Tarefas', description: 'Organize e acompanhe o trabalho da equipe', color: 'text-orange-500', route: '/dashboard/tasks' },
+  { icon: Calendar, title: 'Agenda', description: 'Agende reuniões e eventos', color: 'text-purple-500', route: '/dashboard/agenda' },
+  { icon: MessageSquare, title: 'Social Media', description: 'Planejamento de conteúdo', color: 'text-pink-500', route: '/dashboard/social-media' },
+  { icon: TrendingUp, title: 'Tráfego Pago', description: 'Monitore campanhas do Facebook Ads', color: 'text-red-500', route: '/dashboard/traffic' },
+  { icon: BarChart3, title: 'Relatórios', description: 'Relatórios e links mágicos para clientes', color: 'text-cyan-500', route: '/dashboard/reports' },
+  { icon: DollarSign, title: 'Financeiro', description: 'Controle de receitas e despesas', color: 'text-emerald-500', route: '/dashboard/admin' },
 ];
 
 export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
