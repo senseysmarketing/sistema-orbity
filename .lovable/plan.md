@@ -1,56 +1,51 @@
 
 
-# Trial local — exibir CTA "Assinar Agora" + alinhar status
+# Atualizar `ManageSubscriptionDialog` — features ilimitadas (sync com Landing)
 
 ## Diagnóstico
-O `check-subscription` em trial cai no `returnLocalSubscription`, que devolve:
-- `subscribed: false`
-- `subscription_status: 'trial'` (valor da tabela `agency_subscriptions`, **não** `'trialing'` do Stripe)
-- `plan_name: 'Orbity - Acesso Completo (Trial)'`
+O dialog ainda mostra "5 usuários / 10 clientes / 500 tarefas" lendo `plan.max_users`, `plan.max_clients`, `plan.max_tasks`. Isso contradiz a memória **Unlimited Resource Model** (R$397/R$3564, sem limites) e o que a Landing (`PricingSection.tsx`) anuncia.
 
-Em `SubscriptionDetails.tsx`:
-- O badge cai no `default` → mostra **"Inativa"**.
-- A flag `isTrialing` checa apenas `'trialing'` → bloco de CTA não renderiza.
-- O fallback "sem assinatura" exige `!planName` → também não renderiza (plano existe).
-- Resultado: usuário em trial vê "Inativa" e **nenhum botão** para assinar antecipadamente.
+## Mudança (apenas `src/components/subscription/ManageSubscriptionDialog.tsx`)
 
-## Correção (apenas frontend, sem migration)
-
-### 1. `src/components/subscription/SubscriptionDetails.tsx`
-Tratar `'trial'` (local) como equivalente a `'trialing'` (Stripe):
+Substituir a lista dinâmica baseada em `max_*` por uma **lista estática idêntica à da Landing**:
 
 ```ts
-const isTrialing = status === 'trialing' || status === 'trial';
+const PLAN_FEATURES = [
+  "Membros ilimitados da equipa",
+  "CRM de Vendas & Pipeline",
+  "Automação de WhatsApp Multi-instância",
+  "Gestor de Redes Sociais com IA",
+  "Cobrança Automática (Asaas/Conexa)",
+  "Agenda sincronizada com Google Calendar",
+  "Onboarding Premium Dedicado",
+];
 ```
 
-E no `getStatusBadge`, adicionar case `'trial'` com o mesmo visual azul de "Período de Teste":
-```ts
-case 'trialing':
-case 'trial':
-  return <Badge className="bg-blue-500 hover:bg-blue-500 text-white">Período de Teste</Badge>;
+E no `<CardContent>` de cada plano, renderizar:
+```tsx
+{PLAN_FEATURES.map((f) => (
+  <div key={f} className="flex items-start gap-2">
+    <Check className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+    <span className="text-sm">{f}</span>
+  </div>
+))}
 ```
 
-### 2. Refinar copy do bloco de trial
-Atualizar o card azul de trial para deixar explícito que **assinar agora não interrompe o trial**, mas garante continuidade:
-
-> "Você está no período de teste gratuito. Assine agora para garantir acesso contínuo ao Orbity após o término — sem precisar esperar os 7 dias."
-
-CTA permanece: **"Escolher Plano e Assinar"** → abre `ManageSubscriptionDialog` em `mode="upgrade"` (já existente), que reaproveita o cliente Stripe por email no `create-checkout`.
-
-### 3. (Opcional) `src/components/subscription/SubscriptionStatus.tsx`
-Aplicar o mesmo alias `'trial' | 'trialing'` em `getStatusText`, `getStatusColor` e `isSubscriptionActive` para consistência onde quer que esse componente seja usado.
+## Remoções
+- Bloco de `plan.max_users`, `plan.max_clients`, `plan.max_tasks`.
+- Bloco condicional `plan.has_crm` (CRM já está como item permanente).
+- Item duplicado "Planner Social Media" (substituído por "Gestor de Redes Sociais com IA").
 
 ## Garantias
 | # | Garantia |
 |---|---|
-| 1 | Trial local exibe badge azul "Período de Teste", não mais "Inativa". |
-| 2 | Botão "Escolher Plano e Assinar" sempre visível durante o trial. |
-| 3 | Após 7 dias sem assinatura, o `BlockedAccessScreen` (Master Enforcement) continua barrando o acesso normalmente — sem mudança nessa lógica. |
-| 4 | Sem mudanças em edges, schema ou Stripe. |
+| 1 | Mesma lista de 7 features da Landing — coerência de marketing. |
+| 2 | Reflete o modelo **Unlimited Resource** (sem limites numéricos). |
+| 3 | Ambos os cards (Mensal e Anual) mostram exatamente as mesmas features — único diferencial é preço. |
+| 4 | Sem mudanças em hook, edge function, schema ou Stripe. |
 
 ## Ficheiros alterados
-- `src/components/subscription/SubscriptionDetails.tsx`
-- `src/components/subscription/SubscriptionStatus.tsx` (opcional, alinhamento)
+- `src/components/subscription/ManageSubscriptionDialog.tsx`
 
-Sem migrations. Sem novas secrets. Sem mudança em edge functions.
+Sem migrations. Sem novas secrets.
 
