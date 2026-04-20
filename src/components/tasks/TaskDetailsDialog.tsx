@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock, Copy, Hash, Smartphone, Palette, CalendarClock, Sparkles, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock, Copy, Hash, Smartphone, Palette, CalendarClock, Sparkles, Loader2, RotateCw } from "lucide-react";
 import { getTypeColor } from "@/components/ui/task-card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
@@ -20,6 +20,7 @@ import { useAIAssist } from "@/hooks/useAIAssist";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { describeRecurrence } from "@/lib/recurrence";
 
 interface Subtask {
   id: string;
@@ -47,6 +48,10 @@ interface Task {
   post_date?: string | null;
   hashtags?: string[] | null;
   creative_instructions?: string | null;
+  is_recurring?: boolean;
+  recurrence_rule?: any;
+  recurrence_parent_id?: string | null;
+  next_occurrence_generated?: boolean;
 }
 
 interface Client {
