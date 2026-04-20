@@ -14,7 +14,7 @@ import { NPSChart } from "./NPSChart";
 import { ScorecardCard } from "./ScorecardCard";
 import { Gift, Plus, Settings2, Trash2, Pencil } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { format, eachMonthOfInterval, startOfMonth, endOfMonth, parseISO, isFuture, startOfDay, endOfDay } from "date-fns";
+import { format, eachMonthOfInterval, startOfMonth, endOfMonth, parseISO, isFuture } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface PPRDashboardProps {
