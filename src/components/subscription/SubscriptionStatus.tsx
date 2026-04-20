@@ -114,7 +114,7 @@ export function SubscriptionStatus() {
         {isSubscriptionActive && (
           <Button
             onClick={() => {
-              if (!currentSubscription?.customer_id || currentSubscription?.subscription_status === 'trialing') {
+              if (!currentSubscription?.customer_id || isTrialing) {
                 setShowManageDialog(true);
               } else {
                 openCustomerPortal();
@@ -123,7 +123,7 @@ export function SubscriptionStatus() {
             className="w-full"
             variant="outline"
           >
-            {currentSubscription?.subscription_status === 'trialing' ? 'Escolher Plano e Assinar' : 'Gerenciar Assinatura'}
+            {isTrialing ? 'Escolher Plano e Assinar' : 'Gerenciar Assinatura'}
           </Button>
         )}
       </CardContent>
