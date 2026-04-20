@@ -38,11 +38,7 @@ interface BonusPeriod {
   status: string;
 }
 
-// G1 — Helper de intervalo blindado contra "End of Day Trap"
-const cycleRange = (cycle: { start_date: string; end_date: string }) => ({
-  from: startOfDay(parseISO(cycle.start_date)).toISOString(),
-  to: endOfDay(parseISO(cycle.end_date)).toISOString(),
-});
+// (Helper de intervalo blindado é aplicado em NPSPage; aqui o filtro é por period_id.)
 
 // G2 — Gauge semi-circular (Quiet Luxury): monocromático, traço fino, cor semântica só no arco preenchido
 function RevenueGauge({ progress, hasTarget }: { progress: number; hasTarget: boolean }) {
