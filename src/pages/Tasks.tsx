@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X, Check, ChevronsUpDown, RotateCw } from "lucide-react";
 import { getVirtualAgencyClient, separateVirtualClients, isVirtualAgencyClient } from "@/lib/virtualAgencyClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -62,6 +62,8 @@ import { replaceTemplateVariables, calculateDueDate } from "@/lib/templateVariab
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Switch } from "@/components/ui/switch";
+import { computeNextDueDate, type RecurrenceRule, type RecurrenceFrequency } from "@/lib/recurrence";
 
 interface AssignedUser {
   user_id: string;
@@ -92,6 +94,10 @@ interface Task {
   hashtags?: string[] | null;
   creative_instructions?: string | null;
   is_internal?: boolean;
+  is_recurring?: boolean;
+  recurrence_rule?: RecurrenceRule | null;
+  recurrence_parent_id?: string | null;
+  next_occurrence_generated?: boolean;
   _assignedUsers?: AssignedUser[];
 }
 
@@ -125,6 +131,10 @@ const taskFormSchema = z.object({
   post_date: z.string().nullable().optional().default(""),
   hashtags: z.string().nullable().optional().default(""),
   creative_instructions: z.string().nullable().optional().default(""),
+  is_recurring: z.boolean().default(false),
+  recurrence_frequency: z.enum(["daily", "weekly", "monthly"]).default("weekly"),
+  recurrence_interval: z.number().int().min(1).default(1),
+  recurrence_days_of_week: z.array(z.number()).default([]),
 });
 
 type TaskFormValues = z.infer<typeof taskFormSchema>;
@@ -146,7 +156,124 @@ const taskFormDefaults: TaskFormValues = {
   post_date: "",
   hashtags: "",
   creative_instructions: "",
+  is_recurring: false,
+  recurrence_frequency: "weekly",
+  recurrence_interval: 1,
+  recurrence_days_of_week: [],
 };
+
+// Reusable Recurrence config block
+function RecurrenceFields({
+  values,
+  onChange,
+}: {
+  values: {
+    is_recurring: boolean;
+    recurrence_frequency: RecurrenceFrequency;
+    recurrence_interval: number;
+    recurrence_days_of_week: number[];
+  };
+  onChange: (patch: Partial<{
+    is_recurring: boolean;
+    recurrence_frequency: RecurrenceFrequency;
+    recurrence_interval: number;
+    recurrence_days_of_week: number[];
+  }>) => void;
+}) {
+  const dayLabels = ["D", "S", "T", "Q", "Q", "S", "S"];
+  const toggleDay = (idx: number) => {
+    const next = values.recurrence_days_of_week.includes(idx)
+      ? values.recurrence_days_of_week.filter((d) => d !== idx)
+      : [...values.recurrence_days_of_week, idx].sort();
+    onChange({ recurrence_days_of_week: next });
+  };
+  const unitLabel =
+    values.recurrence_frequency === "daily"
+      ? "dia(s)"
+      : values.recurrence_frequency === "weekly"
+      ? "semana(s)"
+      : "mês(es)";
+
+  return (
+    <div className="grid gap-3 rounded-md border bg-muted/40 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <RotateCw className="h-4 w-4 text-primary" />
+          <Label htmlFor="is-recurring" className="cursor-pointer">Tarefa recorrente</Label>
+        </div>
+        <Switch
+          id="is-recurring"
+          checked={values.is_recurring}
+          onCheckedChange={(checked) => onChange({ is_recurring: checked })}
+        />
+      </div>
+
+      {values.is_recurring && (
+        <div className="grid gap-3 pt-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Frequência</Label>
+              <Select
+                value={values.recurrence_frequency}
+                onValueChange={(v) => onChange({ recurrence_frequency: v as RecurrenceFrequency })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Diária</SelectItem>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                  <SelectItem value="monthly">Mensal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Repetir a cada</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  value={values.recurrence_interval}
+                  onChange={(e) =>
+                    onChange({ recurrence_interval: Math.max(1, parseInt(e.target.value) || 1) })
+                  }
+                  className="w-20"
+                />
+                <span className="text-sm text-muted-foreground">{unitLabel}</span>
+              </div>
+            </div>
+          </div>
+
+          {values.recurrence_frequency === "weekly" && (
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Dias da semana</Label>
+              <div className="flex gap-1.5">
+                {dayLabels.map((label, idx) => {
+                  const active = values.recurrence_days_of_week.includes(idx);
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => toggleDay(idx)}
+                      className={cn(
+                        "h-8 w-8 rounded-md border text-xs font-medium transition-colors",
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background hover:bg-muted border-input"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -585,6 +712,17 @@ export default function Tasks() {
         ? newTask.hashtags.split(",").map(h => h.trim()).filter(Boolean)
         : null;
 
+      const recurrenceRulePayload: RecurrenceRule | null = newTask.is_recurring
+        ? {
+            frequency: newTask.recurrence_frequency,
+            interval: Math.max(1, newTask.recurrence_interval || 1),
+            ...(newTask.recurrence_frequency === "weekly" &&
+            newTask.recurrence_days_of_week.length > 0
+              ? { daysOfWeek: newTask.recurrence_days_of_week }
+              : {}),
+          }
+        : null;
+
       const { data: taskData, error } = await supabase
         .from("tasks")
         .insert([{
@@ -606,6 +744,8 @@ export default function Tasks() {
           post_date: isSocial && newTask.post_date ? dateOnlyToISO(newTask.post_date) : null,
           hashtags: hashtagsArray,
           creative_instructions: hasCreative ? (newTask.creative_instructions || null) : null,
+          is_recurring: newTask.is_recurring,
+          recurrence_rule: recurrenceRulePayload as any,
         }])
         .select()
         .single();
@@ -703,6 +843,10 @@ export default function Tasks() {
       post_date: task.post_date ? task.post_date.split("T")[0] : "",
       hashtags: task.hashtags?.join(", ") || "",
       creative_instructions: task.creative_instructions || "",
+      is_recurring: !!task.is_recurring,
+      recurrence_frequency: (task.recurrence_rule?.frequency as RecurrenceFrequency) || "weekly",
+      recurrence_interval: task.recurrence_rule?.interval || 1,
+      recurrence_days_of_week: task.recurrence_rule?.daysOfWeek || [],
     });
     setIsEditDialogOpen(true);
   };
@@ -759,6 +903,17 @@ export default function Tasks() {
         ? newTask.hashtags.split(",").map(h => h.trim()).filter(Boolean)
         : null;
 
+      const recurrenceRulePayload: RecurrenceRule | null = newTask.is_recurring
+        ? {
+            frequency: newTask.recurrence_frequency,
+            interval: Math.max(1, newTask.recurrence_interval || 1),
+            ...(newTask.recurrence_frequency === "weekly" &&
+            newTask.recurrence_days_of_week.length > 0
+              ? { daysOfWeek: newTask.recurrence_days_of_week }
+              : {}),
+          }
+        : null;
+
       const updates: any = {
         title: newTask.title,
         description: newTask.description,
@@ -777,6 +932,8 @@ export default function Tasks() {
         hashtags: hashtagsArrayEdit,
         creative_instructions: hasCreativeEdit ? (newTask.creative_instructions || null) : null,
         updated_by: profile?.user_id,
+        is_recurring: newTask.is_recurring,
+        recurrence_rule: recurrenceRulePayload as any,
       };
 
       // Reset notification_sent_at if due_date changed
@@ -784,12 +941,50 @@ export default function Tasks() {
         updates.notification_sent_at = null;
       }
 
+      const becameDone =
+        selectedTask.status !== "done" && newTask.status === "done";
+
       const { error } = await supabase
         .from("tasks")
         .update(updates)
         .eq("id", selectedTask.id);
 
       if (error) throw error;
+
+      // Recurring → spawn next occurrence atomically (after status update succeeds)
+      if (
+        becameDone &&
+        selectedTask.is_recurring &&
+        !selectedTask.next_occurrence_generated &&
+        selectedTask.due_date &&
+        (selectedTask.recurrence_rule || recurrenceRulePayload)
+      ) {
+        const ruleForNext = (recurrenceRulePayload || selectedTask.recurrence_rule) as RecurrenceRule;
+        const nextDue = computeNextDueDate(selectedTask.due_date, ruleForNext);
+        if (nextDue) {
+          const { error: rpcError } = await supabase.rpc(
+            "generate_next_recurring_task" as any,
+            { p_task_id: selectedTask.id, p_next_due_date: nextDue }
+          );
+          if (rpcError) {
+            // Rollback status change
+            await supabase
+              .from("tasks")
+              .update({ status: selectedTask.status })
+              .eq("id", selectedTask.id);
+            toast({
+              title: "Falha ao gerar próxima ocorrência",
+              description: rpcError.message,
+              variant: "destructive",
+            });
+            return;
+          }
+          toast({
+            title: "🔁 Próxima ocorrência criada",
+            description: formatDateBR(nextDue.split("T")[0]),
+          });
+        }
+      }
 
       if (selectedTask) {
         await assignUsersToTask(selectedTask.id, newTask.assigned_users);
@@ -910,6 +1105,42 @@ export default function Tasks() {
       if (error) throw error;
 
       await addHistoryEntry(taskId, `Status alterado para ${getStatusName(newStatus)}`);
+
+      // Recurring → spawn next occurrence atomically when moving to "done"
+      if (
+        newStatus === "done" &&
+        task.is_recurring &&
+        !task.next_occurrence_generated &&
+        task.due_date &&
+        task.recurrence_rule
+      ) {
+        const nextDue = computeNextDueDate(task.due_date, task.recurrence_rule);
+        if (nextDue) {
+          const { error: rpcError } = await supabase.rpc(
+            "generate_next_recurring_task" as any,
+            { p_task_id: taskId, p_next_due_date: nextDue }
+          );
+          if (rpcError) {
+            // Rollback status (visual + DB)
+            setTasks((prev) =>
+              prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t))
+            );
+            await supabase.from("tasks").update({ status: task.status }).eq("id", taskId);
+            toast({
+              title: "Falha ao gerar próxima ocorrência",
+              description: rpcError.message,
+              variant: "destructive",
+            });
+            return;
+          }
+          toast({
+            title: "🔁 Próxima ocorrência criada",
+            description: formatDateBR(nextDue.split("T")[0]),
+          });
+          fetchTasks();
+          return;
+        }
+      }
 
       toast({
         title: "Sucesso",
@@ -1256,6 +1487,20 @@ export default function Tasks() {
                         onChange={(e) => form.setValue("due_date", e.target.value)}
                       />
                     </div>
+
+                    <RecurrenceFields
+                      values={{
+                        is_recurring: newTask.is_recurring,
+                        recurrence_frequency: newTask.recurrence_frequency,
+                        recurrence_interval: newTask.recurrence_interval,
+                        recurrence_days_of_week: newTask.recurrence_days_of_week,
+                      }}
+                      onChange={(patch) => {
+                        Object.entries(patch).forEach(([k, v]) =>
+                          form.setValue(k as any, v as any)
+                        );
+                      }}
+                    />
 
                     {/* Campos condicionais de Redes Sociais */}
                     {newTask.task_type === "redes_sociais" && (
@@ -1832,6 +2077,19 @@ export default function Tasks() {
                 onChange={(e) => form.setValue("due_date", e.target.value)}
               />
             </div>
+            <RecurrenceFields
+              values={{
+                is_recurring: newTask.is_recurring,
+                recurrence_frequency: newTask.recurrence_frequency,
+                recurrence_interval: newTask.recurrence_interval,
+                recurrence_days_of_week: newTask.recurrence_days_of_week,
+              }}
+              onChange={(patch) => {
+                Object.entries(patch).forEach(([k, v]) =>
+                  form.setValue(k as any, v as any)
+                );
+              }}
+            />
             <SubtaskManager
               subtasks={newTask.subtasks}
               onChange={(subtasks) => form.setValue("subtasks", subtasks)}

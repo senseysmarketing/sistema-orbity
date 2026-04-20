@@ -6398,11 +6398,15 @@ export type Database = {
           history: Json | null
           id: string
           is_internal: boolean
+          is_recurring: boolean
+          next_occurrence_generated: boolean
           notification_sent_at: string | null
           platform: string | null
           post_date: string | null
           post_type: string | null
           priority: Database["public"]["Enums"]["task_priority"]
+          recurrence_parent_id: string | null
+          recurrence_rule: Json | null
           status: string
           subtasks: Json | null
           task_type: string | null
@@ -6425,11 +6429,15 @@ export type Database = {
           history?: Json | null
           id?: string
           is_internal?: boolean
+          is_recurring?: boolean
+          next_occurrence_generated?: boolean
           notification_sent_at?: string | null
           platform?: string | null
           post_date?: string | null
           post_type?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
+          recurrence_parent_id?: string | null
+          recurrence_rule?: Json | null
           status?: string
           subtasks?: Json | null
           task_type?: string | null
@@ -6452,11 +6460,15 @@ export type Database = {
           history?: Json | null
           id?: string
           is_internal?: boolean
+          is_recurring?: boolean
+          next_occurrence_generated?: boolean
           notification_sent_at?: string | null
           platform?: string | null
           post_date?: string | null
           post_type?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
+          recurrence_parent_id?: string | null
+          recurrence_rule?: Json | null
           status?: string
           subtasks?: Json | null
           task_type?: string | null
@@ -6520,6 +6532,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "tasks_recurrence_parent_id_fkey"
+            columns: ["recurrence_parent_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -7358,6 +7377,10 @@ export type Database = {
           name: string
           phone: string
         }[]
+      }
+      generate_next_recurring_task: {
+        Args: { p_next_due_date: string; p_task_id: string }
+        Returns: string
       }
       get_agency_subscription: {
         Args: { agency_uuid?: string }

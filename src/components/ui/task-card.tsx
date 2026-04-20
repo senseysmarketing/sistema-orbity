@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Clock, AlertCircle, Target, Users, Circle, Loader, Eye, CheckCircle2 } from "lucide-react";
+import { CheckCircle, Clock, AlertCircle, Target, Users, Circle, Loader, Eye, CheckCircle2, RotateCw } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -30,6 +30,7 @@ interface Task {
   created_at: string;
   created_by: string;
   task_type?: string | null;
+  is_recurring?: boolean;
 }
 
 interface TaskCardProps {
@@ -139,7 +140,15 @@ export function TaskCard({
       </div>
 
       {/* Linha 2: Título */}
-      <h3 className="font-semibold text-sm md:text-base line-clamp-2 break-words mb-2 md:mb-3 text-white">{task.title}</h3>
+      <h3 className="font-semibold text-sm md:text-base line-clamp-2 break-words mb-2 md:mb-3 text-white">
+        {task.title}
+        {task.is_recurring && (
+          <RotateCw
+            className="inline-block ml-1.5 h-3.5 w-3.5 text-white/70 align-[-2px]"
+            aria-label="Tarefa recorrente"
+          />
+        )}
+      </h3>
       
       {task.description && (
         <p className="text-sm text-white/70 mb-2 line-clamp-2">

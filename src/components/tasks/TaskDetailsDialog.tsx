@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock, Copy, Hash, Smartphone, Palette, CalendarClock, Sparkles, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock, Copy, Hash, Smartphone, Palette, CalendarClock, Sparkles, Loader2, RotateCw } from "lucide-react";
 import { getTypeColor } from "@/components/ui/task-card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
@@ -20,6 +20,7 @@ import { useAIAssist } from "@/hooks/useAIAssist";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { describeRecurrence } from "@/lib/recurrence";
 
 interface Subtask {
   id: string;
@@ -47,6 +48,10 @@ interface Task {
   post_date?: string | null;
   hashtags?: string[] | null;
   creative_instructions?: string | null;
+  is_recurring?: boolean;
+  recurrence_rule?: any;
+  recurrence_parent_id?: string | null;
+  next_occurrence_generated?: boolean;
 }
 
 interface Client {
@@ -93,6 +98,8 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   const [history, setHistory] = useState<any[]>([]);
   const [creatorName, setCreatorName] = useState<string>("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [showStopRecurrenceAlert, setShowStopRecurrenceAlert] = useState(false);
+  const [stoppingRecurrence, setStoppingRecurrence] = useState(false);
   
   const { canDelete, isCreator, isAdmin, creatorName: permissionCreatorName } = useDeletePermission(task?.created_by);
   const { improveTask, loading: aiLoading } = useAIAssist();
@@ -227,6 +234,35 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
     return null;
   };
 
+  const handleStopRecurrence = async () => {
+    if (!localTask) return;
+    setStoppingRecurrence(true);
+    try {
+      const parentScope = localTask.recurrence_parent_id ?? localTask.id;
+      const { error } = await supabase
+        .from("tasks")
+        .update({ is_recurring: false, next_occurrence_generated: true })
+        .or(`id.eq.${localTask.id},recurrence_parent_id.eq.${parentScope}`)
+        .neq("status", "done");
+      if (error) throw error;
+      toast({
+        title: "Recorrência interrompida",
+        description: "Esta tarefa não gerará mais ocorrências.",
+      });
+      setLocalTask({ ...localTask, is_recurring: false, next_occurrence_generated: true });
+      onTaskUpdate?.();
+    } catch (err: any) {
+      toast({
+        title: "Erro ao interromper recorrência",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setStoppingRecurrence(false);
+      setShowStopRecurrenceAlert(false);
+    }
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -250,6 +286,29 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
               </Badge>
               {getUrgencyBadge()}
             </div>
+
+            {localTask.is_recurring && (
+              <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/50 px-3 py-2">
+                <div className="flex items-center gap-2 text-sm min-w-0">
+                  <RotateCw className="h-4 w-4 text-primary flex-shrink-0" />
+                  <span className="font-medium">Tarefa recorrente</span>
+                  {localTask.recurrence_rule && (
+                    <span className="text-muted-foreground truncate">
+                      · {describeRecurrence(localTask.recurrence_rule)}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowStopRecurrenceAlert(true)}
+                  disabled={stoppingRecurrence}
+                  className="flex-shrink-0"
+                >
+                  Parar Recorrência
+                </Button>
+              </div>
+            )}
 
             <Separator />
 
@@ -537,6 +596,29 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de confirmação para parar recorrência */}
+      <AlertDialog open={showStopRecurrenceAlert} onOpenChange={setShowStopRecurrenceAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCw className="h-5 w-5" />
+              Parar recorrência?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta tarefa e qualquer ocorrência futura pendente deixarão de ser recriadas automaticamente.
+              <br /><br />
+              Você pode reativar editando a tarefa novamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={stoppingRecurrence}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleStopRecurrence} disabled={stoppingRecurrence}>
+              {stoppingRecurrence ? "Parando..." : "Parar recorrência"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Dialog de confirmação de exclusão */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
