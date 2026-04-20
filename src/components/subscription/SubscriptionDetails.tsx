@@ -81,6 +81,7 @@ export function SubscriptionDetails() {
       case 'active':
         return <Badge className="bg-green-500 hover:bg-green-500 text-white">Ativo</Badge>;
       case 'trialing':
+      case 'trial':
         return <Badge className="bg-blue-500 hover:bg-blue-500 text-white">Período de Teste</Badge>;
       case 'past_due':
         return <Badge className="bg-amber-500 hover:bg-amber-500 text-white">Pagamento Pendente</Badge>;
