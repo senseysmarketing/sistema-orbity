@@ -6,14 +6,44 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Check, Crown, Zap } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 
+export type SubscriptionDialogMode = 'new' | 'reactivate' | 'upgrade';
+
 interface ManageSubscriptionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  mode?: SubscriptionDialogMode;
 }
 
-export function ManageSubscriptionDialog({ open, onOpenChange }: ManageSubscriptionDialogProps) {
+const MODE_COPY: Record<SubscriptionDialogMode, {
+  title: string;
+  description: string;
+  ctaMonthly: string;
+  ctaAnnual: string;
+}> = {
+  new: {
+    title: 'Escolha seu Plano Orbity',
+    description: 'Selecione o plano ideal para sua agência e comece agora',
+  ctaMonthly: 'Assinar Plano Mensal',
+    ctaAnnual: 'Assinar Plano Anual',
+  },
+  reactivate: {
+    title: 'Reative sua Assinatura',
+    description: 'Continue de onde parou — sua conta e dados permanecem intactos',
+    ctaMonthly: 'Reativar Plano Mensal',
+    ctaAnnual: 'Reativar Plano Anual',
+  },
+  upgrade: {
+    title: 'Faça Upgrade do seu Plano',
+    description: 'Garanta acesso contínuo antes do término do período de teste',
+    ctaMonthly: 'Assinar Plano Mensal',
+    ctaAnnual: 'Assinar Plano Anual',
+  },
+};
+
+export function ManageSubscriptionDialog({ open, onOpenChange, mode = 'new' }: ManageSubscriptionDialogProps) {
   const { plans, createCheckout } = useSubscription();
   const [loading, setLoading] = useState(false);
+  const copy = MODE_COPY[mode];
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -22,19 +52,19 @@ export function ManageSubscriptionDialog({ open, onOpenChange }: ManageSubscript
     }).format(price);
   };
 
-  const orbityPlans = plans.filter(plan => 
+  const orbityPlans = plans.filter(plan =>
     ['orbity_monthly', 'orbity_annual'].includes(plan.slug)
   );
 
   const handlePlanSelect = async (plan: typeof orbityPlans[0]) => {
     setLoading(true);
     try {
-      const priceId = plan.slug === 'orbity_annual' 
-        ? plan.stripe_price_id_yearly 
+      const priceId = plan.slug === 'orbity_annual'
+        ? plan.stripe_price_id_yearly
         : plan.stripe_price_id_monthly;
-      
+
       if (priceId) {
-        await createCheckout(priceId);
+        await createCheckout(priceId, undefined, { mode });
       }
     } catch (error) {
       console.error('Error selecting plan:', error);
@@ -47,19 +77,16 @@ export function ManageSubscriptionDialog({ open, onOpenChange }: ManageSubscript
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Escolha seu Plano Orbity</DialogTitle>
-          <DialogDescription>
-            Selecione o plano ideal para sua agência e comece agora
-          </DialogDescription>
+          <DialogTitle>{copy.title}</DialogTitle>
+          <DialogDescription>{copy.description}</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           {orbityPlans.map((plan) => {
             const isAnnual = plan.slug === 'orbity_annual';
-            
 
             return (
-              <Card 
+              <Card
                 key={plan.id}
                 className={`transition-all duration-200 hover:shadow-md relative ${isAnnual ? 'border-2 border-primary' : ''}`}
               >
@@ -130,7 +157,7 @@ export function ManageSubscriptionDialog({ open, onOpenChange }: ManageSubscript
                     onClick={() => handlePlanSelect(plan)}
                     disabled={loading}
                   >
-                    {isAnnual ? 'Assinar Plano Anual' : 'Assinar Plano Mensal'}
+                    {isAnnual ? copy.ctaAnnual : copy.ctaMonthly}
                   </Button>
                 </CardContent>
               </Card>
