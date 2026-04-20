@@ -287,6 +287,29 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
               {getUrgencyBadge()}
             </div>
 
+            {localTask.is_recurring && (
+              <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/50 px-3 py-2">
+                <div className="flex items-center gap-2 text-sm min-w-0">
+                  <RotateCw className="h-4 w-4 text-primary flex-shrink-0" />
+                  <span className="font-medium">Tarefa recorrente</span>
+                  {localTask.recurrence_rule && (
+                    <span className="text-muted-foreground truncate">
+                      · {describeRecurrence(localTask.recurrence_rule)}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowStopRecurrenceAlert(true)}
+                  disabled={stoppingRecurrence}
+                  className="flex-shrink-0"
+                >
+                  Parar Recorrência
+                </Button>
+              </div>
+            )}
+
             <Separator />
 
             <div className="space-y-3">
