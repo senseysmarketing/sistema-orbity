@@ -33,7 +33,8 @@ export function SubscriptionStatus() {
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'active': return 'bg-green-500';
-      case 'trialing': return 'bg-blue-400';
+      case 'trialing':
+      case 'trial': return 'bg-blue-400';
       case 'past_due': return 'bg-red-500';
       case 'canceled': return 'bg-gray-500';
       default: return 'bg-gray-500';
@@ -43,15 +44,16 @@ export function SubscriptionStatus() {
   const getStatusText = (status?: string) => {
     switch (status) {
       case 'active': return 'Ativo';
-      case 'trialing': return 'Período de Teste (Ativo)';
+      case 'trialing':
+      case 'trial': return 'Período de Teste (Ativo)';
       case 'past_due': return 'Pagamento Atrasado';
       case 'canceled': return 'Inativo';
       default: return 'Inativo';
     }
   };
 
-  const isSubscriptionActive = currentSubscription?.subscribed && 
-    (currentSubscription?.subscription_status === 'active' || currentSubscription?.subscription_status === 'trialing');
+  const isTrialing = currentSubscription?.subscription_status === 'trialing' || currentSubscription?.subscription_status === 'trial';
+  const isSubscriptionActive = (currentSubscription?.subscribed && currentSubscription?.subscription_status === 'active') || isTrialing;
 
   return (
     <Card>
@@ -112,7 +114,7 @@ export function SubscriptionStatus() {
         {isSubscriptionActive && (
           <Button
             onClick={() => {
-              if (!currentSubscription?.customer_id || currentSubscription?.subscription_status === 'trialing') {
+              if (!currentSubscription?.customer_id || isTrialing) {
                 setShowManageDialog(true);
               } else {
                 openCustomerPortal();
@@ -121,7 +123,7 @@ export function SubscriptionStatus() {
             className="w-full"
             variant="outline"
           >
-            {currentSubscription?.subscription_status === 'trialing' ? 'Escolher Plano e Assinar' : 'Gerenciar Assinatura'}
+            {isTrialing ? 'Escolher Plano e Assinar' : 'Gerenciar Assinatura'}
           </Button>
         )}
       </CardContent>
