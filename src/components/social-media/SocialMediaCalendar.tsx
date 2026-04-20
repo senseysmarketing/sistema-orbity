@@ -16,6 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getVirtualAgencyClient, isVirtualAgencyClient } from "@/lib/virtualAgencyClient";
 
 const STATUSES = [
   { value: "draft", label: "Briefing" },
@@ -83,13 +84,26 @@ export function SocialMediaCalendar() {
     setClientFilter(prev => prev.includes(clientId) ? prev.filter(id => id !== clientId) : [...prev, clientId]);
   };
 
+  const clientsWithAgency = currentAgency
+    ? [getVirtualAgencyClient({ id: currentAgency.id, name: currentAgency.name }), ...clients]
+    : clients;
+
   const getFilteredPostsForDate = (date: Date) => {
     return allTasks.filter(task => {
       const effectiveDate = task.post_date || task.scheduled_date;
       if (!effectiveDate) return false;
       const matchesDate = isSameDay(new Date(effectiveDate), date);
       if (!matchesDate) return false;
-      const matchesClient = clientFilter.length === 0 || clientFilter.includes(task.client_id || '');
+
+      const hasAgencyFilter = clientFilter.some(isVirtualAgencyClient);
+      const realClientFilter = clientFilter.filter(id => !isVirtualAgencyClient(id));
+      const isInternalPost = !task.client_id;
+
+      const matchesClient =
+        clientFilter.length === 0 ||
+        (hasAgencyFilter && isInternalPost) ||
+        (!!task.client_id && realClientFilter.includes(task.client_id));
+
       const matchesStatus = statusFilter === "all" || task.status === statusFilter;
       return matchesClient && matchesStatus;
     });
@@ -180,7 +194,7 @@ export function SocialMediaCalendar() {
             <PopoverContent className="w-64 p-0" align="start">
               <ScrollArea className="h-64">
                 <div className="p-2 space-y-1">
-                  {clients.map((client) => (
+                  {clientsWithAgency.map((client) => (
                     <div key={client.id} className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer" onClick={() => toggleClientFilter(client.id)}>
                       <Checkbox checked={clientFilter.includes(client.id)} onCheckedChange={() => toggleClientFilter(client.id)} />
                       <span className="text-sm">{client.name}</span>
