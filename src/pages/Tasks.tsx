@@ -1106,6 +1106,42 @@ export default function Tasks() {
 
       await addHistoryEntry(taskId, `Status alterado para ${getStatusName(newStatus)}`);
 
+      // Recurring → spawn next occurrence atomically when moving to "done"
+      if (
+        newStatus === "done" &&
+        task.is_recurring &&
+        !task.next_occurrence_generated &&
+        task.due_date &&
+        task.recurrence_rule
+      ) {
+        const nextDue = computeNextDueDate(task.due_date, task.recurrence_rule);
+        if (nextDue) {
+          const { error: rpcError } = await supabase.rpc(
+            "generate_next_recurring_task" as any,
+            { p_task_id: taskId, p_next_due_date: nextDue }
+          );
+          if (rpcError) {
+            // Rollback status (visual + DB)
+            setTasks((prev) =>
+              prev.map((t) => (t.id === taskId ? { ...t, status: task.status } : t))
+            );
+            await supabase.from("tasks").update({ status: task.status }).eq("id", taskId);
+            toast({
+              title: "Falha ao gerar próxima ocorrência",
+              description: rpcError.message,
+              variant: "destructive",
+            });
+            return;
+          }
+          toast({
+            title: "🔁 Próxima ocorrência criada",
+            description: formatDateBR(nextDue.split("T")[0]),
+          });
+          fetchTasks();
+          return;
+        }
+      }
+
       toast({
         title: "Sucesso",
         description: `Tarefa movida para ${getStatusName(newStatus)}!`,
