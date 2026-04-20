@@ -97,11 +97,10 @@ export function SocialMediaCalendar() {
 
       const hasAgencyFilter = clientFilter.some(isVirtualAgencyClient);
       const realClientFilter = clientFilter.filter(id => !isVirtualAgencyClient(id));
-      const isInternalPost = !task.client_id;
 
       const matchesClient =
         clientFilter.length === 0 ||
-        (hasAgencyFilter && isInternalPost) ||
+        (hasAgencyFilter && task.is_internal) ||
         (!!task.client_id && realClientFilter.includes(task.client_id));
 
       const matchesStatus = statusFilter === "all" || task.status === statusFilter;
