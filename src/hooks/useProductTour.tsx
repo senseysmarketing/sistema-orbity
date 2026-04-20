@@ -38,18 +38,28 @@ export function ProductTourProvider({ children }: { children: ReactNode }) {
     setCurrentStep(0);
   };
 
+  const findNextValidStep = (from: number, dir: 1 | -1): number => {
+    let i = from;
+    while (i >= 0 && i < totalSteps) {
+      const target = tourSteps[i]?.target;
+      if (target && document.querySelector(target)) return i;
+      i += dir;
+    }
+    return -1;
+  };
+
   const nextStep = () => {
-    if (currentStep < totalSteps - 1) {
-      setCurrentStep(prev => prev + 1);
-    } else {
+    const next = findNextValidStep(currentStep + 1, 1);
+    if (next === -1) {
       completeTour();
+    } else {
+      setCurrentStep(next);
     }
   };
 
   const prevStep = () => {
-    if (currentStep > 0) {
-      setCurrentStep(prev => prev - 1);
-    }
+    const prev = findNextValidStep(currentStep - 1, -1);
+    if (prev !== -1) setCurrentStep(prev);
   };
 
   const goToStep = (stepIndex: number) => {
