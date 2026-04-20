@@ -92,7 +92,7 @@ export function SubscriptionDetails() {
     }
   };
 
-  const isTrialing = status === 'trialing';
+  const isTrialing = status === 'trialing' || status === 'trial';
   const isActive = status === 'active';
   const isPastDue = status === 'past_due';
   const isCanceled = status === 'canceled';
@@ -260,7 +260,7 @@ export function SubscriptionDetails() {
             <div className="flex items-start gap-2">
               <Sparkles className="h-5 w-5 text-primary mt-0.5 shrink-0" />
               <p className="text-sm text-foreground">
-                Garanta acesso contínuo ao Orbity. Escolha um plano antes do término do período de teste.
+                Você está no período de teste gratuito. Assine agora para garantir acesso contínuo ao Orbity após o término — sem precisar esperar os 7 dias.
               </p>
             </div>
             <Button
