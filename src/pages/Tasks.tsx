@@ -744,7 +744,7 @@ export default function Tasks() {
           post_date: isSocial && newTask.post_date ? dateOnlyToISO(newTask.post_date) : null,
           hashtags: hashtagsArray,
           creative_instructions: hasCreative ? (newTask.creative_instructions || null) : null,
-          is_recurring: newTask.is_recurring,
+          is_recurring: !!newTask.is_recurring,
           recurrence_rule: recurrenceRulePayload as any,
         }])
         .select()
@@ -932,7 +932,7 @@ export default function Tasks() {
         hashtags: hashtagsArrayEdit,
         creative_instructions: hasCreativeEdit ? (newTask.creative_instructions || null) : null,
         updated_by: profile?.user_id,
-        is_recurring: newTask.is_recurring,
+        is_recurring: !!newTask.is_recurring,
         recurrence_rule: recurrenceRulePayload as any,
       };
 
@@ -1061,6 +1061,11 @@ export default function Tasks() {
       post_date: "",
       hashtags: task.hashtags?.join(", ") || "",
       creative_instructions: task.creative_instructions || "",
+      is_recurring: !!task.is_recurring,
+      recurrence_frequency: (task.recurrence_rule?.frequency as RecurrenceFrequency) || "weekly",
+      recurrence_interval: task.recurrence_rule?.interval || 1,
+      recurrence_days_of_week: task.recurrence_rule?.daysOfWeek || [],
+      recurrence_end_at: task.recurrence_rule?.endAt || "",
     });
     setIsDetailDialogOpen(false);
     setCreateStep(2);
