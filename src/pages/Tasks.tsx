@@ -712,6 +712,17 @@ export default function Tasks() {
         ? newTask.hashtags.split(",").map(h => h.trim()).filter(Boolean)
         : null;
 
+      const recurrenceRulePayload: RecurrenceRule | null = newTask.is_recurring
+        ? {
+            frequency: newTask.recurrence_frequency,
+            interval: Math.max(1, newTask.recurrence_interval || 1),
+            ...(newTask.recurrence_frequency === "weekly" &&
+            newTask.recurrence_days_of_week.length > 0
+              ? { daysOfWeek: newTask.recurrence_days_of_week }
+              : {}),
+          }
+        : null;
+
       const { data: taskData, error } = await supabase
         .from("tasks")
         .insert([{
@@ -733,6 +744,8 @@ export default function Tasks() {
           post_date: isSocial && newTask.post_date ? dateOnlyToISO(newTask.post_date) : null,
           hashtags: hashtagsArray,
           creative_instructions: hasCreative ? (newTask.creative_instructions || null) : null,
+          is_recurring: newTask.is_recurring,
+          recurrence_rule: recurrenceRulePayload as any,
         }])
         .select()
         .single();
