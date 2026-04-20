@@ -141,6 +141,7 @@ export function useSocialMediaTasks() {
           hashtags,
           creative_instructions: creativeInstructions,
           archived: task.archived || false,
+          is_internal: task.is_internal || false,
           created_at: task.created_at,
           created_by: task.created_by,
           agency_id: task.agency_id,
