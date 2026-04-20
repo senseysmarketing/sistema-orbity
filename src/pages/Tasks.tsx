@@ -1065,7 +1065,6 @@ export default function Tasks() {
       recurrence_frequency: (task.recurrence_rule?.frequency as RecurrenceFrequency) || "weekly",
       recurrence_interval: task.recurrence_rule?.interval || 1,
       recurrence_days_of_week: task.recurrence_rule?.daysOfWeek || [],
-      recurrence_end_at: task.recurrence_rule?.endAt || "",
     });
     setIsDetailDialogOpen(false);
     setCreateStep(2);
