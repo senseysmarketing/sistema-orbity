@@ -360,6 +360,35 @@ export default function NPSPage() {
         </div>
       </div>
 
+      {/* Filtro rápido — Ciclo Atual */}
+      <Card className="border-dashed">
+        <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <Switch
+              id="filter-cycle"
+              checked={filterByCycle}
+              onCheckedChange={setFilterByCycle}
+              disabled={!activeCycle}
+            />
+            <div>
+              <Label htmlFor="filter-cycle" className="cursor-pointer">
+                Ver apenas o Ciclo Atual
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {activeCycle
+                  ? "Filtra gráficos e respostas pelo intervalo do ciclo ativo."
+                  : "Nenhum ciclo ativo no momento. Configure em Metas & Bônus."}
+              </p>
+            </div>
+          </div>
+          {activeCycle && filterByCycle && (
+            <Badge variant="secondary" className="text-xs">
+              Ciclo: {activeCycle.label} · {format(parseISO(activeCycle.start_date), "dd/MM", { locale: ptBR })} – {format(parseISO(activeCycle.end_date), "dd/MM", { locale: ptBR })}
+            </Badge>
+          )}
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="dashboard" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="dashboard" className="gap-2"><Users className="h-4 w-4" />Dashboard</TabsTrigger>
