@@ -14,7 +14,7 @@ import { NPSChart } from "./NPSChart";
 import { ScorecardCard } from "./ScorecardCard";
 import { Gift, Plus, Settings2, Trash2, Pencil } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
-import { format, eachMonthOfInterval, startOfMonth, endOfMonth, parseISO, isFuture } from "date-fns";
+import { format, eachMonthOfInterval, startOfMonth, endOfMonth, parseISO, isFuture, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface PPRDashboardProps {
@@ -34,8 +34,15 @@ interface BonusPeriod {
   bonus_pool_amount: number;
   nps_target: number;
   nps_actual: number;
+  min_nps_target: number;
   status: string;
 }
+
+// G1 — Helper de intervalo blindado contra "End of Day Trap"
+const cycleRange = (cycle: { start_date: string; end_date: string }) => ({
+  from: startOfDay(parseISO(cycle.start_date)).toISOString(),
+  to: endOfDay(parseISO(cycle.end_date)).toISOString(),
+});
 
 interface NpsResponse {
   id: string;
@@ -295,7 +302,8 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
       end_date: data.end_date as string,
       revenue_target: data.revenue_target as number,
       bonus_pool_percent: data.bonus_pool_percent as number,
-      nps_target: data.nps_target as number,
+      nps_target: (data.nps_target as number) ?? 60,
+      min_nps_target: (data.min_nps_target as number) ?? 8.0,
     }]);
 
     if (error) {
@@ -445,9 +453,27 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
     return { totalRevenue, totalProfit, totalPool, currentRecurring: lastWithData?.revenue || 0 };
   }, [monthlyData]);
 
-  const revenueProgress = selectedPeriod
-    ? Math.min(100, (totals.currentRecurring / (selectedPeriod.revenue_target || 1)) * 100)
-    : 0;
+  // G2 — Zero-State: meta zerada não causa divisão por zero
+  const revenueProgress =
+    selectedPeriod && selectedPeriod.revenue_target > 0
+      ? Math.min(100, (totals.totalRevenue / selectedPeriod.revenue_target) * 100)
+      : 0;
+  const hasRevenueTarget = !!(selectedPeriod && selectedPeriod.revenue_target > 0);
+
+  // G2/G3 — Nota Média do ciclo (escala 0-10), null quando não há respostas
+  const cycleAverageScore = useMemo(() => {
+    if (!npsResponses.length) return null;
+    const sum = npsResponses.reduce((s, r) => s + (r.score || 0), 0);
+    return sum / npsResponses.length;
+  }, [npsResponses]);
+
+  const minNpsTarget = selectedPeriod?.min_nps_target ?? 8.0;
+  const npsStatus: "neutral" | "ok" | "alert" =
+    cycleAverageScore === null
+      ? "neutral"
+      : cycleAverageScore >= minNpsTarget
+      ? "ok"
+      : "alert";
 
   if (loading) {
     return <div className="flex items-center justify-center h-32">

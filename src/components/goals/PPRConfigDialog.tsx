@@ -19,6 +19,7 @@ interface PPRConfigDialogProps {
     revenue_target: number;
     bonus_pool_percent: number;
     nps_target: number;
+    min_nps_target?: number;
   };
   onSave: (updates: Record<string, unknown>) => void;
   onDelete?: () => void;
@@ -33,8 +34,8 @@ export function PPRConfigDialog({ open, onOpenChange, mode, period, onSave, onDe
     period?.end_date ? parseISO(period.end_date) : undefined
   );
   const [revenueTarget, setRevenueTarget] = useState(period?.revenue_target || 50000);
-  const [poolPercent, setPoolPercent] = useState(period?.bonus_pool_percent || 10);
-  const [npsTarget, setNpsTarget] = useState(period?.nps_target || 60);
+  const [poolPercent] = useState(period?.bonus_pool_percent || 10);
+  const [minNpsTarget, setMinNpsTarget] = useState<number>(period?.min_nps_target ?? 8.0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleSave = () => {
@@ -45,7 +46,8 @@ export function PPRConfigDialog({ open, onOpenChange, mode, period, onSave, onDe
       end_date: endDate.toISOString().split("T")[0],
       revenue_target: revenueTarget,
       bonus_pool_percent: poolPercent,
-      nps_target: npsTarget,
+      nps_target: period?.nps_target ?? 60, // legado preservado
+      min_nps_target: minNpsTarget,
     });
     onOpenChange(false);
   };
@@ -58,14 +60,14 @@ export function PPRConfigDialog({ open, onOpenChange, mode, period, onSave, onDe
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {mode === "create" ? "Criar Novo Período" : "Editar Período"}
+              {mode === "create" ? "Criar Novo Ciclo" : "Editar Ciclo"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Nome do Período</Label>
+              <Label>Nome do Ciclo</Label>
               <Input
-                placeholder="Ex: Mar-Mai 2026, Q2 2026"
+                placeholder="Ex: Q1 2026, Sprint Inverno"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
               />
@@ -89,7 +91,7 @@ export function PPRConfigDialog({ open, onOpenChange, mode, period, onSave, onDe
               </div>
             </div>
             <div>
-              <Label>Meta de Faturamento Recorrente (R$)</Label>
+              <Label>Meta de Faturamento (R$)</Label>
               <Input
                 type="number"
                 value={revenueTarget}
@@ -97,24 +99,18 @@ export function PPRConfigDialog({ open, onOpenChange, mode, period, onSave, onDe
               />
             </div>
             <div>
-              <Label>% do Lucro para o Pool</Label>
+              <Label>Nota Mínima Média (0–10)</Label>
               <Input
                 type="number"
-                min={1}
-                max={100}
-                value={poolPercent}
-                onChange={(e) => setPoolPercent(Number(e.target.value))}
+                step={0.1}
+                min={0}
+                max={10}
+                value={minNpsTarget}
+                onChange={(e) => setMinNpsTarget(Number(e.target.value))}
               />
-            </div>
-            <div>
-              <Label>Meta de NPS</Label>
-              <Input
-                type="number"
-                min={-100}
-                max={100}
-                value={npsTarget}
-                onChange={(e) => setNpsTarget(Number(e.target.value))}
-              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Média mínima de satisfação esperada para liberação do bônus do ciclo.
+              </p>
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -142,9 +138,9 @@ export function PPRConfigDialog({ open, onOpenChange, mode, period, onSave, onDe
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir período?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir ciclo?</AlertDialogTitle>
             <AlertDialogDescription>
-              Todas as respostas NPS e scorecards associados a este período serão excluídos permanentemente. Esta ação não pode ser desfeita.
+              Todas as respostas NPS e scorecards associados a este ciclo serão excluídos permanentemente. Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -157,7 +153,7 @@ export function PPRConfigDialog({ open, onOpenChange, mode, period, onSave, onDe
                 onDelete?.();
               }}
             >
-              Excluir Período
+              Excluir Ciclo
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
