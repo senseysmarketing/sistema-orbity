@@ -548,6 +548,78 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
         )}
       </div>
 
+      {/* HERO — Quiet Luxury: Gauge de Faturamento + Nota Média do Ciclo */}
+      {selectedPeriod && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Gauge Faturamento */}
+          <Card>
+            <CardContent className="p-8">
+              <div className="flex flex-col items-center text-center space-y-6">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Faturamento do Ciclo
+                </p>
+                <RevenueGauge
+                  progress={revenueProgress}
+                  hasTarget={hasRevenueTarget}
+                />
+                <div className="space-y-1">
+                  <p className="text-4xl font-light tracking-tight text-foreground">
+                    {formatCurrency(totals.totalRevenue)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {hasRevenueTarget
+                      ? <>Meta: <span className="font-medium text-foreground">{formatCurrency(selectedPeriod.revenue_target)}</span> · {Math.round(revenueProgress)}%</>
+                      : "Meta não definida"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Nota Média do Ciclo */}
+          <Card>
+            <CardContent className="p-8">
+              <div className="flex flex-col items-center text-center space-y-6 h-full justify-center">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Nota Média do Ciclo
+                </p>
+                {cycleAverageScore === null ? (
+                  <>
+                    <p className="text-4xl font-light tracking-tight text-muted-foreground">—</p>
+                    <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
+                      Sem respostas no ciclo
+                    </Badge>
+                  </>
+                ) : (
+                  <>
+                    <p className={`text-6xl font-light tracking-tight ${
+                      npsStatus === "ok"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-destructive"
+                    }`}>
+                      {cycleAverageScore.toFixed(1)}
+                      <span className="text-2xl text-muted-foreground font-light"> / 10</span>
+                    </p>
+                    <Badge
+                      variant={npsStatus === "ok" ? "default" : "destructive"}
+                      className={npsStatus === "ok" ? "bg-emerald-500 hover:bg-emerald-500" : ""}
+                    >
+                      {npsStatus === "ok"
+                        ? `Meta atingida (≥ ${minNpsTarget.toFixed(1)})`
+                        : `Abaixo da meta (${minNpsTarget.toFixed(1)})`}
+                    </Badge>
+                  </>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Média de <span className="font-medium text-foreground">{npsResponses.length}</span>{" "}
+                  {npsResponses.length === 1 ? "resposta" : "respostas"} (escala 0–10)
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* BLOCO 1: Placar Financeiro - Tabela Mensal */}
       {selectedPeriod && (
         <div>
