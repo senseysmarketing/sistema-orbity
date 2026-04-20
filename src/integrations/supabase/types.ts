@@ -1030,6 +1030,7 @@ export type Database = {
           end_date: string
           id: string
           label: string
+          min_nps_target: number
           net_profit: number
           nps_actual: number
           nps_target: number
@@ -1048,6 +1049,7 @@ export type Database = {
           end_date: string
           id?: string
           label: string
+          min_nps_target?: number
           net_profit?: number
           nps_actual?: number
           nps_target?: number
@@ -1066,6 +1068,7 @@ export type Database = {
           end_date?: string
           id?: string
           label?: string
+          min_nps_target?: number
           net_profit?: number
           nps_actual?: number
           nps_target?: number

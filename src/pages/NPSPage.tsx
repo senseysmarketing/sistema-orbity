@@ -17,9 +17,15 @@ import {
   MessageSquareHeart, Send, Users, ThumbsUp, Minus, ThumbsDown, RefreshCw,
   MessageCircle, Palette, Settings2, AlertTriangle
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatPhoneDisplay } from "@/lib/formatPhoneDisplay";
+
+// G1 — Helper de intervalo blindado para evitar "End of Day Trap"
+const cycleRange = (cycle: { start_date: string; end_date: string }) => ({
+  from: startOfDay(parseISO(cycle.start_date)).toISOString(),
+  to: endOfDay(parseISO(cycle.end_date)).toISOString(),
+});
 
 function getCurrentPeriod(): string {
   const now = new Date();
@@ -34,6 +40,28 @@ export default function NPSPage() {
 
   // Local form state for customization
   const [customForm, setCustomForm] = useState<Record<string, any> | null>(null);
+
+  // Filtro rápido: ver apenas o ciclo atual
+  const [filterByCycle, setFilterByCycle] = useState(false);
+
+  // Busca o ciclo ativo (now BETWEEN start_date AND end_date)
+  const { data: activeCycle } = useQuery({
+    queryKey: ["nps-active-cycle", currentAgency?.id],
+    queryFn: async () => {
+      const today = new Date().toISOString().split("T")[0];
+      const { data } = await supabase
+        .from("bonus_periods")
+        .select("id, label, start_date, end_date")
+        .eq("agency_id", currentAgency!.id)
+        .lte("start_date", today)
+        .gte("end_date", today)
+        .order("start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!currentAgency?.id,
+  });
 
   // Fetch NPS responses
   const { data: responses = [], isLoading: loadingResponses } = useQuery({
@@ -137,18 +165,29 @@ export default function NPSPage() {
     },
   });
 
-  // NPS calculation
+  // G1 — Filtra respostas pelo intervalo do ciclo ativo (com end-of-day blindado)
+  const filteredResponses = useMemo(() => {
+    if (!filterByCycle || !activeCycle) return responses;
+    const { from, to } = cycleRange(activeCycle);
+    return responses.filter((r: any) => {
+      if (!r.response_date) return false;
+      const ts = new Date(r.response_date).toISOString();
+      return ts >= from && ts <= to;
+    });
+  }, [responses, filterByCycle, activeCycle]);
+
+  // NPS calculation (sobre lista filtrada)
   const npsMetrics = useMemo(() => {
-    if (!responses.length) return { nps: 0, promoters: 0, neutrals: 0, detractors: 0, total: 0 };
-    const promoters = responses.filter((r: any) => r.score >= 9).length;
-    const neutrals = responses.filter((r: any) => r.score >= 7 && r.score <= 8).length;
-    const detractors = responses.filter((r: any) => r.score <= 6).length;
-    const total = responses.length;
+    if (!filteredResponses.length) return { nps: 0, promoters: 0, neutrals: 0, detractors: 0, total: 0 };
+    const promoters = filteredResponses.filter((r: any) => r.score >= 9).length;
+    const neutrals = filteredResponses.filter((r: any) => r.score >= 7 && r.score <= 8).length;
+    const detractors = filteredResponses.filter((r: any) => r.score <= 6).length;
+    const total = filteredResponses.length;
     const nps = Math.round(((promoters - detractors) / total) * 100);
     return { nps, promoters, neutrals, detractors, total };
-  }, [responses]);
+  }, [filteredResponses]);
 
-  // Client status map
+  // Client status map (sempre baseado em todas as respostas — independente do filtro de ciclo)
   const clientStatusMap = useMemo(() => {
     const map: Record<string, "responded" | "pending" | "not_sent"> = {};
     clients.forEach((c: any) => {
@@ -320,6 +359,35 @@ export default function NPSPage() {
           <p className="text-sm text-muted-foreground">Acompanhe a satisfação dos seus clientes</p>
         </div>
       </div>
+
+      {/* Filtro rápido — Ciclo Atual */}
+      <Card className="border-dashed">
+        <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <Switch
+              id="filter-cycle"
+              checked={filterByCycle}
+              onCheckedChange={setFilterByCycle}
+              disabled={!activeCycle}
+            />
+            <div>
+              <Label htmlFor="filter-cycle" className="cursor-pointer">
+                Ver apenas o Ciclo Atual
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {activeCycle
+                  ? "Filtra gráficos e respostas pelo intervalo do ciclo ativo."
+                  : "Nenhum ciclo ativo no momento. Configure em Metas & Bônus."}
+              </p>
+            </div>
+          </div>
+          {activeCycle && filterByCycle && (
+            <Badge variant="secondary" className="text-xs">
+              Ciclo: {activeCycle.label} · {format(parseISO(activeCycle.start_date), "dd/MM", { locale: ptBR })} – {format(parseISO(activeCycle.end_date), "dd/MM", { locale: ptBR })}
+            </Badge>
+          )}
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="dashboard" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">

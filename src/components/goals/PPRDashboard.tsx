@@ -34,7 +34,48 @@ interface BonusPeriod {
   bonus_pool_amount: number;
   nps_target: number;
   nps_actual: number;
+  min_nps_target: number;
   status: string;
+}
+
+// (Helper de intervalo blindado é aplicado em NPSPage; aqui o filtro é por period_id.)
+
+// G2 — Gauge semi-circular (Quiet Luxury): monocromático, traço fino, cor semântica só no arco preenchido
+function RevenueGauge({ progress, hasTarget }: { progress: number; hasTarget: boolean }) {
+  const radius = 80;
+  const circumference = Math.PI * radius; // semicírculo
+  const clamped = Math.max(0, Math.min(100, progress));
+  const offset = circumference - (clamped / 100) * circumference;
+  const stroke = !hasTarget
+    ? "hsl(var(--muted-foreground))"
+    : clamped >= 100
+    ? "hsl(var(--primary))"
+    : clamped >= 70
+    ? "hsl(142 71% 45%)"
+    : clamped >= 40
+    ? "hsl(38 92% 50%)"
+    : "hsl(var(--destructive))";
+  return (
+    <svg width="200" height="110" viewBox="0 0 200 110" className="overflow-visible">
+      <path
+        d="M 20 100 A 80 80 0 0 1 180 100"
+        fill="none"
+        stroke="hsl(var(--muted))"
+        strokeWidth="8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M 20 100 A 80 80 0 0 1 180 100"
+        fill="none"
+        stroke={stroke}
+        strokeWidth="8"
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        style={{ transition: "stroke-dashoffset 600ms ease, stroke 300ms ease" }}
+      />
+    </svg>
+  );
 }
 
 interface NpsResponse {
@@ -295,7 +336,8 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
       end_date: data.end_date as string,
       revenue_target: data.revenue_target as number,
       bonus_pool_percent: data.bonus_pool_percent as number,
-      nps_target: data.nps_target as number,
+      nps_target: (data.nps_target as number) ?? 60,
+      min_nps_target: (data.min_nps_target as number) ?? 8.0,
     }]);
 
     if (error) {
@@ -445,9 +487,27 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
     return { totalRevenue, totalProfit, totalPool, currentRecurring: lastWithData?.revenue || 0 };
   }, [monthlyData]);
 
-  const revenueProgress = selectedPeriod
-    ? Math.min(100, (totals.currentRecurring / (selectedPeriod.revenue_target || 1)) * 100)
-    : 0;
+  // G2 — Zero-State: meta zerada não causa divisão por zero
+  const revenueProgress =
+    selectedPeriod && selectedPeriod.revenue_target > 0
+      ? Math.min(100, (totals.totalRevenue / selectedPeriod.revenue_target) * 100)
+      : 0;
+  const hasRevenueTarget = !!(selectedPeriod && selectedPeriod.revenue_target > 0);
+
+  // G2/G3 — Nota Média do ciclo (escala 0-10), null quando não há respostas
+  const cycleAverageScore = useMemo(() => {
+    if (!npsResponses.length) return null;
+    const sum = npsResponses.reduce((s, r) => s + (r.score || 0), 0);
+    return sum / npsResponses.length;
+  }, [npsResponses]);
+
+  const minNpsTarget = selectedPeriod?.min_nps_target ?? 8.0;
+  const npsStatus: "neutral" | "ok" | "alert" =
+    cycleAverageScore === null
+      ? "neutral"
+      : cycleAverageScore >= minNpsTarget
+      ? "ok"
+      : "alert";
 
   if (loading) {
     return <div className="flex items-center justify-center h-32">
@@ -491,8 +551,8 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
       {/* Period selector */}
       <div className="flex items-center gap-3 flex-wrap">
         <Select value={selectedPeriodId} onValueChange={setSelectedPeriodId}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Período" />
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Ciclo" />
           </SelectTrigger>
           <SelectContent>
             {periods.map((p) => (
@@ -505,7 +565,7 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
         {isAdmin && (
           <>
             <Button variant="outline" size="sm" onClick={handleCreatePeriod}>
-              <Plus className="h-4 w-4 mr-1" /> Novo Período
+              <Plus className="h-4 w-4 mr-1" /> Novo Ciclo
             </Button>
             <Button variant="ghost" size="sm" onClick={() => { setConfigMode("edit"); setShowConfig(true); }}>
               <Settings2 className="h-4 w-4 mr-1" /> Configurar
@@ -521,6 +581,78 @@ export function PPRDashboard({ program, isAdmin }: PPRDashboardProps) {
           </Badge>
         )}
       </div>
+
+      {/* HERO — Quiet Luxury: Gauge de Faturamento + Nota Média do Ciclo */}
+      {selectedPeriod && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Gauge Faturamento */}
+          <Card>
+            <CardContent className="p-8">
+              <div className="flex flex-col items-center text-center space-y-6">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Faturamento do Ciclo
+                </p>
+                <RevenueGauge
+                  progress={revenueProgress}
+                  hasTarget={hasRevenueTarget}
+                />
+                <div className="space-y-1">
+                  <p className="text-4xl font-light tracking-tight text-foreground">
+                    {formatCurrency(totals.totalRevenue)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {hasRevenueTarget
+                      ? <>Meta: <span className="font-medium text-foreground">{formatCurrency(selectedPeriod.revenue_target)}</span> · {Math.round(revenueProgress)}%</>
+                      : "Meta não definida"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Nota Média do Ciclo */}
+          <Card>
+            <CardContent className="p-8">
+              <div className="flex flex-col items-center text-center space-y-6 h-full justify-center">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  Nota Média do Ciclo
+                </p>
+                {cycleAverageScore === null ? (
+                  <>
+                    <p className="text-4xl font-light tracking-tight text-muted-foreground">—</p>
+                    <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
+                      Sem respostas no ciclo
+                    </Badge>
+                  </>
+                ) : (
+                  <>
+                    <p className={`text-6xl font-light tracking-tight ${
+                      npsStatus === "ok"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-destructive"
+                    }`}>
+                      {cycleAverageScore.toFixed(1)}
+                      <span className="text-2xl text-muted-foreground font-light"> / 10</span>
+                    </p>
+                    <Badge
+                      variant={npsStatus === "ok" ? "default" : "destructive"}
+                      className={npsStatus === "ok" ? "bg-emerald-500 hover:bg-emerald-500" : ""}
+                    >
+                      {npsStatus === "ok"
+                        ? `Meta atingida (≥ ${minNpsTarget.toFixed(1)})`
+                        : `Abaixo da meta (${minNpsTarget.toFixed(1)})`}
+                    </Badge>
+                  </>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Média de <span className="font-medium text-foreground">{npsResponses.length}</span>{" "}
+                  {npsResponses.length === 1 ? "resposta" : "respostas"} (escala 0–10)
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* BLOCO 1: Placar Financeiro - Tabela Mensal */}
       {selectedPeriod && (
