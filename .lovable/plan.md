@@ -1,37 +1,35 @@
 
 
-# Corrigir links da Central de Ajuda + Tour Guiado
+# Botão de feedback WhatsApp na Central de Ajuda
 
-## Problema
-- `HelpCenter.tsx` navega para rotas antigas sem prefixo (`/`, `/crm`, `/tasks`, `/agenda`, `/social-media`, `/traffic`, `/admin`). Todas as rotas reais estão sob `/dashboard/*` (ver `App.tsx`).
-- Resultado: clicar nos guias leva à Landing Page (rota `/`) ou cai no `NotFound`.
-- Tour Guiado (`tourSteps.ts`) está consistente com `data-tour` da sidebar, mas o passo `admin` aparece para usuários não-admin (item da sidebar tem `requiresAdmin: true`), o que pode quebrar o highlight.
+## Mudança
+Adicionar bloco fixo no final do `SheetContent` em `src/components/help/HelpCenter.tsx`, sempre visível abaixo das 3 abas (IA / Guias / Vídeos).
 
-## Mudanças
+## Layout proposto
+Card sutil (`border-t pt-4 mt-6`) com:
+- Texto curto: **"Encontrou um bug ou tem uma sugestão? Seu feedback ajuda o Orbity a evoluir."**
+- Botão verde WhatsApp (ícone SVG igual ao `WhatsAppFloatingButton.tsx`) → abre conversa em nova aba.
 
-### 1. `src/components/help/HelpCenter.tsx`
-Atualizar todas as rotas do array `quickGuides` para o prefixo correto:
+```
+┌─────────────────────────────────────┐
+│ 💬 Encontrou um bug ou sugestão?    │
+│ Seu feedback ajuda o Orbity         │
+│ a ficar cada vez melhor.            │
+│                                      │
+│ [  Enviar feedback no WhatsApp  ]   │
+└─────────────────────────────────────┘
+```
 
-| Antes | Depois |
-|---|---|
-| `/` | `/dashboard` |
-| `/crm` | `/dashboard/crm` |
-| `/tasks` | `/dashboard/tasks` |
-| `/agenda` | `/dashboard/agenda` |
-| `/social-media` | `/dashboard/social-media` |
-| `/traffic` | `/dashboard/traffic` |
-| `/admin` | `/dashboard/admin` |
+## Detalhes técnicos
+- Reutilizar número/mensagem do `WhatsAppFloatingButton.tsx`:
+  - `phoneNumber = "5516994481535"`
+  - Mensagem dedicada: `"Olá! Quero enviar um feedback/reportar um bug no Orbity:"`
+- `<a target="_blank" rel="noopener noreferrer">` com classes Tailwind verdes (`bg-green-500 hover:bg-green-600`).
+- Posicionado **fora** das `<Tabs>`, garantindo presença em qualquer aba ativa.
+- `SheetContent` já tem `overflow-y-auto`, então o bloco rola junto no final — sem `sticky`, mantém o estilo "Quiet Luxury" coerente com o resto da Central.
 
-### 2. `src/components/tour/tourSteps.ts`
-- Manter os 7 passos atuais (selectors `data-tour` já batem com a sidebar).
-- O passo `admin` ficará oculto silenciosamente para não-admins porque o elemento `[data-tour="admin"]` não existe no DOM deles — verificar se o overlay do tour lida bem com target ausente. Se não, adicionar fallback no hook `useProductTour` para pular passos cujo target não exista no DOM.
+## Ficheiro alterado
+- `src/components/help/HelpCenter.tsx` (adicionar bloco final + import do ícone WhatsApp inline SVG).
 
-### 3. (Opcional, mas alinha com a sidebar atual) `HelpCenter.tsx`
-Adicionar entrada para **Relatórios** (`/dashboard/reports`, ícone `BarChart3`) já que existe na sidebar — mantém a Central de Ajuda completa.
-
-## Ficheiros alterados
-- `src/components/help/HelpCenter.tsx` (rotas + opcional novo guia Relatórios)
-- `src/hooks/useProductTour.tsx` (skip seguro de passo com target ausente)
-
-Sem migrations. Sem mudanças em queries ou edge functions.
+Sem migrations. Sem novas dependências.
 
