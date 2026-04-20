@@ -67,7 +67,7 @@ export function useSocialMediaTasks() {
         .from('tasks')
         .select(`
           id, title, description, status, priority,
-          due_date, created_at, created_by, agency_id, archived,
+          due_date, created_at, created_by, agency_id, archived, is_internal,
           platform, post_type, post_date, hashtags, creative_instructions,
           task_clients(client_id, clients(name)),
           task_assignments(user_id)
