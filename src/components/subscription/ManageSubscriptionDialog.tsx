@@ -40,6 +40,16 @@ const MODE_COPY: Record<SubscriptionDialogMode, {
   },
 };
 
+const PLAN_FEATURES = [
+  "Membros ilimitados da equipa",
+  "CRM de Vendas & Pipeline",
+  "Automação de WhatsApp Multi-instância",
+  "Gestor de Redes Sociais com IA",
+  "Cobrança Automática (Asaas/Conexa)",
+  "Agenda sincronizada com Google Calendar",
+  "Onboarding Premium Dedicado",
+];
+
 export function ManageSubscriptionDialog({ open, onOpenChange, mode = 'new' }: ManageSubscriptionDialogProps) {
   const { plans, createCheckout } = useSubscription();
   const [loading, setLoading] = useState(false);
