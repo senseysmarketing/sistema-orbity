@@ -17,9 +17,15 @@ import {
   MessageSquareHeart, Send, Users, ThumbsUp, Minus, ThumbsDown, RefreshCw,
   MessageCircle, Palette, Settings2, AlertTriangle
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfDay, endOfDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatPhoneDisplay } from "@/lib/formatPhoneDisplay";
+
+// G1 — Helper de intervalo blindado para evitar "End of Day Trap"
+const cycleRange = (cycle: { start_date: string; end_date: string }) => ({
+  from: startOfDay(parseISO(cycle.start_date)).toISOString(),
+  to: endOfDay(parseISO(cycle.end_date)).toISOString(),
+});
 
 function getCurrentPeriod(): string {
   const now = new Date();
@@ -34,6 +40,28 @@ export default function NPSPage() {
 
   // Local form state for customization
   const [customForm, setCustomForm] = useState<Record<string, any> | null>(null);
+
+  // Filtro rápido: ver apenas o ciclo atual
+  const [filterByCycle, setFilterByCycle] = useState(false);
+
+  // Busca o ciclo ativo (now BETWEEN start_date AND end_date)
+  const { data: activeCycle } = useQuery({
+    queryKey: ["nps-active-cycle", currentAgency?.id],
+    queryFn: async () => {
+      const today = new Date().toISOString().split("T")[0];
+      const { data } = await supabase
+        .from("bonus_periods")
+        .select("id, label, start_date, end_date")
+        .eq("agency_id", currentAgency!.id)
+        .lte("start_date", today)
+        .gte("end_date", today)
+        .order("start_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!currentAgency?.id,
+  });
 
   // Fetch NPS responses
   const { data: responses = [], isLoading: loadingResponses } = useQuery({
