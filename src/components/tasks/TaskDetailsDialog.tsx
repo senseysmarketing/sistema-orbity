@@ -98,6 +98,8 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   const [history, setHistory] = useState<any[]>([]);
   const [creatorName, setCreatorName] = useState<string>("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [showStopRecurrenceAlert, setShowStopRecurrenceAlert] = useState(false);
+  const [stoppingRecurrence, setStoppingRecurrence] = useState(false);
   
   const { canDelete, isCreator, isAdmin, creatorName: permissionCreatorName } = useDeletePermission(task?.created_by);
   const { improveTask, loading: aiLoading } = useAIAssist();
