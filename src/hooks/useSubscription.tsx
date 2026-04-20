@@ -43,7 +43,7 @@ interface SubscriptionContextType {
   refreshing: boolean;
   showRefreshAlert: boolean;
   checkSubscription: (forceRefresh?: boolean) => Promise<void>;
-  createCheckout: (priceId?: string, agencyId?: string) => Promise<void>;
+  createCheckout: (priceId?: string, agencyId?: string, opts?: { mode?: 'new' | 'reactivate' | 'upgrade' }) => Promise<void>;
   openCustomerPortal: () => Promise<void>;
   refreshPlans: () => Promise<void>;
   isFeatureAvailable: (feature: string) => boolean;
@@ -148,7 +148,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const createCheckout = async (priceId?: string, agencyId?: string) => {
+  const createCheckout = async (
+    priceId?: string,
+    agencyId?: string,
+    opts?: { mode?: 'new' | 'reactivate' | 'upgrade' },
+  ) => {
     if (!user) {
       toast.error('Você precisa estar logado para fazer uma assinatura');
       return;
@@ -174,6 +178,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       const body: any = {};
       if (priceId) body.priceId = priceId;
       if (agencyId) body.agencyId = agencyId;
+      if (opts?.mode) body.mode = opts.mode;
 
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body,

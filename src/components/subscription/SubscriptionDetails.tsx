@@ -2,24 +2,47 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { CreditCard, AlertCircle, RefreshCw, ExternalLink, Sparkles } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  CreditCard,
+  AlertCircle,
+  RefreshCw,
+  ExternalLink,
+  Sparkles,
+  Loader2,
+} from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useAgency } from '@/hooks/useAgency';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ManageSubscriptionDialog } from './ManageSubscriptionDialog';
+import { ManageSubscriptionDialog, type SubscriptionDialogMode } from './ManageSubscriptionDialog';
 
 export function SubscriptionDetails() {
-  const { 
-    currentSubscription, 
-    loading, 
-    refreshing, 
-    checkSubscription, 
-    openCustomerPortal 
+  const {
+    currentSubscription,
+    loading,
+    refreshing,
+    checkSubscription,
+    openCustomerPortal,
   } = useSubscription();
   const { currentAgency } = useAgency();
   const [showManageDialog, setShowManageDialog] = useState(false);
+  const [dialogMode, setDialogMode] = useState<SubscriptionDialogMode>('new');
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const openManageDialog = (mode: SubscriptionDialogMode) => {
+    setDialogMode(mode);
+    setShowManageDialog(true);
+  };
+
+  const handleManageSubscription = async () => {
+    setPortalLoading(true);
+    try {
+      await openCustomerPortal();
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -37,9 +60,12 @@ export function SubscriptionDetails() {
     );
   }
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
-    return format(new Date(dateString), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+  // Guardrail #1: parse seguro de datas (evita epoch / Invalid Date)
+  const safeFormatDate = (dateString?: string | null): string | null => {
+    if (!dateString) return null;
+    const parsed = new Date(dateString);
+    if (isNaN(parsed.getTime()) || parsed.getFullYear() < 2000) return null;
+    return format(parsed, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
   };
 
   const formatCurrency = (value?: number | null) => {
@@ -47,40 +73,43 @@ export function SubscriptionDetails() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
-  const getStatusColor = (status?: string) => {
+  const status = currentSubscription?.subscription_status;
+  const planName = currentSubscription?.plan_name;
+
+  const getStatusBadge = () => {
     switch (status) {
-      case 'active': return 'bg-green-500';
-      case 'trialing': return 'bg-blue-400';
-      case 'past_due': return 'bg-red-500';
-      case 'canceled': return 'bg-gray-500';
-      default: return 'bg-gray-500';
+      case 'active':
+        return <Badge className="bg-green-500 hover:bg-green-500 text-white">Ativo</Badge>;
+      case 'trialing':
+        return <Badge className="bg-blue-500 hover:bg-blue-500 text-white">Período de Teste</Badge>;
+      case 'past_due':
+        return <Badge className="bg-amber-500 hover:bg-amber-500 text-white">Pagamento Pendente</Badge>;
+      case 'canceled':
+        return <Badge variant="outline" className="border-amber-500/40 text-amber-700">Cancelada</Badge>;
+      default:
+        return <Badge variant="outline">Inativa</Badge>;
     }
   };
 
-  const getStatusText = (status?: string) => {
-    switch (status) {
-      case 'active': return 'Ativo';
-      case 'trialing': return 'Período de Teste (Ativo)';
-      case 'past_due': return 'Pagamento Atrasado';
-      case 'canceled': return 'Inativo';
-      default: return 'Inativo';
-    }
-  };
+  const isTrialing = status === 'trialing';
+  const isActive = status === 'active';
+  const isPastDue = status === 'past_due';
+  const isCanceled = status === 'canceled';
 
-  const isTrialing = currentSubscription?.subscription_status === 'trialing';
-  const isSubscriptionActive = currentSubscription?.subscribed && 
-    (currentSubscription?.subscription_status === 'active' || isTrialing);
-  const needsUpgrade = isTrialing || 
-    currentSubscription?.subscription_status === 'past_due' || 
-    currentSubscription?.subscription_status === 'canceled';
+  const trialDaysRemaining =
+    isTrialing && currentSubscription?.trial_end
+      ? Math.max(0, differenceInDays(new Date(currentSubscription.trial_end), new Date()))
+      : null;
 
-  const trialDaysRemaining = isTrialing && currentSubscription?.trial_end
-    ? Math.max(0, differenceInDays(new Date(currentSubscription.trial_end), new Date()))
-    : null;
+  const trialDaysText =
+    trialDaysRemaining !== null
+      ? trialDaysRemaining === 0
+        ? 'Expira hoje'
+        : `Faltam ${trialDaysRemaining} dia${trialDaysRemaining !== 1 ? 's' : ''}`
+      : null;
 
-  const trialDaysText = trialDaysRemaining !== null
-    ? trialDaysRemaining === 0 ? 'Expira hoje' : `Faltam ${trialDaysRemaining} dia${trialDaysRemaining !== 1 ? 's' : ''}`
-    : null;
+  const trialEndFormatted = safeFormatDate(currentSubscription?.trial_end);
+  const subscriptionEndFormatted = safeFormatDate(currentSubscription?.subscription_end);
 
   return (
     <Card>
@@ -99,32 +128,29 @@ export function SubscriptionDetails() {
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
         </div>
-        <CardDescription>
-          Informações sobre sua assinatura
-        </CardDescription>
+        <CardDescription>Informações sobre sua assinatura</CardDescription>
       </CardHeader>
+
       <CardContent className="space-y-6">
         <div className="space-y-3">
           <div className="flex items-center justify-between pb-3 border-b">
             <span className="text-sm font-medium text-muted-foreground">Assinatura</span>
             <span className="font-semibold text-lg">
-              {currentSubscription?.plan_name || 'Nenhuma assinatura'}
+              {planName || 'Nenhuma assinatura'}
             </span>
           </div>
 
           <div className="flex items-center justify-between pb-3 border-b">
             <span className="text-sm font-medium text-muted-foreground">Status</span>
-            <Badge className={`text-white ${getStatusColor(currentSubscription?.subscription_status)}`}>
-              {getStatusText(currentSubscription?.subscription_status)}
-            </Badge>
+            {getStatusBadge()}
           </div>
 
-          {isTrialing && currentSubscription?.trial_end && (
+          {isTrialing && (
             <div className="flex items-center justify-between pb-3 border-b">
               <span className="text-sm font-medium text-muted-foreground">Válido até</span>
               <div className="text-right">
                 <span className="text-sm font-medium">
-                  {formatDate(currentSubscription.trial_end)}
+                  {trialEndFormatted ?? 'Em processamento'}
                 </span>
                 {trialDaysText && (
                   <p className="text-xs text-muted-foreground mt-0.5">{trialDaysText}</p>
@@ -142,64 +168,132 @@ export function SubscriptionDetails() {
             </div>
           )}
 
-          {isSubscriptionActive && !isTrialing && currentSubscription?.subscription_end && (
+          {isActive && subscriptionEndFormatted && (
             <div className="flex items-center justify-between pb-3 border-b">
               <span className="text-sm font-medium text-muted-foreground">Próxima Cobrança</span>
-              <span className="text-sm font-medium">
-                {formatDate(currentSubscription.subscription_end)}
-              </span>
+              <span className="text-sm font-medium">{subscriptionEndFormatted}</span>
+            </div>
+          )}
+
+          {isCanceled && subscriptionEndFormatted && (
+            <div className="flex items-center justify-between pb-3 border-b">
+              <span className="text-sm font-medium text-muted-foreground">Acesso até</span>
+              <span className="text-sm font-medium">{subscriptionEndFormatted}</span>
+            </div>
+          )}
+
+          {isPastDue && subscriptionEndFormatted && (
+            <div className="flex items-center justify-between pb-3 border-b">
+              <span className="text-sm font-medium text-muted-foreground">Vencimento em atraso</span>
+              <span className="text-sm font-medium text-amber-700">{subscriptionEndFormatted}</span>
             </div>
           )}
         </div>
 
-        <div className="space-y-2 pt-2">
-          {isSubscriptionActive && !isTrialing && (
-            <Button
-              onClick={openCustomerPortal}
-              className="w-full"
-              variant="outline"
-            >
+        {/* CTA dominante por estado */}
+        {isActive && (
+          <Button
+            onClick={handleManageSubscription}
+            disabled={portalLoading}
+            variant="outline"
+            className="w-full"
+          >
+            {portalLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
               <ExternalLink className="mr-2 h-4 w-4" />
-              Gerenciar Assinatura
-            </Button>
-          )}
-        </div>
+            )}
+            Gerenciar Assinatura
+          </Button>
+        )}
 
-        {!currentSubscription?.plan_name && (
-          <div className="p-3 bg-muted rounded-lg">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
-              <p className="text-sm text-muted-foreground">
-                Nenhuma assinatura ativa. Entre em contato com a equipe comercial para ativar sua conta.
+        {isPastDue && (
+          <Alert className="border-amber-500/30 bg-amber-500/5 text-foreground">
+            <AlertCircle className="h-4 w-4 !text-amber-600" />
+            <AlertTitle>Pagamento Pendente</AlertTitle>
+            <AlertDescription className="space-y-3">
+              <p>
+                Identificamos uma cobrança em aberto. Regularize para manter o acesso contínuo ao Orbity.
               </p>
+              <Button
+                onClick={handleManageSubscription}
+                disabled={portalLoading}
+                className="w-full sm:w-auto"
+              >
+                {portalLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <CreditCard className="mr-2 h-4 w-4" />
+                )}
+                Regularizar no Stripe
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isCanceled && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="font-medium text-foreground">Assinatura cancelada</p>
+                <p className="text-sm text-muted-foreground">
+                  {subscriptionEndFormatted
+                    ? <>Seu acesso continua disponível até <strong>{subscriptionEndFormatted}</strong>.</>
+                    : 'Reative sua assinatura para manter o acesso ao Orbity.'}
+                </p>
+              </div>
             </div>
+            <Button
+              onClick={() => openManageDialog('reactivate')}
+              className="w-full sm:w-auto"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Reativar Assinatura
+            </Button>
           </div>
         )}
 
-        {needsUpgrade && (
-          <>
-            <Separator className="my-4" />
-            <div className="p-4 rounded-lg bg-primary/5 border border-primary/20 space-y-3">
-              <div className="flex items-start gap-2">
-                <Sparkles className="h-5 w-5 text-primary mt-0.5" />
-                <p className="text-sm text-foreground">
-                  Garanta acesso contínuo ao Orbity. Faça o upgrade para o plano completo e não perca seus dados.
-                </p>
-              </div>
-              <Button
-                className="w-full sm:w-auto"
-                onClick={() => setShowManageDialog(true)}
-              >
-                Escolher Plano e Assinar
-              </Button>
+        {isTrialing && (
+          <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <Sparkles className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+              <p className="text-sm text-foreground">
+                Garanta acesso contínuo ao Orbity. Escolha um plano antes do término do período de teste.
+              </p>
             </div>
-          </>
+            <Button
+              onClick={() => openManageDialog('upgrade')}
+              className="w-full sm:w-auto"
+            >
+              Escolher Plano e Assinar
+            </Button>
+          </div>
+        )}
+
+        {!planName && !isTrialing && !isActive && !isPastDue && !isCanceled && (
+          <div className="rounded-lg bg-muted p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+              <p className="text-sm text-muted-foreground">
+                Você ainda não possui uma assinatura ativa. Escolha um plano para liberar todos os recursos do Orbity.
+              </p>
+            </div>
+            <Button
+              onClick={() => openManageDialog('new')}
+              className="w-full sm:w-auto"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Assinar Plano Agora
+            </Button>
+          </div>
         )}
       </CardContent>
 
       <ManageSubscriptionDialog
         open={showManageDialog}
         onOpenChange={setShowManageDialog}
+        mode={dialogMode}
       />
     </Card>
   );

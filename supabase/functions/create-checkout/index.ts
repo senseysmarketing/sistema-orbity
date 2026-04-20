@@ -31,7 +31,7 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const { priceId, agencyId, email: bodyEmail } = await req.json().catch(() => ({}));
+    const { priceId, agencyId, email: bodyEmail, mode: checkoutMode } = await req.json().catch(() => ({}));
     
     if (!priceId && !agencyId) {
       throw new Error("Either priceId or agencyId is required");
@@ -187,6 +187,7 @@ serve(async (req) => {
         user_id: userId ?? 'unknown',
         user_email: userEmail!,
         agency_id: agencyId || 'unknown',
+        mode: checkoutMode || 'new',
       },
     });
 
