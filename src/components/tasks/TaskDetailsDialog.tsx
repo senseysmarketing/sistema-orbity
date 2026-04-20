@@ -597,6 +597,29 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
         </DialogContent>
       </Dialog>
 
+      {/* Dialog de confirmação para parar recorrência */}
+      <AlertDialog open={showStopRecurrenceAlert} onOpenChange={setShowStopRecurrenceAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCw className="h-5 w-5" />
+              Parar recorrência?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta tarefa e qualquer ocorrência futura pendente deixarão de ser recriadas automaticamente.
+              <br /><br />
+              Você pode reativar editando a tarefa novamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={stoppingRecurrence}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleStopRecurrence} disabled={stoppingRecurrence}>
+              {stoppingRecurrence ? "Parando..." : "Parar recorrência"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Dialog de confirmação de exclusão */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
