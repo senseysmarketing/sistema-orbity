@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X, Check, ChevronsUpDown, RotateCw } from "lucide-react";
 import { getVirtualAgencyClient, separateVirtualClients, isVirtualAgencyClient } from "@/lib/virtualAgencyClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -62,6 +62,8 @@ import { replaceTemplateVariables, calculateDueDate } from "@/lib/templateVariab
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Switch } from "@/components/ui/switch";
+import { computeNextDueDate, type RecurrenceRule, type RecurrenceFrequency } from "@/lib/recurrence";
 
 interface AssignedUser {
   user_id: string;
@@ -92,6 +94,10 @@ interface Task {
   hashtags?: string[] | null;
   creative_instructions?: string | null;
   is_internal?: boolean;
+  is_recurring?: boolean;
+  recurrence_rule?: RecurrenceRule | null;
+  recurrence_parent_id?: string | null;
+  next_occurrence_generated?: boolean;
   _assignedUsers?: AssignedUser[];
 }
 
