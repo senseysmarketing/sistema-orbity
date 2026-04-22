@@ -87,7 +87,8 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
       new Date(currentSubscription.trial_end) <= new Date());
 
   // Detect first access (no subscription record at all)
-  const isFirstAccessFlag = !subStatus || subStatus === 'none' || subStatus === 'pending_payment';
+  const isFirstAccessFlag = currentSubscription !== null &&
+    (!subStatus || subStatus === 'none' || subStatus === 'pending_payment');
 
   // Block access if: agency suspended, past_due > 5 days, trial expired, first access, or generic invalid
   const isBlocked = agencySuspended || isPastDueBlocked || isTrialExpiredFlag || isFirstAccessFlag ||
