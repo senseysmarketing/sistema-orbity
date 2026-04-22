@@ -53,6 +53,7 @@ export interface Expense {
   description?: string;
   is_active?: boolean;
   parent_expense_id?: string | null;
+  subscription_status?: string | null;
 }
 
 export interface Salary {
@@ -243,17 +244,46 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     enabled: !!agencyId,
   });
 
-  // Recurring/fixed expenses for forecast projection (deduplicated client-side by parent_expense_id ?? id)
-  const recurringExpensesQuery = useQuery({
-    queryKey: ['admin-recurring-expenses', agencyId],
+  // Recurring active subscriptions for forecast (anti-ghost: 60-day cutoff + subscription_status='active')
+  const sixtyDaysAgoISO = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 60);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const recurringActiveQuery = useQuery({
+    queryKey: ['admin-recurring-active', agencyId, sixtyDaysAgoISO],
     queryFn: async () => {
       if (!agencyId) return [];
       const { data, error } = await supabase
         .from('expenses')
         .select('*')
         .eq('agency_id', agencyId)
-        .or('expense_type.eq.recorrente,is_fixed.eq.true')
+        .eq('expense_type', 'recorrente')
+        .eq('is_active', true)
+        .in('subscription_status', ['active'])
+        .gte('due_date', sixtyDaysAgoISO)
         .order('due_date', { ascending: false });
+      if (error) throw error;
+      return (data || []) as Expense[];
+    },
+    enabled: !!agencyId && isForecastMode,
+  });
+
+  // Pending installments due in the selected forecast month
+  const installmentsInMonthQuery = useQuery({
+    queryKey: ['admin-installments-month', agencyId, selectedMonth],
+    queryFn: async () => {
+      if (!agencyId) return [];
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('agency_id', agencyId)
+        .eq('expense_type', 'parcelada')
+        .eq('status', 'pending')
+        .gte('due_date', startDate)
+        .lte('due_date', endDate)
+        .order('due_date', { ascending: true });
       if (error) throw error;
       return (data || []) as Expense[];
     },
@@ -267,22 +297,30 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   const employees = employeesQuery.data || [];
   const expenseCategories = expenseCategoriesQuery.data || [];
 
-  // Deduplicate recurring expenses by parent_expense_id ?? id (most recent kept due to desc order)
-  const forecastRecurringExpenses = useMemo<Expense[]>(() => {
-    const raw = recurringExpensesQuery.data || [];
+  // Dedup recurring active by parent_expense_id ?? id (most recent kept due to desc order)
+  const forecastRecurringSubscriptions = useMemo<Expense[]>(() => {
+    const raw = recurringActiveQuery.data || [];
     const seen = new Set<string>();
     const out: Expense[] = [];
     for (const e of raw) {
-      // Skip cancelled or inactive parents
       if (e.status === 'cancelled') continue;
-      if (e.is_active === false) continue;
       const key = e.parent_expense_id ?? e.id;
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(e);
     }
     return out;
-  }, [recurringExpensesQuery.data]);
+  }, [recurringActiveQuery.data]);
+
+  // Pending installments for the month (no dedup — each installment is independent)
+  const forecastInstallments = useMemo<Expense[]>(() => {
+    return (installmentsInMonthQuery.data || []).filter(e => e.status !== 'cancelled');
+  }, [installmentsInMonthQuery.data]);
+
+  // Combined list used by forecast UI/calculations
+  const forecastRecurringExpenses = useMemo<Expense[]>(() => {
+    return [...forecastRecurringSubscriptions, ...forecastInstallments];
+  }, [forecastRecurringSubscriptions, forecastInstallments]);
 
   // Active clients for forecast (with MRR > 0)
   const forecastClients = useMemo<Client[]>(() => {
@@ -554,7 +592,10 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     salariesMonthQuery.refetch();
     employeesQuery.refetch();
     expenseCategoriesQuery.refetch();
-    if (isForecastMode) recurringExpensesQuery.refetch();
+    if (isForecastMode) {
+      recurringActiveQuery.refetch();
+      installmentsInMonthQuery.refetch();
+    }
   };
 
   // ============ FORECAST MODE OVERRIDES ============
@@ -597,20 +638,34 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       });
     });
 
-    // Despesas recorrentes/fixas projetadas
+    // Despesas recorrentes/fixas projetadas + parcelas do mês
     forecastRecurringExpenses.forEach(e => {
-      let day = '05';
-      if (e.recurrence_day) {
-        day = String(Math.min(Math.max(e.recurrence_day, 1), 28)).padStart(2, '0');
-      } else if (e.due_date) {
-        const parts = e.due_date.split('-');
-        if (parts[2]) day = parts[2];
+      const isInstallment = e.expense_type === 'parcelada';
+      let dueDate: string;
+
+      if (isInstallment && e.due_date) {
+        // Parcelas usam a data real do banco
+        dueDate = e.due_date;
+      } else {
+        let day = '05';
+        if (e.recurrence_day) {
+          day = String(Math.min(Math.max(e.recurrence_day, 1), 28)).padStart(2, '0');
+        } else if (e.due_date) {
+          const parts = e.due_date.split('-');
+          if (parts[2]) day = parts[2];
+        }
+        dueDate = `${selectedMonth}-${day}`;
       }
+
+      const title = isInstallment && e.installment_total
+        ? `${e.name} (${e.installment_current ?? '?'}/${e.installment_total})`
+        : e.name;
+
       items.push({
         id: `forecast-expense-${e.id}`,
-        title: e.name,
+        title,
         amount: e.amount,
-        dueDate: `${selectedMonth}-${day}`,
+        dueDate,
         type: 'EXPENSE',
         status: 'PENDING',
         sourceType: 'expense',
@@ -693,6 +748,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     isForecastMode,
     forecastClients,
     forecastRecurringExpenses,
+    forecastRecurringSubscriptions,
+    forecastInstallments,
 
     // Mutations
     markAsPaid: markAsPaidMutation.mutate,
