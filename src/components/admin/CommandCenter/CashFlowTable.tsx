@@ -45,8 +45,49 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
   const [cancelDialogItem, setCancelDialogItem] = useState<CashFlowItem | null>(null);
   const [deleteDialogItem, setDeleteDialogItem] = useState<CashFlowItem | null>(null);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
-  
+  const [revertItem, setRevertItem] = useState<CashFlowItem | null>(null);
+  const [gatewayInfoItem, setGatewayInfoItem] = useState<CashFlowItem | null>(null);
+  const [isReverting, setIsReverting] = useState(false);
+
   const [invoicingId, setInvoicingId] = useState<string | null>(null);
+
+  const isGatewayIncome = (i: CashFlowItem) =>
+    i.type === 'INCOME' && !!i.billingType && i.billingType !== 'manual';
+
+  const gatewayAdminUrl = (bt?: string): string | null =>
+    bt === 'asaas' ? 'https://www.asaas.com/login'
+    : bt === 'conexa' ? 'https://app.conexa.app/login'
+    : null;
+
+  const gatewayLabel = (bt?: string) =>
+    bt === 'asaas' ? 'Asaas' : bt === 'conexa' ? 'Conexa' : 'Gateway';
+
+  const handleRevertPayment = useCallback(async () => {
+    if (!revertItem) return;
+    setIsReverting(true);
+    try {
+      const { sourceType, sourceId } = revertItem;
+      let error: any = null;
+      if (sourceType === 'expense') {
+        ({ error } = await supabase.from('expenses').update({ status: 'pending', paid_at: null } as any).eq('id', sourceId));
+      } else if (sourceType === 'client_payment') {
+        ({ error } = await supabase.from('client_payments').update({ status: 'pending', paid_at: null, paid_date: null } as any).eq('id', sourceId));
+      } else if (sourceType === 'salary') {
+        ({ error } = await supabase.from('salaries').update({ status: 'pending', paid_at: null } as any).eq('id', sourceId));
+      } else {
+        throw new Error('Tipo de registro desconhecido.');
+      }
+      if (error) throw error;
+      toast({ title: '✅ Pagamento revertido', description: 'O lançamento voltou para Pendente.' });
+      queryClient.invalidateQueries();
+      onRefetch?.();
+      setRevertItem(null);
+    } catch (err: any) {
+      toast({ title: 'Erro ao reverter', description: err?.message || 'Tente novamente.', variant: 'destructive' });
+    } finally {
+      setIsReverting(false);
+    }
+  }, [revertItem, toast, queryClient, onRefetch]);
 
   const handleInvoiceConexaSale = async (item: CashFlowItem) => {
     setInvoicingId(item.sourceId);
