@@ -350,6 +350,69 @@ export default function Tasks() {
     archiveOldCompletedTasks();
   }, [currentAgency?.id]);
 
+  // Persistência da visão (Kanban/Lista) por agência
+  useEffect(() => {
+    if (!currentAgency?.id) return;
+    const stored = localStorage.getItem(`tasks:view:${currentAgency.id}`);
+    if (stored === 'kanban' || stored === 'list') {
+      setView(stored);
+    }
+  }, [currentAgency?.id]);
+
+  useEffect(() => {
+    if (!currentAgency?.id) return;
+    localStorage.setItem(`tasks:view:${currentAgency.id}`, view);
+  }, [view, currentAgency?.id]);
+
+  // Toggle rápido de conclusão a partir da Vista em Lista
+  const handleToggleTaskStatus = async (task: Task) => {
+    const newStatus = task.status === 'done' ? 'todo' : 'done';
+    const previousStatus = task.status;
+
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: newStatus } : t)));
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: newStatus as any, updated_by: profile?.user_id })
+        .eq('id', task.id);
+      if (error) throw error;
+
+      await addHistoryEntry(task.id, `Status alterado para ${getStatusName(newStatus)}`);
+
+      if (
+        newStatus === 'done' &&
+        task.is_recurring &&
+        !task.next_occurrence_generated &&
+        task.due_date &&
+        task.recurrence_rule
+      ) {
+        const nextDue = computeNextDueDate(task.due_date, task.recurrence_rule);
+        if (nextDue) {
+          const { error: rpcError } = await supabase.rpc(
+            'generate_next_recurring_task' as any,
+            { p_task_id: task.id, p_next_due_date: nextDue }
+          );
+          if (rpcError) {
+            setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: previousStatus } : t)));
+            await supabase.from('tasks').update({ status: previousStatus as any }).eq('id', task.id);
+            toast({ title: 'Falha ao gerar próxima ocorrência', description: rpcError.message, variant: 'destructive' });
+            return;
+          }
+          toast({ title: '🔁 Próxima ocorrência criada', description: formatDateBR(nextDue.split('T')[0]) });
+          fetchTasks();
+          return;
+        }
+      }
+
+      toast({ title: 'Sucesso', description: `Tarefa movida para ${getStatusName(newStatus)}!` });
+    } catch (error: any) {
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: previousStatus } : t)));
+      toast({ title: 'Erro ao atualizar tarefa', description: error.message, variant: 'destructive' });
+    }
+  };
+
+
   const archiveOldCompletedTasks = async () => {
     if (!currentAgency) return;
 
