@@ -47,6 +47,7 @@ export function UsersManagement() {
   const [newPassword, setNewPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [permissionsTarget, setPermissionsTarget] = useState<AgencyUser | null>(null);
+  const [roleDialogUser, setRoleDialogUser] = useState<AgencyUser | null>(null);
   const { currentAgency, isAgencyAdmin } = useAgency();
   const { user: currentAuthUser } = useAuth();
   const { toast } = useToast();
@@ -307,16 +308,7 @@ export function UsersManagement() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Gerenciar Usuários
-              </CardTitle>
-              <CardDescription>
-                Gerencie os membros da sua agência, convide novos usuários e controle permissões
-              </CardDescription>
-            </div>
+          <div className="flex items-center justify-end">
             <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
@@ -454,38 +446,9 @@ export function UsersManagement() {
                             </DropdownMenuItem>
                           )}
                           
-                          <DropdownMenuItem asChild>
-                            <Dialog>
-                              <DialogTrigger className="w-full text-left">
-                                <Edit className="h-4 w-4 mr-2" />
-                                Alterar Função
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Alterar Função do Usuário</DialogTitle>
-                                  <DialogDescription>
-                                    Altere a função de {user.profiles?.name}
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4">
-                                  <div className="space-y-2">
-                                    <Label>Nova Função</Label>
-                                    <Select 
-                                      defaultValue={user.role}
-                                      onValueChange={(value) => updateUserRole(user.user_id, value)}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="member">Membro</SelectItem>
-                                        <SelectItem value="admin">Administrador</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                </div>
-                              </DialogContent>
-                            </Dialog>
+                          <DropdownMenuItem onClick={() => setRoleDialogUser(user)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Alterar Função
                           </DropdownMenuItem>
                           
                           <AlertDialog>
