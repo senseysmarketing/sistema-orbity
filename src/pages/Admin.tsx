@@ -420,10 +420,14 @@ export default function Admin() {
       {/* Composição dos Custos Projetados — explica de onde vêm os números */}
       {metrics.isForecastMode && (() => {
         const activeEmployeesCount = metrics.employees.filter(e => e.is_active).length;
-        const recurringCount = metrics.forecastRecurringExpenses.length;
+        const subscriptions = metrics.forecastRecurringSubscriptions || [];
+        const installments = metrics.forecastInstallments || [];
+        const subsCount = subscriptions.length;
+        const instCount = installments.length;
         const payrollTotal = metrics.totalPayroll;
-        const recurringTotal = metrics.totalExpenses;
-        const totalProjected = payrollTotal + recurringTotal;
+        const subsTotal = subscriptions.reduce((s, e) => s + (e.amount || 0), 0);
+        const instTotal = installments.reduce((s, e) => s + (e.amount || 0), 0);
+        const totalProjected = payrollTotal + subsTotal + instTotal;
         return (
           <Card className="border-blue-200/40 bg-blue-50/20 dark:border-blue-900/30 dark:bg-blue-950/10">
             <CardHeader className="pb-3">
@@ -455,11 +459,25 @@ export default function Admin() {
               >
                 <span className="flex items-center gap-2">
                   <Repeat className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                  <span>Despesas Recorrentes</span>
-                  <span className="text-xs text-muted-foreground">({recurringCount} {recurringCount === 1 ? 'item' : 'itens'})</span>
+                  <span>Assinaturas Recorrentes</span>
+                  <span className="text-xs text-muted-foreground">({subsCount} {subsCount === 1 ? 'ativa' : 'ativas'})</span>
                 </span>
-                <span className="font-semibold tabular-nums">{formatCurrency(recurringTotal)}</span>
+                <span className="font-semibold tabular-nums">{formatCurrency(subsTotal)}</span>
               </button>
+              {instCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsExpenseCentralOpen(true)}
+                  className="w-full flex items-center justify-between text-sm py-2 px-3 rounded-md hover:bg-blue-100/40 dark:hover:bg-blue-900/20 transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                    <span>Parcelamentos do Mês</span>
+                    <span className="text-xs text-muted-foreground">({instCount} {instCount === 1 ? 'parcela' : 'parcelas'})</span>
+                  </span>
+                  <span className="font-semibold tabular-nums">{formatCurrency(instTotal)}</span>
+                </button>
+              )}
               <div className="border-t border-blue-200/40 dark:border-blue-900/30 pt-2 mt-2 flex items-center justify-between px-3 text-sm">
                 <span className="font-medium text-blue-900 dark:text-blue-200">Total Projetado</span>
                 <span className="font-bold text-blue-900 dark:text-blue-100 tabular-nums">{formatCurrency(totalProjected)}</span>
