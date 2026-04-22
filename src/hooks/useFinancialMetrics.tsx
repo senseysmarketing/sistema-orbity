@@ -592,7 +592,10 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     salariesMonthQuery.refetch();
     employeesQuery.refetch();
     expenseCategoriesQuery.refetch();
-    if (isForecastMode) recurringExpensesQuery.refetch();
+    if (isForecastMode) {
+      recurringActiveQuery.refetch();
+      installmentsInMonthQuery.refetch();
+    }
   };
 
   // ============ FORECAST MODE OVERRIDES ============
