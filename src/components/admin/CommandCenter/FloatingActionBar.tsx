@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Receipt, DollarSign, Building, Users, Bell, CalendarClock } from "lucide-react";
+import { Receipt, DollarSign, Building, Users, Bell } from "lucide-react";
 
 interface FloatingActionBarProps {
   selectedMonth: string;
@@ -40,7 +40,6 @@ export function FloatingActionBar({ selectedMonth, onChangeMonth, onNewClient, o
                 return (
                   <SelectItem key={value} value={value}>
                     <span className="flex items-center gap-1.5">
-                      {isFuture && <CalendarClock className="h-3 w-3 text-muted-foreground" />}
                       <span>{label}</span>
                       {isFuture && <span className="italic text-muted-foreground text-xs">(Previsão)</span>}
                     </span>
