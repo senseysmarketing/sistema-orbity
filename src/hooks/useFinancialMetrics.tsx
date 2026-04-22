@@ -287,7 +287,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
 
       return { masters: masterList, latestChildren };
     },
-    enabled: !!agencyId && isForecastMode,
+    enabled: !!agencyId,
   });
 
   // Pending installments due in the selected forecast month
@@ -307,7 +307,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       if (error) throw error;
       return (data || []) as Expense[];
     },
-    enabled: !!agencyId && isForecastMode,
+    enabled: !!agencyId,
   });
 
   const clients = clientsQuery.data || [];
