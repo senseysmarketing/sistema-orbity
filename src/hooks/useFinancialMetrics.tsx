@@ -575,6 +575,68 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   const forecastProfit = forecastMRR - forecastBurnRate;
   const forecastMargin = forecastMRR > 0 ? (forecastProfit / forecastMRR) * 100 : 0;
 
+  // Forecast cash flow: build virtual items from deterministic sources (clients + recurring + payroll)
+  const forecastCashFlow = useMemo<CashFlowItem[]>(() => {
+    if (!isForecastMode) return [];
+    const items: CashFlowItem[] = [];
+
+    // Receitas projetadas — uma por cliente ativo
+    forecastClients.forEach(c => {
+      const dayNum = Math.min(Math.max(c.due_date || 5, 1), 28);
+      const day = String(dayNum).padStart(2, '0');
+      items.push({
+        id: `forecast-client-${c.id}`,
+        title: c.name,
+        amount: c.monthly_value || 0,
+        dueDate: `${selectedMonth}-${day}`,
+        type: 'INCOME',
+        status: 'PENDING',
+        sourceType: 'client_payment',
+        sourceId: c.id,
+        billingType: c.default_billing_type || 'manual',
+      });
+    });
+
+    // Despesas recorrentes/fixas projetadas
+    forecastRecurringExpenses.forEach(e => {
+      let day = '05';
+      if (e.recurrence_day) {
+        day = String(Math.min(Math.max(e.recurrence_day, 1), 28)).padStart(2, '0');
+      } else if (e.due_date) {
+        const parts = e.due_date.split('-');
+        if (parts[2]) day = parts[2];
+      }
+      items.push({
+        id: `forecast-expense-${e.id}`,
+        title: e.name,
+        amount: e.amount,
+        dueDate: `${selectedMonth}-${day}`,
+        type: 'EXPENSE',
+        status: 'PENDING',
+        sourceType: 'expense',
+        sourceId: e.id,
+      });
+    });
+
+    // Folha projetada — uma linha por funcionário ativo
+    employees.filter(emp => emp.is_active).forEach(emp => {
+      const dayNum = Math.min(Math.max(emp.payment_day || 5, 1), 28);
+      const day = String(dayNum).padStart(2, '0');
+      items.push({
+        id: `forecast-salary-${emp.id}`,
+        title: `Salário - ${emp.name}`,
+        amount: emp.base_salary || 0,
+        dueDate: `${selectedMonth}-${day}`,
+        type: 'EXPENSE',
+        status: 'PENDING',
+        sourceType: 'salary',
+        sourceId: emp.id,
+      });
+    });
+
+    return items.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  }, [isForecastMode, forecastClients, forecastRecurringExpenses, employees, selectedMonth]);
+
   // Build the final return: in forecast mode, override cash metrics; keep real metrics in past/current.
   const out_totalMRR = isForecastMode ? forecastMRR : totalMRR;
   const out_expectedRevenue = isForecastMode ? forecastMRR : expectedRevenue;
@@ -587,7 +649,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   const out_paidBurnRate = isForecastMode ? 0 : paidBurnRate;
   const out_overdueAmount = isForecastMode ? 0 : overdueAmount;
   const out_overdueRate = isForecastMode ? 0 : overdueRate;
-  const out_unifiedCashFlow = isForecastMode ? [] as CashFlowItem[] : unifiedCashFlow;
+  const out_unifiedCashFlow = isForecastMode ? forecastCashFlow : unifiedCashFlow;
   const out_clientProfitability = isForecastMode ? [] as ClientProfitabilityItem[] : clientProfitability;
 
   return {

@@ -7,7 +7,8 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText, ExternalLink, Trash2 } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText, ExternalLink, Trash2, CalendarClock } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
@@ -33,9 +34,10 @@ interface CashFlowTableProps {
   className?: string;
   onEditExpenseById?: (expenseId: string) => void;
   onRefetch?: () => void;
+  isForecastMode?: boolean;
 }
 
-export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, agencyId, selectedMonth, className, onEditExpenseById, onRefetch }: CashFlowTableProps) {
+export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, agencyId, selectedMonth, className, onEditExpenseById, onRefetch, isForecastMode = false }: CashFlowTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<FilterType>('all');
@@ -164,30 +166,49 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
             <CardTitle className="text-lg flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               Fluxo de Caixa
+              {isForecastMode && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge className="ml-1 gap-1 border-blue-200/60 bg-blue-50 text-blue-800 hover:bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-200 cursor-help">
+                      <CalendarClock className="h-3 w-3" />
+                      PREVISÃO
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs">
+                    Lançamentos projetados a partir de contratos ativos, salários e despesas recorrentes vigentes. Nenhum dado real foi criado.
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </CardTitle>
-            <div className="relative w-full max-w-xs">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Pesquisar..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-8 pl-8 text-sm"
-              />
-            </div>
+            {!isForecastMode && (
+              <div className="relative w-full max-w-xs">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Pesquisar..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-8 pl-8 text-sm"
+                />
+              </div>
+            )}
             <div className="flex gap-1.5">
-              <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
-                Este Mês
-              </Button>
-              <Button variant={filter === 'next7' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('next7')}>
-                Próx. 7 dias
-              </Button>
-              <Button
-                variant={filter === 'overdue' ? 'destructive' : 'outline'}
-                size="sm"
-                onClick={() => setFilter('overdue')}
-              >
-                Atrasados {overdueCount > 0 && `(${overdueCount})`}
-              </Button>
+              {!isForecastMode && (
+                <>
+                  <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
+                    Este Mês
+                  </Button>
+                  <Button variant={filter === 'next7' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('next7')}>
+                    Próx. 7 dias
+                  </Button>
+                  <Button
+                    variant={filter === 'overdue' ? 'destructive' : 'outline'}
+                    size="sm"
+                    onClick={() => setFilter('overdue')}
+                  >
+                    Atrasados {overdueCount > 0 && `(${overdueCount})`}
+                  </Button>
+                </>
+              )}
               <Button variant="outline" size="sm" onClick={() => setAdvancedOpen(true)}>
                 <BarChart3 className="h-4 w-4 mr-1" />
                 Análise Avançada
@@ -218,8 +239,9 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                 ) : (
                   filtered.map(item => {
                     const isCancelled = item.status === 'CANCELLED';
+                    const isForecastItem = item.id.startsWith('forecast-');
                     return (
-                    <TableRow key={`${item.sourceType}-${item.id}`} className={`${item.status === 'OVERDUE' ? 'bg-rose-50/50 dark:bg-rose-950/10' : ''} ${isCancelled ? 'opacity-50' : ''}`}>
+                    <TableRow key={`${item.sourceType}-${item.id}`} className={`${item.status === 'OVERDUE' ? 'bg-rose-50/50 dark:bg-rose-950/10' : ''} ${isCancelled ? 'opacity-50' : ''} ${isForecastItem ? 'opacity-90' : ''}`}>
                       <TableCell className="pr-0">
                         {item.type === 'INCOME' ? (
                           <ArrowUpCircle className="h-4 w-4 text-emerald-500" />
@@ -227,7 +249,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                           <ArrowDownCircle className="h-4 w-4 text-rose-500" />
                         )}
                       </TableCell>
-                      <TableCell className="font-medium text-sm">
+                      <TableCell className={`font-medium text-sm ${isForecastItem ? 'italic' : ''}`}>
                         <div className="flex items-center gap-1.5">
                           {item.title}
                           {item.type === 'INCOME' && item.billingType && item.billingType !== 'manual' && (
@@ -237,73 +259,86 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className={`text-right font-semibold text-sm ${isCancelled ? 'line-through text-muted-foreground' : item.type === 'INCOME' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      <TableCell className={`text-right font-semibold text-sm ${isCancelled ? 'line-through text-muted-foreground' : item.type === 'INCOME' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'} ${isForecastItem ? 'italic' : ''}`}>
                         {item.type === 'INCOME' ? '+' : '-'} {formatCurrency(item.amount)}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {new Date(item.dueDate + 'T00:00:00').toLocaleDateString('pt-BR')}
                       </TableCell>
-                      <TableCell>{statusBadge(item.status, item.paidAt)}</TableCell>
+                      <TableCell>
+                        {isForecastItem ? (
+                          <Badge className="gap-1 border-blue-200/60 bg-blue-50 text-blue-800 hover:bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-200">
+                            <CalendarClock className="h-3 w-3" />
+                            Projetado
+                          </Badge>
+                        ) : (
+                          statusBadge(item.status, item.paidAt)
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {item.status !== 'PAID' && item.status !== 'CANCELLED' && (
-                            <MarkAsPaidPopover
-                              originalAmount={item.amount}
-                              isLoading={isMarkingAsPaid}
-                              onConfirm={(paidDate, paidAmount) => {
-                                onMarkAsPaid({ id: item.sourceId, sourceType: item.sourceType, paidDate, paidAmount });
-                              }}
-                            />
-                          )}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {onEditItem && (
-                                <DropdownMenuItem onClick={() => onEditItem(item)}>
-                                  <Pencil className="h-4 w-4 mr-2" />
-                                  Editar Detalhes
-                                </DropdownMenuItem>
-                              )}
-                              {item.invoiceUrl && (
-                                <DropdownMenuItem onClick={() => window.open(item.invoiceUrl, '_blank')}>
-                                  <ExternalLink className="h-4 w-4 mr-2" />
-                                  Ver Fatura
-                                </DropdownMenuItem>
-                              )}
-                              {item.billingType === 'conexa' && !item.invoiceUrl && item.conexaChargeId && item.status !== 'PAID' && item.status !== 'CANCELLED' && (
-                                <DropdownMenuItem
-                                  onClick={() => handleInvoiceConexaSale(item)}
-                                  disabled={invoicingId === item.sourceId}
-                                >
-                                  <FileText className="h-4 w-4 mr-2" />
-                                  {invoicingId === item.sourceId ? 'Emitindo...' : 'Emitir Fatura Conexa'}
-                                </DropdownMenuItem>
-                              )}
-                              {item.status !== 'PAID' && item.status !== 'CANCELLED' && onCancelItem && (
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive"
-                                  onClick={() => setCancelDialogItem(item)}
-                                >
-                                  <Ban className="h-4 w-4 mr-2" />
-                                  Cancelar / Perdoar
-                                </DropdownMenuItem>
-                              )}
-                              {item.status === 'CANCELLED' && (
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive"
-                                  onClick={() => setDeleteDialogItem(item)}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Excluir Registro
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                        {isForecastItem ? (
+                          <span className="text-[11px] text-muted-foreground italic pr-2">— previsão —</span>
+                        ) : (
+                          <div className="flex items-center justify-end gap-1">
+                            {item.status !== 'PAID' && item.status !== 'CANCELLED' && (
+                              <MarkAsPaidPopover
+                                originalAmount={item.amount}
+                                isLoading={isMarkingAsPaid}
+                                onConfirm={(paidDate, paidAmount) => {
+                                  onMarkAsPaid({ id: item.sourceId, sourceType: item.sourceType, paidDate, paidAmount });
+                                }}
+                              />
+                            )}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {onEditItem && (
+                                  <DropdownMenuItem onClick={() => onEditItem(item)}>
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Editar Detalhes
+                                  </DropdownMenuItem>
+                                )}
+                                {item.invoiceUrl && (
+                                  <DropdownMenuItem onClick={() => window.open(item.invoiceUrl, '_blank')}>
+                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                    Ver Fatura
+                                  </DropdownMenuItem>
+                                )}
+                                {item.billingType === 'conexa' && !item.invoiceUrl && item.conexaChargeId && item.status !== 'PAID' && item.status !== 'CANCELLED' && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleInvoiceConexaSale(item)}
+                                    disabled={invoicingId === item.sourceId}
+                                  >
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    {invoicingId === item.sourceId ? 'Emitindo...' : 'Emitir Fatura Conexa'}
+                                  </DropdownMenuItem>
+                                )}
+                                {item.status !== 'PAID' && item.status !== 'CANCELLED' && onCancelItem && (
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => setCancelDialogItem(item)}
+                                  >
+                                    <Ban className="h-4 w-4 mr-2" />
+                                    Cancelar / Perdoar
+                                  </DropdownMenuItem>
+                                )}
+                                {item.status === 'CANCELLED' && (
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => setDeleteDialogItem(item)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Excluir Registro
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                     );
