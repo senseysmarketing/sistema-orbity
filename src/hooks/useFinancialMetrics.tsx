@@ -243,12 +243,53 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     enabled: !!agencyId,
   });
 
+  // Recurring/fixed expenses for forecast projection (deduplicated client-side by parent_expense_id ?? id)
+  const recurringExpensesQuery = useQuery({
+    queryKey: ['admin-recurring-expenses', agencyId],
+    queryFn: async () => {
+      if (!agencyId) return [];
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('agency_id', agencyId)
+        .or('expense_type.eq.recorrente,is_fixed.eq.true')
+        .order('due_date', { ascending: false });
+      if (error) throw error;
+      return (data || []) as Expense[];
+    },
+    enabled: !!agencyId && isForecastMode,
+  });
+
   const clients = clientsQuery.data || [];
   const paymentsAll = paymentsAllQuery.data || [];
   const expenses = expensesMonthQuery.data || [];
   const salaries = salariesMonthQuery.data || [];
   const employees = employeesQuery.data || [];
   const expenseCategories = expenseCategoriesQuery.data || [];
+
+  // Deduplicate recurring expenses by parent_expense_id ?? id (most recent kept due to desc order)
+  const forecastRecurringExpenses = useMemo<Expense[]>(() => {
+    const raw = recurringExpensesQuery.data || [];
+    const seen = new Set<string>();
+    const out: Expense[] = [];
+    for (const e of raw) {
+      // Skip cancelled or inactive parents
+      if (e.status === 'cancelled') continue;
+      if (e.is_active === false) continue;
+      const key = e.parent_expense_id ?? e.id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(e);
+    }
+    return out;
+  }, [recurringExpensesQuery.data]);
+
+  // Active clients for forecast (with MRR > 0)
+  const forecastClients = useMemo<Client[]>(() => {
+    return clients
+      .filter(c => c.active && (c.monthly_value || 0) > 0)
+      .sort((a, b) => (b.monthly_value || 0) - (a.monthly_value || 0));
+  }, [clients]);
 
   // Payments in selected month
   const paymentsInMonth = useMemo(() => {
