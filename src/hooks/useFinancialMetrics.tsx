@@ -53,6 +53,7 @@ export interface Expense {
   description?: string;
   is_active?: boolean;
   parent_expense_id?: string | null;
+  subscription_status?: string | null;
 }
 
 export interface Salary {
