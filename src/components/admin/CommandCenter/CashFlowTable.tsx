@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText, ExternalLink, Trash2, CalendarClock } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText, ExternalLink, Trash2, CalendarClock, Undo2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
