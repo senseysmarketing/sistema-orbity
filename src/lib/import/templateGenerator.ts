@@ -23,29 +23,24 @@ const TEMPLATES: Record<ImportType, TemplateConfig> = {
         name: 'Clientes',
         headers: [
           'Nome*',
-          'Valor Mensal*',
-          'Dia Vencimento*',
-          'Data Início',
-          'Contato',
-          'Serviço',
-          'Ativo*',
-          'Tem Fidelidade',
-          'Observações'
+          'Email',
+          'Telefone',
+          'CPF/CNPJ',
+          'Status*',
+          'Mensalidade',
+          'Dia Vencimento'
         ],
         example: [{
           'Nome*': 'Empresa XYZ Ltda',
-          'Valor Mensal*': 1500.00,
-          'Dia Vencimento*': 10,
-          'Data Início': '2024-01-15',
-          'Contato': '(11) 98765-4321',
-          'Serviço': 'Gestão de Tráfego',
-          'Ativo*': 'SIM',
-          'Tem Fidelidade': 'SIM',
-          'Observações': 'Cliente desde janeiro'
+          'Email': 'contato@xyz.com',
+          'Telefone': '(11) 98765-4321',
+          'CPF/CNPJ': '12.345.678/0001-90',
+          'Status*': 'ATIVO',
+          'Mensalidade': 1500.00,
+          'Dia Vencimento': 10
         }],
         validations: {
-          'Ativo*': ['SIM', 'NAO'],
-          'Tem Fidelidade': ['SIM', 'NAO']
+          'Status*': ['LEAD', 'ATIVO']
         }
       },
       {
@@ -74,31 +69,24 @@ const TEMPLATES: Record<ImportType, TemplateConfig> = {
       '',
       '1. CAMPOS OBRIGATÓRIOS:',
       '   - Campos marcados com * são obrigatórios',
-      '   - Preencha todos os campos obrigatórios',
+      '   - Para Status=ATIVO, Mensalidade e Dia Vencimento são obrigatórios',
+      '   - Para Status=LEAD, Mensalidade e Dia Vencimento são ignorados',
       '',
-      '2. FORMATOS ACEITOS:',
+      '2. FORMATOS:',
       '   - Datas: YYYY-MM-DD (ex: 2024-01-15)',
-      '   - Valores: Use ponto para decimal (ex: 1500.00)',
+      '   - Valores: ponto para decimal (ex: 1500.00)',
       '   - Telefone: (11) 98765-4321 ou 11987654321',
-      '   - Ativo/Fidelidade: SIM ou NAO (maiúsculas)',
+      '   - CPF/CNPJ: opcional. Necessário para sincronização com gateway',
+      '   - Status: LEAD ou ATIVO',
+      '',
+      '3. ABA PAGAMENTOS:',
+      '   - Cliente: Deve ser exatamente igual ao nome na aba Clientes',
       '   - Status: PAGO, PENDENTE ou ATRASADO',
       '',
-      '3. ABA CLIENTES:',
-      '   - Nome: Nome completo do cliente',
-      '   - Valor Mensal: Valor do contrato mensal',
-      '   - Dia Vencimento: Dia do mês (1-31)',
-      '   - Data Início: Data de início do contrato',
-      '',
-      '4. ABA PAGAMENTOS:',
-      '   - Cliente: Deve ser exatamente igual ao nome na aba Clientes',
-      '   - Vencimento: Data de vencimento do pagamento',
-      '   - Data Pagamento: Deixe vazio se não foi pago ainda',
-      '',
-      '5. DICAS:',
+      '4. DICAS:',
       '   - Não altere os cabeçalhos das colunas',
       '   - Remova a linha de exemplo antes de importar',
-      '   - Certifique-se de que os nomes de clientes sejam idênticos nas duas abas',
-      '   - Salve o arquivo como .xlsx antes de importar'
+      '   - O sistema detecta colunas por sinônimos (CPF, Documento, WhatsApp etc)'
     ]
   },
   expenses: {
@@ -229,24 +217,13 @@ const TEMPLATES: Record<ImportType, TemplateConfig> = {
       '   - Email ou Telefone: Pelo menos um é recomendado',
       '   - Origem: De onde veio o lead',
       '   - Etapa do Funil: Estágio atual no funil de vendas',
-      '   - Temperatura: FRIO, MORNO ou QUENTE (nível de interesse do lead)',
+      '   - Temperatura: FRIO, MORNO ou QUENTE',
       '',
       '2. ORIGENS VÁLIDAS:',
       '   - SITE, INDICACAO, GOOGLE_ADS, FACEBOOK_ADS, INSTAGRAM, LINKEDIN, WHATSAPP, MANUAL',
       '',
-      '3. ETAPAS DO FUNIL (estágios de venda):',
-      '   - NOVO_LEAD: Novo lead (entrada no funil)',
-      '   - QUALIFICADO: Lead qualificado para avançar',
-      '   - AGENDAMENTO: Reunião agendada',
-      '   - REUNIAO: Em reunião / apresentação',
-      '   - PROPOSTA: Proposta enviada',
-      '   - GANHO: Venda fechada',
-      '   - PERDIDO: Lead perdido',
-      '',
-      '4. TEMPERATURA (interesse do lead):',
-      '   - FRIO: Lead frio, menor interesse',
-      '   - MORNO: Lead morno, interesse moderado',
-      '   - QUENTE: Lead quente, alto interesse'
+      '3. ETAPAS DO FUNIL:',
+      '   - NOVO_LEAD, QUALIFICADO, AGENDAMENTO, REUNIAO, PROPOSTA, GANHO, PERDIDO'
     ]
   }
 };
@@ -255,19 +232,15 @@ export function generateTemplate(type: ImportType): void {
   const config = TEMPLATES[type];
   const wb = XLSX.utils.book_new();
 
-  // Add data sheets
   config.sheets.forEach(sheet => {
-    // Convert example objects to arrays of values matching the headers
     const exampleRows = sheet.example.map(row => 
       sheet.headers.map(header => row[header] ?? '')
     );
     const data = [sheet.headers, ...exampleRows];
     const ws = XLSX.utils.aoa_to_sheet(data);
 
-    // Set column widths
     ws['!cols'] = sheet.headers.map(() => ({ wch: 20 }));
 
-    // Style header row (yellow background for required fields)
     const headerRange = XLSX.utils.decode_range(ws['!ref'] || 'A1');
     for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
       const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
@@ -284,16 +257,12 @@ export function generateTemplate(type: ImportType): void {
     XLSX.utils.book_append_sheet(wb, ws, sheet.name);
   });
 
-  // Add instructions sheet
   const instructionsData = config.instructions.map(line => [line]);
   const wsInstructions = XLSX.utils.aoa_to_sheet(instructionsData);
   wsInstructions['!cols'] = [{ wch: 80 }];
   XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instruções');
 
-  // Generate filename
   const filename = `template_${type}_${new Date().toISOString().split('T')[0]}.xlsx`;
-  
-  // Download
   XLSX.writeFile(wb, filename);
 }
 

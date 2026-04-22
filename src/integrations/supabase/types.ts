@@ -2881,6 +2881,82 @@ export type Database = {
         }
         Relationships: []
       }
+      import_jobs: {
+        Row: {
+          add_to_mrr: boolean
+          agency_id: string
+          created_at: string
+          error_count: number
+          errors: Json
+          gateway_skipped_count: number
+          gateway_synced_count: number
+          id: string
+          processed_rows: number
+          status: string
+          success_count: number
+          sync_gateway: boolean
+          total_rows: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          add_to_mrr?: boolean
+          agency_id: string
+          created_at?: string
+          error_count?: number
+          errors?: Json
+          gateway_skipped_count?: number
+          gateway_synced_count?: number
+          id?: string
+          processed_rows?: number
+          status?: string
+          success_count?: number
+          sync_gateway?: boolean
+          total_rows: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          add_to_mrr?: boolean
+          agency_id?: string
+          created_at?: string
+          error_count?: number
+          errors?: Json
+          gateway_skipped_count?: number
+          gateway_synced_count?: number
+          id?: string
+          processed_rows?: number
+          status?: string
+          success_count?: number
+          sync_gateway?: boolean
+          total_rows?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_jobs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_jobs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "import_jobs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       import_logs: {
         Row: {
           agency_id: string
