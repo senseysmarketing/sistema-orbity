@@ -4,11 +4,18 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Users, Calendar, DollarSign } from 'lucide-react';
-import { format } from 'date-fns';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Building2, Users, Calendar as CalendarIcon, DollarSign, Clock, RotateCcw } from 'lucide-react';
+import { format, endOfDay, addDays, differenceInDays, differenceInCalendarDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useMaster } from '@/hooks/useMaster';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface AgencyDetailsSheetProps {
   open: boolean;
@@ -40,8 +47,19 @@ const MOCK_PAYMENTS = [
 ];
 
 export function AgencyDetailsSheet({ open, onOpenChange, agency }: AgencyDetailsSheetProps) {
-  const { suspendAgency, reactivateAgency } = useMaster();
+  const { suspendAgency, reactivateAgency, refreshAgencies } = useMaster();
   const [toggling, setToggling] = useState(false);
+  const [trialDate, setTrialDate] = useState<Date | undefined>(undefined);
+  const [savingTrial, setSavingTrial] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+
+  useEffect(() => {
+    if (agency?.trial_end) {
+      setTrialDate(new Date(agency.trial_end));
+    } else {
+      setTrialDate(undefined);
+    }
+  }, [agency?.agency_id, agency?.trial_end]);
 
   if (!agency) return null;
 
@@ -57,6 +75,96 @@ export function AgencyDetailsSheet({ open, onOpenChange, agency }: AgencyDetails
 
   const formatCurrency = (v: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+
+  const status = agency.subscription_status;
+  const trialEditingBlocked = status === 'active' || status === 'canceled';
+  const currentTrialEnd = agency.trial_end ? new Date(agency.trial_end) : null;
+  const now = new Date();
+  const dateChanged =
+    trialDate &&
+    (!currentTrialEnd ||
+      endOfDay(trialDate).toISOString() !== endOfDay(currentTrialEnd).toISOString());
+
+  const handleSaveTrial = async () => {
+    if (!trialDate) return;
+    setSavingTrial(true);
+    try {
+      const finalDate = endOfDay(trialDate).toISOString();
+
+      // Check if subscription record exists
+      const { data: existing } = await supabase
+        .from('agency_subscriptions')
+        .select('id, status')
+        .eq('agency_id', agency.agency_id)
+        .maybeSingle();
+
+      if (existing) {
+        const newStatus =
+          existing.status === 'trial' ||
+          existing.status === 'trial_expired' ||
+          existing.status === 'past_due'
+            ? 'trial'
+            : existing.status;
+
+        const { error } = await supabase
+          .from('agency_subscriptions')
+          .update({ trial_end: finalDate, status: newStatus })
+          .eq('agency_id', agency.agency_id);
+        if (error) throw error;
+      } else {
+        // Upsert with orbity_trial plan
+        const { data: plan, error: planErr } = await supabase
+          .from('subscription_plans')
+          .select('id')
+          .eq('slug', 'orbity_trial')
+          .eq('is_active', true)
+          .maybeSingle();
+        if (planErr) throw planErr;
+        if (!plan) throw new Error('Plano orbity_trial não encontrado.');
+
+        const { error } = await supabase.from('agency_subscriptions').insert({
+          agency_id: agency.agency_id,
+          plan_id: plan.id,
+          status: 'trial',
+          trial_start: new Date().toISOString(),
+          trial_end: finalDate,
+          billing_cycle: 'monthly',
+        });
+        if (error) throw error;
+      }
+
+      toast.success('Trial atualizado com sucesso.');
+      await refreshAgencies();
+    } catch (e: any) {
+      toast.error('Erro ao atualizar trial', { description: e.message });
+    } finally {
+      setSavingTrial(false);
+    }
+  };
+
+  const handleResetTrial = () => {
+    const defaultDate = addDays(new Date(agency.created_at), 7);
+    setTrialDate(defaultDate);
+  };
+
+  const renderTrialLegend = () => {
+    if (!currentTrialEnd) {
+      return <p className="text-xs text-muted-foreground">Sem trial configurado</p>;
+    }
+    if (currentTrialEnd > now) {
+      const days = differenceInDays(currentTrialEnd, now);
+      return (
+        <p className="text-xs text-blue-600">
+          Trial ativo até {format(currentTrialEnd, 'dd/MM/yyyy', { locale: ptBR })} ({days} dia{days !== 1 ? 's' : ''} restantes)
+        </p>
+      );
+    }
+    return (
+      <p className="text-xs text-destructive">
+        Trial expirado em {format(currentTrialEnd, 'dd/MM/yyyy', { locale: ptBR })}
+      </p>
+    );
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -82,7 +190,7 @@ export function AgencyDetailsSheet({ open, onOpenChange, agency }: AgencyDetails
               <div className="text-xs text-muted-foreground">Clientes</div>
             </div>
             <div className="p-3 rounded-lg border bg-muted/50">
-              <Calendar className="h-4 w-4 text-muted-foreground mb-1" />
+              <CalendarIcon className="h-4 w-4 text-muted-foreground mb-1" />
               <div className="text-sm font-medium">{format(new Date(agency.created_at), 'dd/MM/yyyy', { locale: ptBR })}</div>
               <div className="text-xs text-muted-foreground">Criada em</div>
             </div>
@@ -106,6 +214,77 @@ export function AgencyDetailsSheet({ open, onOpenChange, agency }: AgencyDetails
               onCheckedChange={handleToggleActive}
               disabled={toggling}
             />
+          </div>
+
+          <Separator />
+
+          {/* Trial Management */}
+          <div className="space-y-3 p-4 rounded-lg border">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm font-medium">Gestão de Acesso e Trial</Label>
+            </div>
+
+            {trialEditingBlocked ? (
+              <Alert variant="default">
+                <AlertDescription className="text-xs">
+                  A agência já possui ou possuiu uma assinatura (<span className="font-medium">{status}</span>). A modificação manual do período de trial não está disponível para este estado.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Data de expiração do Trial</Label>
+                  <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !trialDate && 'text-muted-foreground'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {trialDate ? format(trialDate, 'dd/MM/yyyy', { locale: ptBR }) : 'Selecionar data'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={trialDate}
+                        onSelect={(d) => { setTrialDate(d); setPopoverOpen(false); }}
+                        initialFocus
+                        className={cn('p-3 pointer-events-auto')}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {renderTrialLegend()}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleSaveTrial}
+                    disabled={!dateChanged || savingTrial}
+                    className="flex-1"
+                  >
+                    {savingTrial ? 'Salvando...' : 'Salvar nova data'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleResetTrial}
+                    disabled={savingTrial}
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Padrão (7d)
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  A data será salva como fim do dia (23:59:59) para o cliente ter acesso até o último minuto.
+                </p>
+              </>
+            )}
           </div>
 
           <Separator />
