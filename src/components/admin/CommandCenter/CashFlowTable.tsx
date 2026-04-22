@@ -166,30 +166,49 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
             <CardTitle className="text-lg flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               Fluxo de Caixa
+              {isForecastMode && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge className="ml-1 gap-1 border-blue-200/60 bg-blue-50 text-blue-800 hover:bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-200 cursor-help">
+                      <CalendarClock className="h-3 w-3" />
+                      PREVISÃO
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-xs">
+                    Lançamentos projetados a partir de contratos ativos, salários e despesas recorrentes vigentes. Nenhum dado real foi criado.
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </CardTitle>
-            <div className="relative w-full max-w-xs">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Pesquisar..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-8 pl-8 text-sm"
-              />
-            </div>
+            {!isForecastMode && (
+              <div className="relative w-full max-w-xs">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Pesquisar..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-8 pl-8 text-sm"
+                />
+              </div>
+            )}
             <div className="flex gap-1.5">
-              <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
-                Este Mês
-              </Button>
-              <Button variant={filter === 'next7' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('next7')}>
-                Próx. 7 dias
-              </Button>
-              <Button
-                variant={filter === 'overdue' ? 'destructive' : 'outline'}
-                size="sm"
-                onClick={() => setFilter('overdue')}
-              >
-                Atrasados {overdueCount > 0 && `(${overdueCount})`}
-              </Button>
+              {!isForecastMode && (
+                <>
+                  <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>
+                    Este Mês
+                  </Button>
+                  <Button variant={filter === 'next7' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('next7')}>
+                    Próx. 7 dias
+                  </Button>
+                  <Button
+                    variant={filter === 'overdue' ? 'destructive' : 'outline'}
+                    size="sm"
+                    onClick={() => setFilter('overdue')}
+                  >
+                    Atrasados {overdueCount > 0 && `(${overdueCount})`}
+                  </Button>
+                </>
+              )}
               <Button variant="outline" size="sm" onClick={() => setAdvancedOpen(true)}>
                 <BarChart3 className="h-4 w-4 mr-1" />
                 Análise Avançada
