@@ -340,16 +340,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id]); // Depender apenas do ID, não do objeto inteiro
 
-  // Restore current agency from localStorage
-  useEffect(() => {
-    const savedAgencyId = localStorage.getItem('currentAgencyId');
-    if (savedAgencyId && userAgencies.length > 0 && !currentAgency) {
-      const savedAgency = userAgencies.find(a => a.id === savedAgencyId);
-      if (savedAgency) {
-        switchAgency(savedAgencyId);
-      }
-    }
-  }, [userAgencies]);
+  // (Restore from localStorage is now handled inside fetchUserAgencies via pickInitialAgencyId)
+
 
   return (
     <AgencyContext.Provider
