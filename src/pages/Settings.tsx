@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 
 import { SubscriptionDetails } from "@/components/subscription/SubscriptionDetails";
 import { BillingHistory } from "@/components/subscription/BillingHistory";
-import { UsersManagement } from "@/components/admin/UsersManagement";
+import { UsersManagement, CreateUserButton } from "@/components/admin/UsersManagement";
 import { NotificationSummaryCard } from "@/components/notifications/NotificationSummaryCard";
 import { NotificationChannelsConfig } from "@/components/notifications/NotificationChannelsConfig";
 import { GoogleCalendarIntegration } from "@/components/settings/GoogleCalendarIntegration";
