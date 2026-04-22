@@ -748,6 +748,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     isForecastMode,
     forecastClients,
     forecastRecurringExpenses,
+    forecastRecurringSubscriptions,
+    forecastInstallments,
 
     // Mutations
     markAsPaid: markAsPaidMutation.mutate,
