@@ -638,20 +638,34 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
       });
     });
 
-    // Despesas recorrentes/fixas projetadas
+    // Despesas recorrentes/fixas projetadas + parcelas do mês
     forecastRecurringExpenses.forEach(e => {
-      let day = '05';
-      if (e.recurrence_day) {
-        day = String(Math.min(Math.max(e.recurrence_day, 1), 28)).padStart(2, '0');
-      } else if (e.due_date) {
-        const parts = e.due_date.split('-');
-        if (parts[2]) day = parts[2];
+      const isInstallment = e.expense_type === 'parcelada';
+      let dueDate: string;
+
+      if (isInstallment && e.due_date) {
+        // Parcelas usam a data real do banco
+        dueDate = e.due_date;
+      } else {
+        let day = '05';
+        if (e.recurrence_day) {
+          day = String(Math.min(Math.max(e.recurrence_day, 1), 28)).padStart(2, '0');
+        } else if (e.due_date) {
+          const parts = e.due_date.split('-');
+          if (parts[2]) day = parts[2];
+        }
+        dueDate = `${selectedMonth}-${day}`;
       }
+
+      const title = isInstallment && e.installment_total
+        ? `${e.name} (${e.installment_current ?? '?'}/${e.installment_total})`
+        : e.name;
+
       items.push({
         id: `forecast-expense-${e.id}`,
-        title: e.name,
+        title,
         amount: e.amount,
-        dueDate: `${selectedMonth}-${day}`,
+        dueDate,
         type: 'EXPENSE',
         status: 'PENDING',
         sourceType: 'expense',
