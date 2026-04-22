@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X, Check, ChevronsUpDown, RotateCw } from "lucide-react";
+import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X, Check, ChevronsUpDown, RotateCw, List, LayoutDashboard } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { TaskListView } from "@/components/tasks/TaskListView";
 import { getVirtualAgencyClient, separateVirtualClients, isVirtualAgencyClient } from "@/lib/virtualAgencyClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
