@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, UserPlus, MoreHorizontal, Trash2, Edit, Mail, Key } from "lucide-react";
+import { Users, UserPlus, MoreHorizontal, Trash2, Edit, Mail, Key, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { RolePermissionsManager } from "./RolePermissionsManager";
+import { AppPermissions } from "@/lib/rolePresets";
 
 
 interface AgencyUser {
@@ -21,6 +24,8 @@ interface AgencyUser {
   user_id: string;
   role: string;
   joined_at: string;
+  custom_role?: string | null;
+  app_permissions?: AppPermissions | null;
   profiles: {
     name: string;
     email: string;
@@ -41,7 +46,9 @@ export function UsersManagement() {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [permissionsTarget, setPermissionsTarget] = useState<AgencyUser | null>(null);
   const { currentAgency, isAgencyAdmin } = useAgency();
+  const { user: currentAuthUser } = useAuth();
   const { toast } = useToast();
   
 
@@ -58,7 +65,7 @@ export function UsersManagement() {
       // Fetch agency users and their profiles separately and join manually
       const { data: agencyUsersData, error: agencyUsersError } = await supabase
         .from('agency_users')
-        .select('id, user_id, role, joined_at')
+        .select('id, user_id, role, joined_at, custom_role, app_permissions')
         .eq('agency_id', currentAgency?.id);
 
       if (agencyUsersError) throw agencyUsersError;
@@ -89,7 +96,7 @@ export function UsersManagement() {
         }
       }));
 
-      setUsers(combinedData);
+      setUsers(combinedData as unknown as AgencyUser[]);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar usuários",
@@ -430,7 +437,7 @@ export function UsersManagement() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => {
                               setSelectedUserId(user.user_id);
                               setPasswordDialogOpen(true);
@@ -439,6 +446,13 @@ export function UsersManagement() {
                             <Key className="h-4 w-4 mr-2" />
                             Alterar Senha
                           </DropdownMenuItem>
+
+                          {user.role !== 'owner' && user.user_id !== currentAuthUser?.id && (
+                            <DropdownMenuItem onClick={() => setPermissionsTarget(user)}>
+                              <ShieldCheck className="h-4 w-4 mr-2" />
+                              Permissões
+                            </DropdownMenuItem>
+                          )}
                           
                           <DropdownMenuItem asChild>
                             <Dialog>
@@ -559,6 +573,19 @@ export function UsersManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {permissionsTarget && (
+        <RolePermissionsManager
+          open={!!permissionsTarget}
+          onOpenChange={(o) => !o && setPermissionsTarget(null)}
+          userId={permissionsTarget.user_id}
+          userName={permissionsTarget.profiles?.name || 'Usuário'}
+          userEmail={permissionsTarget.profiles?.email || ''}
+          currentPermissions={permissionsTarget.app_permissions ?? null}
+          currentCustomRole={permissionsTarget.custom_role ?? null}
+          onSaved={fetchUsers}
+        />
+      )}
     </div>
   );
 }
