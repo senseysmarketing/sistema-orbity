@@ -1,49 +1,68 @@
 
 
-# Correção — Aba "Projeção (90 dias)" zerada na Análise Avançada
+# Reversão de Pagamento — CashFlowTable (versão final aprovada)
 
-## Causa raiz
+## Comportamento
 
-Há **duas instâncias** do `<AdvancedFinancialSheet>` montadas no app:
+Nova ação no `DropdownMenu` de cada linha, visível apenas quando `item.status === 'PAID'` e `!isForecastItem`.
 
-1. `src/pages/Admin.tsx` (linha 542) — recebe **todos** os props (`forecastClients`, `forecastRecurringExpenses`, `employees`, `paymentsAll`, `isForecastMode`). ✅
-2. `src/components/admin/CommandCenter/CashFlowTable.tsx` (linha 424) — recebe **apenas** `cashFlow`, `expensesByCategory`, `agencyId`, `selectedMonth`. ❌
+### Manual (reversível no banco)
+Critério: `item.type === 'EXPENSE'` **ou** `(item.type === 'INCOME' && (!item.billingType || item.billingType === 'manual'))`.
 
-O botão "Análise Avançada" dentro do `CashFlowTable` (linha 212) abre a instância **local**, que está sem os dados de forecast. Como `forecastClients`, `forecastRecurringExpenses` e `employees` caem nos defaults `[]`, o cálculo retorna:
+- Item: ícone `Undo2` + "Reverter para Pendente".
+- Abre `<AlertDialog>` de confirmação ("Esta ação marcará o lançamento como Pendente e removerá a data de pagamento. Se a `due_date` já passou, voltará a aparecer como Atrasado automaticamente.").
+- Confirmação dispara `handleRevertPayment(item)`:
+  - `sourceType === 'expense'` → `UPDATE expenses SET status='pending', paid_at=null WHERE id=item.sourceId`
+  - `sourceType === 'client_payment'` → `UPDATE client_payments SET status='pending', payment_date=null WHERE id=item.sourceId`
+  - `sourceType === 'salary'` → `UPDATE salaries SET status='pending', paid_at=null WHERE id=item.sourceId`
+- Apenas colunas que são preenchidas no momento do pagamento são anuladas — sem tocar em `amount_paid`, `paid_amount` ou outras que possam não existir no schema. Reset de status permite que a UI/cronjobs recalculem `overdue` a partir de `due_date`.
+- `try/catch` com `toast` de sucesso/erro. Sucesso → `queryClient.invalidateQueries()` + `onRefetch?.()`.
 
-- `totalForecastMRR = 0` → gráfico mostra Receita R$0
-- `totalActivePayroll = 0` + `totalForecastFixed = 0` → gráfico mostra Custo R$0
-- Mini-cards: MRR Garantido R$0, Custos Fixos R$0, Margem R$0
+### Gateway (bloqueio seguro — sem ação no banco)
+Critério: `item.type === 'INCOME' && item.billingType && item.billingType !== 'manual'`.
 
-Daí a tela vazia que aparece em abril/2026.
+- Item: ícone `ExternalLink` + "Estornar no Gateway".
+- Abre `<AlertDialog>` informativo (Quiet Luxury, sem variante destrutiva):
+  - **Título:** "Ação Externa Necessária"
+  - **Mensagem:** "Este pagamento foi processado automaticamente via Gateway (Asaas/Conexa). Para evitar inconsistências no seu caixa, realize o estorno ou cancelamento diretamente no painel administrativo do Gateway. O Orbity será atualizado automaticamente assim que o estorno for confirmado via webhook."
+  - **Botão primário:** "Entendido" (fecha).
+  - **Botão secundário (admin login do gateway, NÃO `invoiceUrl`):**
+    - `billingType === 'asaas'` → "Abrir Asaas" → `https://www.asaas.com/login`
+    - `billingType === 'conexa'` → "Abrir Conexa" → `https://app.conexa.app/login`
+    - Outro/desconhecido → omitir o botão secundário.
+  - Abertura via `window.open(url, '_blank', 'noopener,noreferrer')`.
 
-## Correção
+## Implementação técnica (`src/components/admin/CommandCenter/CashFlowTable.tsx`)
 
-### Opção única e limpa: remover a instância duplicada do `CashFlowTable` e elevar o controle de abertura para `Admin.tsx`
+1. **Imports**: adicionar `Undo2` ao `lucide-react` (ExternalLink já está).
+2. **Estado**:
+   ```ts
+   const [revertItem, setRevertItem] = useState<CashFlowItem | null>(null);
+   const [gatewayInfoItem, setGatewayInfoItem] = useState<CashFlowItem | null>(null);
+   const [isReverting, setIsReverting] = useState(false);
+   ```
+3. **Helpers**:
+   ```ts
+   const isGatewayIncome = (i: CashFlowItem) =>
+     i.type === 'INCOME' && !!i.billingType && i.billingType !== 'manual';
+   const gatewayAdminUrl = (bt?: string) =>
+     bt === 'asaas' ? 'https://www.asaas.com/login'
+     : bt === 'conexa' ? 'https://app.conexa.app/login'
+     : null;
+   ```
+4. **`handleRevertPayment`**: switch por `sourceType` aplicando os UPDATEs estritos descritos acima; toast + invalidate + `onRefetch?.()`; `setIsReverting` flag.
+5. **DropdownMenu** (após "Editar Detalhes", antes de "Cancelar"):
+   - Se `item.status === 'PAID'` e `!isForecastItem`:
+     - Se `isGatewayIncome(item)` → "Estornar no Gateway" → `setGatewayInfoItem(item)`.
+     - Senão → "Reverter para Pendente" → `setRevertItem(item)`.
+6. **Dois novos `<AlertDialog>`** ao lado dos existentes — estética Quiet Luxury (tipografia atual, sem cores destrutivas no aviso de gateway, `variant="outline"` no botão secundário, `disabled={isReverting}` no confirm da reversão).
 
-`src/components/admin/CommandCenter/CashFlowTable.tsx`:
-- Adicionar prop `onOpenAdvanced: () => void`.
-- Remover o estado local `advancedOpen` e a montagem do `<AdvancedFinancialSheet>` (linhas 424–431).
-- O botão "Análise Avançada" (linha 212) chama `onOpenAdvanced()` em vez de `setAdvancedOpen(true)`.
+## Não muda
 
-`src/pages/Admin.tsx`:
-- Passar `onOpenAdvanced={() => setIsAdvancedFinancialOpen(true)}` para o `<CashFlowTable>` (já tem `isAdvancedFinancialOpen` no escopo).
-- Manter a única instância já montada na linha 542 — ela já recebe todos os props corretos.
-
-### Resultado
-
-- Clicar em "Análise Avançada" no CashFlowTable abre a sheet **com** os dados completos.
-- Aba "Projeção (90 dias)" mostra:
-  - Gráfico de barras dos 3 meses seguintes (Mai/26, Jun/26, Jul/26) com Receita = MRR ativa e Custo = folha + recorrentes.
-  - Mini-cards "MRR Garantido", "Custos Fixos Previstos" e "Margem Projetada" com os valores reais.
-- Sem regressão na "Visão Atual" (mesmos props de antes).
+- `useFinancialMetrics`, schemas, RLS, Edge Functions, webhooks, demais ações do menu.
+- Itens em modo previsão continuam sem ações.
 
 ## Arquivos alterados
 
-- `src/components/admin/CommandCenter/CashFlowTable.tsx` — remover instância duplicada e estado local; aceitar prop `onOpenAdvanced`.
-- `src/pages/Admin.tsx` — passar `onOpenAdvanced` ao `<CashFlowTable>`.
-
-## Sem mudanças
-
-- `AdvancedFinancialSheet.tsx`, `useAdvancedAnalytics`, `useFinancialMetrics`, queries, RLS — intactos.
+- `src/components/admin/CommandCenter/CashFlowTable.tsx` — único arquivo.
 
