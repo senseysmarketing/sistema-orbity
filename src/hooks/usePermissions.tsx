@@ -33,8 +33,9 @@ export function usePermissions(): PermissionsResult {
   const isAdmin =
     agencyRole === "owner" ||
     agencyRole === "admin" ||
-    profile?.role === "super_admin" ||
-    profile?.role === "administrador";
+    (profile?.role as string) === "super_admin" ||
+    (profile?.role as string) === "administrador" ||
+    profile?.role === "agency_admin";
 
   const enabled = !!user?.id && !!currentAgency?.id && !isAdmin;
 
@@ -70,7 +71,11 @@ export function usePermissions(): PermissionsResult {
   }
 
   // Guardrail 2: null-safe fallback
-  const perms: AppPermissions = (data?.app_permissions as AppPermissions | null) ?? DEFAULT_PERMISSIONS;
+  const rawPerms = data?.app_permissions as unknown;
+  const perms: AppPermissions =
+    rawPerms && typeof rawPerms === "object" && !Array.isArray(rawPerms)
+      ? { ...DEFAULT_PERMISSIONS, ...(rawPerms as Partial<AppPermissions>) }
+      : DEFAULT_PERMISSIONS;
 
   return {
     loading: enabled && isLoading,
