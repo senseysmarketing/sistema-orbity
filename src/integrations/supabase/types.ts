@@ -741,7 +741,9 @@ export type Database = {
       agency_users: {
         Row: {
           agency_id: string
+          app_permissions: Json | null
           created_at: string
+          custom_role: string | null
           id: string
           invited_by: string | null
           joined_at: string
@@ -751,7 +753,9 @@ export type Database = {
         }
         Insert: {
           agency_id: string
+          app_permissions?: Json | null
           created_at?: string
+          custom_role?: string | null
           id?: string
           invited_by?: string | null
           joined_at?: string
@@ -761,7 +765,9 @@ export type Database = {
         }
         Update: {
           agency_id?: string
+          app_permissions?: Json | null
           created_at?: string
+          custom_role?: string | null
           id?: string
           invited_by?: string | null
           joined_at?: string
