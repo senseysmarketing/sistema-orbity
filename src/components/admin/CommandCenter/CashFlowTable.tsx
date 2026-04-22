@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText, ExternalLink, Trash2, CalendarClock } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText, ExternalLink, Trash2, CalendarClock, Undo2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -45,8 +45,49 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
   const [cancelDialogItem, setCancelDialogItem] = useState<CashFlowItem | null>(null);
   const [deleteDialogItem, setDeleteDialogItem] = useState<CashFlowItem | null>(null);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
-  
+  const [revertItem, setRevertItem] = useState<CashFlowItem | null>(null);
+  const [gatewayInfoItem, setGatewayInfoItem] = useState<CashFlowItem | null>(null);
+  const [isReverting, setIsReverting] = useState(false);
+
   const [invoicingId, setInvoicingId] = useState<string | null>(null);
+
+  const isGatewayIncome = (i: CashFlowItem) =>
+    i.type === 'INCOME' && !!i.billingType && i.billingType !== 'manual';
+
+  const gatewayAdminUrl = (bt?: string): string | null =>
+    bt === 'asaas' ? 'https://www.asaas.com/login'
+    : bt === 'conexa' ? 'https://app.conexa.app/login'
+    : null;
+
+  const gatewayLabel = (bt?: string) =>
+    bt === 'asaas' ? 'Asaas' : bt === 'conexa' ? 'Conexa' : 'Gateway';
+
+  const handleRevertPayment = useCallback(async () => {
+    if (!revertItem) return;
+    setIsReverting(true);
+    try {
+      const { sourceType, sourceId } = revertItem;
+      let error: any = null;
+      if (sourceType === 'expense') {
+        ({ error } = await supabase.from('expenses').update({ status: 'pending', paid_at: null } as any).eq('id', sourceId));
+      } else if (sourceType === 'client_payment') {
+        ({ error } = await supabase.from('client_payments').update({ status: 'pending', paid_at: null, paid_date: null } as any).eq('id', sourceId));
+      } else if (sourceType === 'salary') {
+        ({ error } = await supabase.from('salaries').update({ status: 'pending', paid_at: null } as any).eq('id', sourceId));
+      } else {
+        throw new Error('Tipo de registro desconhecido.');
+      }
+      if (error) throw error;
+      toast({ title: '✅ Pagamento revertido', description: 'O lançamento voltou para Pendente.' });
+      queryClient.invalidateQueries();
+      onRefetch?.();
+      setRevertItem(null);
+    } catch (err: any) {
+      toast({ title: 'Erro ao reverter', description: err?.message || 'Tente novamente.', variant: 'destructive' });
+    } finally {
+      setIsReverting(false);
+    }
+  }, [revertItem, toast, queryClient, onRefetch]);
 
   const handleInvoiceConexaSale = async (item: CashFlowItem) => {
     setInvoicingId(item.sourceId);
@@ -325,6 +366,19 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                                     Cancelar / Perdoar
                                   </DropdownMenuItem>
                                 )}
+                                {item.status === 'PAID' && (
+                                  isGatewayIncome(item) ? (
+                                    <DropdownMenuItem onClick={() => setGatewayInfoItem(item)}>
+                                      <ExternalLink className="h-4 w-4 mr-2" />
+                                      Estornar no Gateway
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem onClick={() => setRevertItem(item)}>
+                                      <Undo2 className="h-4 w-4 mr-2" />
+                                      Reverter para Pendente
+                                    </DropdownMenuItem>
+                                  )
+                                )}
                                 {item.status === 'CANCELLED' && (
                                   <DropdownMenuItem
                                     className="text-destructive focus:text-destructive"
@@ -415,6 +469,53 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
               disabled={isDeletingItem}
             >
               {isDeletingItem ? 'Excluindo...' : 'Sim, excluir'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Revert Payment Confirmation Dialog (manual) */}
+      <AlertDialog open={!!revertItem} onOpenChange={(open) => { if (!open && !isReverting) setRevertItem(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reverter pagamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{revertItem?.title}" será marcado como <strong>Pendente</strong> e a data de pagamento será removida. Se a data de vencimento já passou, o lançamento voltará a aparecer como <strong>Atrasado</strong> automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isReverting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRevertPayment} disabled={isReverting}>
+              {isReverting ? 'Revertendo...' : 'Confirmar Reversão'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Gateway Reversal Info Dialog */}
+      <AlertDialog open={!!gatewayInfoItem} onOpenChange={(open) => { if (!open) setGatewayInfoItem(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ação Externa Necessária</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este pagamento foi processado automaticamente via Gateway ({gatewayLabel(gatewayInfoItem?.billingType)}). Para evitar inconsistências no seu caixa, realize o estorno ou cancelamento diretamente no painel administrativo do Gateway. O Orbity será atualizado automaticamente assim que o estorno for confirmado via webhook.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {gatewayAdminUrl(gatewayInfoItem?.billingType) && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const url = gatewayAdminUrl(gatewayInfoItem?.billingType);
+                  if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Abrir {gatewayLabel(gatewayInfoItem?.billingType)}
+              </Button>
+            )}
+            <AlertDialogAction onClick={() => setGatewayInfoItem(null)}>
+              Entendido
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
