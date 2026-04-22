@@ -46,7 +46,9 @@ export function UsersManagement() {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [permissionsTarget, setPermissionsTarget] = useState<AgencyUser | null>(null);
   const { currentAgency, isAgencyAdmin } = useAgency();
+  const { user: currentAuthUser } = useAuth();
   const { toast } = useToast();
   
 
@@ -63,7 +65,7 @@ export function UsersManagement() {
       // Fetch agency users and their profiles separately and join manually
       const { data: agencyUsersData, error: agencyUsersError } = await supabase
         .from('agency_users')
-        .select('id, user_id, role, joined_at')
+        .select('id, user_id, role, joined_at, custom_role, app_permissions')
         .eq('agency_id', currentAgency?.id);
 
       if (agencyUsersError) throw agencyUsersError;
