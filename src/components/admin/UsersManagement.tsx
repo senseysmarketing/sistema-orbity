@@ -437,7 +437,7 @@ export function UsersManagement() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => {
                               setSelectedUserId(user.user_id);
                               setPasswordDialogOpen(true);
@@ -446,6 +446,13 @@ export function UsersManagement() {
                             <Key className="h-4 w-4 mr-2" />
                             Alterar Senha
                           </DropdownMenuItem>
+
+                          {user.role !== 'owner' && user.user_id !== currentAuthUser?.id && (
+                            <DropdownMenuItem onClick={() => setPermissionsTarget(user)}>
+                              <ShieldCheck className="h-4 w-4 mr-2" />
+                              Permissões
+                            </DropdownMenuItem>
+                          )}
                           
                           <DropdownMenuItem asChild>
                             <Dialog>
@@ -566,6 +573,19 @@ export function UsersManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {permissionsTarget && (
+        <RolePermissionsManager
+          open={!!permissionsTarget}
+          onOpenChange={(o) => !o && setPermissionsTarget(null)}
+          userId={permissionsTarget.user_id}
+          userName={permissionsTarget.profiles?.name || 'Usuário'}
+          userEmail={permissionsTarget.profiles?.email || ''}
+          currentPermissions={permissionsTarget.app_permissions ?? null}
+          currentCustomRole={permissionsTarget.custom_role ?? null}
+          onSaved={fetchUsers}
+        />
+      )}
     </div>
   );
 }
