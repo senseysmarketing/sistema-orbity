@@ -84,9 +84,11 @@ export function AppSidebar() {
 
   const isMasterUser = isMasterAgencyAdmin(currentAgency?.id, agencyRole);
 
+  // Mostra todos os itens do menu para todos os membros.
+  // O bloqueio por permissão acontece dentro da página via <RequirePermission/>.
+  // Apenas itens marcados como requiresAdmin continuam restritos a admins/owners.
   const canSeeItem = (item: MenuItem): boolean => {
     if (item.requiresAdmin && !perms.isAdmin) return false;
-    if (item.permission && !perms[item.permission]) return false;
     return true;
   };
 
