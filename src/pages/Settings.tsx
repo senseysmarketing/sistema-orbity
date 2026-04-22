@@ -375,21 +375,7 @@ export default function Settings() {
 
         {isAgencyAdmin && (
           <TabsContent value="users" className="space-y-4">
-            <div className="space-y-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                    <Users className="h-6 w-6" />
-                    Gerenciar Usuários
-                  </h2>
-                  <p className="text-muted-foreground">
-                    Gerencie os membros da sua agência e suas permissões
-                  </p>
-                </div>
-                <CreateUserButton onCreated={() => window.dispatchEvent(new CustomEvent("users:refresh"))} />
-              </div>
-              <UsersManagement showCreateButton={false} />
-            </div>
+            <UsersTabContent />
           </TabsContent>
         )}
 
