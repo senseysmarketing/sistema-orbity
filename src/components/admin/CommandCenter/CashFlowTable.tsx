@@ -366,6 +366,19 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                                     Cancelar / Perdoar
                                   </DropdownMenuItem>
                                 )}
+                                {item.status === 'PAID' && (
+                                  isGatewayIncome(item) ? (
+                                    <DropdownMenuItem onClick={() => setGatewayInfoItem(item)}>
+                                      <ExternalLink className="h-4 w-4 mr-2" />
+                                      Estornar no Gateway
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem onClick={() => setRevertItem(item)}>
+                                      <Undo2 className="h-4 w-4 mr-2" />
+                                      Reverter para Pendente
+                                    </DropdownMenuItem>
+                                  )
+                                )}
                                 {item.status === 'CANCELLED' && (
                                   <DropdownMenuItem
                                     className="text-destructive focus:text-destructive"
