@@ -554,7 +554,41 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     salariesMonthQuery.refetch();
     employeesQuery.refetch();
     expenseCategoriesQuery.refetch();
+    if (isForecastMode) recurringExpensesQuery.refetch();
   };
+
+  // ============ FORECAST MODE OVERRIDES ============
+  // When viewing a future month, replace cash-based metrics with deterministic projections.
+  const forecastMRR = useMemo(() => {
+    return forecastClients.reduce((sum, c) => sum + (c.monthly_value || 0), 0);
+  }, [forecastClients]);
+
+  const forecastPayroll = useMemo(() => {
+    return employees.filter(e => e.is_active).reduce((sum, e) => sum + (e.base_salary || 0), 0);
+  }, [employees]);
+
+  const forecastFixedExpenses = useMemo(() => {
+    return forecastRecurringExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  }, [forecastRecurringExpenses]);
+
+  const forecastBurnRate = forecastPayroll + forecastFixedExpenses;
+  const forecastProfit = forecastMRR - forecastBurnRate;
+  const forecastMargin = forecastMRR > 0 ? (forecastProfit / forecastMRR) * 100 : 0;
+
+  // Build the final return: in forecast mode, override cash metrics; keep real metrics in past/current.
+  const out_totalMRR = isForecastMode ? forecastMRR : totalMRR;
+  const out_expectedRevenue = isForecastMode ? forecastMRR : expectedRevenue;
+  const out_totalPayroll = isForecastMode ? forecastPayroll : totalPayroll;
+  const out_totalExpenses = isForecastMode ? forecastFixedExpenses : totalExpenses;
+  const out_burnRate = isForecastMode ? forecastBurnRate : burnRate;
+  const out_projectedProfit = isForecastMode ? forecastProfit : projectedProfit;
+  const out_profitMargin = isForecastMode ? forecastMargin : profitMargin;
+  const out_paidRevenue = isForecastMode ? 0 : paidRevenue;
+  const out_paidBurnRate = isForecastMode ? 0 : paidBurnRate;
+  const out_overdueAmount = isForecastMode ? 0 : overdueAmount;
+  const out_overdueRate = isForecastMode ? 0 : overdueRate;
+  const out_unifiedCashFlow = isForecastMode ? [] as CashFlowItem[] : unifiedCashFlow;
+  const out_clientProfitability = isForecastMode ? [] as ClientProfitabilityItem[] : clientProfitability;
 
   return {
     // Raw data
@@ -567,31 +601,36 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     expenseCategories,
 
     // Calculated metrics
-    totalMRR,
-    totalExpenses,
-    totalPayroll,
-    burnRate,
+    totalMRR: out_totalMRR,
+    totalExpenses: out_totalExpenses,
+    totalPayroll: out_totalPayroll,
+    burnRate: out_burnRate,
     profitability,
     profitabilityMargin,
-    paidRevenue,
+    paidRevenue: out_paidRevenue,
     realProfitability,
     realProfitabilityMargin,
-    delinquencyRate: overdueAmount,
-    overdueAmount,
+    delinquencyRate: out_overdueAmount,
+    overdueAmount: out_overdueAmount,
     totalGatewayFees,
     totalNetRevenue,
 
     // DRE metrics
-    expectedRevenue,
-    projectedProfit,
-    profitMargin,
-    overdueRate,
-    paidBurnRate,
+    expectedRevenue: out_expectedRevenue,
+    projectedProfit: out_projectedProfit,
+    profitMargin: out_profitMargin,
+    overdueRate: out_overdueRate,
+    paidBurnRate: out_paidBurnRate,
 
     // Structured data
-    unifiedCashFlow,
-    clientProfitability,
+    unifiedCashFlow: out_unifiedCashFlow,
+    clientProfitability: out_clientProfitability,
     expensesByCategory,
+
+    // Forecast specifics
+    isForecastMode,
+    forecastClients,
+    forecastRecurringExpenses,
 
     // Mutations
     markAsPaid: markAsPaidMutation.mutate,
