@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Building2, Users, Calendar as CalendarIcon, DollarSign, Clock, RotateCcw } from 'lucide-react';
-import { format, endOfDay, addDays, differenceInDays, differenceInCalendarDays } from 'date-fns';
+import { format, endOfDay, addDays, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useMaster } from '@/hooks/useMaster';
 import { useEffect, useState } from 'react';
