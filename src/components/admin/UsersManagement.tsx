@@ -96,7 +96,7 @@ export function UsersManagement() {
         }
       }));
 
-      setUsers(combinedData);
+      setUsers(combinedData as unknown as AgencyUser[]);
     } catch (error: any) {
       toast({
         title: "Erro ao carregar usuários",
