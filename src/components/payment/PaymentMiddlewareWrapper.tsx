@@ -17,7 +17,7 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
   const { paymentStatus, loading, isSuperAdmin } = usePaymentMiddleware();
   const { session } = useAuth();
   const { currentAgency, agencyRole } = useAgency();
-  const { currentSubscription } = useSubscription();
+  const { currentSubscription, loading: subscriptionLoading } = useSubscription();
   const location = useLocation();
   const [forceAllow, setForceAllow] = useState(false);
 
