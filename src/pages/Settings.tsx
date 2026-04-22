@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 
 import { SubscriptionDetails } from "@/components/subscription/SubscriptionDetails";
 import { BillingHistory } from "@/components/subscription/BillingHistory";
-import { UsersManagement } from "@/components/admin/UsersManagement";
+import { UsersManagement, CreateUserButton } from "@/components/admin/UsersManagement";
 import { NotificationSummaryCard } from "@/components/notifications/NotificationSummaryCard";
 import { NotificationChannelsConfig } from "@/components/notifications/NotificationChannelsConfig";
 import { GoogleCalendarIntegration } from "@/components/settings/GoogleCalendarIntegration";
@@ -375,18 +375,7 @@ export default function Settings() {
 
         {isAgencyAdmin && (
           <TabsContent value="users" className="space-y-4">
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                  <Users className="h-6 w-6" />
-                  Gerenciar Usuários
-                </h2>
-                <p className="text-muted-foreground">
-                  Gerencie os membros da sua agência e suas permissões
-                </p>
-              </div>
-              <UsersManagement />
-            </div>
+            <UsersTabContent />
           </TabsContent>
         )}
 
@@ -651,6 +640,27 @@ export default function Settings() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function UsersTabContent() {
+  const [refreshKey, setRefreshKey] = useState(0);
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Users className="h-6 w-6" />
+            Gerenciar Usuários
+          </h2>
+          <p className="text-muted-foreground">
+            Gerencie os membros da sua agência e suas permissões
+          </p>
+        </div>
+        <CreateUserButton onCreated={() => setRefreshKey((k) => k + 1)} />
+      </div>
+      <UsersManagement key={refreshKey} showCreateButton={false} />
     </div>
   );
 }
