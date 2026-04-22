@@ -138,6 +138,11 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   const lastDay = new Date(year, month, 0).getDate();
   const endDate = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
 
+  // Forecast mode: selected month is strictly after the current real month
+  const now = new Date();
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const isForecastMode = selectedMonth > currentMonthStr;
+
   // Previous month
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
