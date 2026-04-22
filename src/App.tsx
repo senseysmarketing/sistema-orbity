@@ -13,6 +13,7 @@ import { MasterProvider } from "@/hooks/useMaster";
 import { PaymentMiddlewareProvider } from "@/hooks/usePaymentMiddleware";
 import { PaymentMiddlewareWrapper } from "@/components/payment/PaymentMiddlewareWrapper";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { RequirePermission } from "@/components/auth/RequirePermission";
 import { initMetaPixel, trackPageView } from "@/lib/metaPixel";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
