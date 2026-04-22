@@ -47,15 +47,26 @@ serve(async (req) => {
     const user = userData.user;
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    // Get user's agency
-    const { data: agencyUser, error: agencyError } = await supabaseClient
-      .from('agency_users')
-      .select('agency_id')
-      .eq('user_id', user.id)
-      .single();
+    // Parse optional agency_id from request body (front-end source of truth)
+    let requestedAgencyId: string | null = null;
+    try {
+      const body = await req.json().catch(() => null);
+      if (body && typeof body.agency_id === 'string' && body.agency_id.length > 0) {
+        requestedAgencyId = body.agency_id;
+      }
+    } catch (_e) {
+      // No body or invalid JSON - fall back to auto-selection
+    }
 
-    if (agencyError || !agencyUser) {
-      logStep("No agency found for user");
+    // Get ALL agencies the user belongs to (no .single() - users can have multiple)
+    const { data: agencyUsers, error: agencyError } = await supabaseClient
+      .from('agency_users')
+      .select('agency_id, role, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true });
+
+    if (agencyError || !agencyUsers || agencyUsers.length === 0) {
+      logStep("No agency found for user", { error: agencyError?.message });
       return new Response(JSON.stringify({ 
         subscribed: false,
         subscription_status: 'none',
@@ -65,8 +76,45 @@ serve(async (req) => {
       });
     }
 
-    const agencyId = agencyUser.agency_id;
-    logStep("Found user agency", { agencyId });
+    let agencyId: string | null = null;
+
+    // 1) If front-end passed an agency_id, validate the user belongs to it and use it
+    if (requestedAgencyId) {
+      const match = agencyUsers.find((a: any) => a.agency_id === requestedAgencyId);
+      if (match) {
+        agencyId = match.agency_id;
+        logStep("Using agency_id from request body", { agencyId, role: match.role });
+      } else {
+        logStep("Requested agency_id does not belong to user, falling back to auto-selection", { requestedAgencyId });
+      }
+    }
+
+    // 2) Auto-selection: prioritize agency with active subscription
+    if (!agencyId) {
+      const userAgencyIds = agencyUsers.map((a: any) => a.agency_id);
+      const { data: activeSubs } = await supabaseClient
+        .from('agency_subscriptions')
+        .select('agency_id, status')
+        .in('agency_id', userAgencyIds)
+        .in('status', ['active', 'trial', 'trialing', 'past_due']);
+
+      const activeAgencyIds = new Set((activeSubs || []).map((s: any) => s.agency_id));
+
+      // Prefer: active subscription + admin role (oldest first)
+      const adminWithSub = agencyUsers.find((a: any) =>
+        activeAgencyIds.has(a.agency_id) && ['owner', 'admin'].includes(a.role)
+      );
+      // Then: active subscription with any role
+      const memberWithSub = agencyUsers.find((a: any) => activeAgencyIds.has(a.agency_id));
+      // Then: admin role without active subscription
+      const adminAny = agencyUsers.find((a: any) => ['owner', 'admin'].includes(a.role));
+      // Fallback: oldest agency
+      const fallback = agencyUsers[0];
+
+      const chosen = adminWithSub || memberWithSub || adminAny || fallback;
+      agencyId = chosen.agency_id;
+      logStep("Auto-selected agency", { agencyId, role: chosen.role, hasActiveSub: activeAgencyIds.has(chosen.agency_id), totalAgencies: agencyUsers.length });
+    }
 
     // ALWAYS check Stripe FIRST (source of truth for payments)
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
