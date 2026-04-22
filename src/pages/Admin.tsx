@@ -536,15 +536,16 @@ export default function Admin() {
       />
 
       {/* Team Section */}
-      <TeamSection
-        employees={metrics.employees}
-        onEditEmployee={handleEditEmployee}
-        onEditSalaryByEmployee={handleEditSalaryByEmployee}
-        onDeleteEmployee={handleDeleteEmployee}
-        onToggleEmployeeActive={handleToggleEmployeeActive}
-        onAddEmployee={() => { setSelectedEmployee(null); setEmployeeFormOpen(true); }}
-      />
-
+      <div id="team-section">
+        <TeamSection
+          employees={metrics.employees}
+          onEditEmployee={handleEditEmployee}
+          onEditSalaryByEmployee={handleEditSalaryByEmployee}
+          onDeleteEmployee={handleDeleteEmployee}
+          onToggleEmployeeActive={handleToggleEmployeeActive}
+          onAddEmployee={() => { setSelectedEmployee(null); setEmployeeFormOpen(true); }}
+        />
+      </div>
       {/* Client Management Sheet */}
       <ClientManagementSheet
         open={clientManagementOpen}
