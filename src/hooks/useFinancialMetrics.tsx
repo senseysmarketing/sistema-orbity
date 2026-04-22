@@ -138,6 +138,11 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   const lastDay = new Date(year, month, 0).getDate();
   const endDate = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
 
+  // Forecast mode: selected month is strictly after the current real month
+  const now = new Date();
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const isForecastMode = selectedMonth > currentMonthStr;
+
   // Previous month
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
@@ -238,12 +243,53 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     enabled: !!agencyId,
   });
 
+  // Recurring/fixed expenses for forecast projection (deduplicated client-side by parent_expense_id ?? id)
+  const recurringExpensesQuery = useQuery({
+    queryKey: ['admin-recurring-expenses', agencyId],
+    queryFn: async () => {
+      if (!agencyId) return [];
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('agency_id', agencyId)
+        .or('expense_type.eq.recorrente,is_fixed.eq.true')
+        .order('due_date', { ascending: false });
+      if (error) throw error;
+      return (data || []) as Expense[];
+    },
+    enabled: !!agencyId && isForecastMode,
+  });
+
   const clients = clientsQuery.data || [];
   const paymentsAll = paymentsAllQuery.data || [];
   const expenses = expensesMonthQuery.data || [];
   const salaries = salariesMonthQuery.data || [];
   const employees = employeesQuery.data || [];
   const expenseCategories = expenseCategoriesQuery.data || [];
+
+  // Deduplicate recurring expenses by parent_expense_id ?? id (most recent kept due to desc order)
+  const forecastRecurringExpenses = useMemo<Expense[]>(() => {
+    const raw = recurringExpensesQuery.data || [];
+    const seen = new Set<string>();
+    const out: Expense[] = [];
+    for (const e of raw) {
+      // Skip cancelled or inactive parents
+      if (e.status === 'cancelled') continue;
+      if (e.is_active === false) continue;
+      const key = e.parent_expense_id ?? e.id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(e);
+    }
+    return out;
+  }, [recurringExpensesQuery.data]);
+
+  // Active clients for forecast (with MRR > 0)
+  const forecastClients = useMemo<Client[]>(() => {
+    return clients
+      .filter(c => c.active && (c.monthly_value || 0) > 0)
+      .sort((a, b) => (b.monthly_value || 0) - (a.monthly_value || 0));
+  }, [clients]);
 
   // Payments in selected month
   const paymentsInMonth = useMemo(() => {
@@ -508,7 +554,41 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     salariesMonthQuery.refetch();
     employeesQuery.refetch();
     expenseCategoriesQuery.refetch();
+    if (isForecastMode) recurringExpensesQuery.refetch();
   };
+
+  // ============ FORECAST MODE OVERRIDES ============
+  // When viewing a future month, replace cash-based metrics with deterministic projections.
+  const forecastMRR = useMemo(() => {
+    return forecastClients.reduce((sum, c) => sum + (c.monthly_value || 0), 0);
+  }, [forecastClients]);
+
+  const forecastPayroll = useMemo(() => {
+    return employees.filter(e => e.is_active).reduce((sum, e) => sum + (e.base_salary || 0), 0);
+  }, [employees]);
+
+  const forecastFixedExpenses = useMemo(() => {
+    return forecastRecurringExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  }, [forecastRecurringExpenses]);
+
+  const forecastBurnRate = forecastPayroll + forecastFixedExpenses;
+  const forecastProfit = forecastMRR - forecastBurnRate;
+  const forecastMargin = forecastMRR > 0 ? (forecastProfit / forecastMRR) * 100 : 0;
+
+  // Build the final return: in forecast mode, override cash metrics; keep real metrics in past/current.
+  const out_totalMRR = isForecastMode ? forecastMRR : totalMRR;
+  const out_expectedRevenue = isForecastMode ? forecastMRR : expectedRevenue;
+  const out_totalPayroll = isForecastMode ? forecastPayroll : totalPayroll;
+  const out_totalExpenses = isForecastMode ? forecastFixedExpenses : totalExpenses;
+  const out_burnRate = isForecastMode ? forecastBurnRate : burnRate;
+  const out_projectedProfit = isForecastMode ? forecastProfit : projectedProfit;
+  const out_profitMargin = isForecastMode ? forecastMargin : profitMargin;
+  const out_paidRevenue = isForecastMode ? 0 : paidRevenue;
+  const out_paidBurnRate = isForecastMode ? 0 : paidBurnRate;
+  const out_overdueAmount = isForecastMode ? 0 : overdueAmount;
+  const out_overdueRate = isForecastMode ? 0 : overdueRate;
+  const out_unifiedCashFlow = isForecastMode ? [] as CashFlowItem[] : unifiedCashFlow;
+  const out_clientProfitability = isForecastMode ? [] as ClientProfitabilityItem[] : clientProfitability;
 
   return {
     // Raw data
@@ -521,31 +601,36 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     expenseCategories,
 
     // Calculated metrics
-    totalMRR,
-    totalExpenses,
-    totalPayroll,
-    burnRate,
+    totalMRR: out_totalMRR,
+    totalExpenses: out_totalExpenses,
+    totalPayroll: out_totalPayroll,
+    burnRate: out_burnRate,
     profitability,
     profitabilityMargin,
-    paidRevenue,
+    paidRevenue: out_paidRevenue,
     realProfitability,
     realProfitabilityMargin,
-    delinquencyRate: overdueAmount,
-    overdueAmount,
+    delinquencyRate: out_overdueAmount,
+    overdueAmount: out_overdueAmount,
     totalGatewayFees,
     totalNetRevenue,
 
     // DRE metrics
-    expectedRevenue,
-    projectedProfit,
-    profitMargin,
-    overdueRate,
-    paidBurnRate,
+    expectedRevenue: out_expectedRevenue,
+    projectedProfit: out_projectedProfit,
+    profitMargin: out_profitMargin,
+    overdueRate: out_overdueRate,
+    paidBurnRate: out_paidBurnRate,
 
     // Structured data
-    unifiedCashFlow,
-    clientProfitability,
+    unifiedCashFlow: out_unifiedCashFlow,
+    clientProfitability: out_clientProfitability,
     expensesByCategory,
+
+    // Forecast specifics
+    isForecastMode,
+    forecastClients,
+    forecastRecurringExpenses,
 
     // Mutations
     markAsPaid: markAsPaidMutation.mutate,

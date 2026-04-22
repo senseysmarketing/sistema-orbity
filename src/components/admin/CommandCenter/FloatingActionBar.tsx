@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Receipt, DollarSign, Building, Users, Bell } from "lucide-react";
+import { Receipt, DollarSign, Building, Users, Bell, CalendarClock } from "lucide-react";
 
 interface FloatingActionBarProps {
   selectedMonth: string;
@@ -27,13 +27,25 @@ export function FloatingActionBar({ selectedMonth, onChangeMonth, onNewClient, o
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Array.from({ length: 12 }, (_, i) => {
+              {Array.from({ length: 15 }, (_, i) => {
+                // Offsets: +3, +2, +1, 0, -1, -2, ... -11 (futures first, then current, then past)
+                const offset = 3 - i;
                 const date = new Date();
                 date.setDate(1);
-                date.setMonth(date.getMonth() - i);
+                date.setMonth(date.getMonth() + offset);
                 const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-                return <SelectItem key={value} value={value}>{label.charAt(0).toUpperCase() + label.slice(1)}</SelectItem>;
+                const rawLabel = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+                const label = rawLabel.charAt(0).toUpperCase() + rawLabel.slice(1);
+                const isFuture = offset > 0;
+                return (
+                  <SelectItem key={value} value={value}>
+                    <span className="flex items-center gap-1.5">
+                      {isFuture && <CalendarClock className="h-3 w-3 text-muted-foreground" />}
+                      <span>{label}</span>
+                      {isFuture && <span className="italic text-muted-foreground text-xs">(Previsão)</span>}
+                    </span>
+                  </SelectItem>
+                );
               })}
             </SelectContent>
           </Select>

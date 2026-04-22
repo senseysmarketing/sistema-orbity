@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, CalendarClock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -36,6 +36,7 @@ import { TeamSection } from "@/components/admin/CommandCenter/TeamSection";
 import { ClientManagementSheet } from "@/components/admin/CommandCenter/ClientManagementSheet";
 import { BillingAutomationSettings } from "@/components/admin/BillingAutomationSettings";
 import { AdvancedExpenseSheet } from "@/components/admin/CommandCenter/AdvancedExpenseSheet";
+import { AdvancedFinancialSheet } from "@/components/admin/CommandCenter/AdvancedFinancialSheet";
 
 export default function Admin() {
   const { profile } = useAuth();
@@ -86,6 +87,7 @@ export default function Admin() {
   const [firstPaymentClient, setFirstPaymentClient] = useState<any>(null);
   const [isBillingRulerOpen, setIsBillingRulerOpen] = useState(false);
   const [isExpenseCentralOpen, setIsExpenseCentralOpen] = useState(false);
+  const [isAdvancedFinancialOpen, setIsAdvancedFinancialOpen] = useState(false);
 
   const hasAccess = profile?.role === 'agency_admin';
 
@@ -403,6 +405,17 @@ export default function Admin() {
         onOpenExpenseCentral={() => setIsExpenseCentralOpen(true)}
       />
 
+      {/* Forecast Banner — Quiet Luxury */}
+      {metrics.isForecastMode && (
+        <Alert className="border-blue-200/60 bg-blue-50/40 text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-200">
+          <CalendarClock className="h-4 w-4" />
+          <AlertTitle className="font-medium">Modo de Projeção Ativo</AlertTitle>
+          <AlertDescription className="text-blue-800/80 dark:text-blue-300/80">
+            🕒 Os valores exibidos são baseados em contratos ativos, salários atuais e despesas fixas recorrentes. Valores reais podem variar consoante vendas extras ou cancelamentos.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Hero Metrics */}
       <HeroMetrics
         expectedRevenue={metrics.expectedRevenue}
@@ -416,39 +429,70 @@ export default function Admin() {
         isLoading={metrics.isLoading}
       />
 
-      {/* Main Grid: Cash Flow + Client Profitability */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <CashFlowTable
-          className="lg:col-span-2"
-          cashFlow={metrics.unifiedCashFlow}
-          expensesByCategory={metrics.expensesByCategory}
-          onMarkAsPaid={metrics.markAsPaid}
-          isMarkingAsPaid={metrics.isMarkingAsPaid}
-          onEditItem={(item) => {
-            if (item.sourceType === 'client_payment') {
-              const payment = metrics.paymentsInMonth.find(p => p.id === item.sourceId);
-              if (payment) { setSelectedPayment(payment); setPaymentFormOpen(true); }
-            } else if (item.sourceType === 'expense') {
-              const expense = metrics.expenses.find(e => e.id === item.sourceId);
-              if (expense) { setSelectedExpense(expense); setExpenseFormOpen(true); }
-            } else if (item.sourceType === 'salary') {
-              const salary = metrics.salaries.find(s => s.id === item.sourceId);
-              if (salary) { setSelectedSalary(salary); setSalaryFormOpen(true); }
-            }
-          }}
-          onCancelItem={metrics.cancelItem}
-          isCancellingItem={metrics.isCancellingItem}
-          agencyId={currentAgency?.id || ""}
-          selectedMonth={selectedMonth}
-          onEditExpenseById={handleEditExpenseById}
-          onRefetch={metrics.refetchAll}
-        />
-        <ClientProfitabilityCard
-          clients={metrics.clientProfitability}
-          allClients={metrics.clients}
-          selectedMonth={selectedMonth}
-        />
-      </div>
+      {/* Main Grid: Cash Flow + Client Profitability — hidden in forecast mode */}
+      {metrics.isForecastMode ? (
+        <Card>
+          <CardContent className="py-8 text-center space-y-3">
+            <Sparkles className="h-8 w-8 mx-auto text-muted-foreground" />
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Tabela de fluxo de caixa fica disponível em meses com lançamentos reais.
+              Abra a Análise Avançada para ver a Projeção de Cobranças e antecipar faturamento em lote.
+            </p>
+            <Button onClick={() => setIsAdvancedFinancialOpen(true)} variant="default" size="sm">
+              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+              Abrir Projeção de Cobranças
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <CashFlowTable
+            className="lg:col-span-2"
+            cashFlow={metrics.unifiedCashFlow}
+            expensesByCategory={metrics.expensesByCategory}
+            onMarkAsPaid={metrics.markAsPaid}
+            isMarkingAsPaid={metrics.isMarkingAsPaid}
+            onEditItem={(item) => {
+              if (item.sourceType === 'client_payment') {
+                const payment = metrics.paymentsInMonth.find(p => p.id === item.sourceId);
+                if (payment) { setSelectedPayment(payment); setPaymentFormOpen(true); }
+              } else if (item.sourceType === 'expense') {
+                const expense = metrics.expenses.find(e => e.id === item.sourceId);
+                if (expense) { setSelectedExpense(expense); setExpenseFormOpen(true); }
+              } else if (item.sourceType === 'salary') {
+                const salary = metrics.salaries.find(s => s.id === item.sourceId);
+                if (salary) { setSelectedSalary(salary); setSalaryFormOpen(true); }
+              }
+            }}
+            onCancelItem={metrics.cancelItem}
+            isCancellingItem={metrics.isCancellingItem}
+            agencyId={currentAgency?.id || ""}
+            selectedMonth={selectedMonth}
+            onEditExpenseById={handleEditExpenseById}
+            onRefetch={metrics.refetchAll}
+          />
+          <ClientProfitabilityCard
+            clients={metrics.clientProfitability}
+            allClients={metrics.clients}
+            selectedMonth={selectedMonth}
+          />
+        </div>
+      )}
+
+      {/* AdvancedFinancialSheet — top-level mount so it stays accessible in forecast mode */}
+      <AdvancedFinancialSheet
+        open={isAdvancedFinancialOpen}
+        onOpenChange={setIsAdvancedFinancialOpen}
+        cashFlow={metrics.unifiedCashFlow}
+        expensesByCategory={metrics.expensesByCategory}
+        agencyId={currentAgency?.id || ""}
+        selectedMonth={selectedMonth}
+        forecastClients={metrics.forecastClients}
+        forecastRecurringExpenses={metrics.forecastRecurringExpenses}
+        employees={metrics.employees}
+        paymentsAll={metrics.paymentsAll}
+        isForecastMode={metrics.isForecastMode}
+      />
 
       {/* Team Section */}
       <TeamSection
