@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.process-billing-reminders]
 verify_jwt = false
+
+[functions.process-batch-import]
+verify_jwt = false

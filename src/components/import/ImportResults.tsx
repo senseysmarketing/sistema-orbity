@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, AlertCircle, Home } from "lucide-react";
+import { CheckCircle2, AlertCircle, Home, Link2, RefreshCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface ImportResultsProps {
@@ -8,9 +8,20 @@ interface ImportResultsProps {
   errorCount: number;
   importType: string;
   onNewImport: () => void;
+  gatewaySyncedCount?: number;
+  gatewaySkippedCount?: number;
+  showGatewaySection?: boolean;
 }
 
-export function ImportResults({ successCount, errorCount, importType, onNewImport }: ImportResultsProps) {
+export function ImportResults({
+  successCount,
+  errorCount,
+  importType,
+  onNewImport,
+  gatewaySyncedCount = 0,
+  gatewaySkippedCount = 0,
+  showGatewaySection = false,
+}: ImportResultsProps) {
   const navigate = useNavigate();
   const totalRecords = successCount + errorCount;
   const isSuccess = errorCount === 0;
@@ -33,16 +44,16 @@ export function ImportResults({ successCount, errorCount, importType, onNewImpor
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <Card className={isSuccess ? "border-green-500" : "border-yellow-500"}>
+      <Card className={isSuccess ? "border-emerald-500/50" : "border-amber-500/50"}>
         <CardHeader className="text-center pb-4">
           <div className="flex justify-center mb-4">
             {isSuccess ? (
-              <div className="p-4 bg-green-500/10 rounded-full">
-                <CheckCircle2 className="h-16 w-16 text-green-600" />
+              <div className="p-4 bg-emerald-500/10 rounded-full">
+                <CheckCircle2 className="h-16 w-16 text-emerald-600" />
               </div>
             ) : (
-              <div className="p-4 bg-yellow-500/10 rounded-full">
-                <AlertCircle className="h-16 w-16 text-yellow-600" />
+              <div className="p-4 bg-amber-500/10 rounded-full">
+                <AlertCircle className="h-16 w-16 text-amber-600" />
               </div>
             )}
           </div>
@@ -50,21 +61,19 @@ export function ImportResults({ successCount, errorCount, importType, onNewImpor
             {isSuccess ? 'Importação Concluída!' : 'Importação Parcialmente Concluída'}
           </CardTitle>
           <CardDescription>
-            {isSuccess 
+            {isSuccess
               ? 'Todos os dados foram importados com sucesso'
-              : 'Alguns registros não puderam ser importados'
-            }
+              : 'Alguns registros não puderam ser importados'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Summary */}
           <div className="grid grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
             <div className="text-center">
               <p className="text-3xl font-bold">{totalRecords}</p>
               <p className="text-sm text-muted-foreground">Total</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-bold text-green-600">{successCount}</p>
+              <p className="text-3xl font-bold text-emerald-600">{successCount}</p>
               <p className="text-sm text-muted-foreground">Importados</p>
             </div>
             <div className="text-center">
@@ -73,17 +82,16 @@ export function ImportResults({ successCount, errorCount, importType, onNewImpor
             </div>
           </div>
 
-          {/* Breakdown */}
           <div className="space-y-3">
-            <h3 className="font-semibold">Detalhes da Importação</h3>
+            <h3 className="font-semibold">Detalhes</h3>
             <div className="space-y-2 text-sm">
               <div className="flex items-center justify-between p-3 bg-muted rounded">
                 <span>Tipo de Importação</span>
                 <span className="font-medium">{getImportTypeName()}</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-green-500/5 rounded">
-                <span className="text-green-700">✓ Registros Importados</span>
-                <span className="font-medium text-green-700">{successCount}</span>
+              <div className="flex items-center justify-between p-3 bg-emerald-500/5 rounded">
+                <span className="text-emerald-700">✓ Registros Importados</span>
+                <span className="font-medium text-emerald-700">{successCount}</span>
               </div>
               {errorCount > 0 && (
                 <div className="flex items-center justify-between p-3 bg-destructive/5 rounded">
@@ -94,7 +102,26 @@ export function ImportResults({ successCount, errorCount, importType, onNewImpor
             </div>
           </div>
 
-          {/* Actions */}
+          {showGatewaySection && (
+            <div className="space-y-3">
+              <h3 className="font-semibold">Sincronização com Gateway</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between p-3 bg-primary/5 rounded">
+                  <span className="text-primary flex items-center gap-2">
+                    <Link2 className="h-4 w-4" /> Sincronizados (criados no gateway)
+                  </span>
+                  <span className="font-medium text-primary">{gatewaySyncedCount}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted rounded">
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <RefreshCcw className="h-4 w-4" /> Já existiam no gateway
+                  </span>
+                  <span className="font-medium">{gatewaySkippedCount}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col gap-3 pt-4">
             <Button onClick={() => navigate(getNavigationPath())} className="w-full">
               <Home className="h-4 w-4 mr-2" />
