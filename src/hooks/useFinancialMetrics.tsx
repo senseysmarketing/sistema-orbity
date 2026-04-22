@@ -252,20 +252,40 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   }, []);
 
   const recurringActiveQuery = useQuery({
-    queryKey: ['admin-recurring-active', agencyId, sixtyDaysAgoISO],
+    queryKey: ['admin-recurring-active-masters', agencyId, sixtyDaysAgoISO],
     queryFn: async () => {
-      if (!agencyId) return [];
-      const { data, error } = await supabase
+      if (!agencyId) return { masters: [] as Expense[], latestChildren: [] as Expense[] };
+
+      // Step 1: fetch active subscription MASTERS (parent_expense_id IS NULL).
+      // Source of truth: same criteria SaaS Tracker uses to list active subscriptions.
+      const { data: masters, error: mastersError } = await supabase
         .from('expenses')
         .select('*')
         .eq('agency_id', agencyId)
         .eq('expense_type', 'recorrente')
+        .is('parent_expense_id', null)
         .eq('is_active', true)
-        .in('subscription_status', ['active'])
-        .gte('due_date', sixtyDaysAgoISO)
-        .order('due_date', { ascending: false });
-      if (error) throw error;
-      return (data || []) as Expense[];
+        .in('subscription_status', ['active']);
+      if (mastersError) throw mastersError;
+
+      const masterList = (masters || []) as Expense[];
+      const masterIds = masterList.map(m => m.id);
+
+      // Step 2: fetch all children (desc) so we can pick the most recent per master.
+      let latestChildren: Expense[] = [];
+      if (masterIds.length > 0) {
+        const { data: children, error: childrenError } = await supabase
+          .from('expenses')
+          .select('*')
+          .eq('agency_id', agencyId)
+          .in('parent_expense_id', masterIds)
+          .order('due_date', { ascending: false })
+          .range(0, 4999);
+        if (childrenError) throw childrenError;
+        latestChildren = (children || []) as Expense[];
+      }
+
+      return { masters: masterList, latestChildren };
     },
     enabled: !!agencyId && isForecastMode,
   });
@@ -297,20 +317,38 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
   const employees = employeesQuery.data || [];
   const expenseCategories = expenseCategoriesQuery.data || [];
 
-  // Dedup recurring active by parent_expense_id ?? id (most recent kept due to desc order)
+  // 1 line per active master, using the most recent child's amount/due_date (handles price adjustments).
+  // Anti-ghost: drop groups with no activity in the last 60 days.
   const forecastRecurringSubscriptions = useMemo<Expense[]>(() => {
-    const raw = recurringActiveQuery.data || [];
-    const seen = new Set<string>();
+    const data = recurringActiveQuery.data;
+    if (!data) return [];
+    const { masters, latestChildren } = data;
+
+    const childrenByParent = new Map<string, Expense[]>();
+    for (const child of latestChildren) {
+      if (!child.parent_expense_id) continue;
+      const arr = childrenByParent.get(child.parent_expense_id) || [];
+      arr.push(child);
+      childrenByParent.set(child.parent_expense_id, arr);
+    }
+
     const out: Expense[] = [];
-    for (const e of raw) {
-      if (e.status === 'cancelled') continue;
-      const key = e.parent_expense_id ?? e.id;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(e);
+    for (const master of masters) {
+      if (master.status === 'cancelled') continue;
+      const children = childrenByParent.get(master.id) || [];
+      const mostRecent = children[0] || master;
+
+      const referenceDate = mostRecent.due_date || master.due_date;
+      if (referenceDate && referenceDate < sixtyDaysAgoISO) continue;
+
+      out.push({
+        ...master,
+        amount: mostRecent.amount,
+        due_date: mostRecent.due_date || master.due_date,
+      });
     }
     return out;
-  }, [recurringActiveQuery.data]);
+  }, [recurringActiveQuery.data, sixtyDaysAgoISO]);
 
   // Pending installments for the month (no dedup — each installment is independent)
   const forecastInstallments = useMemo<Expense[]>(() => {
