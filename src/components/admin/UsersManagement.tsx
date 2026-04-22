@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, UserPlus, MoreHorizontal, Trash2, Edit, Mail, Key } from "lucide-react";
+import { Users, UserPlus, MoreHorizontal, Trash2, Edit, Mail, Key, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { RolePermissionsManager } from "./RolePermissionsManager";
+import { AppPermissions } from "@/lib/rolePresets";
 
 
 interface AgencyUser {
@@ -21,6 +24,8 @@ interface AgencyUser {
   user_id: string;
   role: string;
   joined_at: string;
+  custom_role?: string | null;
+  app_permissions?: AppPermissions | null;
   profiles: {
     name: string;
     email: string;
