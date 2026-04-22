@@ -94,18 +94,32 @@ export function AgenciesTable() {
   };
 
   const getStatusBadge = (agency: typeof agencies[0]) => {
-    // Check for trial status
+    // Check for trial status — tricolor (azul / amarelo / vermelho)
     if (agency.subscription_status === 'trial') {
       const trialEnd = agency.trial_end ? new Date(agency.trial_end) : null;
-      if (trialEnd && trialEnd > new Date()) {
-        const daysLeft = differenceInDays(trialEnd, new Date());
+      const now = new Date();
+      if (trialEnd && trialEnd > now) {
+        const hoursLeft = (trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const dateLabel = format(trialEnd, 'dd/MM', { locale: ptBR });
+        if (hoursLeft <= 48) {
+          return (
+            <Badge className="bg-yellow-500/10 text-yellow-700 border-yellow-500/20 hover:bg-yellow-500/20">
+              Trial: expira em {dateLabel} ⚠
+            </Badge>
+          );
+        }
         return (
-          <Badge className="bg-violet-500/10 text-violet-600 border-violet-500/20 hover:bg-violet-500/20">
-            Trial ({daysLeft}d restantes)
+          <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20 hover:bg-blue-500/20">
+            Trial: expira em {dateLabel}
           </Badge>
         );
       }
-      return <Badge className="bg-orange-500/10 text-orange-600 border-orange-500/20 hover:bg-orange-500/20">Trial Expirado</Badge>;
+      const expiredLabel = trialEnd ? format(trialEnd, 'dd/MM', { locale: ptBR }) : '';
+      return (
+        <Badge className="bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20">
+          Trial expirado{expiredLabel ? ` em ${expiredLabel}` : ''}
+        </Badge>
+      );
     }
     
     switch (agency.computed_status) {

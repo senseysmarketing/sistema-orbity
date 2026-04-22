@@ -52,6 +52,17 @@ export function BlockedAccessScreen({ onRetry, reason = 'payment' }: BlockedAcce
 
   const _isOverdue = status === 'past_due';
 
+  // Detect if trial period was customized by Orbity team (diff > 1 day from default 7d)
+  const trialEndDate = currentSubscription?.trial_end ? new Date(currentSubscription.trial_end) : null;
+  const agencyCreatedAt = currentAgency?.created_at ? new Date(currentAgency.created_at) : null;
+  const isCustomTrial = !!(
+    trialEndDate &&
+    agencyCreatedAt &&
+    Math.abs(
+      trialEndDate.getTime() - (agencyCreatedAt.getTime() + 7 * 24 * 60 * 60 * 1000)
+    ) > 24 * 60 * 60 * 1000
+  );
+
   const hasMonthlyValue = currentAgency?.monthly_value && currentAgency.monthly_value > 0;
 
   // Suspended by admin view
@@ -227,6 +238,12 @@ export function BlockedAccessScreen({ onRetry, reason = 'payment' }: BlockedAcce
                   : 'Acesso suspenso. Detectamos uma pendência financeira superior a 5 dias. Por favor, regularize o pagamento.'
               }
             </p>
+
+            {isTrialExpired && isCustomTrial && trialEndDate && (
+              <p className="text-xs text-muted-foreground italic">
+                Seu período de teste foi configurado pela equipe Orbity até {new Intl.DateTimeFormat('pt-BR').format(trialEndDate)}.
+              </p>
+            )}
             
             <div className="space-y-3">
               <div className="space-y-2">
