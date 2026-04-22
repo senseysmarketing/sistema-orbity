@@ -1864,64 +1864,98 @@ export default function Tasks() {
                   <X className="h-4 w-4" />
                 </Button>
               )}
+
+              <ToggleGroup
+                type="single"
+                size="sm"
+                variant="outline"
+                value={view}
+                onValueChange={(v) => v && setView(v as 'kanban' | 'list')}
+                className="ml-auto flex-shrink-0"
+              >
+                <ToggleGroupItem value="kanban" aria-label="Kanban" title="Kanban">
+                  <LayoutDashboard className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="list" aria-label="Lista" title="Lista">
+                  <List className="h-4 w-4" />
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
           </div>
 
-          {/* Kanban View */}
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-6 overflow-x-auto pb-4">
-              {statuses.map((status) => (
-                <KanbanColumn
-                  key={status.slug}
-                  id={status.slug}
-                  title={status.name}
-                  tasks={sortedTasksByStatus(status.slug)}
-                  color={status.color}
-                  count={sortedTasksByStatus(status.slug).length}
-                  onViewDetails={handleViewDetails}
-                  onEdit={handleEditTask}
-                  onDelete={handleDeleteTask}
-                  getPriorityColor={getPriorityColor}
-                  getPriorityLabel={getPriorityLabel}
-                  getUrgencyLevel={getUrgencyLevel}
-                  getAssignedUserName={() => ""}
-                  getClientName={getClientName}
-                  formatDateBR={formatDateBR}
-                  getAssignedUsers={getAssignedUsers}
-                  getTypeName={getTypeName}
-                  getTypeShortName={getTypeShortName}
-                  getTypeIcon={getTypeIcon}
-                />
-              ))}
-            </div>
+          {view === 'kanban' ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="flex gap-6 overflow-x-auto pb-4">
+                {statuses.map((status) => (
+                  <KanbanColumn
+                    key={status.slug}
+                    id={status.slug}
+                    title={status.name}
+                    tasks={sortedTasksByStatus(status.slug)}
+                    color={status.color}
+                    count={sortedTasksByStatus(status.slug).length}
+                    onViewDetails={handleViewDetails}
+                    onEdit={handleEditTask}
+                    onDelete={handleDeleteTask}
+                    getPriorityColor={getPriorityColor}
+                    getPriorityLabel={getPriorityLabel}
+                    getUrgencyLevel={getUrgencyLevel}
+                    getAssignedUserName={() => ""}
+                    getClientName={getClientName}
+                    formatDateBR={formatDateBR}
+                    getAssignedUsers={getAssignedUsers}
+                    getTypeName={getTypeName}
+                    getTypeShortName={getTypeShortName}
+                    getTypeIcon={getTypeIcon}
+                  />
+                ))}
+              </div>
 
-            <DragOverlay>
-              {activeId ? (
-                <SortableTaskCard
-                  task={tasks.find((task) => task.id === activeId)!}
-                  onViewDetails={() => {}}
-                  onEdit={() => {}}
-                  onDelete={() => {}}
-                  getPriorityColor={getPriorityColor}
-                  getPriorityLabel={getPriorityLabel}
-                  getUrgencyLevel={getUrgencyLevel}
-                  getAssignedUserName={() => ""}
-                  getClientName={getClientName}
-                  formatDateBR={formatDateBR}
-                  assignedUsers={activeId ? getAssignedUsers(activeId) : []}
-                  getTypeName={getTypeName}
-                  getTypeShortName={getTypeShortName}
-                  getTypeIcon={getTypeIcon}
-                />
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+              <DragOverlay>
+                {activeId ? (
+                  <SortableTaskCard
+                    task={tasks.find((task) => task.id === activeId)!}
+                    onViewDetails={() => {}}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    getPriorityColor={getPriorityColor}
+                    getPriorityLabel={getPriorityLabel}
+                    getUrgencyLevel={getUrgencyLevel}
+                    getAssignedUserName={() => ""}
+                    getClientName={getClientName}
+                    formatDateBR={formatDateBR}
+                    assignedUsers={activeId ? getAssignedUsers(activeId) : []}
+                    getTypeName={getTypeName}
+                    getTypeShortName={getTypeShortName}
+                    getTypeIcon={getTypeIcon}
+                  />
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          ) : (
+            <TaskListView
+              tasks={filteredTasks}
+              statuses={statuses}
+              getAssignedUsers={getAssignedUsers}
+              getClientName={getClientName}
+              getTypeIcon={getTypeIcon}
+              getTypeShortName={getTypeShortName}
+              getPriorityColor={getPriorityColor}
+              getPriorityLabel={getPriorityLabel}
+              formatDateBR={formatDateBR}
+              onViewDetails={handleViewDetails}
+              onEdit={handleEditTask}
+              onDelete={handleDeleteTask}
+              onToggleComplete={handleToggleTaskStatus}
+            />
+          )}
         </TabsContent>
+
 
         <TabsContent value="analytics" className="space-y-4">
           <TaskAnalytics
