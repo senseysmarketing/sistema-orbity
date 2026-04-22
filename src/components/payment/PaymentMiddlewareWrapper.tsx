@@ -17,7 +17,7 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
   const { paymentStatus, loading, isSuperAdmin } = usePaymentMiddleware();
   const { session } = useAuth();
   const { currentAgency, agencyRole } = useAgency();
-  const { currentSubscription } = useSubscription();
+  const { currentSubscription, loading: subscriptionLoading } = useSubscription();
   const location = useLocation();
   const [forceAllow, setForceAllow] = useState(false);
 
@@ -45,7 +45,7 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
   }
 
   // Show loading spinner while checking payment status (with force-allow escape)
-  if (loading && !forceAllow) {
+  if ((loading || subscriptionLoading) && !forceAllow) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
@@ -87,7 +87,8 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
       new Date(currentSubscription.trial_end) <= new Date());
 
   // Detect first access (no subscription record at all)
-  const isFirstAccessFlag = !subStatus || subStatus === 'none' || subStatus === 'pending_payment';
+  const isFirstAccessFlag = currentSubscription !== null &&
+    (!subStatus || subStatus === 'none' || subStatus === 'pending_payment');
 
   // Block access if: agency suspended, past_due > 5 days, trial expired, first access, or generic invalid
   const isBlocked = agencySuspended || isPastDueBlocked || isTrialExpiredFlag || isFirstAccessFlag ||
