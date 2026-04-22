@@ -549,6 +549,39 @@ export function UsersManagement() {
           onSaved={fetchUsers}
         />
       )}
+
+      <Dialog open={!!roleDialogUser} onOpenChange={(o) => !o && setRoleDialogUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar Função do Usuário</DialogTitle>
+            <DialogDescription>
+              Altere a função de {roleDialogUser?.profiles?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nova Função</Label>
+              <Select
+                defaultValue={roleDialogUser?.role}
+                onValueChange={(value) => {
+                  if (roleDialogUser) {
+                    updateUserRole(roleDialogUser.user_id, value);
+                    setRoleDialogUser(null);
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="member">Membro</SelectItem>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
