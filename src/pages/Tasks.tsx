@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
-import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X, Check, ChevronsUpDown, RotateCw } from "lucide-react";
+import { Plus, Search, LayoutGrid, TrendingUp, Settings, FileText, Tag, Filter, X, Check, ChevronsUpDown, RotateCw, List, LayoutDashboard } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { TaskListView } from "@/components/tasks/TaskListView";
 import { getVirtualAgencyClient, separateVirtualClients, isVirtualAgencyClient } from "@/lib/virtualAgencyClient";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -298,6 +300,7 @@ export default function Tasks() {
   const [dueDateRange, setDueDateRange] = useState<DateRange | undefined>(undefined);
   const [includeNoDueDate, setIncludeNoDueDate] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [view, setView] = useState<'kanban' | 'list'>('kanban');
 
   const toStartOfDay = (d: Date) => {
     const copy = new Date(d);
@@ -346,6 +349,69 @@ export default function Tasks() {
     // Arquivar tarefas concluídas há mais de 7 dias
     archiveOldCompletedTasks();
   }, [currentAgency?.id]);
+
+  // Persistência da visão (Kanban/Lista) por agência
+  useEffect(() => {
+    if (!currentAgency?.id) return;
+    const stored = localStorage.getItem(`tasks:view:${currentAgency.id}`);
+    if (stored === 'kanban' || stored === 'list') {
+      setView(stored);
+    }
+  }, [currentAgency?.id]);
+
+  useEffect(() => {
+    if (!currentAgency?.id) return;
+    localStorage.setItem(`tasks:view:${currentAgency.id}`, view);
+  }, [view, currentAgency?.id]);
+
+  // Toggle rápido de conclusão a partir da Vista em Lista
+  const handleToggleTaskStatus = async (task: Task) => {
+    const newStatus = task.status === 'done' ? 'todo' : 'done';
+    const previousStatus = task.status;
+
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: newStatus } : t)));
+
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: newStatus as any, updated_by: profile?.user_id })
+        .eq('id', task.id);
+      if (error) throw error;
+
+      await addHistoryEntry(task.id, `Status alterado para ${getStatusName(newStatus)}`);
+
+      if (
+        newStatus === 'done' &&
+        task.is_recurring &&
+        !task.next_occurrence_generated &&
+        task.due_date &&
+        task.recurrence_rule
+      ) {
+        const nextDue = computeNextDueDate(task.due_date, task.recurrence_rule);
+        if (nextDue) {
+          const { error: rpcError } = await supabase.rpc(
+            'generate_next_recurring_task' as any,
+            { p_task_id: task.id, p_next_due_date: nextDue }
+          );
+          if (rpcError) {
+            setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: previousStatus } : t)));
+            await supabase.from('tasks').update({ status: previousStatus as any }).eq('id', task.id);
+            toast({ title: 'Falha ao gerar próxima ocorrência', description: rpcError.message, variant: 'destructive' });
+            return;
+          }
+          toast({ title: '🔁 Próxima ocorrência criada', description: formatDateBR(nextDue.split('T')[0]) });
+          fetchTasks();
+          return;
+        }
+      }
+
+      toast({ title: 'Sucesso', description: `Tarefa movida para ${getStatusName(newStatus)}!` });
+    } catch (error: any) {
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: previousStatus } : t)));
+      toast({ title: 'Erro ao atualizar tarefa', description: error.message, variant: 'destructive' });
+    }
+  };
+
 
   const archiveOldCompletedTasks = async () => {
     if (!currentAgency) return;
@@ -1798,64 +1864,98 @@ export default function Tasks() {
                   <X className="h-4 w-4" />
                 </Button>
               )}
+
+              <ToggleGroup
+                type="single"
+                size="sm"
+                variant="outline"
+                value={view}
+                onValueChange={(v) => v && setView(v as 'kanban' | 'list')}
+                className="ml-auto flex-shrink-0"
+              >
+                <ToggleGroupItem value="kanban" aria-label="Kanban" title="Kanban">
+                  <LayoutDashboard className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem value="list" aria-label="Lista" title="Lista">
+                  <List className="h-4 w-4" />
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
           </div>
 
-          {/* Kanban View */}
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-6 overflow-x-auto pb-4">
-              {statuses.map((status) => (
-                <KanbanColumn
-                  key={status.slug}
-                  id={status.slug}
-                  title={status.name}
-                  tasks={sortedTasksByStatus(status.slug)}
-                  color={status.color}
-                  count={sortedTasksByStatus(status.slug).length}
-                  onViewDetails={handleViewDetails}
-                  onEdit={handleEditTask}
-                  onDelete={handleDeleteTask}
-                  getPriorityColor={getPriorityColor}
-                  getPriorityLabel={getPriorityLabel}
-                  getUrgencyLevel={getUrgencyLevel}
-                  getAssignedUserName={() => ""}
-                  getClientName={getClientName}
-                  formatDateBR={formatDateBR}
-                  getAssignedUsers={getAssignedUsers}
-                  getTypeName={getTypeName}
-                  getTypeShortName={getTypeShortName}
-                  getTypeIcon={getTypeIcon}
-                />
-              ))}
-            </div>
+          {view === 'kanban' ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="flex gap-6 overflow-x-auto pb-4">
+                {statuses.map((status) => (
+                  <KanbanColumn
+                    key={status.slug}
+                    id={status.slug}
+                    title={status.name}
+                    tasks={sortedTasksByStatus(status.slug)}
+                    color={status.color}
+                    count={sortedTasksByStatus(status.slug).length}
+                    onViewDetails={handleViewDetails}
+                    onEdit={handleEditTask}
+                    onDelete={handleDeleteTask}
+                    getPriorityColor={getPriorityColor}
+                    getPriorityLabel={getPriorityLabel}
+                    getUrgencyLevel={getUrgencyLevel}
+                    getAssignedUserName={() => ""}
+                    getClientName={getClientName}
+                    formatDateBR={formatDateBR}
+                    getAssignedUsers={getAssignedUsers}
+                    getTypeName={getTypeName}
+                    getTypeShortName={getTypeShortName}
+                    getTypeIcon={getTypeIcon}
+                  />
+                ))}
+              </div>
 
-            <DragOverlay>
-              {activeId ? (
-                <SortableTaskCard
-                  task={tasks.find((task) => task.id === activeId)!}
-                  onViewDetails={() => {}}
-                  onEdit={() => {}}
-                  onDelete={() => {}}
-                  getPriorityColor={getPriorityColor}
-                  getPriorityLabel={getPriorityLabel}
-                  getUrgencyLevel={getUrgencyLevel}
-                  getAssignedUserName={() => ""}
-                  getClientName={getClientName}
-                  formatDateBR={formatDateBR}
-                  assignedUsers={activeId ? getAssignedUsers(activeId) : []}
-                  getTypeName={getTypeName}
-                  getTypeShortName={getTypeShortName}
-                  getTypeIcon={getTypeIcon}
-                />
-              ) : null}
-            </DragOverlay>
-          </DndContext>
+              <DragOverlay>
+                {activeId ? (
+                  <SortableTaskCard
+                    task={tasks.find((task) => task.id === activeId)!}
+                    onViewDetails={() => {}}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    getPriorityColor={getPriorityColor}
+                    getPriorityLabel={getPriorityLabel}
+                    getUrgencyLevel={getUrgencyLevel}
+                    getAssignedUserName={() => ""}
+                    getClientName={getClientName}
+                    formatDateBR={formatDateBR}
+                    assignedUsers={activeId ? getAssignedUsers(activeId) : []}
+                    getTypeName={getTypeName}
+                    getTypeShortName={getTypeShortName}
+                    getTypeIcon={getTypeIcon}
+                  />
+                ) : null}
+              </DragOverlay>
+            </DndContext>
+          ) : (
+            <TaskListView
+              tasks={filteredTasks}
+              statuses={statuses}
+              getAssignedUsers={getAssignedUsers}
+              getClientName={getClientName}
+              getTypeIcon={getTypeIcon}
+              getTypeShortName={getTypeShortName}
+              getPriorityColor={getPriorityColor}
+              getPriorityLabel={getPriorityLabel}
+              formatDateBR={formatDateBR}
+              onViewDetails={handleViewDetails}
+              onEdit={handleEditTask}
+              onDelete={handleDeleteTask}
+              onToggleComplete={handleToggleTaskStatus}
+            />
+          )}
         </TabsContent>
+
 
         <TabsContent value="analytics" className="space-y-4">
           <TaskAnalytics
