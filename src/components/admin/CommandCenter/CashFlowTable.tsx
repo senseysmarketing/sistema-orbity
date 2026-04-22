@@ -474,6 +474,53 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Revert Payment Confirmation Dialog (manual) */}
+      <AlertDialog open={!!revertItem} onOpenChange={(open) => { if (!open && !isReverting) setRevertItem(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reverter pagamento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{revertItem?.title}" será marcado como <strong>Pendente</strong> e a data de pagamento será removida. Se a data de vencimento já passou, o lançamento voltará a aparecer como <strong>Atrasado</strong> automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isReverting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRevertPayment} disabled={isReverting}>
+              {isReverting ? 'Revertendo...' : 'Confirmar Reversão'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Gateway Reversal Info Dialog */}
+      <AlertDialog open={!!gatewayInfoItem} onOpenChange={(open) => { if (!open) setGatewayInfoItem(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ação Externa Necessária</AlertDialogTitle>
+            <AlertDialogDescription>
+              Este pagamento foi processado automaticamente via Gateway ({gatewayLabel(gatewayInfoItem?.billingType)}). Para evitar inconsistências no seu caixa, realize o estorno ou cancelamento diretamente no painel administrativo do Gateway. O Orbity será atualizado automaticamente assim que o estorno for confirmado via webhook.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {gatewayAdminUrl(gatewayInfoItem?.billingType) && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const url = gatewayAdminUrl(gatewayInfoItem?.billingType);
+                  if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Abrir {gatewayLabel(gatewayInfoItem?.billingType)}
+              </Button>
+            )}
+            <AlertDialogAction onClick={() => setGatewayInfoItem(null)}>
+              Entendido
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
     </TooltipProvider>
   );
