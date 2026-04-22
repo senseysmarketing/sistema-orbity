@@ -123,6 +123,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
     try {
       const { data, error } = await supabase.functions.invoke('check-subscription', {
+        body: { agency_id: currentAgency?.id },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
