@@ -1,68 +1,82 @@
 
 
-# Reversão de Pagamento — CashFlowTable (versão final aprovada)
+# Vista em Lista nas Tarefas — versão final aprovada com 3 guardrails
 
-## Comportamento
+## 1. Toggle e estado (`src/pages/Tasks.tsx`)
 
-Nova ação no `DropdownMenu` de cada linha, visível apenas quando `item.status === 'PAID'` e `!isForecastItem`.
+- `const [view, setView] = useState<'kanban' | 'list'>('kanban')` com persistência em `localStorage` (`tasks:view:${currentAgency.id}`).
+- `ToggleGroup` (size sm, variant outline) no fim da linha de filtros, com itens `LayoutDashboard` (Kanban) e `List` (Lista).
+- Render condicional: `{view === 'kanban' ? <DndContext.../> : <TaskListView .../>}` — mesmo `filteredTasks`, mesmos handlers.
 
-### Manual (reversível no banco)
-Critério: `item.type === 'EXPENSE'` **ou** `(item.type === 'INCOME' && (!item.billingType || item.billingType === 'manual'))`.
+## 2. Novo componente `src/components/tasks/TaskListView.tsx`
 
-- Item: ícone `Undo2` + "Reverter para Pendente".
-- Abre `<AlertDialog>` de confirmação ("Esta ação marcará o lançamento como Pendente e removerá a data de pagamento. Se a `due_date` já passou, voltará a aparecer como Atrasado automaticamente.").
-- Confirmação dispara `handleRevertPayment(item)`:
-  - `sourceType === 'expense'` → `UPDATE expenses SET status='pending', paid_at=null WHERE id=item.sourceId`
-  - `sourceType === 'client_payment'` → `UPDATE client_payments SET status='pending', payment_date=null WHERE id=item.sourceId`
-  - `sourceType === 'salary'` → `UPDATE salaries SET status='pending', paid_at=null WHERE id=item.sourceId`
-- Apenas colunas que são preenchidas no momento do pagamento são anuladas — sem tocar em `amount_paid`, `paid_amount` ou outras que possam não existir no schema. Reset de status permite que a UI/cronjobs recalculem `overdue` a partir de `due_date`.
-- `try/catch` com `toast` de sucesso/erro. Sucesso → `queryClient.invalidateQueries()` + `onRefetch?.()`.
+Wrapper `<div className="rounded-md border bg-card">` envolvendo um único `<Accordion type="multiple" defaultValue={...}>`.
 
-### Gateway (bloqueio seguro — sem ação no banco)
-Critério: `item.type === 'INCOME' && item.billingType && item.billingType !== 'manual'`.
+### Guardrail 1 — Accordion por status
+- Para cada `status` em `statuses`: um `<AccordionItem value={status.slug}>`.
+- `defaultValue` = todos os slugs **exceto** `'done'` (concluído nasce colapsado).
+- `<AccordionTrigger>` customizado: borda lateral esquerda 4px com `status.color`, exibe nome em uppercase tracking-wide + contador `({n})`. Sem underline no hover.
+- `<AccordionContent>`: container `overflow-x-auto` envolvendo a `<Table>` daquele grupo.
+- Grupos com 0 tarefas após filtros são ocultados.
 
-- Item: ícone `ExternalLink` + "Estornar no Gateway".
-- Abre `<AlertDialog>` informativo (Quiet Luxury, sem variante destrutiva):
-  - **Título:** "Ação Externa Necessária"
-  - **Mensagem:** "Este pagamento foi processado automaticamente via Gateway (Asaas/Conexa). Para evitar inconsistências no seu caixa, realize o estorno ou cancelamento diretamente no painel administrativo do Gateway. O Orbity será atualizado automaticamente assim que o estorno for confirmado via webhook."
-  - **Botão primário:** "Entendido" (fecha).
-  - **Botão secundário (admin login do gateway, NÃO `invoiceUrl`):**
-    - `billingType === 'asaas'` → "Abrir Asaas" → `https://www.asaas.com/login`
-    - `billingType === 'conexa'` → "Abrir Conexa" → `https://app.conexa.app/login`
-    - Outro/desconhecido → omitir o botão secundário.
-  - Abertura via `window.open(url, '_blank', 'noopener,noreferrer')`.
+### Guardrail 2 — Ordenação inteligente
+Dentro de cada grupo, ordenar por:
+1. `due_date` ascendente (sem data → final).
+2. Desempate por prioridade: `urgent (4) > high (3) > medium (2) > low (1) > sem prioridade (0)`.
 
-## Implementação técnica (`src/components/admin/CommandCenter/CashFlowTable.tsx`)
+```ts
+const priorityRank = { urgent: 4, high: 3, medium: 2, low: 1 };
+const sorted = [...groupTasks].sort((a, b) => {
+  const da = a.due_date ? new Date(a.due_date).getTime() : Infinity;
+  const db = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+  if (da !== db) return da - db;
+  return (priorityRank[b.priority] ?? 0) - (priorityRank[a.priority] ?? 0);
+});
+```
 
-1. **Imports**: adicionar `Undo2` ao `lucide-react` (ExternalLink já está).
-2. **Estado**:
-   ```ts
-   const [revertItem, setRevertItem] = useState<CashFlowItem | null>(null);
-   const [gatewayInfoItem, setGatewayInfoItem] = useState<CashFlowItem | null>(null);
-   const [isReverting, setIsReverting] = useState(false);
-   ```
-3. **Helpers**:
-   ```ts
-   const isGatewayIncome = (i: CashFlowItem) =>
-     i.type === 'INCOME' && !!i.billingType && i.billingType !== 'manual';
-   const gatewayAdminUrl = (bt?: string) =>
-     bt === 'asaas' ? 'https://www.asaas.com/login'
-     : bt === 'conexa' ? 'https://app.conexa.app/login'
-     : null;
-   ```
-4. **`handleRevertPayment`**: switch por `sourceType` aplicando os UPDATEs estritos descritos acima; toast + invalidate + `onRefetch?.()`; `setIsReverting` flag.
-5. **DropdownMenu** (após "Editar Detalhes", antes de "Cancelar"):
-   - Se `item.status === 'PAID'` e `!isForecastItem`:
-     - Se `isGatewayIncome(item)` → "Estornar no Gateway" → `setGatewayInfoItem(item)`.
-     - Senão → "Reverter para Pendente" → `setRevertItem(item)`.
-6. **Dois novos `<AlertDialog>`** ao lado dos existentes — estética Quiet Luxury (tipografia atual, sem cores destrutivas no aviso de gateway, `variant="outline"` no botão secundário, `disabled={isReverting}` no confirm da reversão).
+### Guardrail 3 — Densidade e responsividade
+- `<Table>` envolto em `<div className="overflow-x-auto">`.
+- Todas as `<TableCell>` recebem `whitespace-nowrap`.
+- Tipografia `text-xs`; título em `text-sm font-normal`. Linhas `h-10`, `border-b border-border/40`. Hover `hover:bg-muted/40 cursor-pointer`.
+- Tarefa concluída → `opacity-60 line-through` apenas no título.
 
-## Não muda
+### Colunas
 
-- `useFinancialMetrics`, schemas, RLS, Edge Functions, webhooks, demais ações do menu.
-- Itens em modo previsão continuam sem ações.
+| # | Coluna | Largura | Conteúdo |
+|---|---|---|---|
+| 1 | Checkbox | 32px | `checked={task.status==='done'}` → `onToggleComplete(task)` (stopPropagation) |
+| 2 | Tipo | 28px | `getTypeIcon(task.task_type)` |
+| 3 | Título | flex | `task.title` (clique → `onViewDetails`); ícone `RotateCw` h-3 ml-1 se `is_recurring` |
+| 4 | Cliente | 160px | Badge `variant="secondary"` truncate com `getClientName(client_id)` |
+| 5 | Responsáveis | auto | **1 user** → Avatar h-6 w-6 + primeiro nome. **2+** → stack sobreposta (`-ml-2`) até 3, `+N` se exceder |
+| 6 | Prioridade | 80px | `Flag` lucide com `getPriorityColor` + label sm:visível |
+| 7 | Entrega | 110px | `formatDateBR(due_date)`; `text-destructive` se vencida e não concluída; "—" se ausente |
+| 8 | Ações | 32px | `DropdownMenu` (`MoreHorizontal`): "Editar" → `onEdit`, "Excluir" (destructive) → `onDelete` |
 
-## Arquivos alterados
+### Props
+```ts
+{
+  tasks, statuses, profiles, clients,
+  getAssignedUsers, getClientName, getTypeIcon, getTypeShortName,
+  getPriorityColor, getPriorityLabel, formatDateBR,
+  onViewDetails, onEdit, onDelete, onToggleComplete
+}
+```
 
-- `src/components/admin/CommandCenter/CashFlowTable.tsx` — único arquivo.
+## 3. Integração em `Tasks.tsx`
+
+- Imports: `List`, `LayoutDashboard` (lucide), `ToggleGroup/Item`, `TaskListView`.
+- `onToggleComplete` chama a mesma mutação já usada para mudança de status no Kanban (mantendo paridade — sem nova rota de dados).
+- Filtros (busca, prioridade, usuário, cliente, tipo, período) inalterados — `filteredTasks` é a fonte única.
+- DnD permanece exclusivo do Kanban.
+
+## Sem mudanças
+
+- `KanbanColumn`, `SortableTaskCard`, hooks (`useTaskAssignments`, `useTaskStatuses`), schema, RLS, Edge Functions.
+- Abas Análises/Configurações intactas.
+
+## Arquivos
+
+- **Novo:** `src/components/tasks/TaskListView.tsx`
+- **Editado:** `src/pages/Tasks.tsx`
 
