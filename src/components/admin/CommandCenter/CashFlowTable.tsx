@@ -7,7 +7,8 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText, ExternalLink, Trash2 } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Filter, MoreHorizontal, Pencil, Ban, Search, BarChart3, FileText, ExternalLink, Trash2, CalendarClock, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
@@ -33,9 +34,10 @@ interface CashFlowTableProps {
   className?: string;
   onEditExpenseById?: (expenseId: string) => void;
   onRefetch?: () => void;
+  isForecastMode?: boolean;
 }
 
-export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, agencyId, selectedMonth, className, onEditExpenseById, onRefetch }: CashFlowTableProps) {
+export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, agencyId, selectedMonth, className, onEditExpenseById, onRefetch, isForecastMode = false }: CashFlowTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<FilterType>('all');
