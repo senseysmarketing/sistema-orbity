@@ -80,11 +80,25 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
     currentSubscription?.subscription_end &&
     (new Date().getTime() - new Date(currentSubscription.subscription_end).getTime()) / (1000 * 60 * 60 * 24) > 5;
 
-  // Block access if: agency suspended, past_due > 5 days, or trial expired without valid subscription
-  const isBlocked = agencySuspended || isPastDueBlocked || (!paymentStatus?.isValid && !isSuperAdmin && !subscriptionActive);
-  
+  // Detect expired trial without active Stripe subscription
+  const subStatus = currentSubscription?.subscription_status;
+  const isTrialExpiredFlag = subStatus === 'trial_expired' ||
+    (subStatus === 'trial' && currentSubscription?.trial_end &&
+      new Date(currentSubscription.trial_end) <= new Date());
+
+  // Detect first access (no subscription record at all)
+  const isFirstAccessFlag = !subStatus || subStatus === 'none' || subStatus === 'pending_payment';
+
+  // Block access if: agency suspended, past_due > 5 days, trial expired, first access, or generic invalid
+  const isBlocked = agencySuspended || isPastDueBlocked || isTrialExpiredFlag || isFirstAccessFlag ||
+    (!paymentStatus?.isValid && !isSuperAdmin && !subscriptionActive);
+
   if (isBlocked) {
-    const reason = agencySuspended ? 'suspended' : 'payment';
+    let reason: 'suspended' | 'payment' | 'trial_expired' | 'first_access' = 'payment';
+    if (agencySuspended) reason = 'suspended';
+    else if (isTrialExpiredFlag) reason = 'trial_expired';
+    else if (isFirstAccessFlag) reason = 'first_access';
+    else if (isPastDueBlocked) reason = 'payment';
     return <BlockedAccessScreen reason={reason} />;
   }
 

@@ -9,7 +9,7 @@ import { useAgency } from '@/hooks/useAgency';
 
 interface BlockedAccessScreenProps {
   onRetry?: () => void;
-  reason?: 'suspended' | 'payment';
+  reason?: 'suspended' | 'payment' | 'trial_expired' | 'first_access';
 }
 
 export function BlockedAccessScreen({ onRetry, reason = 'payment' }: BlockedAccessScreenProps) {
@@ -39,14 +39,18 @@ export function BlockedAccessScreen({ onRetry, reason = 'payment' }: BlockedAcce
     }
   };
 
-  const isTrialExpired = currentSubscription?.subscription_end && 
-    new Date(currentSubscription.subscription_end) <= new Date();
+  const status = currentSubscription?.subscription_status;
+  const isTrialExpired = reason === 'trial_expired' ||
+    status === 'trial_expired' ||
+    (status === 'trial' && currentSubscription?.trial_end &&
+      new Date(currentSubscription.trial_end) <= new Date());
 
-  const isFirstAccess = !currentSubscription?.subscription_status || 
-    currentSubscription.subscription_status === 'none' ||
-    currentSubscription.subscription_status === 'pending_payment';
+  const isFirstAccess = reason === 'first_access' ||
+    !status ||
+    status === 'none' ||
+    status === 'pending_payment';
 
-  const _isOverdue = currentSubscription?.subscription_status === 'past_due';
+  const _isOverdue = status === 'past_due';
 
   const hasMonthlyValue = currentAgency?.monthly_value && currentAgency.monthly_value > 0;
 

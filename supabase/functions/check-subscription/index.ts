@@ -241,12 +241,23 @@ async function returnLocalSubscription(supabaseClient: any, agencyId: string) {
     const plan = localSubscription.subscription_plans;
     const isActive = localSubscription.status === 'active';
 
-    logStep("Local subscription found", { status: localSubscription.status, isActive });
+    // Detect expired trial: status='trial' but trial_end already passed
+    let effectiveStatus = localSubscription.status;
+    if (localSubscription.status === 'trial') {
+      const trialExpired = localSubscription.trial_end &&
+        new Date(localSubscription.trial_end) <= new Date();
+      if (trialExpired) {
+        effectiveStatus = 'trial_expired';
+      }
+    }
+
+    logStep("Local subscription found", { status: localSubscription.status, effectiveStatus, isActive });
 
     return new Response(JSON.stringify({
       subscribed: isActive,
-      subscription_status: localSubscription.status,
+      subscription_status: effectiveStatus,
       plan_name: plan.name,
+      trial_end: localSubscription.trial_end,
       subscription_end: localSubscription.current_period_end,
       customer_id: localSubscription.stripe_customer_id,
       subscription_id: localSubscription.stripe_subscription_id,
