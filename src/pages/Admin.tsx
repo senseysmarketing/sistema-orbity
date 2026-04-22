@@ -528,6 +528,7 @@ export default function Admin() {
           onEditExpenseById={handleEditExpenseById}
           onRefetch={metrics.refetchAll}
           isForecastMode={metrics.isForecastMode}
+          onOpenAdvanced={() => setIsAdvancedFinancialOpen(true)}
         />
         {!metrics.isForecastMode && (
           <ClientProfitabilityCard

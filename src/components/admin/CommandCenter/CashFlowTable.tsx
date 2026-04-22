@@ -13,7 +13,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
 import { MarkAsPaidPopover } from "./MarkAsPaidPopover";
-import { AdvancedFinancialSheet } from "./AdvancedFinancialSheet";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -35,9 +34,10 @@ interface CashFlowTableProps {
   onEditExpenseById?: (expenseId: string) => void;
   onRefetch?: () => void;
   isForecastMode?: boolean;
+  onOpenAdvanced?: () => void;
 }
 
-export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, agencyId, selectedMonth, className, onEditExpenseById, onRefetch, isForecastMode = false }: CashFlowTableProps) {
+export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMarkingAsPaid, onEditItem, onCancelItem, isCancellingItem, agencyId, selectedMonth, className, onEditExpenseById, onRefetch, isForecastMode = false, onOpenAdvanced }: CashFlowTableProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<FilterType>('all');
@@ -45,7 +45,6 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
   const [cancelDialogItem, setCancelDialogItem] = useState<CashFlowItem | null>(null);
   const [deleteDialogItem, setDeleteDialogItem] = useState<CashFlowItem | null>(null);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   
   const [invoicingId, setInvoicingId] = useState<string | null>(null);
 
@@ -209,7 +208,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                   </Button>
                 </>
               )}
-              <Button variant="outline" size="sm" onClick={() => setAdvancedOpen(true)}>
+              <Button variant="outline" size="sm" onClick={() => onOpenAdvanced?.()}>
                 <BarChart3 className="h-4 w-4 mr-1" />
                 Análise Avançada
               </Button>
@@ -420,15 +419,6 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <AdvancedFinancialSheet
-        open={advancedOpen}
-        onOpenChange={setAdvancedOpen}
-        cashFlow={cashFlow}
-        expensesByCategory={expensesByCategory}
-        agencyId={agencyId}
-        selectedMonth={selectedMonth}
-      />
 
     </div>
     </TooltipProvider>
