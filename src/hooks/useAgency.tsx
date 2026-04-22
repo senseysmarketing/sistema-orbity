@@ -71,10 +71,46 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
 
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+  const pickInitialAgencyId = (
+    agencyUsers: Array<{ agency_id: string; role: string; created_at?: string }>,
+    subs: Array<{ agency_id: string; status: string; trial_end: string | null }>,
+    savedId: string | null
+  ): string => {
+    // 1) Saved preference wins if still valid
+    if (savedId && agencyUsers.some(au => au.agency_id === savedId)) {
+      return savedId;
+    }
+    const now = new Date();
+    const isSubValid = (s: { status: string; trial_end: string | null }) => {
+      if (s.status === 'active' || s.status === 'past_due') return true;
+      if (s.status === 'trial' || s.status === 'trialing') {
+        return !!s.trial_end && new Date(s.trial_end) > now;
+      }
+      return false;
+    };
+    const validIds = new Set(subs.filter(isSubValid).map(s => s.agency_id));
+
+    const sorted = [...agencyUsers].sort((a, b) =>
+      (a.created_at || '').localeCompare(b.created_at || '')
+    );
+
+    const adminWithSub = sorted.find(au =>
+      validIds.has(au.agency_id) && ['owner', 'admin'].includes(au.role)
+    );
+    if (adminWithSub) return adminWithSub.agency_id;
+
+    const memberWithSub = sorted.find(au => validIds.has(au.agency_id));
+    if (memberWithSub) return memberWithSub.agency_id;
+
+    const adminAny = sorted.find(au => ['owner', 'admin'].includes(au.role));
+    if (adminAny) return adminAny.agency_id;
+
+    return sorted[0].agency_id;
+  };
+
   const fetchUserAgencies = async () => {
     if (!user) return;
 
-    // Evitar chamadas duplicadas
     if (isFetchingRef.current) {
       console.log('[Agency] Already fetching, skipping duplicate call');
       return;
@@ -95,11 +131,11 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
             *,
             agencies (*)
           `)
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true });
 
         if (agencyUsersError) throw agencyUsersError;
 
-        // Guard: se user ficou null durante o fetch (logout), descartar resultado
         if (!user) {
           console.log('[Agency] User became null during fetch, discarding result');
           isFetchingRef.current = false;
@@ -109,8 +145,7 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
 
         const agencies = agencyUsers?.map(au => au.agencies).filter(Boolean) || [];
         setUserAgencies(agencies);
-        
-        // Check if user has no agency
+
         if (agencies.length === 0) {
           setHasNoAgency(true);
           setCurrentAgency(null);
@@ -119,17 +154,31 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         } else {
           setHasNoAgency(false);
 
-          // Set current agency (first one if not set)
           if (!currentAgency) {
-            const firstAgency = agencies[0];
-            const userRole = agencyUsers?.find(au => au.agency_id === firstAgency.id)?.role;
-            setCurrentAgency(firstAgency);
+            // Fetch subscriptions for deterministic selection
+            const agencyIds = agencies.map((a: any) => a.id);
+            const { data: subsData } = await supabase
+              .from('agency_subscriptions')
+              .select('agency_id, status, trial_end')
+              .in('agency_id', agencyIds);
+
+            const savedId = localStorage.getItem('currentAgencyId');
+            const auList = (agencyUsers || []).map((au: any) => ({
+              agency_id: au.agency_id,
+              role: au.role,
+              created_at: au.created_at,
+            }));
+            const chosenId = pickInitialAgencyId(auList, (subsData || []) as any, savedId);
+
+            const chosenAgency = agencies.find((a: any) => a.id === chosenId) || agencies[0];
+            const userRole = agencyUsers?.find(au => au.agency_id === chosenAgency.id)?.role;
+            setCurrentAgency(chosenAgency);
             setAgencyRole(userRole || null);
-            localStorage.setItem('currentAgencyId', firstAgency.id);
+            localStorage.setItem('currentAgencyId', chosenAgency.id);
+            console.log('[Agency] Initial agency selected:', chosenAgency.name, 'role:', userRole);
           }
         }
 
-        // Success — break out of retry loop
         isFetchingRef.current = false;
         setLoading(false);
         return;
@@ -138,7 +187,6 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
         if (attempt < MAX_RETRIES) {
           await delay(1000);
         } else {
-          // All retries exhausted
           console.error('[Agency] All retries failed, setting fetchError');
           setFetchError(true);
         }
@@ -292,16 +340,8 @@ export function AgencyProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id]); // Depender apenas do ID, não do objeto inteiro
 
-  // Restore current agency from localStorage
-  useEffect(() => {
-    const savedAgencyId = localStorage.getItem('currentAgencyId');
-    if (savedAgencyId && userAgencies.length > 0 && !currentAgency) {
-      const savedAgency = userAgencies.find(a => a.id === savedAgencyId);
-      if (savedAgency) {
-        switchAgency(savedAgencyId);
-      }
-    }
-  }, [userAgencies]);
+  // (Restore from localStorage is now handled inside fetchUserAgencies via pickInitialAgencyId)
+
 
   return (
     <AgencyContext.Provider
