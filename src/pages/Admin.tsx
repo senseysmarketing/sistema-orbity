@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, CalendarClock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -36,6 +36,7 @@ import { TeamSection } from "@/components/admin/CommandCenter/TeamSection";
 import { ClientManagementSheet } from "@/components/admin/CommandCenter/ClientManagementSheet";
 import { BillingAutomationSettings } from "@/components/admin/BillingAutomationSettings";
 import { AdvancedExpenseSheet } from "@/components/admin/CommandCenter/AdvancedExpenseSheet";
+import { AdvancedFinancialSheet } from "@/components/admin/CommandCenter/AdvancedFinancialSheet";
 
 export default function Admin() {
   const { profile } = useAuth();
