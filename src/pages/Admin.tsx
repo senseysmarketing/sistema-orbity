@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ShieldAlert, CalendarClock, Sparkles } from "lucide-react";
+import { ShieldAlert, CalendarClock, Sparkles, Users, Repeat } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -416,6 +417,58 @@ export default function Admin() {
         </Alert>
       )}
 
+      {/* Composição dos Custos Projetados — explica de onde vêm os números */}
+      {metrics.isForecastMode && (() => {
+        const activeEmployeesCount = metrics.employees.filter(e => e.is_active).length;
+        const recurringCount = metrics.forecastRecurringExpenses.length;
+        const payrollTotal = metrics.totalPayroll;
+        const recurringTotal = metrics.totalExpenses;
+        const totalProjected = payrollTotal + recurringTotal;
+        return (
+          <Card className="border-blue-200/40 bg-blue-50/20 dark:border-blue-900/30 dark:bg-blue-950/10">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                Composição dos Custos Projetados
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById('team-section');
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="w-full flex items-center justify-between text-sm py-2 px-3 rounded-md hover:bg-blue-100/40 dark:hover:bg-blue-900/20 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>Folha de Pagamento</span>
+                  <span className="text-xs text-muted-foreground">({activeEmployeesCount} {activeEmployeesCount === 1 ? 'ativo' : 'ativos'})</span>
+                </span>
+                <span className="font-semibold tabular-nums">{formatCurrency(payrollTotal)}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsExpenseCentralOpen(true)}
+                className="w-full flex items-center justify-between text-sm py-2 px-3 rounded-md hover:bg-blue-100/40 dark:hover:bg-blue-900/20 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Repeat className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  <span>Despesas Recorrentes</span>
+                  <span className="text-xs text-muted-foreground">({recurringCount} {recurringCount === 1 ? 'item' : 'itens'})</span>
+                </span>
+                <span className="font-semibold tabular-nums">{formatCurrency(recurringTotal)}</span>
+              </button>
+              <div className="border-t border-blue-200/40 dark:border-blue-900/30 pt-2 mt-2 flex items-center justify-between px-3 text-sm">
+                <span className="font-medium text-blue-900 dark:text-blue-200">Total Projetado</span>
+                <span className="font-bold text-blue-900 dark:text-blue-100 tabular-nums">{formatCurrency(totalProjected)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       {/* Hero Metrics */}
       <HeroMetrics
         expectedRevenue={metrics.expectedRevenue}
@@ -429,55 +482,43 @@ export default function Admin() {
         isLoading={metrics.isLoading}
       />
 
-      {/* Main Grid: Cash Flow + Client Profitability — hidden in forecast mode */}
-      {metrics.isForecastMode ? (
-        <Card>
-          <CardContent className="py-8 text-center space-y-3">
-            <Sparkles className="h-8 w-8 mx-auto text-muted-foreground" />
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Tabela de fluxo de caixa fica disponível em meses com lançamentos reais.
-              Abra a Análise Avançada para ver a Projeção de Cobranças e antecipar faturamento em lote.
-            </p>
-            <Button onClick={() => setIsAdvancedFinancialOpen(true)} variant="default" size="sm">
-              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-              Abrir Projeção de Cobranças
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <CashFlowTable
-            className="lg:col-span-2"
-            cashFlow={metrics.unifiedCashFlow}
-            expensesByCategory={metrics.expensesByCategory}
-            onMarkAsPaid={metrics.markAsPaid}
-            isMarkingAsPaid={metrics.isMarkingAsPaid}
-            onEditItem={(item) => {
-              if (item.sourceType === 'client_payment') {
-                const payment = metrics.paymentsInMonth.find(p => p.id === item.sourceId);
-                if (payment) { setSelectedPayment(payment); setPaymentFormOpen(true); }
-              } else if (item.sourceType === 'expense') {
-                const expense = metrics.expenses.find(e => e.id === item.sourceId);
-                if (expense) { setSelectedExpense(expense); setExpenseFormOpen(true); }
-              } else if (item.sourceType === 'salary') {
-                const salary = metrics.salaries.find(s => s.id === item.sourceId);
-                if (salary) { setSelectedSalary(salary); setSalaryFormOpen(true); }
-              }
-            }}
-            onCancelItem={metrics.cancelItem}
-            isCancellingItem={metrics.isCancellingItem}
-            agencyId={currentAgency?.id || ""}
-            selectedMonth={selectedMonth}
-            onEditExpenseById={handleEditExpenseById}
-            onRefetch={metrics.refetchAll}
-          />
+      {/* Main Grid: Cash Flow + Client Profitability — profitability hidden in forecast */}
+      <div className={`grid grid-cols-1 ${metrics.isForecastMode ? '' : 'lg:grid-cols-3'} gap-6`}>
+        <CashFlowTable
+          className={metrics.isForecastMode ? '' : 'lg:col-span-2'}
+          cashFlow={metrics.unifiedCashFlow}
+          expensesByCategory={metrics.expensesByCategory}
+          onMarkAsPaid={metrics.markAsPaid}
+          isMarkingAsPaid={metrics.isMarkingAsPaid}
+          onEditItem={(item) => {
+            if (item.id.startsWith('forecast-')) return; // forecast items are read-only
+            if (item.sourceType === 'client_payment') {
+              const payment = metrics.paymentsInMonth.find(p => p.id === item.sourceId);
+              if (payment) { setSelectedPayment(payment); setPaymentFormOpen(true); }
+            } else if (item.sourceType === 'expense') {
+              const expense = metrics.expenses.find(e => e.id === item.sourceId);
+              if (expense) { setSelectedExpense(expense); setExpenseFormOpen(true); }
+            } else if (item.sourceType === 'salary') {
+              const salary = metrics.salaries.find(s => s.id === item.sourceId);
+              if (salary) { setSelectedSalary(salary); setSalaryFormOpen(true); }
+            }
+          }}
+          onCancelItem={metrics.cancelItem}
+          isCancellingItem={metrics.isCancellingItem}
+          agencyId={currentAgency?.id || ""}
+          selectedMonth={selectedMonth}
+          onEditExpenseById={handleEditExpenseById}
+          onRefetch={metrics.refetchAll}
+          isForecastMode={metrics.isForecastMode}
+        />
+        {!metrics.isForecastMode && (
           <ClientProfitabilityCard
             clients={metrics.clientProfitability}
             allClients={metrics.clients}
             selectedMonth={selectedMonth}
           />
-        </div>
-      )}
+        )}
+      </div>
 
       {/* AdvancedFinancialSheet — top-level mount so it stays accessible in forecast mode */}
       <AdvancedFinancialSheet
