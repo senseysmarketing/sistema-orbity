@@ -94,11 +94,17 @@ serve(async (req) => {
       const userAgencyIds = agencyUsers.map((a: any) => a.agency_id);
       const { data: activeSubs } = await supabaseClient
         .from('agency_subscriptions')
-        .select('agency_id, status')
+        .select('agency_id, status, trial_end')
         .in('agency_id', userAgencyIds)
         .in('status', ['active', 'trial', 'trialing', 'past_due']);
 
-      const activeAgencyIds = new Set((activeSubs || []).map((s: any) => s.agency_id));
+      const nowIso = new Date();
+      const validSubs = (activeSubs || []).filter((s: any) => {
+        if (s.status === 'active' || s.status === 'past_due') return true;
+        // trial / trialing -> must have trial_end in the future
+        return s.trial_end && new Date(s.trial_end) > nowIso;
+      });
+      const activeAgencyIds = new Set(validSubs.map((s: any) => s.agency_id));
 
       // Prefer: active subscription + admin role (oldest first)
       const adminWithSub = agencyUsers.find((a: any) =>
