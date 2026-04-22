@@ -255,22 +255,38 @@ export function SubscriptionDetails() {
           </div>
         )}
 
-        {isTrialing && (
-          <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 space-y-3">
-            <div className="flex items-start gap-2">
-              <Sparkles className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-              <p className="text-sm text-foreground">
-                Você está no período de teste gratuito. Assine agora para garantir acesso contínuo ao Orbity após o término — sem precisar esperar os 7 dias.
-              </p>
+        {isTrialing && (() => {
+          const trialEndDate = currentSubscription?.trial_end ? new Date(currentSubscription.trial_end) : null;
+          const agencyCreatedAt = (currentAgency as any)?.created_at ? new Date((currentAgency as any).created_at) : null;
+          const isCustomTrial = !!(
+            trialEndDate &&
+            agencyCreatedAt &&
+            Math.abs(
+              trialEndDate.getTime() - (agencyCreatedAt.getTime() + 7 * 24 * 60 * 60 * 1000)
+            ) > 24 * 60 * 60 * 1000
+          );
+          return (
+            <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <Sparkles className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                <p className="text-sm text-foreground">
+                  Você está no período de teste gratuito. Assine agora para garantir acesso contínuo ao Orbity após o término — sem precisar esperar os 7 dias.
+                </p>
+              </div>
+              {isCustomTrial && (
+                <p className="text-xs text-muted-foreground italic pl-7">
+                  Período personalizado pela equipe Orbity.
+                </p>
+              )}
+              <Button
+                onClick={() => openManageDialog('upgrade')}
+                className="w-full sm:w-auto"
+              >
+                Escolher Plano e Assinar
+              </Button>
             </div>
-            <Button
-              onClick={() => openManageDialog('upgrade')}
-              className="w-full sm:w-auto"
-            >
-              Escolher Plano e Assinar
-            </Button>
-          </div>
-        )}
+          );
+        })()}
 
         {!planName && !isTrialing && !isActive && !isPastDue && !isCanceled && (
           <div className="rounded-lg bg-muted p-4 space-y-3">

@@ -238,6 +238,12 @@ export function BlockedAccessScreen({ onRetry, reason = 'payment' }: BlockedAcce
                   : 'Acesso suspenso. Detectamos uma pendência financeira superior a 5 dias. Por favor, regularize o pagamento.'
               }
             </p>
+
+            {isTrialExpired && isCustomTrial && trialEndDate && (
+              <p className="text-xs text-muted-foreground italic">
+                Seu período de teste foi configurado pela equipe Orbity até {new Intl.DateTimeFormat('pt-BR').format(trialEndDate)}.
+              </p>
+            )}
             
             <div className="space-y-3">
               <div className="space-y-2">
