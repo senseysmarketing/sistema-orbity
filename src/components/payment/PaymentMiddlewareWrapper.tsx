@@ -45,7 +45,7 @@ export function PaymentMiddlewareWrapper({ children }: PaymentMiddlewareWrapperP
   }
 
   // Show loading spinner while checking payment status (with force-allow escape)
-  if (loading && !forceAllow) {
+  if ((loading || subscriptionLoading) && !forceAllow) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
