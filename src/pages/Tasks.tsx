@@ -300,6 +300,7 @@ export default function Tasks() {
   const [dueDateRange, setDueDateRange] = useState<DateRange | undefined>(undefined);
   const [includeNoDueDate, setIncludeNoDueDate] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [view, setView] = useState<'kanban' | 'list'>('kanban');
 
   const toStartOfDay = (d: Date) => {
     const copy = new Date(d);
