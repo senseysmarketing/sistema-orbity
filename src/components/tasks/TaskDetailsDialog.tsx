@@ -329,7 +329,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[85vh] md:max-h-[90vh] overflow-y-auto p-4 md:p-6">
+        <DialogContent className="max-w-3xl lg:max-w-4xl max-h-[85vh] md:max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 md:p-6">
           <DialogHeader>
             <DialogTitle className="text-xl md:text-2xl">{localTask.title}</DialogTitle>
           </DialogHeader>
