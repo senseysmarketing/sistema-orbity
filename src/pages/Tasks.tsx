@@ -356,6 +356,89 @@ export default function Tasks() {
     archiveOldCompletedTasks();
   }, [currentAgency?.id]);
 
+  // Realtime: sincronização ao vivo de tasks entre múltiplos usuários da agência.
+  // Sem WAL bloat (REPLICA IDENTITY default — id já chega em payload.old).
+  // Joins re-hidratados via TASK_QUERY_FIELDS para evitar perda de avatares/clientes.
+  useEffect(() => {
+    if (!currentAgency?.id) return;
+
+    const agencyId = currentAgency.id;
+
+    const refetchTaskById = async (id: string) => {
+      const { data, error } = await supabase
+        .from("tasks")
+        .select(TASK_QUERY_FIELDS)
+        .eq("id", id)
+        .maybeSingle();
+      if (error || !data) return null;
+
+      const raw: any = data;
+      const userIds = (raw.task_assignments || []).map((a: any) => a.user_id);
+      let profilesMap: Record<string, AssignedUser> = {};
+      if (userIds.length > 0) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("id, user_id, name, role")
+          .in("user_id", userIds);
+        (profileData || []).forEach((p: any) => {
+          profilesMap[p.user_id] = p;
+        });
+      }
+      const assignedUsers = (raw.task_assignments || []).map((a: any) =>
+        profilesMap[a.user_id] || { id: "", user_id: a.user_id, name: "Usuário desconhecido", role: "unknown" }
+      );
+
+      return {
+        ...raw,
+        client_id: raw.client_id || raw.task_clients?.[0]?.client_id || null,
+        _assignedUsers: assignedUsers,
+      } as Task;
+    };
+
+    const channel = supabase
+      .channel(`tasks-realtime-${agencyId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tasks", filter: `agency_id=eq.${agencyId}` },
+        async (payload: any) => {
+          if (payload.eventType === "DELETE") {
+            const deletedId = payload.old?.id;
+            if (!deletedId) return;
+            setTasks((prev) => prev.filter((t) => t.id !== deletedId));
+            return;
+          }
+
+          const newId = payload.new?.id;
+          if (!newId) return;
+
+          // Ignorar tarefas arquivadas (mantém comportamento do fetchTasks)
+          if (payload.new?.archived === true) {
+            setTasks((prev) => prev.filter((t) => t.id !== newId));
+            return;
+          }
+
+          const row = await refetchTaskById(newId);
+          if (!row) return;
+
+          if (payload.eventType === "INSERT") {
+            setTasks((prev) => (prev.some((t) => t.id === row.id) ? prev : [row, ...prev]));
+          } else if (payload.eventType === "UPDATE") {
+            setTasks((prev) => {
+              const exists = prev.some((t) => t.id === row.id);
+              return exists
+                ? prev.map((t) => (t.id === row.id ? row : t))
+                : [row, ...prev];
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentAgency?.id]);
+
   // Persistência da visão (Kanban/Lista) por agência
   useEffect(() => {
     if (!currentAgency?.id) return;
