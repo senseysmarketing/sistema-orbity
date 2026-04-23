@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -29,7 +30,7 @@ export function StripeIntegration() {
 
   const [secretKey, setSecretKey] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
-  const [activeGateway, setActiveGateway] = useState<"asaas" | "stripe">("asaas");
+  const [stripeEnabled, setStripeEnabled] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [showWh, setShowWh] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -57,7 +58,7 @@ export function StripeIntegration() {
       const w = row.stripe_webhook_secret ?? "";
       setSecretKey(k ? maskKey(k) : "");
       setWebhookSecret(w ? maskKey(w) : "");
-      setActiveGateway((row.active_payment_gateway as "asaas" | "stripe") ?? "asaas");
+      setStripeEnabled(row.active_payment_gateway === "stripe");
       setHadKey(!!k);
     }
   }, [row]);
@@ -66,22 +67,26 @@ export function StripeIntegration() {
     ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-agency-webhook?agency_id=${agencyId}`
     : "";
 
-  const isConfigured = hadKey;
-  const stripeActive = isConfigured && activeGateway === "stripe";
+  const hasKey = hadKey || (!!secretKey && !secretKey.includes("••••"));
+  const isConnected = hasKey && stripeEnabled;
 
   const handleSave = async () => {
     if (!agencyId) return;
     setSaving(true);
     try {
-      const update: Partial<AgencyStripeRow> = { active_payment_gateway: activeGateway };
-      // Só atualiza chaves se o usuário digitou algo novo (não mascarado)
+      const update: Partial<AgencyStripeRow> = {
+        active_payment_gateway: stripeEnabled ? "stripe" : "asaas",
+      };
       if (secretKey && !secretKey.includes("••••")) update.stripe_secret_key = secretKey.trim();
       if (webhookSecret && !webhookSecret.includes("••••")) update.stripe_webhook_secret = webhookSecret.trim();
 
       const { error } = await supabase.from("agencies").update(update).eq("id", agencyId);
       if (error) throw error;
 
-      toast({ title: "Configurações salvas", description: "Integração Stripe atualizada." });
+      toast({
+        title: "Configurações salvas!",
+        description: stripeEnabled ? "Stripe habilitado como gateway." : "Stripe desabilitado.",
+      });
       queryClient.invalidateQueries({ queryKey: ["agency-stripe", agencyId] });
       queryClient.invalidateQueries({ queryKey: ["payment-gateway", agencyId] });
     } catch (err: any) {
@@ -107,10 +112,7 @@ export function StripeIntegration() {
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.error ?? "Falha desconhecida");
-      toast({
-        title: "Conexão OK",
-        description: `Modo: ${data.livemode ? "LIVE" : "TEST"}`,
-      });
+      toast({ title: "Conexão OK", description: `Modo: ${data.livemode ? "LIVE" : "TEST"}` });
     } catch (err: any) {
       toast({ title: "Falha no teste", description: err.message, variant: "destructive" });
     } finally {
@@ -137,6 +139,12 @@ export function StripeIntegration() {
     );
   }
 
+  const webhookEvents = [
+    { code: "checkout.session.completed", desc: "Checkout finalizado pelo cliente" },
+    { code: "payment_intent.succeeded", desc: "Pagamento confirmado com sucesso" },
+    { code: "payment_intent.payment_failed", desc: "Falha no pagamento" },
+  ];
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -153,37 +161,26 @@ export function StripeIntegration() {
             </div>
           </div>
           <Badge
-            variant={stripeActive ? "default" : "secondary"}
-            className={stripeActive ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300 hover:bg-emerald-100" : ""}
+            variant={isConnected ? "default" : "secondary"}
+            className={isConnected ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300 hover:bg-emerald-100" : ""}
           >
-            {stripeActive ? "Ativo" : isConfigured ? "Configurado" : "Não configurado"}
+            {isConnected ? "Conectado" : "Desconectado"}
           </Badge>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Seletor de gateway principal */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Gateway principal de cobrança</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {(["asaas", "stripe"] as const).map((g) => (
-              <button
-                key={g}
-                type="button"
-                onClick={() => setActiveGateway(g)}
-                className={`rounded-lg border-2 p-3 text-left transition-all ${
-                  activeGateway === g
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border hover:border-muted-foreground/30"
-                }`}
-              >
-                <div className="text-sm font-semibold capitalize">{g}</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">
-                  {g === "asaas" ? "PIX/Boleto (Brasil)" : "Multi-moeda global"}
-                </div>
-              </button>
-            ))}
+        {/* Master Switch */}
+        <div className="flex items-center justify-between rounded-lg border p-3">
+          <div className="space-y-0.5">
+            <Label htmlFor="stripe-active" className="text-sm font-medium cursor-pointer">
+              Habilitar Stripe
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Disponibiliza Stripe como opção de faturamento para clientes
+            </p>
           </div>
+          <Switch id="stripe-active" checked={stripeEnabled} onCheckedChange={setStripeEnabled} />
         </div>
 
         <Separator />
@@ -249,44 +246,65 @@ export function StripeIntegration() {
         <Separator />
 
         {/* Webhook URL */}
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">URL do Webhook (cole no painel Stripe)</Label>
-          {agencyId ? (
-            <div className="flex gap-2">
-              <Input readOnly value={webhookUrl} className="text-xs font-mono bg-muted/50" />
-              <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => copy(webhookUrl, "URL")}>
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <div className="h-10 rounded-md bg-muted animate-pulse" />
-          )}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Info className="h-4 w-4 text-blue-500" />
+            <Label className="text-sm font-medium">Configuração de Webhook (Retorno de Pagamento)</Label>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">URL do Webhook</Label>
+            {agencyId ? (
+              <div className="flex gap-2">
+                <Input readOnly value={webhookUrl} className="text-xs font-mono bg-muted/50" />
+                <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => copy(webhookUrl, "URL")}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="h-10 rounded-md bg-muted animate-pulse" />
+            )}
+          </div>
         </div>
 
-        <Alert className="bg-muted/50 border-border">
-          <Info className="h-4 w-4 text-primary" />
-          <AlertDescription className="text-xs space-y-2 ml-2">
-            <p className="font-semibold text-sm">Como configurar na Stripe</p>
-            <ol className="space-y-1.5 list-decimal list-outside pl-5 text-muted-foreground">
-              <li>Crie uma <strong className="text-foreground">Restricted Key</strong> em Developers → API keys (permissões: Checkout Sessions write, Payment Intents read).</li>
-              <li>Em Developers → Webhooks → "Add endpoint", cole a URL acima e habilite os eventos:
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {["checkout.session.completed", "payment_intent.succeeded", "payment_intent.payment_failed"].map((e) => (
-                    <span key={e} className="flex items-center gap-1 font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded">
-                      <CheckCircle2 className="h-3 w-3 text-primary" /> {e}
-                    </span>
+        {/* Setup Guide */}
+        <Alert className="mt-2 bg-blue-50/50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
+          <Info className="h-4 w-4 text-blue-500" />
+          <AlertDescription className="text-xs space-y-3 ml-2">
+            <p className="font-semibold text-sm text-blue-800 dark:text-blue-300">Como configurar na Stripe</p>
+
+            <ol className="space-y-2 list-decimal list-outside pl-5 text-muted-foreground">
+              <li className="leading-relaxed">
+                <span>No painel Stripe, acesse <strong className="text-foreground">Developers → API keys</strong> e crie uma <strong className="text-foreground">Restricted Key</strong> com permissões: <em>Checkout Sessions (write)</em> e <em>Payment Intents (read)</em>. Cole-a no campo <strong className="text-foreground">Restricted Secret Key</strong> acima.</span>
+              </li>
+              <li className="leading-relaxed">
+                <span>Acesse <strong className="text-foreground">Developers → Webhooks → "Add endpoint"</strong> e cole a <strong className="text-foreground">URL do Webhook</strong> gerada acima.</span>
+              </li>
+              <li className="leading-relaxed">
+                <span>⚠️ <strong className="text-foreground">IMPORTANTE — Eventos para Cobranças:</strong> Marque estritamente estas opções:</span>
+                <div className="mt-2 flex flex-col gap-1.5">
+                  {webhookEvents.map((evt) => (
+                    <div key={evt.code} className="flex items-center gap-1 flex-wrap">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                      <span className="font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded">{evt.code}</span>
+                      <span className="text-[11px] text-muted-foreground">— {evt.desc}</span>
+                    </div>
                   ))}
                 </div>
               </li>
-              <li>Copie o <strong className="text-foreground">Signing secret</strong> do endpoint e cole aqui.</li>
-              <li>Selecione <strong className="text-foreground">Stripe</strong> como gateway principal e salve.</li>
+              <li className="leading-relaxed">
+                <span>Após criar o endpoint, copie o <strong className="text-foreground">Signing secret</strong> (whsec_…) e cole no campo <strong className="text-foreground">Webhook Signing Secret</strong> acima.</span>
+              </li>
+              <li className="leading-relaxed">
+                <span>Ative o switch <strong className="text-foreground">"Habilitar Stripe"</strong> e clique em <strong className="text-foreground">"Salvar e Conectar"</strong>.</span>
+              </li>
             </ol>
           </AlertDescription>
         </Alert>
 
         <Button onClick={handleSave} disabled={saving} className="w-full">
           {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-          Salvar configurações
+          Salvar e Conectar
         </Button>
       </CardContent>
     </Card>
