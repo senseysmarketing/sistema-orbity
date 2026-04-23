@@ -51,6 +51,7 @@ interface MasterContextType {
   refreshAgencies: () => Promise<void>;
   suspendAgency: (agencyId: string) => Promise<void>;
   reactivateAgency: (agencyId: string) => Promise<void>;
+  deleteAgencyPermanently: (agencyId: string) => Promise<boolean>;
   getMasterMetrics: () => {
     totalAgencies: number;
     activeAgencies: number;
