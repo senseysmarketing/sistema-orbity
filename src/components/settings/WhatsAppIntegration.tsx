@@ -121,6 +121,29 @@ export const WhatsAppIntegration = () => {
           description="Conecte seu WhatsApp para automação de mensagens no CRM"
         />
       )}
+
+      {/* Manual re-link tool for orphan conversations */}
+      <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/10">
+        <div className="space-y-0.5">
+          <Label className="text-sm font-medium">Sincronizar conversas com leads</Label>
+          <p className="text-xs text-muted-foreground">
+            Vincula conversas recebidas no WhatsApp aos leads correspondentes pelo número de telefone. Útil quando mensagens chegaram antes do lead ter sido cadastrado.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => relinkOrphans.mutate()}
+          disabled={relinkOrphans.isPending}
+        >
+          {relinkOrphans.isPending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Link2 className="mr-2 h-4 w-4" />
+          )}
+          Sincronizar agora
+        </Button>
+      </div>
     </div>
   );
 };
