@@ -159,11 +159,15 @@ async function validateSignature(req: Request, body: string): Promise<boolean> {
 }
 
 /**
- * Finds active/processing automations for a conversation, with a cross-instance lead_id fallback.
- * Uses agencyId to search across ALL WhatsApp accounts (general + billing) belonging to the agency.
+ * Finds active/processing automations for a conversation, with cross-instance fallbacks:
+ *  1) by conversation_id (fast)
+ *  2) by lead_id across all agency accounts
+ *  3) by phone variants — finds automations linked to ANY conversation of the same number
+ *     in the agency (handles re-created conversations / duplicates).
  */
 async function findActiveAutomations(
-  supabase: any, agencyId: string, conversationId: string, leadId: string | null
+  supabase: any, agencyId: string, conversationId: string, leadId: string | null,
+  phoneNumber?: string,
 ): Promise<{ id: string }[]> {
   // 1. By conversation (scoped, fast)
   const { data: byConv } = await supabase
@@ -172,24 +176,45 @@ async function findActiveAutomations(
     .in('status', ['active', 'processing']).limit(10);
 
   if (byConv && byConv.length > 0) return byConv;
-  if (!leadId) return [];
 
-  // 2. By lead across ALL accounts in the agency (cross-instance)
+  // Pull all agency accounts once for steps 2 & 3
   const { data: agencyAccounts } = await supabase
     .from('whatsapp_accounts').select('id')
     .eq('agency_id', agencyId);
 
   if (!agencyAccounts || agencyAccounts.length === 0) return [];
-
   const accountIds = agencyAccounts.map((a: any) => a.id);
 
-  const { data: byLead } = await supabase
-    .from('whatsapp_automation_control').select('id')
-    .in('account_id', accountIds)
-    .eq('lead_id', leadId)
-    .in('status', ['active', 'processing']).limit(10);
+  // 2. By lead across ALL accounts in the agency (cross-instance)
+  if (leadId) {
+    const { data: byLead } = await supabase
+      .from('whatsapp_automation_control').select('id')
+      .in('account_id', accountIds)
+      .eq('lead_id', leadId)
+      .in('status', ['active', 'processing']).limit(10);
 
-  return byLead || [];
+    if (byLead && byLead.length > 0) return byLead;
+  }
+
+  // 3. By phone variants — find any conversation of the same number, then its automations
+  if (phoneNumber) {
+    const variants = phoneVariants(phoneNumber);
+    const { data: phoneConvs } = await supabase
+      .from('whatsapp_conversations').select('id')
+      .in('account_id', accountIds)
+      .in('phone_number', variants);
+
+    const convIds = (phoneConvs || []).map((c: any) => c.id).filter((id: string) => id !== conversationId);
+    if (convIds.length > 0) {
+      const { data: byPhone } = await supabase
+        .from('whatsapp_automation_control').select('id')
+        .in('conversation_id', convIds)
+        .in('status', ['active', 'processing']).limit(10);
+      if (byPhone && byPhone.length > 0) return byPhone;
+    }
+  }
+
+  return [];
 }
 
 /**
@@ -517,7 +542,7 @@ serve(async (req) => {
         // Stop active automations when customer replies
         const pauseAutomations = (async () => {
           const automations = await findActiveAutomations(
-            supabase, account.agency_id, conversation.id, conversation.lead_id
+            supabase, account.agency_id, conversation.id, conversation.lead_id, phoneNumber
           );
 
           for (const automation of automations) {
@@ -579,7 +604,7 @@ serve(async (req) => {
       } else if (!existingMsg) {
         // Operator sent from phone directly — pause automation
         const automations = await findActiveAutomations(
-          supabase, account.agency_id, conversation.id, conversation.lead_id
+          supabase, account.agency_id, conversation.id, conversation.lead_id, phoneNumber
         );
 
         for (const automation of automations) {
