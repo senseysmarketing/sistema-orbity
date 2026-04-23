@@ -592,10 +592,17 @@ function StickyActionBar({
   onNext: () => void;
 }) {
   const decided = !!item.decision;
+  const needsPanel = decided || revisionOpen;
 
   return (
-    <div className="sticky bottom-0 inset-x-0 bg-[#0a0a1a]/70 backdrop-blur-2xl border-t border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] z-20">
-      <div className="max-w-xl mx-auto">
+    <div className="fixed bottom-8 sm:bottom-10 left-1/2 -translate-x-1/2 z-30 w-[calc(100%-2rem)] max-w-md pb-[env(safe-area-inset-bottom)]">
+      <div
+        className={
+          needsPanel
+            ? "bg-[#0a0a1a]/80 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-2xl shadow-black/50"
+            : ""
+        }
+      >
         {decided ? (
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm text-white/60">
@@ -607,7 +614,7 @@ function StickyActionBar({
               <Button
                 size="lg"
                 onClick={onNext}
-                className="bg-white/5 backdrop-blur-xl border border-white/10 text-white hover:bg-white/10"
+                className="bg-white/10 backdrop-blur-xl border border-white/15 text-white hover:bg-white/20"
               >
                 Próxima arte
                 <ChevronRight className="h-4 w-4 ml-1" />
@@ -662,7 +669,7 @@ function StickyActionBar({
           <div className="grid grid-cols-2 gap-3">
             <Button
               size="lg"
-              className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-shadow"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xl shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-shadow"
               onClick={() => onSubmit(item, "approved")}
               disabled={submitting}
             >
@@ -677,7 +684,7 @@ function StickyActionBar({
               size="lg"
               onClick={() => setRevisionOpen(true)}
               disabled={submitting}
-              className="bg-white/5 backdrop-blur-xl border border-white/10 text-white hover:bg-white/10"
+              className="bg-white/10 backdrop-blur-2xl border border-white/15 text-white hover:bg-white/20 shadow-2xl shadow-black/40"
             >
               <Pencil className="h-4 w-4 mr-2" />
               Solicitar Ajuste
