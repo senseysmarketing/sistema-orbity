@@ -136,7 +136,7 @@ export function TaskListView({
               </span>
             </AccordionTrigger>
             <AccordionContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="w-full">
                 <Table className="table-fixed w-full">
                   <colgroup>
                     <col style={{ width: "40px" }} />
@@ -183,10 +183,10 @@ export function TaskListView({
 
                           {/* Título */}
                           <TableCell className="py-1.5 max-w-0">
-                            <div className="flex items-center gap-1 min-w-0">
+                            <div className="flex items-center gap-1 min-w-0 w-full">
                               <span
                                 className={cn(
-                                  "text-sm font-normal truncate",
+                                  "text-sm font-normal block truncate min-w-0 flex-1",
                                   isDone && "opacity-60 line-through",
                                 )}
                                 title={task.title}
