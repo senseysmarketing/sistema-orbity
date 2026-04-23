@@ -8,22 +8,26 @@ export interface PermissionsResult {
   loading: boolean;
   permissions: AppPermissions;
   customRole: string | null;
-  canAccessCRM: boolean;
+  canAccessClients: boolean;
   canAccessTasks: boolean;
-  canAccessFinancial: boolean;
-  canAccessTraffic: boolean;
-  canAccessSocialMedia: boolean;
+  canAccessReminders: boolean;
   canAccessAgenda: boolean;
+  canAccessCRM: boolean;
+  canAccessSocialMedia: boolean;
+  canAccessTraffic: boolean;
+  canAccessContracts: boolean;
+  canAccessNPS: boolean;
+  canAccessGoals: boolean;
+  canAccessFinancial: boolean;
+  canAccessReports: boolean;
+  canAccessImport: boolean;
   isAdmin: boolean;
 }
 
 const ALL_TRUE: AppPermissions = {
-  crm: true,
-  tasks: true,
-  financial: true,
-  traffic: true,
-  social_media: true,
-  agenda: true,
+  clients: true, tasks: true, reminders: true, agenda: true, crm: true,
+  social_media: true, traffic: true, contracts: true,
+  nps: true, goals: true, financial: true, reports: true, import_data: true,
 };
 
 export function usePermissions(): PermissionsResult {
@@ -60,33 +64,63 @@ export function usePermissions(): PermissionsResult {
       loading: false,
       permissions: ALL_TRUE,
       customRole: null,
-      canAccessCRM: true,
+      canAccessClients: true,
       canAccessTasks: true,
-      canAccessFinancial: true,
-      canAccessTraffic: true,
-      canAccessSocialMedia: true,
+      canAccessReminders: true,
       canAccessAgenda: true,
+      canAccessCRM: true,
+      canAccessSocialMedia: true,
+      canAccessTraffic: true,
+      canAccessContracts: true,
+      canAccessNPS: true,
+      canAccessGoals: true,
+      canAccessFinancial: true,
+      canAccessReports: true,
+      canAccessImport: true,
       isAdmin: true,
     };
   }
 
-  // Guardrail 2: null-safe fallback
-  const rawPerms = data?.app_permissions as unknown;
-  const perms: AppPermissions =
-    rawPerms && typeof rawPerms === "object" && !Array.isArray(rawPerms)
-      ? { ...DEFAULT_PERMISSIONS, ...(rawPerms as Partial<AppPermissions>) }
-      : DEFAULT_PERMISSIONS;
+  // Fallback retrocompatível: herdar das chaves antigas quando as novas não existem
+  const rawObj =
+    data?.app_permissions && typeof data.app_permissions === "object" && !Array.isArray(data.app_permissions)
+      ? (data.app_permissions as Record<string, boolean | undefined>)
+      : {};
+  const raw = rawObj as Partial<AppPermissions>;
+
+  const perms: AppPermissions = {
+    clients:      raw.clients      ?? raw.crm ?? DEFAULT_PERMISSIONS.clients,
+    tasks:        raw.tasks        ?? DEFAULT_PERMISSIONS.tasks,
+    reminders:    raw.reminders    ?? DEFAULT_PERMISSIONS.reminders,
+    agenda:       raw.agenda       ?? DEFAULT_PERMISSIONS.agenda,
+    crm:          raw.crm          ?? DEFAULT_PERMISSIONS.crm,
+    social_media: raw.social_media ?? DEFAULT_PERMISSIONS.social_media,
+    traffic:      raw.traffic      ?? DEFAULT_PERMISSIONS.traffic,
+    contracts:    raw.contracts    ?? raw.financial ?? DEFAULT_PERMISSIONS.contracts,
+    nps:          raw.nps          ?? raw.crm ?? DEFAULT_PERMISSIONS.nps,
+    goals:        raw.goals        ?? raw.financial ?? DEFAULT_PERMISSIONS.goals,
+    financial:    raw.financial    ?? DEFAULT_PERMISSIONS.financial,
+    reports:      raw.reports      ?? DEFAULT_PERMISSIONS.reports,
+    import_data:  raw.import_data  ?? DEFAULT_PERMISSIONS.import_data,
+  };
 
   return {
     loading: enabled && isLoading,
     permissions: perms,
     customRole: data?.custom_role ?? null,
-    canAccessCRM: !!perms.crm,
+    canAccessClients: !!perms.clients,
     canAccessTasks: !!perms.tasks,
-    canAccessFinancial: !!perms.financial,
-    canAccessTraffic: !!perms.traffic,
-    canAccessSocialMedia: !!perms.social_media,
+    canAccessReminders: !!perms.reminders,
     canAccessAgenda: !!perms.agenda,
+    canAccessCRM: !!perms.crm,
+    canAccessSocialMedia: !!perms.social_media,
+    canAccessTraffic: !!perms.traffic,
+    canAccessContracts: !!perms.contracts,
+    canAccessNPS: !!perms.nps,
+    canAccessGoals: !!perms.goals,
+    canAccessFinancial: !!perms.financial,
+    canAccessReports: !!perms.reports,
+    canAccessImport: !!perms.import_data,
     isAdmin: false,
   };
 }

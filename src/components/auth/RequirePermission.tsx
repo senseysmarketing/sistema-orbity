@@ -5,12 +5,19 @@ import { usePermissions, PermissionsResult } from "@/hooks/usePermissions";
 
 type PermissionKey = Extract<
   keyof PermissionsResult,
-  | "canAccessCRM"
+  | "canAccessClients"
   | "canAccessTasks"
-  | "canAccessFinancial"
-  | "canAccessTraffic"
-  | "canAccessSocialMedia"
+  | "canAccessReminders"
   | "canAccessAgenda"
+  | "canAccessCRM"
+  | "canAccessSocialMedia"
+  | "canAccessTraffic"
+  | "canAccessContracts"
+  | "canAccessNPS"
+  | "canAccessGoals"
+  | "canAccessFinancial"
+  | "canAccessReports"
+  | "canAccessImport"
 >;
 
 interface RequirePermissionProps {
