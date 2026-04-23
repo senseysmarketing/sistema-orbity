@@ -4,9 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock, Copy, Hash, Smartphone, Palette, CalendarClock, Sparkles, Loader2, RotateCw } from "lucide-react";
+import { Pencil, Trash2, Calendar, Building2, History, AlertCircle, CheckCircle, Clock, ListTodo, Lock, Copy, Hash, Smartphone, Palette, CalendarClock, Sparkles, Loader2, RotateCw, Send, MessageSquareWarning } from "lucide-react";
 import { getTypeColor } from "@/components/ui/task-card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -21,6 +23,7 @@ import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { describeRecurrence } from "@/lib/recurrence";
+import { useCreateApprovalLink } from "@/hooks/useCreateApprovalLink";
 
 interface Subtask {
   id: string;
@@ -52,6 +55,8 @@ interface Task {
   recurrence_rule?: any;
   recurrence_parent_id?: string | null;
   next_occurrence_generated?: boolean;
+  is_rejected?: boolean;
+  client_feedback?: string | null;
 }
 
 interface Client {
@@ -78,6 +83,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   todo: { label: "A Fazer", color: "bg-gray-500" },
   in_progress: { label: "Em Andamento", color: "bg-blue-500" },
   em_revisao: { label: "Em Revisão", color: "bg-purple-500" },
+  approved: { label: "Aprovado", color: "bg-emerald-500" },
   done: { label: "Concluída", color: "bg-green-500" },
 };
 
@@ -107,6 +113,26 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   const { toast } = useToast();
   const { profile } = useAuth();
   const [localTask, setLocalTask] = useState<Task | null>(task);
+  const [showBatchDialog, setShowBatchDialog] = useState(false);
+  const [batchCandidates, setBatchCandidates] = useState<Array<{ id: string; title: string }>>([]);
+  const { findBatchCandidates, createLink, isCreating } = useCreateApprovalLink();
+
+  const handleSendForApproval = async () => {
+    if (!localTask) return;
+    const hasAttachments = (localTask.attachments?.length ?? 0) > 0;
+    if (!hasAttachments) {
+      toast({ title: "Adicione um anexo antes de enviar para aprovação.", variant: "destructive" });
+      return;
+    }
+    const candidates = await findBatchCandidates(localTask.id, localTask.client_id);
+    if (candidates.length > 0) {
+      setBatchCandidates(candidates);
+      setShowBatchDialog(true);
+      return;
+    }
+    await createLink([localTask.id]);
+    onTaskUpdate?.();
+  };
 
   useEffect(() => {
     setLocalTask(task);

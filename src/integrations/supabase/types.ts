@@ -6236,6 +6236,103 @@ export type Database = {
         }
         Relationships: []
       }
+      task_approval_items: {
+        Row: {
+          approval_id: string
+          client_feedback: string | null
+          decided_at: string | null
+          decision: string | null
+          id: string
+          task_id: string
+        }
+        Insert: {
+          approval_id: string
+          client_feedback?: string | null
+          decided_at?: string | null
+          decision?: string | null
+          id?: string
+          task_id: string
+        }
+        Update: {
+          approval_id?: string
+          client_feedback?: string | null
+          decided_at?: string | null
+          decision?: string | null
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_approval_items_approval_id_fkey"
+            columns: ["approval_id"]
+            isOneToOne: false
+            referencedRelation: "task_approvals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_approval_items_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_approvals: {
+        Row: {
+          agency_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          status: string
+          token: string
+        }
+        Insert: {
+          agency_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          status?: string
+          token: string
+        }
+        Update: {
+          agency_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_approvals_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_approvals_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "task_approvals_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       task_assignments: {
         Row: {
           assigned_at: string
@@ -6525,6 +6622,7 @@ export type Database = {
           archived: boolean
           assigned_to: string | null
           attachments: Json | null
+          client_feedback: string | null
           client_id: string | null
           created_at: string
           created_by: string
@@ -6536,6 +6634,7 @@ export type Database = {
           id: string
           is_internal: boolean
           is_recurring: boolean
+          is_rejected: boolean
           next_occurrence_generated: boolean
           notification_sent_at: string | null
           platform: string | null
@@ -6556,6 +6655,7 @@ export type Database = {
           archived?: boolean
           assigned_to?: string | null
           attachments?: Json | null
+          client_feedback?: string | null
           client_id?: string | null
           created_at?: string
           created_by: string
@@ -6567,6 +6667,7 @@ export type Database = {
           id?: string
           is_internal?: boolean
           is_recurring?: boolean
+          is_rejected?: boolean
           next_occurrence_generated?: boolean
           notification_sent_at?: string | null
           platform?: string | null
@@ -6587,6 +6688,7 @@ export type Database = {
           archived?: boolean
           assigned_to?: string | null
           attachments?: Json | null
+          client_feedback?: string | null
           client_id?: string | null
           created_at?: string
           created_by?: string
@@ -6598,6 +6700,7 @@ export type Database = {
           id?: string
           is_internal?: boolean
           is_recurring?: boolean
+          is_rejected?: boolean
           next_occurrence_generated?: boolean
           notification_sent_at?: string | null
           platform?: string | null
