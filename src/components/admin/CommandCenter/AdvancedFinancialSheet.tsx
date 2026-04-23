@@ -240,11 +240,15 @@ export function AdvancedFinancialSheet({
         </SheetHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3 no-print">
             <TabsTrigger value="current">Visão Atual</TabsTrigger>
             <TabsTrigger value="forecast" className="gap-1.5">
               <CalendarClock className="h-3.5 w-3.5" />
               Projeção (90 dias)
+            </TabsTrigger>
+            <TabsTrigger value="dre" className="gap-1.5">
+              <FileText className="h-3.5 w-3.5" />
+              DRE / Contabilidade
             </TabsTrigger>
           </TabsList>
 
