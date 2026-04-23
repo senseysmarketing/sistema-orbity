@@ -320,6 +320,17 @@ export function AgenciesTable() {
                               <Play className="h-4 w-4 mr-2" /> Reativar
                             </DropdownMenuItem>
                           )}
+                          {canDeleteAgency(agency.computed_status) && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => openDeleteDialog(agency)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> Excluir Permanentemente
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
