@@ -94,6 +94,7 @@ export interface CashFlowItem {
   status: 'PAID' | 'PENDING' | 'OVERDUE' | 'CANCELLED';
   sourceType: 'client_payment' | 'expense' | 'salary';
   sourceId: string;
+  category?: string;
   billingType?: string;
   invoiceUrl?: string;
   conexaChargeId?: string;
@@ -527,6 +528,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         status: mapStatus(e.status),
         sourceType: 'expense',
         sourceId: e.id,
+        category: e.category,
         paidAt: (e as any).paid_at || e.paid_date || undefined,
       });
     });
