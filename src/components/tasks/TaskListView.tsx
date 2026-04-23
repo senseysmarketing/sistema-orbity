@@ -137,7 +137,7 @@ export function TaskListView({
             </AccordionTrigger>
             <AccordionContent className="p-0">
               <div className="w-full">
-                <Table className="table-fixed w-full">
+                <table className="table-fixed w-full caption-bottom text-sm">
                   <colgroup>
                     <col style={{ width: "40px" }} />
                     <col style={{ width: "32px" }} />
