@@ -99,6 +99,12 @@ function CinematicShell({ children }: { children: React.ReactNode }) {
         }}
       />
       <div className="relative z-10 flex min-h-screen flex-col">{children}</div>
+      {/* Global Powered by Orbity footer */}
+      <div className="fixed bottom-2 inset-x-0 text-center pointer-events-none z-10">
+        <span className="text-[11px] uppercase tracking-[0.3em] text-white/40">
+          Powered by Orbity
+        </span>
+      </div>
     </div>
   );
 }
