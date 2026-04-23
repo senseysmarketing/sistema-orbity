@@ -30,6 +30,12 @@ export const LOSS_REASONS: { category: string; reasons: { value: string; label: 
     ],
   },
   {
+    category: "Problemas de Comunicação",
+    reasons: [
+      { value: "ghosting_whatsapp", label: "Ghosting no WhatsApp" },
+    ],
+  },
+  {
     category: "Problemas Comerciais",
     reasons: [
       { value: "sem_orcamento", label: "Sem orçamento (Budget)" },
