@@ -339,7 +339,7 @@ export default function PublicApproval() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="flex-1 flex items-center pb-6"
+        className="flex-1 flex items-center pb-40"
       >
         <div className="w-full max-w-xl mx-auto px-4">
           <motion.div variants={itemVariants}>
