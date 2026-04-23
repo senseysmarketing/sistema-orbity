@@ -109,11 +109,9 @@ export const SortableLeadCard = memo(function SortableLeadCard({
   }, [statusConfig, displayStatus]);
 
   const style = {
-    transform: CSS.Translate.toString(transform),
+    transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.8 : 1,
-    scale: isDragging ? '1.05' : '1',
-    zIndex: isDragging ? 999 : 1,
+    opacity: isDragging ? 0.5 : 1,
   };
 
   const urgency = getUrgencyLevel(lead);
@@ -143,10 +141,8 @@ export const SortableLeadCard = memo(function SortableLeadCard({
       className="relative"
     >
       <Card
-        className={`group transition-all duration-200 cursor-grab active:cursor-grabbing select-none border-[#5a35a0] ${
-          isDragging 
-            ? 'shadow-2xl border-primary/50' 
-            : 'hover:shadow-lg hover:shadow-purple-900/30 hover:brightness-110'
+        className={`group cursor-grab active:cursor-grabbing select-none border-[#5a35a0] ${
+          isDragging ? 'shadow-2xl border-primary/50' : ''
         }`}
         style={{ backgroundColor: '#4c2882' }}
         onClick={handleClick}
