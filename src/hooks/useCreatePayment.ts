@@ -31,6 +31,40 @@ export function useCreatePayment() {
 
     setLoading(true);
     try {
+      // Roteamento: se a agência tem Stripe como gateway ativo, usa create-agency-stripe-charge
+      const { data: agencyRow } = await supabase
+        .from("agencies")
+        .select("active_payment_gateway, stripe_secret_key")
+        .eq("id", currentAgency.id)
+        .maybeSingle();
+
+      const useStripe =
+        agencyRow?.active_payment_gateway === "stripe" && !!agencyRow?.stripe_secret_key;
+
+      if (useStripe) {
+        const { data: result, error } = await supabase.functions.invoke(
+          "create-agency-stripe-charge",
+          {
+            body: {
+              client_id: data.client_id,
+              amount: data.amount,
+              due_date: data.due_date,
+              description: data.description ?? null,
+              agency_id: currentAgency.id,
+              currency: "brl",
+            },
+          },
+        );
+        if (error) throw new Error(error.message);
+        if (result?.error) throw new Error(result.error);
+
+        toast({
+          title: "Cobrança Stripe criada",
+          description: "Link de pagamento gerado com sucesso!",
+        });
+        return result.payment;
+      }
+
       const payload: Record<string, unknown> = {
         client_id: data.client_id,
         amount: data.amount,
