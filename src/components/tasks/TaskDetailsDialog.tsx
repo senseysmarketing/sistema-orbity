@@ -115,7 +115,26 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   const [localTask, setLocalTask] = useState<Task | null>(task);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [batchCandidates, setBatchCandidates] = useState<Array<{ id: string; title: string }>>([]);
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const { findBatchCandidates, createLink, isCreating } = useCreateApprovalLink();
+
+  const APPROVAL_MAX_BYTES = 10 * 1024 * 1024;
+
+  const validateAttachmentsForApproval = (atts?: Attachment[]) => {
+    if (!atts || atts.length === 0) return false;
+    for (const a of atts) {
+      const size = (a as any).size ?? (a as any).file_size ?? 0;
+      if (size && size > APPROVAL_MAX_BYTES) {
+        toast({
+          title: "Arquivo acima do limite",
+          description: "O arquivo excede o limite de 10MB para links de aprovação.",
+          variant: "destructive",
+        });
+        return false;
+      }
+    }
+    return true;
+  };
 
   const handleSendForApproval = async () => {
     if (!localTask) return;
@@ -124,14 +143,32 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
       toast({ title: "Adicione um anexo antes de enviar para aprovação.", variant: "destructive" });
       return;
     }
+    if (!validateAttachmentsForApproval(localTask.attachments)) return;
     const candidates = await findBatchCandidates(localTask.id, localTask.client_id);
     if (candidates.length > 0) {
       setBatchCandidates(candidates);
+      setSelectedBatchIds(candidates.map((c) => c.id));
       setShowBatchDialog(true);
       return;
     }
     await createLink([localTask.id]);
     onTaskUpdate?.();
+  };
+
+  const handleConfirmBatch = async (includeBatch: boolean) => {
+    if (!localTask) return;
+    const ids = includeBatch
+      ? [localTask.id, ...selectedBatchIds]
+      : [localTask.id];
+    setShowBatchDialog(false);
+    await createLink(ids);
+    onTaskUpdate?.();
+  };
+
+  const toggleBatchId = (id: string) => {
+    setSelectedBatchIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   useEffect(() => {
@@ -298,6 +335,15 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
           </DialogHeader>
 
           <div className="space-y-4">
+            {localTask.is_rejected && localTask.client_feedback && (
+              <Alert variant="destructive">
+                <MessageSquareWarning className="h-4 w-4" />
+                <AlertTitle>Ajuste Solicitado pelo Cliente</AlertTitle>
+                <AlertDescription className="whitespace-pre-wrap">
+                  {localTask.client_feedback}
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="flex flex-wrap gap-2">
               {taskType && getTypeName && (
                 <Badge className={`${getTypeColor(taskType)} border-0 text-sm`}>
@@ -607,6 +653,32 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                 <span className="hidden sm:inline">Duplicar</span>
               </Button>
             )}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="w-full sm:w-auto">
+                    <Button
+                      onClick={handleSendForApproval}
+                      disabled={isCreating || (localTask.attachments?.length ?? 0) === 0}
+                      className="w-full sm:w-auto bg-amber-500 hover:bg-amber-500/90 text-white"
+                    >
+                      {isCreating ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      <span className="hidden sm:inline">Enviar para Aprovação</span>
+                      <span className="sm:hidden">Aprovação</span>
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {(localTask.attachments?.length ?? 0) === 0 && (
+                  <TooltipContent>
+                    Adicione um anexo à tarefa para gerar um link de aprovação.
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
             <Button
               variant="destructive"
               onClick={() => canDelete ? setShowDeleteAlert(true) : setShowNoPermissionAlert(true)}
@@ -792,6 +864,60 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
             >
               {aiApplying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Aplicar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Smart Batch — confirmação para agrupar tarefas em revisão */}
+      <AlertDialog open={showBatchDialog} onOpenChange={setShowBatchDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5" />
+              Agrupar tarefas em um único link?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Detectamos {batchCandidates.length} outra{batchCandidates.length > 1 ? "s" : ""} tarefa
+              {batchCandidates.length > 1 ? "s" : ""} deste cliente também aguardando revisão.
+              Selecione abaixo as que deseja incluir no mesmo link de aprovação.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-64 overflow-y-auto space-y-2 my-2">
+            {batchCandidates.map((c) => (
+              <label
+                key={c.id}
+                className="flex items-center gap-2 p-2 rounded-md bg-muted/50 cursor-pointer hover:bg-muted"
+              >
+                <Checkbox
+                  checked={selectedBatchIds.includes(c.id)}
+                  onCheckedChange={() => toggleBatchId(c.id)}
+                />
+                <span className="text-sm">{c.title}</span>
+              </label>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCreating}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="outline"
+              disabled={isCreating}
+              onClick={() => handleConfirmBatch(false)}
+            >
+              Apenas esta tarefa
+            </Button>
+            <AlertDialogAction
+              disabled={isCreating || selectedBatchIds.length === 0}
+              onClick={(e) => {
+                e.preventDefault();
+                handleConfirmBatch(true);
+              }}
+            >
+              {isCreating ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Gerar link com {selectedBatchIds.length + 1} tarefa
+              {selectedBatchIds.length + 1 > 1 ? "s" : ""}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
