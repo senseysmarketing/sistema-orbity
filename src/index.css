@@ -155,3 +155,41 @@ All colors MUST be HSL.
     min-height: 44px;
   }
 }
+
+/* Print styles — DRE export */
+@media print {
+  /* Hide app chrome without reserving space */
+  .app-sidebar,
+  [data-sidebar],
+  header,
+  nav,
+  .no-print,
+  [role="tablist"],
+  button {
+    display: none !important;
+  }
+
+  /* Sheet/Dialog overlays become plain white container */
+  [role="dialog"],
+  [data-radix-popper-content-wrapper] {
+    position: static !important;
+    box-shadow: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: visible !important;
+    transform: none !important;
+  }
+
+  /* Force the print area to render in normal flow */
+  #dre-print-area {
+    display: block !important;
+    position: static !important;
+    padding: 24px;
+    color: #000;
+    background: #fff;
+  }
+
+  @page {
+    margin: 16mm;
+  }
+}
