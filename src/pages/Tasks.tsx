@@ -1960,6 +1960,7 @@ export default function Tasks() {
           ) : (
             <TaskListView
               tasks={filteredTasks}
+              sortBy={sortBy}
               statuses={statuses}
               getAssignedUsers={getAssignedUsers}
               getClientName={getClientName}
