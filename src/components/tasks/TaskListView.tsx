@@ -42,6 +42,7 @@ interface StatusItem {
 interface TaskListViewProps {
   tasks: Task[];
   statuses: StatusItem[];
+  sortBy?: 'due_date' | 'recent';
   getAssignedUsers: (taskId: string) => AssignedUser[];
   getClientName: (clientId: string | null, task?: Task) => string;
   getTypeIcon: (slug: string | null | undefined) => string | ReactNode;
@@ -75,6 +76,7 @@ function getFirstName(name: string): string {
 export function TaskListView({
   tasks,
   statuses,
+  sortBy = 'due_date',
   getAssignedUsers,
   getClientName,
   getTypeIcon,
@@ -94,6 +96,11 @@ export function TaskListView({
     .map((status) => {
       const groupTasks = tasks.filter((t) => t.status === status.slug);
       const sorted = [...groupTasks].sort((a, b) => {
+        if (sortBy === 'recent') {
+          const ua = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+          const ub = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+          return ub - ua;
+        }
         const da = a.due_date ? new Date(a.due_date).getTime() : Infinity;
         const db = b.due_date ? new Date(b.due_date).getTime() : Infinity;
         if (da !== db) return da - db;

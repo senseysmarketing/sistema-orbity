@@ -84,6 +84,7 @@ interface Task {
   client_id: string | null;
   due_date: string | null;
   created_at: string;
+  updated_at?: string;
   created_by: string;
   archived?: boolean;
   history?: any[];
@@ -301,6 +302,7 @@ export default function Tasks() {
   const [includeNoDueDate, setIncludeNoDueDate] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
+  const [sortBy, setSortBy] = useState<'due_date' | 'recent'>('due_date');
 
   const toStartOfDay = (d: Date) => {
     const copy = new Date(d);
@@ -1231,16 +1233,22 @@ export default function Tasks() {
   };
 
   const sortedTasksByStatus = (status: string) => {
-    return filteredTasks
-      .filter((task) => task.status === status)
-      .sort((a, b) => {
-        // Ordenar por data de vencimento, mais recente primeiro
-        // Se não tiver data, vai para o final
-        if (!a.due_date && !b.due_date) return 0;
-        if (!a.due_date) return 1;
-        if (!b.due_date) return -1;
-        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    const arr = filteredTasks.filter((task) => task.status === status);
+    if (sortBy === 'recent') {
+      return arr.sort((a, b) => {
+        const da = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+        const db = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+        return db - da;
       });
+    }
+    return arr.sort((a, b) => {
+      // Ordenar por data de vencimento, mais recente primeiro
+      // Se não tiver data, vai para o final
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    });
   };
 
   const clearFilters = () => {
@@ -1865,6 +1873,18 @@ export default function Tasks() {
                 </Button>
               )}
 
+              <div className="flex-shrink-0">
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'due_date' | 'recent')}>
+                  <SelectTrigger className="h-9 w-[180px]">
+                    <SelectValue placeholder="Ordenar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="due_date">Data de entrega</SelectItem>
+                    <SelectItem value="recent">Últimas alterações</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <ToggleGroup
                 type="single"
                 size="sm"
@@ -1940,6 +1960,7 @@ export default function Tasks() {
           ) : (
             <TaskListView
               tasks={filteredTasks}
+              sortBy={sortBy}
               statuses={statuses}
               getAssignedUsers={getAssignedUsers}
               getClientName={getClientName}
