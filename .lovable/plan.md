@@ -1,55 +1,50 @@
 
 
-# Otimização extrema do Kanban de Leads (60fps)
+# Realtime para Kanbans de Tarefas e Leads (sem WAL bloat)
 
-## 1. `src/components/crm/LeadsKanban.tsx` — Hoisting de funções puras
+## 1. Migration SQL (mínima)
 
-Mover as 5 funções auxiliares para o **escopo do módulo** (topo do arquivo, fora do componente):
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE public.tasks;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.leads;
+```
 
-- `getPriorityColor(priority: string)`
-- `getPriorityLabel(priority: string)`
-- `formatCurrency(value: number)`
-- `formatDate(date: string | null)`
-- `getUrgencyLevel(lead: Lead)`
+Sem `REPLICA IDENTITY FULL` — o default já inclui a PK (`id`) em `payload.old`, suficiente para `DELETE` (filtrar por id) e `UPDATE` (substituir por id após refetch).
 
-Como são puras (sem dependências de state/props), criar uma única vez no load do módulo. Remover qualquer `useCallback` redundante.
+## 2. `src/pages/Tasks.tsx` — Realtime com joins consistentes
 
-## 2. Auditoria de props inline no caminho até `SortableLeadCard`
+- Extrair a string de `select()` atual do `fetchTasks` para uma constante no topo do arquivo: `const TASK_QUERY_FIELDS = "..."` (mesma string, sem alteração de campos/joins).
+- Refatorar `fetchTasks` para usar `TASK_QUERY_FIELDS`.
+- Adicionar `useEffect` (após o `useEffect` do `fetchTasks`) com subscrição Realtime:
+  - Canal: `tasks-realtime-${currentAgency.id}`
+  - `on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: 'agency_id=eq.${currentAgency.id}' }, handler)`
+  - Handler:
+    - **INSERT**: `supabase.from('tasks').select(TASK_QUERY_FIELDS).eq('id', payload.new.id).maybeSingle()` → `setTasks(prev => prev.some(t => t.id === row.id) ? prev : [row, ...prev])` (idempotente contra optimismo local).
+    - **UPDATE**: mesmo refetch individual → `setTasks(prev => prev.map(t => t.id === row.id ? row : t))`.
+    - **DELETE**: `setTasks(prev => prev.filter(t => t.id !== payload.old.id))`.
+  - Cleanup: `supabase.removeChannel(channel)`.
+  - Dependência: `[currentAgency?.id]`.
 
-Inspecionar `LeadsKanban` → `LeadKanbanColumn` → `SortableLeadCard` e garantir que **nenhuma prop funcional seja inline**:
+Mantém `fetchTasks()` como fallback após mutações locais (não remover).
 
-- `onEdit`, `onDelete`, `onView`, `onScheduleMeeting` → estabilizar com `useCallback` no `LeadsKanban` (dependências mínimas: setters/mutations, que já são estáveis).
-- Se algum handler atualmente faz `(lead) => openEdit(lead)` inline, refatorar para `useCallback((lead) => ...)`.
-- `LeadKanbanColumn` deve repassar essas refs estáveis sem wrapping inline.
+## 3. `src/pages/CRM.tsx` — sem mudanças
 
-Sem isso, `memo` no card é inerte.
-
-## 3. `src/components/crm/SortableLeadCard.tsx` — memo + GPU + useMemo
-
-- `import { memo, useMemo } from "react"`
-- Trocar `CSS.Transform.toString(transform)` → `CSS.Translate.toString(transform)` (ativa `translate3d` na GPU).
-- Memoizar `currentStatusConfig` com `useMemo([statusConfig, displayStatus])`.
-- Exportar como:
-  ```ts
-  export const SortableLeadCard = memo(function SortableLeadCard(props: SortableLeadCardProps) { ... });
-  ```
-  Mantém Fast Refresh com export nomeado.
+A subscrição Realtime para `leads` já existe e está correta. A migration ativa-a.
 
 ## Sem alterações
 
-- Estética, classes Tailwind, JSX, animações de hover, lógica WhatsApp/Reunião.
-- `LeadKanbanColumn` (apenas verificar que não recria handlers inline ao repassar).
-- Lógica de `handleDragEnd`, atualização otimista, Meta events.
+- UI/estética dos Kanbans, drag-and-drop, otimismo local, Meta events.
+- Hooks de tasks/leads, edge functions, demais páginas.
+- `REPLICA IDENTITY` (mantido como default).
 
 ## Arquivos editados
 
-- `src/components/crm/LeadsKanban.tsx` — hoist de 5 funções puras + `useCallback` em handlers passados aos cards.
-- `src/components/crm/SortableLeadCard.tsx` — `memo`, `CSS.Translate`, `useMemo` em `currentStatusConfig`.
-- `src/components/crm/LeadKanbanColumn.tsx` — apenas se houver wrapping inline a corrigir (verificar e ajustar).
+- `supabase/migrations/<timestamp>_realtime_tasks_leads.sql` — nova (2 linhas).
+- `src/pages/Tasks.tsx` — extrair `TASK_QUERY_FIELDS` + adicionar `useEffect` Realtime.
 
 ## Resultado
 
-- Funções puras: zero alocação por render.
-- Handlers estáveis + `memo`: cards não-arrastados não re-renderizam durante o drag.
-- `CSS.Translate`: transform via GPU, libera CPU → 60fps consistentes.
+- Multi-utilizador: cards movem-se ao vivo na tela de toda a agência.
+- Sem WAL bloat — payload mínimo do Postgres, joins reidratados via select consistente.
+- Zero flicker — patches granulares no `useState` local.
 
