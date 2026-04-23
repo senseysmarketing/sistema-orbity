@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent } from "@/components/ui/card";
@@ -73,7 +74,7 @@ interface SortableLeadCardProps {
   isDragging?: boolean;
 }
 
-export function SortableLeadCard({
+export const SortableLeadCard = memo(function SortableLeadCard({
   lead,
   onEdit,
   onDelete,
@@ -99,14 +100,16 @@ export function SortableLeadCard({
   const normalizedDbStatus = normalizeLeadStatusToDb(lead.status);
   const displayStatus = mapDatabaseStatusToDisplay(normalizedDbStatus);
   
-  // Find status configuration
-  const statusKey = Object.keys(statusConfig).find((key) =>
-    statusConfig[key].title.toLowerCase() === String(displayStatus).toLowerCase()
-  );
-  const currentStatusConfig = statusKey ? statusConfig[statusKey] : null;
+  // Find status configuration (memoized to avoid Object.keys loop per render)
+  const currentStatusConfig = useMemo(() => {
+    const statusKey = Object.keys(statusConfig).find((key) =>
+      statusConfig[key].title.toLowerCase() === String(displayStatus).toLowerCase()
+    );
+    return statusKey ? statusConfig[statusKey] : null;
+  }, [statusConfig, displayStatus]);
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.8 : 1,
     scale: isDragging ? '1.05' : '1',
@@ -301,4 +304,4 @@ export function SortableLeadCard({
     </Card>
     </div>
   );
-}
+});
