@@ -51,6 +51,27 @@ export const WhatsAppIntegration = () => {
     },
   });
 
+  // Re-link orphan WhatsApp conversations to leads (manual sync)
+  const relinkOrphans = useMutation({
+    mutationFn: async () => {
+      if (!currentAgency?.id) throw new Error('No agency');
+      const { data, error } = await supabase.rpc('relink_orphan_whatsapp_conversations', {
+        p_agency_id: currentAgency.id,
+      });
+      if (error) throw error;
+      return (data as any)?.[0] ?? { linked_count: 0, total_orphans: 0 };
+    },
+    onSuccess: (result: { linked_count: number; total_orphans: number }) => {
+      toast({
+        title: 'Sincronização concluída',
+        description: `${result.linked_count} de ${result.total_orphans} conversas órfãs foram vinculadas a leads.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao sincronizar', description: error.message, variant: 'destructive' });
+    },
+  });
+
   if (isLoadingSettings) {
     return (
       <div className="flex items-center justify-center py-8">
