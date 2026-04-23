@@ -154,6 +154,32 @@ export function MasterProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deleteAgencyPermanently = async (agencyId: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('master-delete-agency', {
+        body: { agency_id: agencyId },
+      });
+
+      if (error) {
+        const msg = (data as any)?.error || error.message || 'Erro ao excluir agência';
+        toast.error(msg);
+        return false;
+      }
+      if ((data as any)?.error) {
+        toast.error((data as any).error);
+        return false;
+      }
+
+      toast.success('Agência excluída permanentemente');
+      await refreshAgencies();
+      return true;
+    } catch (error) {
+      console.error('Error deleting agency:', error);
+      toast.error('Erro ao excluir agência');
+      return false;
+    }
+  };
+
   const getMasterMetrics = () => {
     const totalAgencies = agencies.length;
     const activeAgencies = agencies.filter(a => a.computed_status === 'active').length;
