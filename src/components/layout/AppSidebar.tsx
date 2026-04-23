@@ -13,12 +13,19 @@ import faviconLogo from "@/assets/favicon-logo.png";
 
 type PermKey = Extract<
   keyof PermissionsResult,
-  | "canAccessCRM"
+  | "canAccessClients"
   | "canAccessTasks"
-  | "canAccessFinancial"
-  | "canAccessTraffic"
-  | "canAccessSocialMedia"
+  | "canAccessReminders"
   | "canAccessAgenda"
+  | "canAccessCRM"
+  | "canAccessSocialMedia"
+  | "canAccessTraffic"
+  | "canAccessContracts"
+  | "canAccessNPS"
+  | "canAccessGoals"
+  | "canAccessFinancial"
+  | "canAccessReports"
+  | "canAccessImport"
 >;
 
 interface MenuItem {
@@ -40,15 +47,15 @@ const menuCategories: MenuCategory[] = [
     label: "Gestão & Visão Geral",
     items: [
       { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-      { title: "Relatórios", url: "/dashboard/reports", icon: BarChart3, requiresAdmin: true },
+      { title: "Relatórios", url: "/dashboard/reports", icon: BarChart3, permission: "canAccessReports" },
     ],
   },
   {
     label: "Operacional",
     items: [
-      { title: "Clientes", url: "/dashboard/clients", icon: Users, permission: "canAccessCRM" },
+      { title: "Clientes", url: "/dashboard/clients", icon: Users, permission: "canAccessClients" },
       { title: "Tarefas Gerais", url: "/dashboard/tasks", icon: CheckSquare, permission: "canAccessTasks" },
-      { title: "Lembretes", url: "/dashboard/reminders", icon: User },
+      { title: "Lembretes", url: "/dashboard/reminders", icon: User, permission: "canAccessReminders" },
       { title: "Agenda", url: "/dashboard/agenda", icon: Calendar, permission: "canAccessAgenda" },
       { title: "CRM & Leads", url: "/dashboard/crm", icon: ContactRound, permission: "canAccessCRM" },
     ],
@@ -58,16 +65,16 @@ const menuCategories: MenuCategory[] = [
     items: [
       { title: "Social Media", url: "/dashboard/social-media", icon: Instagram, permission: "canAccessSocialMedia" },
       { title: "Controle de Tráfego", url: "/dashboard/traffic", icon: TrendingUp, permission: "canAccessTraffic" },
-      { title: "Contratos", url: "/dashboard/contracts", icon: FileText, permission: "canAccessFinancial" },
+      { title: "Contratos", url: "/dashboard/contracts", icon: FileText, permission: "canAccessContracts" },
     ],
   },
   {
     label: "Administração",
     items: [
-      { title: "NPS", url: "/dashboard/nps", icon: MessageSquareHeart, permission: "canAccessCRM" },
-      { title: "Metas & Bônus", url: "/dashboard/goals", icon: Trophy, permission: "canAccessFinancial" },
+      { title: "NPS", url: "/dashboard/nps", icon: MessageSquareHeart, permission: "canAccessNPS" },
+      { title: "Metas & Bônus", url: "/dashboard/goals", icon: Trophy, permission: "canAccessGoals" },
       { title: "Administrativo", url: "/dashboard/admin", icon: DollarSign, permission: "canAccessFinancial" },
-      { title: "Importação", url: "/dashboard/import", icon: Upload, requiresAdmin: true },
+      { title: "Importação", url: "/dashboard/import", icon: Upload, permission: "canAccessImport" },
       { title: "Configurações", url: "/dashboard/settings", icon: Settings },
     ],
   },

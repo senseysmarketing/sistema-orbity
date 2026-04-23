@@ -109,20 +109,20 @@ const App = () => (
                           </PaymentMiddlewareWrapper>
                         }>
                           <Route index element={<Index />} />
-                          <Route path="clients" element={<RequirePermission permission="canAccessCRM"><Clients /></RequirePermission>} />
-                          <Route path="clients/:id" element={<RequirePermission permission="canAccessCRM"><ClientDetail /></RequirePermission>} />
+                          <Route path="clients" element={<RequirePermission permission="canAccessClients"><Clients /></RequirePermission>} />
+                          <Route path="clients/:id" element={<RequirePermission permission="canAccessClients"><ClientDetail /></RequirePermission>} />
                           <Route path="tasks" element={<RequirePermission permission="canAccessTasks"><Tasks /></RequirePermission>} />
-                          <Route path="reminders" element={<Reminders />} />
+                          <Route path="reminders" element={<RequirePermission permission="canAccessReminders"><Reminders /></RequirePermission>} />
                           <Route path="crm" element={<RequirePermission permission="canAccessCRM"><CRM /></RequirePermission>} />
                           <Route path="agenda" element={<RequirePermission permission="canAccessAgenda"><Agenda /></RequirePermission>} />
                           <Route path="traffic" element={<RequirePermission permission="canAccessTraffic"><Traffic /></RequirePermission>} />
-                          <Route path="goals" element={<RequirePermission permission="canAccessFinancial"><Goals /></RequirePermission>} />
-                          <Route path="nps" element={<RequirePermission permission="canAccessCRM"><NPSPage /></RequirePermission>} />
+                          <Route path="goals" element={<RequirePermission permission="canAccessGoals"><Goals /></RequirePermission>} />
+                          <Route path="nps" element={<RequirePermission permission="canAccessNPS"><NPSPage /></RequirePermission>} />
                           <Route path="admin" element={<RequirePermission permission="canAccessFinancial"><Admin /></RequirePermission>} />
-                          <Route path="contracts" element={<RequirePermission permission="canAccessFinancial"><Contracts /></RequirePermission>} />
+                          <Route path="contracts" element={<RequirePermission permission="canAccessContracts"><Contracts /></RequirePermission>} />
                           <Route path="social-media" element={<RequirePermission permission="canAccessSocialMedia"><SocialMedia /></RequirePermission>} />
-                          <Route path="import" element={<RequirePermission requireAdmin><Import /></RequirePermission>} />
-                          <Route path="reports" element={<RequirePermission requireAdmin><Reports /></RequirePermission>} />
+                          <Route path="import" element={<RequirePermission permission="canAccessImport"><Import /></RequirePermission>} />
+                          <Route path="reports" element={<RequirePermission permission="canAccessReports"><Reports /></RequirePermission>} />
                           <Route path="settings" element={<Settings />} />
                           <Route path="settings/notifications" element={<NotificationSettings />} />
                           <Route path="master" element={<Master />} />
