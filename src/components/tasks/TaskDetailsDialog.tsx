@@ -335,6 +335,15 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
           </DialogHeader>
 
           <div className="space-y-4">
+            {localTask.is_rejected && localTask.client_feedback && (
+              <Alert variant="destructive">
+                <MessageSquareWarning className="h-4 w-4" />
+                <AlertTitle>Ajuste Solicitado pelo Cliente</AlertTitle>
+                <AlertDescription className="whitespace-pre-wrap">
+                  {localTask.client_feedback}
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="flex flex-wrap gap-2">
               {taskType && getTypeName && (
                 <Badge className={`${getTypeColor(taskType)} border-0 text-sm`}>
