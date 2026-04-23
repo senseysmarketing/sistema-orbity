@@ -96,6 +96,31 @@ export function AgenciesTable() {
     setActionLoading(null);
   };
 
+  const openDeleteDialog = (agency: typeof agencies[0]) => {
+    setDeleteDialogAgency(agency);
+    setDeleteConfirmText('');
+  };
+
+  const closeDeleteDialog = () => {
+    if (deleting) return;
+    setDeleteDialogAgency(null);
+    setDeleteConfirmText('');
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteDialogAgency) return;
+    setDeleting(true);
+    const ok = await deleteAgencyPermanently(deleteDialogAgency.agency_id);
+    setDeleting(false);
+    if (ok) {
+      setDeleteDialogAgency(null);
+      setDeleteConfirmText('');
+    }
+  };
+
+  const canDeleteAgency = (status: string) =>
+    status === 'suspended' || status === 'canceled' || status === 'trial_expired';
+
   const openDetails = (agency: typeof agencies[0]) => {
     setSelectedAgency(agency);
     setSheetOpen(true);
