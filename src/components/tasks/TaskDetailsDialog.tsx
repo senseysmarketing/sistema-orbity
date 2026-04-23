@@ -868,6 +868,60 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Smart Batch — confirmação para agrupar tarefas em revisão */}
+      <AlertDialog open={showBatchDialog} onOpenChange={setShowBatchDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5" />
+              Agrupar tarefas em um único link?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Detectamos {batchCandidates.length} outra{batchCandidates.length > 1 ? "s" : ""} tarefa
+              {batchCandidates.length > 1 ? "s" : ""} deste cliente também aguardando revisão.
+              Selecione abaixo as que deseja incluir no mesmo link de aprovação.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="max-h-64 overflow-y-auto space-y-2 my-2">
+            {batchCandidates.map((c) => (
+              <label
+                key={c.id}
+                className="flex items-center gap-2 p-2 rounded-md bg-muted/50 cursor-pointer hover:bg-muted"
+              >
+                <Checkbox
+                  checked={selectedBatchIds.includes(c.id)}
+                  onCheckedChange={() => toggleBatchId(c.id)}
+                />
+                <span className="text-sm">{c.title}</span>
+              </label>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCreating}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="outline"
+              disabled={isCreating}
+              onClick={() => handleConfirmBatch(false)}
+            >
+              Apenas esta tarefa
+            </Button>
+            <AlertDialogAction
+              disabled={isCreating || selectedBatchIds.length === 0}
+              onClick={(e) => {
+                e.preventDefault();
+                handleConfirmBatch(true);
+              }}
+            >
+              {isCreating ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Gerar link com {selectedBatchIds.length + 1} tarefa
+              {selectedBatchIds.length + 1 > 1 ? "s" : ""}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
