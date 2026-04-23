@@ -1,70 +1,85 @@
 
 
-# Mover Toggles de Automação para "Cadência de Mensagens" + Agendar Cron
-
-## Problema
-
-Os toggles **Auto-Contato** e **Auto-Ghosting** foram adicionados no painel global de **Configurações → Integrações → WhatsApp** (`src/components/settings/WhatsAppIntegration.tsx`), mas o local correto — onde o usuário procurou — é o **Sheet de Configurações do CRM → Cadência de Mensagens** (`src/components/crm/WhatsAppTemplateManager.tsx`), logo abaixo dos badges *"Pausa automática em caso de resposta"* e *"Escudo Anti-Bot ativo"* (visíveis no print).
-
-Além disso, o cron job ainda não foi agendado no Postgres.
+# Refatorar `PublicApproval.tsx` — Modo Galeria Premium (com 3 Refinamentos de Elite)
 
 ## Mudanças
 
-### 1. Mover bloco "Automações do CRM" → `WhatsAppTemplateManager.tsx`
+### 1. Edge Function `approval-get/index.ts` — expor contato do gestor
 
-Inserir a nova seção **logo após** a linha de badges *Pausa automática / Escudo Anti-Bot* e **antes** das `Tabs` (Saudação / Follow-up). Visual minimal, alinhado com o resto do sheet (sem card pesado — usar `border rounded-lg p-4 bg-muted/20`, mesmo padrão dos toggles atuais):
+No payload de retorno, adicionar `agency.contact_phone` (já existe na tabela `agencies`):
 
-- **Auto-Contato** (`whatsapp_auto_contact`, default `true`)
-  - Label: *"Mover lead para Contato ao receber resposta"*
-  - Descrição curta: *"Quando o lead enviar a primeira mensagem, ele é movido automaticamente para a coluna Em Contato."*
-- **Auto-Ghosting** (`whatsapp_auto_ghosting`, default `false`)
-  - Label: *"Mover para Perdido 24h após o último Follow-up"*
-  - Descrição: *"Se o lead não responder em até 24 horas após a última mensagem da sequência, será movido para Perdido com o motivo 'Ghosting no WhatsApp'."*
-
-Reaproveitar a mesma lógica já implementada (`useQuery` lendo `agencies.whatsapp_auto_contact / whatsapp_auto_ghosting` + `useMutation` com `update().eq('id', currentAgency.id)` + toast). `useAgency` e `supabase` já estão importados no arquivo.
-
-### 2. Remover o bloco duplicado de `WhatsAppIntegration.tsx`
-
-Apagar a seção "Automações do CRM" (linhas ~164-210) e o `useQuery`/`useMutation` correlatos em `src/components/settings/WhatsAppIntegration.tsx`. As Configurações → Integrações voltam a focar apenas em conexão de instâncias (escopo original do arquivo).
-
-### 3. Agendar o Cron Job (Guardrail #3 — sem versionamento da chave)
-
-Executar **via tool de insert SQL no Supabase** (não via migration, conforme guideline em `<schedule-jobs-supabase-edge-functions>`), garantindo que `pg_cron` + `pg_net` estejam habilitados e usando a anon key real do projeto:
-
-```sql
--- 1. Garantir extensões
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
-
--- 2. Agendar varredura horária
-select cron.schedule(
-  'process-lead-ghosting-hourly',
-  '0 * * * *', -- toda hora cheia
-  $$
-  select net.http_post(
-    url := 'https://ovookkywclrqfmtumelw.supabase.co/functions/v1/process-lead-ghosting',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92b29ra3l3Y2xycWZtdHVtZWx3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg1NjkyMjUsImV4cCI6MjA3NDE0NTIyNX0.NoHXndIJVUZ_dV5pEGZWfw2RUlEutBrgKaIDdlOazHs'
-    ),
-    body := '{}'::jsonb
-  );
-  $$
-);
+```ts
+agency: {
+  name: ...,
+  logo_url: ...,
+  contact_phone: (approval as any).agencies?.contact_phone ?? null, // NOVO
+}
 ```
 
-A anon key é **pública por design** (já exposta no frontend via `VITE_SUPABASE_PUBLISHABLE_KEY`); o risco apontado pelo Guardrail #3 era apenas commitar em arquivo `.sql` versionado — usar a tool de insert direto no banco satisfaz a regra.
+E incluir `contact_phone` no `select` da query. Profiles não possuem telefone, então o WhatsApp do gestor sempre cai no `agencies.contact_phone` (telefone padrão da agência) — sem necessidade de join com `task_assignments`/`profiles`.
+
+### 2. `src/pages/PublicApproval.tsx` — refatoração completa
+
+**Tipos** (atualizar `ApprovalPayload.agency`):
+```ts
+agency: { name: string; logo_url: string | null; contact_phone: string | null };
+```
+
+**Estrutura da página**:
+- Container raiz: `min-h-screen bg-background flex flex-col` (neutro, segue tema do projeto).
+- Cabeçalho minimalista (topo, `py-4 px-5`): logo (`h-10 object-contain`) ou nome da agência em `text-base font-medium tracking-tight`. Subtítulo `text-xs text-muted-foreground` com contador "X de N respondidas".
+- Área principal: `flex-1 flex items-center` com o `<Carousel>` ocupando `w-full max-w-xl mx-auto px-4`.
+- Captura `setApi={setCarouselApi}` + `useEffect` ouvindo `"select"` para atualizar o índice atual; também recalcula quando `data` muda.
+
+**Refinamento #1 — Contentor de Media Adaptativo (Feed 1:1 + Stories 9:16)**:
+- Cada `CarouselItem` renderiza um "palco" fixo: `relative w-full h-[60vh] sm:h-[65vh] rounded-2xl overflow-hidden bg-black shadow-2xl ring-1 ring-white/5`.
+- Dentro do palco, opcional camada de **glass blur** com a própria imagem em `absolute inset-0 blur-2xl opacity-40 scale-110 object-cover` para criar moldura ambiente (efeito vidro de luxo).
+- Acima dessa camada: `<img>` ou `<video>` em `relative h-full w-full object-contain` — garante que 1:1 e 9:16 aparecem sem corte, sempre centralizados.
+- Pip indicators (`flex gap-1.5 justify-center mt-3`): ativa `bg-primary w-4`, demais `bg-muted w-1.5`, todas `h-1.5 rounded-full transition-all`.
+- Texto abaixo do palco: título `text-base font-semibold` + preview da legenda em `line-clamp-3 text-sm text-muted-foreground`.
+
+**Refinamento #2 — Gestão Inteligente de Legendas (Drawer)**:
+- Se `description.length > 280` (ou contém >3 quebras `\n\n`), exibir botão "Ler legenda completa" (`variant="ghost" size="sm"` com ícone `<ChevronDown />`) abaixo do preview truncado.
+- Ao clicar, abrir `<Drawer>` (shadcn/vaul, padrão Mobile-First) com:
+  - `DrawerHeader`: título da tarefa.
+  - Conteúdo: `whitespace-pre-wrap text-sm leading-relaxed` em `max-h-[60vh] overflow-y-auto`.
+  - `DrawerFooter`: botão "Fechar".
+- Em desktop o Drawer continua funcionando perfeitamente (vaul é responsivo).
+
+**Refinamento #3 — Barra de Ações sticky com backdrop-blur**:
+- `<div className="sticky bottom-0 inset-x-0 bg-background/80 backdrop-blur-xl border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">`
+- Quando o item atual **não está decidido**: grid 2 colunas com `gap-3`:
+  - **Aprovar Arte** (`size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white"`, ícone `<Check />`).
+  - **Solicitar Ajuste** (`size="lg" variant="outline"`, ícone `<Pencil />`).
+- Quando decidido: badge sutil ("✓ Aprovado por você" / "✏ Ajuste enviado") + botão "Próxima arte" se `canScrollNext`.
+- Form de revisão: ao clicar em "Solicitar Ajuste", expande inline acima da barra (`animate-in slide-in-from-bottom-4`) com `Textarea` 500 chars, botão "Cancelar" (ghost) + "Enviar ajuste" (primary). Mantém `feedbacks[task_id]` state + `submitDecision(item, "revision")`.
+
+**Auto-avanço mágico**:
+- Após `submitDecision` resolver com sucesso, calcular próximo item pendente (`items.findIndex((it, idx) => idx > currentIndex && !it.decision)`); se existir → `carouselApi.scrollTo(nextIdx)`; senão deixa o re-render exibir `AllDoneScreen`.
+
+**Refinamento #3 — `AllDoneScreen` com CTA de WhatsApp + Rever Aprovações**:
+- Renderizada quando `data.items.every(i => i.decision)`.
+- Layout centralizado vertical/horizontal, ocupa viewport (`min-h-screen flex flex-col items-center justify-center px-6 text-center`).
+- Ícone `<CheckCircle2 className="h-20 w-20 text-emerald-500" />` com `animate-in zoom-in-50 duration-500`.
+- Título `text-2xl font-semibold tracking-tight`: "Tudo pronto!".
+- Subtítulo `text-muted-foreground`: "Agradecemos o seu feedback. A agência já foi notificada."
+- Bloco de ações em coluna (`flex flex-col gap-3 mt-8 w-full max-w-xs`):
+  - **"Falar com o meu Gestor"** — `size="lg"` com ícone `<MessageSquare />`. Renderizado **somente** se `data.agency.contact_phone` existir. Onclick: abre `https://wa.me/{digits}?text=Olá! Acabei de aprovar a arte de {agency.name} 👋` (digits = phone com `replace(/\D/g, "")`).
+  - **"Rever aprovações"** — `variant="outline" size="lg"` com ícone `<RefreshCw />`. Onclick: força `setShowSummary(false)` e `carouselApi.scrollTo(0)`, retornando à galeria em modo "view-only" (botões substituídos pelo badge de status).
+- Rodapé sutil: nome da agência + "Powered by Orbity" em `text-[11px] uppercase tracking-[0.25em] text-muted-foreground/60`.
+
+**Estados existentes preservados**:
+- `CenterShell` e `ExpiredOrErrorScreen` mantidos, apenas trocando `font-serif` por `font-sans` e `bg-neutral-50/text-neutral-900` por tokens do tema (`bg-background`, `text-foreground`, `text-muted-foreground`).
 
 ## Arquivos editados
 
-- `src/components/crm/WhatsAppTemplateManager.tsx` — **novo bloco "Automações do CRM"** entre os badges e as Tabs (≈ 80 linhas: query + mutation + UI dos 2 switches).
-- `src/components/settings/WhatsAppIntegration.tsx` — **remoção** do bloco duplicado (limpeza ≈ 80 linhas, incluindo imports não mais usados).
-- **Insert SQL** (não migration): `cron.schedule(...)` para invocar a função a cada hora.
+- `supabase/functions/approval-get/index.ts` — incluir `contact_phone` no select e no payload de `agency`.
+- `src/pages/PublicApproval.tsx` — refatoração completa (mantém `fetchData`, `submitDecision`, contratos das edge functions). Adiciona `useState<CarouselApi>`, `useState<number>(currentIndex)`, `useState<boolean>(showSummary)`, `AllDoneScreen` com CTAs, Drawer para legendas longas, palco de mídia com glass blur, sticky bar com backdrop-blur.
 
 ## Sem mudanças
 
-- Edge Function `process-lead-ghosting` — já implementada e funcional, sem alterações.
-- Edge Function `whatsapp-webhook` — Guardrail #1 já aplicado, mantido.
-- Schema das colunas em `agencies` — preservado.
-- Lógica de cadência, fases, templates, anti-bot, takeover — preservadas.
+- Edge Function `approval-decide` — preservada.
+- Roteamento (`/approve/:token`) — preservado.
+- Componentes `Carousel`, `Drawer`, `AttachmentsDisplay` (reutilizados como fallback para anexos não-imagem/vídeo) — sem alteração.
+- Demais páginas e fluxos — não tocados.
 
