@@ -1,70 +1,41 @@
 
 
-# Approval Suite — Guardrail de Status + Redeploy das Edge Functions
+# Ocultar descrição em cards de tarefas rejeitadas + Fix histórico "undefined"
 
-## Problemas
+## Mudanças
 
-1. **Link público quebra ao acessar**: as Edge Functions `approval-get` e `approval-decide` retornam **404 NOT_FOUND**. Foram criadas mas não foram deployadas com sucesso. Por isso a página `/approve/:token` falha ao buscar dados.
-2. **Falta de guardrail de status**: o botão "Enviar para Aprovação" só valida se há anexos. Mesmo com a tarefa em "A Fazer" (como no screenshot), o link é gerado. Conceitualmente, só faz sentido enviar tarefas que estão em **Em Revisão** (pronta para o cliente avaliar).
+### 1. `src/components/ui/task-card.tsx` — ocultar descrição quando rejeitada
 
-## Solução
+Na linha 167, trocar a condição de renderização da descrição para também checar `is_rejected`:
 
-### 1. Redeploy das Edge Functions
-
-Forçar redeploy de `approval-get` e `approval-decide` (sem alterações de código — apenas garantir que ficam disponíveis no runtime).
-
-### 2. Guardrail de status no `TaskDetailsDialog.tsx`
-
-No fluxo `handleSendForApproval`, **antes** de checar anexos:
-
-- Se `localTask.status !== "em_revisao"` → abrir um novo `AlertDialog` (`showMoveToReviewDialog`) com o título **"Mover para Em Revisão?"** e a descrição:
-  > "Para enviar uma tarefa para aprovação do cliente, ela precisa estar na coluna **Em Revisão**. Deseja mover esta tarefa agora e continuar?"
-- Botões:
-  - **Cancelar** — fecha o modal, nada acontece.
-  - **Mover e Continuar** (primary) — atualiza `tasks.status = 'em_revisao'` no Supabase, atualiza `localTask` localmente, chama `onTaskUpdate?.()` para refletir no Kanban via React Query, e em seguida segue o fluxo normal (validar anexos → checar batch candidates → criar link).
-
-### 3. Refator mínimo do fluxo
-
-```ts
-const handleSendForApproval = async () => {
-  if (!localTask) return;
-  if (localTask.status !== "em_revisao") {
-    setShowMoveToReviewDialog(true);
-    return;
-  }
-  await proceedWithApproval();
-};
-
-const proceedWithApproval = async () => {
-  // validações de anexo + batch + createLink (lógica atual extraída)
-};
-
-const handleMoveToReviewAndContinue = async () => {
-  const { error } = await supabase
-    .from("tasks")
-    .update({ status: "em_revisao" })
-    .eq("id", localTask!.id);
-  if (error) { toast({ title: "Erro ao mover tarefa", variant: "destructive" }); return; }
-  setLocalTask({ ...localTask!, status: "em_revisao" });
-  onTaskUpdate?.();
-  setShowMoveToReviewDialog(false);
-  await proceedWithApproval();
-};
+```tsx
+{task.description && !isRejected && (
+  <p className="text-sm text-white/70 mb-2 line-clamp-2">
+    {task.description}
+  </p>
+)}
 ```
 
-### 4. Tooltip do botão atualizado
+Resultado: tarefas rejeitadas pelo cliente ficam compactas (badge vermelho + título + data + cliente), independente de terem descrição ou não — visual consistente com o print que você gostou.
 
-Trocar a mensagem do `Tooltip` para refletir os dois requisitos: "A tarefa precisa estar em **Em Revisão** e ter pelo menos um anexo." (mantém o botão clicável — o modal de confirmação cuida do guardrail).
+### 2. `src/components/tasks/TaskDetailsDialog.tsx` — corrigir "Status: undefined" no histórico
+
+No bloco de renderização do histórico (linhas ~649-664), substituir o fallback genérico por uma função que reconhece entradas vindas da Edge Function `approval-decide` (que grava `type: "external_approval"`, `decision`, `feedback`, `at`, `user`):
+
+- `type: "external_approval"` + `decision: "approved"` → "✅ Aprovado pelo cliente"
+- `type: "external_approval"` + `decision: "rejected"` → "❌ Rejeitado pelo cliente" + bloco em itálico abaixo com o `feedback` entre aspas
+- Entradas legadas com `entry.action` ou `entry.status` → continuam funcionando
+- Fallback final → "Atualização registrada" (em vez de "Status: undefined")
+- Timestamp: `entry.timestamp || entry.at`
+- Autor: `entry.user_name || entry.user || (type === 'external_approval' ? 'Cliente' : null)`
 
 ## Arquivos editados
 
-- `src/components/tasks/TaskDetailsDialog.tsx` — novo `AlertDialog`, refator do `handleSendForApproval`, tooltip atualizado.
-- `supabase/functions/approval-get/index.ts` — redeploy (sem mudança de código).
-- `supabase/functions/approval-decide/index.ts` — redeploy (sem mudança de código).
+- `src/components/ui/task-card.tsx` — 1 linha alterada (condição de descrição).
+- `src/components/tasks/TaskDetailsDialog.tsx` — bloco do histórico (~15 linhas).
 
 ## Sem mudanças
 
-- Schema do banco — preservado.
-- Lógica de Smart Batch, validação de 10 MB, Alert de feedback, link público — preservados.
-- Demais status do Kanban — preservados.
+- Edge Functions, schema, lógica de aprovação e demais seções do modal — preservados.
+- Cards não-rejeitados continuam exibindo descrição normalmente.
 
