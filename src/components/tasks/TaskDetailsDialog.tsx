@@ -424,14 +424,49 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                 </div>
               )}
 
-              {localTask.description && (
-                <div>
-                  <p className="text-sm font-medium mb-1">Descrição</p>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    <LinkifyText text={localTask.description} />
-                  </p>
-                </div>
-              )}
+              {localTask.description && (() => {
+                const isLongDescription =
+                  localTask.description.length > 240 ||
+                  localTask.description.split('\n').length > 6;
+                return (
+                  <div>
+                    <p className="text-sm font-medium mb-1">Descrição</p>
+                    <div
+                      className={cn(
+                        "relative transition-all",
+                        isLongDescription && !isDescriptionExpanded && "max-h-[180px] overflow-hidden",
+                      )}
+                    >
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        <LinkifyText text={localTask.description} />
+                      </p>
+                      {isLongDescription && !isDescriptionExpanded && (
+                        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-background to-transparent" />
+                      )}
+                    </div>
+                    {isLongDescription && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsDescriptionExpanded((v) => !v)}
+                        className="mt-2 h-8 px-2 text-primary hover:text-primary"
+                      >
+                        {isDescriptionExpanded ? (
+                          <>
+                            <ChevronUp className="h-4 w-4 mr-1" />
+                            Ver menos
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-4 w-4 mr-1" />
+                            Ver mais
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Anexos */}
               {localTask.attachments && localTask.attachments.length > 0 && (
