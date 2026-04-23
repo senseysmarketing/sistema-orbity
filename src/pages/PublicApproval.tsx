@@ -763,9 +763,6 @@ function AllDoneScreen({
           </Button>
         </div>
 
-        <footer className="mt-16 text-[11px] uppercase tracking-[0.25em] text-white/30">
-          {agency.name} · Powered by Orbity
-        </footer>
       </motion.div>
     </div>
   );
