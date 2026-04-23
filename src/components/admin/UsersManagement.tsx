@@ -12,6 +12,13 @@ import {
   TrendingUp,
   Share2,
   Calendar,
+  Bell,
+  ContactRound,
+  FileText,
+  MessageSquareHeart,
+  Trophy,
+  BarChart3,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,12 +53,19 @@ interface AgencyUser {
 }
 
 const PERMISSION_META: Record<keyof AppPermissions, { label: string; icon: typeof Users }> = {
-  crm: { label: "CRM", icon: Users },
+  clients: { label: "Clientes", icon: Users },
   tasks: { label: "Tarefas", icon: CheckSquare },
-  financial: { label: "Financeiro", icon: DollarSign },
-  traffic: { label: "Tráfego", icon: TrendingUp },
-  social_media: { label: "Social", icon: Share2 },
+  reminders: { label: "Lembretes", icon: Bell },
   agenda: { label: "Agenda", icon: Calendar },
+  crm: { label: "CRM", icon: ContactRound },
+  social_media: { label: "Social", icon: Share2 },
+  traffic: { label: "Tráfego", icon: TrendingUp },
+  contracts: { label: "Contratos", icon: FileText },
+  nps: { label: "NPS", icon: MessageSquareHeart },
+  goals: { label: "Metas", icon: Trophy },
+  financial: { label: "Financeiro", icon: DollarSign },
+  reports: { label: "Relatórios", icon: BarChart3 },
+  import_data: { label: "Importação", icon: Upload },
 };
 
 function getRoleLabel(role: string) {
