@@ -1,191 +1,129 @@
 
 
-# Unificação de Leads (Aplicação + Agendamento)
+# Excluir Agência Permanentemente (apenas suspensas/canceladas/trial expirado)
 
-## Diagnóstico
+## Comportamento
 
-Hoje `ApplicationModal` e `DemoSchedulingModal` fazem `INSERT` independentes em `orbity_leads`, sem verificar se o e-mail já existe. Resultado: o **Renan** apareceu duplicado — uma linha como "Aplicação" (perfil/qualificação) e outra como "Agendamento" (data marcada). Confirmado no banco: `renan@turbotravelmarketing.com.br` tem 2 registros (`application` + `scheduling`).
+Adiciona item **"Excluir Permanentemente"** (vermelho, ícone `Trash2`) no menu de três pontinhos da `AgenciesTable`. Aparece **somente** quando `computed_status` for `suspended`, `canceled` ou `trial_expired` — para agências `active`, `trialing` ou `past_due` o item nem é renderizado.
 
-## Solução: dedupe por e-mail (UPSERT) + merge de dados
+## Guardrail de confirmação (duplo)
 
-**Princípio**: 1 lead = 1 e-mail. Quando o mesmo e-mail vier de novo, fazemos **merge** — preservando o que já existe e sobrescrevendo apenas o que veio novo. Assim:
+Modal `AlertDialog` com:
+- Título: "Excluir agência permanentemente?"
+- Descrição listando o impacto: "Esta ação removerá **todos os dados** desta agência: usuários, clientes, leads, tarefas, posts, contratos, pagamentos, despesas, integrações e arquivos. **Não há como desfazer.**"
+- Resumo dinâmico: `{user_count} usuários · {client_count} clientes · {task_count} tarefas`
+- **Input de confirmação obrigatório**: usuário precisa digitar o nome exato da agência para liberar o botão "Excluir Permanentemente"
+- Botão final em `variant="destructive"`, com loading state
 
-| Cenário | Resultado |
-|---|---|
-| Só preenche aplicação | 1 lead com qualificação, sem agendamento |
-| Só agenda demo | 1 lead com data/hora, sem qualificação |
-| Faz aplicação **e depois** agenda | 1 lead único com qualificação **e** agendamento |
-| Agenda **e depois** preenche aplicação | 1 lead único com agendamento **e** qualificação |
+## Edge Function `master-delete-agency`
 
-## 1. Migration — índice único + função de merge
+Nova edge `verify_jwt = true` que:
+
+1. Valida JWT do chamador e confirma que é admin/owner da agência master (`is_master_agency_admin()` via RPC)
+2. Busca a agência alvo e valida que **não está ativa** (`is_active = false` OU `subscription_status IN ('canceled', 'trial')` com `trial_end < now()`). Se estiver ativa, retorna `403`.
+3. Bloqueia exclusão da própria agência master (`7bef1258-af3d-48cc-b3a7-f79fac29c7c0`)
+4. Usa `SUPABASE_SERVICE_ROLE_KEY` para executar exclusão em cascata via uma RPC `delete_agency_cascade(p_agency_id)` (criada na migration), que apaga em ordem segura respeitando FKs:
+   - Tabelas dependentes sem FK cascade: `notifications`, `notification_queue`, `notification_tracking`, `notification_preferences`, `notification_event_preferences`, `agency_notification_rules`
+   - Pipeline CRM: `lead_history`, `leads`, `automation_logs`, `whatsapp_automations`, `whatsapp_messages`
+   - Operacional: `task_assignments`, `task_clients`, `tasks`, `meetings`, `posts`, `reminders`, `goals`, `nps_responses`
+   - Financeiro: `payments`, `expenses`, `cash_flow`, `contracts`, `contract_templates`, `billing_*`, `invoices`
+   - Integrações: `facebook_*`, `meta_*`, `google_*`, `whatsapp_instances`, `evolution_*`, `conexa_*`, `asaas_*`, `traffic_*`
+   - Storage: deleta objetos dos buckets `client-files`, `task-attachments`, `post-attachments` filtrando por prefixo `{agency_id}/`
+   - `agency_subscriptions`, `agency_invitations`, `agency_users`, `agencies` (último)
+5. Tudo dentro de uma transação (`BEGIN/COMMIT`); rollback em caso de erro
+6. Loga auditoria em tabela existente `audit_log` se houver, ou em `console.error/info` da edge
+
+## Hook `useMaster` — novo método
+
+```ts
+deleteAgencyPermanently: (agencyId: string) => Promise<void>
+```
+
+Chama `supabase.functions.invoke('master-delete-agency', { body: { agency_id } })`, exibe toast de sucesso/erro e dispara `refreshAgencies()`.
+
+## UI — `AgenciesTable.tsx`
+
+Adicionar abaixo do item "Reativar":
+
+```tsx
+{(['suspended','canceled','trial_expired'] as const).includes(agency.computed_status) && (
+  <>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem 
+      onClick={() => openDeleteDialog(agency)} 
+      className="text-destructive focus:text-destructive"
+    >
+      <Trash2 className="h-4 w-4 mr-2" /> Excluir Permanentemente
+    </DropdownMenuItem>
+  </>
+)}
+```
+
+Estado local `deleteDialogAgency` controla o `AlertDialog` com input de confirmação por nome.
+
+## Migration
 
 ```sql
--- Dedupe dos leads existentes (mantém o mais antigo, faz merge dos campos)
-WITH ranked AS (
-  SELECT id, email,
-         ROW_NUMBER() OVER (PARTITION BY lower(email) ORDER BY created_at ASC) as rn
-  FROM public.orbity_leads
-),
-keepers AS (SELECT email, MIN(created_at) AS keep_at FROM public.orbity_leads GROUP BY lower(email))
--- Merge: para cada e-mail duplicado, copia campos não-nulos das duplicatas para o registro mais antigo
-UPDATE public.orbity_leads target
-SET
-  whatsapp       = COALESCE(target.whatsapp, src.whatsapp),
-  phone          = COALESCE(target.phone, src.phone),
-  instagram      = COALESCE(target.instagram, src.instagram),
-  agency_name    = COALESCE(target.agency_name, src.agency_name),
-  team_size      = COALESCE(target.team_size, src.team_size),
-  active_clients = COALESCE(target.active_clients, src.active_clients),
-  avg_ticket     = COALESCE(target.avg_ticket, src.avg_ticket),
-  scheduled_at   = COALESCE(target.scheduled_at, src.scheduled_at),
-  lead_source    = CASE
-    WHEN target.scheduled_at IS NOT NULL OR src.scheduled_at IS NOT NULL THEN 'scheduling'
-    ELSE COALESCE(target.lead_source, src.lead_source)
-  END,
-  status = CASE
-    WHEN src.scheduled_at IS NOT NULL AND target.status = 'novo' THEN 'reuniao_agendada'
-    ELSE target.status
-  END
-FROM (
-  SELECT lower(email) AS email_key,
-         MAX(whatsapp) whatsapp, MAX(phone) phone, MAX(instagram) instagram,
-         MAX(agency_name) agency_name, MAX(team_size) team_size,
-         MAX(active_clients) active_clients, MAX(avg_ticket) avg_ticket,
-         MAX(scheduled_at) scheduled_at, MAX(lead_source) lead_source
-  FROM public.orbity_leads
-  GROUP BY lower(email)
-  HAVING COUNT(*) > 1
-) src
-WHERE lower(target.email) = src.email_key
-  AND (target.email, target.created_at) IN (SELECT email, keep_at FROM keepers);
-
--- Apaga as duplicatas (mantém o registro mais antigo de cada e-mail)
-DELETE FROM public.orbity_leads
-WHERE id IN (
-  SELECT id FROM (
-    SELECT id, ROW_NUMBER() OVER (PARTITION BY lower(email) ORDER BY created_at ASC) rn
-    FROM public.orbity_leads
-  ) t WHERE rn > 1
-);
-
--- Índice único case-insensitive previne duplicatas futuras
-CREATE UNIQUE INDEX idx_orbity_leads_email_unique ON public.orbity_leads (lower(email));
-
--- RPC de upsert/merge inteligente (chamada pelos dois modais)
-CREATE OR REPLACE FUNCTION public.upsert_orbity_lead(
-  p_name text, p_email text, p_whatsapp text DEFAULT NULL,
-  p_phone text DEFAULT NULL, p_instagram text DEFAULT NULL,
-  p_agency_name text DEFAULT NULL, p_team_size text DEFAULT NULL,
-  p_active_clients text DEFAULT NULL, p_avg_ticket text DEFAULT NULL,
-  p_scheduled_at timestamptz DEFAULT NULL, p_lead_source text DEFAULT NULL
-) RETURNS uuid
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_id uuid;
+CREATE OR REPLACE FUNCTION public.delete_agency_cascade(p_agency_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  master_id uuid := '7bef1258-af3d-48cc-b3a7-f79fac29c7c0';
 BEGIN
-  INSERT INTO public.orbity_leads (
-    name, email, whatsapp, phone, instagram, agency_name,
-    team_size, active_clients, avg_ticket, scheduled_at, lead_source,
-    status
-  ) VALUES (
-    p_name, lower(p_email), p_whatsapp, p_phone, p_instagram, p_agency_name,
-    p_team_size, p_active_clients, p_avg_ticket, p_scheduled_at, p_lead_source,
-    CASE WHEN p_scheduled_at IS NOT NULL THEN 'reuniao_agendada' ELSE 'novo' END
-  )
-  ON CONFLICT (lower(email)) DO UPDATE SET
-    name           = COALESCE(NULLIF(EXCLUDED.name, ''),           orbity_leads.name),
-    whatsapp       = COALESCE(EXCLUDED.whatsapp,       orbity_leads.whatsapp),
-    phone          = COALESCE(EXCLUDED.phone,          orbity_leads.phone),
-    instagram      = COALESCE(EXCLUDED.instagram,      orbity_leads.instagram),
-    agency_name    = COALESCE(EXCLUDED.agency_name,    orbity_leads.agency_name),
-    team_size      = COALESCE(EXCLUDED.team_size,      orbity_leads.team_size),
-    active_clients = COALESCE(EXCLUDED.active_clients, orbity_leads.active_clients),
-    avg_ticket     = COALESCE(EXCLUDED.avg_ticket,     orbity_leads.avg_ticket),
-    scheduled_at   = COALESCE(EXCLUDED.scheduled_at,   orbity_leads.scheduled_at),
-    lead_source    = CASE
-      WHEN EXCLUDED.scheduled_at IS NOT NULL THEN 'scheduling'
-      ELSE COALESCE(orbity_leads.lead_source, EXCLUDED.lead_source)
-    END,
-    status = CASE
-      WHEN EXCLUDED.scheduled_at IS NOT NULL
-       AND orbity_leads.status IN ('novo','em_contato') THEN 'reuniao_agendada'
-      ELSE orbity_leads.status
-    END,
-    updated_at = now()
-  RETURNING id INTO v_id;
-  RETURN v_id;
+  IF p_agency_id = master_id THEN
+    RAISE EXCEPTION 'Cannot delete master agency';
+  END IF;
+
+  -- DELETE em cascata na ordem correta (todas as tabelas com agency_id)
+  DELETE FROM public.notifications WHERE agency_id = p_agency_id;
+  DELETE FROM public.notification_queue WHERE agency_id = p_agency_id;
+  -- ... (lista completa de tabelas filhas)
+  DELETE FROM public.agency_subscriptions WHERE agency_id = p_agency_id;
+  DELETE FROM public.agency_users WHERE agency_id = p_agency_id;
+  DELETE FROM public.agencies WHERE id = p_agency_id;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.upsert_orbity_lead(
-  text,text,text,text,text,text,text,text,text,timestamptz,text
-) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.delete_agency_cascade(uuid) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.delete_agency_cascade(uuid) TO service_role;
 ```
 
-**Por que RPC e não `upsert()` direto pelo client**: o índice é em `lower(email)` (expressão), e o `.upsert()` do Supabase JS exige uma constraint nomeada em coluna física. A RPC `SECURITY DEFINER` resolve o merge atomicamente e mantém a RLS de INSERT anônima já existente intacta.
+A função só é executável via service role (chamada exclusivamente pela edge), nunca diretamente pelo cliente.
 
-## 2. `ApplicationModal.tsx` — trocar `insert` por RPC
+## Limpeza de Storage
+
+Dentro da edge, antes da RPC SQL:
 
 ```ts
-await supabase.rpc('upsert_orbity_lead', {
-  p_name: name.trim(),
-  p_email: email.trim(),
-  p_whatsapp: rawPhone(whatsapp),
-  p_instagram: instagram.trim(),
-  p_team_size: teamSize,
-  p_active_clients: activeClients,
-  p_avg_ticket: avgTicket,
-  p_lead_source: 'application',
-});
+for (const bucket of ['client-files', 'task-attachments', 'post-attachments']) {
+  const { data: files } = await supabase.storage.from(bucket).list(agency_id, { limit: 1000 });
+  if (files?.length) {
+    await supabase.storage.from(bucket).remove(files.map(f => `${agency_id}/${f.name}`));
+  }
+}
 ```
 
-Não passa `p_scheduled_at` → mantém agendamento existente (se houver) intocado.
+## Não-deleta usuários do `auth.users`
 
-## 3. `DemoSchedulingModal.tsx` — trocar `insert` por RPC
-
-```ts
-await supabase.rpc('upsert_orbity_lead', {
-  p_name: name.trim(),
-  p_email: email.trim(),
-  p_whatsapp: rawPhone(phone),
-  p_phone: rawPhone(phone),
-  p_agency_name: agencyName.trim(),
-  p_scheduled_at: scheduledAt.toISOString(),
-  p_lead_source: 'scheduling',
-});
-```
-
-Webhook n8n e tracking continuam intactos.
-
-## 4. UI — `OrbityLeadsTable.tsx` (badge "Origem" enriquecido)
-
-Quando o lead tem **ambas as origens** (qualificação preenchida + `scheduled_at`), o badge "Origem" passa a mostrar **dois chips empilhados**: `Aplicação` + `Agendamento`. Lógica:
-
-```tsx
-const hasApplication = !!(lead.team_size || lead.active_clients || lead.avg_ticket || lead.instagram);
-const hasScheduling  = !!lead.scheduled_at;
-// renderiza 1 ou 2 badges conforme combinação
-```
-
-Sem alteração de schema/colunas — usa o que já existe.
-
-## Resultado prático
-
-- **Renan duplicado**: a migration faz o merge — a linha "Aplicação" absorve o `scheduled_at` e `agency_name` da linha "Agendamento", e a duplicata é apagada. Sobra **1 lead único** com tudo.
-- **Daqui pra frente**: índice único em `lower(email)` + RPC de merge garantem que nunca mais haverá duplicata, independente da ordem (aplicar→agendar ou agendar→aplicar).
-- **Status inteligente**: se o lead estava como `novo` e agenda demo, vira `reuniao_agendada` automaticamente. Se já estava em `apresentado`/`fechado`/etc., status é preservado (não regride).
+Usuários ficam na tabela `auth.users` (podem pertencer a outras agências). Apenas os vínculos em `agency_users` são removidos. Se o usuário não tiver mais nenhuma agência, ele simplesmente não consegue logar em nenhum painel — sem efeito colateral.
 
 ## Arquivos
 
-**Migration nova** — dedupe + índice único + RPC `upsert_orbity_lead`
+**Novos:**
+- `supabase/functions/master-delete-agency/index.ts`
+- `supabase/functions/master-delete-agency/config.toml` (`verify_jwt = true`)
+- Migration: RPC `delete_agency_cascade`
 
 **Editados:**
-- `src/components/landing/ApplicationModal.tsx` — `insert` → `rpc('upsert_orbity_lead')`
-- `src/components/landing/DemoSchedulingModal.tsx` — idem
-- `src/components/master/OrbityLeadsTable.tsx` — badge "Origem" suporta dupla origem
+- `src/components/master/AgenciesTable.tsx` — item de menu condicional + `AlertDialog` de confirmação com input
+- `src/hooks/useMaster.tsx` — método `deleteAgencyPermanently`
 
 ## Sem mudanças
 
-- RLS, schema de colunas, webhook n8n, Pixel tracking
-- Painel Master (tabs, métricas, fluxo de status)
-- Demais módulos
+- Schema das demais tabelas, RLS, billing, edges existentes
+- Agência master (protegida no RPC + na edge)
+- Outras abas do painel master
 
