@@ -12,11 +12,16 @@ import { Input } from '@/components/ui/input';
 import {
   MoreHorizontal, Eye, Pause, Play, RefreshCw,
   CheckCircle2, AlertTriangle, XCircle, Ban, Search,
-  ChevronLeft, ChevronRight, Copy, Check,
+  ChevronLeft, ChevronRight, Copy, Check, Trash2,
 } from 'lucide-react';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
+} from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
