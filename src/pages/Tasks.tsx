@@ -291,6 +291,8 @@ export default function Tasks() {
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [tasksSettingsOpen, setTasksSettingsOpen] = useState(false);
+  const [tasksSettingsView, setTasksSettingsView] = useState<TasksSettingsView>("hub");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
