@@ -190,6 +190,8 @@ export type Database = {
           subscription_expires_at: string | null
           subscription_plan: Database["public"]["Enums"]["subscription_plan"]
           updated_at: string
+          whatsapp_auto_contact: boolean
+          whatsapp_auto_ghosting: boolean
         }
         Insert: {
           contact_email?: string | null
@@ -213,6 +215,8 @@ export type Database = {
           subscription_expires_at?: string | null
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
           updated_at?: string
+          whatsapp_auto_contact?: boolean
+          whatsapp_auto_ghosting?: boolean
         }
         Update: {
           contact_email?: string | null
@@ -236,6 +240,8 @@ export type Database = {
           subscription_expires_at?: string | null
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
           updated_at?: string
+          whatsapp_auto_contact?: boolean
+          whatsapp_auto_ghosting?: boolean
         }
         Relationships: [
           {
