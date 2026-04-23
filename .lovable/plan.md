@@ -1,120 +1,155 @@
 
 
-# Trial Personalizado por Agência — Plano final aprovado com Fail-Safe
+# Templates de Contrato com Variáveis Mágicas — Plano final aprovado
 
-## Decisão arquitetural (mantida)
+## 1. Schema (`contract_templates`)
 
-Reusar `agency_subscriptions.trial_end` como única fonte de verdade. Sem nova coluna, sem alteração no `PaymentMiddlewareWrapper`, `useAgency`, `check-subscription` ou view `master_agency_overview`.
+```sql
+CREATE TABLE public.contract_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agency_id UUID NOT NULL REFERENCES public.agencies(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_by UUID,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-## 1. `AgencyDetailsSheet.tsx` — nova seção "Gestão de Acesso e Trial"
+CREATE INDEX idx_contract_templates_agency ON public.contract_templates(agency_id);
 
-Inserir entre o toggle "Acesso Ativo" e o histórico de pagamentos.
+ALTER TABLE public.contract_templates ENABLE ROW LEVEL SECURITY;
 
-### Guardrail 1 — Blindagem por status (Fail-Safe)
+CREATE POLICY "agency members read templates"
+  ON public.contract_templates FOR SELECT
+  USING (user_belongs_to_agency(agency_id));
 
-Avaliar `agency.subscription_status` **antes** de renderizar o editor:
+CREATE POLICY "agency members write templates"
+  ON public.contract_templates FOR ALL
+  USING (user_belongs_to_agency(agency_id))
+  WITH CHECK (user_belongs_to_agency(agency_id));
 
-- **`active` ou `canceled`** → renderizar apenas:
-  ```tsx
-  <Alert variant="default">
-    <AlertDescription>
-      A agência já possui ou possuiu uma assinatura ({status}). A modificação 
-      manual do período de trial não está disponível para este estado.
-    </AlertDescription>
-  </Alert>
-  ```
-  Nenhum DatePicker. Nenhum botão. Nenhuma mutação possível.
-
-- **`trial`, `trial_expired`, `past_due`, ou subscription inexistente** → renderizar editor completo:
-  - `Popover` + `Calendar` (shadcn DatePicker padrão, `pointer-events-auto`)
-  - Estado inicial: `agency.trial_end` (se existir)
-  - Legenda contextual:
-    - `trial_end > now()` → "Trial ativo até dd/MM/yyyy ({n} dias restantes)" — texto azul
-    - `trial_end <= now()` → "Trial expirado em dd/MM/yyyy" — texto vermelho
-    - `null` → "Sem trial configurado"
-  - Botões lado a lado:
-    - **"Salvar nova data"** (primary) — habilitado só quando data foi alterada
-    - **"Resetar para padrão (7 dias)"** (outline) — define `created_at + 7 dias`
-
-### Guardrail 2 — Fim do dia (timezone-safe)
-
-Ao salvar, normalizar a data selecionada para `23:59:59.999` antes de enviar:
-
-```ts
-import { endOfDay } from 'date-fns';
-
-const finalDate = endOfDay(selectedDate); // 23:59:59.999 local
-await supabase
-  .from('agency_subscriptions')
-  .update({ trial_end: finalDate.toISOString() })
-  .eq('agency_id', agency.agency_id);
+CREATE TRIGGER trg_contract_templates_updated_at
+  BEFORE UPDATE ON public.contract_templates
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
-Cliente prometido até dia 05/05 mantém acesso até 05/05 23:59 e só vê `BlockedAccessScreen` na manhã de 06/05.
+## 2. `ContractTemplatesManager.tsx` (novo)
 
-### Mutação
+Layout dividido (Quiet Luxury, `border border-border/60`, sem sombras pesadas):
 
-- **Update simples** quando já existe registro em `agency_subscriptions`:
-  ```ts
-  await supabase
-    .from('agency_subscriptions')
-    .update({ trial_end: endOfDay(date).toISOString(), status: 'trial' })
-    .eq('agency_id', agency.agency_id);
-  ```
-  Status só vai para `'trial'` se atual for `trial`/`trial_expired`/`past_due`. Para os demais (já bloqueados pelo Guardrail 1), nem chegamos aqui.
+- **Lista (esquerda, `w-72`)**: Cards minimalistas com nome + data + ações Editar/Excluir. Botão "Novo Modelo" no topo.
+- **Editor (direita, flex-1)**:
+  - Input "Nome do Modelo"
+  - Painel sticky de **Variáveis Mágicas** — chips clicáveis (`Badge variant="outline"` com `cursor-pointer`) que copiam o placeholder ao clipboard + toast "Variável copiada":
+    - **Cliente**: `{{CLIENT_NAME}}`, `{{CLIENT_DOCUMENT}}`, `{{CLIENT_ADDRESS}}`, `{{CLIENT_EMAIL}}`, `{{CLIENT_PHONE}}`
+    - **Contrato**: `{{CONTRACT_VALUE}}`, `{{START_DATE}}`, `{{END_DATE}}`
+    - **Agência**: `{{AGENCY_NAME}}`, `{{AGENCY_DOCUMENT}}`
+  - `Textarea` (`min-h-[500px] font-mono text-sm leading-relaxed`)
+  - Botões "Salvar" / "Cancelar"
+- CRUD direto via `supabase.from('contract_templates')`.
 
-- **Upsert com plano `orbity_trial`** (caso raro — sem registro):
-  ```ts
-  const { data: plan } = await supabase
-    .from('subscription_plans').select('id')
-    .eq('slug', 'orbity_trial').eq('is_active', true).single();
-  
-  await supabase.from('agency_subscriptions').insert({
-    agency_id, plan_id: plan.id, status: 'trial',
-    trial_start: new Date().toISOString(),
-    trial_end: endOfDay(date).toISOString(),
-    billing_cycle: 'monthly'
-  });
-  ```
+## 3. Integração em `Contracts.tsx`
 
-- Toast de sucesso/erro + `refreshAgencies()` após salvar.
+`<Tabs>` com **Contratos** (`ContractsList`) e **Modelos** (`ContractTemplatesManager`).
 
-## 2. `AgenciesTable.tsx` — badge mais rica
+Botão "Novo Contrato" vira `DropdownMenu` com:
+- "Gerar com IA" → `SmartContractGenerator` (intacto)
+- "Usar Modelo" → `TemplateContractWizard` (novo)
 
-Refinar o `getStatusBadge` apenas para o caso `trial`:
+## 4. `TemplateContractWizard.tsx` (3 passos)
 
-| Condição | Cor | Texto |
-|---|---|---|
-| `trial_end > now() + 48h` | azul | `Trial: expira em dd/MM` |
-| `trial_end > now()` e `≤ 48h` | amarelo | `Trial: expira em dd/MM ⚠` |
-| `trial_end <= now()` | vermelho | `Trial expirado em dd/MM` |
+Mesma assinatura (`onCancel`, `onComplete`). Header com "Passo X de 3" + Progress fina.
 
-Sem nova coluna — tudo dentro do badge de Status existente (mantém densidade Quiet Luxury).
+### Passo 1 — Base
+- Toggle "Cliente cadastrado" / "Manual".
+- Cadastrado: `Select` com clientes da agência.
+- Manual: inputs Nome, Documento, Email, Telefone, Endereço.
+- `Select` de Modelo (lista de `contract_templates`).
 
-## 3. Avisos sutis ao owner
+### Passo 2 — Variáveis do Contrato
+- Valor Mensal (R$) — obrigatório
+- Data de Início — obrigatória
+- Data de Término — opcional
+- **Guardrail 1 — Documento da Agência**:
+  - Novo input: "Documento da Agência (CNPJ/NIF) — Opcional"
+  - Estado inicializado de `localStorage.getItem('orbity_agency_doc_' + agencyId)` ou string vazia
+  - Ao salvar (avançar para passo 3), persiste em `localStorage.setItem('orbity_agency_doc_' + agencyId, value)`
+  - Hint sob o campo: "Salvo no seu navegador para os próximos contratos."
 
-- **`BlockedAccessScreen.tsx`** (motivo `trial_expired`): linha discreta "Seu período de teste foi configurado pela equipe Orbity até dd/MM/yyyy" — exibida quando `Math.abs(trial_end - (created_at + 7d)) > 1 dia`.
-- **`SubscriptionDetails.tsx`** (card de trial): nota "Período personalizado pela equipe Orbity" sob a mesma heurística.
+### Passo 3 — Revisão Final
 
-## 4. Lógica de bloqueio — sem mudanças
+**Guardrail 3 — Aviso visual no topo**:
+```tsx
+<Alert variant="default" className="border-border/60">
+  <Info className="h-4 w-4" />
+  <AlertDescription>
+    Reveja os dados abaixo. Variáveis sem informação no CRM foram preenchidas com 
+    <code className="mx-1 px-1.5 py-0.5 rounded bg-muted text-xs">—</code>.
+    Substitua antes de salvar.
+  </AlertDescription>
+</Alert>
+```
 
-`PaymentMiddlewareWrapper` já bloqueia via `subscription_status === 'trial' && trial_end <= now()`. Como editamos diretamente `trial_end`, o bloqueio passa a usar a data customizada automaticamente.
+**Composição do conteúdo** (executada uma vez ao entrar no passo):
+```ts
+const map = {
+  '{{CLIENT_NAME}}': clientName || '—',
+  '{{CLIENT_DOCUMENT}}': clientDocument || '—',
+  '{{CLIENT_ADDRESS}}': formatAddress(client) || '—',
+  '{{CLIENT_EMAIL}}': clientEmail || '—',
+  '{{CLIENT_PHONE}}': clientPhone || '—',
+  '{{CONTRACT_VALUE}}': formatBRL(monthlyValue),
+  '{{START_DATE}}': format(startDate, 'dd/MM/yyyy'),
+  '{{END_DATE}}': endDate ? format(endDate, 'dd/MM/yyyy') : 'Indeterminado',
+  '{{AGENCY_NAME}}': currentAgency.name,
+  '{{AGENCY_DOCUMENT}}': agencyDoc || '—',
+};
+let out = template.content;
+Object.entries(map).forEach(([k, v]) => { out = out.split(k).join(v); });
+```
 
-## Arquivos alterados
+**Guardrail 2 — Editor com formatação preservada**:
 
-- `src/components/master/AgencyDetailsSheet.tsx` — nova seção com guardrail de status, DatePicker, `endOfDay`, 2 botões, mutação
-- `src/components/master/AgenciesTable.tsx` — badge tricolor (azul/amarelo/vermelho)
-- `src/components/payment/BlockedAccessScreen.tsx` — aviso "personalizado pela equipe"
-- `src/components/subscription/SubscriptionDetails.tsx` — nota equivalente
+Container de leitura/edição em duas camadas:
+- `Textarea` com classes: `min-h-[600px] font-serif text-[15px] leading-7 whitespace-pre-wrap p-6 bg-background border-border/60`
+- `style={{ tabSize: 2 }}` para preservar indentação
+- Espaçamento entre cláusulas mantido pelo `\n\n` original do template + `whitespace-pre-wrap`
+
+Botão "Salvar Contrato" → `INSERT` em `contracts`:
+```ts
+{
+  agency_id, client_id, client_name, client_cpf_cnpj: clientDocument,
+  client_address, client_email, client_phone,
+  total_value: monthlyValue,
+  start_date, end_date,
+  custom_clauses: contractContent,
+  status: 'draft',
+  created_by: user.id
+}
+```
+
+## 5. Estética Quiet Luxury — guardrails visuais
+
+- Bordas finas (`border-border/60`), sem ring agressivo
+- Tipografia: `font-mono` no editor de template, `font-serif text-[15px] leading-7` no editor de revisão (sensação de documento jurídico)
+- Sem cores destrutivas em avisos informativos — apenas `<Alert variant="default">`
+- Espaçamento generoso (`space-y-6` entre seções do wizard)
+
+## Arquivos
+
+**Novos:**
+- `src/components/contracts/ContractTemplatesManager.tsx`
+- `src/components/contracts/TemplateContractWizard.tsx`
+
+**Editados:**
+- `src/pages/Contracts.tsx` — Tabs + DropdownMenu no botão "Novo Contrato"
+
+**Migration:**
+- `contract_templates` + RLS + trigger `updated_at`
 
 ## Sem mudanças
 
-- Schema (`agency_subscriptions.trial_end` já existe)
-- `PaymentMiddlewareWrapper`, `useAgency`, `useSubscription`, edge `check-subscription`
-- View `master_agency_overview` (já expõe `trial_end` e `subscription_status`)
-- RLS — Master já tem permissão via `is_master_agency_admin()`
-
-## Resultado
-
-Master abre a sheet de uma agência em trial → escolhe "05/05" → salva (gravado como `2025-05-05T23:59:59.999Z` local). Cliente usa o sistema sem bloqueio até a meia-noite do dia 06/05. Se a agência já estiver `active` ou `canceled`, o editor sequer aparece — apenas um aviso explicando o porquê.
+- `SmartContractGenerator.tsx` (fluxo IA preservado)
+- `ContractsList.tsx`, tabela `contracts`, edge `ai-assist`
+- Schema `agencies` (CNPJ resolvido via input + localStorage no wizard)
 
