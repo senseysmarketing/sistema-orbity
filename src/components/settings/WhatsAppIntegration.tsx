@@ -160,6 +160,50 @@ export const WhatsAppIntegration = () => {
         />
       )}
 
+      {/* CRM Automations */}
+      <div className="space-y-3 pt-2">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight">Automações do CRM</h3>
+          <p className="text-xs text-muted-foreground">
+            Controle como o sistema move leads automaticamente com base nas interações no WhatsApp.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
+          <div className="space-y-0.5 pr-4">
+            <Label htmlFor="auto-contact" className="text-sm font-medium">
+              Mover lead para Contato ao receber resposta
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Quando o lead enviar a primeira mensagem, ele é movido automaticamente da coluna inicial para Em Contato.
+            </p>
+          </div>
+          <Switch
+            id="auto-contact"
+            checked={autoContact}
+            onCheckedChange={(checked) => toggleAutomation.mutate({ field: 'whatsapp_auto_contact', value: checked })}
+            disabled={toggleAutomation.isPending}
+          />
+        </div>
+
+        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
+          <div className="space-y-0.5 pr-4">
+            <Label htmlFor="auto-ghosting" className="text-sm font-medium">
+              Mover para Perdido 24h após o último Follow-up
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Se o lead não responder até 24 horas após o envio da última mensagem programada da sequência de follow-up, o sistema irá movê-lo automaticamente para Perdido com o motivo "Ghosting no WhatsApp".
+            </p>
+          </div>
+          <Switch
+            id="auto-ghosting"
+            checked={autoGhosting}
+            onCheckedChange={(checked) => toggleAutomation.mutate({ field: 'whatsapp_auto_ghosting', value: checked })}
+            disabled={toggleAutomation.isPending}
+          />
+        </div>
+      </div>
+
       {/* Manual re-link tool for orphan conversations */}
       <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/10">
         <div className="space-y-0.5">
