@@ -1,155 +1,174 @@
 
 
-# Templates de Contrato com Variáveis Mágicas — Plano final aprovado
+# Permissões granulares por tela (separadas por categoria do menu)
 
-## 1. Schema (`contract_templates`)
+## Problema atual
 
-```sql
-CREATE TABLE public.contract_templates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  agency_id UUID NOT NULL REFERENCES public.agencies(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  content TEXT NOT NULL,
-  created_by UUID,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+Apenas 6 toggles (`crm`, `tasks`, `financial`, `traffic`, `social_media`, `agenda`) controlam **15+ telas**, causando:
+- **Clientes** bloqueado junto com CRM (mesma chave `canAccessCRM`)
+- **NPS** amarrado a CRM, **Contratos** a Financeiro, **Metas** a Financeiro — sem controle individual
+- **Lembretes** sem permissão (sempre aberto), **Relatórios** apenas admin
+- Cargos preset jogam tudo junto, sem nuance
 
-CREATE INDEX idx_contract_templates_agency ON public.contract_templates(agency_id);
+## Solução: 13 permissões agrupadas por categoria do sidebar
 
-ALTER TABLE public.contract_templates ENABLE ROW LEVEL SECURITY;
+Mantém a estrutura atual (`agency_users.app_permissions` JSONB, sem migration de schema) e expande as chaves. Default `true` para retrocompatibilidade — ninguém perde acesso após o deploy.
 
-CREATE POLICY "agency members read templates"
-  ON public.contract_templates FOR SELECT
-  USING (user_belongs_to_agency(agency_id));
+### Novo `AppPermissions` (em `src/lib/rolePresets.ts`)
 
-CREATE POLICY "agency members write templates"
-  ON public.contract_templates FOR ALL
-  USING (user_belongs_to_agency(agency_id))
-  WITH CHECK (user_belongs_to_agency(agency_id));
-
-CREATE TRIGGER trg_contract_templates_updated_at
-  BEFORE UPDATE ON public.contract_templates
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-```
-
-## 2. `ContractTemplatesManager.tsx` (novo)
-
-Layout dividido (Quiet Luxury, `border border-border/60`, sem sombras pesadas):
-
-- **Lista (esquerda, `w-72`)**: Cards minimalistas com nome + data + ações Editar/Excluir. Botão "Novo Modelo" no topo.
-- **Editor (direita, flex-1)**:
-  - Input "Nome do Modelo"
-  - Painel sticky de **Variáveis Mágicas** — chips clicáveis (`Badge variant="outline"` com `cursor-pointer`) que copiam o placeholder ao clipboard + toast "Variável copiada":
-    - **Cliente**: `{{CLIENT_NAME}}`, `{{CLIENT_DOCUMENT}}`, `{{CLIENT_ADDRESS}}`, `{{CLIENT_EMAIL}}`, `{{CLIENT_PHONE}}`
-    - **Contrato**: `{{CONTRACT_VALUE}}`, `{{START_DATE}}`, `{{END_DATE}}`
-    - **Agência**: `{{AGENCY_NAME}}`, `{{AGENCY_DOCUMENT}}`
-  - `Textarea` (`min-h-[500px] font-mono text-sm leading-relaxed`)
-  - Botões "Salvar" / "Cancelar"
-- CRUD direto via `supabase.from('contract_templates')`.
-
-## 3. Integração em `Contracts.tsx`
-
-`<Tabs>` com **Contratos** (`ContractsList`) e **Modelos** (`ContractTemplatesManager`).
-
-Botão "Novo Contrato" vira `DropdownMenu` com:
-- "Gerar com IA" → `SmartContractGenerator` (intacto)
-- "Usar Modelo" → `TemplateContractWizard` (novo)
-
-## 4. `TemplateContractWizard.tsx` (3 passos)
-
-Mesma assinatura (`onCancel`, `onComplete`). Header com "Passo X de 3" + Progress fina.
-
-### Passo 1 — Base
-- Toggle "Cliente cadastrado" / "Manual".
-- Cadastrado: `Select` com clientes da agência.
-- Manual: inputs Nome, Documento, Email, Telefone, Endereço.
-- `Select` de Modelo (lista de `contract_templates`).
-
-### Passo 2 — Variáveis do Contrato
-- Valor Mensal (R$) — obrigatório
-- Data de Início — obrigatória
-- Data de Término — opcional
-- **Guardrail 1 — Documento da Agência**:
-  - Novo input: "Documento da Agência (CNPJ/NIF) — Opcional"
-  - Estado inicializado de `localStorage.getItem('orbity_agency_doc_' + agencyId)` ou string vazia
-  - Ao salvar (avançar para passo 3), persiste em `localStorage.setItem('orbity_agency_doc_' + agencyId, value)`
-  - Hint sob o campo: "Salvo no seu navegador para os próximos contratos."
-
-### Passo 3 — Revisão Final
-
-**Guardrail 3 — Aviso visual no topo**:
-```tsx
-<Alert variant="default" className="border-border/60">
-  <Info className="h-4 w-4" />
-  <AlertDescription>
-    Reveja os dados abaixo. Variáveis sem informação no CRM foram preenchidas com 
-    <code className="mx-1 px-1.5 py-0.5 rounded bg-muted text-xs">—</code>.
-    Substitua antes de salvar.
-  </AlertDescription>
-</Alert>
-```
-
-**Composição do conteúdo** (executada uma vez ao entrar no passo):
 ```ts
-const map = {
-  '{{CLIENT_NAME}}': clientName || '—',
-  '{{CLIENT_DOCUMENT}}': clientDocument || '—',
-  '{{CLIENT_ADDRESS}}': formatAddress(client) || '—',
-  '{{CLIENT_EMAIL}}': clientEmail || '—',
-  '{{CLIENT_PHONE}}': clientPhone || '—',
-  '{{CONTRACT_VALUE}}': formatBRL(monthlyValue),
-  '{{START_DATE}}': format(startDate, 'dd/MM/yyyy'),
-  '{{END_DATE}}': endDate ? format(endDate, 'dd/MM/yyyy') : 'Indeterminado',
-  '{{AGENCY_NAME}}': currentAgency.name,
-  '{{AGENCY_DOCUMENT}}': agencyDoc || '—',
-};
-let out = template.content;
-Object.entries(map).forEach(([k, v]) => { out = out.split(k).join(v); });
-```
+export interface AppPermissions {
+  // Operacional
+  clients: boolean;       // NOVO — separa de CRM
+  tasks: boolean;
+  reminders: boolean;     // NOVO
+  agenda: boolean;
+  crm: boolean;           // CRM & Leads (pipeline)
 
-**Guardrail 2 — Editor com formatação preservada**:
+  // Marketing & Vendas
+  social_media: boolean;
+  traffic: boolean;
+  contracts: boolean;     // NOVO — separa de financial
 
-Container de leitura/edição em duas camadas:
-- `Textarea` com classes: `min-h-[600px] font-serif text-[15px] leading-7 whitespace-pre-wrap p-6 bg-background border-border/60`
-- `style={{ tabSize: 2 }}` para preservar indentação
-- Espaçamento entre cláusulas mantido pelo `\n\n` original do template + `whitespace-pre-wrap`
-
-Botão "Salvar Contrato" → `INSERT` em `contracts`:
-```ts
-{
-  agency_id, client_id, client_name, client_cpf_cnpj: clientDocument,
-  client_address, client_email, client_phone,
-  total_value: monthlyValue,
-  start_date, end_date,
-  custom_clauses: contractContent,
-  status: 'draft',
-  created_by: user.id
+  // Administração
+  nps: boolean;           // NOVO — separa de CRM
+  goals: boolean;         // NOVO — separa de financial
+  financial: boolean;     // Administrativo (DRE/Caixa)
+  reports: boolean;       // NOVO — deixa de ser admin-only opcional
+  import_data: boolean;   // NOVO — idem
 }
+
+export const DEFAULT_PERMISSIONS: AppPermissions = {
+  clients: true, tasks: true, reminders: true, agenda: true, crm: true,
+  social_media: false, traffic: false, contracts: false,
+  nps: false, goals: false, financial: false, reports: false, import_data: false,
+};
 ```
 
-## 5. Estética Quiet Luxury — guardrails visuais
+**Fallback retrocompatível** em `usePermissions`: se o JSONB salvo não tiver a nova chave, herdar do agrupamento antigo (ex.: `clients ?? crm`, `nps ?? crm`, `contracts ?? financial`, `goals ?? financial`, `reminders ?? true`, `reports/import_data ?? isAdmin`). Isso garante que ninguém é bloqueado sem o admin reconfigurar.
 
-- Bordas finas (`border-border/60`), sem ring agressivo
-- Tipografia: `font-mono` no editor de template, `font-serif text-[15px] leading-7` no editor de revisão (sensação de documento jurídico)
-- Sem cores destrutivas em avisos informativos — apenas `<Alert variant="default">`
-- Espaçamento generoso (`space-y-6` entre seções do wizard)
+### Cargos preset atualizados
 
-## Arquivos
+Cada preset em `ROLE_PRESETS` ganha valores explícitos para as 13 chaves. Exemplos:
+- **Designer**: `tasks`, `reminders` ✓ — resto ✗
+- **Social Media**: `tasks`, `reminders`, `agenda`, `social_media` ✓
+- **Gestor de Tráfego**: `tasks`, `reminders`, `agenda`, `clients`, `crm`, `traffic`, `reports` ✓
+- **Comercial**: `reminders`, `agenda`, `clients`, `crm`, `nps`, `contracts` ✓
+- **Gerente**: tudo ✓ exceto `financial` e `import_data`
+- **Personalizado**: livre
 
-**Novos:**
-- `src/components/contracts/ContractTemplatesManager.tsx`
-- `src/components/contracts/TemplateContractWizard.tsx`
+## UI — `RolePermissionsManager.tsx` agrupado por categoria
 
-**Editados:**
-- `src/pages/Contracts.tsx` — Tabs + DropdownMenu no botão "Novo Contrato"
+Substitui a lista única de 6 itens por **3 seções colapsáveis** espelhando o sidebar:
 
-**Migration:**
-- `contract_templates` + RLS + trigger `updated_at`
+```
+🗂  Operacional        [5/5 ativos]
+    ├─ 👥 Clientes               [toggle]
+    ├─ ✅ Tarefas                [toggle]
+    ├─ 🔔 Lembretes              [toggle]
+    ├─ 📅 Agenda                 [toggle]
+    └─ 🎯 CRM & Leads            [toggle]
+
+📣  Marketing & Vendas  [1/3 ativos]
+    ├─ 📱 Social Media           [toggle]
+    ├─ 📈 Tráfego                [toggle]
+    └─ 📄 Contratos              [toggle]
+
+⚙️  Administração      [0/5 ativos]
+    ├─ 💚 NPS                    [toggle]
+    ├─ 🏆 Metas & Bônus          [toggle]
+    ├─ 💰 Administrativo (Fin.)  [toggle]
+    ├─ 📊 Relatórios             [toggle]
+    └─ ⬆️ Importação             [toggle]
+```
+
+- Header de cada seção com contador `n/total ativos` + chevron de expandir/recolher.
+- Botão sutil **"Ativar tudo na seção"** / **"Desativar tudo"** ao lado do contador.
+- `Switch` mantém o mesmo visual atual (Quiet Luxury, sem cores agressivas).
+- Modal cresce: `max-w-2xl` + `max-h-[85vh] overflow-y-auto` para acomodar as seções sem perder densidade.
+
+## `usePermissions` — novos campos derivados
+
+```ts
+canAccessClients, canAccessTasks, canAccessReminders, canAccessAgenda, canAccessCRM,
+canAccessSocialMedia, canAccessTraffic, canAccessContracts,
+canAccessNPS, canAccessGoals, canAccessFinancial, canAccessReports, canAccessImport
+```
+
+Admins (`isAdmin`) continuam retornando `true` em todos.
+
+## Roteamento — `App.tsx`
+
+Cada rota passa a usar a sua chave dedicada:
+
+| Rota | Antes | Depois |
+|---|---|---|
+| `/clients` | `canAccessCRM` | `canAccessClients` |
+| `/clients/:id` | `canAccessCRM` | `canAccessClients` |
+| `/crm` | `canAccessCRM` | `canAccessCRM` |
+| `/nps` | `canAccessCRM` | `canAccessNPS` |
+| `/contracts` | `canAccessFinancial` | `canAccessContracts` |
+| `/goals` | `canAccessFinancial` | `canAccessGoals` |
+| `/admin` | `canAccessFinancial` | `canAccessFinancial` |
+| `/reminders` | (livre) | `canAccessReminders` |
+| `/reports` | `requireAdmin` | `canAccessReports` |
+| `/import` | `requireAdmin` | `canAccessImport` |
+
+`RequirePermission` ganha o novo union de `PermissionKey` (13 chaves).
+
+## Sidebar — `AppSidebar.tsx`
+
+Cada item aponta para sua chave correspondente:
+- `Clientes → canAccessClients`
+- `Lembretes → canAccessReminders`
+- `Contratos → canAccessContracts` (item novo na seção Marketing & Vendas — hoje não está listado)
+- `NPS → canAccessNPS`, `Metas & Bônus → canAccessGoals`
+- `Importação → canAccessImport`, `Relatórios → canAccessReports`
+
+`MobileBottomNav` permanece (Home/Tarefas/CRM/Agenda já corretos).
+
+## `detectPresetFromPermissions`
+
+Compara as 13 chaves. Qualquer divergência cai em "Personalizado".
+
+## Fail-safe de retrocompatibilidade
+
+No `usePermissions`, ao montar `perms`:
+
+```ts
+const raw = (data?.app_permissions ?? {}) as Partial<AppPermissions>;
+const perms: AppPermissions = {
+  clients:     raw.clients     ?? raw.crm ?? true,        // herda CRM antigo
+  tasks:       raw.tasks       ?? true,
+  reminders:   raw.reminders   ?? true,
+  agenda:      raw.agenda      ?? true,
+  crm:         raw.crm         ?? true,
+  social_media:raw.social_media?? false,
+  traffic:     raw.traffic     ?? false,
+  contracts:   raw.contracts   ?? raw.financial ?? false, // herda financial
+  nps:         raw.nps         ?? raw.crm ?? false,       // herda CRM
+  goals:       raw.goals       ?? raw.financial ?? false, // herda financial
+  financial:   raw.financial   ?? false,
+  reports:     raw.reports     ?? false,
+  import_data: raw.import_data ?? false,
+};
+```
+
+Resultado: usuários atuais com `crm: true` continuam vendo Clientes; quem só tinha tasks continua só com tasks. **Nenhuma regressão.**
+
+## Arquivos editados
+
+- `src/lib/rolePresets.ts` — interface, defaults, presets atualizados, detect
+- `src/hooks/usePermissions.tsx` — fallbacks retrocompatíveis + novos derivados
+- `src/components/auth/RequirePermission.tsx` — `PermissionKey` expandida
+- `src/components/admin/RolePermissionsManager.tsx` — UI agrupada em 3 seções com contadores e bulk toggle
+- `src/components/layout/AppSidebar.tsx` — chaves por item (inclui `Contratos`)
+- `src/App.tsx` — rotas com chaves dedicadas
 
 ## Sem mudanças
 
-- `SmartContractGenerator.tsx` (fluxo IA preservado)
-- `ContractsList.tsx`, tabela `contracts`, edge `ai-assist`
-- Schema `agencies` (CNPJ resolvido via input + localStorage no wizard)
+- Schema (`agency_users.app_permissions` JSONB já comporta novas chaves)
+- RLS, edge functions, Master, billing
+- `MobileBottomNav` (já correto)
+- Lógica de admin/owner (continua bypass total)
 
