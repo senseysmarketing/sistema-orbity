@@ -604,7 +604,7 @@ serve(async (req) => {
       } else if (!existingMsg) {
         // Operator sent from phone directly — pause automation
         const automations = await findActiveAutomations(
-          supabase, account.agency_id, conversation.id, conversation.lead_id
+          supabase, account.agency_id, conversation.id, conversation.lead_id, phoneNumber
         );
 
         for (const automation of automations) {
