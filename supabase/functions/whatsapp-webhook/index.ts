@@ -593,13 +593,23 @@ serve(async (req) => {
         }
 
         if (!isAutoReply) {
-          // Run pause + lead promotion in parallel for zero added latency
-          await Promise.all([
-            pauseAutomations,
-            shouldPromote
-              ? promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id)
-              : Promise.resolve(),
-          ]);
+          // 🔒 Guardrail #1: agency setting only fetched when there's a real promotion candidate
+          let promotionPromise: Promise<any> = Promise.resolve();
+          if (shouldPromote) {
+            const { data: agencyCfg } = await supabase
+              .from('agencies')
+              .select('whatsapp_auto_contact')
+              .eq('id', account.agency_id)
+              .maybeSingle();
+            const autoContactEnabled = agencyCfg?.whatsapp_auto_contact !== false; // default true
+            if (autoContactEnabled) {
+              promotionPromise = promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id);
+            } else {
+              console.log('[whatsapp-webhook] Auto-Contact disabled for agency, skipping promotion', { agencyId: account.agency_id });
+            }
+          }
+          // pause-on-reply runs regardless of auto-contact setting
+          await Promise.all([pauseAutomations, promotionPromise]);
         }
       } else if (!existingMsg) {
         // Operator sent from phone directly — pause automation
