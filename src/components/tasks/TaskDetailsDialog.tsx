@@ -113,6 +113,26 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   const { toast } = useToast();
   const { profile } = useAuth();
   const [localTask, setLocalTask] = useState<Task | null>(task);
+  const [showBatchDialog, setShowBatchDialog] = useState(false);
+  const [batchCandidates, setBatchCandidates] = useState<Array<{ id: string; title: string }>>([]);
+  const { findBatchCandidates, createLink, isCreating } = useCreateApprovalLink();
+
+  const handleSendForApproval = async () => {
+    if (!localTask) return;
+    const hasAttachments = (localTask.attachments?.length ?? 0) > 0;
+    if (!hasAttachments) {
+      toast({ title: "Adicione um anexo antes de enviar para aprovação.", variant: "destructive" });
+      return;
+    }
+    const candidates = await findBatchCandidates(localTask.id, localTask.client_id);
+    if (candidates.length > 0) {
+      setBatchCandidates(candidates);
+      setShowBatchDialog(true);
+      return;
+    }
+    await createLink([localTask.id]);
+    onTaskUpdate?.();
+  };
 
   useEffect(() => {
     setLocalTask(task);
