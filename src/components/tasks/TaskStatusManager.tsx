@@ -42,7 +42,8 @@ const DEFAULT_STATUSES = [
   { slug: "todo", name: "A Fazer", color: "bg-gray-500", order_position: 0 },
   { slug: "in_progress", name: "Em Andamento", color: "bg-blue-500", order_position: 1 },
   { slug: "em_revisao", name: "Em Revisão", color: "bg-purple-500", order_position: 2 },
-  { slug: "done", name: "Concluída", color: "bg-green-500", order_position: 3 },
+  { slug: "approved", name: "Aprovado", color: "bg-emerald-500", order_position: 3 },
+  { slug: "done", name: "Concluída", color: "bg-green-500", order_position: 4 },
 ];
 
 interface StatusItem {

@@ -31,6 +31,8 @@ interface Task {
   created_by: string;
   task_type?: string | null;
   is_recurring?: boolean;
+  is_rejected?: boolean;
+  client_feedback?: string | null;
 }
 
 interface TaskCardProps {
@@ -83,6 +85,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: any }> 
   todo: { label: "A Fazer", color: "bg-gray-500", icon: Circle },
   in_progress: { label: "Em Andamento", color: "bg-blue-500", icon: Loader },
   em_revisao: { label: "Em Revisão", color: "bg-purple-500", icon: Eye },
+  approved: { label: "Aprovado", color: "bg-emerald-500", icon: CheckCircle2 },
   done: { label: "Concluída", color: "bg-green-500", icon: CheckCircle2 },
 };
 
@@ -112,12 +115,23 @@ export function TaskCard({
   const UrgencyIcon = urgency.level === 'completed' ? CheckCircle : 
                       urgency.level === 'overdue' ? AlertCircle : Clock;
 
+  const isRejected = task.is_rejected === true;
+
   return (
     <div 
-      className="p-3 md:p-4 rounded-lg border border-[#5a35a0] cursor-pointer hover:shadow-lg hover:shadow-purple-900/30 hover:brightness-110 hover:scale-[1.02] hover:-translate-y-0.5 transition-all duration-300 ease-out"
+      className={`p-3 md:p-4 rounded-lg border cursor-pointer hover:shadow-lg hover:shadow-purple-900/30 hover:brightness-110 hover:scale-[1.02] hover:-translate-y-0.5 transition-all duration-300 ease-out ${
+        isRejected
+          ? "border-destructive/60 ring-1 ring-destructive/40"
+          : "border-[#5a35a0]"
+      }`}
       onClick={(e) => onClick?.(e)}
       style={{ backgroundColor: '#4c2882' }}
     >
+      {isRejected && (
+        <Badge variant="destructive" className="mb-2 w-full justify-center">
+          Rejeitado pelo Cliente
+        </Badge>
+      )}
       {/* Linha 1: Ícone Status + Badges */}
       <div className="flex items-center justify-between gap-2 mb-2">
         <StatusIcon className="h-5 w-5 flex-shrink-0 text-white" />

@@ -44,12 +44,21 @@ const DEFAULT_STATUSES: TaskStatus[] = [
   },
   {
     id: "default-4",
+    slug: "approved",
+    name: "Aprovado",
+    color: "bg-emerald-500",
+    is_default: true,
+    is_active: true,
+    order_position: 3,
+  },
+  {
+    id: "default-5",
     slug: "done",
     name: "Concluída",
     color: "bg-green-500",
     is_default: true,
     is_active: true,
-    order_position: 3,
+    order_position: 4,
   },
 ];
 
