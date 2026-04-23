@@ -1,26 +1,55 @@
 
 
-# Remover scroll horizontal da lista de tarefas
+# Filtro de Ordenação — "Últimas alterações" como opção extra
 
-## Diagnóstico
+## Comportamento
 
-O wrapper `<div className="overflow-x-auto">` ao redor da `<Table>` força barra de rolagem horizontal mesmo quando o conteúdo cabe. Combinado com `table-fixed` + `colgroup` somando ~692px de colunas fixas + título flexível, em larguras menores aparece scroll. Em telas largas (1976px atuais) sobra espaço, mas o `overflow-x-auto` ainda renderiza a barra visualmente em alguns navegadores.
+Padrão **continua** sendo ordenação por **Data de Entrega (mais próxima primeiro)** — comportamento atual intacto. O novo controle adiciona apenas uma opção momentânea para reordenar quando o usuário quiser.
 
-## Solução
+Novo `<Select>` "Ordenar" na barra de filtros de `/dashboard/tasks` com 2 opções:
 
-1. **Remover `overflow-x-auto`** — substituir por `<div className="w-full">` simples. A tabela ocupa 100% da largura disponível naturalmente.
+- **Data de entrega** (padrão) — `due_date ASC` (comportamento atual, sem mudança)
+- **Últimas alterações** — `updated_at DESC` (puxa as tarefas movimentadas/editadas mais recentemente)
 
-2. **Truncar título com limite visual** — já existe `truncate` + `max-w-0` na célula. Manter, mas garantir que o `<span>` interno também respeite com `block truncate` para títulos longos como "Post | Tema: Gestão e Processo - O Ângulo do Inimigo Oculto…" virarem `…` no fim sem empurrar layout.
+## Implementação
 
-3. **Manter colunas fixas à direita** — Cliente (180px), Responsáveis (160px), Prioridade (90px), Entrega (110px), Ações (40px) continuam alinhadas como aprovado anteriormente.
+### 1. Estado e UI
 
-4. **Sem scroll horizontal** — em viewports pequenos (<1024px), o título encolhe e trunca; nunca aparece barra. Em viewports grandes, o título expande e ocupa o espaço sobrando — sem "vazio feio" e sem rolagem.
+Em `src/pages/Tasks.tsx`:
+- Novo estado `sortBy` (`'due_date' | 'recent'`), padrão `'due_date'`.
+- Novo `<Select>` "Ordenar" na linha de filtros, mesmo padrão visual dos demais (Prioridade, Usuário, Cliente, Tipo, Período).
 
-## Arquivo editado
+### 2. Query Supabase
 
-- `src/components/tasks/TaskListView.tsx` — remover `overflow-x-auto`; reforçar truncate no `<span>` do título.
+Garantir que `updated_at` está no `select` da query principal de `tasks` (coluna já existe e é atualizada por trigger em qualquer UPDATE — mudança de status, atribuição, edição).
+
+### 3. Lógica de ordenação
+
+```ts
+const sortedTasks = useMemo(() => {
+  const arr = [...filteredTasks];
+  if (sortBy === 'recent') {
+    return arr.sort((a,b) => +new Date(b.updated_at) - +new Date(a.updated_at));
+  }
+  // padrão: due_date asc (mantém comportamento atual)
+  return arr.sort((a,b) => (a.due_date ? +new Date(a.due_date) : Infinity) - (b.due_date ? +new Date(b.due_date) : Infinity));
+}, [filteredTasks, sortBy]);
+```
+
+### 4. Compatibilidade Lista/Kanban
+
+`TaskListView` recebe prop `sortBy`. Quando `'due_date'`, mantém o sort interno atual de cada grupo (sem mudança visual). Quando `'recent'`, ordena por `updated_at DESC` dentro de cada grupo de status. Kanban segue a mesma lógica por coluna.
+
+## Arquivos editados
+
+- `src/pages/Tasks.tsx` — `<Select>` de ordenação + estado + `useMemo` + passar `sortBy` para Lista/Kanban.
+- `src/components/tasks/TaskListView.tsx` — receber `sortBy` e aplicar no sort interno por grupo (mantendo o comportamento atual quando `'due_date'`).
+- Componente Kanban da página — receber `sortBy` e aplicar na ordem das colunas.
+- Query de tasks — incluir `updated_at` no select se ainda não estiver.
 
 ## Sem mudanças
 
-- Larguras das colunas, ordenação, agrupamento, ações, Kanban, demais telas.
+- Comportamento padrão de ordenação (data de entrega) — preservado.
+- Filtros existentes (Prioridade, Usuário, Cliente, Tipo, Período) — intactos.
+- Schema do banco, demais telas (Meu Dia, tarefas solicitadas) — não afetadas.
 
