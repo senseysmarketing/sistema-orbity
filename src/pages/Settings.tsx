@@ -26,6 +26,7 @@ import { WhatsAppIntegration } from "@/components/settings/WhatsAppIntegration";
 import { AISettingsManager } from "@/components/settings/AISettingsManager";
 import { AsaasIntegration } from "@/components/settings/AsaasIntegration";
 import { ConexaIntegration } from "@/components/settings/ConexaIntegration";
+import { StripeIntegration } from "@/components/settings/StripeIntegration";
 import { FacebookIntegration } from "@/components/settings/FacebookIntegration";
 
 export default function Settings() {
@@ -434,6 +435,7 @@ export default function Settings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <AsaasIntegration />
                   <ConexaIntegration />
+                  <StripeIntegration />
                 </div>
               </div>
             )}
