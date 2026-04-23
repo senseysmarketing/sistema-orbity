@@ -542,7 +542,7 @@ serve(async (req) => {
         // Stop active automations when customer replies
         const pauseAutomations = (async () => {
           const automations = await findActiveAutomations(
-            supabase, account.agency_id, conversation.id, conversation.lead_id
+            supabase, account.agency_id, conversation.id, conversation.lead_id, phoneNumber
           );
 
           for (const automation of automations) {
