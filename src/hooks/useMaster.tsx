@@ -235,6 +235,7 @@ export function MasterProvider({ children }: { children: ReactNode }) {
         refreshAgencies,
         suspendAgency,
         reactivateAgency,
+        deleteAgencyPermanently,
         getMasterMetrics,
         getStatusCounts,
       }}
