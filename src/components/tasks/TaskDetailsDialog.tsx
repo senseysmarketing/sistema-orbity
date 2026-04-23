@@ -117,7 +117,13 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [batchCandidates, setBatchCandidates] = useState<Array<{ id: string; title: string }>>([]);
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const { findBatchCandidates, createLink, isCreating } = useCreateApprovalLink();
+
+  useEffect(() => {
+    setIsDescriptionExpanded(false);
+  }, [task?.id]);
+
 
   const APPROVAL_MAX_BYTES = 10 * 1024 * 1024;
 
