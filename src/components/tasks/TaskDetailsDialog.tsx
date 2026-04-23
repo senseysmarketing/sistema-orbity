@@ -957,6 +957,24 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Mover para Em Revisão antes de gerar link de aprovação */}
+      <AlertDialog open={showMoveToReviewDialog} onOpenChange={setShowMoveToReviewDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mover para Em Revisão?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Para enviar uma tarefa para aprovação do cliente, ela precisa estar na coluna <strong>Em Revisão</strong>. Deseja mover esta tarefa agora e continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={movingToReview}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMoveToReviewAndContinue} disabled={movingToReview}>
+              {movingToReview ? "Movendo..." : "Mover e Continuar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Smart Batch — confirmação para agrupar tarefas em revisão */}
       <AlertDialog open={showBatchDialog} onOpenChange={setShowBatchDialog}>
         <AlertDialogContent>
