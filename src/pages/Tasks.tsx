@@ -1232,16 +1232,22 @@ export default function Tasks() {
   };
 
   const sortedTasksByStatus = (status: string) => {
-    return filteredTasks
-      .filter((task) => task.status === status)
-      .sort((a, b) => {
-        // Ordenar por data de vencimento, mais recente primeiro
-        // Se não tiver data, vai para o final
-        if (!a.due_date && !b.due_date) return 0;
-        if (!a.due_date) return 1;
-        if (!b.due_date) return -1;
-        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    const arr = filteredTasks.filter((task) => task.status === status);
+    if (sortBy === 'recent') {
+      return arr.sort((a, b) => {
+        const da = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+        const db = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+        return db - da;
       });
+    }
+    return arr.sort((a, b) => {
+      // Ordenar por data de vencimento, mais recente primeiro
+      // Se não tiver data, vai para o final
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    });
   };
 
   const clearFilters = () => {
