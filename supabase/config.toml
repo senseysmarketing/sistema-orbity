@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.test-agency-stripe]
 verify_jwt = false
+
+[functions.storage-garbage-collector]
+verify_jwt = false
