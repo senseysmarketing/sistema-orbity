@@ -115,7 +115,26 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   const [localTask, setLocalTask] = useState<Task | null>(task);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [batchCandidates, setBatchCandidates] = useState<Array<{ id: string; title: string }>>([]);
+  const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
   const { findBatchCandidates, createLink, isCreating } = useCreateApprovalLink();
+
+  const APPROVAL_MAX_BYTES = 10 * 1024 * 1024;
+
+  const validateAttachmentsForApproval = (atts?: Attachment[]) => {
+    if (!atts || atts.length === 0) return false;
+    for (const a of atts) {
+      const size = (a as any).size ?? (a as any).file_size ?? 0;
+      if (size && size > APPROVAL_MAX_BYTES) {
+        toast({
+          title: "Arquivo acima do limite",
+          description: "O arquivo excede o limite de 10MB para links de aprovação.",
+          variant: "destructive",
+        });
+        return false;
+      }
+    }
+    return true;
+  };
 
   const handleSendForApproval = async () => {
     if (!localTask) return;
@@ -124,14 +143,32 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
       toast({ title: "Adicione um anexo antes de enviar para aprovação.", variant: "destructive" });
       return;
     }
+    if (!validateAttachmentsForApproval(localTask.attachments)) return;
     const candidates = await findBatchCandidates(localTask.id, localTask.client_id);
     if (candidates.length > 0) {
       setBatchCandidates(candidates);
+      setSelectedBatchIds(candidates.map((c) => c.id));
       setShowBatchDialog(true);
       return;
     }
     await createLink([localTask.id]);
     onTaskUpdate?.();
+  };
+
+  const handleConfirmBatch = async (includeBatch: boolean) => {
+    if (!localTask) return;
+    const ids = includeBatch
+      ? [localTask.id, ...selectedBatchIds]
+      : [localTask.id];
+    setShowBatchDialog(false);
+    await createLink(ids);
+    onTaskUpdate?.();
+  };
+
+  const toggleBatchId = (id: string) => {
+    setSelectedBatchIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   useEffect(() => {
