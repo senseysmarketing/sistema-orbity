@@ -127,7 +127,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   }, [task?.id]);
 
 
-  const APPROVAL_MAX_BYTES = 10 * 1024 * 1024;
+  const APPROVAL_MAX_BYTES = 100 * 1024 * 1024;
 
   const validateAttachmentsForApproval = (atts?: Attachment[]) => {
     if (!atts || atts.length === 0) return false;

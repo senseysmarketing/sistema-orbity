@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef } from "react";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -10,10 +9,19 @@ import {
   File,
   Loader2,
   Download,
-  Paperclip
+  Paperclip,
+  Film,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ImageLightbox } from "./image-lightbox";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 export interface Attachment {
   id: string;
@@ -42,6 +50,10 @@ const ALLOWED_TYPES = [
   "image/png",
   "image/gif",
   "image/webp",
+  // Vídeos
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
   // Documentos
   "application/pdf",
   "application/msword",
@@ -50,15 +62,38 @@ const ALLOWED_TYPES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ];
 
-const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".doc", ".docx", ".xls", ".xlsx"];
+const ALLOWED_EXTENSIONS = [
+  ".jpg", ".jpeg", ".png", ".gif", ".webp",
+  ".mp4", ".mov", ".webm",
+  ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+];
+
+const isImage = (type: string) => type.startsWith("image/");
+const isVideo = (type: string) => type.startsWith("video/");
+const isExpired = (a: Attachment) => a.url === "expired" || a.type === "system";
+
+const getFileIcon = (type: string) => {
+  if (type.startsWith("image/")) return <ImageIcon className="h-4 w-4" />;
+  if (type.startsWith("video/")) return <Film className="h-4 w-4 text-purple-500" />;
+  if (type.includes("pdf")) return <FileText className="h-4 w-4 text-red-500" />;
+  if (type.includes("word") || type.includes("document")) return <FileText className="h-4 w-4 text-blue-500" />;
+  if (type.includes("excel") || type.includes("spreadsheet")) return <FileText className="h-4 w-4 text-green-500" />;
+  return <File className="h-4 w-4" />;
+};
+
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 export function FileAttachments({
   attachments,
   onChange,
   bucket,
   entityId,
-  maxFiles = 5,
-  maxSizeMB = 5,
+  maxFiles = 10,
+  maxSizeMB = 100,
   disabled = false,
   className,
 }: FileAttachmentsProps) {
@@ -69,58 +104,27 @@ export function FileAttachments({
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const getFileIcon = (type: string) => {
-    if (type.startsWith("image/")) {
-      return <ImageIcon className="h-4 w-4" />;
-    }
-    if (type.includes("pdf")) {
-      return <FileText className="h-4 w-4 text-red-500" />;
-    }
-    if (type.includes("word") || type.includes("document")) {
-      return <FileText className="h-4 w-4 text-blue-500" />;
-    }
-    if (type.includes("excel") || type.includes("spreadsheet")) {
-      return <FileText className="h-4 w-4 text-green-500" />;
-    }
-    return <File className="h-4 w-4" />;
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
   const validateFile = (file: File): string | null => {
-    // Verificar tipo
     if (!ALLOWED_TYPES.includes(file.type)) {
       const ext = file.name.split(".").pop()?.toLowerCase();
       if (!ext || !ALLOWED_EXTENSIONS.includes(`.${ext}`)) {
         return `Tipo de arquivo não permitido. Use: ${ALLOWED_EXTENSIONS.join(", ")}`;
       }
     }
-
-    // Verificar tamanho
     const maxBytes = maxSizeMB * 1024 * 1024;
     if (file.size > maxBytes) {
       return `Arquivo muito grande. Máximo: ${maxSizeMB}MB`;
     }
-
     return null;
   };
 
   const uploadFile = async (file: File): Promise<Attachment | null> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      toast({
-        title: "Erro",
-        description: "Você precisa estar logado para fazer upload.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Você precisa estar logado para fazer upload.", variant: "destructive" });
       return null;
     }
 
-    // Gerar nome único
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(7);
     const extension = file.name.split(".").pop();
@@ -128,20 +132,14 @@ export function FileAttachments({
 
     const { data, error } = await supabase.storage
       .from(bucket)
-      .upload(fileName, file, {
-        cacheControl: "3600",
-        upsert: false,
-      });
+      .upload(fileName, file, { cacheControl: "3600", upsert: false });
 
     if (error) {
       console.error("Upload error:", error);
       throw error;
     }
 
-    // Obter URL pública
-    const { data: urlData } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(data.path);
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
 
     return {
       id: `${timestamp}-${randomId}`,
@@ -157,7 +155,6 @@ export function FileAttachments({
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
     
-    // Verificar limite de arquivos
     if (attachments.length + fileArray.length > maxFiles) {
       toast({
         title: "Limite excedido",
@@ -173,25 +170,15 @@ export function FileAttachments({
     for (const file of fileArray) {
       const error = validateFile(file);
       if (error) {
-        toast({
-          title: "Erro no arquivo",
-          description: `${file.name}: ${error}`,
-          variant: "destructive",
-        });
+        toast({ title: "Erro no arquivo", description: `${file.name}: ${error}`, variant: "destructive" });
         continue;
       }
 
       try {
         const attachment = await uploadFile(file);
-        if (attachment) {
-          newAttachments.push(attachment);
-        }
+        if (attachment) newAttachments.push(attachment);
       } catch (err: any) {
-        toast({
-          title: "Erro no upload",
-          description: `Falha ao enviar ${file.name}: ${err.message}`,
-          variant: "destructive",
-        });
+        toast({ title: "Erro no upload", description: `Falha ao enviar ${file.name}: ${err.message}`, variant: "destructive" });
       }
     }
 
@@ -210,17 +197,13 @@ export function FileAttachments({
     const attachment = attachments.find(a => a.id === attachmentId);
     if (!attachment) return;
 
-    // Remover do storage
     try {
       const path = attachment.url.split(`${bucket}/`)[1];
-      if (path) {
-        await supabase.storage.from(bucket).remove([path]);
-      }
+      if (path) await supabase.storage.from(bucket).remove([path]);
     } catch (err) {
       console.error("Error removing file from storage:", err);
     }
 
-    // Atualizar lista
     onChange(attachments.filter(a => a.id !== attachmentId));
   };
 
@@ -233,9 +216,7 @@ export function FileAttachments({
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    if (!disabled && !uploading) {
-      setDragOver(true);
-    }
+    if (!disabled && !uploading) setDragOver(true);
   }, [disabled, uploading]);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
@@ -243,13 +224,15 @@ export function FileAttachments({
     setDragOver(false);
   }, []);
 
-  const isImage = (type: string) => type.startsWith("image/");
+  const mediaAttachments = attachments.filter(a => isImage(a.type) || isVideo(a.type));
   const imageAttachments = attachments.filter(a => isImage(a.type));
+  const documentAttachments = attachments.filter(a => !isImage(a.type) && !isVideo(a.type));
 
   const openLightbox = (index: number) => {
     setLightboxIndex(index);
     setLightboxOpen(true);
   };
+
   return (
     <div className={cn("space-y-3", className)}>
       {/* Drop zone */}
@@ -285,8 +268,7 @@ export function FileAttachments({
             <div>
               <span className="text-sm font-medium">Arraste arquivos ou clique para selecionar</span>
               <p className="text-xs text-muted-foreground mt-1">
-                Máximo {maxFiles} arquivos, {maxSizeMB}MB cada. 
-                Formatos: imagens, PDF, Word, Excel
+                Até {maxFiles} arquivos. Máximo de {maxSizeMB}MB por arquivo (Imagens ou Vídeos).
               </p>
             </div>
           </div>
@@ -301,20 +283,36 @@ export function FileAttachments({
             <span>Anexos ({attachments.length}/{maxFiles})</span>
           </div>
           
-          {/* Grid de imagens */}
-          {imageAttachments.length > 0 && (
+          {/* Grid de mídias (imagens + vídeos) */}
+          {mediaAttachments.length > 0 && (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {imageAttachments.map((attachment, index) => (
+              {mediaAttachments.map((attachment) => {
+                const imgIndex = imageAttachments.findIndex(i => i.id === attachment.id);
+                return (
                   <div
                     key={attachment.id}
                     className="relative group aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer"
-                    onClick={() => openLightbox(index)}
+                    onClick={() => isImage(attachment.type) && imgIndex >= 0 && openLightbox(imgIndex)}
                   >
-                    <img
-                      src={attachment.url}
-                      alt={attachment.name}
-                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                    />
+                    {isVideo(attachment.type) ? (
+                      <video
+                        src={attachment.url}
+                        className="w-full h-full object-cover"
+                        preload="metadata"
+                        muted
+                      />
+                    ) : (
+                      <img
+                        src={attachment.url}
+                        alt={attachment.name}
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      />
+                    )}
+                    {isVideo(attachment.type) && (
+                      <div className="absolute top-1 right-1 bg-black/60 rounded p-1">
+                        <Film className="h-3 w-3 text-white" />
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                       {!disabled && (
                         <button
@@ -330,49 +328,46 @@ export function FileAttachments({
                       )}
                     </div>
                   </div>
-                ))}
+                );
+              })}
             </div>
           )}
 
           {/* Lista de documentos */}
-          {attachments.filter(a => !isImage(a.type)).length > 0 && (
+          {documentAttachments.length > 0 && (
             <div className="space-y-1">
-              {attachments
-                .filter(a => !isImage(a.type))
-                .map((attachment) => (
-                  <div
-                    key={attachment.id}
-                    className="flex items-center gap-2 p-2 rounded-md bg-muted/50 group"
-                  >
-                    {getFileIcon(attachment.type)}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{attachment.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatFileSize(attachment.size)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <a
-                        href={attachment.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1 rounded hover:bg-muted"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Download className="h-4 w-4" />
-                      </a>
-                      {!disabled && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemove(attachment.id)}
-                          className="p-1 rounded hover:bg-destructive/10 text-destructive"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
+              {documentAttachments.map((attachment) => (
+                <div
+                  key={attachment.id}
+                  className="flex items-center gap-2 p-2 rounded-md bg-muted/50 group"
+                >
+                  {getFileIcon(attachment.type)}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{attachment.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
                   </div>
-                ))}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <a
+                      href={attachment.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1 rounded hover:bg-muted"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Download className="h-4 w-4" />
+                    </a>
+                    {!disabled && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemove(attachment.id)}
+                        className="p-1 rounded hover:bg-destructive/10 text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -389,7 +384,7 @@ export function FileAttachments({
   );
 }
 
-// Componente para exibição somente leitura dos anexos
+// Componente para exibição somente leitura dos anexos — Carrossel de mídia + lápide
 interface AttachmentsDisplayProps {
   attachments: Attachment[];
   className?: string;
@@ -401,35 +396,17 @@ export function AttachmentsDisplay({ attachments, className }: AttachmentsDispla
 
   if (!attachments || attachments.length === 0) return null;
 
-  const getFileIcon = (type: string) => {
-    if (type.startsWith("image/")) {
-      return <ImageIcon className="h-4 w-4" />;
-    }
-    if (type.includes("pdf")) {
-      return <FileText className="h-4 w-4 text-red-500" />;
-    }
-    if (type.includes("word") || type.includes("document")) {
-      return <FileText className="h-4 w-4 text-blue-500" />;
-    }
-    if (type.includes("excel") || type.includes("spreadsheet")) {
-      return <FileText className="h-4 w-4 text-green-500" />;
-    }
-    return <File className="h-4 w-4" />;
-  };
+  // Mídias = imagens + vídeos + lápides (expirados)
+  const medias = attachments.filter(a => isImage(a.type) || isVideo(a.type) || isExpired(a));
+  const documents = attachments.filter(a => !isImage(a.type) && !isVideo(a.type) && !isExpired(a));
+  const realImages = attachments.filter(a => isImage(a.type) && !isExpired(a));
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const isImage = (type: string) => type.startsWith("image/");
-  const images = attachments.filter(a => isImage(a.type));
-  const documents = attachments.filter(a => !isImage(a.type));
-
-  const openLightbox = (index: number) => {
-    setLightboxIndex(index);
-    setLightboxOpen(true);
+  const openLightbox = (url: string) => {
+    const idx = realImages.findIndex(i => i.url === url);
+    if (idx >= 0) {
+      setLightboxIndex(idx);
+      setLightboxOpen(true);
+    }
   };
 
   return (
@@ -439,26 +416,46 @@ export function AttachmentsDisplay({ attachments, className }: AttachmentsDispla
         <span>Anexos ({attachments.length})</span>
       </div>
 
-      {/* Grid de imagens */}
-      {images.length > 0 && (
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-          {images.map((attachment, index) => (
-            <div
-              key={attachment.id}
-              className="relative aspect-square rounded-lg overflow-hidden border bg-muted group cursor-pointer"
-              onClick={() => openLightbox(index)}
-            >
-              <img
-                src={attachment.url}
-                alt={attachment.name}
-                className="w-full h-full object-cover transition-transform group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <ImageIcon className="h-6 w-6 text-white" />
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* Carrossel de mídias */}
+      {medias.length > 0 && (
+        <Carousel opts={{ align: "start" }} className="w-full">
+          <CarouselContent>
+            {medias.map((attachment) => (
+              <CarouselItem key={attachment.id}>
+                <div className="rounded-lg overflow-hidden border bg-muted flex items-center justify-center min-h-[280px] max-h-[420px]">
+                  {isExpired(attachment) ? (
+                    <div className="flex flex-col items-center gap-3 p-8 text-center">
+                      <Clock className="h-10 w-10 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground max-w-md">
+                        Mídia removida automaticamente após 15 dias de conclusão para economia de espaço.
+                      </p>
+                    </div>
+                  ) : isVideo(attachment.type) ? (
+                    <video
+                      src={attachment.url}
+                      controls
+                      preload="metadata"
+                      className="w-full max-h-[420px] object-contain bg-black"
+                    />
+                  ) : (
+                    <img
+                      src={attachment.url}
+                      alt={attachment.name}
+                      className="w-full max-h-[420px] object-contain cursor-pointer"
+                      onClick={() => openLightbox(attachment.url)}
+                    />
+                  )}
+                </div>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          {medias.length > 1 && (
+            <>
+              <CarouselPrevious className="left-2" />
+              <CarouselNext className="right-2" />
+            </>
+          )}
+        </Carousel>
       )}
 
       {/* Lista de documentos */}
@@ -475,9 +472,7 @@ export function AttachmentsDisplay({ attachments, className }: AttachmentsDispla
               {getFileIcon(attachment.type)}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{attachment.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatFileSize(attachment.size)}
-                </p>
+                <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
               </div>
               <Download className="h-4 w-4 text-muted-foreground" />
             </a>
@@ -487,7 +482,7 @@ export function AttachmentsDisplay({ attachments, className }: AttachmentsDispla
 
       {/* Lightbox para imagens */}
       <ImageLightbox
-        images={images.map(a => ({ url: a.url, name: a.name }))}
+        images={realImages.map(a => ({ url: a.url, name: a.name }))}
         initialIndex={lightboxIndex}
         open={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
