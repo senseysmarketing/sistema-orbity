@@ -45,6 +45,7 @@ import RegisterByInvite from "./pages/RegisterByInvite";
 import PublicClientReport from "./pages/PublicClientReport";
 import NPSPage from "./pages/NPSPage";
 import PublicNPSSurvey from "./pages/PublicNPSSurvey";
+import PublicApproval from "./pages/PublicApproval";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -98,6 +99,7 @@ const App = () => (
                         <Route path="/register" element={<RegisterByInvite />} />
                         <Route path="/report/:token" element={<PublicClientReport />} />
                         <Route path="/nps-survey" element={<PublicNPSSurvey />} />
+                        <Route path="/approve/:token" element={<PublicApproval />} />
                         <Route path="/welcome" element={<Welcome />} />
                         <Route path="/subscription-success" element={<SubscriptionSuccess />} />
                         <Route path="/subscription-canceled" element={<SubscriptionCanceled />} />

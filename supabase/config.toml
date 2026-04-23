@@ -44,3 +44,9 @@ verify_jwt = false
 
 [functions.master-delete-agency]
 verify_jwt = true
+
+[functions.approval-get]
+verify_jwt = false
+
+[functions.approval-decide]
+verify_jwt = false
