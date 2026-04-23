@@ -164,7 +164,7 @@ export function TaskCard({
         )}
       </h3>
       
-      {task.description && (
+      {task.description && !isRejected && (
         <p className="text-sm text-white/70 mb-2 line-clamp-2">
           {task.description}
         </p>
