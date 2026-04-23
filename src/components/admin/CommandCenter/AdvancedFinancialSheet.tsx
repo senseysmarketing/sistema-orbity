@@ -584,6 +584,119 @@ export function AdvancedFinancialSheet({
               </Card>
             )}
           </TabsContent>
+
+          {/* ============ TAB C: DRE / CONTABILIDADE ============ */}
+          <TabsContent value="dre" className="space-y-4 mt-6">
+            <div className="flex items-center gap-2 no-print">
+              <Button size="sm" variant="outline" onClick={handleCopyDRE} className="gap-1.5">
+                <Copy className="h-3.5 w-3.5" />
+                Copiar Resumo
+              </Button>
+              <Button size="sm" onClick={handlePrintDRE} className="gap-1.5">
+                <Printer className="h-3.5 w-3.5" />
+                Imprimir PDF
+              </Button>
+            </div>
+
+            <div id="dre-print-area">
+              <div className="mb-4 space-y-1">
+                <h2 className="text-lg font-semibold">DRE — {monthLabel}</h2>
+                <p className="text-xs text-muted-foreground">
+                  Demonstração do Resultado do Exercício
+                  {isForecastMode && (
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      Modo Projeção
+                    </Badge>
+                  )}
+                </p>
+              </div>
+
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">Receita Bruta</TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        {formatCurrency(dre.receitaBruta)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8 text-muted-foreground">
+                        (–) Impostos e Taxas
+                        {dre.isProjectedTax && (
+                          <Badge variant="outline" className="ml-2 text-[10px] py-0 px-1.5">
+                            Estimado · taxa histórica {(dre.effectiveTaxRate * 100).toFixed(1)}%
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {formatCurrency(dre.impostos)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow className="bg-muted/30">
+                      <TableCell className="font-semibold">= Receita Líquida</TableCell>
+                      <TableCell className="text-right tabular-nums font-semibold">
+                        {formatCurrency(dre.receitaLiquida)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8 text-muted-foreground">
+                        (–) Custos Operacionais
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {formatCurrency(dre.custosOper)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="pl-8 text-muted-foreground">
+                        (–) Folha de Pagamento
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {formatCurrency(dre.folhaPag)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow className="bg-muted/30">
+                      <TableCell className="font-semibold">
+                        = Lucro Operacional (EBITDA)
+                      </TableCell>
+                      <TableCell
+                        className={`text-right tabular-nums font-semibold ${
+                          dre.ebitda >= 0
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-rose-600 dark:text-rose-400'
+                        }`}
+                      >
+                        {formatCurrency(dre.ebitda)}
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Margem de Lucro Líquido</TableCell>
+                      <TableCell
+                        className={`text-right tabular-nums font-medium ${
+                          dre.margemPct >= 0
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-rose-600 dark:text-rose-400'
+                        }`}
+                      >
+                        {dre.margemPct.toFixed(1)}%
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              <p className="text-[10px] text-muted-foreground mt-3">
+                Impostos identificados por categoria contendo: imposto, tributo, taxa, DAS, Simples, ISS, IRPJ, CSLL, PIS, COFINS.
+                {dre.isProjectedTax && ' Em modo projeção, impostos são estimados via taxa histórica do mês anterior.'}
+              </p>
+            </div>
+          </TabsContent>
         </Tabs>
       </SheetContent>
     </Sheet>
