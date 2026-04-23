@@ -31,6 +31,25 @@ export const WhatsAppIntegration = () => {
 
   const useSeparateBilling = paymentSettings?.use_separate_billing_whatsapp ?? false;
 
+  // Fetch CRM automation toggles from agencies
+  const { data: agencyAutomations } = useQuery({
+    queryKey: ['agency-crm-automations', currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return null;
+      const { data, error } = await supabase
+        .from('agencies')
+        .select('whatsapp_auto_contact, whatsapp_auto_ghosting')
+        .eq('id', currentAgency.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentAgency?.id,
+  });
+
+  const autoContact = agencyAutomations?.whatsapp_auto_contact ?? true;
+  const autoGhosting = agencyAutomations?.whatsapp_auto_ghosting ?? false;
+
   // Toggle mutation
   const toggleBilling = useMutation({
     mutationFn: async (enabled: boolean) => {
@@ -45,6 +64,25 @@ export const WhatsAppIntegration = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payment-settings-billing-wa', currentAgency?.id] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao salvar configuração', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // CRM automations mutation
+  const toggleAutomation = useMutation({
+    mutationFn: async (payload: { field: 'whatsapp_auto_contact' | 'whatsapp_auto_ghosting'; value: boolean }) => {
+      if (!currentAgency?.id) throw new Error('No agency');
+      const { error } = await supabase
+        .from('agencies')
+        .update({ [payload.field]: payload.value })
+        .eq('id', currentAgency.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agency-crm-automations', currentAgency?.id] });
+      toast({ title: 'Configuração atualizada' });
     },
     onError: (error: Error) => {
       toast({ title: 'Erro ao salvar configuração', description: error.message, variant: 'destructive' });
