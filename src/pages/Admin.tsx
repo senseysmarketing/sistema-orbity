@@ -96,6 +96,74 @@ export default function Admin() {
   // Financial metrics hook
   const metrics = useFinancialMetrics(currentAgency?.id, selectedMonth);
 
+  // Previous month for DRE historical tax rate (forecast mode)
+  const prevMonthStr = useMemo(() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const pm = m === 1 ? 12 : m - 1;
+    const py = m === 1 ? y - 1 : y;
+    return `${py}-${String(pm).padStart(2, '0')}`;
+  }, [selectedMonth]);
+
+  const historicalCashFlowQuery = useQuery({
+    queryKey: ['admin-dre-historical', currentAgency?.id, prevMonthStr],
+    queryFn: async (): Promise<CashFlowItem[]> => {
+      if (!currentAgency?.id) return [];
+      const [py, pm] = prevMonthStr.split('-').map(Number);
+      const lastDay = new Date(py, pm, 0).getDate();
+      const start = `${prevMonthStr}-01`;
+      const end = `${prevMonthStr}-${String(lastDay).padStart(2, '0')}`;
+
+      const [paymentsRes, expensesRes] = await Promise.all([
+        supabase
+          .from('client_payments')
+          .select('id, amount, amount_paid, due_date, status')
+          .eq('agency_id', currentAgency.id)
+          .gte('due_date', start)
+          .lte('due_date', end),
+        supabase
+          .from('expenses')
+          .select('id, name, amount, due_date, status, category')
+          .eq('agency_id', currentAgency.id)
+          .gte('due_date', start)
+          .lte('due_date', end),
+      ]);
+
+      const items: CashFlowItem[] = [];
+      const mapStatus = (s: string): CashFlowItem['status'] =>
+        s === 'paid' ? 'PAID' : s === 'overdue' ? 'OVERDUE' : s === 'cancelled' ? 'CANCELLED' : 'PENDING';
+
+      (paymentsRes.data || []).forEach((p: any) => {
+        items.push({
+          id: p.id,
+          title: '',
+          amount: p.status === 'paid' ? (p.amount_paid || p.amount) : p.amount,
+          dueDate: p.due_date,
+          type: 'INCOME',
+          status: mapStatus(p.status),
+          sourceType: 'client_payment',
+          sourceId: p.id,
+        });
+      });
+      (expensesRes.data || []).forEach((e: any) => {
+        items.push({
+          id: e.id,
+          title: e.name,
+          amount: e.amount,
+          dueDate: e.due_date,
+          type: 'EXPENSE',
+          status: mapStatus(e.status),
+          sourceType: 'expense',
+          sourceId: e.id,
+          category: e.category,
+        });
+      });
+      return items;
+    },
+    enabled: !!currentAgency?.id && metrics.isForecastMode,
+    staleTime: 5 * 60 * 1000,
+  });
+  const historicalCashFlow = historicalCashFlowQuery.data || [];
+
   // Auto-generate current month payments for active clients
   useEffect(() => {
     if (!currentAgency?.id || metrics.clients.length === 0 || metrics.paymentsAll.length === 0) return;
@@ -553,6 +621,7 @@ export default function Admin() {
         employees={metrics.employees}
         paymentsAll={metrics.paymentsAll}
         isForecastMode={metrics.isForecastMode}
+        historicalCashFlow={historicalCashFlow}
       />
 
       {/* Team Section */}
