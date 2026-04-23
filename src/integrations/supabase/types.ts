@@ -169,6 +169,7 @@ export type Database = {
       }
       agencies: {
         Row: {
+          active_payment_gateway: string | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string
@@ -184,9 +185,12 @@ export type Database = {
           monthly_value: number | null
           name: string
           slug: string
+          stripe_account_id: string | null
           stripe_customer_id: string | null
           stripe_price_id: string | null
           stripe_product_id: string | null
+          stripe_secret_key: string | null
+          stripe_webhook_secret: string | null
           subscription_expires_at: string | null
           subscription_plan: Database["public"]["Enums"]["subscription_plan"]
           updated_at: string
@@ -194,6 +198,7 @@ export type Database = {
           whatsapp_auto_ghosting: boolean
         }
         Insert: {
+          active_payment_gateway?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -209,9 +214,12 @@ export type Database = {
           monthly_value?: number | null
           name: string
           slug: string
+          stripe_account_id?: string | null
           stripe_customer_id?: string | null
           stripe_price_id?: string | null
           stripe_product_id?: string | null
+          stripe_secret_key?: string | null
+          stripe_webhook_secret?: string | null
           subscription_expires_at?: string | null
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
           updated_at?: string
@@ -219,6 +227,7 @@ export type Database = {
           whatsapp_auto_ghosting?: boolean
         }
         Update: {
+          active_payment_gateway?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -234,9 +243,12 @@ export type Database = {
           monthly_value?: number | null
           name?: string
           slug?: string
+          stripe_account_id?: string | null
           stripe_customer_id?: string | null
           stripe_price_id?: string | null
           stripe_product_id?: string | null
+          stripe_secret_key?: string | null
+          stripe_webhook_secret?: string | null
           subscription_expires_at?: string | null
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
           updated_at?: string
@@ -1569,6 +1581,9 @@ export type Database = {
           paid_date: string | null
           pix_copy_paste: string | null
           status: Database["public"]["Enums"]["payment_status"]
+          stripe_checkout_session_id: string | null
+          stripe_checkout_url: string | null
+          stripe_payment_intent_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1591,6 +1606,9 @@ export type Database = {
           paid_date?: string | null
           pix_copy_paste?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_checkout_url?: string | null
+          stripe_payment_intent_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1613,6 +1631,9 @@ export type Database = {
           paid_date?: string | null
           pix_copy_paste?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
+          stripe_checkout_session_id?: string | null
+          stripe_checkout_url?: string | null
+          stripe_payment_intent_id?: string | null
           updated_at?: string
         }
         Relationships: [
