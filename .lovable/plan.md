@@ -1,42 +1,42 @@
 
 
-# Ajustes finais — Footer "Powered by Orbity" + Botões flutuantes
+# Ajustes na integração Stripe da Agência
 
-## 1. Rodapé "Powered by Orbity" sempre visível
+Alinhar a UX/lógica do Stripe ao padrão Asaas/Conexa: **gateway é escolhido na hora de gerar a cobrança**, não há "principal".
 
-- Adicionar um rodapé fixo discreto na base da página (`fixed bottom-0` em camada inferior à action bar, ou logo abaixo dela), centralizado.
-- Texto: `Powered by Orbity` em `text-[11px] uppercase tracking-[0.3em] text-white/40`.
-- Posicionado **abaixo** da barra de ações flutuante, como assinatura permanente da plataforma — visível tanto na galeria quanto na `AllDoneScreen`.
-- Estrutura: `<div className="fixed bottom-2 inset-x-0 text-center pointer-events-none z-10">Powered by Orbity</div>`.
+## 1. `src/components/settings/StripeIntegration.tsx`
 
-## 2. Botões flutuantes (sem barra sticky)
+- **Remover** o seletor "Gateway principal de cobrança" (Asaas vs Stripe) — desnecessário.
+- **Adicionar** Master Switch `Habilitar Stripe` (idêntico ao do Asaas):
+  - Card com `Switch`, label "Habilitar Stripe" + descrição "Disponibiliza Stripe como opção de faturamento para clientes".
+  - Estado `stripeEnabled` derivado de `active_payment_gateway === 'stripe'` (reutilizando a coluna como flag de "habilitado/desabilitado", já que o switch substitui o seletor).
+- **Badge** no header: "Conectado" (verde) quando `hasKey && stripeEnabled`, senão "Desconectado". Mesma lógica visual do Asaas.
+- **Alert "Como configurar na Stripe"**: refatorar para usar o mesmo padrão visual do Asaas — `bg-blue-50/50 border-blue-200 dark:bg-blue-950/30`, ícone `Info` azul, título `text-blue-800 dark:text-blue-300`, lista numerada com `leading-relaxed`, eventos do webhook listados com `CheckCircle2 emerald` + descrição em texto (não chips).
+- Botão final: "Salvar e Conectar" (mesmo label do Asaas).
+- Lógica de `handleSave` atualiza `active_payment_gateway` para `'stripe'` se switch ON, ou `'asaas'` (default) se OFF — tratando a coluna como flag binária de "Stripe habilitado".
 
-- Remover o wrapper `sticky bottom-0 ... bg-[#0a0a1a]/70 backdrop-blur-2xl border-t border-white/10` que prende os botões na barra inferior.
-- Substituir por um contêiner **flutuante centralizado**: `fixed bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 z-30 w-[calc(100%-2rem)] max-w-md`.
-- Os dois botões (Aprovar Arte / Solicitar Ajuste) ficam lado a lado em `grid grid-cols-2 gap-3`, **sem fundo de barra** atrás — apenas os botões sólidos flutuando sobre o conteúdo.
-- Cada botão mantém:
-  - **Aprovar Arte**: emerald sólido com `shadow-2xl shadow-emerald-500/40` (glow mais forte para destacar do fundo escuro).
-  - **Solicitar Ajuste**: glass `bg-white/10 backdrop-blur-2xl border border-white/15 text-white shadow-2xl shadow-black/40` (glow escuro para flutuar melhor).
-- Para o estado **decidido** (badge "✓ Aprovado") e o estado **form de revisão inline**: mesmo container flutuante, com painel glass `bg-[#0a0a1a]/80 backdrop-blur-2xl border border-white/10 rounded-2xl p-4 shadow-2xl` apenas quando há conteúdo expandido (textarea de ajuste ou badge).
+## 2. `src/hooks/useCreatePayment.ts`
 
-## 3. Espaçamento da galeria
+- **Reverter** o roteamento automático baseado em `active_payment_gateway`. O hook deve continuar respeitando o `billing_type` escolhido no formulário de criação de cobrança (Asaas/Conexa/Manual/Stripe).
+- Adicionar suporte a `billing_type === 'stripe'` → invoca `create-agency-stripe-charge` (mantém a edge function como está).
+- Demais billing types seguem o fluxo atual via `create-gateway-charge`.
 
-- Adicionar `pb-32` ao contêiner principal do carousel para garantir que o conteúdo não fique escondido atrás dos botões flutuantes.
-- O rodapé "Powered by Orbity" usa `pointer-events-none` para não bloquear cliques na área dos botões.
+## 3. UI de criação de cobrança (formulário "Gerar cobrança")
 
-## 4. AllDoneScreen
-
-- Manter os CTAs ("Falar com o Gestor" e "Rever aprovações") no fluxo normal da tela (não flutuantes) — pois ali já são o foco principal.
-- O rodapé fixo "Powered by Orbity" continua visível no canto inferior, substituindo o footer atual que vivia dentro do conteúdo da `AllDoneScreen`.
-- Remover o "Powered by Orbity" interno da `AllDoneScreen` (vira redundante com o global).
-
-## Arquivo editado
-
-- `src/pages/PublicApproval.tsx` — apenas ajustes de classe/estrutura: remover wrapper sticky, adicionar contêiner flutuante para os botões, adicionar rodapé global fixo, adicionar `pb-32` no main.
+- No seletor de método/gateway (onde já aparecem Asaas/Conexa/Manual), **adicionar opção "Stripe"** quando a agência tem `stripe_secret_key` configurada e `active_payment_gateway === 'stripe'` (flag de habilitado).
+- Hook `usePaymentGateway`: retornar flag `stripe_enabled` derivada (`stripe_secret_key != null && active_payment_gateway === 'stripe'`) para o seletor exibir/ocultar a opção.
 
 ## Sem mudanças
 
-- Lógica de `submitDecision`, carousel API, auto-advance, drawer de legenda — preservadas.
-- Edge functions — preservadas.
-- Demais visuais (glass frame, gradientes, animações Framer Motion) — preservados.
+- Edge functions (`create-agency-stripe-charge`, `stripe-agency-webhook`, `test-agency-stripe`) — preservadas.
+- Migration / schema — preservada (a coluna `active_payment_gateway` agora atua como flag de habilitação do Stripe).
+- `AsaasIntegration.tsx`, `ConexaIntegration.tsx` — preservados.
+- Stripe Master (assinatura Orbity) — intocável.
+
+## Arquivos editados
+
+- `src/components/settings/StripeIntegration.tsx` — remover seletor, adicionar switch, refatorar Alert no padrão azul.
+- `src/hooks/useCreatePayment.ts` — roteamento por `billing_type`, não por `active_payment_gateway`.
+- `src/hooks/usePaymentGateway.tsx` — flag `stripe_enabled`.
+- Componente do formulário de criação de cobrança — adicionar opção Stripe no seletor de método.
 
