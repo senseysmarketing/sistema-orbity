@@ -42,6 +42,7 @@ interface StatusItem {
 interface TaskListViewProps {
   tasks: Task[];
   statuses: StatusItem[];
+  sortBy?: 'due_date' | 'recent';
   getAssignedUsers: (taskId: string) => AssignedUser[];
   getClientName: (clientId: string | null, task?: Task) => string;
   getTypeIcon: (slug: string | null | undefined) => string | ReactNode;
