@@ -151,7 +151,7 @@ export const SortableLeadCard = memo(function SortableLeadCard({
         }`}
         style={{ backgroundColor: '#4c2882' }}
         onClick={handleClick}
-      
+      >
       <CardContent className="p-3">
         <div className="space-y-2.5">
           {/* Header with Name and Actions */}
