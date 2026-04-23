@@ -653,6 +653,32 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                 <span className="hidden sm:inline">Duplicar</span>
               </Button>
             )}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="w-full sm:w-auto">
+                    <Button
+                      onClick={handleSendForApproval}
+                      disabled={isCreating || (localTask.attachments?.length ?? 0) === 0}
+                      className="w-full sm:w-auto bg-amber-500 hover:bg-amber-500/90 text-white"
+                    >
+                      {isCreating ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      <span className="hidden sm:inline">Enviar para Aprovação</span>
+                      <span className="sm:hidden">Aprovação</span>
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {(localTask.attachments?.length ?? 0) === 0 && (
+                  <TooltipContent>
+                    Adicione um anexo à tarefa para gerar um link de aprovação.
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
             <Button
               variant="destructive"
               onClick={() => canDelete ? setShowDeleteAlert(true) : setShowNoPermissionAlert(true)}
