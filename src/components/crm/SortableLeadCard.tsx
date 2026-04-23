@@ -93,7 +93,10 @@ export const SortableLeadCard = memo(function SortableLeadCard({
     setNodeRef,
     transform,
     transition,
+    isDragging: sortableIsDragging,
   } = useSortable({ id: lead.id });
+
+  const effectiveIsDragging = sortableIsDragging || isDragging;
 
   const { mapDatabaseStatusToDisplay, getStatusConfig } = useLeadStatuses();
   const statusConfig = getStatusConfig();
@@ -111,7 +114,7 @@ export const SortableLeadCard = memo(function SortableLeadCard({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: sortableIsDragging ? 0.5 : 1,
   };
 
   const urgency = getUrgencyLevel(lead);
@@ -119,7 +122,7 @@ export const SortableLeadCard = memo(function SortableLeadCard({
 
 
   const handleClick = (e: React.MouseEvent) => {
-    if (!isDragging) {
+    if (!effectiveIsDragging) {
       onView?.(lead);
     }
   };
@@ -138,16 +141,16 @@ export const SortableLeadCard = memo(function SortableLeadCard({
     <div
       ref={setNodeRef}
       style={style}
-      className="relative"
+      className="relative cursor-grab active:cursor-grabbing"
+      {...attributes}
+      {...listeners}
     >
       <Card
-        className={`group cursor-grab active:cursor-grabbing select-none border-[#5a35a0] ${
-          isDragging ? 'shadow-2xl border-primary/50' : ''
+        className={`group select-none border-[#5a35a0] ${
+          effectiveIsDragging ? 'shadow-2xl border-primary/50' : ''
         }`}
         style={{ backgroundColor: '#4c2882' }}
         onClick={handleClick}
-        {...attributes}
-        {...listeners}
       >
       <CardContent className="p-3">
         <div className="space-y-2.5">
