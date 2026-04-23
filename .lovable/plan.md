@@ -1,164 +1,68 @@
 
 
-# Gerador de DRE com Guardrails Financeiros
+# Correção do Espelhamento de Conversas WhatsApp e Detecção de Resposta
 
-## Visão geral
+## Diagnóstico
 
-Nova aba **"DRE / Contabilidade"** no `AdvancedFinancialSheet`, com classificação robusta de impostos (sem regex em títulos), projeção inteligente via taxa efetiva histórica, e CSS de impressão baseado em `display: none` (preserva fluxo do documento).
+Inspecionando o banco e os logs, encontrei a raiz do problema:
 
-## 1. Categorização Robusta — `category` no `CashFlowItem`
+1. **199 mensagens recebidas nos últimos 7 dias** — o webhook do Evolution API ESTÁ entregando mensagens. O problema NÃO é entrega.
+2. **Conversas órfãs**: dezenas de conversas com `last_customer_message_at` recente porém `lead_id = NULL`. Exemplos reais: `553799521336`, `5516991700586`, `5511972040042` — todas com cliente respondendo nas últimas 24h, sem lead vinculado.
+3. **Causa raiz da vinculação falhar**: o webhook tenta linkar via `find_lead_by_normalized_phone` apenas no momento da mensagem. Se o lead não existe **naquele instante exato** (ex.: cadastro posterior, número levemente diferente, captura via webhook depois), a conversa fica órfã **para sempre**.
+4. **Sintoma no chat do lead**: `useLeadConversation` busca conversa filtrando por `account_id + lead_id`. Se a única conversa existente está órfã (sem `lead_id`), o chat aparece vazio mesmo havendo mensagens no banco do mesmo número.
+5. **Sintoma na automação**: `findActiveAutomations` por `lead_id` falha quando a conversa órfã não tem como localizar a automação ativa pelo número — então o status nunca muda para `responded` e os follow-ups continuam disparando.
+6. **Sintoma no CRM Vivo**: `promoteLeadOnReply` exige `conversation.lead_id`. Se a conversa está órfã, o card nunca move de coluna.
 
-Em `src/hooks/useFinancialMetrics.tsx`:
+## Correções
 
-- Adicionar `category?: string` ao `CashFlowItem`.
-- No `unifiedCashFlow` (linha 520), preencher `category: e.category` ao mapear `expenses` para o item de fluxo. Despesas/salários sem categoria ficam `undefined`.
+### 1. Vinculação retroativa no frontend (`useLeadConversation`)
 
-Isso permite identificar impostos pela **categoria nominal**, não pelo título.
+Em `src/hooks/useWhatsApp.tsx`, modificar `useLeadConversation` para:
 
-### Heurística de imposto (centralizada em `useDREStatement`)
+- 1ª tentativa: buscar conversa por `account_id + lead_id` (atual).
+- 2ª tentativa (fallback): se não encontrar e o lead tiver telefone, buscar por **variantes do telefone** (mesma lógica de `phoneVariants` do webhook) entre conversas órfãs do mesmo `account_id`.
+- Ao encontrar uma conversa órfã que casa, **fazer UPDATE imediato** setando `lead_id` (auto-cura). Próximas vezes já vão pelo caminho rápido.
 
-```ts
-const TAX_KEYWORDS = ['imposto', 'tributo', 'taxa', 'das', 'simples', 'iss', 'irpj', 'csll', 'pis', 'cofins'];
-const isTaxCategory = (category?: string) => {
-  if (!category) return false;
-  const c = category.toLowerCase().trim();
-  return TAX_KEYWORDS.some(k => c.includes(k));
-};
-```
+Resultado: conversas existentes que ficaram órfãs passam a aparecer no chat do lead automaticamente assim que o usuário abrir o card.
 
-Match em **nome da categoria**, case-insensitive. Não inspeciona o `title`.
+### 2. Vinculação por telefone também na automação (webhook)
 
-## 2. Hook `useDREStatement` — `src/hooks/useDREStatement.ts` (novo)
+Em `supabase/functions/whatsapp-webhook/index.ts`, expandir `findActiveAutomations`:
 
-Recebe: `{ cashFlow, isForecastMode, totalForecastMRR, totalActivePayroll, totalForecastFixed, historicalCashFlow }` (último opcional, vindo do mês anterior real para cálculo de taxa efetiva).
+- Após falhar busca por `conversation_id` e por `lead_id`, fazer 3ª tentativa: buscar automações ativas/processing **pela conversa do mesmo phone_number** (variants), não só pelo conversation_id literal. Isso resolve o caso de a conversa ter sido recriada ou de haver duas conversas para o mesmo número.
 
-### Cálculos (modo real)
+### 3. Função utilitária de re-link em massa
 
-```ts
-const incomes  = cashFlow.filter(i => i.type === 'INCOME' && i.status === 'PAID');
-const expensesItems = cashFlow.filter(i => i.type === 'EXPENSE' && i.status !== 'CANCELLED' && i.sourceType === 'expense');
-const salariesItems = cashFlow.filter(i => i.type === 'EXPENSE' && i.status !== 'CANCELLED' && i.sourceType === 'salary');
+Criar function SQL `relink_orphan_whatsapp_conversations(p_agency_id uuid)` que:
 
-const receitaBruta   = sum(incomes);
-const impostos       = sum(expensesItems.filter(e => isTaxCategory(e.category)));
-const custosOper     = sum(expensesItems.filter(e => !isTaxCategory(e.category)));
-const folhaPag       = sum(salariesItems);
-```
+- Pega todas as conversas com `lead_id IS NULL` da agência.
+- Para cada uma, tenta casar com leads via `find_lead_by_normalized_phone`.
+- Atualiza `lead_id` quando encontrar match.
 
-### Projeção inteligente (modo forecast)
+Expor um botão discreto **"Sincronizar conversas com leads"** na tela de Configurações > Integrações > WhatsApp (já existe `WhatsAppIntegration.tsx`), que chama essa função e mostra quantas foram religadas. Útil para a vinculação inicial e para manutenção.
 
-Em vez de zerar impostos, calcular **taxa efetiva histórica** a partir do `historicalCashFlow` (mês real mais recente disponível, vindo do `Admin.tsx` via `useFinancialMetrics` do mês anterior — ou mesmo do mês atual se já tiver receita realizada):
+### 4. Trigger automático ao criar/editar lead com telefone
 
-```ts
-const FALLBACK_TAX_RATE = 0.06; // 6%
-const histIncomes = historical.filter(i => i.type==='INCOME' && i.status==='PAID');
-const histTaxes   = historical.filter(i => i.type==='EXPENSE' && i.sourceType==='expense' && isTaxCategory(i.category));
-const histRevenue = sum(histIncomes);
-const effectiveTaxRate = histRevenue > 0 ? sum(histTaxes) / histRevenue : FALLBACK_TAX_RATE;
+Adicionar trigger AFTER INSERT OR UPDATE OF phone na tabela `leads`:
 
-const receitaBruta = totalForecastMRR;
-const impostos     = receitaBruta * effectiveTaxRate;
-const custosOper   = totalForecastFixed;
-const folhaPag     = totalActivePayroll;
-```
+- Quando um lead é criado/atualizado com telefone, varre conversas órfãs daquela agência e linka automaticamente as que casarem por variants.
+- Isso garante que **leads cadastrados depois** das mensagens já chegam linkados.
 
-### Cascata final
+### 5. Promoção do CRM Vivo retroativa
 
-```ts
-const receitaLiquida = receitaBruta - impostos;
-const ebitda         = receitaLiquida - custosOper - folhaPag;
-const margemPct      = receitaBruta > 0 ? (ebitda / receitaBruta) * 100 : 0;
-
-return { receitaBruta, impostos, receitaLiquida, custosOper, folhaPag, ebitda, margemPct, effectiveTaxRate, isProjectedTax: isForecastMode };
-```
-
-A UI exibe um badge "Estimado (taxa histórica X%)" ao lado da linha de impostos quando `isProjectedTax`.
-
-## 3. Aba DRE no `AdvancedFinancialSheet.tsx`
-
-- `TabsList` muda para `grid-cols-3`. Nova `<TabsTrigger value="dre">` com ícone `FileText`.
-- `<TabsContent value="dre">` envolve um `<div id="dre-print-area">` contendo:
-  - Cabeçalho `print:block` com título "DRE — {monthLabel}" + badge "Modo Projeção" se `isForecastMode`.
-  - Tabela cascata (`<Table>` shadcn):
-
-| Linha | Estilo |
-|---|---|
-| Receita Bruta | normal |
-| (–) Impostos e Taxas | `pl-6 text-muted-foreground` (badge se estimado) |
-| **= Receita Líquida** | `font-semibold bg-muted/30` |
-| (–) Custos Operacionais | `pl-6 text-muted-foreground` |
-| (–) Folha de Pagamento | `pl-6 text-muted-foreground` |
-| **= Lucro Operacional (EBITDA)** | `font-semibold bg-muted/30` |
-| Margem de Lucro Líquido | `%`, verde se ≥0, vermelho se <0 |
-
-- Acima da tabela, dois botões `size="sm"` com classe `no-print`:
-  - **Copiar Resumo** (ícone `Copy`) — gera string formatada e `navigator.clipboard.writeText` + toast.
-  - **Imprimir PDF** (ícone `Printer`) — chama `window.print()`.
-
-### Origem de `historicalCashFlow`
-
-Em `Admin.tsx`, instanciar uma segunda chamada leve usando a estrutura existente (mês imediatamente anterior ao `selectedMonth`) e passar como prop opcional `historicalCashFlow` para `AdvancedFinancialSheet`, repassada ao `useDREStatement`. Se vazio, hook usa fallback 6%.
-
-## 4. CSS de Impressão Correto — `src/index.css`
-
-Substituir abordagem `visibility:hidden` por `display:none` em elementos cromados, deixando o `#dre-print-area` no fluxo natural:
-
-```css
-@media print {
-  /* Esconde cromo da aplicação sem reservar espaço */
-  .app-sidebar,
-  [data-sidebar],
-  header,
-  nav,
-  .no-print,
-  [role="tablist"],
-  button {
-    display: none !important;
-  }
-
-  /* Sheet/Dialog overlays viram contêiner branco simples */
-  [role="dialog"],
-  [data-radix-popper-content-wrapper] {
-    position: static !important;
-    box-shadow: none !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    overflow: visible !important;
-  }
-
-  /* Esconde tudo que NÃO é o print area, usando :not + has para preservar ancestrais */
-  body :not(:has(#dre-print-area)):not(#dre-print-area):not(#dre-print-area *) {
-    /* Mantém ancestrais visíveis para que o print-area renderize */
-  }
-
-  /* Force the print area to flow */
-  #dre-print-area {
-    display: block !important;
-    position: static !important;
-    padding: 24px;
-    color: #000;
-    background: #fff;
-  }
-
-  #dre-print-area * { visibility: visible; }
-
-  @page { margin: 16mm; }
-}
-```
-
-Botões e header da Sheet ganham classe `no-print`. Estratégia: esconder cromo conhecido por seletor + `.no-print`, deixar o resto fluir.
+No webhook, após linkar uma conversa órfã ao lead (caso 4), também executar `promoteLeadOnReply` se a mensagem que disparou o link veio do cliente — mas como esse cenário é coberto pelo trigger SQL e pelo botão manual, garantir só que o trigger NÃO duplica histórico (verificar `lead_history` antes de inserir o evento `whatsapp_interaction`).
 
 ## Arquivos editados
 
-- `src/hooks/useFinancialMetrics.tsx` — adicionar `category` ao `CashFlowItem` e preencher no mapeamento de expenses.
-- `src/hooks/useDREStatement.ts` (novo) — motor de cálculo com guardrails 1 e 2.
-- `src/components/admin/CommandCenter/AdvancedFinancialSheet.tsx` — nova aba, tabela cascata, botões Copiar/Imprimir, prop `historicalCashFlow`.
-- `src/pages/Admin.tsx` — buscar `historicalCashFlow` do mês anterior e passar como prop.
-- `src/index.css` — bloco `@media print` com `display:none` para cromo + `.no-print`.
+- `src/hooks/useWhatsApp.tsx` — `useLeadConversation` com fallback por telefone + auto-cura.
+- `supabase/functions/whatsapp-webhook/index.ts` — `findActiveAutomations` com 3ª etapa por phone variants.
+- `src/components/settings/WhatsAppIntegration.tsx` — botão "Sincronizar conversas com leads".
+- Migração SQL — função `relink_orphan_whatsapp_conversations(uuid)` + trigger em `leads` para re-link automático.
 
 ## Sem mudanças
 
-- Schema do banco — `expense_categories` e `expenses.category` já existem.
-- Demais abas, hooks de métricas, demais telas — intactos.
-- Nenhuma biblioteca nova.
+- Estrutura das tabelas `whatsapp_conversations`, `whatsapp_messages`, `whatsapp_automation_control` — preservada.
+- Lógica de envio (`whatsapp-send`), sync manual (`whatsapp-sync-messages`), conexão (`whatsapp-connect`) — intactas.
+- Régua de cobrança (`purpose='billing'`) e demais features — não afetadas.
+- Configuração do Evolution API — não muda.
 
