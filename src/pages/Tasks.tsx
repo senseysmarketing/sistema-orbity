@@ -84,6 +84,7 @@ interface Task {
   client_id: string | null;
   due_date: string | null;
   created_at: string;
+  updated_at?: string;
   created_by: string;
   archived?: boolean;
   history?: any[];
