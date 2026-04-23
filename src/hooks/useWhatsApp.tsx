@@ -227,20 +227,76 @@ export function useWhatsApp(purpose: string = 'general') {
     });
   };
 
-  // Get conversation for a lead
+  // Get conversation for a lead — with auto-cure for orphan conversations (no lead_id)
   const useLeadConversation = (leadId: string | null) => {
     return useQuery({
       queryKey: ['whatsapp-conversation', account?.id, leadId],
       queryFn: async () => {
         if (!account?.id || !leadId) return null;
-        const { data, error } = await supabase
+
+        // 1st attempt: direct lookup by lead_id
+        const { data: direct, error } = await supabase
           .from('whatsapp_conversations')
           .select('*')
           .eq('account_id', account.id)
           .eq('lead_id', leadId)
           .maybeSingle();
         if (error) throw error;
-        return data as WhatsAppConversation | null;
+        if (direct) return direct as WhatsAppConversation;
+
+        // 2nd attempt: fallback by phone variants (auto-cure orphan conversations)
+        const { data: lead } = await supabase
+          .from('leads')
+          .select('phone')
+          .eq('id', leadId)
+          .maybeSingle();
+
+        if (!lead?.phone) return null;
+
+        // Generate phone variants (mirror webhook logic)
+        const digits = lead.phone.replace(/\D/g, '');
+        if (digits.length < 8) return null;
+
+        const variants = new Set<string>([digits]);
+        if (digits.startsWith('55') && digits.length === 13) {
+          const ddd = digits.slice(2, 4);
+          const localWithout = digits.slice(5);
+          variants.add('55' + ddd + localWithout);
+          variants.add(ddd + digits.slice(4));
+          variants.add(ddd + localWithout);
+        } else if (digits.startsWith('55') && digits.length === 12) {
+          const ddd = digits.slice(2, 4);
+          const localWithout = digits.slice(4);
+          variants.add('55' + ddd + '9' + localWithout);
+          variants.add(ddd + localWithout);
+          variants.add(ddd + '9' + localWithout);
+        }
+        if (digits.startsWith('55')) {
+          variants.add(digits.slice(2));
+        }
+
+        const variantsArr = [...variants];
+
+        // Search orphan conversations (lead_id IS NULL) matching any variant
+        const { data: orphans } = await supabase
+          .from('whatsapp_conversations')
+          .select('*')
+          .eq('account_id', account.id)
+          .is('lead_id', null)
+          .in('phone_number', variantsArr);
+
+        const orphan = orphans?.[0];
+        if (!orphan) return null;
+
+        // Auto-cure: link the orphan conversation to this lead
+        const { data: linked } = await supabase
+          .from('whatsapp_conversations')
+          .update({ lead_id: leadId })
+          .eq('id', orphan.id)
+          .select('*')
+          .maybeSingle();
+
+        return (linked || { ...orphan, lead_id: leadId }) as WhatsAppConversation;
       },
       enabled: !!account?.id && !!leadId,
     });
