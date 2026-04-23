@@ -67,6 +67,10 @@ import { z } from "zod";
 import { Switch } from "@/components/ui/switch";
 import { computeNextDueDate, type RecurrenceRule, type RecurrenceFrequency } from "@/lib/recurrence";
 
+// Campos de select consistentes para fetchTasks e refetch individual via Realtime.
+// Manter esta string sincronizada garante que joins (clients/assignments) não se percam em updates ao vivo.
+const TASK_QUERY_FIELDS = "*, task_clients(client_id), task_assignments(user_id)";
+
 interface AssignedUser {
   user_id: string;
   name: string;
@@ -443,12 +447,10 @@ export default function Tasks() {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const selectFields = "*, task_clients(client_id), task_assignments(user_id)";
-
       const [openResult, doneResult] = await Promise.all([
         supabase
           .from("tasks")
-          .select(selectFields)
+          .select(TASK_QUERY_FIELDS)
           .eq("agency_id", currentAgency.id)
           .eq("archived", false)
           .neq("status", "done")
@@ -456,7 +458,7 @@ export default function Tasks() {
           .limit(300),
         supabase
           .from("tasks")
-          .select(selectFields)
+          .select(TASK_QUERY_FIELDS)
           .eq("agency_id", currentAgency.id)
           .eq("archived", false)
           .eq("status", "done")
