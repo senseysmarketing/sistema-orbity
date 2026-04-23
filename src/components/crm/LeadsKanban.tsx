@@ -354,9 +354,8 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onSched
             getUrgencyLevel={getUrgencyLevel}
             formatCurrency={formatCurrency}
             formatDate={formatDate}
-            isDragging={true}
           />
-        ) : null}
+          ) : null}
       </DragOverlay>
 
       <LossReasonDialog
