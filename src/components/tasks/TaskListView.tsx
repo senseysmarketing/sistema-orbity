@@ -136,7 +136,7 @@ export function TaskListView({
               </span>
             </AccordionTrigger>
             <AccordionContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="w-full">
                 <Table className="table-fixed w-full">
                   <colgroup>
                     <col style={{ width: "40px" }} />
