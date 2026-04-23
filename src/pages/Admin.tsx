@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { ShieldAlert, CalendarClock, Sparkles, Users, Repeat, Package } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 
 import { useFinancialMetrics } from "@/hooks/useFinancialMetrics";
-import type { Client, ClientPayment, Expense, Salary, Employee } from "@/hooks/useFinancialMetrics";
+import type { Client, ClientPayment, Expense, Salary, Employee, CashFlowItem } from "@/hooks/useFinancialMetrics";
 
 // Forms (keep using Dialog internally - Diretriz 1: they work standalone)
 import { ClientForm } from "@/components/admin/ClientForm";
