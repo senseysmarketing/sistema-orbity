@@ -301,6 +301,7 @@ export default function Tasks() {
   const [includeNoDueDate, setIncludeNoDueDate] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
+  const [sortBy, setSortBy] = useState<'due_date' | 'recent'>('due_date');
 
   const toStartOfDay = (d: Date) => {
     const copy = new Date(d);
