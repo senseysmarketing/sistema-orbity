@@ -15,13 +15,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   TrendingUp, TrendingDown, DollarSign, Calendar, BarChart3, AlertTriangle,
-  Target, Sparkles, ExternalLink, Loader2, CalendarClock,
+  Target, Sparkles, ExternalLink, Loader2, CalendarClock, FileText, Copy, Printer,
 } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
 import { useAdvancedAnalytics } from "@/hooks/useAdvancedAnalytics";
+import { useDREStatement } from "@/hooks/useDREStatement";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -42,6 +43,7 @@ interface AdvancedFinancialSheetProps {
   employees?: Employee[];
   paymentsAll?: ClientPayment[];
   isForecastMode?: boolean;
+  historicalCashFlow?: CashFlowItem[];
 }
 
 type RowStatus = "billed" | "pending";
@@ -54,7 +56,7 @@ interface ProjectionRow {
 export function AdvancedFinancialSheet({
   open, onOpenChange, cashFlow, expensesByCategory, agencyId, selectedMonth,
   forecastClients = [], forecastRecurringExpenses = [], employees = [],
-  paymentsAll = [], isForecastMode = false,
+  paymentsAll = [], isForecastMode = false, historicalCashFlow = [],
 }: AdvancedFinancialSheetProps) {
   const defaultYear = selectedMonth.split('-')[0];
   const [selectedYear, setSelectedYear] = useState(defaultYear);
