@@ -1873,6 +1873,18 @@ export default function Tasks() {
                 </Button>
               )}
 
+              <div className="flex-shrink-0">
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'due_date' | 'recent')}>
+                  <SelectTrigger className="h-9 w-[180px]">
+                    <SelectValue placeholder="Ordenar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="due_date">Data de entrega</SelectItem>
+                    <SelectItem value="recent">Últimas alterações</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <ToggleGroup
                 type="single"
                 size="sm"
