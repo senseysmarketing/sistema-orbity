@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.approval-decide]
 verify_jwt = false
+
+[functions.process-lead-ghosting]
+verify_jwt = false
