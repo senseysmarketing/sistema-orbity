@@ -137,7 +137,17 @@ export function TaskListView({
             </AccordionTrigger>
             <AccordionContent className="p-0">
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="table-fixed w-full">
+                  <colgroup>
+                    <col style={{ width: "40px" }} />
+                    <col style={{ width: "32px" }} />
+                    <col />
+                    <col style={{ width: "180px" }} />
+                    <col style={{ width: "160px" }} />
+                    <col style={{ width: "90px" }} />
+                    <col style={{ width: "110px" }} />
+                    <col style={{ width: "40px" }} />
+                  </colgroup>
                   <TableBody>
                     {groupTasks.map((task) => {
                       const isDone = task.status === "done";
