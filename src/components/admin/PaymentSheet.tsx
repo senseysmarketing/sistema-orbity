@@ -395,7 +395,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
                   <SelectContent>
                     {enabledGateways.map((gw) => (
                       <SelectItem key={gw} value={gw}>
-                        {gw === 'manual' ? 'Manual' : gw === 'asaas' ? 'Asaas' : 'Conexa'}
+                        {gw === 'manual' ? 'Manual' : gw === 'asaas' ? 'Asaas' : gw === 'stripe' ? 'Stripe' : 'Conexa'}
                       </SelectItem>
                     ))}
                   </SelectContent>

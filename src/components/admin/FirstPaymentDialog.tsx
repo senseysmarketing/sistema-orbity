@@ -172,7 +172,7 @@ export function FirstPaymentDialog({ isOpen, onClose, client }: FirstPaymentDial
               <SelectContent>
                 {enabledGateways.map((gw) => (
                   <SelectItem key={gw} value={gw}>
-                    {gw === "manual" ? "Manual" : gw === "asaas" ? "Asaas" : "Conexa"}
+                    {gw === "manual" ? "Manual" : gw === "asaas" ? "Asaas" : gw === "stripe" ? "Stripe" : "Conexa"}
                   </SelectItem>
                 ))}
               </SelectContent>

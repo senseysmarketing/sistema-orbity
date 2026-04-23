@@ -31,17 +31,8 @@ export function useCreatePayment() {
 
     setLoading(true);
     try {
-      // Roteamento: se a agência tem Stripe como gateway ativo, usa create-agency-stripe-charge
-      const { data: agencyRow } = await supabase
-        .from("agencies")
-        .select("active_payment_gateway, stripe_secret_key")
-        .eq("id", currentAgency.id)
-        .maybeSingle();
-
-      const useStripe =
-        agencyRow?.active_payment_gateway === "stripe" && !!agencyRow?.stripe_secret_key;
-
-      if (useStripe) {
+      // Roteamento por billing_type escolhido no formulário
+      if (data.billing_type === "stripe") {
         const { data: result, error } = await supabase.functions.invoke(
           "create-agency-stripe-charge",
           {

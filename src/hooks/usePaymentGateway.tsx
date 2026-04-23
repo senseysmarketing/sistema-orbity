@@ -105,6 +105,22 @@ export function usePaymentGateway() {
     enabled: !!agencyId,
   });
 
+  // Stripe vive na tabela `agencies` (isolado do gateway Master Orbity)
+  const { data: stripeRow } = useQuery({
+    queryKey: ['agency-stripe-flag', agencyId],
+    queryFn: async () => {
+      if (!agencyId) return null;
+      const { data, error } = await supabase
+        .from('agencies')
+        .select('stripe_secret_key, active_payment_gateway')
+        .eq('id', agencyId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!agencyId,
+  });
+
   const upsertMutation = useMutation({
     mutationFn: async (updates: Partial<Omit<PaymentSettings, 'id' | 'agency_id'>>) => {
       if (!agencyId) throw new Error('No agency');
@@ -126,13 +142,15 @@ export function usePaymentGateway() {
 
   const isAsaasActive = !!(settings?.asaas_enabled && settings?.asaas_api_key);
   const isConexaActive = !!(settings?.conexa_enabled && settings?.conexa_api_key);
+  const isStripeActive = !!(stripeRow?.stripe_secret_key && stripeRow?.active_payment_gateway === 'stripe');
 
   const enabledGateways = useMemo(() => {
     const gateways: string[] = ['manual'];
     if (isAsaasActive) gateways.push('asaas');
     if (isConexaActive) gateways.push('conexa');
+    if (isStripeActive) gateways.push('stripe');
     return gateways;
-  }, [isAsaasActive, isConexaActive]);
+  }, [isAsaasActive, isConexaActive, isStripeActive]);
 
   const stableSettings = useMemo(() => {
     return settings ?? { ...defaultSettings, id: '', agency_id: agencyId || '' } as PaymentSettings;
@@ -143,6 +161,7 @@ export function usePaymentGateway() {
     gateway: (settings?.active_gateway ?? 'manual') as 'manual' | 'asaas' | 'conexa',
     isAsaasActive,
     isConexaActive,
+    isStripeActive,
     enabledGateways,
     isLoading,
     updateSettings: upsertMutation.mutateAsync,
