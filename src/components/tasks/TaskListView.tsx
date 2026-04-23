@@ -305,7 +305,7 @@ export function TaskListView({
                       );
                     })}
                   </TableBody>
-                </Table>
+                </table>
               </div>
             </AccordionContent>
           </AccordionItem>
