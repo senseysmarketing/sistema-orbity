@@ -31,8 +31,8 @@ Deno.serve(async (req) => {
     const { data: approval, error: approvalErr } = await admin
       .from("task_approvals")
       .select(
-        `id, agency_id, token, status, created_at, expires_at, completed_at,
-         agencies:agency_id (name, logo_url),
+         `id, agency_id, token, status, created_at, expires_at, completed_at,
+         agencies:agency_id (name, logo_url, contact_phone),
          items:task_approval_items (
            id, task_id, decision, client_feedback, decided_at,
            tasks:task_id ( id, title, description, attachments, status )
