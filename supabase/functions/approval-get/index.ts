@@ -90,6 +90,7 @@ Deno.serve(async (req) => {
       agency: {
         name: (approval as any).agencies?.name ?? "",
         logo_url: (approval as any).agencies?.logo_url ?? null,
+        contact_phone: (approval as any).agencies?.contact_phone ?? null,
       },
       token: approval.token,
       expires_at: approval.expires_at,
