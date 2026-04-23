@@ -622,7 +622,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
             </div>
           )}
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+          <DialogFooter className="flex-col sm:flex-row sm:flex-wrap sm:justify-end gap-2">
             <Button
               variant="outline"
               onClick={() => {
