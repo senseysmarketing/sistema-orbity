@@ -7498,6 +7498,10 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_notification_tracking: { Args: never; Returns: undefined }
+      delete_agency_cascade: {
+        Args: { p_agency_id: string }
+        Returns: undefined
+      }
       enforce_plan_limits: {
         Args: {
           agency_uuid: string

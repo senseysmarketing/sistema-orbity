@@ -12,11 +12,16 @@ import { Input } from '@/components/ui/input';
 import {
   MoreHorizontal, Eye, Pause, Play, RefreshCw,
   CheckCircle2, AlertTriangle, XCircle, Ban, Search,
-  ChevronLeft, ChevronRight, Copy, Check,
+  ChevronLeft, ChevronRight, Copy, Check, Trash2,
 } from 'lucide-react';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
+} from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -55,12 +60,15 @@ function CopyOnboardingLinks() {
 }
 
 export function AgenciesTable() {
-  const { agencies, loading, refreshAgencies, suspendAgency, reactivateAgency, getStatusCounts } = useMaster();
+  const { agencies, loading, refreshAgencies, suspendAgency, reactivateAgency, deleteAgencyPermanently, getStatusCounts } = useMaster();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedAgency, setSelectedAgency] = useState<typeof agencies[0] | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteDialogAgency, setDeleteDialogAgency] = useState<typeof agencies[0] | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -87,6 +95,31 @@ export function AgenciesTable() {
     await reactivateAgency(agencyId);
     setActionLoading(null);
   };
+
+  const openDeleteDialog = (agency: typeof agencies[0]) => {
+    setDeleteDialogAgency(agency);
+    setDeleteConfirmText('');
+  };
+
+  const closeDeleteDialog = () => {
+    if (deleting) return;
+    setDeleteDialogAgency(null);
+    setDeleteConfirmText('');
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteDialogAgency) return;
+    setDeleting(true);
+    const ok = await deleteAgencyPermanently(deleteDialogAgency.agency_id);
+    setDeleting(false);
+    if (ok) {
+      setDeleteDialogAgency(null);
+      setDeleteConfirmText('');
+    }
+  };
+
+  const canDeleteAgency = (status: string) =>
+    status === 'suspended' || status === 'canceled' || status === 'trial_expired';
 
   const openDetails = (agency: typeof agencies[0]) => {
     setSelectedAgency(agency);
@@ -287,6 +320,17 @@ export function AgenciesTable() {
                               <Play className="h-4 w-4 mr-2" /> Reativar
                             </DropdownMenuItem>
                           )}
+                          {canDeleteAgency(agency.computed_status) && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => openDeleteDialog(agency)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> Excluir Permanentemente
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -332,6 +376,59 @@ export function AgenciesTable() {
         onOpenChange={setSheetOpen}
         agency={selectedAgency}
       />
+
+      <AlertDialog
+        open={!!deleteDialogAgency}
+        onOpenChange={(open) => { if (!open) closeDeleteDialog(); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2">
+              <Trash2 className="h-5 w-5" /> Excluir agência permanentemente?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  Esta ação removerá <strong>todos os dados</strong> da agência{' '}
+                  <strong>{deleteDialogAgency?.agency_name}</strong>: usuários, clientes, leads,
+                  tarefas, posts, contratos, pagamentos, despesas, integrações e arquivos.
+                </p>
+                <p className="font-semibold text-destructive">Não há como desfazer.</p>
+                {deleteDialogAgency && (
+                  <div className="rounded-md border bg-muted/40 p-3 text-xs">
+                    <span className="font-medium">{deleteDialogAgency.user_count}</span> usuários ·{' '}
+                    <span className="font-medium">{deleteDialogAgency.client_count}</span> clientes ·{' '}
+                    <span className="font-medium">{deleteDialogAgency.task_count}</span> tarefas
+                  </div>
+                )}
+                <div className="space-y-2 pt-2">
+                  <Label htmlFor="delete-confirm-input" className="text-foreground">
+                    Para confirmar, digite o nome da agência: <strong>{deleteDialogAgency?.agency_name}</strong>
+                  </Label>
+                  <Input
+                    id="delete-confirm-input"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder={deleteDialogAgency?.agency_name}
+                    disabled={deleting}
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleConfirmDelete(); }}
+              disabled={deleting || deleteConfirmText.trim() !== (deleteDialogAgency?.agency_name ?? '')}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? 'Excluindo...' : 'Excluir Permanentemente'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
