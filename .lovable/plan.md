@@ -1,45 +1,26 @@
 
 
-# Alinhamento das colunas na visualização em lista de Tarefas
+# Remover scroll horizontal da lista de tarefas
 
 ## Diagnóstico
 
-Em `TaskListView.tsx`, cada grupo de status (ex: "Em Revisão", "Aguardando Material") renderiza uma `<Table>` independente dentro de um `<AccordionItem>`. Sem largura fixa, cada tabela calcula a largura das colunas com base no próprio conteúdo — então grupos com muitas linhas (Em Revisão, 17) ficam com colunas Cliente/Responsáveis maiores, "empurrando" os badges para a direita; grupos com poucas linhas (Onboarding, Em Andamento) encolhem essas colunas e os badges aparecem colados ao título.
-
-Resultado visual: badges de Cliente e avatares de Responsáveis dançam de posição entre os grupos.
+O wrapper `<div className="overflow-x-auto">` ao redor da `<Table>` força barra de rolagem horizontal mesmo quando o conteúdo cabe. Combinado com `table-fixed` + `colgroup` somando ~692px de colunas fixas + título flexível, em larguras menores aparece scroll. Em telas largas (1976px atuais) sobra espaço, mas o `overflow-x-auto` ainda renderiza a barra visualmente em alguns navegadores.
 
 ## Solução
 
-Padronizar as larguras das 8 colunas em **todas** as tabelas, garantindo alinhamento idêntico independentemente do grupo. Cliente e Responsáveis ficam **alinhados à direita** (próximos das colunas Prioridade/Entrega), como acontece hoje no grupo "Em Revisão".
+1. **Remover `overflow-x-auto`** — substituir por `<div className="w-full">` simples. A tabela ocupa 100% da largura disponível naturalmente.
 
-### Mudanças em `src/components/tasks/TaskListView.tsx`
+2. **Truncar título com limite visual** — já existe `truncate` + `max-w-0` na célula. Manter, mas garantir que o `<span>` interno também respeite com `block truncate` para títulos longos como "Post | Tema: Gestão e Processo - O Ângulo do Inimigo Oculto…" virarem `…` no fim sem empurrar layout.
 
-1. **Adicionar `table-fixed` na `<Table>`** + `<colgroup>` com larguras explícitas para travar o layout:
+3. **Manter colunas fixas à direita** — Cliente (180px), Responsáveis (160px), Prioridade (90px), Entrega (110px), Ações (40px) continuam alinhadas como aprovado anteriormente.
 
-   | Coluna | Largura |
-   |---|---|
-   | Checkbox | 40px |
-   | Tipo (ícone) | 32px |
-   | Título | `auto` (consome o espaço sobrando) |
-   | Cliente | 180px |
-   | Responsáveis | 160px |
-   | Prioridade | 90px |
-   | Entrega | 110px |
-   | Ações | 40px |
-
-2. **Empurrar Título para ocupar o espaço flexível**: célula do título fica com `w-full` + `truncate`, e as colunas Cliente/Responsáveis/Prioridade/Entrega ficam fixas à direita — exatamente como aparece hoje em "Em Revisão".
-
-3. **Conteúdo das células fixas alinhado à esquerda dentro da própria célula** (mantém legibilidade), mas como as colunas têm largura fixa, badges e avatares ficam na mesma coordenada X em todos os grupos.
-
-4. **Truncate no título** (`truncate` + `max-w-0` no padrão flex/table-fixed) para títulos longos não quebrarem o layout em grupos densos.
-
-### Sem mudanças
-
-- Nenhuma alteração na lógica de filtros, ordenação, agrupamento ou ações.
-- Visualização Kanban (`SortableTaskCard`) intacta.
-- Demais telas (Dashboard `MyTasksList`, `RequestedTasksList`) intactas.
+4. **Sem scroll horizontal** — em viewports pequenos (<1024px), o título encolhe e trunca; nunca aparece barra. Em viewports grandes, o título expande e ocupa o espaço sobrando — sem "vazio feio" e sem rolagem.
 
 ## Arquivo editado
 
-- `src/components/tasks/TaskListView.tsx` — adicionar `table-fixed` + `<colgroup>` com larguras fixas; ajustar célula do título para `truncate`.
+- `src/components/tasks/TaskListView.tsx` — remover `overflow-x-auto`; reforçar truncate no `<span>` do título.
+
+## Sem mudanças
+
+- Larguras das colunas, ordenação, agrupamento, ações, Kanban, demais telas.
 
