@@ -60,12 +60,15 @@ function CopyOnboardingLinks() {
 }
 
 export function AgenciesTable() {
-  const { agencies, loading, refreshAgencies, suspendAgency, reactivateAgency, getStatusCounts } = useMaster();
+  const { agencies, loading, refreshAgencies, suspendAgency, reactivateAgency, deleteAgencyPermanently, getStatusCounts } = useMaster();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [selectedAgency, setSelectedAgency] = useState<typeof agencies[0] | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteDialogAgency, setDeleteDialogAgency] = useState<typeof agencies[0] | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setCurrentPage(1);
