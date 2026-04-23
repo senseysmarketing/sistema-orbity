@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2,
   Clock,
@@ -14,7 +15,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Carousel,
   CarouselContent,
@@ -64,6 +64,45 @@ const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 const isImage = (a: Attachment) => /^image\//i.test(a.type ?? "");
 const isVideo = (a: Attachment) => /^video\//i.test(a.type ?? "");
 
+/* ============== Animation Variants (matching PublicClientReport) ============== */
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.15, delayChildren: 0.3 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } },
+};
+
+const headerVariants = {
+  hidden: { opacity: 0, y: -40 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
+};
+
+/* ============== Cinematic Background Shell ============== */
+
+function CinematicShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-[#0a0a1a] text-white">
+      {/* Radial gradients */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse at top, rgba(59,130,246,0.08) 0%, transparent 60%), radial-gradient(ellipse at bottom right, rgba(139,92,246,0.05) 0%, transparent 50%)",
+        }}
+      />
+      <div className="relative z-10 flex min-h-screen flex-col">{children}</div>
+    </div>
+  );
+}
+
 export default function PublicApproval() {
   const { token } = useParams<{ token: string }>();
   const [loading, setLoading] = useState(true);
@@ -75,6 +114,7 @@ export default function PublicApproval() {
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [forceReview, setForceReview] = useState(false);
+  const [successPulse, setSuccessPulse] = useState<"approved" | "revision" | null>(null);
 
   const fetchData = async () => {
     if (!token) return;
@@ -177,13 +217,17 @@ export default function PublicApproval() {
       });
       setRevisionOpen((s) => ({ ...s, [item.task_id]: false }));
 
+      // Premium success pulse
+      setSuccessPulse(decision);
+      setTimeout(() => setSuccessPulse(null), 700);
+
       // Auto-advance to next pending
       setTimeout(() => {
         const idx = nextItems.findIndex((it, i) => i > currentIndex && !it.decision);
         if (idx >= 0 && carouselApi) {
           carouselApi.scrollTo(idx);
         }
-      }, 250);
+      }, 450);
     } catch {
       toast.error("Erro de rede ao enviar resposta.");
     } finally {
@@ -198,22 +242,22 @@ export default function PublicApproval() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background text-foreground">
-        <Toaster position="top-center" richColors closeButton />
+      <CinematicShell>
+        <Toaster position="top-center" theme="dark" closeButton />
         <CenterShell>
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="mt-4 text-sm text-muted-foreground">Carregando aprovação…</p>
+          <Loader2 className="h-8 w-8 animate-spin text-white/40" />
+          <p className="mt-4 text-sm text-white/50">Carregando aprovação…</p>
         </CenterShell>
-      </div>
+      </CinematicShell>
     );
   }
 
   if (errorState) {
     return (
-      <div className="min-h-screen bg-background text-foreground">
-        <Toaster position="top-center" richColors closeButton />
+      <CinematicShell>
+        <Toaster position="top-center" theme="dark" closeButton />
         <ExpiredOrErrorScreen error={errorState} />
-      </div>
+      </CinematicShell>
     );
   }
 
@@ -221,8 +265,8 @@ export default function PublicApproval() {
 
   if (allDone && !forceReview) {
     return (
-      <div className="min-h-screen bg-background text-foreground">
-        <Toaster position="top-center" richColors closeButton />
+      <CinematicShell>
+        <Toaster position="top-center" theme="dark" closeButton />
         <AllDoneScreen
           agency={data.agency}
           onReview={() => {
@@ -230,64 +274,129 @@ export default function PublicApproval() {
             setTimeout(() => carouselApi?.scrollTo(0), 50);
           }}
         />
-      </div>
+      </CinematicShell>
     );
   }
 
   const totalDecided = data.items.filter((i) => i.decision).length;
+  const allApproved = totalDecided === data.items.length;
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <Toaster position="top-center" richColors closeButton />
+    <CinematicShell>
+      <Toaster position="top-center" theme="dark" closeButton />
 
-      {/* Header minimalista */}
-      <header className="py-4 px-5 text-center border-b border-border/50">
+      {/* Premium Header */}
+      <motion.header
+        variants={headerVariants}
+        initial="hidden"
+        animate="visible"
+        className="px-5 pt-8 pb-5 text-center"
+      >
+        <div className="text-[10px] sm:text-[11px] uppercase tracking-[0.25em] text-white/40 mb-3">
+          Aprovação de Conteúdo
+        </div>
         {data.agency.logo_url ? (
           <img
             src={data.agency.logo_url}
             alt={data.agency.name}
-            className="h-10 mx-auto object-contain"
+            className="h-10 mx-auto object-contain rounded-lg shadow-lg"
           />
         ) : (
-          <div className="text-base font-medium tracking-tight">{data.agency.name}</div>
+          <div className="text-xl font-bold tracking-tight text-white">
+            {data.agency.name}
+          </div>
         )}
-        <p className="mt-1 text-xs text-muted-foreground">
+        <div className="mt-3 flex items-center justify-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span
+              className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${
+                allApproved ? "bg-emerald-400" : "bg-amber-400"
+              }`}
+            />
+            <span
+              className={`relative inline-flex h-2 w-2 rounded-full ${
+                allApproved ? "bg-emerald-400" : "bg-amber-400"
+              }`}
+            />
+          </span>
+          <span className="text-xs text-white/60">
+            {allApproved ? "Tudo aprovado" : "Aguardando você"}
+          </span>
+        </div>
+        <p className="mt-2 text-xs text-white/50">
           {totalDecided} de {data.items.length} respondidas
         </p>
-      </header>
+      </motion.header>
 
       {/* Galeria */}
-      <main className="flex-1 flex items-center py-6">
+      <motion.main
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="flex-1 flex items-center pb-6"
+      >
         <div className="w-full max-w-xl mx-auto px-4">
-          <Carousel className="w-full" setApi={setCarouselApi} opts={{ align: "start" }}>
-            <CarouselContent>
-              {data.items.map((item) => (
-                <CarouselItem key={item.id}>
-                  <GalleryStage item={item} />
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-            <CarouselPrevious className="hidden sm:flex" />
-            <CarouselNext className="hidden sm:flex" />
-          </Carousel>
+          <motion.div variants={itemVariants}>
+            <div className="relative bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-3xl p-3">
+              <Carousel className="w-full" setApi={setCarouselApi} opts={{ align: "start" }}>
+                <CarouselContent>
+                  {data.items.map((item) => (
+                    <CarouselItem key={item.id}>
+                      <GalleryStage item={item} />
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                <CarouselPrevious className="hidden sm:flex bg-white/5 backdrop-blur-xl border-white/10 text-white hover:bg-white/10 hover:text-white" />
+                <CarouselNext className="hidden sm:flex bg-white/5 backdrop-blur-xl border-white/10 text-white hover:bg-white/10 hover:text-white" />
+              </Carousel>
 
-          {/* Pip indicators */}
+              {/* Success pulse overlay */}
+              <AnimatePresence>
+                {successPulse && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.6 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.2 }}
+                    transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                    className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-3xl bg-black/40 backdrop-blur-sm z-10"
+                  >
+                    <div className="flex flex-col items-center gap-3">
+                      <CheckCircle2
+                        className={`h-20 w-20 ${
+                          successPulse === "approved"
+                            ? "text-emerald-400 drop-shadow-[0_0_20px_rgba(16,185,129,0.7)]"
+                            : "text-amber-400 drop-shadow-[0_0_20px_rgba(251,191,36,0.7)]"
+                        }`}
+                      />
+                      <span className="text-sm font-medium text-white/90">
+                        {successPulse === "approved" ? "Aprovado!" : "Ajuste enviado"}
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+
+          {/* Pip indicators premium */}
           {data.items.length > 1 && (
-            <div className="flex gap-1.5 justify-center mt-4">
+            <motion.div variants={itemVariants} className="flex gap-1.5 justify-center mt-5">
               {data.items.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => carouselApi?.scrollTo(idx)}
-                  className={`h-1.5 rounded-full transition-all ${
-                    idx === currentIndex ? "bg-primary w-4" : "bg-muted w-1.5"
+                  className={`h-1.5 rounded-full transition-all duration-500 ${
+                    idx === currentIndex
+                      ? "w-6 bg-gradient-to-r from-blue-500 to-violet-500"
+                      : "w-1.5 bg-white/10 hover:bg-white/20"
                   }`}
                   aria-label={`Ir para arte ${idx + 1}`}
                 />
               ))}
-            </div>
+            </motion.div>
           )}
         </div>
-      </main>
+      </motion.main>
 
       {/* Sticky action bar */}
       {data.items[currentIndex] && (
@@ -307,7 +416,7 @@ export default function PublicApproval() {
           onNext={() => carouselApi?.scrollNext()}
         />
       )}
-    </div>
+    </CinematicShell>
   );
 }
 
@@ -328,10 +437,9 @@ function GalleryStage({ item }: { item: ApprovalItem }) {
   return (
     <div className="space-y-4">
       {/* Palco */}
-      <div className="relative w-full h-[55vh] sm:h-[62vh] rounded-2xl overflow-hidden bg-black shadow-2xl ring-1 ring-white/5">
+      <div className="relative w-full h-[55vh] sm:h-[62vh] rounded-2xl overflow-hidden bg-black ring-1 ring-white/10">
         {heroImage && (
           <>
-            {/* Glass blur */}
             <img
               src={heroImage.url}
               alt=""
@@ -358,14 +466,24 @@ function GalleryStage({ item }: { item: ApprovalItem }) {
           </div>
         )}
 
-        {/* Decision badge no topo */}
+        {/* Top radial glow overlay */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-32"
+          style={{
+            background:
+              "radial-gradient(ellipse at top, rgba(255,255,255,0.08) 0%, transparent 70%)",
+          }}
+        />
+
+        {/* Decision badge */}
         {item.decision && (
           <div className="absolute top-3 left-3">
             <span
-              className={`text-[11px] uppercase tracking-wider px-2.5 py-1 rounded-full backdrop-blur-md ${
+              className={`text-[11px] uppercase tracking-wider px-2.5 py-1 rounded-full backdrop-blur-md border ${
                 item.decision === "approved"
-                  ? "bg-emerald-500/90 text-white"
-                  : "bg-amber-500/90 text-white"
+                  ? "bg-emerald-500/20 border-emerald-400/30 text-emerald-200"
+                  : "bg-amber-500/20 border-amber-400/30 text-amber-200"
               }`}
             >
               {item.decision === "approved" ? "✓ Aprovado" : "✏ Ajuste enviado"}
@@ -376,9 +494,9 @@ function GalleryStage({ item }: { item: ApprovalItem }) {
 
       {/* Texto */}
       <div className="px-1">
-        <h2 className="text-base font-semibold tracking-tight">{item.title}</h2>
+        <h2 className="text-base font-semibold tracking-tight text-white">{item.title}</h2>
         {previewDesc && (
-          <p className="mt-2 text-sm text-muted-foreground whitespace-pre-wrap line-clamp-3 leading-relaxed">
+          <p className="mt-2 text-sm text-white/60 whitespace-pre-wrap line-clamp-3 leading-relaxed">
             {previewDesc}
           </p>
         )}
@@ -386,11 +504,9 @@ function GalleryStage({ item }: { item: ApprovalItem }) {
         {isLongDesc && <FullCaptionDrawer item={item} />}
 
         {item.decision === "revision" && item.client_feedback && (
-          <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
-            <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
-              Seu pedido de ajuste:
-            </p>
-            <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">
+          <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2">
+            <p className="text-xs font-medium text-amber-300">Seu pedido de ajuste:</p>
+            <p className="text-xs text-amber-100/70 mt-1 whitespace-pre-wrap">
               "{item.client_feedback}"
             </p>
           </div>
@@ -416,24 +532,29 @@ function FullCaptionDrawer({ item }: { item: ApprovalItem }) {
       <Button
         variant="ghost"
         size="sm"
-        className="mt-1 -ml-2 h-8 text-xs text-primary"
+        className="mt-1 -ml-2 h-8 text-xs text-blue-400 hover:text-blue-300 hover:bg-white/5 group"
         onClick={() => setOpen(true)}
       >
         Ler legenda completa
-        <ChevronDown className="h-3.5 w-3.5 ml-1" />
+        <ChevronDown className="h-3.5 w-3.5 ml-1 transition-transform group-hover:translate-y-0.5" />
       </Button>
-      <DrawerContent>
+      <DrawerContent className="bg-[#0a0a1a] border-t border-white/10 text-white">
         <DrawerHeader>
-          <DrawerTitle className="text-left">{item.title}</DrawerTitle>
+          <DrawerTitle className="text-left text-white">{item.title}</DrawerTitle>
         </DrawerHeader>
         <div className="px-4 pb-4 max-h-[60vh] overflow-y-auto">
-          <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
+          <p className="text-sm leading-relaxed whitespace-pre-wrap text-white/80">
             {item.description}
           </p>
         </div>
         <DrawerFooter>
           <DrawerClose asChild>
-            <Button variant="outline">Fechar</Button>
+            <Button
+              variant="outline"
+              className="bg-white/5 backdrop-blur-xl border-white/10 text-white hover:bg-white/10 hover:text-white"
+            >
+              Fechar
+            </Button>
           </DrawerClose>
         </DrawerFooter>
       </DrawerContent>
@@ -467,17 +588,21 @@ function StickyActionBar({
   const decided = !!item.decision;
 
   return (
-    <div className="sticky bottom-0 inset-x-0 bg-background/80 backdrop-blur-xl border-t border-border p-4 pb-[max(1rem,env(safe-area-inset-bottom))] z-20">
+    <div className="sticky bottom-0 inset-x-0 bg-[#0a0a1a]/70 backdrop-blur-2xl border-t border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] z-20">
       <div className="max-w-xl mx-auto">
         {decided ? (
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-white/60">
               {item.decision === "approved"
                 ? "✓ Aprovado por você"
                 : "✏ Ajuste enviado"}
             </span>
             {canScrollNext && (
-              <Button size="lg" onClick={onNext}>
+              <Button
+                size="lg"
+                onClick={onNext}
+                className="bg-white/5 backdrop-blur-xl border border-white/10 text-white hover:bg-white/10"
+              >
                 Próxima arte
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
@@ -486,12 +611,12 @@ function StickyActionBar({
         ) : revisionOpen ? (
           <div className="space-y-3 animate-in slide-in-from-bottom-4 duration-200">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-amber-600">
+              <span className="text-xs font-medium text-amber-300">
                 Descreva o ajuste
               </span>
               <span
                 className={`text-[11px] tabular-nums ${
-                  feedback.length > 500 ? "text-destructive" : "text-muted-foreground"
+                  feedback.length > 500 ? "text-red-400" : "text-white/50"
                 }`}
               >
                 {feedback.length}/500
@@ -503,7 +628,7 @@ function StickyActionBar({
               maxLength={500}
               placeholder="Descreva o ajuste necessário com clareza…"
               rows={3}
-              className="resize-none"
+              className="resize-none bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-blue-500/40 focus-visible:border-blue-500/50"
               autoFocus
             />
             <div className="grid grid-cols-2 gap-3">
@@ -511,15 +636,17 @@ function StickyActionBar({
                 variant="ghost"
                 onClick={() => setRevisionOpen(false)}
                 disabled={submitting}
+                className="text-white/70 hover:text-white hover:bg-white/5"
               >
                 Cancelar
               </Button>
               <Button
                 onClick={() => onSubmit(item, "revision")}
                 disabled={submitting || feedback.trim().length === 0}
+                className="bg-gradient-to-r from-blue-500 to-violet-500 hover:from-blue-600 hover:to-violet-600 text-white shadow-lg shadow-blue-500/30"
               >
                 {submitting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin text-white" />
                 ) : null}
                 Enviar ajuste
               </Button>
@@ -529,7 +656,7 @@ function StickyActionBar({
           <div className="grid grid-cols-2 gap-3">
             <Button
               size="lg"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-shadow"
               onClick={() => onSubmit(item, "approved")}
               disabled={submitting}
             >
@@ -542,9 +669,9 @@ function StickyActionBar({
             </Button>
             <Button
               size="lg"
-              variant="outline"
               onClick={() => setRevisionOpen(true)}
               disabled={submitting}
+              className="bg-white/5 backdrop-blur-xl border border-white/10 text-white hover:bg-white/10"
             >
               <Pencil className="h-4 w-4 mr-2" />
               Solicitar Ajuste
@@ -573,37 +700,60 @@ function AllDoneScreen({
     : null;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
-      <div className="animate-in zoom-in-50 fade-in duration-500">
-        <CheckCircle2 className="h-20 w-20 text-emerald-500 mx-auto" />
-      </div>
-      <h1 className="mt-6 text-2xl font-semibold tracking-tight">Tudo pronto!</h1>
-      <p className="mt-2 text-sm text-muted-foreground max-w-sm">
-        Agradecemos o seu feedback. A agência já foi notificada.
-      </p>
+    <div className="relative min-h-screen flex flex-col items-center justify-center px-6 text-center">
+      {/* Emerald glow on top */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[50vh]"
+        style={{
+          background:
+            "radial-gradient(ellipse at top, rgba(16,185,129,0.15) 0%, transparent 60%)",
+        }}
+      />
 
-      <div className="flex flex-col gap-3 mt-8 w-full max-w-xs">
-        {waUrl && (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.85, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 flex flex-col items-center"
+      >
+        <div className="relative">
+          <span className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping" />
+          <CheckCircle2 className="relative h-24 w-24 text-emerald-400 drop-shadow-[0_0_30px_rgba(16,185,129,0.6)]" />
+        </div>
+
+        <h1 className="mt-8 text-3xl font-bold tracking-tight text-white">Tudo pronto!</h1>
+        <p className="mt-3 text-sm text-white/60 max-w-sm leading-relaxed">
+          Agradecemos o seu feedback. A agência já foi notificada.
+        </p>
+
+        <div className="flex flex-col gap-3 mt-10 w-full max-w-xs">
+          {waUrl && (
+            <Button
+              size="lg"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/40 hover:shadow-emerald-500/60 transition-shadow"
+              asChild
+            >
+              <a href={waUrl} target="_blank" rel="noopener noreferrer">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Falar com o meu Gestor
+              </a>
+            </Button>
+          )}
           <Button
             size="lg"
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            asChild
+            onClick={onReview}
+            className="bg-white/5 backdrop-blur-xl border border-white/10 text-white hover:bg-white/10"
           >
-            <a href={waUrl} target="_blank" rel="noopener noreferrer">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Falar com o meu Gestor
-            </a>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Rever aprovações
           </Button>
-        )}
-        <Button size="lg" variant="outline" onClick={onReview}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Rever aprovações
-        </Button>
-      </div>
+        </div>
 
-      <footer className="mt-16 text-[11px] uppercase tracking-[0.25em] text-muted-foreground/60">
-        {agency.name} · Powered by Orbity
-      </footer>
+        <footer className="mt-16 text-[11px] uppercase tracking-[0.25em] text-white/30">
+          {agency.name} · Powered by Orbity
+        </footer>
+      </motion.div>
     </div>
   );
 }
@@ -612,7 +762,7 @@ function AllDoneScreen({
 
 function CenterShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6">
+    <div className="flex flex-1 flex-col items-center justify-center px-6">
       {children}
     </div>
   );
@@ -622,34 +772,39 @@ function ExpiredOrErrorScreen({ error }: { error: ErrorPayload }) {
   const isExpired = error.error === "expired" || error.error === "completed";
   return (
     <CenterShell>
-      <Card className="max-w-lg w-full">
-        <CardContent className="pt-10 pb-8 px-8 text-center">
-          <div className="mx-auto h-14 w-14 rounded-full bg-muted flex items-center justify-center mb-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        className="max-w-lg w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl"
+      >
+        <div className="pt-10 pb-8 px-8 text-center">
+          <div className="mx-auto h-14 w-14 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6">
             {isExpired ? (
-              <Clock className="h-7 w-7 text-muted-foreground" />
+              <Clock className="h-7 w-7 text-white/60" />
             ) : (
-              <AlertTriangle className="h-7 w-7 text-muted-foreground" />
+              <AlertTriangle className="h-7 w-7 text-white/60" />
             )}
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight mb-3">
+          <h1 className="text-2xl font-semibold tracking-tight mb-3 text-white">
             {error.error === "completed"
               ? "Aprovação concluída"
               : isExpired
               ? "Link expirado"
               : "Link indisponível"}
           </h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">{error.message}</p>
+          <p className="text-sm text-white/50 leading-relaxed">{error.message}</p>
           <Button
             variant="ghost"
-            className="mt-8"
+            className="mt-8 text-white/70 hover:text-white hover:bg-white/5"
             onClick={() =>
               window.history.length > 1 ? window.history.back() : window.close()
             }
           >
             Voltar
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </motion.div>
     </CenterShell>
   );
 }
