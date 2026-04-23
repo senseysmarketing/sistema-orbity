@@ -47,6 +47,8 @@ import { TaskAnalytics } from "@/components/tasks/TaskAnalytics";
 import { TaskDetailsDialog } from "@/components/tasks/TaskDetailsDialog";
 import { TaskStatusManager } from "@/components/tasks/TaskStatusManager";
 import { TaskTypeManager } from "@/components/tasks/TaskTypeManager";
+import { TasksSettings, type TasksSettingsView } from "@/components/tasks/TasksSettings";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { TaskTemplateManager } from "@/components/templates/TaskTemplateManager";
 import { TemplateSelector } from "@/components/templates/TemplateSelector";
 import { QuickTemplatesDropdown } from "@/components/templates/QuickTemplatesDropdown";
@@ -1378,6 +1380,35 @@ export default function Tasks() {
           <p className="text-sm md:text-base text-muted-foreground">Painel completo para gerenciamento e acompanhamento de tarefas</p>
         </div>
         <div className="flex items-center gap-2">
+          <Sheet
+            open={tasksSettingsOpen}
+            onOpenChange={(open) => {
+              setTasksSettingsOpen(open);
+              if (!open) setTasksSettingsView("hub");
+            }}
+          >
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" title="Configurações de Tarefas">
+                <Settings className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent
+              side="right"
+              className={cn(
+                "w-full overflow-y-auto border-l transition-[max-width] duration-300",
+                {
+                  "sm:max-w-md": tasksSettingsView === "hub",
+                  "sm:max-w-3xl": tasksSettingsView === "templates",
+                  "sm:max-w-2xl": tasksSettingsView === "types" || tasksSettingsView === "statuses",
+                }
+              )}
+            >
+              <SheetHeader className="mb-6">
+                <SheetTitle className="text-2xl font-bold">Configurações de Tarefas</SheetTitle>
+              </SheetHeader>
+              <TasksSettings onViewChange={setTasksSettingsView} />
+            </SheetContent>
+          </Sheet>
           {templates.length > 0 && (
             <QuickTemplatesDropdown
               templates={templates}
@@ -1789,7 +1820,7 @@ export default function Tasks() {
       </div>
 
       <Tabs defaultValue="tasks" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-2 lg:w-auto">
           <TabsTrigger value="tasks" className="flex items-center gap-2">
             <LayoutGrid className="h-4 w-4" />
             <span className="hidden sm:inline">Tarefas</span>
@@ -1797,10 +1828,6 @@ export default function Tasks() {
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             <span className="hidden sm:inline">Análises</span>
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            <span className="hidden sm:inline">Configurações</span>
           </TabsTrigger>
         </TabsList>
 
@@ -2070,34 +2097,6 @@ export default function Tasks() {
             clients={clients}
             getAssignedUsers={getAssignedUsers}
           />
-        </TabsContent>
-
-        <TabsContent value="settings" className="space-y-6">
-          <Tabs defaultValue="templates" className="space-y-4">
-            <TabsList className="flex w-full overflow-x-auto scrollbar-hide">
-              <TabsTrigger value="templates" className="flex-shrink-0 gap-1 md:gap-2">
-                <FileText className="h-4 w-4" />
-                <span className="hidden sm:inline">Templates</span>
-              </TabsTrigger>
-              <TabsTrigger value="types" className="flex-shrink-0 gap-1 md:gap-2">
-                <Tag className="h-4 w-4" />
-                <span className="hidden sm:inline">Tipos</span>
-              </TabsTrigger>
-              <TabsTrigger value="statuses" className="flex-shrink-0 gap-1 md:gap-2">
-                <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">Status</span>
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="templates">
-              <TaskTemplateManager />
-            </TabsContent>
-            <TabsContent value="types">
-              <TaskTypeManager />
-            </TabsContent>
-            <TabsContent value="statuses">
-              <TaskStatusManager />
-            </TabsContent>
-          </Tabs>
         </TabsContent>
       </Tabs>
 
