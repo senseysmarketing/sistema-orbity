@@ -263,8 +263,8 @@ export function StripeIntegration() {
           )}
         </div>
 
-        <Alert className="bg-violet-50/50 border-violet-200 dark:bg-violet-950/30 dark:border-violet-800">
-          <Info className="h-4 w-4 text-violet-500" />
+        <Alert className="bg-muted/50 border-border">
+          <Info className="h-4 w-4 text-primary" />
           <AlertDescription className="text-xs space-y-2 ml-2">
             <p className="font-semibold text-sm">Como configurar na Stripe</p>
             <ol className="space-y-1.5 list-decimal list-outside pl-5 text-muted-foreground">
@@ -273,7 +273,7 @@ export function StripeIntegration() {
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {["checkout.session.completed", "payment_intent.succeeded", "payment_intent.payment_failed"].map((e) => (
                     <span key={e} className="flex items-center gap-1 font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-500" /> {e}
+                      <CheckCircle2 className="h-3 w-3 text-primary" /> {e}
                     </span>
                   ))}
                 </div>
