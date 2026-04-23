@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { Flag, MoreHorizontal, RotateCw, Pencil, Trash2 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -137,7 +137,7 @@ export function TaskListView({
             </AccordionTrigger>
             <AccordionContent className="p-0">
               <div className="w-full">
-                <Table className="table-fixed w-full">
+                <table className="table-fixed w-full caption-bottom text-sm">
                   <colgroup>
                     <col style={{ width: "40px" }} />
                     <col style={{ width: "32px" }} />
@@ -305,7 +305,7 @@ export function TaskListView({
                       );
                     })}
                   </TableBody>
-                </Table>
+                </table>
               </div>
             </AccordionContent>
           </AccordionItem>
