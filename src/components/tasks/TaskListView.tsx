@@ -137,7 +137,17 @@ export function TaskListView({
             </AccordionTrigger>
             <AccordionContent className="p-0">
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="table-fixed w-full">
+                  <colgroup>
+                    <col style={{ width: "40px" }} />
+                    <col style={{ width: "32px" }} />
+                    <col />
+                    <col style={{ width: "180px" }} />
+                    <col style={{ width: "160px" }} />
+                    <col style={{ width: "90px" }} />
+                    <col style={{ width: "110px" }} />
+                    <col style={{ width: "40px" }} />
+                  </colgroup>
                   <TableBody>
                     {groupTasks.map((task) => {
                       const isDone = task.status === "done";
@@ -172,18 +182,21 @@ export function TaskListView({
                           </TableCell>
 
                           {/* Título */}
-                          <TableCell className="py-1.5 whitespace-nowrap">
-                            <span
-                              className={cn(
-                                "text-sm font-normal",
-                                isDone && "opacity-60 line-through",
+                          <TableCell className="py-1.5 max-w-0">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span
+                                className={cn(
+                                  "text-sm font-normal truncate",
+                                  isDone && "opacity-60 line-through",
+                                )}
+                                title={task.title}
+                              >
+                                {task.title}
+                              </span>
+                              {task.is_recurring && (
+                                <RotateCw className="h-3 w-3 shrink-0 text-muted-foreground" />
                               )}
-                            >
-                              {task.title}
-                            </span>
-                            {task.is_recurring && (
-                              <RotateCw className="h-3 w-3 inline ml-1 text-muted-foreground" />
-                            )}
+                            </div>
                           </TableCell>
 
                           {/* Cliente */}
