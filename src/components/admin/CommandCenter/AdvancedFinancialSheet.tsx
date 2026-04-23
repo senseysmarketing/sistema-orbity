@@ -97,6 +97,42 @@ export function AdvancedFinancialSheet({
     [forecastRecurringExpenses]
   );
 
+  // ============ DRE STATEMENT ============
+  const dre = useDREStatement({
+    cashFlow,
+    isForecastMode,
+    totalForecastMRR,
+    totalActivePayroll,
+    totalForecastFixed,
+    historicalCashFlow,
+  });
+
+  const handleCopyDRE = async () => {
+    const fmt = (v: number) => formatCurrency(v).padStart(16);
+    const lines = [
+      `📊 DRE — ${monthLabel}${isForecastMode ? ' (Projeção)' : ''}`,
+      ``,
+      `Receita Bruta:        ${fmt(dre.receitaBruta)}`,
+      `(–) Impostos:         ${fmt(dre.impostos)}${dre.isProjectedTax ? ` (taxa ${(dre.effectiveTaxRate * 100).toFixed(1)}%)` : ''}`,
+      `= Receita Líquida:    ${fmt(dre.receitaLiquida)}`,
+      `(–) Custos Oper.:     ${fmt(dre.custosOper)}`,
+      `(–) Folha Pgto:       ${fmt(dre.folhaPag)}`,
+      `= EBITDA:             ${fmt(dre.ebitda)}`,
+      `Margem Líquida:       ${dre.margemPct.toFixed(1)}%`,
+    ].join('\n');
+
+    try {
+      await navigator.clipboard.writeText(lines);
+      toast({ title: "Resumo copiado", description: "Cole no WhatsApp ou e-mail." });
+    } catch {
+      toast({ title: "Erro ao copiar", variant: "destructive" });
+    }
+  };
+
+  const handlePrintDRE = () => {
+    window.print();
+  };
+
   // 90-day chart data: M+1, M+2, M+3 from current real month
   const chartData = useMemo(() => {
     const now = new Date();
