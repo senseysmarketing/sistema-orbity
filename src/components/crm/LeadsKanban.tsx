@@ -38,6 +38,40 @@ interface Lead {
   created_by: string;
 }
 
+// ===== Pure helpers hoisted to module scope (created once, zero per-render allocation) =====
+const getPriorityColor = (priority: string) => {
+  switch (priority) {
+    case 'hot': return 'bg-red-100 text-red-800 border-red-200';
+    case 'warm': return 'bg-orange-100 text-orange-800 border-orange-200';
+    case 'cold': return 'bg-blue-100 text-blue-800 border-blue-200';
+    default: return 'bg-gray-100 text-gray-800 border-gray-200';
+  }
+};
+
+const getPriorityLabel = (priority: string) => getTemperatureLabel(priority);
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
+const formatDate = (date: string | null) => {
+  if (!date) return '-';
+  return new Date(date).toLocaleDateString('pt-BR');
+};
+
+const getUrgencyLevel = (lead: Lead) => {
+  const today = new Date();
+  const nextContact = lead.next_contact ? new Date(lead.next_contact) : null;
+
+  if (nextContact && nextContact < today) {
+    return { level: 'urgent', label: 'Urgente', color: 'bg-red-100 text-red-800' };
+  } else if (nextContact && nextContact.getTime() - today.getTime() <= 86400000) {
+    return { level: 'today', label: 'Hoje', color: 'bg-yellow-100 text-yellow-800' };
+  } else if (lead.temperature === 'hot') {
+    return { level: 'high', label: 'Quente', color: 'bg-orange-100 text-orange-800' };
+  }
+  return { level: 'normal', label: 'Normal', color: 'bg-gray-100 text-gray-800' };
+};
+
 interface LeadsKanbanProps {
   leads: Lead[];
   onEdit: (lead: Lead) => void;
@@ -113,44 +147,7 @@ export function LeadsKanban({ leads, onEdit, onDelete, onUpdate, onView, onSched
     }),
   );
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'hot': return 'bg-red-100 text-red-800 border-red-200';
-      case 'warm': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'cold': return 'bg-blue-100 text-blue-800 border-blue-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getPriorityLabel = (priority: string) => {
-    return getTemperatureLabel(priority);
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value);
-  };
-
-  const formatDate = (date: string | null) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString('pt-BR');
-  };
-
-  const getUrgencyLevel = (lead: Lead) => {
-    const today = new Date();
-    const nextContact = lead.next_contact ? new Date(lead.next_contact) : null;
-    
-    if (nextContact && nextContact < today) {
-      return { level: 'urgent', label: 'Urgente', color: 'bg-red-100 text-red-800' };
-    } else if (nextContact && nextContact.getTime() - today.getTime() <= 86400000) {
-      return { level: 'today', label: 'Hoje', color: 'bg-yellow-100 text-yellow-800' };
-    } else if (lead.temperature === 'hot') {
-      return { level: 'high', label: 'Quente', color: 'bg-orange-100 text-orange-800' };
-    }
-    return { level: 'normal', label: 'Normal', color: 'bg-gray-100 text-gray-800' };
-  };
+  // Pure helpers (getPriorityColor/Label, formatCurrency/Date, getUrgencyLevel) hoisted to module scope.
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
