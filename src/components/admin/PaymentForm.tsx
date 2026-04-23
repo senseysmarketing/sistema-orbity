@@ -154,7 +154,7 @@ export function PaymentForm({ open, onOpenChange, onSuccess, payment, preselecte
     }
   };
 
-  const billingTypeLabel = (bt: string) => bt === 'manual' ? 'Manual' : bt === 'asaas' ? 'Asaas' : 'Conexa';
+  const billingTypeLabel = (bt: string) => bt === 'manual' ? 'Manual' : bt === 'asaas' ? 'Asaas' : bt === 'stripe' ? 'Stripe' : 'Conexa';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
