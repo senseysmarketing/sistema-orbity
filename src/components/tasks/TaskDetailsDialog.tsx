@@ -646,22 +646,39 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                       </div>
                     )}
                     {/* Histórico de mudanças */}
-                    {history.map((entry: any, index: number) => (
-                      <div key={index} className="flex items-start gap-2 p-2 rounded-md bg-muted/50">
-                        <div className="flex-1">
-                          <p className="text-sm">{entry.action || `Status: ${entry.status}`}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{format(new Date(entry.timestamp), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
-                            {entry.user_name && (
-                              <>
-                                <span>•</span>
-                                <span>por {entry.user_name}</span>
-                              </>
+                    {history.map((entry: any, index: number) => {
+                      const isExternal = entry.type === 'external_approval';
+                      const label = isExternal
+                        ? entry.decision === 'approved'
+                          ? '✅ Aprovado pelo cliente'
+                          : '❌ Rejeitado pelo cliente'
+                        : entry.action
+                        ? entry.action
+                        : entry.status
+                        ? `Status: ${entry.status}`
+                        : 'Atualização registrada';
+                      const when = entry.timestamp || entry.at;
+                      const who = entry.user_name || entry.user || (isExternal ? 'Cliente' : null);
+                      return (
+                        <div key={index} className="flex items-start gap-2 p-2 rounded-md bg-muted/50">
+                          <div className="flex-1">
+                            <p className="text-sm">{label}</p>
+                            {isExternal && entry.decision === 'rejected' && entry.feedback && (
+                              <p className="text-xs text-muted-foreground italic mt-1">"{entry.feedback}"</p>
                             )}
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              {when && <span>{format(new Date(when), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>}
+                              {who && (
+                                <>
+                                  <span>•</span>
+                                  <span>por {who}</span>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </>
