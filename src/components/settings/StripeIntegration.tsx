@@ -142,8 +142,8 @@ export function StripeIntegration() {
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#635BFF]">
-              <Zap className="h-5 w-5 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+              <Zap className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
               <CardTitle className="text-base">Stripe</CardTitle>
