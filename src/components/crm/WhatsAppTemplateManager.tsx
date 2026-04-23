@@ -193,6 +193,43 @@ export function WhatsAppTemplateManager() {
   const queryClient = useQueryClient();
   const { account, isConnected, sendMessage } = useWhatsApp('general');
 
+  // CRM automations toggles (auto-contact / auto-ghosting)
+  const { data: agencyAutomations } = useQuery({
+    queryKey: ['agency-crm-automations', currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return null;
+      const { data, error } = await supabase
+        .from('agencies')
+        .select('whatsapp_auto_contact, whatsapp_auto_ghosting')
+        .eq('id', currentAgency.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentAgency?.id,
+  });
+
+  const autoContact = agencyAutomations?.whatsapp_auto_contact ?? true;
+  const autoGhosting = agencyAutomations?.whatsapp_auto_ghosting ?? false;
+
+  const toggleAutomation = useMutation({
+    mutationFn: async (payload: { field: 'whatsapp_auto_contact' | 'whatsapp_auto_ghosting'; value: boolean }) => {
+      if (!currentAgency?.id) throw new Error('No agency');
+      const { error } = await supabase
+        .from('agencies')
+        .update({ [payload.field]: payload.value })
+        .eq('id', currentAgency.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agency-crm-automations', currentAgency?.id] });
+      toast({ title: 'Configuração atualizada' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao salvar configuração', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['whatsapp-templates', currentAgency?.id],
     queryFn: async () => {
@@ -339,6 +376,50 @@ export function WhatsAppTemplateManager() {
           <Badge variant="secondary" className="gap-1.5">
             <Shield className="h-3 w-3" /> Escudo Anti-Bot ativo
           </Badge>
+        </div>
+      </div>
+
+      {/* Automações do CRM */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold tracking-tight">Automações do CRM</h3>
+          <p className="text-xs text-muted-foreground">
+            Controle como o sistema move leads automaticamente com base nas interações no WhatsApp.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
+          <div className="space-y-0.5 pr-4">
+            <Label htmlFor="auto-contact" className="text-sm font-medium">
+              Mover lead para Contato ao receber resposta
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Quando o lead enviar a primeira mensagem, ele é movido automaticamente para a coluna Em Contato.
+            </p>
+          </div>
+          <Switch
+            id="auto-contact"
+            checked={autoContact}
+            onCheckedChange={(checked) => toggleAutomation.mutate({ field: 'whatsapp_auto_contact', value: checked })}
+            disabled={toggleAutomation.isPending}
+          />
+        </div>
+
+        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
+          <div className="space-y-0.5 pr-4">
+            <Label htmlFor="auto-ghosting" className="text-sm font-medium">
+              Mover para Perdido 24h após o último Follow-up
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Se o lead não responder em até 24 horas após a última mensagem da sequência, será movido para Perdido com o motivo "Ghosting no WhatsApp".
+            </p>
+          </div>
+          <Switch
+            id="auto-ghosting"
+            checked={autoGhosting}
+            onCheckedChange={(checked) => toggleAutomation.mutate({ field: 'whatsapp_auto_ghosting', value: checked })}
+            disabled={toggleAutomation.isPending}
+          />
         </div>
       </div>
 
