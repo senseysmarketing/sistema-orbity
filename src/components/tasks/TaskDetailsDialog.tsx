@@ -117,6 +117,8 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [batchCandidates, setBatchCandidates] = useState<Array<{ id: string; title: string }>>([]);
   const [selectedBatchIds, setSelectedBatchIds] = useState<string[]>([]);
+  const [showMoveToReviewDialog, setShowMoveToReviewDialog] = useState(false);
+  const [movingToReview, setMovingToReview] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const { findBatchCandidates, createLink, isCreating } = useCreateApprovalLink();
 
@@ -143,7 +145,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
     return true;
   };
 
-  const handleSendForApproval = async () => {
+  const proceedWithApproval = async () => {
     if (!localTask) return;
     const hasAttachments = (localTask.attachments?.length ?? 0) > 0;
     if (!hasAttachments) {
@@ -160,6 +162,52 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
     }
     await createLink([localTask.id]);
     onTaskUpdate?.();
+  };
+
+  const handleSendForApproval = async () => {
+    if (!localTask) return;
+    if (localTask.status !== "em_revisao") {
+      setShowMoveToReviewDialog(true);
+      return;
+    }
+    await proceedWithApproval();
+  };
+
+  const handleMoveToReviewAndContinue = async () => {
+    if (!localTask) return;
+    setMovingToReview(true);
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ status: "em_revisao" })
+        .eq("id", localTask.id);
+      if (error) {
+        toast({ title: "Erro ao mover tarefa", description: error.message, variant: "destructive" });
+        return;
+      }
+      setLocalTask({ ...localTask, status: "em_revisao" } as Task);
+      onTaskUpdate?.();
+      setShowMoveToReviewDialog(false);
+      // Use updated reference for downstream logic
+      const updated = { ...localTask, status: "em_revisao" } as Task;
+      const hasAttachments = (updated.attachments?.length ?? 0) > 0;
+      if (!hasAttachments) {
+        toast({ title: "Adicione um anexo antes de enviar para aprovação.", variant: "destructive" });
+        return;
+      }
+      if (!validateAttachmentsForApproval(updated.attachments)) return;
+      const candidates = await findBatchCandidates(updated.id, updated.client_id);
+      if (candidates.length > 0) {
+        setBatchCandidates(candidates);
+        setSelectedBatchIds(candidates.map((c) => c.id));
+        setShowBatchDialog(true);
+        return;
+      }
+      await createLink([updated.id]);
+      onTaskUpdate?.();
+    } finally {
+      setMovingToReview(false);
+    }
   };
 
   const handleConfirmBatch = async (includeBatch: boolean) => {
@@ -714,11 +762,9 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                     </Button>
                   </span>
                 </TooltipTrigger>
-                {(localTask.attachments?.length ?? 0) === 0 && (
-                  <TooltipContent>
-                    Adicione um anexo à tarefa para gerar um link de aprovação.
-                  </TooltipContent>
-                )}
+                <TooltipContent>
+                  A tarefa precisa estar em <strong>Em Revisão</strong> e ter pelo menos um anexo.
+                </TooltipContent>
               </Tooltip>
             </TooltipProvider>
             <Button
@@ -906,6 +952,24 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
             >
               {aiApplying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Aplicar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Mover para Em Revisão antes de gerar link de aprovação */}
+      <AlertDialog open={showMoveToReviewDialog} onOpenChange={setShowMoveToReviewDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mover para Em Revisão?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Para enviar uma tarefa para aprovação do cliente, ela precisa estar na coluna <strong>Em Revisão</strong>. Deseja mover esta tarefa agora e continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={movingToReview}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMoveToReviewAndContinue} disabled={movingToReview}>
+              {movingToReview ? "Movendo..." : "Mover e Continuar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
