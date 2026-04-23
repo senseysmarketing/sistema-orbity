@@ -59,7 +59,6 @@ export function StripeIntegration() {
       setWebhookSecret(w ? maskKey(w) : "");
       setActiveGateway((row.active_payment_gateway as "asaas" | "stripe") ?? "asaas");
       setHadKey(!!k);
-      setHadWh(!!w);
     }
   }, [row]);
 
