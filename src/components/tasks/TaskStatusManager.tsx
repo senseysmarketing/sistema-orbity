@@ -151,16 +151,29 @@ export function TaskStatusManager() {
     enabled: !!currentAgency?.id,
   });
 
-  // Inicializar status padrão no banco se não existirem
+  // Inicializar status padrão no banco se não existirem (e migrar 'approved')
   const initializeDefaultsMutation = useMutation({
     mutationFn: async () => {
       const existingDefaults = dbStatuses.filter((s) => s.is_default);
-      if (existingDefaults.length >= DEFAULT_STATUSES.length) return;
-
       const existingSlugs = existingDefaults.map((s) => s.slug);
       const missingDefaults = DEFAULT_STATUSES.filter(
         (d) => !existingSlugs.includes(d.slug)
       );
+
+      // Caso especial: se 'approved' está faltando mas 'done' existe,
+      // re-numerar para inserir 'approved' entre 'em_revisao' e 'done'.
+      const needsApprovedSeed =
+        !existingSlugs.includes("approved") && existingSlugs.includes("done");
+
+      if (needsApprovedSeed) {
+        const doneRow = existingDefaults.find((s) => s.slug === "done");
+        if (doneRow) {
+          await supabase
+            .from("task_statuses")
+            .update({ order_position: 4 })
+            .eq("id", doneRow.id);
+        }
+      }
 
       if (missingDefaults.length === 0) return;
 
