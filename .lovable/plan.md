@@ -1,42 +1,55 @@
 
 
-# Ajustes na integração Stripe da Agência
+# Otimização extrema do Kanban de Leads (60fps)
 
-Alinhar a UX/lógica do Stripe ao padrão Asaas/Conexa: **gateway é escolhido na hora de gerar a cobrança**, não há "principal".
+## 1. `src/components/crm/LeadsKanban.tsx` — Hoisting de funções puras
 
-## 1. `src/components/settings/StripeIntegration.tsx`
+Mover as 5 funções auxiliares para o **escopo do módulo** (topo do arquivo, fora do componente):
 
-- **Remover** o seletor "Gateway principal de cobrança" (Asaas vs Stripe) — desnecessário.
-- **Adicionar** Master Switch `Habilitar Stripe` (idêntico ao do Asaas):
-  - Card com `Switch`, label "Habilitar Stripe" + descrição "Disponibiliza Stripe como opção de faturamento para clientes".
-  - Estado `stripeEnabled` derivado de `active_payment_gateway === 'stripe'` (reutilizando a coluna como flag de "habilitado/desabilitado", já que o switch substitui o seletor).
-- **Badge** no header: "Conectado" (verde) quando `hasKey && stripeEnabled`, senão "Desconectado". Mesma lógica visual do Asaas.
-- **Alert "Como configurar na Stripe"**: refatorar para usar o mesmo padrão visual do Asaas — `bg-blue-50/50 border-blue-200 dark:bg-blue-950/30`, ícone `Info` azul, título `text-blue-800 dark:text-blue-300`, lista numerada com `leading-relaxed`, eventos do webhook listados com `CheckCircle2 emerald` + descrição em texto (não chips).
-- Botão final: "Salvar e Conectar" (mesmo label do Asaas).
-- Lógica de `handleSave` atualiza `active_payment_gateway` para `'stripe'` se switch ON, ou `'asaas'` (default) se OFF — tratando a coluna como flag binária de "Stripe habilitado".
+- `getPriorityColor(priority: string)`
+- `getPriorityLabel(priority: string)`
+- `formatCurrency(value: number)`
+- `formatDate(date: string | null)`
+- `getUrgencyLevel(lead: Lead)`
 
-## 2. `src/hooks/useCreatePayment.ts`
+Como são puras (sem dependências de state/props), criar uma única vez no load do módulo. Remover qualquer `useCallback` redundante.
 
-- **Reverter** o roteamento automático baseado em `active_payment_gateway`. O hook deve continuar respeitando o `billing_type` escolhido no formulário de criação de cobrança (Asaas/Conexa/Manual/Stripe).
-- Adicionar suporte a `billing_type === 'stripe'` → invoca `create-agency-stripe-charge` (mantém a edge function como está).
-- Demais billing types seguem o fluxo atual via `create-gateway-charge`.
+## 2. Auditoria de props inline no caminho até `SortableLeadCard`
 
-## 3. UI de criação de cobrança (formulário "Gerar cobrança")
+Inspecionar `LeadsKanban` → `LeadKanbanColumn` → `SortableLeadCard` e garantir que **nenhuma prop funcional seja inline**:
 
-- No seletor de método/gateway (onde já aparecem Asaas/Conexa/Manual), **adicionar opção "Stripe"** quando a agência tem `stripe_secret_key` configurada e `active_payment_gateway === 'stripe'` (flag de habilitado).
-- Hook `usePaymentGateway`: retornar flag `stripe_enabled` derivada (`stripe_secret_key != null && active_payment_gateway === 'stripe'`) para o seletor exibir/ocultar a opção.
+- `onEdit`, `onDelete`, `onView`, `onScheduleMeeting` → estabilizar com `useCallback` no `LeadsKanban` (dependências mínimas: setters/mutations, que já são estáveis).
+- Se algum handler atualmente faz `(lead) => openEdit(lead)` inline, refatorar para `useCallback((lead) => ...)`.
+- `LeadKanbanColumn` deve repassar essas refs estáveis sem wrapping inline.
 
-## Sem mudanças
+Sem isso, `memo` no card é inerte.
 
-- Edge functions (`create-agency-stripe-charge`, `stripe-agency-webhook`, `test-agency-stripe`) — preservadas.
-- Migration / schema — preservada (a coluna `active_payment_gateway` agora atua como flag de habilitação do Stripe).
-- `AsaasIntegration.tsx`, `ConexaIntegration.tsx` — preservados.
-- Stripe Master (assinatura Orbity) — intocável.
+## 3. `src/components/crm/SortableLeadCard.tsx` — memo + GPU + useMemo
+
+- `import { memo, useMemo } from "react"`
+- Trocar `CSS.Transform.toString(transform)` → `CSS.Translate.toString(transform)` (ativa `translate3d` na GPU).
+- Memoizar `currentStatusConfig` com `useMemo([statusConfig, displayStatus])`.
+- Exportar como:
+  ```ts
+  export const SortableLeadCard = memo(function SortableLeadCard(props: SortableLeadCardProps) { ... });
+  ```
+  Mantém Fast Refresh com export nomeado.
+
+## Sem alterações
+
+- Estética, classes Tailwind, JSX, animações de hover, lógica WhatsApp/Reunião.
+- `LeadKanbanColumn` (apenas verificar que não recria handlers inline ao repassar).
+- Lógica de `handleDragEnd`, atualização otimista, Meta events.
 
 ## Arquivos editados
 
-- `src/components/settings/StripeIntegration.tsx` — remover seletor, adicionar switch, refatorar Alert no padrão azul.
-- `src/hooks/useCreatePayment.ts` — roteamento por `billing_type`, não por `active_payment_gateway`.
-- `src/hooks/usePaymentGateway.tsx` — flag `stripe_enabled`.
-- Componente do formulário de criação de cobrança — adicionar opção Stripe no seletor de método.
+- `src/components/crm/LeadsKanban.tsx` — hoist de 5 funções puras + `useCallback` em handlers passados aos cards.
+- `src/components/crm/SortableLeadCard.tsx` — `memo`, `CSS.Translate`, `useMemo` em `currentStatusConfig`.
+- `src/components/crm/LeadKanbanColumn.tsx` — apenas se houver wrapping inline a corrigir (verificar e ajustar).
+
+## Resultado
+
+- Funções puras: zero alocação por render.
+- Handlers estáveis + `memo`: cards não-arrastados não re-renderizam durante o drag.
+- `CSS.Translate`: transform via GPU, libera CPU → 60fps consistentes.
 
