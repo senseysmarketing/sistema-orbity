@@ -54,8 +54,8 @@ async function configureWebhook(apiUrl: string, apiKey: string, instanceName: st
       return { success: res.ok, data };
     }
   } catch (e) {
-    console.error('[whatsapp-connect] Webhook configuration failed:', e.message);
-    return { success: false, error: e.message };
+    console.error('[whatsapp-connect] Webhook configuration failed:', (e as Error).message);
+    return { success: false, error: (e as Error).message };
   }
 }
 
@@ -136,7 +136,7 @@ serve(async (req) => {
             throw new Error(`Evolution API error: ${JSON.stringify(createData)}`);
           }
         } catch (e) {
-          console.log('Instance create result:', e.message);
+          console.log('Instance create result:', (e as Error).message);
         }
 
         // Configure webhook automatically
@@ -224,7 +224,7 @@ serve(async (req) => {
                 if (cleaned) connectedPhone = cleaned;
               }
             } catch (e) {
-              console.log('[whatsapp-connect] fetchInstances failed:', e.message);
+              console.log('[whatsapp-connect] fetchInstances failed:', (e as Error).message);
             }
           }
 
@@ -263,7 +263,7 @@ serve(async (req) => {
                   .eq('id', account.id);
               }
             } catch (qrErr) {
-              console.log('QR fetch error (non-critical):', qrErr.message);
+              console.log('QR fetch error (non-critical):', (qrErr as Error).message);
             }
           }
 
@@ -274,7 +274,7 @@ serve(async (req) => {
             qr_code,
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         } catch (apiErr) {
-          console.log('Evolution API status check failed:', apiErr.message);
+          console.log('Evolution API status check failed:', (apiErr as Error).message);
           return new Response(JSON.stringify({
             success: true,
             status: account.status,
@@ -301,7 +301,7 @@ serve(async (req) => {
               headers: { 'apikey': effectiveKey },
             });
           } catch (e) {
-            console.log('Logout error (non-critical):', e.message);
+            console.log('Logout error (non-critical):', (e as Error).message);
           }
 
           await supabase
@@ -398,7 +398,7 @@ serve(async (req) => {
             webhook_url: currentUrl,
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         } catch (e) {
-          console.error('[whatsapp-connect] Webhook check failed:', e.message);
+          console.error('[whatsapp-connect] Webhook check failed:', (e as Error).message);
           const result = await configureWebhook(effectiveUrl, effectiveKey, account.instance_name);
           return new Response(JSON.stringify({
             success: true,
@@ -413,7 +413,7 @@ serve(async (req) => {
     }
   } catch (error) {
     console.error('whatsapp-connect error:', error);
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
+    return new Response(JSON.stringify({ success: false, error: (error as Error).message }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
