@@ -10,7 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
-  Building2, Users, Calendar as CalendarIcon, DollarSign, Clock, RotateCcw,
+  Building2, Users, Calendar as CalendarIcon, Clock, RotateCcw,
   Mail, Phone, Globe, MessageCircle, Activity, TrendingUp, ExternalLink,
   CheckCircle2, AlertCircle, MinusCircle, Loader2, FileText, CreditCard,
 } from 'lucide-react';
@@ -173,7 +173,7 @@ export function AgencyDetailsSheet({ open, onOpenChange, agency }: AgencyDetails
     if (currentTrialEnd > now) {
       const days = differenceInDays(currentTrialEnd, now);
       return (
-        <p className="text-xs text-blue-600">
+        <p className="text-xs text-primary">
           Trial ativo até {format(currentTrialEnd, 'dd/MM/yyyy', { locale: ptBR })} ({days} dia{days !== 1 ? 's' : ''} restantes)
         </p>
       );
