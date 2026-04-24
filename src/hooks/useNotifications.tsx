@@ -332,10 +332,29 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   );
 }
 
+const noopAsync = async () => {};
+
+const fallbackContext: NotificationContextType = {
+  notifications: [],
+  loading: false,
+  unreadCount: 0,
+  fetchNotifications: noopAsync,
+  markAsRead: noopAsync,
+  markAllAsRead: noopAsync,
+  archiveNotification: noopAsync,
+  deleteNotification: noopAsync,
+  enableDoNotDisturb: noopAsync,
+};
+
 export function useNotifications() {
   const context = useContext(NotificationContext);
+  // Fail-open: se o componente for montado fora do NotificationProvider
+  // (ex: durante transição de rota), retorna um contexto vazio em vez de crashar.
   if (context === undefined) {
-    throw new Error('useNotifications must be used within a NotificationProvider');
+    if (import.meta.env.DEV) {
+      console.warn('[useNotifications] usado fora do NotificationProvider — retornando fallback vazio.');
+    }
+    return fallbackContext;
   }
   return context;
 }
