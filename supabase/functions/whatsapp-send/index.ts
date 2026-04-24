@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { phoneVariants } from "../_shared/phone.ts";
 
 // Normalize phone to digits-only with Brazil country code 55.
 function normalizeBrazilPhone(phone: string): string {
@@ -51,11 +52,14 @@ serve(async (req) => {
     // Ensure conversation exists
     let convId = conversation_id;
     if (!convId) {
+      // Elastic search: handle Brazilian 9th-digit variations
+      const variations = phoneVariants(phone_number);
       const { data: existingConv } = await supabase
         .from('whatsapp_conversations')
         .select('id')
         .eq('account_id', account_id)
-        .eq('phone_number', phone_number)
+        .in('phone_number', variations)
+        .limit(1)
         .maybeSingle();
 
       if (existingConv) {

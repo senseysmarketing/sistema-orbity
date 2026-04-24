@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { phoneVariants } from "../_shared/phone.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -111,12 +112,14 @@ serve(async (req) => {
     // Ensure conversation exists
     let convId = conversation_id;
     if (!convId) {
-      // Try to find existing conversation
+      // Elastic search: handle Brazilian 9th-digit variations
+      const variations = phoneVariants(digits);
       const { data: conv } = await supabase
         .from('whatsapp_conversations')
         .select('id')
         .eq('account_id', account_id)
-        .eq('phone_number', digits)
+        .in('phone_number', variations)
+        .limit(1)
         .maybeSingle();
 
       convId = conv?.id;
