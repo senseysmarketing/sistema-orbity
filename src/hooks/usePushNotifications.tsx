@@ -17,6 +17,11 @@ const firebaseConfig = {
 
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
+// Anti-spam: token só é re-salvo se mudar OU após 12h
+const TOKEN_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const LS_TOKEN_KEY = 'orbity_last_saved_push_token';
+const LS_TOKEN_TS_KEY = 'orbity_last_saved_push_token_at';
+
 const isStandalone = (): boolean => {
   if ((navigator as any).standalone === true) return true;
   if (window.matchMedia('(display-mode: standalone)').matches) return true;
@@ -189,6 +194,16 @@ export function PushNotificationProvider({ children }: { children: ReactNode }) 
     };
 
     try {
+      // Guardrail anti-spam: skip se token igual e salvo há < 12h
+      try {
+        const cachedToken = localStorage.getItem(LS_TOKEN_KEY);
+        const cachedAt = Number(localStorage.getItem(LS_TOKEN_TS_KEY) || '0');
+        if (cachedToken === fcmToken && cachedAt && (Date.now() - cachedAt) < TOKEN_REFRESH_INTERVAL_MS) {
+          console.log('[Push] Token cache hit (< 12h), skipping DB save');
+          return;
+        }
+      } catch {}
+
       const { data: existingToken } = await supabase
         .from('push_subscriptions')
         .select('id, is_active')
