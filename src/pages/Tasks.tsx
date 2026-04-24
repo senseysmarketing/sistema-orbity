@@ -1226,6 +1226,7 @@ export default function Tasks() {
       post_date: "",
       hashtags: task.hashtags?.join(", ") || "",
       creative_instructions: task.creative_instructions || "",
+      post_caption: "",
       is_recurring: !!task.is_recurring,
       recurrence_frequency: (task.recurrence_rule?.frequency as RecurrenceFrequency) || "weekly",
       recurrence_interval: task.recurrence_rule?.interval || 1,
