@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
       return json({ error: deleteErr.message || 'Failed to delete agency' }, 500);
     }
 
-    console.info(`[master-delete-agency] agency ${agencyId} (${agency.name}) deleted by user ${claims.claims.sub}`);
+    console.info(`[master-delete-agency] agency ${agencyId} (${agency.name}) deleted by user ${callerId}`);
     return json({ success: true, agency_id: agencyId, agency_name: agency.name });
   } catch (err) {
     console.error('[master-delete-agency] unexpected error:', err);
