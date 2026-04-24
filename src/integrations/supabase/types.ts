@@ -184,6 +184,9 @@ export type Database = {
           max_users: number
           monthly_value: number | null
           name: string
+          onboarding_completed_at: string | null
+          onboarding_discount_eligible: boolean
+          onboarding_widget_dismissed: boolean
           slug: string
           stripe_account_id: string | null
           stripe_customer_id: string | null
@@ -213,6 +216,9 @@ export type Database = {
           max_users?: number
           monthly_value?: number | null
           name: string
+          onboarding_completed_at?: string | null
+          onboarding_discount_eligible?: boolean
+          onboarding_widget_dismissed?: boolean
           slug: string
           stripe_account_id?: string | null
           stripe_customer_id?: string | null
@@ -242,6 +248,9 @@ export type Database = {
           max_users?: number
           monthly_value?: number | null
           name?: string
+          onboarding_completed_at?: string | null
+          onboarding_discount_eligible?: boolean
+          onboarding_widget_dismissed?: boolean
           slug?: string
           stripe_account_id?: string | null
           stripe_customer_id?: string | null
@@ -7628,6 +7637,7 @@ export type Database = {
         Returns: boolean
       }
       cleanup_old_notification_tracking: { Args: never; Returns: undefined }
+      complete_fast_track: { Args: { agency_uuid: string }; Returns: boolean }
       delete_agency_cascade: {
         Args: { p_agency_id: string }
         Returns: undefined
