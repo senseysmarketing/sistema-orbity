@@ -646,6 +646,49 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                   </div>
                 </>
               )}
+
+              {/* Legenda do Post (IA) - apenas para Redes Sociais e Criativos */}
+              {(taskType === "redes_sociais" || taskType === "criativos") && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <MessageSquareWarning className="h-4 w-4 text-muted-foreground" />
+                        Legenda do Post (Para Aprovação)
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleGenerateCaption}
+                        disabled={generatingCaption || aiLoading}
+                      >
+                        {generatingCaption ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4 mr-2" />
+                        )}
+                        Gerar com IA
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={localTask.post_caption ?? ""}
+                      onChange={(e) =>
+                        setLocalTask((prev) =>
+                          prev ? { ...prev, post_caption: e.target.value } : prev
+                        )
+                      }
+                      placeholder="Escreva a legenda ou gere com IA. Ela será exibida ao cliente no link de aprovação."
+                      rows={6}
+                      className="resize-y"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      O texto é salvo automaticamente.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Subtarefas */}
