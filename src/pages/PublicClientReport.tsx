@@ -414,6 +414,40 @@ function ReportDashboard({ data }: { data: ReportData }) {
           </div>
         </motion.div>
 
+        {/* Resultados por Objetivo (dynamic) */}
+        {data.results_by_objective && data.results_by_objective.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.2, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-8"
+          >
+            <h3 className="text-white/50 text-xs uppercase tracking-[0.15em] mb-4 font-medium">
+              Resultados por Objetivo
+            </h3>
+            <div className="grid grid-cols-1 gap-3">
+              {data.results_by_objective.map((r, i) => (
+                <div key={i} className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-white/80 text-sm font-semibold">{r.label}</p>
+                    <p className="text-white/40 text-[11px]">
+                      {r.campaignCount} campanha(s) · {formatCurrency(r.spend)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white text-xl font-black tracking-tight">
+                      <CountUp end={r.total} />
+                    </p>
+                    {r.costPerResult !== null && isFinite(r.costPerResult) && (
+                      <p className="text-white/40 text-[11px]">CPR: {formatCurrency(r.costPerResult)}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         {/* Top Campaigns */}
         {data.top_campaigns.length > 0 && (
           <motion.div
@@ -427,6 +461,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
             <div className="space-y-3">
               {data.top_campaigns.map((campaign, i) => {
                 const cpa = campaign.conversions > 0 ? campaign.spend / campaign.conversions : 0;
+                const labelLower = (campaign.result_label || data.actionTypeLabel || "conversão").toLowerCase();
                 return (
                   <motion.div
                     key={i}
@@ -445,6 +480,26 @@ function ReportDashboard({ data }: { data: ReportData }) {
                     </div>
                     <Progress
                       value={(campaign.spend / maxSpend) * 100}
+                      className="h-1.5 bg-white/[0.06] [&>div]:bg-gradient-to-r [&>div]:from-blue-500 [&>div]:to-violet-500"
+                    />
+                    <div className="flex items-center justify-between mt-1.5">
+                      {campaign.conversions > 0 && (
+                        <p className="text-white/30 text-[11px]">
+                          {campaign.conversions} {labelLower}
+                        </p>
+                      )}
+                      {cpa > 0 && (
+                        <p className="text-white/40 text-[11px] font-medium">
+                          CPR: {formatCurrency(cpa)}
+                        </p>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
                       className="h-1.5 bg-white/[0.06] [&>div]:bg-gradient-to-r [&>div]:from-blue-500 [&>div]:to-violet-500"
                     />
                     <div className="flex items-center justify-between mt-1.5">
