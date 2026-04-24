@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/drawer";
 import { AttachmentsDisplay, type Attachment } from "@/components/ui/file-attachments";
 import { toast, Toaster } from "sonner";
+import { resolveBrandTheme, type BrandThemeKey } from "@/lib/brandThemes";
 
 interface ApprovalItem {
   id: string;
@@ -47,7 +48,15 @@ interface ApprovalItem {
 }
 
 interface ApprovalPayload {
-  agency: { name: string; logo_url: string | null; contact_phone: string | null };
+  agency: {
+    name: string;
+    logo_url: string | null;
+    contact_phone: string | null;
+    brand_theme?: BrandThemeKey | null;
+    public_email?: string | null;
+    public_phone?: string | null;
+    website_url?: string | null;
+  };
   token: string;
   expires_at: string;
   status: string;
@@ -87,19 +96,36 @@ const headerVariants = {
 
 /* ============== Cinematic Background Shell ============== */
 
-function CinematicShell({ children }: { children: React.ReactNode }) {
+function CinematicShell({
+  children,
+  themeKey,
+  agency,
+}: {
+  children: React.ReactNode;
+  themeKey?: BrandThemeKey | null;
+  agency?: ApprovalPayload["agency"] | null;
+}) {
+  const t = resolveBrandTheme(themeKey);
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#0a0a1a] text-white">
-      {/* Radial gradients */}
+    <div className={`relative min-h-screen overflow-hidden ${t.bgClass} text-white`}>
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse at top, rgba(59,130,246,0.08) 0%, transparent 60%), radial-gradient(ellipse at bottom right, rgba(139,92,246,0.05) 0%, transparent 50%)",
-        }}
+        style={t.overlayStyle}
       />
       <div className="relative z-10 flex min-h-screen flex-col">{children}</div>
+
+      {/* Agency contact footer */}
+      {agency && (agency.public_email || agency.public_phone || agency.website_url) && (
+        <div className="relative z-10 px-4 pb-14 pt-2">
+          <p className="text-[10px] text-white/40 text-center">
+            {[agency.public_phone, agency.public_email, agency.website_url]
+              .filter(Boolean)
+              .join("  ·  ")}
+          </p>
+        </div>
+      )}
+
       {/* Global Powered by Orbity footer */}
       <div className="fixed bottom-2 inset-x-0 text-center pointer-events-none z-10">
         <span className="text-[11px] uppercase tracking-[0.3em] text-white/40">
