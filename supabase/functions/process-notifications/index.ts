@@ -219,6 +219,19 @@ function getTodayInBrasilia(): Date {
   return nowBrasilia;
 }
 
+function getCellEnabled(routing: unknown, category: string, channel: 'in_app' | 'push' | 'email'): boolean {
+  if (!routing || typeof routing !== 'object') return true;
+  const cat = (routing as Record<string, Record<string, boolean>>)[category];
+  if (!cat) return true;
+  if (cat[channel] === false) return false;
+  return true;
+}
+
+function isCriticalType(type: string): boolean {
+  const t = (type || '').toLowerCase();
+  return t === 'system' || t === 'system_alert' || t.startsWith('billing') || t === 'payments';
+}
+
 async function checkUserPreferences(
   userId: string,
   agencyId: string,
@@ -243,6 +256,8 @@ async function checkUserPreferences(
 
   if (!preferences) return true;
 
+  const isCritical = isCriticalType(notificationType);
+
   const typeEnabled = {
     'reminders': preferences.reminders_enabled,
     'tasks': preferences.tasks_enabled,
@@ -256,6 +271,17 @@ async function checkUserPreferences(
 
   if (typeEnabled === false) return false;
 
+  // In-app routing matrix check (skip for critical)
+  if (!isCritical) {
+    const routingCategory = notificationType === 'posts' ? 'tasks' : notificationType;
+    if (!getCellEnabled((preferences as any).channel_routing, routingCategory, 'in_app')) {
+      return false;
+    }
+  }
+
+  // Snooze / DND bypass for critical alerts (billing, system_alert)
+  if (isCritical) return true;
+
   // Check do not disturb until timestamp
   if (preferences.do_not_disturb_until && new Date(preferences.do_not_disturb_until) > new Date()) {
     return false;
@@ -265,7 +291,7 @@ async function checkUserPreferences(
   if (preferences.dnd_start_time && preferences.dnd_end_time) {
     const now = new Date();
     const currentTime = now.toTimeString().slice(0, 5); // HH:MM format
-    
+
     if (currentTime >= preferences.dnd_start_time && currentTime <= preferences.dnd_end_time) {
       return false;
     }
