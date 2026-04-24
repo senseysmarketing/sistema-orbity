@@ -5,7 +5,8 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
-import { Mail, Check, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Mail, Check, Loader2, Sparkles } from "lucide-react";
 
 export function EmailIntegration() {
   const { toast } = useToast();
