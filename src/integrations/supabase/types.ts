@@ -4338,9 +4338,11 @@ export type Database = {
           created_at: string
           entity_id: string | null
           entity_type: string | null
+          group_count: number
           id: string
           is_archived: boolean
           is_read: boolean
+          last_aggregated_at: string | null
           message: string
           metadata: Json | null
           priority: Database["public"]["Enums"]["notification_priority"]
@@ -4358,9 +4360,11 @@ export type Database = {
           created_at?: string
           entity_id?: string | null
           entity_type?: string | null
+          group_count?: number
           id?: string
           is_archived?: boolean
           is_read?: boolean
+          last_aggregated_at?: string | null
           message: string
           metadata?: Json | null
           priority?: Database["public"]["Enums"]["notification_priority"]
@@ -4378,9 +4382,11 @@ export type Database = {
           created_at?: string
           entity_id?: string | null
           entity_type?: string | null
+          group_count?: number
           id?: string
           is_archived?: boolean
           is_read?: boolean
+          last_aggregated_at?: string | null
           message?: string
           metadata?: Json | null
           priority?: Database["public"]["Enums"]["notification_priority"]

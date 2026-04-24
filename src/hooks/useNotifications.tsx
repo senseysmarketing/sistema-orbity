@@ -27,6 +27,8 @@ export interface Notification {
   entity_type?: string;
   entity_id?: string;
   action_type?: string;
+  group_count?: number;
+  last_aggregated_at?: string | null;
 }
 
 interface NotificationContextType {
@@ -57,17 +59,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     
     try {
       setLoading(true);
+      // GUARDRAIL #1: ordenação por COALESCE(last_aggregated_at, created_at) DESC
+      // Emulado com dois .order() — o último_aggregated_at vence quando não-nulo.
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('agency_id', currentAgency.id)
         .eq('is_archived', false)
+        .order('last_aggregated_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
 
-      setNotifications(data || []);
+      setNotifications((data || []) as Notification[]);
       setUnreadCount((data || []).filter(n => !n.is_read).length);
     } catch (error: any) {
       console.error('Error fetching notifications:', error);
@@ -193,7 +198,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [notifications, unreadCount, toast]);
 
-  // Single WebSocket channel + fetch
+  // Single WebSocket channel + fetch (Realtime Otimista — patch local sem refetch)
   useEffect(() => {
     if (!currentAgency?.id) return;
 
@@ -204,13 +209,71 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'notifications',
           filter: `agency_id=eq.${currentAgency.id}`,
         },
-        () => {
-          fetchNotifications();
+        (payload) => {
+          const novo = payload.new as Notification;
+          if (novo.is_archived) return;
+          setNotifications(prev => {
+            if (prev.some(n => n.id === novo.id)) return prev;
+            return [novo, ...prev].slice(0, 50);
+          });
+          if (!novo.is_read) {
+            setUnreadCount(c => c + 1);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `agency_id=eq.${currentAgency.id}`,
+        },
+        (payload) => {
+          const novo = payload.new as Notification;
+          const antigo = payload.old as Partial<Notification>;
+          setNotifications(prev => {
+            // Removido (arquivado) → tira da lista
+            if (novo.is_archived) return prev.filter(n => n.id !== novo.id);
+            const idx = prev.findIndex(n => n.id === novo.id);
+            if (idx === -1) {
+              // Pode ser uma agregação que não estava no top 50; ignora
+              return prev;
+            }
+            const next = [...prev];
+            next[idx] = novo;
+            return next;
+          });
+          // Ajuste de unread count
+          if (antigo.is_read === false && novo.is_read === true) {
+            setUnreadCount(c => Math.max(0, c - 1));
+          } else if (antigo.is_read === true && novo.is_read === false) {
+            setUnreadCount(c => c + 1);
+          }
+          if (!antigo.is_archived && novo.is_archived && !novo.is_read) {
+            setUnreadCount(c => Math.max(0, c - 1));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `agency_id=eq.${currentAgency.id}`,
+        },
+        (payload) => {
+          const antigo = payload.old as Partial<Notification>;
+          setNotifications(prev => prev.filter(n => n.id !== antigo.id));
+          if (antigo.is_read === false) {
+            setUnreadCount(c => Math.max(0, c - 1));
+          }
         }
       )
       .subscribe();
