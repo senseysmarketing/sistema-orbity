@@ -265,13 +265,14 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
       const result = await generateCaption(prompt, currentAgency?.id);
       if (!result) return;
 
-      let finalCaption = result.caption || "";
-      if (result.cta_text) finalCaption += `\n\n${result.cta_text}`;
+      let finalCaption = (result.caption || "").trim();
+      if (result.cta_text && !finalCaption.toLowerCase().includes(result.cta_text.trim().toLowerCase())) {
+        finalCaption += `\n\n${result.cta_text.trim()}`;
+      }
       if (result.hashtags && result.hashtags.length > 0) {
-        const tags = result.hashtags
-          .map((t) => (t.startsWith("#") ? t : `#${t}`))
-          .join(" ");
-        finalCaption += `\n\n${tags}`;
+        const tags = result.hashtags.map((t) => (t.startsWith("#") ? t : `#${t}`));
+        const missing = tags.filter((t) => !finalCaption.toLowerCase().includes(t.toLowerCase()));
+        if (missing.length) finalCaption += `\n\n${missing.join(" ")}`;
       }
 
       setLocalTask((prev) => (prev ? { ...prev, post_caption: finalCaption } : prev));
