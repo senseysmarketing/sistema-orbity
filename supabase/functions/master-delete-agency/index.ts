@@ -28,10 +28,11 @@ Deno.serve(async (req) => {
     });
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: claims, error: claimsErr } = await userClient.auth.getClaims(token);
-    if (claimsErr || !claims?.claims?.sub) {
+    const { data: userData, error: userErr } = await userClient.auth.getUser(token);
+    if (userErr || !userData?.user?.id) {
       return json({ error: 'Unauthorized' }, 401);
     }
+    const callerId = userData.user.id;
 
     // Verify caller is master agency admin
     const { data: isMaster, error: masterErr } = await userClient.rpc('is_master_agency_admin');
@@ -98,7 +99,7 @@ Deno.serve(async (req) => {
       return json({ error: deleteErr.message || 'Failed to delete agency' }, 500);
     }
 
-    console.info(`[master-delete-agency] agency ${agencyId} (${agency.name}) deleted by user ${claims.claims.sub}`);
+    console.info(`[master-delete-agency] agency ${agencyId} (${agency.name}) deleted by user ${callerId}`);
     return json({ success: true, agency_id: agencyId, agency_name: agency.name });
   } catch (err) {
     console.error('[master-delete-agency] unexpected error:', err);
