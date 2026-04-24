@@ -238,6 +238,51 @@ export default function Settings() {
     }
   };
 
+  type MacroTab = "account" | "agency" | "ops" | "billing";
+  const VALID_TABS: MacroTab[] = ["account", "agency", "ops", "billing"];
+  const ADMIN_TABS: MacroTab[] = ["agency", "ops", "billing"];
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get("tab") as MacroTab | null;
+  const tab: MacroTab = (() => {
+    if (!rawTab || !VALID_TABS.includes(rawTab)) return "account";
+    if (ADMIN_TABS.includes(rawTab) && !isAdmin) return "account";
+    return rawTab;
+  })();
+
+  // Security fallback: if URL points at admin tab but user isn't admin, normalize URL
+  useEffect(() => {
+    if (rawTab && (!VALID_TABS.includes(rawTab) || (ADMIN_TABS.includes(rawTab) && !isAdmin))) {
+      const next = new URLSearchParams(searchParams);
+      next.set("tab", "account");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawTab, isAdmin]);
+
+  const setTab = (next: MacroTab) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("tab", next);
+    setSearchParams(params, { replace: false });
+  };
+
+  const navItems: { key: MacroTab; label: string; icon: typeof User; adminOnly?: boolean }[] = [
+    { key: "account", label: "Minha Conta", icon: User },
+    { key: "agency", label: "Minha Agência", icon: Building2, adminOnly: true },
+    { key: "ops", label: "Operação & IA", icon: Cog, adminOnly: true },
+    { key: "billing", label: "Faturamento", icon: Receipt, adminOnly: true },
+  ].filter((i) => !i.adminOnly || isAdmin);
+
+  const SectionHeading = ({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description?: string }) => (
+    <div className="space-y-1">
+      <h3 className="text-lg font-medium flex items-center gap-2">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        {title}
+      </h3>
+      {description && <p className="text-sm text-muted-foreground">{description}</p>}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -247,416 +292,381 @@ export default function Settings() {
         </p>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="flex w-full overflow-x-auto scrollbar-hide md:grid md:grid-cols-9">
-          <TabsTrigger value="profile" className="flex-shrink-0 gap-1 md:gap-2">
-            <User className="h-4 w-4" />
-            <span className="hidden sm:inline">Perfil</span>
-          </TabsTrigger>
-          <TabsTrigger value="subscription" className="flex-shrink-0 gap-1 md:gap-2">
-            <CreditCard className="h-4 w-4" />
-            <span className="hidden sm:inline">Assinatura</span>
-          </TabsTrigger>
-          {isAdmin && (
-            <TabsTrigger value="users" className="flex-shrink-0 gap-1 md:gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Usuários</span>
-            </TabsTrigger>
+      <div className="flex flex-col md:flex-row gap-8">
+        {/* Mobile: horizontal scrollable nav */}
+        <nav className="flex md:hidden flex-row gap-2 overflow-x-auto whitespace-nowrap -mx-1 px-1 pb-2 scrollbar-hide">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = tab === item.key;
+            return (
+              <button
+                key={item.key}
+                onClick={() => setTab(item.key)}
+                className={`shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors border ${
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-foreground border-border hover:bg-muted"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Desktop: vertical sidebar */}
+        <nav className="hidden md:flex md:flex-col md:w-64 shrink-0 space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = tab === item.key;
+            return (
+              <button
+                key={item.key}
+                onClick={() => setTab(item.key)}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-left transition-colors ${
+                  active
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Content area */}
+        <div className="flex-1 min-w-0 space-y-8">
+          {tab === "account" && (
+            <>
+              {/* Perfil */}
+              <section className="space-y-4">
+                <SectionHeading icon={User} title="Perfil" description="Atualize suas informações pessoais" />
+                <Card>
+                  <CardContent className="space-y-6 pt-6">
+                    <div className="flex items-center space-x-6">
+                      <Avatar className="h-20 w-20">
+                        <AvatarImage src={profile.avatar_url || ""} />
+                        <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                          {getInitials(profile.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="space-y-2">
+                        <h3 className="text-lg font-medium">{profile.name}</h3>
+                        <Badge className={getRoleColor(userProfile?.role || '')}>
+                          {getRoleLabel(userProfile?.role || '')}
+                        </Badge>
+                        <p className="text-sm text-muted-foreground">{profile.email}</p>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="grid gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="name">Nome Completo</Label>
+                        <Input
+                          id="name"
+                          value={profile.name}
+                          onChange={(e) => setProfile(prev => ({ ...prev, name: e.target.value }))}
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={profile.email}
+                          disabled
+                          className="bg-muted"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          O email não pode ser alterado. Entre em contato com o administrador se necessário.
+                        </p>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="avatar">URL da Foto de Perfil</Label>
+                        <Input
+                          id="avatar"
+                          type="url"
+                          placeholder="https://exemplo.com/sua-foto.jpg"
+                          value={profile.avatar_url}
+                          onChange={(e) => setProfile(prev => ({ ...prev, avatar_url: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <Button onClick={updateProfile} disabled={loading} className="w-full sm:w-auto">
+                      <Save className="mr-2 h-4 w-4" />
+                      {loading ? 'Salvando...' : 'Salvar Alterações'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </section>
+
+              <Separator className="my-8" />
+
+              {/* Conta / Segurança */}
+              <section className="space-y-4">
+                <SectionHeading icon={Shield} title="Conta e Segurança" description="Gerencie a segurança e acesso da sua conta" />
+                <Card>
+                  <CardContent className="space-y-4 pt-6">
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-1">
+                        <h4 className="font-medium">Alterar Senha</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Atualize sua senha para manter sua conta segura
+                        </p>
+                      </div>
+                      <Button variant="outline" onClick={() => setShowPasswordDialog(true)}>
+                        <Lock className="mr-2 h-4 w-4" />
+                        Alterar Senha
+                      </Button>
+                    </div>
+
+                    <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Alterar Senha</DialogTitle>
+                          <DialogDescription>
+                            Digite sua nova senha. Ela deve ter pelo menos 6 caracteres.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="new-password">Nova Senha</Label>
+                            <Input
+                              id="new-password"
+                              type="password"
+                              placeholder="Digite a nova senha"
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="confirm-password">Confirmar Senha</Label>
+                            <Input
+                              id="confirm-password"
+                              type="password"
+                              placeholder="Confirme a nova senha"
+                              value={confirmPassword}
+                              onChange={(e) => setConfirmPassword(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+                            Cancelar
+                          </Button>
+                          <Button onClick={updatePassword} disabled={updatingPassword}>
+                            {updatingPassword ? 'Salvando...' : 'Alterar Senha'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="space-y-1">
+                        <h4 className="font-medium">Autenticação de Dois Fatores</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Adicione uma camada extra de segurança à sua conta
+                        </p>
+                      </div>
+                      <Switch disabled />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 border rounded-lg border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
+                      <div className="space-y-1">
+                        <h4 className="font-medium text-orange-800 dark:text-orange-200">Limpar Cache do Aplicativo</h4>
+                        <p className="text-sm text-orange-700 dark:text-orange-300">
+                          Resolve problemas de refresh automático e dados desatualizados
+                        </p>
+                      </div>
+                      <Button variant="outline" onClick={handleCacheReset} className="border-orange-300 text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900/50">
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Limpar Cache
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 border rounded-lg border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+                      <div className="space-y-1">
+                        <h4 className="font-medium text-red-800 dark:text-red-200">Sair da Conta</h4>
+                        <p className="text-sm text-red-700 dark:text-red-300">
+                          Desconecte-se da sua conta em todos os dispositivos
+                        </p>
+                      </div>
+                      <Button variant="destructive" onClick={signOut}>
+                        <Shield className="mr-2 h-4 w-4" />
+                        Sair
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+
+              <Separator className="my-8" />
+
+              {/* Notificações */}
+              <section className="space-y-4">
+                <SectionHeading icon={Bell} title="Notificações" description="Gerencie como e quando você recebe notificações" />
+                <NotificationSummaryCard />
+              </section>
+
+              <Separator className="my-8" />
+
+              {/* Aparência */}
+              <section className="space-y-4">
+                <SectionHeading icon={Palette} title="Aparência" description="Personalize a aparência do sistema" />
+                <Card>
+                  <CardContent className="space-y-6 pt-6">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Escolha o tema que será aplicado em todo o sistema, incluindo o menu lateral.
+                      </p>
+                      <div className="grid grid-cols-3 gap-3">
+                        <button
+                          onClick={() => setTheme('light')}
+                          className={`p-4 border rounded-lg text-center hover:bg-muted/50 transition-all duration-200 ${
+                            theme === 'light' ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : 'border-border'
+                          }`}
+                        >
+                          <div className="w-full h-12 bg-background border border-border rounded mb-3 flex items-center justify-center">
+                            <div className="w-2 h-2 bg-foreground rounded-full"></div>
+                          </div>
+                          <span className="text-sm font-medium">Claro</span>
+                          <p className="text-xs text-muted-foreground mt-1">Tema claro para uso diurno</p>
+                        </button>
+
+                        <button
+                          onClick={() => setTheme('dark')}
+                          className={`p-4 border rounded-lg text-center hover:bg-muted/50 transition-all duration-200 ${
+                            theme === 'dark' ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : 'border-border'
+                          }`}
+                        >
+                          <div className="w-full h-12 bg-slate-800 border border-slate-600 rounded mb-3 flex items-center justify-center">
+                            <div className="w-2 h-2 bg-slate-100 rounded-full"></div>
+                          </div>
+                          <span className="text-sm font-medium">Escuro</span>
+                          <p className="text-xs text-muted-foreground mt-1">Tema escuro para baixa luminosidade</p>
+                        </button>
+
+                        <button
+                          onClick={() => setTheme('system')}
+                          className={`p-4 border rounded-lg text-center hover:bg-muted/50 transition-all duration-200 ${
+                            theme === 'system' ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : 'border-border'
+                          }`}
+                        >
+                          <div className="w-full h-12 bg-gradient-to-r from-background via-muted to-slate-800 border border-border rounded mb-3 flex items-center justify-center">
+                            <div className="w-2 h-2 bg-primary rounded-full"></div>
+                          </div>
+                          <span className="text-sm font-medium">Sistema</span>
+                          <p className="text-xs text-muted-foreground mt-1">Segue configuração do sistema</p>
+                        </button>
+                      </div>
+
+                      <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                        <p className="text-sm text-muted-foreground">
+                          <strong>Tema atual:</strong> {theme === 'light' ? 'Claro' : theme === 'dark' ? 'Escuro' : 'Sistema'}
+                          {theme === 'system' && ` (${window.matchMedia('(prefers-color-scheme: dark)').matches ? 'Escuro' : 'Claro'} detectado)`}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </section>
+
+              <Separator className="my-8" />
+
+              {/* Integrações Pessoais (Google Calendar) */}
+              <section className="space-y-4">
+                <SectionHeading icon={Puzzle} title="Integrações Pessoais" description="Conecte ferramentas vinculadas à sua conta individual" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <GoogleCalendarIntegration />
+                </div>
+              </section>
+            </>
           )}
-          {isAdmin && (
-            <TabsTrigger value="branding" className="flex-shrink-0 gap-1 md:gap-2">
-              <Wand2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Branding</span>
-            </TabsTrigger>
+
+          {tab === "agency" && isAdmin && (
+            <>
+              <section className="space-y-4">
+                <SectionHeading icon={Wand2} title="Branding e Identidade" description="Personalize a marca exibida nas páginas públicas" />
+                <BrandingTab />
+              </section>
+
+              <Separator className="my-8" />
+
+              <section className="space-y-4">
+                <SectionHeading icon={Users} title="Usuários da Agência" description="Gerencie os membros da sua equipe e suas permissões" />
+                <UsersTabContent />
+              </section>
+            </>
           )}
-          {isAdmin && (
-            <TabsTrigger value="ai" className="flex-shrink-0 gap-1 md:gap-2">
-              <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">IA</span>
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="integrations" className="flex-shrink-0 gap-1 md:gap-2">
-            <Puzzle className="h-4 w-4" />
-            <span className="hidden sm:inline">Integrações</span>
-          </TabsTrigger>
-          <TabsTrigger value="account" className="flex-shrink-0 gap-1 md:gap-2">
-            <Shield className="h-4 w-4" />
-            <span className="hidden sm:inline">Conta</span>
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex-shrink-0 gap-1 md:gap-2">
-            <Bell className="h-4 w-4" />
-            <span className="hidden sm:inline">Notificações</span>
-          </TabsTrigger>
-          <TabsTrigger value="appearance" className="flex-shrink-0 gap-1 md:gap-2">
-            <Palette className="h-4 w-4" />
-            <span className="hidden sm:inline">Aparência</span>
-          </TabsTrigger>
-        </TabsList>
 
-        <TabsContent value="profile" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Informações do Perfil</CardTitle>
-              <CardDescription>
-                Atualize suas informações pessoais
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Avatar e Role */}
-              <div className="flex items-center space-x-6">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src={profile.avatar_url || ""} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                    {getInitials(profile.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-medium">{profile.name}</h3>
-                  <Badge className={getRoleColor(userProfile?.role || '')}>
-                    {getRoleLabel(userProfile?.role || '')}
-                  </Badge>
-                  <p className="text-sm text-muted-foreground">{profile.email}</p>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Formulário de edição */}
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name">Nome Completo</Label>
-                  <Input
-                    id="name"
-                    value={profile.name}
-                    onChange={(e) => setProfile(prev => ({ ...prev, name: e.target.value }))}
-                  />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={profile.email}
-                    disabled
-                    className="bg-muted"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    O email não pode ser alterado. Entre em contato com o administrador se necessário.
-                  </p>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="avatar">URL da Foto de Perfil</Label>
-                  <Input
-                    id="avatar"
-                    type="url"
-                    placeholder="https://exemplo.com/sua-foto.jpg"
-                    value={profile.avatar_url}
-                    onChange={(e) => setProfile(prev => ({ ...prev, avatar_url: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <Button onClick={updateProfile} disabled={loading} className="w-full sm:w-auto">
-                <Save className="mr-2 h-4 w-4" />
-                {loading ? 'Salvando...' : 'Salvar Alterações'}
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="subscription" className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <CreditCard className="h-6 w-6" />
-              Gerenciar Assinatura
-            </h2>
-            <p className="text-muted-foreground">
-              Visualize e gerencie seu plano de assinatura atual
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <SubscriptionDetails />
-            <BillingHistory />
-          </div>
-        </TabsContent>
-
-        {isAdmin && (
-          <TabsContent value="users" className="space-y-4">
-            <UsersTabContent />
-          </TabsContent>
-        )}
-
-        {isAdmin && (
-          <TabsContent value="branding" className="space-y-4">
-            <BrandingTab />
-          </TabsContent>
-        )}
-
-        {isAdmin && (
-          <TabsContent value="ai" className="space-y-4">
-            <AISettingsManager />
-          </TabsContent>
-        )}
-
-        <TabsContent value="integrations" className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-              <Puzzle className="h-6 w-6" />
-              Integrações
-            </h2>
-            <p className="text-muted-foreground">
-              Conecte serviços externos para expandir as funcionalidades
-            </p>
-          </div>
-          
-          <div className="space-y-8">
-            {isAdmin && (
-              <div>
-                <h3 className="text-lg font-semibold">Marketing e Tráfego</h3>
-                <p className="text-sm text-muted-foreground mb-4">Gerencie suas conexões de anúncios e tráfego pago</p>
-                <Separator className="mb-4" />
+          {tab === "ops" && isAdmin && (
+            <>
+              <section className="space-y-4">
+                <SectionHeading icon={Puzzle} title="Marketing e Tráfego" description="Gerencie suas conexões de anúncios e tráfego pago" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FacebookIntegration />
                 </div>
-              </div>
-            )}
+              </section>
 
-            <div>
-              <h3 className="text-lg font-semibold">Produtividade</h3>
-              <p className="text-sm text-muted-foreground mb-4">Ferramentas para organizar sua rotina e agenda</p>
-              <Separator className="mb-4" />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <GoogleCalendarIntegration />
-              </div>
-            </div>
+              <Separator className="my-8" />
 
-            <div>
-              <h3 className="text-lg font-semibold">Comunicação</h3>
-              <p className="text-sm text-muted-foreground mb-4">Canais de comunicação com clientes e leads</p>
-              <Separator className="mb-4" />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <WhatsAppIntegration />
-              </div>
-            </div>
+              <section className="space-y-4">
+                <SectionHeading icon={Bell} title="Comunicação" description="Canais de comunicação com clientes e leads" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <WhatsAppIntegration />
+                </div>
+              </section>
 
-            {isAdmin && (
-              <div>
-                <h3 className="text-lg font-semibold">Gateways de Pagamento</h3>
-                <p className="text-sm text-muted-foreground mb-4">Configure cobranças automatizadas para seus clientes</p>
-                <Separator className="mb-4" />
+              <Separator className="my-8" />
+
+              <section className="space-y-4">
+                <SectionHeading icon={CreditCard} title="Gateways de Pagamento" description="Configure cobranças automatizadas para seus clientes" />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <AsaasIntegration />
                   <ConexaIntegration />
                   <StripeIntegration />
                 </div>
-              </div>
-            )}
-          </div>
-        </TabsContent>
+              </section>
 
-        <TabsContent value="account" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Segurança da Conta</CardTitle>
-              <CardDescription>
-                Gerencie a segurança e acesso da sua conta
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-1">
-                    <h4 className="font-medium">Alterar Senha</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Atualize sua senha para manter sua conta segura
-                    </p>
-                  </div>
-                  <Button variant="outline" onClick={() => setShowPasswordDialog(true)}>
-                    <Lock className="mr-2 h-4 w-4" />
-                    Alterar Senha
-                  </Button>
-                </div>
+              <Separator className="my-8" />
 
-                {/* Dialog de Alteração de Senha */}
-                <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Alterar Senha</DialogTitle>
-                      <DialogDescription>
-                        Digite sua nova senha. Ela deve ter pelo menos 6 caracteres.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="new-password">Nova Senha</Label>
-                        <Input
-                          id="new-password"
-                          type="password"
-                          placeholder="Digite a nova senha"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="confirm-password">Confirmar Senha</Label>
-                        <Input
-                          id="confirm-password"
-                          type="password"
-                          placeholder="Confirme a nova senha"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
-                        Cancelar
-                      </Button>
-                      <Button onClick={updatePassword} disabled={updatingPassword}>
-                        {updatingPassword ? 'Salvando...' : 'Alterar Senha'}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+              <section className="space-y-4">
+                <SectionHeading icon={Bell} title="Notificações da Agência" description="Configure os canais globais de notificação" />
+                <Card>
+                  <CardContent className="pt-6">
+                    <NotificationChannelsConfig />
+                  </CardContent>
+                </Card>
+              </section>
 
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-1">
-                    <h4 className="font-medium">Autenticação de Dois Fatores</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Adicione uma camada extra de segurança à sua conta
-                    </p>
-                  </div>
-                  <Switch disabled />
-                </div>
+              <Separator className="my-8" />
 
-                <div className="flex items-center justify-between p-4 border rounded-lg border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-900/20">
-                  <div className="space-y-1">
-                    <h4 className="font-medium text-orange-800 dark:text-orange-200">Limpar Cache do Aplicativo</h4>
-                    <p className="text-sm text-orange-700 dark:text-orange-300">
-                      Resolve problemas de refresh automático e dados desatualizados
-                    </p>
-                  </div>
-                  <Button variant="outline" onClick={handleCacheReset} className="border-orange-300 text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900/50">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Limpar Cache
-                  </Button>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
-                  <div className="space-y-1">
-                    <h4 className="font-medium text-red-800 dark:text-red-200">Sair da Conta</h4>
-                    <p className="text-sm text-red-700 dark:text-red-300">
-                      Desconecte-se da sua conta em todos os dispositivos
-                    </p>
-                  </div>
-                  <Button variant="destructive" onClick={signOut}>
-                    <Shield className="mr-2 h-4 w-4" />
-                    Sair
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="notifications" className="space-y-6">
-          <NotificationSummaryCard />
-
-          {isAdmin && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Configurações da Agência (Admin)</CardTitle>
-                <CardDescription>
-                  Configure as integrações de notificação para toda a agência
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <NotificationChannelsConfig />
-              </CardContent>
-            </Card>
+              <section className="space-y-4">
+                <SectionHeading icon={Sparkles} title="Inteligência Artificial" description="Personalize prompts e comportamentos da IA" />
+                <AISettingsManager />
+              </section>
+            </>
           )}
-        </TabsContent>
 
-        <TabsContent value="appearance" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Aparência</CardTitle>
-              <CardDescription>
-                Personalize a aparência do sistema
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium mb-3 flex items-center gap-2">
-                    <Palette className="h-4 w-4" />
-                    Tema
-                  </h4>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Escolha o tema que será aplicado em todo o sistema, incluindo o menu lateral.
-                  </p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      onClick={() => setTheme('light')}
-                      className={`p-4 border rounded-lg text-center hover:bg-muted/50 transition-all duration-200 ${
-                        theme === 'light' ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : 'border-border'
-                      }`}
-                    >
-                      <div className="w-full h-12 bg-background border border-border rounded mb-3 flex items-center justify-center">
-                        <div className="w-2 h-2 bg-foreground rounded-full"></div>
-                      </div>
-                      <span className="text-sm font-medium">Claro</span>
-                      <p className="text-xs text-muted-foreground mt-1">Tema claro para uso diurno</p>
-                    </button>
-                    
-                    <button
-                      onClick={() => setTheme('dark')}
-                      className={`p-4 border rounded-lg text-center hover:bg-muted/50 transition-all duration-200 ${
-                        theme === 'dark' ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : 'border-border'
-                      }`}
-                    >
-                      <div className="w-full h-12 bg-slate-800 border border-slate-600 rounded mb-3 flex items-center justify-center">
-                        <div className="w-2 h-2 bg-slate-100 rounded-full"></div>
-                      </div>
-                      <span className="text-sm font-medium">Escuro</span>
-                      <p className="text-xs text-muted-foreground mt-1">Tema escuro para baixa luminosidade</p>
-                    </button>
-                    
-                    <button
-                      onClick={() => setTheme('system')}
-                      className={`p-4 border rounded-lg text-center hover:bg-muted/50 transition-all duration-200 ${
-                        theme === 'system' ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : 'border-border'
-                      }`}
-                    >
-                      <div className="w-full h-12 bg-gradient-to-r from-background via-muted to-slate-800 border border-border rounded mb-3 flex items-center justify-center">
-                        <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      </div>
-                      <span className="text-sm font-medium">Sistema</span>
-                      <p className="text-xs text-muted-foreground mt-1">Segue configuração do sistema</p>
-                    </button>
-                  </div>
-                  
-                  <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-                    <p className="text-sm text-muted-foreground">
-                      <strong>Tema atual:</strong> {theme === 'light' ? 'Claro' : theme === 'dark' ? 'Escuro' : 'Sistema'} 
-                      {theme === 'system' && ` (${window.matchMedia('(prefers-color-scheme: dark)').matches ? 'Escuro' : 'Claro'} detectado)`}
-                    </p>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="text-sm text-muted-foreground">
-                  <p>Mais opções de personalização serão adicionadas em futuras atualizações.</p>
-                </div>
+          {tab === "billing" && isAdmin && (
+            <section className="space-y-4">
+              <SectionHeading icon={CreditCard} title="Assinatura e Faturamento" description="Visualize e gerencie seu plano Orbity" />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <SubscriptionDetails />
+                <BillingHistory />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </section>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
