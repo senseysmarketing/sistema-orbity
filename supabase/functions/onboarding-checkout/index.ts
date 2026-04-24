@@ -159,6 +159,22 @@ serve(async (req) => {
       throw new Error(`No Stripe price ID found for plan ${planSlug} with billing cycle ${billingCycle || 'monthly'}`);
     }
 
+    // Fast-Track discount: check if agency is eligible for the R$100 onboarding coupon
+    const { data: agencyFlags } = await supabaseClient
+      .from('agencies')
+      .select('onboarding_discount_eligible')
+      .eq('id', agencyData.id)
+      .maybeSingle();
+
+    const fastTrackCouponId = Deno.env.get('STRIPE_FAST_TRACK_COUPON_ID');
+    const discounts = (agencyFlags?.onboarding_discount_eligible && fastTrackCouponId)
+      ? [{ coupon: fastTrackCouponId }]
+      : undefined;
+
+    if (discounts) {
+      logStep("Applying Fast-Track discount", { couponId: fastTrackCouponId });
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : adminUser.email,
@@ -169,6 +185,8 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
+      // Stripe rejects discounts + allow_promotion_codes simultaneously
+      ...(discounts ? { discounts } : { allow_promotion_codes: true }),
       success_url: `${req.headers.get("origin")}/subscription-success?session_id={CHECKOUT_SESSION_ID}&onboarding=true`,
       cancel_url: `${req.headers.get("origin")}/subscription-canceled`,
       metadata: {
@@ -176,6 +194,7 @@ serve(async (req) => {
         user_id: userId,
         plan_slug: planSlug,
         onboarding: "true",
+        fast_track_discount: discounts ? "true" : "false",
       },
     });
 
