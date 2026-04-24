@@ -57,17 +57,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     
     try {
       setLoading(true);
+      // GUARDRAIL #1: ordenação por COALESCE(last_aggregated_at, created_at) DESC
+      // Emulado com dois .order() — o último_aggregated_at vence quando não-nulo.
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('agency_id', currentAgency.id)
         .eq('is_archived', false)
+        .order('last_aggregated_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
 
-      setNotifications(data || []);
+      setNotifications((data || []) as Notification[]);
       setUnreadCount((data || []).filter(n => !n.is_read).length);
     } catch (error: any) {
       console.error('Error fetching notifications:', error);
