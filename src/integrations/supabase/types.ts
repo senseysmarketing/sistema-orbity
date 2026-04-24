@@ -6674,6 +6674,7 @@ export type Database = {
           next_occurrence_generated: boolean
           notification_sent_at: string | null
           platform: string | null
+          post_caption: string | null
           post_date: string | null
           post_type: string | null
           priority: Database["public"]["Enums"]["task_priority"]
@@ -6707,6 +6708,7 @@ export type Database = {
           next_occurrence_generated?: boolean
           notification_sent_at?: string | null
           platform?: string | null
+          post_caption?: string | null
           post_date?: string | null
           post_type?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
@@ -6740,6 +6742,7 @@ export type Database = {
           next_occurrence_generated?: boolean
           notification_sent_at?: string | null
           platform?: string | null
+          post_caption?: string | null
           post_date?: string | null
           post_type?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
