@@ -61,21 +61,59 @@ const iconColorMap: Record<NotificationType, string> = {
   system: "text-muted-foreground",
 };
 
+// Mapa de entity_type → tabela do Supabase para verificação de existência (dead-link interception).
+// Apenas entidades com tabela conhecida são checadas; demais navegam direto.
+const ENTITY_TABLE_MAP: Record<string, "tasks" | "leads" | "client_payments" | "meetings"> = {
+  task: "tasks",
+  lead: "leads",
+  payment: "client_payments",
+  meeting: "meetings",
+};
+
 export function NotificationItem({ notification, onClose }: NotificationItemProps) {
   const { markAsRead, archiveNotification } = useNotifications();
   const navigate = useNavigate();
   const Icon = iconMap[notification.type] || Bell;
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const meetingLink = notification.metadata?.meeting_link;
+  const groupCount = notification.group_count ?? 1;
 
   const handleClick = async () => {
-    if (!notification.is_read) {
-      await markAsRead(notification.id);
-    }
+    if (isNavigating) return;
+    setIsNavigating(true);
+    try {
+      // Dead-link interception: se temos entity_type+entity_id mapeados, valida existência
+      const tableName = notification.entity_type
+        ? ENTITY_TABLE_MAP[notification.entity_type]
+        : undefined;
 
-    if (notification.action_url) {
-      navigate(notification.action_url);
-      onClose();
+      if (tableName && notification.entity_id) {
+        const { data, error } = await supabase
+          .from(tableName)
+          .select("id")
+          .eq("id", notification.entity_id)
+          .maybeSingle();
+
+        if (error) {
+          console.warn("dead-link check failed, continuando navegação:", error);
+        } else if (!data) {
+          toast("Este item já não está disponível");
+          await archiveNotification(notification.id);
+          return;
+        }
+      }
+
+      if (!notification.is_read) {
+        await markAsRead(notification.id);
+      }
+
+      if (notification.action_url) {
+        navigate(notification.action_url);
+        onClose();
+      }
+    } finally {
+      setIsNavigating(false);
     }
   };
 
@@ -111,13 +149,18 @@ export function NotificationItem({ notification, onClose }: NotificationItemProp
       className={cn(
         "p-3 md:p-4 hover:bg-muted/50 transition-colors cursor-pointer relative group border-l-3",
         borderColorMap[notification.type],
-        !notification.is_read ? "bg-primary/5" : "opacity-75"
+        !notification.is_read ? "bg-primary/5" : "opacity-75",
+        isNavigating && "opacity-50 pointer-events-none"
       )}
       onClick={handleClick}
     >
       <div className="flex gap-2 md:gap-3">
         <div className={cn("mt-0.5 md:mt-1 shrink-0", iconColorMap[notification.type])}>
-          <Icon className="h-4 w-4 md:h-5 md:w-5" />
+          {isNavigating ? (
+            <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin" />
+          ) : (
+            <Icon className="h-4 w-4 md:h-5 md:w-5" />
+          )}
         </div>
         
         <div className="flex-1 space-y-1 md:space-y-1.5 min-w-0">
@@ -132,6 +175,11 @@ export function NotificationItem({ notification, onClose }: NotificationItemProp
               )}>
                 {notification.title}
               </p>
+              {groupCount > 1 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-semibold shrink-0">
+                  {groupCount}
+                </span>
+              )}
             </div>
             <Button
               variant="ghost"
