@@ -8,6 +8,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils";
 import { AIPreFillStep } from "@/components/ui/ai-prefill-step";
 import { useAIAssist, TaskPrefillResult } from "@/hooks/useAIAssist";
+import { Sparkles, Loader2 } from "lucide-react";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 import { FileAttachments, Attachment } from "@/components/ui/file-attachments";
 import { WizardStepIndicator } from "@/components/ui/wizard-step-indicator";
