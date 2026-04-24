@@ -175,6 +175,22 @@ serve(async (req) => {
 
     const origin = req.headers.get("origin") || "http://localhost:3000";
 
+    // Fast-Track discount: only when an agencyId is in scope
+    let discounts: { coupon: string }[] | undefined = undefined;
+    if (agencyId) {
+      const { data: agencyFlags } = await supabaseAdmin
+        .from('agencies')
+        .select('onboarding_discount_eligible')
+        .eq('id', agencyId)
+        .maybeSingle();
+
+      const fastTrackCouponId = Deno.env.get('STRIPE_FAST_TRACK_COUPON_ID');
+      if (agencyFlags?.onboarding_discount_eligible && fastTrackCouponId) {
+        discounts = [{ coupon: fastTrackCouponId }];
+        logStep("Applying Fast-Track discount", { couponId: fastTrackCouponId });
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : userEmail!,
@@ -182,12 +198,14 @@ serve(async (req) => {
       mode: "subscription",
       success_url: `${origin}/subscription-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/subscription-canceled`,
-      allow_promotion_codes: true,
+      // Stripe rejects discounts + allow_promotion_codes simultaneously
+      ...(discounts ? { discounts } : { allow_promotion_codes: true }),
       metadata: {
         user_id: userId ?? 'unknown',
         user_email: userEmail!,
         agency_id: agencyId || 'unknown',
         mode: checkoutMode || 'new',
+        fast_track_discount: discounts ? 'true' : 'false',
       },
     });
 

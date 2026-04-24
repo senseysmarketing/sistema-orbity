@@ -18,7 +18,7 @@ import { initMetaPixel, trackPageView } from "@/lib/metaPixel";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import Welcome from "./pages/Welcome";
+
 import Tasks from "./pages/Tasks";
 import Reminders from "./pages/Reminders";
 import CRM from "./pages/CRM";
@@ -100,7 +100,7 @@ const App = () => (
                         <Route path="/report/:token" element={<PublicClientReport />} />
                         <Route path="/nps-survey" element={<PublicNPSSurvey />} />
                         <Route path="/approve/:token" element={<PublicApproval />} />
-                        <Route path="/welcome" element={<Welcome />} />
+                        
                         <Route path="/subscription-success" element={<SubscriptionSuccess />} />
                         <Route path="/subscription-canceled" element={<SubscriptionCanceled />} />
                         

@@ -49,7 +49,7 @@ export default function SubscriptionSuccess() {
           // Check subscription and redirect to welcome
           setTimeout(() => {
             checkSubscription();
-            navigate('/welcome');
+            navigate('/dashboard');
           }, 2000);
         }
       } else if (sessionId) {
