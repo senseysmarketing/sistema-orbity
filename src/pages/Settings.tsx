@@ -563,17 +563,11 @@ export default function Settings() {
           <TabsContent value="agency" className="space-y-8 mt-6">
             {tab === "agency" && (
               <>
-                <section className="space-y-4">
-                  <SectionHeading icon={Wand2} title="Branding e Identidade" description="Personalize a marca exibida nas páginas públicas" />
-                  <BrandingTab />
-                </section>
+                <BrandingTab />
 
                 <Separator className="my-8" />
 
-                <section className="space-y-4">
-                  <SectionHeading icon={Users} title="Usuários da Agência" description="Gerencie os membros da sua equipe e suas permissões" />
-                  <UsersTabContent />
-                </section>
+                <UsersTabContent />
               </>
             )}
           </TabsContent>
