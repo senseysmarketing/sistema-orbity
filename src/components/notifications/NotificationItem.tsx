@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
@@ -12,12 +13,15 @@ import {
   X,
   ExternalLink,
   Video,
-  Eye
+  Eye,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNotifications, type Notification, type NotificationType } from "@/hooks/useNotifications";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface NotificationItemProps {
   notification: Notification;
