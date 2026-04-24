@@ -73,10 +73,10 @@ export function BrandingTab() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Sparkles className="h-6 w-6" />
+        <h3 className="text-lg font-medium flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-muted-foreground" />
           Branding & Agência
-        </h2>
+        </h3>
         <p className="text-muted-foreground">
           Personalize a identidade visual exibida nos links públicos da sua agência
         </p>
