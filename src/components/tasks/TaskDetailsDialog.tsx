@@ -52,6 +52,7 @@ interface Task {
   post_date?: string | null;
   hashtags?: string[] | null;
   creative_instructions?: string | null;
+  post_caption?: string | null;
   is_recurring?: boolean;
   recurrence_rule?: any;
   recurrence_parent_id?: string | null;
@@ -109,9 +110,10 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   const [stoppingRecurrence, setStoppingRecurrence] = useState(false);
   
   const { canDelete, isCreator, isAdmin, creatorName: permissionCreatorName } = useDeletePermission(task?.created_by);
-  const { improveTask, loading: aiLoading } = useAIAssist();
+  const { improveTask, generateCaption, loading: aiLoading } = useAIAssist();
   const { currentAgency } = useAgency();
   const { toast } = useToast();
+  const [generatingCaption, setGeneratingCaption] = useState(false);
   const { profile } = useAuth();
   const [localTask, setLocalTask] = useState<Task | null>(task);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
@@ -229,6 +231,58 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   useEffect(() => {
     setLocalTask(task);
   }, [task]);
+
+  // Debounce salvamento da legenda (evita race conditions)
+  useEffect(() => {
+    if (!localTask || !task) return;
+    if ((localTask.post_caption ?? null) === (task.post_caption ?? null)) return;
+    const timer = setTimeout(async () => {
+      try {
+        const { error } = await supabase
+          .from("tasks")
+          .update({ post_caption: localTask.post_caption ?? null })
+          .eq("id", localTask.id);
+        if (error) throw error;
+        onTaskUpdate?.();
+      } catch (err: any) {
+        toast({
+          title: "Erro ao salvar legenda",
+          description: err.message,
+          variant: "destructive",
+        });
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localTask?.post_caption]);
+
+  const handleGenerateCaption = async () => {
+    if (!localTask) return;
+    setGeneratingCaption(true);
+    try {
+      const clientName = localTask.client_id ? getClientName(localTask.client_id) : "Cliente";
+      const prompt = `Crie uma legenda para o cliente ${clientName}. Título da Tarefa: ${localTask.title}. Briefing: ${localTask.description || "Sem descrição"}. Plataforma alvo: ${localTask.platform || "Geral"}. Instruções extras: ${localTask.creative_instructions || "Nenhuma"}.`;
+      const result = await generateCaption(prompt, currentAgency?.id);
+      if (!result) return;
+
+      let finalCaption = result.caption || "";
+      if (result.cta_text) finalCaption += `\n\n${result.cta_text}`;
+      if (result.hashtags && result.hashtags.length > 0) {
+        const tags = result.hashtags
+          .map((t) => (t.startsWith("#") ? t : `#${t}`))
+          .join(" ");
+        finalCaption += `\n\n${tags}`;
+      }
+
+      setLocalTask((prev) => (prev ? { ...prev, post_caption: finalCaption } : prev));
+      toast({
+        title: "Legenda gerada com IA ✨",
+        description: "Você pode editar antes de enviar para aprovação.",
+      });
+    } finally {
+      setGeneratingCaption(false);
+    }
+  };
 
   useEffect(() => {
     const loadTaskDetails = async () => {
@@ -589,6 +643,49 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
                         <LinkifyText text={localTask.creative_instructions} />
                       </p>
                     </div>
+                  </div>
+                </>
+              )}
+
+              {/* Legenda do Post (IA) - apenas para Redes Sociais e Criativos */}
+              {(taskType === "redes_sociais" || taskType === "criativos") && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <MessageSquareWarning className="h-4 w-4 text-muted-foreground" />
+                        Legenda do Post (Para Aprovação)
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleGenerateCaption}
+                        disabled={generatingCaption || aiLoading}
+                      >
+                        {generatingCaption ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-4 w-4 mr-2" />
+                        )}
+                        Gerar com IA
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={localTask.post_caption ?? ""}
+                      onChange={(e) =>
+                        setLocalTask((prev) =>
+                          prev ? { ...prev, post_caption: e.target.value } : prev
+                        )
+                      }
+                      placeholder="Escreva a legenda ou gere com IA. Ela será exibida ao cliente no link de aprovação."
+                      rows={6}
+                      className="resize-y"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      O texto é salvo automaticamente.
+                    </p>
                   </div>
                 </>
               )}

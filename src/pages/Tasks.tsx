@@ -102,6 +102,7 @@ interface Task {
   post_date?: string | null;
   hashtags?: string[] | null;
   creative_instructions?: string | null;
+  post_caption?: string | null;
   is_internal?: boolean;
   is_recurring?: boolean;
   recurrence_rule?: RecurrenceRule | null;

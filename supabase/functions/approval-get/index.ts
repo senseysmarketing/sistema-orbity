@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
          agencies:agency_id (name, logo_url, contact_phone),
          items:task_approval_items (
            id, task_id, decision, client_feedback, decided_at,
-           tasks:task_id ( id, title, description, attachments, status )
+           tasks:task_id ( id, title, description, attachments, status, post_caption )
          )`
       )
       .eq("token", token)
@@ -104,6 +104,7 @@ Deno.serve(async (req) => {
         title: item.tasks?.title ?? "Tarefa",
         description: item.tasks?.description ?? "",
         attachments: item.tasks?.attachments ?? [],
+        post_caption: item.tasks?.post_caption ?? null,
       })),
     };
 
