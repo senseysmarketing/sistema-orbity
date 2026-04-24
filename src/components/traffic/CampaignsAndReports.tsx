@@ -722,15 +722,15 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="flex items-center gap-1.5">
-              <CardTitle className="text-sm font-medium">{currentActionLabel}</CardTitle>
+              <CardTitle className="text-sm font-medium">Resultados</CardTitle>
               <Popover open={actionSelectorOpen} onOpenChange={setActionSelectorOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full">
+                  <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full" title="Filtrar métrica global">
                     <ChevronDown className="h-3 w-3" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-64 p-2 max-h-60 overflow-y-auto" align="start">
-                  <p className="text-xs text-muted-foreground px-2 py-1 font-medium">Selecionar métrica de conversão</p>
+                  <p className="text-xs text-muted-foreground px-2 py-1 font-medium">Filtrar métrica global</p>
                   {sortedAvailableActions.length === 0 ? (
                     <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma ação disponível</p>
                   ) : (
@@ -756,10 +756,29 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(dynamicTotalConversions)}</div>
-            <p className="text-xs text-muted-foreground">
-              Taxa: {((dynamicTotalConversions / metrics.clicks) * 100 || 0).toFixed(2)}%
-            </p>
+            {resultsByObjective.length === 0 ? (
+              <>
+                <div className="text-2xl font-bold">{formatNumber(dynamicTotalConversions)}</div>
+                <p className="text-xs text-muted-foreground">Sem campanhas ativas no período</p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <div className="text-2xl font-bold">{formatNumber(primaryResult.total)}</div>
+                  <span className="text-sm text-muted-foreground font-medium">{primaryResult.label}</span>
+                </div>
+                {secondaryResults.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1 truncate" title={secondaryResults.map(r => `${r.total} ${r.label}`).join(' · ')}>
+                    {secondaryResults.map(r => `+ ${formatNumber(r.total)} ${r.label}`).join(' · ')}
+                  </p>
+                )}
+                {secondaryResults.length === 0 && primaryResult.costPerResult !== null && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Custo / resultado: {formatCostPerResult(primaryResult.costPerResult)}
+                  </p>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
