@@ -166,37 +166,47 @@ export function OnboardingChecklist() {
   const canDismiss = completed || sevenDaysOld;
 
   return (
-    <Card className="relative overflow-hidden border-border/60 bg-card/60 backdrop-blur-sm">
-      {/* Sutil gradiente roxo no topo */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-primary/5 to-transparent" />
-
-      <div className="relative p-5 md:p-6 space-y-4">
+    <Card className="border-border/60 bg-card">
+      <div className="p-5 md:p-6 space-y-4">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <div className="rounded-lg bg-primary/10 p-2 text-primary">
-              <Sparkles className="h-4 w-4" />
+        <div className="flex items-start gap-3">
+          <div className="rounded-lg bg-primary/10 p-2 text-primary">
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold tracking-tight text-foreground">
+              Configure sua agência em 5 passos
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {doneCount} de {items.length} concluídos
+            </p>
+          </div>
+        </div>
+
+        {/* Banner da oferta R$100 — 3 estados */}
+        {!completed && countdown && (
+          <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+            <div className="rounded-md bg-amber-500/15 p-1.5 text-amber-600 dark:text-amber-400 shrink-0">
+              <Clock className="h-4 w-4" />
             </div>
-            <div>
-              <h3 className="text-sm font-semibold tracking-tight text-foreground">
-                Configure sua agência em 5 passos
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {doneCount} de {items.length} concluídos
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                🎁 Complete os 5 passos em 24h e ganhe R$100 OFF na primeira mensalidade
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-400/80 mt-0.5">
+                {countdown.hours}h {countdown.minutes}m restantes
               </p>
             </div>
           </div>
+        )}
 
-          {countdown && !completed && (
-            <Badge
-              variant="outline"
-              className="gap-1.5 border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400 font-medium"
-            >
-              <Clock className="h-3 w-3" />
-              {countdown.hours}h {countdown.minutes}m restantes para R$100 OFF
-            </Badge>
-          )}
-        </div>
+        {!completed && !countdown && (
+          <div className="rounded-lg border border-border/60 bg-muted/40 p-3">
+            <p className="text-xs text-muted-foreground">
+              A janela do bônus de R$100 expirou, mas configurar sua agência ainda vale muito. Continue quando puder.
+            </p>
+          </div>
+        )}
 
         {/* Progress */}
         <Progress value={doneCount * 20} className="h-1.5" />
