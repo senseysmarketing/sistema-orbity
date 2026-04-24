@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { User, Lock, Bell, Palette, Save, Shield, CreditCard, Users, Puzzle, Trash2, Sparkles, Wand2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { User, Lock, Bell, Palette, Save, Shield, CreditCard, Users, Puzzle, Trash2, Sparkles, Wand2, Building2, Cog, Receipt, type LucideIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
