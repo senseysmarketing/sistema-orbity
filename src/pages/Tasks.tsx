@@ -168,6 +168,7 @@ const taskFormDefaults: TaskFormValues = {
   post_date: "",
   hashtags: "",
   creative_instructions: "",
+  post_caption: "",
   is_recurring: false,
   recurrence_frequency: "weekly",
   recurrence_interval: 1,
