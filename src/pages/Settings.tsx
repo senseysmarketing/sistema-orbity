@@ -555,85 +555,95 @@ export default function Settings() {
                   <GoogleCalendarIntegration />
                 </div>
               </section>
-            </>
-          )}
+        </TabsContent>
 
-          {tab === "agency" && isAdmin && (
-            <>
+        {isAdmin && (
+          <TabsContent value="agency" className="space-y-8 mt-6">
+            {tab === "agency" && (
+              <>
+                <section className="space-y-4">
+                  <SectionHeading icon={Wand2} title="Branding e Identidade" description="Personalize a marca exibida nas páginas públicas" />
+                  <BrandingTab />
+                </section>
+
+                <Separator className="my-8" />
+
+                <section className="space-y-4">
+                  <SectionHeading icon={Users} title="Usuários da Agência" description="Gerencie os membros da sua equipe e suas permissões" />
+                  <UsersTabContent />
+                </section>
+              </>
+            )}
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="ops" className="space-y-8 mt-6">
+            {tab === "ops" && (
+              <>
+                <section className="space-y-4">
+                  <SectionHeading icon={Puzzle} title="Marketing e Tráfego" description="Gerencie suas conexões de anúncios e tráfego pago" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FacebookIntegration />
+                  </div>
+                </section>
+
+                <Separator className="my-8" />
+
+                <section className="space-y-4">
+                  <SectionHeading icon={Bell} title="Comunicação" description="Canais de comunicação com clientes e leads" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <WhatsAppIntegration />
+                  </div>
+                </section>
+
+                <Separator className="my-8" />
+
+                <section className="space-y-4">
+                  <SectionHeading icon={CreditCard} title="Gateways de Pagamento" description="Configure cobranças automatizadas para seus clientes" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <AsaasIntegration />
+                    <ConexaIntegration />
+                    <StripeIntegration />
+                  </div>
+                </section>
+
+                <Separator className="my-8" />
+
+                <section className="space-y-4">
+                  <SectionHeading icon={Bell} title="Notificações da Agência" description="Configure os canais globais de notificação" />
+                  <Card>
+                    <CardContent className="pt-6">
+                      <NotificationChannelsConfig />
+                    </CardContent>
+                  </Card>
+                </section>
+
+                <Separator className="my-8" />
+
+                <section className="space-y-4">
+                  <SectionHeading icon={Sparkles} title="Inteligência Artificial" description="Personalize prompts e comportamentos da IA" />
+                  <AISettingsManager />
+                </section>
+              </>
+            )}
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="billing" className="space-y-8 mt-6">
+            {tab === "billing" && (
               <section className="space-y-4">
-                <SectionHeading icon={Wand2} title="Branding e Identidade" description="Personalize a marca exibida nas páginas públicas" />
-                <BrandingTab />
-              </section>
-
-              <Separator className="my-8" />
-
-              <section className="space-y-4">
-                <SectionHeading icon={Users} title="Usuários da Agência" description="Gerencie os membros da sua equipe e suas permissões" />
-                <UsersTabContent />
-              </section>
-            </>
-          )}
-
-          {tab === "ops" && isAdmin && (
-            <>
-              <section className="space-y-4">
-                <SectionHeading icon={Puzzle} title="Marketing e Tráfego" description="Gerencie suas conexões de anúncios e tráfego pago" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FacebookIntegration />
+                <SectionHeading icon={CreditCard} title="Assinatura e Faturamento" description="Visualize e gerencie seu plano Orbity" />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <SubscriptionDetails />
+                  <BillingHistory />
                 </div>
               </section>
-
-              <Separator className="my-8" />
-
-              <section className="space-y-4">
-                <SectionHeading icon={Bell} title="Comunicação" description="Canais de comunicação com clientes e leads" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <WhatsAppIntegration />
-                </div>
-              </section>
-
-              <Separator className="my-8" />
-
-              <section className="space-y-4">
-                <SectionHeading icon={CreditCard} title="Gateways de Pagamento" description="Configure cobranças automatizadas para seus clientes" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <AsaasIntegration />
-                  <ConexaIntegration />
-                  <StripeIntegration />
-                </div>
-              </section>
-
-              <Separator className="my-8" />
-
-              <section className="space-y-4">
-                <SectionHeading icon={Bell} title="Notificações da Agência" description="Configure os canais globais de notificação" />
-                <Card>
-                  <CardContent className="pt-6">
-                    <NotificationChannelsConfig />
-                  </CardContent>
-                </Card>
-              </section>
-
-              <Separator className="my-8" />
-
-              <section className="space-y-4">
-                <SectionHeading icon={Sparkles} title="Inteligência Artificial" description="Personalize prompts e comportamentos da IA" />
-                <AISettingsManager />
-              </section>
-            </>
-          )}
-
-          {tab === "billing" && isAdmin && (
-            <section className="space-y-4">
-              <SectionHeading icon={CreditCard} title="Assinatura e Faturamento" description="Visualize e gerencie seu plano Orbity" />
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <SubscriptionDetails />
-                <BillingHistory />
-              </div>
-            </section>
-          )}
-        </div>
-      </div>
+            )}
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }
