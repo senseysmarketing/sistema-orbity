@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { User, Lock, Bell, Palette, Save, Shield, CreditCard, Users, Puzzle, Trash2, Sparkles, Wand2, Building2, Cog, Receipt, type LucideIcon } from "lucide-react";
+import { User, Lock, Bell, Palette, Save, Shield, CreditCard, Users, Puzzle, Trash2, Sparkles, Building2, Cog, Receipt, type LucideIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -563,17 +563,11 @@ export default function Settings() {
           <TabsContent value="agency" className="space-y-8 mt-6">
             {tab === "agency" && (
               <>
-                <section className="space-y-4">
-                  <SectionHeading icon={Wand2} title="Branding e Identidade" description="Personalize a marca exibida nas páginas públicas" />
-                  <BrandingTab />
-                </section>
+                <BrandingTab />
 
                 <Separator className="my-8" />
 
-                <section className="space-y-4">
-                  <SectionHeading icon={Users} title="Usuários da Agência" description="Gerencie os membros da sua equipe e suas permissões" />
-                  <UsersTabContent />
-                </section>
+                <UsersTabContent />
               </>
             )}
           </TabsContent>
