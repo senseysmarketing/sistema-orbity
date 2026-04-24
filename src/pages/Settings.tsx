@@ -650,11 +650,11 @@ function UsersTabContent() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Users className="h-6 w-6" />
+          <h3 className="text-lg font-medium flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
             Gerenciar Usuários
-          </h2>
-          <p className="text-muted-foreground">
+          </h3>
+          <p className="text-sm text-muted-foreground">
             Gerencie os membros da sua agência e suas permissões
           </p>
         </div>
