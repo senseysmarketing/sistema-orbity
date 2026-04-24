@@ -293,11 +293,11 @@ export default function Settings() {
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as MacroTab)} className="space-y-6">
-        <TabsList className="flex w-full h-auto justify-start overflow-x-auto whitespace-nowrap scrollbar-hide">
+        <TabsList className="grid w-full h-auto" style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}>
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
-              <TabsTrigger key={item.key} value={item.key} className="flex-shrink-0 gap-2">
+              <TabsTrigger key={item.key} value={item.key} className="gap-2">
                 <Icon className="h-4 w-4" />
                 <span>{item.label}</span>
               </TabsTrigger>
