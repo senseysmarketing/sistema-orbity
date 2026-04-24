@@ -145,11 +145,51 @@ Deno.serve(async (req) => {
       console.error("approval links cleanup exception:", e);
     }
 
+    // ============================================================
+    // TTL de Notificações:
+    //   - Lidas: deleta após 15 dias
+    //   - Não lidas: deleta após 30 dias (lixo esquecido)
+    // ============================================================
+    let notificationsReadDeleted = 0;
+    let notificationsUnreadDeleted = 0;
+    try {
+      const cutoff15 = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+      const cutoff30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      const { error: readErr, count: readCount } = await supabase
+        .from("notifications")
+        .delete({ count: "exact" })
+        .eq("is_read", true)
+        .lt("created_at", cutoff15);
+
+      if (readErr) {
+        console.error("notifications (read) cleanup error:", readErr);
+      } else {
+        notificationsReadDeleted = readCount ?? 0;
+      }
+
+      const { error: unreadErr, count: unreadCount } = await supabase
+        .from("notifications")
+        .delete({ count: "exact" })
+        .eq("is_read", false)
+        .lt("created_at", cutoff30);
+
+      if (unreadErr) {
+        console.error("notifications (unread) cleanup error:", unreadErr);
+      } else {
+        notificationsUnreadDeleted = unreadCount ?? 0;
+      }
+    } catch (e) {
+      console.error("notifications cleanup exception:", e);
+    }
+
     const result = {
       tasks_processed: tasksProcessed,
       files_deleted: filesDeleted,
       files_preserved: filesPreserved,
       approval_links_deleted: approvalLinksDeleted,
+      notifications_read_deleted: notificationsReadDeleted,
+      notifications_unread_deleted: notificationsUnreadDeleted,
     };
     console.log("storage-garbage-collector finished:", result);
 
