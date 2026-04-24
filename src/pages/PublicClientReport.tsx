@@ -533,15 +533,31 @@ function ReportDashboard({ data }: { data: ReportData }) {
           </motion.div>
         )}
 
+        {/* Agency contact footer (white-label) */}
+        {data.branding && (data.branding.public_email || data.branding.public_phone || data.branding.website_url) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.7 }}
+            className="text-center mt-10"
+          >
+            <p className="text-white/40 text-[11px]">
+              {[data.branding.public_phone, data.branding.public_email, data.branding.website_url]
+                .filter(Boolean)
+                .join("  ·  ")}
+            </p>
+          </motion.div>
+        )}
+
         {/* Footer */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.8 }}
-          className="text-center mt-12"
+          className="text-center mt-6"
         >
           <p className="text-white/20 text-[11px]">
-            Gerado por <span className="text-white/30 font-medium">Sensey's</span>
+            Gerado por <span className="text-white/30 font-medium">{data.agency_name}</span>
           </p>
         </motion.div>
       </div>
