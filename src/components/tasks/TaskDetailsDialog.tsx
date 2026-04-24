@@ -110,9 +110,10 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
   const [stoppingRecurrence, setStoppingRecurrence] = useState(false);
   
   const { canDelete, isCreator, isAdmin, creatorName: permissionCreatorName } = useDeletePermission(task?.created_by);
-  const { improveTask, loading: aiLoading } = useAIAssist();
+  const { improveTask, generateCaption, loading: aiLoading } = useAIAssist();
   const { currentAgency } = useAgency();
   const { toast } = useToast();
+  const [generatingCaption, setGeneratingCaption] = useState(false);
   const { profile } = useAuth();
   const [localTask, setLocalTask] = useState<Task | null>(task);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
