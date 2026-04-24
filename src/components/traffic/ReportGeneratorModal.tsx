@@ -9,6 +9,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAIAssist } from "@/hooks/useAIAssist";
 
+interface ResultByObjective {
+  label: string;
+  actionType: string;
+  total: number;
+  spend: number;
+  costPerResult: number | null;
+  campaignCount: number;
+}
+
+interface CampaignBreakdownItem {
+  name: string;
+  objective: string;
+  result_value: number;
+  result_label: string;
+  result_action_type: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cost_per_result: number | null;
+}
+
 interface ReportData {
   accountName: string;
   period: string;
@@ -20,6 +42,8 @@ interface ReportData {
   avgCPC: number;
   avgCPM: number;
   conversionLabel?: string;
+  resultsByObjective?: ResultByObjective[];
+  campaignBreakdown?: CampaignBreakdownItem[];
 }
 
 interface ReportGeneratorModalProps {
