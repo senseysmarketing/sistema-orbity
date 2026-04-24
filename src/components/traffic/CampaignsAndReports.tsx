@@ -619,19 +619,27 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                   top_campaigns: campaigns
                     .sort((a, b) => b.spend - a.spend)
                     .slice(0, 5)
-                    .map(c => ({
-                      name: c.name,
-                      objective: c.objective,
-                      spend: c.spend,
-                      conversions: computeConversionsForActions(c.actions, c.conversions),
-                      impressions: c.impressions,
-                      clicks: c.clicks,
-                      ctr: c.ctr,
-                    })),
+                    .map(c => {
+                      const r = getObjectiveResult(c);
+                      return {
+                        name: c.name,
+                        objective: c.objective,
+                        spend: c.spend,
+                        conversions: r.value,
+                        result_label: r.label,
+                        result_action_type: r.actionType,
+                        impressions: c.impressions,
+                        clicks: c.clicks,
+                        ctr: c.ctr,
+                      };
+                    }),
                   chart_data: chartData,
                   active_campaigns: campaigns.filter(c => c.status === 'ACTIVE').length,
                   selectedActionType,
                   actionTypeLabel: currentActionLabel,
+                  // NEW: dynamic results breakdown
+                  results_by_objective: resultsByObjective,
+                  campaign_breakdown: campaignBreakdown,
                 };
 
                 const { error: updateError } = await supabase
