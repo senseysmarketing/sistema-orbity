@@ -19,7 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useDeletePermission } from "@/hooks/useDeletePermission";
 import { LinkifyText } from "@/lib/linkify";
 import { AttachmentsDisplay, Attachment } from "@/components/ui/file-attachments";
-import { useAIAssist, type CaptionResult } from "@/hooks/useAIAssist";
+import { useAIAssist } from "@/hooks/useAIAssist";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
