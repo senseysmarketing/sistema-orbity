@@ -20,8 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SubscriptionDetails } from "@/components/subscription/SubscriptionDetails";
 import { BillingHistory } from "@/components/subscription/BillingHistory";
 import { UsersManagement, CreateUserButton } from "@/components/admin/UsersManagement";
-import { NotificationSummaryCard } from "@/components/notifications/NotificationSummaryCard";
-import { NotificationChannelsConfig } from "@/components/notifications/NotificationChannelsConfig";
+import { useNavigate } from "react-router-dom";
 import { GoogleCalendarIntegration } from "@/components/settings/GoogleCalendarIntegration";
 import { WhatsAppIntegration } from "@/components/settings/WhatsAppIntegration";
 import { AISettingsManager } from "@/components/settings/AISettingsManager";
@@ -43,6 +42,7 @@ export default function Settings() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [updatingPassword, setUpdatingPassword] = useState(false);
   
+  const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { profile: userProfile, signOut } = useAuth();
   const { isAgencyAdmin } = useAgency();
@@ -480,7 +480,19 @@ export default function Settings() {
               {/* Notificações */}
               <section className="space-y-4">
                 <SectionHeading icon={Bell} title="Notificações" description="Gerencie como e quando você recebe notificações" />
-                <NotificationSummaryCard />
+                <Card>
+                  <CardContent className="pt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium">Central de Notificações</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Matriz de roteamento (Sistema, Push, E-mail), Modo Foco e canais — tudo num só lugar.
+                      </p>
+                    </div>
+                    <Button onClick={() => navigate("/dashboard/settings/notifications")}>
+                      🎛️ Abrir Central
+                    </Button>
+                  </CardContent>
+                </Card>
               </section>
 
               <Separator className="my-8" />
@@ -603,19 +615,6 @@ export default function Settings() {
                     <StripeIntegration />
                   </div>
                 </section>
-
-                <Separator className="my-8" />
-
-                <section className="space-y-4">
-                  <SectionHeading icon={Bell} title="Notificações da Agência" description="Configure os canais globais de notificação" />
-                  <Card>
-                    <CardContent className="pt-6">
-                      <NotificationChannelsConfig />
-                    </CardContent>
-                  </Card>
-                </section>
-
-                <Separator className="my-8" />
 
                 <section className="space-y-4">
                   <SectionHeading icon={Sparkles} title="Inteligência Artificial" description="Personalize prompts e comportamentos da IA" />
