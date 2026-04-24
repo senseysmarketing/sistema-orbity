@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, Lock, Bell, Palette, Save, Shield, CreditCard, Users, Puzzle, Trash2, Sparkles } from "lucide-react";
+import { User, Lock, Bell, Palette, Save, Shield, CreditCard, Users, Puzzle, Trash2, Sparkles, Wand2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,7 @@ import { AsaasIntegration } from "@/components/settings/AsaasIntegration";
 import { ConexaIntegration } from "@/components/settings/ConexaIntegration";
 import { StripeIntegration } from "@/components/settings/StripeIntegration";
 import { FacebookIntegration } from "@/components/settings/FacebookIntegration";
+import { BrandingTab } from "@/components/settings/BrandingTab";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -44,6 +45,7 @@ export default function Settings() {
   const { theme, setTheme } = useTheme();
   const { profile: userProfile, signOut } = useAuth();
   const { isAgencyAdmin } = useAgency();
+  const isAdmin = isAgencyAdmin();
   const { toast } = useToast();
 
   useEffect(() => {
