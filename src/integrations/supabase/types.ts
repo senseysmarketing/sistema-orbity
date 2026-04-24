@@ -7736,6 +7736,10 @@ export type Database = {
       is_master_agency_admin: { Args: never; Returns: boolean }
       is_master_user: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      master_get_agency_details: {
+        Args: { p_agency_id: string }
+        Returns: Json
+      }
       relink_orphan_whatsapp_conversations: {
         Args: { p_agency_id: string }
         Returns: {
