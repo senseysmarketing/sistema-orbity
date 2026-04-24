@@ -864,11 +864,16 @@ Instruções Criativas: ${newTask.creative_instructions || "Nenhuma"}`;
     try {
       const result = await generateCaption(prompt, currentAgency?.id);
       if (!result) return;
-      const parts: string[] = [];
-      if (result.caption) parts.push(result.caption.trim());
-      if (result.cta_text) parts.push(result.cta_text.trim());
-      if (result.hashtags?.length) parts.push(result.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" "));
-      const finalCaption = parts.join("\n\n");
+      let finalCaption = (result.caption || "").trim();
+      const lowerCap = finalCaption.toLowerCase();
+      if (result.cta_text && !lowerCap.includes(result.cta_text.trim().toLowerCase())) {
+        finalCaption += `\n\n${result.cta_text.trim()}`;
+      }
+      if (result.hashtags?.length) {
+        const tags = result.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`));
+        const missing = tags.filter((t) => !finalCaption.toLowerCase().includes(t.toLowerCase()));
+        if (missing.length) finalCaption += `\n\n${missing.join(" ")}`;
+      }
       form.setValue("post_caption", finalCaption, { shouldValidate: false, shouldDirty: true });
     } finally {
       setCaptionLoading(false);
