@@ -25,7 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { PushDiagnostics } from "./PushDiagnostics";
-import { NotificationChannelsConfig } from "./NotificationChannelsConfig";
+import { EmailIntegration } from "./integrations/EmailIntegration";
 import {
   ROUTING_CATEGORIES,
   ROUTING_CHANNELS,
@@ -539,7 +539,7 @@ export function NotificationPreferencesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0">
-          <NotificationChannelsConfig />
+          <EmailIntegration />
         </CardContent>
       </Card>
 
