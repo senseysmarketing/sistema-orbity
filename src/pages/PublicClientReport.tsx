@@ -6,6 +6,28 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
+interface ResultByObjective {
+  label: string;
+  actionType: string;
+  total: number;
+  spend: number;
+  costPerResult: number | null;
+  campaignCount: number;
+}
+
+interface CampaignBreakdownItem {
+  name: string;
+  objective: string;
+  result_value: number;
+  result_label: string;
+  result_action_type: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cost_per_result: number | null;
+}
+
 interface ReportData {
   client_name: string;
   agency_name: string;
@@ -26,6 +48,8 @@ interface ReportData {
     objective: string;
     spend: number;
     conversions: number;
+    result_label?: string;
+    result_action_type?: string;
     impressions?: number;
     clicks?: number;
     ctr?: number;
@@ -40,6 +64,8 @@ interface ReportData {
   is_mock: boolean;
   period?: { from: string; to: string };
   actionTypeLabel?: string;
+  results_by_objective?: ResultByObjective[];
+  campaign_breakdown?: CampaignBreakdownItem[];
 }
 
 function CountUp({ end, duration = 1.5, prefix = "", suffix = "", decimals = 0 }: { end: number; duration?: number; prefix?: string; suffix?: string; decimals?: number }) {
