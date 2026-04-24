@@ -18,6 +18,7 @@ export interface SocialMediaTask {
   priority: string;
   hashtags: string[] | null;
   creative_instructions?: string | null;
+  post_caption?: string | null;
   archived: boolean;
   is_internal: boolean;
   created_at: string;
@@ -68,7 +69,7 @@ export function useSocialMediaTasks() {
         .select(`
           id, title, description, status, priority,
           due_date, created_at, created_by, agency_id, archived, is_internal,
-          platform, post_type, post_date, hashtags, creative_instructions,
+          platform, post_type, post_date, hashtags, creative_instructions, post_caption,
           task_clients(client_id, clients(name)),
           task_assignments(user_id)
         `)
@@ -140,6 +141,7 @@ export function useSocialMediaTasks() {
           priority: task.priority || 'medium',
           hashtags,
           creative_instructions: creativeInstructions,
+          post_caption: task.post_caption ?? null,
           archived: task.archived || false,
           is_internal: task.is_internal || false,
           created_at: task.created_at,
