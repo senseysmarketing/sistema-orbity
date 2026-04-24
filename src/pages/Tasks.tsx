@@ -299,7 +299,8 @@ export default function Tasks() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
   const [createStep, setCreateStep] = useState<number>(1);
-  const { preFillTask, loading: aiLoading } = useAIAssist();
+  const { preFillTask, generateCaption, loading: aiLoading } = useAIAssist();
+  const [captionLoading, setCaptionLoading] = useState(false);
 
   // Filtros e busca
   const [searchTerm, setSearchTerm] = useState("");
