@@ -184,6 +184,37 @@ export default function PublicApproval() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  // Dynamic favicon (white-label) — restores original on unmount
+  useEffect(() => {
+    const logo = data?.agency?.logo_url;
+    if (!logo) return;
+    let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+    let created = false;
+    let prevHref: string | null = null;
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+      created = true;
+    } else {
+      prevHref = link.href;
+    }
+    link.href = logo;
+    // Update tab title with agency name
+    const prevTitle = document.title;
+    if (data?.agency?.name) {
+      document.title = `Aprovação · ${data.agency.name}`;
+    }
+    return () => {
+      if (created && link?.parentNode) {
+        link.parentNode.removeChild(link);
+      } else if (link && prevHref) {
+        link.href = prevHref;
+      }
+      document.title = prevTitle;
+    };
+  }, [data?.agency?.logo_url, data?.agency?.name]);
+
   useEffect(() => {
     if (!carouselApi) return;
     const onSelect = () => setCurrentIndex(carouselApi.selectedScrollSnap());
