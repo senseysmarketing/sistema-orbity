@@ -1,5 +1,5 @@
 import { resolveBrandTheme, type BrandThemeKey } from "@/lib/brandThemes";
-import { CheckCircle2, BarChart3, Eye, MousePointerClick, Target } from "lucide-react";
+import { CheckCircle2, BarChart3, Eye, Target } from "lucide-react";
 
 interface BrandingPreviewProps {
   theme: BrandThemeKey;
