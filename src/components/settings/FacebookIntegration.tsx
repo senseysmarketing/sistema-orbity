@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
-import { Facebook, Loader2, Shield, Users, Check, Unlink } from "lucide-react";
+import { Facebook, Loader2, Shield, Users, Check, Unlink, Wrench } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { META_MAINTENANCE_ACTIVE, META_MAINTENANCE_RETURN_DATE, META_MAINTENANCE_MESSAGE } from "@/components/traffic/utils/metaMaintenanceNotice";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -246,6 +248,14 @@ export const FacebookIntegration = () => {
           </>
         ) : (
           <div className="space-y-4">
+            {META_MAINTENANCE_ACTIVE && (
+              <Alert variant="warning">
+                <Wrench className="h-4 w-4" />
+                <AlertTitle>Meta Ads em manutenção</AlertTitle>
+                <AlertDescription>{META_MAINTENANCE_MESSAGE}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="p-3 sm:p-4 border rounded-lg bg-muted/30 space-y-2">
               <p className="text-sm font-medium">Recursos disponíveis:</p>
               <ul className="text-xs sm:text-sm text-muted-foreground space-y-1">
@@ -257,18 +267,25 @@ export const FacebookIntegration = () => {
               </ul>
             </div>
 
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="w-full">
-                  <Facebook className="mr-2 h-4 w-4" />
-                  Conectar Meta Ads
-                </Button>
-              </DialogTrigger>
-              <FacebookConnectionDialog
-                onSuccess={handleConnectionSuccess}
-                onClose={() => setIsDialogOpen(false)}
-              />
-            </Dialog>
+            {META_MAINTENANCE_ACTIVE ? (
+              <Button className="w-full" disabled>
+                <Wrench className="mr-2 h-4 w-4" />
+                Conexão indisponível — previsão {META_MAINTENANCE_RETURN_DATE}
+              </Button>
+            ) : (
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="w-full">
+                    <Facebook className="mr-2 h-4 w-4" />
+                    Conectar Meta Ads
+                  </Button>
+                </DialogTrigger>
+                <FacebookConnectionDialog
+                  onSuccess={handleConnectionSuccess}
+                  onClose={() => setIsDialogOpen(false)}
+                />
+              </Dialog>
+            )}
           </div>
         )}
       </CardContent>

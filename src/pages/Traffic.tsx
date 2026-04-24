@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, Facebook, Settings, BarChart, Activity, LogOut, Users, TrendingUp } from "lucide-react";
+import { AlertCircle, Facebook, Settings, BarChart, Activity, LogOut, Users, TrendingUp, Wrench } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { META_MAINTENANCE_ACTIVE, META_MAINTENANCE_RETURN_DATE, META_MAINTENANCE_MESSAGE } from "@/components/traffic/utils/metaMaintenanceNotice";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -168,23 +170,42 @@ export default function Traffic() {
             Conecte suas contas de anúncios para monitorar suas campanhas
           </p>
           
-          <div className="max-w-md mx-auto">
+          <div className="max-w-md mx-auto space-y-4">
+            {META_MAINTENANCE_ACTIVE && (
+              <Alert variant="warning">
+                <Wrench className="h-4 w-4" />
+                <AlertTitle>Meta Ads em manutenção</AlertTitle>
+                <AlertDescription>{META_MAINTENANCE_MESSAGE}</AlertDescription>
+              </Alert>
+            )}
             <Card className="border-2 border-dashed">
               <CardHeader className="text-center">
                 <Facebook className="h-12 w-12 text-blue-600 mx-auto mb-4" />
                 <CardTitle>Meta Ads</CardTitle>
                 <CardDescription>
-                  Configure a conexão do Facebook na aba de Integrações nas Configurações
+                  {META_MAINTENANCE_ACTIVE
+                    ? `Conexões com o Meta Ads temporariamente indisponíveis. Previsão de retorno: ${META_MAINTENANCE_RETURN_DATE}.`
+                    : "Configure a conexão do Facebook na aba de Integrações nas Configurações"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="text-center">
                 <Button 
                   className="w-full" 
                   size="lg"
+                  disabled={META_MAINTENANCE_ACTIVE}
                   onClick={() => navigate('/dashboard/settings?tab=integrations')}
                 >
-                  <Settings className="mr-2 h-5 w-5" />
-                  Ir para Integrações
+                  {META_MAINTENANCE_ACTIVE ? (
+                    <>
+                      <Wrench className="mr-2 h-5 w-5" />
+                      Conexão indisponível
+                    </>
+                  ) : (
+                    <>
+                      <Settings className="mr-2 h-5 w-5" />
+                      Ir para Integrações
+                    </>
+                  )}
                 </Button>
               </CardContent>
             </Card>
