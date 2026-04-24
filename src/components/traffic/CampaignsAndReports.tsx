@@ -19,6 +19,13 @@ import { ReportGeneratorModal } from "./ReportGeneratorModal";
 import { useAIAssist } from "@/hooks/useAIAssist";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  getObjectiveResult,
+  getCostPerResult,
+  groupResultsByObjective,
+  formatCostPerResult,
+  type ResultByObjective,
+} from "./utils/objectiveMapping";
 
 // Mapa de tradução de action_types da Meta API
 const ACTION_TYPE_LABELS: Record<string, string> = {
