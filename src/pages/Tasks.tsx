@@ -8,6 +8,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils";
 import { AIPreFillStep } from "@/components/ui/ai-prefill-step";
 import { useAIAssist, TaskPrefillResult } from "@/hooks/useAIAssist";
+import { Sparkles, Loader2 } from "lucide-react";
 import { SubtaskManager, Subtask } from "@/components/ui/subtask-manager";
 import { FileAttachments, Attachment } from "@/components/ui/file-attachments";
 import { WizardStepIndicator } from "@/components/ui/wizard-step-indicator";
@@ -141,6 +142,7 @@ const taskFormSchema = z.object({
   post_date: z.string().nullable().optional().default(""),
   hashtags: z.string().nullable().optional().default(""),
   creative_instructions: z.string().nullable().optional().default(""),
+  post_caption: z.string().nullable().optional().default(""),
   is_recurring: z.boolean().default(false),
   recurrence_frequency: z.enum(["daily", "weekly", "monthly"]).default("weekly"),
   recurrence_interval: z.number().int().min(1).default(1),
@@ -166,6 +168,7 @@ const taskFormDefaults: TaskFormValues = {
   post_date: "",
   hashtags: "",
   creative_instructions: "",
+  post_caption: "",
   is_recurring: false,
   recurrence_frequency: "weekly",
   recurrence_interval: 1,
@@ -298,7 +301,8 @@ export default function Tasks() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [isTemplateSelectorOpen, setIsTemplateSelectorOpen] = useState(false);
   const [createStep, setCreateStep] = useState<number>(1);
-  const { preFillTask, loading: aiLoading } = useAIAssist();
+  const { preFillTask, generateCaption, loading: aiLoading } = useAIAssist();
+  const [captionLoading, setCaptionLoading] = useState(false);
 
   // Filtros e busca
   const [searchTerm, setSearchTerm] = useState("");
@@ -844,6 +848,33 @@ export default function Tasks() {
     }
   };
 
+  const handleGenerateCaption = async () => {
+    if (!["redes_sociais", "criativos"].includes(newTask.task_type)) return;
+    const clientName = newTask.client_ids
+      .map((id) => clients.find((c) => c.id === id)?.name)
+      .filter(Boolean)
+      .join(", ") || "Cliente não definido";
+    const prompt = `Cliente: ${clientName}
+Título: ${newTask.title || "Sem título"}
+Briefing: ${newTask.description || "Sem descrição"}
+Plataforma: ${newTask.platform || "Não especificada"}
+Tipo de Post: ${newTask.post_type || "Não especificado"}
+Instruções Criativas: ${newTask.creative_instructions || "Nenhuma"}`;
+    setCaptionLoading(true);
+    try {
+      const result = await generateCaption(prompt, currentAgency?.id);
+      if (!result) return;
+      const parts: string[] = [];
+      if (result.caption) parts.push(result.caption.trim());
+      if (result.cta_text) parts.push(result.cta_text.trim());
+      if (result.hashtags?.length) parts.push(result.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" "));
+      const finalCaption = parts.join("\n\n");
+      form.setValue("post_caption", finalCaption, { shouldValidate: false, shouldDirty: true });
+    } finally {
+      setCaptionLoading(false);
+    }
+  };
+
   const handleCreateTask = async () => {
     if (!newTask.title.trim()) {
       toast({
@@ -902,6 +933,7 @@ export default function Tasks() {
           post_date: isSocial && newTask.post_date ? dateOnlyToISO(newTask.post_date) : null,
           hashtags: hashtagsArray,
           creative_instructions: hasCreative ? (newTask.creative_instructions || null) : null,
+          post_caption: hasCreative ? (newTask.post_caption || null) : null,
           is_recurring: !!newTask.is_recurring,
           recurrence_rule: recurrenceRulePayload as any,
         }])
@@ -1001,6 +1033,7 @@ export default function Tasks() {
       post_date: task.post_date ? task.post_date.split("T")[0] : "",
       hashtags: task.hashtags?.join(", ") || "",
       creative_instructions: task.creative_instructions || "",
+      post_caption: (task as any).post_caption || "",
       is_recurring: !!task.is_recurring,
       recurrence_frequency: (task.recurrence_rule?.frequency as RecurrenceFrequency) || "weekly",
       recurrence_interval: task.recurrence_rule?.interval || 1,
@@ -1089,6 +1122,7 @@ export default function Tasks() {
         post_date: isSocialEdit && newTask.post_date ? dateOnlyToISO(newTask.post_date) : null,
         hashtags: hashtagsArrayEdit,
         creative_instructions: hasCreativeEdit ? (newTask.creative_instructions || null) : null,
+        post_caption: hasCreativeEdit ? (newTask.post_caption || null) : null,
         updated_by: profile?.user_id,
         is_recurring: !!newTask.is_recurring,
         recurrence_rule: recurrenceRulePayload as any,
@@ -1219,6 +1253,7 @@ export default function Tasks() {
       post_date: "",
       hashtags: task.hashtags?.join(", ") || "",
       creative_instructions: task.creative_instructions || "",
+      post_caption: "",
       is_recurring: !!task.is_recurring,
       recurrence_frequency: (task.recurrence_rule?.frequency as RecurrenceFrequency) || "weekly",
       recurrence_interval: task.recurrence_rule?.interval || 1,
@@ -1732,6 +1767,36 @@ export default function Tasks() {
                         />
                       </div>
                     )}
+                    {/* Legenda do Post - Redes Sociais e Criativos */}
+                    {["redes_sociais", "criativos"].includes(newTask.task_type) && (
+                      <div className="grid gap-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Legenda do Post</Label>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleGenerateCaption}
+                            disabled={captionLoading}
+                            className="gap-2"
+                          >
+                            {captionLoading ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Sparkles className="h-3.5 w-3.5" />
+                            )}
+                            Gerar com IA
+                          </Button>
+                        </div>
+                        <Textarea
+                          value={newTask.post_caption || ""}
+                          onChange={(e) => form.setValue("post_caption", e.target.value)}
+                          placeholder="Legenda que será enviada junto com as artes para aprovação do cliente..."
+                          rows={5}
+                          className="whitespace-pre-wrap"
+                        />
+                      </div>
+                    )}
                     <div className="grid gap-4">
                       <div className="grid gap-2">
                         <Label>Clientes</Label>
@@ -1789,6 +1854,7 @@ export default function Tasks() {
                         ] : []),
                         ...(["redes_sociais", "criativos"].includes(newTask.task_type) ? [
                           { label: "Instruções Criativas", value: newTask.creative_instructions },
+                          { label: "Legenda do Post", value: newTask.post_caption || "" },
                         ] : []),
                       ]}
                     />
@@ -2254,7 +2320,36 @@ export default function Tasks() {
                   value={newTask.creative_instructions}
                   onChange={(e) => form.setValue("creative_instructions", e.target.value)}
                   placeholder="Instruções de arte, roteiro, textos na arte, CTAs..."
-                  rows={3}
+                />
+              </div>
+            )}
+            {/* Legenda do Post - Redes Sociais e Criativos */}
+            {["redes_sociais", "criativos"].includes(newTask.task_type) && (
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label>Legenda do Post</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleGenerateCaption}
+                    disabled={captionLoading}
+                    className="gap-2"
+                  >
+                    {captionLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    Gerar com IA
+                  </Button>
+                </div>
+                <Textarea
+                  value={newTask.post_caption || ""}
+                  onChange={(e) => form.setValue("post_caption", e.target.value)}
+                  placeholder="Legenda que será enviada junto com as artes para aprovação do cliente..."
+                  rows={5}
+                  className="whitespace-pre-wrap"
                 />
               </div>
             )}
