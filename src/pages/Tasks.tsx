@@ -142,6 +142,7 @@ const taskFormSchema = z.object({
   post_date: z.string().nullable().optional().default(""),
   hashtags: z.string().nullable().optional().default(""),
   creative_instructions: z.string().nullable().optional().default(""),
+  post_caption: z.string().nullable().optional().default(""),
   is_recurring: z.boolean().default(false),
   recurrence_frequency: z.enum(["daily", "weekly", "monthly"]).default("weekly"),
   recurrence_interval: z.number().int().min(1).default(1),
