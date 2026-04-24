@@ -848,6 +848,33 @@ export default function Tasks() {
     }
   };
 
+  const handleGenerateCaption = async () => {
+    if (!["redes_sociais", "criativos"].includes(newTask.task_type)) return;
+    const clientName = newTask.client_ids
+      .map((id) => clients.find((c) => c.id === id)?.name)
+      .filter(Boolean)
+      .join(", ") || "Cliente não definido";
+    const prompt = `Cliente: ${clientName}
+Título: ${newTask.title || "Sem título"}
+Briefing: ${newTask.description || "Sem descrição"}
+Plataforma: ${newTask.platform || "Não especificada"}
+Tipo de Post: ${newTask.post_type || "Não especificado"}
+Instruções Criativas: ${newTask.creative_instructions || "Nenhuma"}`;
+    setCaptionLoading(true);
+    try {
+      const result = await generateCaption(prompt, currentAgency?.id);
+      if (!result) return;
+      const parts: string[] = [];
+      if (result.caption) parts.push(result.caption.trim());
+      if (result.cta_text) parts.push(result.cta_text.trim());
+      if (result.hashtags?.length) parts.push(result.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" "));
+      const finalCaption = parts.join("\n\n");
+      form.setValue("post_caption", finalCaption, { shouldValidate: false, shouldDirty: true });
+    } finally {
+      setCaptionLoading(false);
+    }
+  };
+
   const handleCreateTask = async () => {
     if (!newTask.title.trim()) {
       toast({
