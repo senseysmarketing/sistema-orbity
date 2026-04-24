@@ -1,30 +1,23 @@
-// Firebase Cloud Messaging Service Worker (Data-Only Payload - sem duplicação)
+// Firebase Cloud Messaging Service Worker (Data-Only Payload v3)
+// SW assume 100% do controle de exibição. Sem dependência do FCM auto-display.
+// Funciona em iOS PWA, Android Chrome e Desktop.
 
-// Instalação do Service Worker (sem skipWaiting para evitar reload automático)
 self.addEventListener('install', () => {
-  console.log('[SW] Installing...');
-  // NÃO usar skipWaiting() aqui - deixar o PWA controlar a atualização
+  console.log('[SW] Installing v3 (data-only)...');
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating...');
-  // Assumir controle imediato para receber push events - ESSENCIAL para iOS PWA
+  console.log('[SW] Activating v3...');
   event.waitUntil(clients.claim());
 });
 
-// Handler para mensagens do client (skipWaiting controlado pelo PWA)
 self.addEventListener('message', (event) => {
-  console.log('[SW] Message received:', event.data);
   if (event.data?.type === 'SKIP_WAITING') {
-    // Só faz skipWaiting quando explicitamente solicitado pelo PWA
     self.skipWaiting();
   }
 });
 
-// NOTA: Firebase SDK não é mais necessário para data-only payloads
-// O evento 'push' universal abaixo cuida de tudo
-
-// Handler universal de push - funciona em todos os browsers incluindo Safari/iOS
+// Handler universal de push - data-only
 self.addEventListener('push', (event) => {
   console.log('[SW] Push event recebido');
 
@@ -34,57 +27,51 @@ self.addEventListener('push', (event) => {
   }
 
   event.waitUntil((async () => {
-    let msg = {};
+    let payload = {};
     try {
-      msg = event.data.json();
+      payload = event.data.json();
     } catch {
-      msg = { data: { body: event.data.text() } };
+      payload = { data: { body: event.data.text() } };
     }
 
-    console.log('[SW] Push payload:', JSON.stringify(msg));
+    const data = payload?.data || {};
+    const title = data.title || 'Nova notificação';
+    const body = data.body || '';
+    const icon = data.icon || 'https://sistema-orbity.lovable.app/favicon.ico';
+    const tag = data.notification_id || data.tag || `orbity-${Date.now()}`;
+    const url = data.action_url || data.url || '/dashboard';
 
-    // Data-only payload: todos os dados vêm do campo 'data'
-    const data = msg?.data || {};
-    const title = data?.title || 'Nova notificação';
-    const body = data?.body || '';
-    const icon = data?.icon || 'https://sistema-orbity.lovable.app/favicon.ico';
-
-    // Tag única baseada no ID da notificação (evita duplicação)
-    const notificationTag = data?.notification_id || `orbity-${Date.now()}`;
-
-    console.log('[SW] Exibindo notificação:', title, 'tag:', notificationTag);
-
-    await self.registration.showNotification(title, {
+    const options = {
       body,
       icon,
       badge: 'https://sistema-orbity.lovable.app/favicon.ico',
-      data,
-      tag: notificationTag,
-      renotify: false  // NÃO renotificar se tag igual (previne duplicatas)
-    });
+      tag,
+      renotify: false,
+      vibrate: [200, 100, 200],
+      data: { ...data, url },
+      actions: [{ action: 'open', title: 'Ver agora' }],
+    };
 
-    console.log('[SW] Notificação exibida com sucesso');
+    console.log('[SW] Exibindo notificação:', title, 'tag:', tag);
+    await self.registration.showNotification(title, options);
   })());
 });
 
-// Click handler
+// Click handler universal
 self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification click:', event);
-  
   event.notification.close();
 
-  const actionUrl = event.notification.data?.action_url || '/dashboard';
-  const urlToOpen = new URL(actionUrl, self.location.origin).href;
+  const targetUrl = event.notification.data?.url || event.notification.data?.action_url || '/dashboard';
+  const absoluteUrl = new URL(targetUrl, self.location.origin).href;
 
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
-          client.navigate(urlToOpen);
-          return client.focus();
-        }
+  event.waitUntil((async () => {
+    const clientList = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of clientList) {
+      if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+        try { await client.navigate(absoluteUrl); } catch {}
+        return client.focus();
       }
-      return clients.openWindow?.(urlToOpen);
-    })
-  );
+    }
+    if (clients.openWindow) return clients.openWindow(absoluteUrl);
+  })());
 });

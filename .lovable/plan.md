@@ -1,111 +1,77 @@
-# Plano: Otimização do Hook useBrowserNotifications.tsx
 
-## Objetivo
-Refatorar o hook de notificações locais do navegador com 4 melhorias enterprise: Deep Linking, Deduplicação, Feedback Sonoro e Auto-Encerramento.
+# Plano: Data-Only Push Payloads + Hardening + Build Cleanup
 
-## Alterações Técnicas
+## 1. `public/firebase-messaging-sw.js` (reescrita)
 
-### 1. Interface Estendida (CustomNotificationOptions)
-```typescript
-interface CustomNotificationOptions extends NotificationOptions {
-  action_url?: string;  // URL para navegação no clique
-  silent?: boolean;     // Controla feedback sonoro
-  tag?: string;         // Deduplicação (SO sobrescreve notificações com mesma tag)
-}
+- Remover qualquer dependência do Firebase SDK no SW (já era data-only, mas reforçar).
+- Listener `push` universal: lê `payload.data` e chama `self.registration.showNotification(title, options)` com `vibrate`, `actions: [{action:'open', title:'Ver agora'}]`, `tag` único (notification_id), `renotify: false`.
+- `notificationclick`: tenta `client.navigate()` em aba existente do mesmo origin; senão `clients.openWindow(targetUrl)`. Lê URL de `data.url || data.action_url`.
+- Mantém `clients.claim()` no activate e `SKIP_WAITING` controlado.
+
+## 2. `supabase/functions/send-push-notification/index.ts`
+
+Substituir o objeto `message` em `sendToFCM` por payload **data-only blindado**:
+
+```ts
+const message = {
+  message: {
+    token: fcmToken,
+    data: {
+      title: payload.title,
+      body: payload.body,
+      icon: payload.icon || 'https://sistema-orbity.lovable.app/favicon.ico',
+      url: absoluteActionUrl,
+      action_url: absoluteActionUrl,
+      tag: payload.data?.notification_id || `orbity-${Date.now()}`,
+      notification_id: payload.data?.notification_id || `${Date.now()}`,
+      ...payload.data,
+    },
+    android: { priority: 'HIGH' },
+    apns: {
+      headers: {
+        'apns-priority': '10',
+        'apns-push-type': 'alert',
+      },
+      payload: {
+        aps: { 'content-available': 1, 'mutable-content': 1 },
+      },
+    },
+    webpush: {
+      headers: { TTL: '86400', Urgency: 'high' },
+      fcm_options: { link: absoluteActionUrl },
+    },
+  },
+};
 ```
 
-### 2. Deep Linking (Navegação Dinâmica)
-- Atualizar `notification.onclick` para:
-  - `window.focus()` - trazer janela para frente
-  - Se `action_url` presente: `window.location.href = action_url`
-  - `notification.close()` - fechar após clique
+(Sem chave `notification` — SW exibe.)
 
-### 3. Deduplicação Inteligente (Tag)
-- A propriedade `tag` é repassada ao `new Notification()` via spread
-- Sistema Operacional (macOS/Windows) automaticamente sobrescreve notificações antigas com mesma tag
-- Exemplo uso: `tag: 'approvals'` para evitar spam de aprovações
+## 3. `src/hooks/usePushNotifications.tsx` — Refresh inteligente do token
 
-### 4. Feedback Sonoro Embutido
-```typescript
-if (!options?.silent) {
-  const audio = new Audio('/notification.mp3');
-  audio.play().catch(() => {}); // Previne erros de autoplay
-}
-```
-- Som condicional (respeita flag `silent`)
-- Arquivo `/notification.mp3` já existe na pasta public
+Adicionar guardrail anti-spam:
 
-### 5. Auto-Encerramento de Segurança
-```typescript
-setTimeout(() => notification.close(), 6000);
-```
-- Fecha automaticamente após 6 segundos
-- Previne notificações "presas" no ecrã
+- Constantes: `const TOKEN_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;`
+- Em `saveToken`, antes do upsert, ler do `localStorage` `last_saved_token` e `last_saved_token_at`. Se `fcmToken === last_saved_token` **E** `Date.now() - last_saved_token_at < 12h`, fazer `return` cedo (log "[Push] Token cache hit, skipping save").
+- Após upsert bem-sucedido, gravar `localStorage.setItem('last_saved_token', fcmToken)` e `localStorage.setItem('last_saved_token_at', String(Date.now()))`.
+- Adicionar listener `visibilitychange` num novo `useEffect` (deps: `user?.id`, `isSupported`, `permission`, `hasFirebaseConfig`) que, quando `document.visibilityState === 'visible'`, chama `getToken()` e `saveTokenRef.current(token)` — o cache acima evita spam.
+- Cleanup do listener no return.
 
-## Arquivo Impactado
-| Arquivo | Ação |
-|---------|------|
-| `src/hooks/useBrowserNotifications.tsx` | Refatoração completa (66 linhas) |
+## 4. Build errors (limpeza de tipagem `unknown`)
 
-## Código Final Esperado
-```typescript
-import { useState, useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
+Padrão: substituir `error.message` (e variantes `e`, `qrErr`, `apiErr`, `recordError`, `_match`) por `(error as Error).message` ou typed params. Arquivos:
 
-interface CustomNotificationOptions extends NotificationOptions {
-  action_url?: string;
-  silent?: boolean;
-  tag?: string;
-}
+- `supabase/functions/whatsapp-connect/index.ts` (9 ocorrências: linhas 57, 58, 139, 227, 266, 277, 304, 401, 416)
+- `supabase/functions/whatsapp-send/index.ts` (linha 143)
+- `supabase/functions/whatsapp-sync-messages/index.ts` (linha 239)
+- `supabase/functions/whatsapp-webhook/index.ts`:
+  - Linha 606: `promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id!)` — confirmar não-nulo no escopo do `if (conversation.lead_id)` que já existe acima OU fazer guard explícito.
+  - Linha 656: `(error as Error).message`.
 
-export function useBrowserNotifications() {
-  const [permission, setPermission] = useState<NotificationPermission>('default');
-  const { toast } = useToast();
+## 5. Resultado esperado
 
-  useEffect(() => {
-    if ('Notification' in window) {
-      setPermission(Notification.permission);
-    }
-  }, []);
+- iOS PWA: `content-available: 1` + `apns-priority: 10` acordam o SW em background → `push` listener exibe notificação localmente.
+- Android: `priority: HIGH` força execução do SW mesmo em modo economia.
+- DB: tokens só re-salvos quando mudam ou após 12h.
+- Build limpo nos arquivos WhatsApp.
 
-  const requestPermission = async () => { /* mantido */ };
-
-  const showNotification = (title: string, options?: CustomNotificationOptions) => {
-    if (permission === 'granted') {
-      const notification = new Notification(title, {
-        icon: '/favicon.ico',
-        badge: '/favicon.ico',
-        ...options,  // tag passada aqui para deduplicação SO
-      });
-
-      if (!options?.silent) {
-        const audio = new Audio('/notification.mp3');
-        audio.play().catch(() => {});
-      }
-
-      notification.onclick = () => {
-        window.focus();
-        if (options?.action_url) {
-          window.location.href = options.action_url;
-        }
-        notification.close();
-      };
-
-      setTimeout(() => notification.close(), 6000);
-
-      return notification;
-    }
-    return null;
-  };
-
-  return { permission, requestPermission, showNotification };
-}
-```
-
-## Benefícios
-- ✨ **Deep Linking**: Clique vai direto para a tarefa/lead/reunião
-- 🔄 **Deduplicação**: Tags evitam spam de notificações repetidas
-- 🔊 **Sonoro**: Alerta sonoro garante percepção mesmo em outra aba
-- ⏱️ **Auto-close**: Notificações não ficam presas indefinidamente
-
-Posso executar?
+**Aprovar para executar.**

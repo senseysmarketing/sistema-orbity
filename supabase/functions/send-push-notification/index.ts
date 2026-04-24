@@ -176,27 +176,45 @@ async function sendToFCM(
     ? actionUrl 
     : `https://sistema-orbity.lovable.app${actionUrl}`;
 
-  // Data-only payload: FCM não exibe automaticamente, apenas o Service Worker exibe
+  // Data-only blindado: SW assume controle total (iOS + Android estáveis)
+  const notificationId = payload.data?.notification_id || `${Date.now()}`;
   const message = {
     message: {
       token: fcmToken,
-      // SEM notification - deixa o Service Worker exibir (evita duplicação)
-      webpush: {
-        headers: {
-          TTL: '86400',      // 24h - mensagem persiste se offline
-          Urgency: 'high',   // Entrega imediata para iOS/Android
-        },
-        fcm_options: {
-          link: absoluteActionUrl,
-        },
-      },
+      // SEM chave 'notification' - SW exibe via showNotification
       data: {
         title: payload.title,
         body: payload.body,
         icon: payload.icon || 'https://sistema-orbity.lovable.app/favicon.ico',
-        notification_id: payload.data?.notification_id || `${Date.now()}`,
+        url: absoluteActionUrl,
         action_url: absoluteActionUrl,
+        tag: notificationId,
+        notification_id: notificationId,
         ...payload.data,
+      },
+      android: {
+        priority: 'HIGH',
+      },
+      apns: {
+        headers: {
+          'apns-priority': '10',
+          'apns-push-type': 'alert',
+        },
+        payload: {
+          aps: {
+            'content-available': 1,
+            'mutable-content': 1,
+          },
+        },
+      },
+      webpush: {
+        headers: {
+          TTL: '86400',
+          Urgency: 'high',
+        },
+        fcm_options: {
+          link: absoluteActionUrl,
+        },
       },
     },
   };
