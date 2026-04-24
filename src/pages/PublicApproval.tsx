@@ -306,7 +306,7 @@ export default function PublicApproval() {
 
   if (loading) {
     return (
-      <CinematicShell>
+      <CinematicShell themeKey={data?.agency?.brand_theme} agency={data?.agency}>
         <Toaster position="top-center" theme="dark" closeButton />
         <CenterShell>
           <Loader2 className="h-8 w-8 animate-spin text-white/40" />
@@ -318,7 +318,7 @@ export default function PublicApproval() {
 
   if (errorState) {
     return (
-      <CinematicShell>
+      <CinematicShell themeKey={data?.agency?.brand_theme} agency={data?.agency}>
         <Toaster position="top-center" theme="dark" closeButton />
         <ExpiredOrErrorScreen error={errorState} />
       </CinematicShell>
@@ -329,7 +329,7 @@ export default function PublicApproval() {
 
   if (allDone && !forceReview) {
     return (
-      <CinematicShell>
+      <CinematicShell themeKey={data?.agency?.brand_theme} agency={data?.agency}>
         <Toaster position="top-center" theme="dark" closeButton />
         <AllDoneScreen
           agency={data.agency}
@@ -346,7 +346,7 @@ export default function PublicApproval() {
   const allApproved = totalDecided === data.items.length;
 
   return (
-    <CinematicShell>
+    <CinematicShell themeKey={data?.agency?.brand_theme} agency={data?.agency}>
       <Toaster position="top-center" theme="dark" closeButton />
 
       {/* Premium Header */}
