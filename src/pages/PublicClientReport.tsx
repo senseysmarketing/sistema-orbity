@@ -500,26 +500,6 @@ function ReportDashboard({ data }: { data: ReportData }) {
             </div>
           </motion.div>
         )}
-                      className="h-1.5 bg-white/[0.06] [&>div]:bg-gradient-to-r [&>div]:from-blue-500 [&>div]:to-violet-500"
-                    />
-                    <div className="flex items-center justify-between mt-1.5">
-                      {campaign.conversions > 0 && (
-                        <p className="text-white/30 text-[11px]">
-                          {campaign.conversions} {(data.actionTypeLabel || "conversão").toLowerCase()}{campaign.conversions > 1 && !data.actionTypeLabel ? "es" : ""}
-                        </p>
-                      )}
-                      {cpa > 0 && (
-                        <p className="text-white/40 text-[11px] font-medium">
-                          CPA: {formatCurrency(cpa)}
-                        </p>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
 
         {/* Footer */}
         <motion.div
