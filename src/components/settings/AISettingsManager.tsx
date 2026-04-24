@@ -178,15 +178,6 @@ export function AISettingsManager() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-          <Sparkles className="h-6 w-6" />
-          Configurações de IA
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Personalize os prompts usados pela IA ao pré-preencher tarefas e posts. As instruções técnicas (idioma, formato de resposta) são mantidas automaticamente.
-        </p>
-      </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {renderCard(
