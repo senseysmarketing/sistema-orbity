@@ -603,7 +603,7 @@ serve(async (req) => {
               .maybeSingle();
             const autoContactEnabled = agencyCfg?.whatsapp_auto_contact !== false; // default true
             if (autoContactEnabled) {
-              promotionPromise = promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id);
+              promotionPromise = promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id!);
             } else {
               console.log('[whatsapp-webhook] Auto-Contact disabled for agency, skipping promotion', { agencyId: account.agency_id });
             }
@@ -653,7 +653,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('[whatsapp-webhook] Error:', error);
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
+    return new Response(JSON.stringify({ success: false, error: (error as Error).message }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
