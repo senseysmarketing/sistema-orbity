@@ -426,24 +426,47 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
 
   // Compute dynamic conversion values based on selected action type
   const currentActionLabel = selectedActionType === '__default__' ? 'Conversões' : getActionTypeLabel(selectedActionType);
-  
+
   const computeConversionsForActions = (actions?: ActionData[], fallbackConversions?: number): number => {
     if (!actions || actions.length === 0 || selectedActionType === '__default__') return fallbackConversions || 0;
     const match = actions.find(a => a.action_type === selectedActionType);
     return match ? (parseInt(String(match.value)) || 0) : 0;
   };
 
-  const dynamicTotalConversions = selectedActionType === '__default__' 
+  const dynamicTotalConversions = selectedActionType === '__default__'
     ? metrics.conversions
-    : (metrics.allActions?.find(a => a.action_type === selectedActionType)?.value || 
+    : (metrics.allActions?.find(a => a.action_type === selectedActionType)?.value ||
        activeCampaigns.reduce((sum, c) => sum + computeConversionsForActions(c.actions, 0), 0));
 
   // Sorted available actions for the selector
   const sortedAvailableActions = [...availableActions].sort((a, b) => b.value - a.value);
 
+  // ===== Dynamic results-by-objective (per-campaign objective mapping) =====
+  const resultsByObjective: ResultByObjective[] = groupResultsByObjective(activeCampaigns);
+  const primaryResult = resultsByObjective[0];
+  const secondaryResults = resultsByObjective.slice(1);
+
+  // Per-campaign breakdown (used in snapshot + reports)
+  const campaignBreakdown = activeCampaigns.map(c => {
+    const r = getObjectiveResult(c);
+    const cpr = getCostPerResult(c);
+    return {
+      name: c.name,
+      objective: c.objective,
+      result_value: r.value,
+      result_label: r.label,
+      result_action_type: r.actionType,
+      spend: c.spend,
+      impressions: c.impressions,
+      clicks: c.clicks,
+      ctr: c.ctr,
+      cost_per_result: cpr,
+    };
+  });
+
   const reportData = {
     accountName: selectedAccountName,
-    period: dateRange?.from && dateRange?.to 
+    period: dateRange?.from && dateRange?.to
       ? `${format(dateRange.from, 'dd/MM/yyyy')} - ${format(dateRange.to, 'dd/MM/yyyy')}`
       : '',
     totalSpend: metrics.spend,
@@ -454,6 +477,8 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
     avgCPC: metrics.cpc,
     avgCPM: metrics.cpm,
     conversionLabel: currentActionLabel,
+    resultsByObjective,
+    campaignBreakdown,
   };
 
   if (loading && !hasInitialData) {
