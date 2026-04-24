@@ -124,7 +124,33 @@ Deno.serve(async (req) => {
       offset += PAGE;
     }
 
-    const result = { tasks_processed: tasksProcessed, files_deleted: filesDeleted, files_preserved: filesPreserved };
+    // ============================================================
+    // Limpeza física de links de aprovação expirados há > 15 dias
+    // (FK ON DELETE CASCADE blindada → task_approval_items vão junto)
+    // ============================================================
+    let approvalLinksDeleted = 0;
+    try {
+      const cutoff = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+      const { error: approvalsErr, count } = await supabase
+        .from("task_approvals")
+        .delete({ count: "exact" })
+        .lt("expires_at", cutoff);
+
+      if (approvalsErr) {
+        console.error("approval links cleanup error:", approvalsErr);
+      } else {
+        approvalLinksDeleted = count ?? 0;
+      }
+    } catch (e) {
+      console.error("approval links cleanup exception:", e);
+    }
+
+    const result = {
+      tasks_processed: tasksProcessed,
+      files_deleted: filesDeleted,
+      files_preserved: filesPreserved,
+      approval_links_deleted: approvalLinksDeleted,
+    };
     console.log("storage-garbage-collector finished:", result);
 
     return new Response(JSON.stringify(result), {
