@@ -232,6 +232,58 @@ export function TaskDetailsDialog({ task, open, onOpenChange, onEdit, onDelete, 
     setLocalTask(task);
   }, [task]);
 
+  // Debounce salvamento da legenda (evita race conditions)
+  useEffect(() => {
+    if (!localTask || !task) return;
+    if ((localTask.post_caption ?? null) === (task.post_caption ?? null)) return;
+    const timer = setTimeout(async () => {
+      try {
+        const { error } = await supabase
+          .from("tasks")
+          .update({ post_caption: localTask.post_caption ?? null })
+          .eq("id", localTask.id);
+        if (error) throw error;
+        onTaskUpdate?.();
+      } catch (err: any) {
+        toast({
+          title: "Erro ao salvar legenda",
+          description: err.message,
+          variant: "destructive",
+        });
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localTask?.post_caption]);
+
+  const handleGenerateCaption = async () => {
+    if (!localTask) return;
+    setGeneratingCaption(true);
+    try {
+      const clientName = localTask.client_id ? getClientName(localTask.client_id) : "Cliente";
+      const prompt = `Crie uma legenda para o cliente ${clientName}. Título da Tarefa: ${localTask.title}. Briefing: ${localTask.description || "Sem descrição"}. Plataforma alvo: ${localTask.platform || "Geral"}. Instruções extras: ${localTask.creative_instructions || "Nenhuma"}.`;
+      const result = await generateCaption(prompt, currentAgency?.id);
+      if (!result) return;
+
+      let finalCaption = result.caption || "";
+      if (result.cta_text) finalCaption += `\n\n${result.cta_text}`;
+      if (result.hashtags && result.hashtags.length > 0) {
+        const tags = result.hashtags
+          .map((t) => (t.startsWith("#") ? t : `#${t}`))
+          .join(" ");
+        finalCaption += `\n\n${tags}`;
+      }
+
+      setLocalTask((prev) => (prev ? { ...prev, post_caption: finalCaption } : prev));
+      toast({
+        title: "Legenda gerada com IA ✨",
+        description: "Você pode editar antes de enviar para aprovação.",
+      });
+    } finally {
+      setGeneratingCaption(false);
+    }
+  };
+
   useEffect(() => {
     const loadTaskDetails = async () => {
       if (localTask?.history) {
