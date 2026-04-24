@@ -297,9 +297,12 @@ async function createMonthlySnapshot(supabase: any, agencyId: string, month: Dat
     .eq('active', true);
 
   // Calcular métricas
-  const totalRevenue = payments?.filter(p => p.status === 'paid').reduce((sum, p) => sum + Number(p.amount), 0) || 0;
-  const totalExpenses = expenses?.filter(e => e.status === 'paid').reduce((sum, e) => sum + Number(e.amount), 0) || 0;
-  const totalSalaries = salaries?.filter(s => s.status === 'paid').reduce((sum, s) => sum + Number(s.amount), 0) || 0;
+  const pays = (payments || []) as Array<{ status: string; amount: number }>;
+  const exps = (expenses || []) as Array<{ status: string; amount: number }>;
+  const sals = (salaries || []) as Array<{ status: string; amount: number }>;
+  const totalRevenue = pays.filter(p => p.status === 'paid').reduce((sum, p) => sum + Number(p.amount), 0);
+  const totalExpenses = exps.filter(e => e.status === 'paid').reduce((sum, e) => sum + Number(e.amount), 0);
+  const totalSalaries = sals.filter(s => s.status === 'paid').reduce((sum, s) => sum + Number(s.amount), 0);
 
   await supabase.from('monthly_snapshots').insert({
     agency_id: agencyId,
@@ -309,12 +312,12 @@ async function createMonthlySnapshot(supabase: any, agencyId: string, month: Dat
     total_salaries: totalSalaries,
     net_profit: totalRevenue - totalExpenses - totalSalaries,
     active_clients_count: activeClientsCount || 0,
-    paid_payments_count: payments?.filter(p => p.status === 'paid').length || 0,
-    pending_payments_count: payments?.filter(p => p.status === 'pending').length || 0,
-    overdue_payments_count: payments?.filter(p => p.status === 'overdue').length || 0,
-    paid_expenses_count: expenses?.filter(e => e.status === 'paid').length || 0,
-    pending_expenses_count: expenses?.filter(e => e.status === 'pending').length || 0,
-    paid_salaries_count: salaries?.filter(s => s.status === 'paid').length || 0,
-    pending_salaries_count: salaries?.filter(s => s.status === 'pending').length || 0,
+    paid_payments_count: pays.filter(p => p.status === 'paid').length,
+    pending_payments_count: pays.filter(p => p.status === 'pending').length,
+    overdue_payments_count: pays.filter(p => p.status === 'overdue').length,
+    paid_expenses_count: exps.filter(e => e.status === 'paid').length,
+    pending_expenses_count: exps.filter(e => e.status === 'pending').length,
+    paid_salaries_count: sals.filter(s => s.status === 'paid').length,
+    pending_salaries_count: sals.filter(s => s.status === 'pending').length,
   });
 }

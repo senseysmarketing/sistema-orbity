@@ -243,7 +243,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('[QUALIFICATION] Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
@@ -494,7 +494,7 @@ async function sendMetaEvent(
       event_id: eventId,
       pixel_id: pixelId,
       status: 'failed',
-      response_data: { error: error.message },
+      response_data: { error: (error as Error).message },
     });
   }
 }

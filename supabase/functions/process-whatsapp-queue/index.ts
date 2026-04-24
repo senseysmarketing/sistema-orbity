@@ -335,7 +335,7 @@ serve(async (req) => {
             .replace(/\{\{empresa\}\}/gi, lead.company || '');
 
           const customFields = (lead.custom_fields as Record<string, string> | null) || {};
-          message = message.replace(/\{\{formulario:([^}]+)\}\}/gi, (_match, fieldKey: string) => {
+          message = message.replace(/\{\{formulario:([^}]+)\}\}/gi, (_match: string, fieldKey: string) => {
             const key = fieldKey.trim();
             if (customFields[key] !== undefined && customFields[key] !== null) {
               return String(customFields[key]);
@@ -472,12 +472,12 @@ serve(async (req) => {
         await supabase.from('whatsapp_automation_control').update({
           status: newRetryCount >= MAX_RETRIES ? 'finished' : 'active',
           retry_count: newRetryCount,
-          last_error: recordError?.message || 'Unexpected error',
+          last_error: (recordError as Error)?.message || 'Unexpected error',
           conversation_state: newRetryCount >= MAX_RETRIES ? 'max_retries_exceeded' : undefined,
         }).eq('id', record.id);
 
         await logAutomationEvent(supabase, record.id, record.whatsapp_accounts?.id, 'processing_error', {
-          error: recordError?.message, retry_count: newRetryCount,
+          error: (recordError as Error)?.message, retry_count: newRetryCount,
         });
       }
     }
@@ -488,7 +488,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('[process-queue] Error:', error);
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
+    return new Response(JSON.stringify({ success: false, error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
