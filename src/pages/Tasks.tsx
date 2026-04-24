@@ -1006,6 +1006,7 @@ export default function Tasks() {
       post_date: task.post_date ? task.post_date.split("T")[0] : "",
       hashtags: task.hashtags?.join(", ") || "",
       creative_instructions: task.creative_instructions || "",
+      post_caption: (task as any).post_caption || "",
       is_recurring: !!task.is_recurring,
       recurrence_frequency: (task.recurrence_rule?.frequency as RecurrenceFrequency) || "weekly",
       recurrence_interval: task.recurrence_rule?.interval || 1,
