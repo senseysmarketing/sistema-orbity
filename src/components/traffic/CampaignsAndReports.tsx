@@ -850,35 +850,41 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                 <TableRow>
                   <TableHead>Campanha</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Objetivo</TableHead>
                   <TableHead>Última Alteração</TableHead>
                   <TableHead>Gasto</TableHead>
                   <TableHead>Cliques</TableHead>
-                  <TableHead>{currentActionLabel}</TableHead>
+                  <TableHead>Resultados</TableHead>
+                  <TableHead>Custo / Resultado</TableHead>
                   <TableHead>CTR</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {activeCampaigns.map((campaign) => (
+                {activeCampaigns.map((campaign) => {
+                  const result = getObjectiveResult(campaign);
+                  const costPerResult = getCostPerResult(campaign);
+                  return (
                     <TableRow key={campaign.id} className={expandedCampaign === campaign.id ? 'bg-muted/30' : ''}>
                       <TableCell className="font-medium" title={campaign.name}>
                         {truncateText(campaign.name)}
                       </TableCell>
                       <TableCell>{getStatusBadge(campaign.status)}</TableCell>
-                      <TableCell>{getObjectiveLabel(campaign.objective)}</TableCell>
                       <TableCell>
-                        {campaign.updated_time 
+                        {campaign.updated_time
                           ? format(new Date(campaign.updated_time), 'dd/MM/yyyy', { locale: ptBR })
                           : 'N/A'
                         }
                       </TableCell>
                       <TableCell>{formatCurrency(campaign.spend)}</TableCell>
                       <TableCell>{formatNumber(campaign.clicks)}</TableCell>
-                      <TableCell>{computeConversionsForActions(campaign.actions, campaign.conversions)}</TableCell>
+                      <TableCell>
+                        <span className="font-medium">{formatNumber(result.value)}</span>
+                        <span className="text-xs text-muted-foreground ml-1">({result.label})</span>
+                      </TableCell>
+                      <TableCell>{formatCostPerResult(costPerResult)}</TableCell>
                       <TableCell>{campaign.ctr.toFixed(2)}%</TableCell>
                       <TableCell>
-                        <Button 
+                        <Button
                           onClick={() => handleWeeklyAnalysis(campaign.id)}
                           variant={expandedCampaign === campaign.id ? "default" : "outline"}
                           size="sm"
@@ -888,7 +894,8 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                         </Button>
                       </TableCell>
                     </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}
