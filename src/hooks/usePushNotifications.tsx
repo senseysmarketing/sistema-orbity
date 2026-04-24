@@ -275,7 +275,13 @@ export function PushNotificationProvider({ children }: { children: ReactNode }) 
         console.error('[Push] Error saving token:', error);
         throw error;
       }
-      
+
+      // Persistir cache anti-spam
+      try {
+        localStorage.setItem(LS_TOKEN_KEY, fcmToken);
+        localStorage.setItem(LS_TOKEN_TS_KEY, String(Date.now()));
+      } catch {}
+
       console.log(`[Push] Token saved for ${deviceType} (standalone: ${standalone})`);
     } catch (error) {
       console.error('[Push] Failed to save token:', error);
@@ -445,6 +451,32 @@ export function PushNotificationProvider({ children }: { children: ReactNode }) 
     return () => {
       didLoad = true;
     };
+  }, [user?.id, isSupported, permission, hasFirebaseConfig, getFirebaseMessaging]);
+
+  // Refresh inteligente do token quando o app volta a ficar visível.
+  // O cache local em saveToken evita spam (skip se igual e < 12h).
+  useEffect(() => {
+    if (!user || !isSupported || permission !== 'granted' || !hasFirebaseConfig) return;
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const messaging = getFirebaseMessaging();
+        const registration = await navigator.serviceWorker.ready;
+        const currentToken = await getToken(messaging, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: registration,
+        });
+        if (currentToken && saveTokenRef.current) {
+          await saveTokenRef.current(currentToken);
+        }
+      } catch (err) {
+        console.warn('[Push] Visibility refresh failed:', err);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [user?.id, isSupported, permission, hasFirebaseConfig, getFirebaseMessaging]);
 
   return (
