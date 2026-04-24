@@ -16,6 +16,27 @@ interface PushPayload {
   body: string;
   icon?: string;
   data?: Record<string, string>;
+  /** Skip routing/snooze/DND checks. Used by test buttons & critical alerts. */
+  bypass_snooze?: boolean;
+  /** Notification category used for routing matrix lookup (leads/payments/tasks/meetings/system). */
+  category?: string;
+  /** Notification type for bypass detection (system_alert, billing.*). */
+  type?: string;
+}
+
+const BYPASS_TYPES = new Set(["system_alert"]);
+function isBypassType(type?: string): boolean {
+  if (!type) return false;
+  const t = type.toLowerCase();
+  return BYPASS_TYPES.has(t) || t.startsWith("billing");
+}
+
+function getCellEnabled(routing: unknown, category: string, channel: "in_app" | "push" | "email"): boolean {
+  if (!routing || typeof routing !== "object") return true;
+  const cat = (routing as Record<string, Record<string, boolean>>)[category];
+  if (!cat) return true;
+  if (cat[channel] === false) return false;
+  return true;
 }
 
 // Cache for access token
