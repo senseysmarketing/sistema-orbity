@@ -3,7 +3,7 @@
 // Isolamento total: usa `agencies.stripe_secret_key` + `agencies.stripe_webhook_secret`
 // (nunca STRIPE_SECRET_KEY do ambiente).
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

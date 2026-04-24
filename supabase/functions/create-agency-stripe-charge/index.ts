@@ -1,7 +1,7 @@
 // Cria cobrança via Stripe usando a chave PRÓPRIA da agência (NÃO a STRIPE_SECRET_KEY do Master).
 // Suporta multi-moeda (currency dinâmico, fallback 'brl').
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
