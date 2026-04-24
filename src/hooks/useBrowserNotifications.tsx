@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
+interface CustomNotificationOptions extends NotificationOptions {
+  action_url?: string;
+  silent?: boolean;
+  tag?: string;
+}
+
 export function useBrowserNotifications() {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const { toast } = useToast();
@@ -40,7 +46,7 @@ export function useBrowserNotifications() {
     }
   };
 
-  const showNotification = (title: string, options?: NotificationOptions) => {
+  const showNotification = (title: string, options?: CustomNotificationOptions) => {
     if (permission === 'granted') {
       const notification = new Notification(title, {
         icon: '/favicon.ico',
@@ -48,10 +54,23 @@ export function useBrowserNotifications() {
         ...options,
       });
 
+      // Feedback sonoro embutido (respeita flag silent)
+      if (!options?.silent) {
+        const audio = new Audio('/notification.mp3');
+        audio.play().catch(() => {}); // Previne erros de autoplay bloqueado pelo navegador
+      }
+
+      // Deep Linking: navegação dinâmica no clique
       notification.onclick = () => {
         window.focus();
+        if (options?.action_url) {
+          window.location.href = options.action_url;
+        }
         notification.close();
       };
+
+      // Auto-encerramento de segurança após 6s
+      setTimeout(() => notification.close(), 6000);
 
       return notification;
     }
