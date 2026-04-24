@@ -2319,7 +2319,36 @@ Instruções Criativas: ${newTask.creative_instructions || "Nenhuma"}`;
                   value={newTask.creative_instructions}
                   onChange={(e) => form.setValue("creative_instructions", e.target.value)}
                   placeholder="Instruções de arte, roteiro, textos na arte, CTAs..."
-                  rows={3}
+                />
+              </div>
+            )}
+            {/* Legenda do Post - Redes Sociais e Criativos */}
+            {["redes_sociais", "criativos"].includes(newTask.task_type) && (
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label>Legenda do Post</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleGenerateCaption}
+                    disabled={captionLoading}
+                    className="gap-2"
+                  >
+                    {captionLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    Gerar com IA
+                  </Button>
+                </div>
+                <Textarea
+                  value={newTask.post_caption || ""}
+                  onChange={(e) => form.setValue("post_caption", e.target.value)}
+                  placeholder="Legenda que será enviada junto com as artes para aprovação do cliente..."
+                  rows={5}
+                  className="whitespace-pre-wrap"
                 />
               </div>
             )}
