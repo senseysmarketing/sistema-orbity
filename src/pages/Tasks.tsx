@@ -906,6 +906,7 @@ export default function Tasks() {
           post_date: isSocial && newTask.post_date ? dateOnlyToISO(newTask.post_date) : null,
           hashtags: hashtagsArray,
           creative_instructions: hasCreative ? (newTask.creative_instructions || null) : null,
+          post_caption: hasCreative ? (newTask.post_caption || null) : null,
           is_recurring: !!newTask.is_recurring,
           recurrence_rule: recurrenceRulePayload as any,
         }])
