@@ -5,6 +5,7 @@ import { Clock, Wifi, TrendingUp, DollarSign, Target, BarChart3, ArrowDown, Eye,
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { resolveBrandTheme, type BrandThemeKey } from "@/lib/brandThemes";
 
 interface ResultByObjective {
   label: string;
@@ -66,6 +67,12 @@ interface ReportData {
   actionTypeLabel?: string;
   results_by_objective?: ResultByObjective[];
   campaign_breakdown?: CampaignBreakdownItem[];
+  branding?: {
+    brand_theme?: BrandThemeKey | null;
+    public_email?: string | null;
+    public_phone?: string | null;
+    website_url?: string | null;
+  };
 }
 
 function CountUp({ end, duration = 1.5, prefix = "", suffix = "", decimals = 0 }: { end: number; duration?: number; prefix?: string; suffix?: string; decimals?: number }) {
@@ -170,6 +177,31 @@ export default function PublicClientReport() {
     fetchReport();
   }, [token]);
 
+  // Dynamic favicon (white-label)
+  useEffect(() => {
+    const logo = data?.agency_logo;
+    if (!logo) return;
+    let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+    let created = false;
+    let prevHref: string | null = null;
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+      created = true;
+    } else {
+      prevHref = link.href;
+    }
+    link.href = logo;
+    const prevTitle = document.title;
+    document.title = `Relatório · ${data?.agency_name ?? "Orbity"}`;
+    return () => {
+      if (created && link?.parentNode) link.parentNode.removeChild(link);
+      else if (link && prevHref) link.href = prevHref;
+      document.title = prevTitle;
+    };
+  }, [data?.agency_logo, data?.agency_name]);
+
   if (loading) return <LoadingState />;
   if (expired || !data) return <ExpiredState />;
   return <ReportDashboard data={data} />;
@@ -222,6 +254,7 @@ function ExpiredState() {
 
 function ReportDashboard({ data }: { data: ReportData }) {
   const formatCurrency = (v: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);
+  const t = resolveBrandTheme(data.branding?.brand_theme);
 
   const metrics = [
     { label: "Investimento", value: data.metrics.spend, icon: DollarSign, format: "currency" },
@@ -253,9 +286,8 @@ function ReportDashboard({ data }: { data: ReportData }) {
     : fallbackChartData;
 
   return (
-    <div className="min-h-screen bg-[#0a0a1a] relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.08)_0%,_transparent_60%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_rgba(139,92,246,0.05)_0%,_transparent_50%)]" />
+    <div className={`min-h-screen ${t.bgClass} relative overflow-hidden`}>
+      <div className="absolute inset-0" style={t.overlayStyle} aria-hidden />
 
       <div className="relative z-10 max-w-lg mx-auto px-3 sm:px-4 py-8 pb-20">
         {/* Header */}
@@ -501,15 +533,31 @@ function ReportDashboard({ data }: { data: ReportData }) {
           </motion.div>
         )}
 
+        {/* Agency contact footer (white-label) */}
+        {data.branding && (data.branding.public_email || data.branding.public_phone || data.branding.website_url) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.7 }}
+            className="text-center mt-10"
+          >
+            <p className="text-white/40 text-[11px]">
+              {[data.branding.public_phone, data.branding.public_email, data.branding.website_url]
+                .filter(Boolean)
+                .join("  ·  ")}
+            </p>
+          </motion.div>
+        )}
+
         {/* Footer */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.8 }}
-          className="text-center mt-12"
+          className="text-center mt-6"
         >
           <p className="text-white/20 text-[11px]">
-            Gerado por <span className="text-white/30 font-medium">Sensey's</span>
+            Gerado por <span className="text-white/30 font-medium">{data.agency_name}</span>
           </p>
         </motion.div>
       </div>

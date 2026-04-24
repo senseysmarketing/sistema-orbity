@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { User, Lock, Bell, Palette, Save, Shield, CreditCard, Users, Puzzle, Trash2, Sparkles } from "lucide-react";
+import { User, Lock, Bell, Palette, Save, Shield, CreditCard, Users, Puzzle, Trash2, Sparkles, Wand2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,7 @@ import { AsaasIntegration } from "@/components/settings/AsaasIntegration";
 import { ConexaIntegration } from "@/components/settings/ConexaIntegration";
 import { StripeIntegration } from "@/components/settings/StripeIntegration";
 import { FacebookIntegration } from "@/components/settings/FacebookIntegration";
+import { BrandingTab } from "@/components/settings/BrandingTab";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -44,6 +45,7 @@ export default function Settings() {
   const { theme, setTheme } = useTheme();
   const { profile: userProfile, signOut } = useAuth();
   const { isAgencyAdmin } = useAgency();
+  const isAdmin = isAgencyAdmin();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -245,7 +247,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-4">
-        <TabsList className="flex w-full overflow-x-auto scrollbar-hide md:grid md:grid-cols-8">
+        <TabsList className="flex w-full overflow-x-auto scrollbar-hide md:grid md:grid-cols-9">
           <TabsTrigger value="profile" className="flex-shrink-0 gap-1 md:gap-2">
             <User className="h-4 w-4" />
             <span className="hidden sm:inline">Perfil</span>
@@ -254,13 +256,19 @@ export default function Settings() {
             <CreditCard className="h-4 w-4" />
             <span className="hidden sm:inline">Assinatura</span>
           </TabsTrigger>
-          {isAgencyAdmin && (
+          {isAdmin && (
             <TabsTrigger value="users" className="flex-shrink-0 gap-1 md:gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Usuários</span>
             </TabsTrigger>
           )}
-          {isAgencyAdmin && (
+          {isAdmin && (
+            <TabsTrigger value="branding" className="flex-shrink-0 gap-1 md:gap-2">
+              <Wand2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Branding</span>
+            </TabsTrigger>
+          )}
+          {isAdmin && (
             <TabsTrigger value="ai" className="flex-shrink-0 gap-1 md:gap-2">
               <Sparkles className="h-4 w-4" />
               <span className="hidden sm:inline">IA</span>
@@ -374,13 +382,19 @@ export default function Settings() {
           </div>
         </TabsContent>
 
-        {isAgencyAdmin && (
+        {isAdmin && (
           <TabsContent value="users" className="space-y-4">
             <UsersTabContent />
           </TabsContent>
         )}
 
-        {isAgencyAdmin && (
+        {isAdmin && (
+          <TabsContent value="branding" className="space-y-4">
+            <BrandingTab />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
           <TabsContent value="ai" className="space-y-4">
             <AISettingsManager />
           </TabsContent>
@@ -398,7 +412,7 @@ export default function Settings() {
           </div>
           
           <div className="space-y-8">
-            {isAgencyAdmin && (
+            {isAdmin && (
               <div>
                 <h3 className="text-lg font-semibold">Marketing e Tráfego</h3>
                 <p className="text-sm text-muted-foreground mb-4">Gerencie suas conexões de anúncios e tráfego pago</p>
@@ -427,7 +441,7 @@ export default function Settings() {
               </div>
             </div>
 
-            {isAgencyAdmin && (
+            {isAdmin && (
               <div>
                 <h3 className="text-lg font-semibold">Gateways de Pagamento</h3>
                 <p className="text-sm text-muted-foreground mb-4">Configure cobranças automatizadas para seus clientes</p>
@@ -550,7 +564,7 @@ export default function Settings() {
         <TabsContent value="notifications" className="space-y-6">
           <NotificationSummaryCard />
 
-          {isAgencyAdmin && (
+          {isAdmin && (
             <Card>
               <CardHeader>
                 <CardTitle>Configurações da Agência (Admin)</CardTitle>

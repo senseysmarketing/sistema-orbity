@@ -170,6 +170,7 @@ export type Database = {
       agencies: {
         Row: {
           active_payment_gateway: string | null
+          brand_theme: string | null
           contact_email: string | null
           contact_phone: string | null
           created_at: string
@@ -187,6 +188,8 @@ export type Database = {
           onboarding_completed_at: string | null
           onboarding_discount_eligible: boolean
           onboarding_widget_dismissed: boolean
+          public_email: string | null
+          public_phone: string | null
           slug: string
           stripe_account_id: string | null
           stripe_customer_id: string | null
@@ -197,11 +200,13 @@ export type Database = {
           subscription_expires_at: string | null
           subscription_plan: Database["public"]["Enums"]["subscription_plan"]
           updated_at: string
+          website_url: string | null
           whatsapp_auto_contact: boolean
           whatsapp_auto_ghosting: boolean
         }
         Insert: {
           active_payment_gateway?: string | null
+          brand_theme?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -219,6 +224,8 @@ export type Database = {
           onboarding_completed_at?: string | null
           onboarding_discount_eligible?: boolean
           onboarding_widget_dismissed?: boolean
+          public_email?: string | null
+          public_phone?: string | null
           slug: string
           stripe_account_id?: string | null
           stripe_customer_id?: string | null
@@ -229,11 +236,13 @@ export type Database = {
           subscription_expires_at?: string | null
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
           updated_at?: string
+          website_url?: string | null
           whatsapp_auto_contact?: boolean
           whatsapp_auto_ghosting?: boolean
         }
         Update: {
           active_payment_gateway?: string | null
+          brand_theme?: string | null
           contact_email?: string | null
           contact_phone?: string | null
           created_at?: string
@@ -251,6 +260,8 @@ export type Database = {
           onboarding_completed_at?: string | null
           onboarding_discount_eligible?: boolean
           onboarding_widget_dismissed?: boolean
+          public_email?: string | null
+          public_phone?: string | null
           slug?: string
           stripe_account_id?: string | null
           stripe_customer_id?: string | null
@@ -261,6 +272,7 @@ export type Database = {
           subscription_expires_at?: string | null
           subscription_plan?: Database["public"]["Enums"]["subscription_plan"]
           updated_at?: string
+          website_url?: string | null
           whatsapp_auto_contact?: boolean
           whatsapp_auto_ghosting?: boolean
         }

@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
       .from("task_approvals")
       .select(
          `id, agency_id, token, status, created_at, expires_at, completed_at,
-         agencies:agency_id (name, logo_url, contact_phone),
+         agencies:agency_id (name, logo_url, contact_phone, brand_theme, public_email, public_phone, website_url),
          items:task_approval_items (
            id, task_id, decision, client_feedback, decided_at,
            tasks:task_id ( id, title, description, attachments, status, post_caption )
@@ -91,6 +91,10 @@ Deno.serve(async (req) => {
         name: (approval as any).agencies?.name ?? "",
         logo_url: (approval as any).agencies?.logo_url ?? null,
         contact_phone: (approval as any).agencies?.contact_phone ?? null,
+        brand_theme: (approval as any).agencies?.brand_theme ?? "obsidian",
+        public_email: (approval as any).agencies?.public_email ?? null,
+        public_phone: (approval as any).agencies?.public_phone ?? null,
+        website_url: (approval as any).agencies?.website_url ?? null,
       },
       token: approval.token,
       expires_at: approval.expires_at,
