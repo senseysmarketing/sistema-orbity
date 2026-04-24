@@ -555,6 +555,8 @@ export default function Settings() {
                   <GoogleCalendarIntegration />
                 </div>
               </section>
+            </>
+          )}
         </TabsContent>
 
         {isAdmin && (
