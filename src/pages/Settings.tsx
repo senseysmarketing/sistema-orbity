@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useTheme } from "@/components/ui/theme-provider";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -291,53 +292,20 @@ export default function Settings() {
         </p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-8">
-        {/* Mobile: horizontal scrollable nav */}
-        <nav className="flex md:hidden flex-row gap-2 overflow-x-auto whitespace-nowrap -mx-1 px-1 pb-2 scrollbar-hide">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as MacroTab)} className="space-y-6">
+        <TabsList className="flex w-full h-auto justify-start overflow-x-auto whitespace-nowrap scrollbar-hide">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const active = tab === item.key;
             return (
-              <button
-                key={item.key}
-                onClick={() => setTab(item.key)}
-                className={`shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors border ${
-                  active
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-background text-foreground border-border hover:bg-muted"
-                }`}
-              >
+              <TabsTrigger key={item.key} value={item.key} className="flex-shrink-0 gap-2">
                 <Icon className="h-4 w-4" />
-                {item.label}
-              </button>
+                <span>{item.label}</span>
+              </TabsTrigger>
             );
           })}
-        </nav>
+        </TabsList>
 
-        {/* Desktop: vertical sidebar */}
-        <nav className="hidden md:flex md:flex-col md:w-64 shrink-0 space-y-1">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = tab === item.key;
-            return (
-              <button
-                key={item.key}
-                onClick={() => setTab(item.key)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-left transition-colors ${
-                  active
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Content area */}
-        <div className="flex-1 min-w-0 space-y-8">
+        <TabsContent value="account" className="space-y-8 mt-6">
           {tab === "account" && (
             <>
               {/* Perfil */}
@@ -589,83 +557,95 @@ export default function Settings() {
               </section>
             </>
           )}
+        </TabsContent>
 
-          {tab === "agency" && isAdmin && (
-            <>
+        {isAdmin && (
+          <TabsContent value="agency" className="space-y-8 mt-6">
+            {tab === "agency" && (
+              <>
+                <section className="space-y-4">
+                  <SectionHeading icon={Wand2} title="Branding e Identidade" description="Personalize a marca exibida nas páginas públicas" />
+                  <BrandingTab />
+                </section>
+
+                <Separator className="my-8" />
+
+                <section className="space-y-4">
+                  <SectionHeading icon={Users} title="Usuários da Agência" description="Gerencie os membros da sua equipe e suas permissões" />
+                  <UsersTabContent />
+                </section>
+              </>
+            )}
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="ops" className="space-y-8 mt-6">
+            {tab === "ops" && (
+              <>
+                <section className="space-y-4">
+                  <SectionHeading icon={Puzzle} title="Marketing e Tráfego" description="Gerencie suas conexões de anúncios e tráfego pago" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FacebookIntegration />
+                  </div>
+                </section>
+
+                <Separator className="my-8" />
+
+                <section className="space-y-4">
+                  <SectionHeading icon={Bell} title="Comunicação" description="Canais de comunicação com clientes e leads" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <WhatsAppIntegration />
+                  </div>
+                </section>
+
+                <Separator className="my-8" />
+
+                <section className="space-y-4">
+                  <SectionHeading icon={CreditCard} title="Gateways de Pagamento" description="Configure cobranças automatizadas para seus clientes" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <AsaasIntegration />
+                    <ConexaIntegration />
+                    <StripeIntegration />
+                  </div>
+                </section>
+
+                <Separator className="my-8" />
+
+                <section className="space-y-4">
+                  <SectionHeading icon={Bell} title="Notificações da Agência" description="Configure os canais globais de notificação" />
+                  <Card>
+                    <CardContent className="pt-6">
+                      <NotificationChannelsConfig />
+                    </CardContent>
+                  </Card>
+                </section>
+
+                <Separator className="my-8" />
+
+                <section className="space-y-4">
+                  <SectionHeading icon={Sparkles} title="Inteligência Artificial" description="Personalize prompts e comportamentos da IA" />
+                  <AISettingsManager />
+                </section>
+              </>
+            )}
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="billing" className="space-y-8 mt-6">
+            {tab === "billing" && (
               <section className="space-y-4">
-                <SectionHeading icon={Wand2} title="Branding e Identidade" description="Personalize a marca exibida nas páginas públicas" />
-                <BrandingTab />
-              </section>
-
-              <Separator className="my-8" />
-
-              <section className="space-y-4">
-                <SectionHeading icon={Users} title="Usuários da Agência" description="Gerencie os membros da sua equipe e suas permissões" />
-                <UsersTabContent />
-              </section>
-            </>
-          )}
-
-          {tab === "ops" && isAdmin && (
-            <>
-              <section className="space-y-4">
-                <SectionHeading icon={Puzzle} title="Marketing e Tráfego" description="Gerencie suas conexões de anúncios e tráfego pago" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FacebookIntegration />
+                <SectionHeading icon={CreditCard} title="Assinatura e Faturamento" description="Visualize e gerencie seu plano Orbity" />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <SubscriptionDetails />
+                  <BillingHistory />
                 </div>
               </section>
-
-              <Separator className="my-8" />
-
-              <section className="space-y-4">
-                <SectionHeading icon={Bell} title="Comunicação" description="Canais de comunicação com clientes e leads" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <WhatsAppIntegration />
-                </div>
-              </section>
-
-              <Separator className="my-8" />
-
-              <section className="space-y-4">
-                <SectionHeading icon={CreditCard} title="Gateways de Pagamento" description="Configure cobranças automatizadas para seus clientes" />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <AsaasIntegration />
-                  <ConexaIntegration />
-                  <StripeIntegration />
-                </div>
-              </section>
-
-              <Separator className="my-8" />
-
-              <section className="space-y-4">
-                <SectionHeading icon={Bell} title="Notificações da Agência" description="Configure os canais globais de notificação" />
-                <Card>
-                  <CardContent className="pt-6">
-                    <NotificationChannelsConfig />
-                  </CardContent>
-                </Card>
-              </section>
-
-              <Separator className="my-8" />
-
-              <section className="space-y-4">
-                <SectionHeading icon={Sparkles} title="Inteligência Artificial" description="Personalize prompts e comportamentos da IA" />
-                <AISettingsManager />
-              </section>
-            </>
-          )}
-
-          {tab === "billing" && isAdmin && (
-            <section className="space-y-4">
-              <SectionHeading icon={CreditCard} title="Assinatura e Faturamento" description="Visualize e gerencie seu plano Orbity" />
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <SubscriptionDetails />
-                <BillingHistory />
-              </div>
-            </section>
-          )}
-        </div>
-      </div>
+            )}
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
 }
