@@ -1854,6 +1854,7 @@ Instruções Criativas: ${newTask.creative_instructions || "Nenhuma"}`;
                         ] : []),
                         ...(["redes_sociais", "criativos"].includes(newTask.task_type) ? [
                           { label: "Instruções Criativas", value: newTask.creative_instructions },
+                          { label: "Legenda do Post", value: newTask.post_caption || "" },
                         ] : []),
                       ]}
                     />
