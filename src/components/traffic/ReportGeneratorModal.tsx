@@ -94,16 +94,41 @@ export function ReportGeneratorModal({ isOpen, onClose, reportData, agencyId }: 
 
   const handleGenerateAI = async () => {
     setAiLoading(true);
+
+    const fmtCpr = (v: number | null) =>
+      v === null || !isFinite(v) || isNaN(v)
+        ? '—'
+        : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+
+    const objectivesBlock = reportData.resultsByObjective && reportData.resultsByObjective.length > 0
+      ? reportData.resultsByObjective
+          .map(r => `  - ${r.label}: ${r.total} (gasto: R$ ${r.spend.toFixed(2)}, custo/result.: ${fmtCpr(r.costPerResult)}, ${r.campaignCount} campanha(s))`)
+          .join('\n')
+      : '  (sem dados agrupados por objetivo)';
+
+    const campaignsBlock = reportData.campaignBreakdown && reportData.campaignBreakdown.length > 0
+      ? reportData.campaignBreakdown
+          .map(c => `  - ${c.name} → R$ ${c.spend.toFixed(2)} | ${c.result_value} ${c.result_label} | CPR: ${fmtCpr(c.cost_per_result)} | CTR: ${c.ctr.toFixed(2)}%`)
+          .join('\n')
+      : '  (sem campanhas detalhadas)';
+
     const content = `Dados do período:
 - Conta: ${reportData.accountName}
 - Período: ${reportData.period}
 - Investimento: R$ ${reportData.totalSpend.toFixed(2)}
 - Impressões: ${reportData.totalImpressions}
 - Cliques: ${reportData.totalClicks}
-- ${reportData.conversionLabel || 'Conversões'}: ${reportData.totalConversions}
 - CTR: ${reportData.avgCTR.toFixed(2)}%
 - CPC: R$ ${reportData.avgCPC.toFixed(2)}
-- CPM: R$ ${reportData.avgCPM.toFixed(2)}`;
+- CPM: R$ ${reportData.avgCPM.toFixed(2)}
+
+Resultados por Objetivo:
+${objectivesBlock}
+
+Detalhamento por Campanha:
+${campaignsBlock}
+
+Gere um relatório que reflita as diferentes estratégias (cada campanha pode ter um objetivo diferente: leads, mensagens, cliques, etc.). Apresente os resultados de forma clara para o cliente final.`;
 
     const result = await generateReport(content, agencyId);
     if (result?.message) {
@@ -112,8 +137,22 @@ export function ReportGeneratorModal({ isOpen, onClose, reportData, agencyId }: 
     setAiLoading(false);
   };
 
-  const { accountName, period, totalSpend, totalImpressions, totalClicks, totalConversions, avgCTR, avgCPC, avgCPM, conversionLabel } = reportData;
+  const { accountName, period, totalSpend, totalImpressions, totalClicks, totalConversions, avgCTR, avgCPC, avgCPM, conversionLabel, resultsByObjective, campaignBreakdown } = reportData;
   const convLabel = conversionLabel || 'Conversões';
+
+  const fmtCpr = (v: number | null) =>
+    v === null || !isFinite(v) || isNaN(v)
+      ? '—'
+      : formatCurrency(v);
+
+  // Pre-built breakdown strings for templates
+  const objectivesBreakdown = resultsByObjective && resultsByObjective.length > 0
+    ? resultsByObjective.map(r => `• ${r.total} ${r.label} — ${formatCurrency(r.spend)} (CPR: ${fmtCpr(r.costPerResult)})`).join('\n')
+    : `• ${totalConversions} ${convLabel}`;
+
+  const campaignsBreakdownText = campaignBreakdown && campaignBreakdown.length > 0
+    ? campaignBreakdown.map(c => `• ${c.name}\n  ↳ ${formatCurrency(c.spend)} → ${c.result_value} ${c.result_label} (CPR: ${fmtCpr(c.cost_per_result)})`).join('\n')
+    : '';
 
   const templates = [
     {
