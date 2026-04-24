@@ -49,7 +49,7 @@ export function ConfirmationStep() {
         : flow === 'direct_annual' ? 'Orbity Anual' : 'Orbity Mensal';
       trackCompleteRegistration({ content_name: contentName, currency: 'BRL' });
       if (flow === 'trial') {
-        navigate('/welcome');
+        navigate('/dashboard');
       }
     }
     // direct flows: redirect handled by initiateCheckout (window.open to checkout URL)

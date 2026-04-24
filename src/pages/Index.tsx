@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { format, isToday, isBefore, startOfDay } from 'date-fns';
 
 import { MyDayHeader } from '@/components/dashboard/MyDayHeader';
+import { OnboardingChecklist } from '@/components/onboarding/OnboardingChecklist';
 import { MyTasksList } from '@/components/dashboard/MyTasksList';
 import { RequestedTasksList } from '@/components/dashboard/RequestedTasksList';
 import { RoutineBlock } from '@/components/dashboard/RoutineBlock';
@@ -265,6 +266,9 @@ const Index = () => {
         todayTasksDone={doneTodayTasks.length}
         overdueCount={overdueTasks.length}
       />
+
+      {/* Orbity Fast-Track — Onboarding gamificado (decide internamente se renderiza) */}
+      <OnboardingChecklist />
 
       {/* Próxima reunião do dia — banner compacto */}
       {nextMeeting && (
