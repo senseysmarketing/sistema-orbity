@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     // 3. Buscar nome da agência
     const { data: agency } = await supabaseAdmin
       .from("agencies")
-      .select("name, logo_url")
+      .select("name, logo_url, brand_theme, public_email, public_phone, website_url")
       .eq("id", client.agency_id)
       .single();
 
@@ -66,6 +66,12 @@ Deno.serve(async (req) => {
       client_name: client.name,
       agency_name: agency?.name || "Agência",
       agency_logo: agency?.logo_url || null,
+      branding: {
+        brand_theme: agency?.brand_theme || "obsidian",
+        public_email: agency?.public_email || null,
+        public_phone: agency?.public_phone || null,
+        website_url: agency?.website_url || null,
+      },
       metrics: snapshot?.metrics || {
         spend: 0,
         conversions: 0,
