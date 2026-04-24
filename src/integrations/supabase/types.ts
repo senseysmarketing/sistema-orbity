@@ -4121,6 +4121,7 @@ export type Database = {
         Row: {
           agency_id: string
           browser_notifications: boolean
+          channel_routing: Json
           created_at: string
           dnd_end_time: string | null
           dnd_holidays: boolean | null
@@ -4155,6 +4156,7 @@ export type Database = {
         Insert: {
           agency_id: string
           browser_notifications?: boolean
+          channel_routing?: Json
           created_at?: string
           dnd_end_time?: string | null
           dnd_holidays?: boolean | null
@@ -4189,6 +4191,7 @@ export type Database = {
         Update: {
           agency_id?: string
           browser_notifications?: boolean
+          channel_routing?: Json
           created_at?: string
           dnd_end_time?: string | null
           dnd_holidays?: boolean | null
