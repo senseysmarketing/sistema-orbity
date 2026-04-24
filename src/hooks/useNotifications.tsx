@@ -27,6 +27,8 @@ export interface Notification {
   entity_type?: string;
   entity_id?: string;
   action_type?: string;
+  group_count?: number;
+  last_aggregated_at?: string | null;
 }
 
 interface NotificationContextType {
