@@ -236,6 +236,8 @@ Estratégia + Otimização = RESULTADOS! ✨`
     { key: 'avgCTR', value: `${avgCTR.toFixed(2)}%`, description: 'CTR médio' },
     { key: 'avgCPC', value: formatCurrency(avgCPC), description: 'CPC médio' },
     { key: 'avgCPM', value: formatCurrency(avgCPM), description: 'CPM médio' },
+    { key: 'resultsByObjective', value: objectivesBreakdown, description: 'Resultados agrupados por objetivo' },
+    { key: 'campaignBreakdown', value: campaignsBreakdownText || '—', description: 'Detalhamento por campanha' },
   ];
 
   return (
