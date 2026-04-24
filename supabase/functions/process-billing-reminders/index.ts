@@ -352,7 +352,7 @@ serve(async (req) => {
                 agency_id: agencyId,
                 client_id: payment.client_id,
                 payment_id: payment.id,
-                message_type: msgType,
+                message_type: 'unknown',
                 status: "error",
                 error_details: String(paymentErr),
               });
