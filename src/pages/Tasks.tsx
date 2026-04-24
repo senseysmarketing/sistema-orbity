@@ -1094,6 +1094,7 @@ export default function Tasks() {
         post_date: isSocialEdit && newTask.post_date ? dateOnlyToISO(newTask.post_date) : null,
         hashtags: hashtagsArrayEdit,
         creative_instructions: hasCreativeEdit ? (newTask.creative_instructions || null) : null,
+        post_caption: hasCreativeEdit ? (newTask.post_caption || null) : null,
         updated_by: profile?.user_id,
         is_recurring: !!newTask.is_recurring,
         recurrence_rule: recurrenceRulePayload as any,
