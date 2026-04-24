@@ -291,6 +291,31 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Routing/snooze guardrails (bypass for tests + critical types)
+    const bypass = !!payload.bypass_snooze || isBypassType(payload.type);
+    if (!bypass) {
+      const { data: prefs } = await supabase
+        .from('notification_preferences')
+        .select('channel_routing, do_not_disturb_until')
+        .eq('user_id', payload.user_id)
+        .maybeSingle();
+
+      if (prefs?.do_not_disturb_until && new Date(prefs.do_not_disturb_until) > new Date()) {
+        console.log('[FCM] User in snooze mode - skipping push');
+        return new Response(
+          JSON.stringify({ sent: 0, total: 0, skipped: 'snoozed' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (payload.category && !getCellEnabled(prefs?.channel_routing, payload.category, 'push')) {
+        console.log(`[FCM] Push channel disabled for category ${payload.category}`);
+        return new Response(
+          JSON.stringify({ sent: 0, total: 0, skipped: 'channel_off' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Fetch active FCM tokens for the user
     const { data: subscriptions, error: fetchError } = await supabase
       .from('push_subscriptions')
