@@ -43,6 +43,7 @@ interface ApprovalItem {
   title: string;
   description: string;
   attachments: Attachment[];
+  post_caption?: string | null;
 }
 
 interface ApprovalPayload {
@@ -508,6 +509,18 @@ function GalleryStage({ item }: { item: ApprovalItem }) {
         )}
 
         {isLongDesc && <FullCaptionDrawer item={item} />}
+
+        {/* Legenda Proposta (gerada/editada pela equipe) */}
+        {item.post_caption && item.post_caption.trim().length > 0 && (
+          <div className="mt-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 sm:p-5">
+            <p className="text-[10px] uppercase tracking-[0.25em] text-white/40 mb-2">
+              Legenda Proposta
+            </p>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap text-white/85">
+              {item.post_caption}
+            </p>
+          </div>
+        )}
 
         {item.decision === "revision" && item.client_feedback && (
           <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2">
