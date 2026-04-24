@@ -499,6 +499,19 @@ function GalleryStage({ item }: { item: ApprovalItem }) {
         )}
       </div>
 
+      {/* Legenda Proposta — logo abaixo do carrossel de mídias (Quiet Luxury) */}
+      {item.post_caption && item.post_caption.trim().length > 0 && (
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] backdrop-blur-xl p-4 sm:p-6 shadow-lg">
+          <p className="text-[10px] uppercase tracking-[0.25em] text-white/40 mb-3 flex items-center gap-2">
+            <span className="h-px w-4 bg-white/20" />
+            Legenda Proposta
+          </p>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap text-white/90 font-light">
+            {item.post_caption}
+          </p>
+        </div>
+      )}
+
       {/* Texto */}
       <div className="px-1">
         <h2 className="text-base font-semibold tracking-tight text-white">{item.title}</h2>
@@ -509,18 +522,6 @@ function GalleryStage({ item }: { item: ApprovalItem }) {
         )}
 
         {isLongDesc && <FullCaptionDrawer item={item} />}
-
-        {/* Legenda Proposta (gerada/editada pela equipe) */}
-        {item.post_caption && item.post_caption.trim().length > 0 && (
-          <div className="mt-4 rounded-xl border border-white/10 bg-white/5 backdrop-blur-xl p-4 sm:p-5">
-            <p className="text-[10px] uppercase tracking-[0.25em] text-white/40 mb-2">
-              Legenda Proposta
-            </p>
-            <p className="text-sm leading-relaxed whitespace-pre-wrap text-white/85">
-              {item.post_caption}
-            </p>
-          </div>
-        )}
 
         {item.decision === "revision" && item.client_feedback && (
           <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2">
