@@ -265,12 +265,12 @@ export default function Settings() {
     setSearchParams(params, { replace: false });
   };
 
-  const navItems: { key: MacroTab; label: string; icon: typeof User; adminOnly?: boolean }[] = [
-    { key: "account", label: "Minha Conta", icon: User },
-    { key: "agency", label: "Minha Agência", icon: Building2, adminOnly: true },
-    { key: "ops", label: "Operação & IA", icon: Cog, adminOnly: true },
-    { key: "billing", label: "Faturamento", icon: Receipt, adminOnly: true },
-  ].filter((i) => !i.adminOnly || isAdmin);
+  const navItems: { key: MacroTab; label: string; icon: LucideIcon; adminOnly?: boolean }[] = ([
+    { key: "account" as MacroTab, label: "Minha Conta", icon: User },
+    { key: "agency" as MacroTab, label: "Minha Agência", icon: Building2, adminOnly: true },
+    { key: "ops" as MacroTab, label: "Operação & IA", icon: Cog, adminOnly: true },
+    { key: "billing" as MacroTab, label: "Faturamento", icon: Receipt, adminOnly: true },
+  ]).filter((i) => !i.adminOnly || isAdmin);
 
   const SectionHeading = ({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description?: string }) => (
     <div className="space-y-1">
