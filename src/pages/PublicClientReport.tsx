@@ -6,6 +6,28 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
+interface ResultByObjective {
+  label: string;
+  actionType: string;
+  total: number;
+  spend: number;
+  costPerResult: number | null;
+  campaignCount: number;
+}
+
+interface CampaignBreakdownItem {
+  name: string;
+  objective: string;
+  result_value: number;
+  result_label: string;
+  result_action_type: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cost_per_result: number | null;
+}
+
 interface ReportData {
   client_name: string;
   agency_name: string;
@@ -26,6 +48,8 @@ interface ReportData {
     objective: string;
     spend: number;
     conversions: number;
+    result_label?: string;
+    result_action_type?: string;
     impressions?: number;
     clicks?: number;
     ctr?: number;
@@ -40,6 +64,8 @@ interface ReportData {
   is_mock: boolean;
   period?: { from: string; to: string };
   actionTypeLabel?: string;
+  results_by_objective?: ResultByObjective[];
+  campaign_breakdown?: CampaignBreakdownItem[];
 }
 
 function CountUp({ end, duration = 1.5, prefix = "", suffix = "", decimals = 0 }: { end: number; duration?: number; prefix?: string; suffix?: string; decimals?: number }) {
@@ -388,6 +414,40 @@ function ReportDashboard({ data }: { data: ReportData }) {
           </div>
         </motion.div>
 
+        {/* Resultados por Objetivo (dynamic) */}
+        {data.results_by_objective && data.results_by_objective.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.2, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-8"
+          >
+            <h3 className="text-white/50 text-xs uppercase tracking-[0.15em] mb-4 font-medium">
+              Resultados por Objetivo
+            </h3>
+            <div className="grid grid-cols-1 gap-3">
+              {data.results_by_objective.map((r, i) => (
+                <div key={i} className="bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="text-white/80 text-sm font-semibold">{r.label}</p>
+                    <p className="text-white/40 text-[11px]">
+                      {r.campaignCount} campanha(s) · {formatCurrency(r.spend)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white text-xl font-black tracking-tight">
+                      <CountUp end={r.total} />
+                    </p>
+                    {r.costPerResult !== null && isFinite(r.costPerResult) && (
+                      <p className="text-white/40 text-[11px]">CPR: {formatCurrency(r.costPerResult)}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         {/* Top Campaigns */}
         {data.top_campaigns.length > 0 && (
           <motion.div
@@ -401,6 +461,7 @@ function ReportDashboard({ data }: { data: ReportData }) {
             <div className="space-y-3">
               {data.top_campaigns.map((campaign, i) => {
                 const cpa = campaign.conversions > 0 ? campaign.spend / campaign.conversions : 0;
+                const labelLower = (campaign.result_label || data.actionTypeLabel || "conversão").toLowerCase();
                 return (
                   <motion.div
                     key={i}
@@ -424,12 +485,12 @@ function ReportDashboard({ data }: { data: ReportData }) {
                     <div className="flex items-center justify-between mt-1.5">
                       {campaign.conversions > 0 && (
                         <p className="text-white/30 text-[11px]">
-                          {campaign.conversions} {(data.actionTypeLabel || "conversão").toLowerCase()}{campaign.conversions > 1 && !data.actionTypeLabel ? "es" : ""}
+                          {campaign.conversions} {labelLower}
                         </p>
                       )}
                       {cpa > 0 && (
                         <p className="text-white/40 text-[11px] font-medium">
-                          CPA: {formatCurrency(cpa)}
+                          CPR: {formatCurrency(cpa)}
                         </p>
                       )}
                     </div>

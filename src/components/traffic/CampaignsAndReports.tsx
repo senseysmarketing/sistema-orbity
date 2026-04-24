@@ -19,6 +19,13 @@ import { ReportGeneratorModal } from "./ReportGeneratorModal";
 import { useAIAssist } from "@/hooks/useAIAssist";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  getObjectiveResult,
+  getCostPerResult,
+  groupResultsByObjective,
+  formatCostPerResult,
+  type ResultByObjective,
+} from "./utils/objectiveMapping";
 
 // Mapa de tradução de action_types da Meta API
 const ACTION_TYPE_LABELS: Record<string, string> = {
@@ -419,24 +426,47 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
 
   // Compute dynamic conversion values based on selected action type
   const currentActionLabel = selectedActionType === '__default__' ? 'Conversões' : getActionTypeLabel(selectedActionType);
-  
+
   const computeConversionsForActions = (actions?: ActionData[], fallbackConversions?: number): number => {
     if (!actions || actions.length === 0 || selectedActionType === '__default__') return fallbackConversions || 0;
     const match = actions.find(a => a.action_type === selectedActionType);
     return match ? (parseInt(String(match.value)) || 0) : 0;
   };
 
-  const dynamicTotalConversions = selectedActionType === '__default__' 
+  const dynamicTotalConversions = selectedActionType === '__default__'
     ? metrics.conversions
-    : (metrics.allActions?.find(a => a.action_type === selectedActionType)?.value || 
+    : (metrics.allActions?.find(a => a.action_type === selectedActionType)?.value ||
        activeCampaigns.reduce((sum, c) => sum + computeConversionsForActions(c.actions, 0), 0));
 
   // Sorted available actions for the selector
   const sortedAvailableActions = [...availableActions].sort((a, b) => b.value - a.value);
 
+  // ===== Dynamic results-by-objective (per-campaign objective mapping) =====
+  const resultsByObjective: ResultByObjective[] = groupResultsByObjective(activeCampaigns);
+  const primaryResult = resultsByObjective[0];
+  const secondaryResults = resultsByObjective.slice(1);
+
+  // Per-campaign breakdown (used in snapshot + reports)
+  const campaignBreakdown = activeCampaigns.map(c => {
+    const r = getObjectiveResult(c);
+    const cpr = getCostPerResult(c);
+    return {
+      name: c.name,
+      objective: c.objective,
+      result_value: r.value,
+      result_label: r.label,
+      result_action_type: r.actionType,
+      spend: c.spend,
+      impressions: c.impressions,
+      clicks: c.clicks,
+      ctr: c.ctr,
+      cost_per_result: cpr,
+    };
+  });
+
   const reportData = {
     accountName: selectedAccountName,
-    period: dateRange?.from && dateRange?.to 
+    period: dateRange?.from && dateRange?.to
       ? `${format(dateRange.from, 'dd/MM/yyyy')} - ${format(dateRange.to, 'dd/MM/yyyy')}`
       : '',
     totalSpend: metrics.spend,
@@ -447,6 +477,8 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
     avgCPC: metrics.cpc,
     avgCPM: metrics.cpm,
     conversionLabel: currentActionLabel,
+    resultsByObjective,
+    campaignBreakdown,
   };
 
   if (loading && !hasInitialData) {
@@ -587,19 +619,27 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                   top_campaigns: campaigns
                     .sort((a, b) => b.spend - a.spend)
                     .slice(0, 5)
-                    .map(c => ({
-                      name: c.name,
-                      objective: c.objective,
-                      spend: c.spend,
-                      conversions: computeConversionsForActions(c.actions, c.conversions),
-                      impressions: c.impressions,
-                      clicks: c.clicks,
-                      ctr: c.ctr,
-                    })),
+                    .map(c => {
+                      const r = getObjectiveResult(c);
+                      return {
+                        name: c.name,
+                        objective: c.objective,
+                        spend: c.spend,
+                        conversions: r.value,
+                        result_label: r.label,
+                        result_action_type: r.actionType,
+                        impressions: c.impressions,
+                        clicks: c.clicks,
+                        ctr: c.ctr,
+                      };
+                    }),
                   chart_data: chartData,
                   active_campaigns: campaigns.filter(c => c.status === 'ACTIVE').length,
                   selectedActionType,
                   actionTypeLabel: currentActionLabel,
+                  // NEW: dynamic results breakdown
+                  results_by_objective: resultsByObjective,
+                  campaign_breakdown: campaignBreakdown,
                 };
 
                 const { error: updateError } = await supabase
@@ -682,15 +722,15 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="flex items-center gap-1.5">
-              <CardTitle className="text-sm font-medium">{currentActionLabel}</CardTitle>
+              <CardTitle className="text-sm font-medium">Resultados</CardTitle>
               <Popover open={actionSelectorOpen} onOpenChange={setActionSelectorOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full">
+                  <Button variant="ghost" size="icon" className="h-5 w-5 rounded-full" title="Filtrar métrica global">
                     <ChevronDown className="h-3 w-3" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-64 p-2 max-h-60 overflow-y-auto" align="start">
-                  <p className="text-xs text-muted-foreground px-2 py-1 font-medium">Selecionar métrica de conversão</p>
+                  <p className="text-xs text-muted-foreground px-2 py-1 font-medium">Filtrar métrica global</p>
                   {sortedAvailableActions.length === 0 ? (
                     <p className="text-xs text-muted-foreground px-2 py-2">Nenhuma ação disponível</p>
                   ) : (
@@ -716,10 +756,29 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(dynamicTotalConversions)}</div>
-            <p className="text-xs text-muted-foreground">
-              Taxa: {((dynamicTotalConversions / metrics.clicks) * 100 || 0).toFixed(2)}%
-            </p>
+            {resultsByObjective.length === 0 ? (
+              <>
+                <div className="text-2xl font-bold">{formatNumber(dynamicTotalConversions)}</div>
+                <p className="text-xs text-muted-foreground">Sem campanhas ativas no período</p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <div className="text-2xl font-bold">{formatNumber(primaryResult.total)}</div>
+                  <span className="text-sm text-muted-foreground font-medium">{primaryResult.label}</span>
+                </div>
+                {secondaryResults.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1 truncate" title={secondaryResults.map(r => `${r.total} ${r.label}`).join(' · ')}>
+                    {secondaryResults.map(r => `+ ${formatNumber(r.total)} ${r.label}`).join(' · ')}
+                  </p>
+                )}
+                {secondaryResults.length === 0 && primaryResult.costPerResult !== null && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Custo / resultado: {formatCostPerResult(primaryResult.costPerResult)}
+                  </p>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -791,35 +850,41 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                 <TableRow>
                   <TableHead>Campanha</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Objetivo</TableHead>
                   <TableHead>Última Alteração</TableHead>
                   <TableHead>Gasto</TableHead>
                   <TableHead>Cliques</TableHead>
-                  <TableHead>{currentActionLabel}</TableHead>
+                  <TableHead>Resultados</TableHead>
+                  <TableHead>Custo / Resultado</TableHead>
                   <TableHead>CTR</TableHead>
                   <TableHead>Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {activeCampaigns.map((campaign) => (
+                {activeCampaigns.map((campaign) => {
+                  const result = getObjectiveResult(campaign);
+                  const costPerResult = getCostPerResult(campaign);
+                  return (
                     <TableRow key={campaign.id} className={expandedCampaign === campaign.id ? 'bg-muted/30' : ''}>
                       <TableCell className="font-medium" title={campaign.name}>
                         {truncateText(campaign.name)}
                       </TableCell>
                       <TableCell>{getStatusBadge(campaign.status)}</TableCell>
-                      <TableCell>{getObjectiveLabel(campaign.objective)}</TableCell>
                       <TableCell>
-                        {campaign.updated_time 
+                        {campaign.updated_time
                           ? format(new Date(campaign.updated_time), 'dd/MM/yyyy', { locale: ptBR })
                           : 'N/A'
                         }
                       </TableCell>
                       <TableCell>{formatCurrency(campaign.spend)}</TableCell>
                       <TableCell>{formatNumber(campaign.clicks)}</TableCell>
-                      <TableCell>{computeConversionsForActions(campaign.actions, campaign.conversions)}</TableCell>
+                      <TableCell>
+                        <span className="font-medium">{formatNumber(result.value)}</span>
+                        <span className="text-xs text-muted-foreground ml-1">({result.label})</span>
+                      </TableCell>
+                      <TableCell>{formatCostPerResult(costPerResult)}</TableCell>
                       <TableCell>{campaign.ctr.toFixed(2)}%</TableCell>
                       <TableCell>
-                        <Button 
+                        <Button
                           onClick={() => handleWeeklyAnalysis(campaign.id)}
                           variant={expandedCampaign === campaign.id ? "default" : "outline"}
                           size="sm"
@@ -829,7 +894,8 @@ export function CampaignsAndReports({ selectedAdAccounts }: CampaignsAndReportsP
                         </Button>
                       </TableCell>
                     </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}

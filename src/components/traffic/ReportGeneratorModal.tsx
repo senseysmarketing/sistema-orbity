@@ -9,6 +9,28 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAIAssist } from "@/hooks/useAIAssist";
 
+interface ResultByObjective {
+  label: string;
+  actionType: string;
+  total: number;
+  spend: number;
+  costPerResult: number | null;
+  campaignCount: number;
+}
+
+interface CampaignBreakdownItem {
+  name: string;
+  objective: string;
+  result_value: number;
+  result_label: string;
+  result_action_type: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cost_per_result: number | null;
+}
+
 interface ReportData {
   accountName: string;
   period: string;
@@ -20,6 +42,8 @@ interface ReportData {
   avgCPC: number;
   avgCPM: number;
   conversionLabel?: string;
+  resultsByObjective?: ResultByObjective[];
+  campaignBreakdown?: CampaignBreakdownItem[];
 }
 
 interface ReportGeneratorModalProps {
@@ -70,16 +94,41 @@ export function ReportGeneratorModal({ isOpen, onClose, reportData, agencyId }: 
 
   const handleGenerateAI = async () => {
     setAiLoading(true);
+
+    const fmtCpr = (v: number | null) =>
+      v === null || !isFinite(v) || isNaN(v)
+        ? '—'
+        : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+
+    const objectivesBlock = reportData.resultsByObjective && reportData.resultsByObjective.length > 0
+      ? reportData.resultsByObjective
+          .map(r => `  - ${r.label}: ${r.total} (gasto: R$ ${r.spend.toFixed(2)}, custo/result.: ${fmtCpr(r.costPerResult)}, ${r.campaignCount} campanha(s))`)
+          .join('\n')
+      : '  (sem dados agrupados por objetivo)';
+
+    const campaignsBlock = reportData.campaignBreakdown && reportData.campaignBreakdown.length > 0
+      ? reportData.campaignBreakdown
+          .map(c => `  - ${c.name} → R$ ${c.spend.toFixed(2)} | ${c.result_value} ${c.result_label} | CPR: ${fmtCpr(c.cost_per_result)} | CTR: ${c.ctr.toFixed(2)}%`)
+          .join('\n')
+      : '  (sem campanhas detalhadas)';
+
     const content = `Dados do período:
 - Conta: ${reportData.accountName}
 - Período: ${reportData.period}
 - Investimento: R$ ${reportData.totalSpend.toFixed(2)}
 - Impressões: ${reportData.totalImpressions}
 - Cliques: ${reportData.totalClicks}
-- ${reportData.conversionLabel || 'Conversões'}: ${reportData.totalConversions}
 - CTR: ${reportData.avgCTR.toFixed(2)}%
 - CPC: R$ ${reportData.avgCPC.toFixed(2)}
-- CPM: R$ ${reportData.avgCPM.toFixed(2)}`;
+- CPM: R$ ${reportData.avgCPM.toFixed(2)}
+
+Resultados por Objetivo:
+${objectivesBlock}
+
+Detalhamento por Campanha:
+${campaignsBlock}
+
+Gere um relatório que reflita as diferentes estratégias (cada campanha pode ter um objetivo diferente: leads, mensagens, cliques, etc.). Apresente os resultados de forma clara para o cliente final.`;
 
     const result = await generateReport(content, agencyId);
     if (result?.message) {
@@ -88,8 +137,22 @@ export function ReportGeneratorModal({ isOpen, onClose, reportData, agencyId }: 
     setAiLoading(false);
   };
 
-  const { accountName, period, totalSpend, totalImpressions, totalClicks, totalConversions, avgCTR, avgCPC, avgCPM, conversionLabel } = reportData;
+  const { accountName, period, totalSpend, totalImpressions, totalClicks, totalConversions, avgCTR, avgCPC, avgCPM, conversionLabel, resultsByObjective, campaignBreakdown } = reportData;
   const convLabel = conversionLabel || 'Conversões';
+
+  const fmtCpr = (v: number | null) =>
+    v === null || !isFinite(v) || isNaN(v)
+      ? '—'
+      : formatCurrency(v);
+
+  // Pre-built breakdown strings for templates
+  const objectivesBreakdown = resultsByObjective && resultsByObjective.length > 0
+    ? resultsByObjective.map(r => `• ${r.total} ${r.label} — ${formatCurrency(r.spend)} (CPR: ${fmtCpr(r.costPerResult)})`).join('\n')
+    : `• ${totalConversions} ${convLabel}`;
+
+  const campaignsBreakdownText = campaignBreakdown && campaignBreakdown.length > 0
+    ? campaignBreakdown.map(c => `• ${c.name}\n  ↳ ${formatCurrency(c.spend)} → ${c.result_value} ${c.result_label} (CPR: ${fmtCpr(c.cost_per_result)})`).join('\n')
+    : '';
 
   const templates = [
     {
@@ -103,37 +166,33 @@ export function ReportGeneratorModal({ isOpen, onClose, reportData, agencyId }: 
 💰 *INVESTIMENTO:* ${formatCurrency(totalSpend)}
 👁️ *IMPRESSÕES:* ${formatNumber(totalImpressions)}
 🖱️ *CLIQUES:* ${formatNumber(totalClicks)}
-🎯 *${convLabel.toUpperCase()}:* ${totalConversions}
+📊 *CTR:* ${avgCTR.toFixed(2)}%
 
-📈 *MÉTRICAS:*
-• CTR: ${avgCTR.toFixed(2)}%
-• CPC: ${formatCurrency(avgCPC)}
-• CPM: ${formatCurrency(avgCPM)}
+🎯 *RESULTADOS POR OBJETIVO:*
+${objectivesBreakdown}
 
-✨ Campanha otimizada e acompanhada diariamente!`
+✨ Campanhas otimizadas e acompanhadas diariamente!`
     },
     {
       title: "🎯 Foco em Resultados",
       category: "Conversões",
       message: `🎯 *RESULTADOS DO PERÍODO*
 
-${totalConversions} ${convLabel.toLowerCase()} geradas! 🔥
+${objectivesBreakdown}
 
 💡 *Destaques:*
-📍 Investimento de ${formatCurrency(totalSpend)}
+📍 Investimento total: ${formatCurrency(totalSpend)}
 📍 ${formatNumber(totalClicks)} cliques qualificados
 📍 CTR de ${avgCTR.toFixed(2)}%
 
-🚀 Vamos escalar as campanhas que estão performando melhor!
-
-#TrafegoOtimizado #ResultadosReais`
+🚀 Vamos escalar as campanhas que estão performando melhor!`
     },
     {
-      title: "💎 Premium",
+      title: "💎 Premium (Detalhado)",
       category: "Completo",
       message: `💎 *RELATÓRIO EXECUTIVO DE TRÁFEGO*
 
-📊 *OVERVIEW - ${period}*
+📊 *OVERVIEW — ${period}*
 🏢 Conta: ${accountName}
 
 💰 *FINANCEIRO:*
@@ -141,11 +200,14 @@ Total Investido: ${formatCurrency(totalSpend)}
 CPC Médio: ${formatCurrency(avgCPC)}
 CPM: ${formatCurrency(avgCPM)}
 
-🎯 *PERFORMANCE:*
-✨ ${formatNumber(totalImpressions)} impressões
-🖱️ ${formatNumber(totalClicks)} cliques
-🎯 ${totalConversions} ${convLabel.toLowerCase()}
-📊 CTR: ${avgCTR.toFixed(2)}%
+👁️ *ALCANCE:*
+${formatNumber(totalImpressions)} impressões · ${formatNumber(totalClicks)} cliques · CTR ${avgCTR.toFixed(2)}%
+
+🎯 *RESULTADOS POR OBJETIVO:*
+${objectivesBreakdown}
+
+📋 *DETALHAMENTO POR CAMPANHA:*
+${campaignsBreakdownText || '(sem campanhas no período)'}
 
 🚀 *Status:* Campanhas otimizadas!`
     },
@@ -154,11 +216,10 @@ CPM: ${formatCurrency(avgCPM)}
       category: "Social",
       message: `📊 RESULTADOS DO MÊS 📊
 
-${totalConversions} ${convLabel.toUpperCase()}! 🎯
+${objectivesBreakdown}
 
 💰 ${formatCurrency(totalSpend)} investidos
 👥 ${formatNumber(totalImpressions)} pessoas alcançadas
-🖱️ ${formatNumber(totalClicks)} cliques
 📈 ${avgCTR.toFixed(2)}% de CTR
 
 Estratégia + Otimização = RESULTADOS! ✨`
@@ -175,6 +236,8 @@ Estratégia + Otimização = RESULTADOS! ✨`
     { key: 'avgCTR', value: `${avgCTR.toFixed(2)}%`, description: 'CTR médio' },
     { key: 'avgCPC', value: formatCurrency(avgCPC), description: 'CPC médio' },
     { key: 'avgCPM', value: formatCurrency(avgCPM), description: 'CPM médio' },
+    { key: 'resultsByObjective', value: objectivesBreakdown, description: 'Resultados agrupados por objetivo' },
+    { key: 'campaignBreakdown', value: campaignsBreakdownText || '—', description: 'Detalhamento por campanha' },
   ];
 
   return (
