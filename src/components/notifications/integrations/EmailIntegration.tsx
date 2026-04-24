@@ -5,12 +5,15 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
-import { Mail, Check, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Mail, Check, Loader2, Sparkles } from "lucide-react";
 
 export function EmailIntegration() {
   const { toast } = useToast();
   const { currentAgency } = useAgency();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [config, setConfig] = useState({
     email_enabled: false
   });
@@ -128,15 +131,58 @@ export function EmailIntegration() {
             </ul>
           </div>
 
-          <Button 
-            onClick={handleSave} 
-            disabled={loading}
-            className="w-full"
-          >
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-            <span className="hidden sm:inline">Salvar Configuração</span>
-            <span className="sm:hidden">Salvar</span>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button 
+              onClick={handleSave} 
+              disabled={loading}
+              className="flex-1"
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+              <span className="hidden sm:inline">Salvar Configuração</span>
+              <span className="sm:hidden">Salvar</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={testing || !user || !currentAgency}
+              onClick={async () => {
+                if (!user || !currentAgency) return;
+                setTesting(true);
+                try {
+                  const { error } = await supabase.functions.invoke("send-email-notification", {
+                    body: {
+                      test: true,
+                      bypass_snooze: true,
+                      userId: user.id,
+                      agencyId: currentAgency.id,
+                      notification: {
+                        title: "🎉 Teste de E-mail Orbity",
+                        message: "Olá! Este é um teste de conexão do Orbity.",
+                        type: "system_alert",
+                      },
+                    },
+                  });
+                  if (error) throw error;
+                  toast({
+                    title: "✅ E-mail enviado",
+                    description: "Confira sua caixa de entrada (e a pasta de spam).",
+                  });
+                } catch (err: any) {
+                  toast({
+                    title: "Falha no envio",
+                    description: err?.message || "Verifique a configuração de e-mail.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setTesting(false);
+                }
+              }}
+            >
+              {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              <span className="hidden sm:inline">Enviar E-mail de Teste</span>
+              <span className="sm:hidden">Testar</span>
+            </Button>
+          </div>
         </CardContent>
       )}
     </Card>

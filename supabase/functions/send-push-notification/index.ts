@@ -16,6 +16,27 @@ interface PushPayload {
   body: string;
   icon?: string;
   data?: Record<string, string>;
+  /** Skip routing/snooze/DND checks. Used by test buttons & critical alerts. */
+  bypass_snooze?: boolean;
+  /** Notification category used for routing matrix lookup (leads/payments/tasks/meetings/system). */
+  category?: string;
+  /** Notification type for bypass detection (system_alert, billing.*). */
+  type?: string;
+}
+
+const BYPASS_TYPES = new Set(["system_alert"]);
+function isBypassType(type?: string): boolean {
+  if (!type) return false;
+  const t = type.toLowerCase();
+  return BYPASS_TYPES.has(t) || t.startsWith("billing");
+}
+
+function getCellEnabled(routing: unknown, category: string, channel: "in_app" | "push" | "email"): boolean {
+  if (!routing || typeof routing !== "object") return true;
+  const cat = (routing as Record<string, Record<string, boolean>>)[category];
+  if (!cat) return true;
+  if (cat[channel] === false) return false;
+  return true;
 }
 
 // Cache for access token
@@ -268,6 +289,31 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Missing required fields: user_id, title, body' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Routing/snooze guardrails (bypass for tests + critical types)
+    const bypass = !!payload.bypass_snooze || isBypassType(payload.type);
+    if (!bypass) {
+      const { data: prefs } = await supabase
+        .from('notification_preferences')
+        .select('channel_routing, do_not_disturb_until')
+        .eq('user_id', payload.user_id)
+        .maybeSingle();
+
+      if (prefs?.do_not_disturb_until && new Date(prefs.do_not_disturb_until) > new Date()) {
+        console.log('[FCM] User in snooze mode - skipping push');
+        return new Response(
+          JSON.stringify({ sent: 0, total: 0, skipped: 'snoozed' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (payload.category && !getCellEnabled(prefs?.channel_routing, payload.category, 'push')) {
+        console.log(`[FCM] Push channel disabled for category ${payload.category}`);
+        return new Response(
+          JSON.stringify({ sent: 0, total: 0, skipped: 'channel_off' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Fetch active FCM tokens for the user

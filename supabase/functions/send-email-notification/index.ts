@@ -17,11 +17,44 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { test, email, notification, userId, agencyId } = await req.json();
+    const { test, notification, userId, agencyId, bypass_snooze, category } = await req.json();
 
     // Fixed sender information
     const FROM_EMAIL = "contato@notificacoes.orbityapp.com.br";
     const FROM_NAME = "Orbity";
+
+    // Bypass detection (test buttons + critical types)
+    const notifType: string = (notification?.type || '').toLowerCase();
+    const isCritical = notifType === 'system_alert' || notifType.startsWith('billing');
+    const bypass = !!test || !!bypass_snooze || isCritical;
+
+    // Routing/snooze guardrails
+    if (!bypass) {
+      const { data: prefs } = await supabase
+        .from('notification_preferences')
+        .select('channel_routing, do_not_disturb_until')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (prefs?.do_not_disturb_until && new Date(prefs.do_not_disturb_until) > new Date()) {
+        console.log('Email skipped: user in snooze mode');
+        return new Response(
+          JSON.stringify({ success: false, reason: 'snoozed' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (category) {
+        const routing = prefs?.channel_routing as Record<string, Record<string, boolean>> | undefined;
+        const cat = routing?.[category];
+        if (cat && cat.email === false) {
+          console.log(`Email skipped: channel disabled for category ${category}`);
+          return new Response(
+            JSON.stringify({ success: false, reason: 'channel_off' }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+    }
 
     // Get user's email configuration
     const { data: channelData } = await supabase
