@@ -166,37 +166,33 @@ Gere um relatório que reflita as diferentes estratégias (cada campanha pode te
 💰 *INVESTIMENTO:* ${formatCurrency(totalSpend)}
 👁️ *IMPRESSÕES:* ${formatNumber(totalImpressions)}
 🖱️ *CLIQUES:* ${formatNumber(totalClicks)}
-🎯 *${convLabel.toUpperCase()}:* ${totalConversions}
+📊 *CTR:* ${avgCTR.toFixed(2)}%
 
-📈 *MÉTRICAS:*
-• CTR: ${avgCTR.toFixed(2)}%
-• CPC: ${formatCurrency(avgCPC)}
-• CPM: ${formatCurrency(avgCPM)}
+🎯 *RESULTADOS POR OBJETIVO:*
+${objectivesBreakdown}
 
-✨ Campanha otimizada e acompanhada diariamente!`
+✨ Campanhas otimizadas e acompanhadas diariamente!`
     },
     {
       title: "🎯 Foco em Resultados",
       category: "Conversões",
       message: `🎯 *RESULTADOS DO PERÍODO*
 
-${totalConversions} ${convLabel.toLowerCase()} geradas! 🔥
+${objectivesBreakdown}
 
 💡 *Destaques:*
-📍 Investimento de ${formatCurrency(totalSpend)}
+📍 Investimento total: ${formatCurrency(totalSpend)}
 📍 ${formatNumber(totalClicks)} cliques qualificados
 📍 CTR de ${avgCTR.toFixed(2)}%
 
-🚀 Vamos escalar as campanhas que estão performando melhor!
-
-#TrafegoOtimizado #ResultadosReais`
+🚀 Vamos escalar as campanhas que estão performando melhor!`
     },
     {
-      title: "💎 Premium",
+      title: "💎 Premium (Detalhado)",
       category: "Completo",
       message: `💎 *RELATÓRIO EXECUTIVO DE TRÁFEGO*
 
-📊 *OVERVIEW - ${period}*
+📊 *OVERVIEW — ${period}*
 🏢 Conta: ${accountName}
 
 💰 *FINANCEIRO:*
@@ -204,11 +200,14 @@ Total Investido: ${formatCurrency(totalSpend)}
 CPC Médio: ${formatCurrency(avgCPC)}
 CPM: ${formatCurrency(avgCPM)}
 
-🎯 *PERFORMANCE:*
-✨ ${formatNumber(totalImpressions)} impressões
-🖱️ ${formatNumber(totalClicks)} cliques
-🎯 ${totalConversions} ${convLabel.toLowerCase()}
-📊 CTR: ${avgCTR.toFixed(2)}%
+👁️ *ALCANCE:*
+${formatNumber(totalImpressions)} impressões · ${formatNumber(totalClicks)} cliques · CTR ${avgCTR.toFixed(2)}%
+
+🎯 *RESULTADOS POR OBJETIVO:*
+${objectivesBreakdown}
+
+📋 *DETALHAMENTO POR CAMPANHA:*
+${campaignsBreakdownText || '(sem campanhas no período)'}
 
 🚀 *Status:* Campanhas otimizadas!`
     },
@@ -217,11 +216,10 @@ CPM: ${formatCurrency(avgCPM)}
       category: "Social",
       message: `📊 RESULTADOS DO MÊS 📊
 
-${totalConversions} ${convLabel.toUpperCase()}! 🎯
+${objectivesBreakdown}
 
 💰 ${formatCurrency(totalSpend)} investidos
 👥 ${formatNumber(totalImpressions)} pessoas alcançadas
-🖱️ ${formatNumber(totalClicks)} cliques
 📈 ${avgCTR.toFixed(2)}% de CTR
 
 Estratégia + Otimização = RESULTADOS! ✨`
