@@ -11,7 +11,6 @@ import { useAgency } from "@/hooks/useAgency";
 import { toast } from "sonner";
 import {
   Bell,
-  Mail,
   Volume2,
   VolumeX,
   Chrome,
@@ -29,7 +28,6 @@ import {
   Info,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
