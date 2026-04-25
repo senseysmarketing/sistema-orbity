@@ -1,190 +1,95 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { useAuth } from "@/hooks/useAuth";
-import { Mail, Check, Loader2, Sparkles } from "lucide-react";
+import { Mail, Loader2, Send } from "lucide-react";
+import { toast } from "sonner";
 
-export function EmailIntegration() {
-  const { toast } = useToast();
+interface EmailIntegrationProps {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+}
+
+export function EmailIntegration({ enabled, onChange }: EmailIntegrationProps) {
   const { currentAgency } = useAgency();
   const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [config, setConfig] = useState({
-    email_enabled: false
-  });
 
-  useEffect(() => {
-    fetchConfig();
-  }, [currentAgency?.id]);
-
-  const fetchConfig = async () => {
+  const handleSendTest = async () => {
+    if (!user || !currentAgency) return;
+    setTesting(true);
     try {
-      const { data, error } = await supabase
-        .from('notification_integrations')
-        .select('email_enabled')
-        .eq('agency_id', currentAgency!.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (data) setConfig({ email_enabled: data.email_enabled || false });
-    } catch (error: any) {
-      console.error('Error fetching config:', error);
-    }
-  };
-
-  const handleSave = async () => {
-    try {
-      setLoading(true);
-
-      const { error } = await supabase
-        .from('notification_integrations')
-        .upsert({
-          agency_id: currentAgency!.id,
-          email_enabled: config.email_enabled,
-          email_from_name: 'Orbity',
-          email_from_address: 'contato@orbityapp.com.br',
-          email_provider: 'resend',
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'agency_id'
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Configuração salva",
-        description: "Integração de email configurada com sucesso.",
+      const { error } = await supabase.functions.invoke("send-email-notification", {
+        body: {
+          test: true,
+          bypass_snooze: true,
+          userId: user.id,
+          agencyId: currentAgency.id,
+          notification: {
+            title: "🎉 Teste de E-mail Orbity",
+            message: "Olá! Este é um teste de conexão do Orbity.",
+            type: "system_alert",
+          },
+        },
       });
-    } catch (error: any) {
-      toast({
-        title: "Erro ao salvar",
-        description: error.message,
-        variant: "destructive",
+      if (error) throw error;
+      toast.success("E-mail enviado", {
+        description: "Confira sua caixa de entrada (e a pasta de spam).",
+      });
+    } catch (err: any) {
+      toast.error("Falha no envio", {
+        description: err?.message || "Verifique a configuração de e-mail.",
       });
     } finally {
-      setLoading(false);
+      setTesting(false);
     }
   };
 
   return (
-    <Card>
-      <CardHeader className="p-4 sm:p-6">
-        <div className="flex items-start sm:items-center justify-between gap-3">
-          <div className="flex items-start sm:items-center gap-2 min-w-0 flex-1">
-            <Mail className="h-4 w-4 sm:h-5 sm:w-5 mt-0.5 sm:mt-0 flex-shrink-0" />
-            <div className="min-w-0">
-              <CardTitle className="text-base sm:text-lg">
-                <span className="hidden sm:inline">Notificações por Email</span>
-                <span className="sm:hidden">Email</span>
-              </CardTitle>
-              <CardDescription className="text-xs sm:text-sm">
-                Envie notificações via email
-              </CardDescription>
-            </div>
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <div className="rounded-md bg-primary/10 p-2 shrink-0">
+            <Mail className="h-4 w-4 text-primary" />
           </div>
-          <Switch
-            checked={config.email_enabled}
-            onCheckedChange={(checked) => setConfig({ ...config, email_enabled: checked })}
-            className="flex-shrink-0"
-          />
-        </div>
-      </CardHeader>
-
-      {config.email_enabled && (
-        <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0 sm:pt-0">
-          <div className="rounded-md bg-muted p-3 sm:p-4 space-y-2">
-            <p className="text-xs sm:text-sm font-medium">ℹ️ Informações do Remetente</p>
-            <div className="space-y-1 text-xs sm:text-sm">
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
-                <span className="text-muted-foreground">Remetente:</span>
-                <span className="font-medium">Orbity</span>
-              </div>
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
-                <span className="text-muted-foreground">Email:</span>
-                <span className="font-medium truncate text-xs">contato@orbityapp.com.br</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-md bg-blue-50 dark:bg-blue-950/30 p-3 space-y-2">
-            <p className="text-xs sm:text-sm font-medium text-blue-900 dark:text-blue-100">
-              💡 Como funciona
+          <div className="min-w-0">
+            <Label htmlFor="email-enabled" className="text-sm font-medium cursor-pointer">
+              Notificações por E-mail
+            </Label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Receba resumos e alertas importantes diretamente na sua caixa de entrada.
             </p>
-            <ul className="text-[10px] sm:text-xs text-blue-800 dark:text-blue-200 space-y-1 ml-3 sm:ml-4 list-disc">
-              <li>
-                <span className="hidden sm:inline">Os emails serão enviados via Resend usando o domínio da Orbity</span>
-                <span className="sm:hidden">Emails via Resend (Orbity)</span>
-              </li>
-              <li>
-                <span className="hidden sm:inline">Cada usuário configura seu email pessoal nas preferências</span>
-                <span className="sm:hidden">Configure seu email pessoal</span>
-              </li>
-              <li>
-                <span className="hidden sm:inline">Usuários escolhem quais tipos de notificação querem receber</span>
-                <span className="sm:hidden">Escolha os tipos de notificação</span>
-              </li>
-            </ul>
           </div>
+        </div>
+        <Switch
+          id="email-enabled"
+          checked={enabled}
+          onCheckedChange={onChange}
+          className="shrink-0"
+        />
+      </div>
 
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button 
-              onClick={handleSave} 
-              disabled={loading}
-              className="flex-1"
-            >
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-              <span className="hidden sm:inline">Salvar Configuração</span>
-              <span className="sm:hidden">Salvar</span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={testing || !user || !currentAgency}
-              onClick={async () => {
-                if (!user || !currentAgency) return;
-                setTesting(true);
-                try {
-                  const { error } = await supabase.functions.invoke("send-email-notification", {
-                    body: {
-                      test: true,
-                      bypass_snooze: true,
-                      userId: user.id,
-                      agencyId: currentAgency.id,
-                      notification: {
-                        title: "🎉 Teste de E-mail Orbity",
-                        message: "Olá! Este é um teste de conexão do Orbity.",
-                        type: "system_alert",
-                      },
-                    },
-                  });
-                  if (error) throw error;
-                  toast({
-                    title: "✅ E-mail enviado",
-                    description: "Confira sua caixa de entrada (e a pasta de spam).",
-                  });
-                } catch (err: any) {
-                  toast({
-                    title: "Falha no envio",
-                    description: err?.message || "Verifique a configuração de e-mail.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setTesting(false);
-                }
-              }}
-            >
-              {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              <span className="hidden sm:inline">Enviar E-mail de Teste</span>
-              <span className="sm:hidden">Testar</span>
-            </Button>
-          </div>
-        </CardContent>
+      {enabled && (
+        <div className="pl-11">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={testing || !user || !currentAgency}
+            onClick={handleSendTest}
+          >
+            {testing ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
+            Enviar E-mail de Teste
+          </Button>
+        </div>
       )}
-    </Card>
+    </div>
   );
 }
