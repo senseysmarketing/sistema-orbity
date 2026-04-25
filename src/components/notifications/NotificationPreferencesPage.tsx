@@ -13,6 +13,7 @@ import {
   Bell,
   Mail,
   Volume2,
+  VolumeX,
   Chrome,
   Clock,
   Smartphone,
@@ -20,11 +21,24 @@ import {
   ArrowLeft,
   BellOff,
   PauseCircle,
+  Send,
+  Wifi,
+  Share2,
+  PlusSquare,
+  Lock,
+  Info,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { PushDiagnostics } from "./PushDiagnostics";
+import { useBrowserNotifications } from "@/hooks/useBrowserNotifications";
 import { EmailIntegration } from "./integrations/EmailIntegration";
 import {
   ROUTING_CATEGORIES,
@@ -41,18 +55,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface Channels {
-  sound_enabled: boolean;
-  browser_notifications: boolean;
-}
-
 interface DoNotDisturb {
   dnd_start_time: string;
   dnd_end_time: string;
   dnd_weekends: boolean;
 }
 
-function PushNotificationSection() {
+// ============ APP Orbity (PWA Push) Section ============
+function AppOrbityCard() {
   const {
     permission,
     isSupported,
@@ -62,103 +72,312 @@ function PushNotificationSection() {
     disablePushNotifications,
     token,
     isStandaloneMode,
-    isIOS,
-    isAndroid,
   } = usePushNotifications();
-
-  if (!hasFirebaseConfig) {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between opacity-60">
-          <Label className="flex items-center gap-2 text-sm">
-            <Smartphone className="h-4 w-4" />
-            <span>Push no Celular</span>
-          </Label>
-          <span className="text-xs text-muted-foreground">Não configurado</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isSupported) {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between opacity-60">
-          <Label className="flex items-center gap-2 text-sm">
-            <Smartphone className="h-4 w-4" />
-            <span>Push no Celular</span>
-          </Label>
-          <span className="text-xs text-muted-foreground">Não suportado</span>
-        </div>
-      </div>
-    );
-  }
+  const { user } = useAuth();
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   const isEnabled = permission === "granted" && !!token;
-  const showIOSWarning = isIOS && !isStandaloneMode;
+
+  const handleVerify = async () => {
+    setVerifying(true);
+    try {
+      if (!token) {
+        toast.error("Sem token ativo", {
+          description: "Ative as notificações do APP primeiro.",
+        });
+        return;
+      }
+      const { count } = await supabase
+        .from("push_subscriptions")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user!.id)
+        .eq("is_active", true);
+      if ((count ?? 0) > 0) {
+        toast.success("Conexão ativa", {
+          description: `${count} dispositivo(s) registrado(s) para receber notificações.`,
+        });
+      } else {
+        toast.error("Nenhuma conexão ativa", {
+          description: "Tente desativar e ativar novamente.",
+        });
+      }
+    } catch (err: any) {
+      toast.error("Erro ao verificar", { description: err?.message });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleSendTest = async () => {
+    if (!user) return;
+    setTesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-push-notification", {
+        body: {
+          user_id: user.id,
+          title: "🔔 Teste APP Orbity",
+          body: "Se você está vendo isto, as notificações do APP estão a funcionar!",
+          data: { action_url: "/dashboard/settings/notifications", test: "true" },
+        },
+      });
+      if (error) throw error;
+      if (data?.sent > 0) {
+        toast.success("Notificação enviada", {
+          description: `${data.sent}/${data.total} dispositivo(s) — aguarde alguns segundos.`,
+        });
+      } else {
+        toast.error("Falha no envio", {
+          description: "Nenhum dispositivo recebeu. Tente reativar as notificações.",
+        });
+      }
+    } catch (err: any) {
+      toast.error("Erro no teste", { description: err?.message });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label className="flex items-center gap-2 cursor-pointer text-sm">
-          <Smartphone className="h-4 w-4" />
-          <span>Push no Celular</span>
-        </Label>
-        {isEnabled ? (
-          <Button variant="outline" size="sm" onClick={disablePushNotifications} disabled={isLoading}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Desativar"}
-          </Button>
-        ) : (
-          <Button variant="default" size="sm" onClick={requestPermission} disabled={isLoading}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            {isLoading ? "Ativando..." : "Ativar"}
-          </Button>
-        )}
-      </div>
+    <>
+      <Card className="bg-card/30">
+        <CardHeader className="p-4 md:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 min-w-0 flex-1">
+              <div className="rounded-md bg-primary/10 p-2 shrink-0">
+                <Smartphone className="h-4 w-4 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <CardTitle className="text-base">APP Orbity</CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  Notificações push no telemóvel, mesmo com o app fechado.
+                </CardDescription>
+              </div>
+            </div>
+            {isEnabled && (
+              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full shrink-0">
+                ATIVO
+              </span>
+            )}
+          </div>
+        </CardHeader>
 
-      {showIOSWarning && (
-        <div className="ml-6 p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
-          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-            ⚠️ Para receber notificações no iPhone:
-          </p>
-          <ol className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-1 ml-4 list-decimal">
-            <li>Toque em <strong>Compartilhar</strong> (ícone ↑) no Safari</li>
-            <li>Selecione <strong>"Adicionar à Tela de Início"</strong></li>
-            <li>Abra o app pelo <strong>ícone na tela inicial</strong></li>
-            <li>Então ative as notificações aqui</li>
-          </ol>
-        </div>
-      )}
+        <CardContent className="p-4 md:p-6 pt-0 space-y-3">
+          {!hasFirebaseConfig || !isSupported ? (
+            <p className="text-xs text-muted-foreground">
+              Push não disponível neste dispositivo.
+            </p>
+          ) : !isStandaloneMode ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Para receber notificações no telemóvel, instale o Orbity como aplicação no seu
+                ecrã principal.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowInstallModal(true)}
+              >
+                <Smartphone className="mr-2 h-4 w-4" />
+                Como instalar o APP Orbity
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {!isEnabled ? (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={requestPermission}
+                  disabled={isLoading}
+                >
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Ativar notificações do APP
+                </Button>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleVerify}
+                    disabled={verifying}
+                  >
+                    {verifying ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wifi className="mr-2 h-4 w-4" />
+                    )}
+                    Verificar Conexão
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSendTest}
+                    disabled={testing}
+                  >
+                    {testing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="mr-2 h-4 w-4" />
+                    )}
+                    Enviar Notificação de Teste
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={disablePushNotifications}
+                    disabled={isLoading}
+                  >
+                    Desativar
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-      {isAndroid && !isStandaloneMode && !isEnabled && (
-        <div className="ml-6 p-2 rounded-md bg-blue-500/10 border border-blue-500/30">
-          <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">💡 Dica para Android:</p>
-          <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
-            Para melhor experiência, instale o app pelo menu ⋮ → "Instalar aplicativo".
-          </p>
-        </div>
-      )}
+      <Dialog open={showInstallModal} onOpenChange={setShowInstallModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Smartphone className="h-5 w-5" />
+              Instalar o APP Orbity
+            </DialogTitle>
+            <DialogDescription>
+              Em apenas 2 passos, o Orbity vai ficar no ecrã do seu telemóvel como qualquer outra
+              aplicação.
+            </DialogDescription>
+          </DialogHeader>
 
-      <p className="text-xs text-muted-foreground ml-6">
-        {isEnabled
-          ? `✓ Push ativo${isStandaloneMode ? " (PWA)" : ""}. Lembre-se de autorizar as notificações nas definições do sistema.`
-          : "Receba alertas no celular mesmo com o app fechado."}
-      </p>
+          <div className="space-y-4 pt-2">
+            <div className="flex items-start gap-3 p-3 rounded-lg border bg-card/30">
+              <div className="rounded-full bg-primary/10 p-2 shrink-0">
+                <Share2 className="h-4 w-4 text-primary" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">1. Abra o menu de partilha</p>
+                <p className="text-xs text-muted-foreground">
+                  No <strong>iPhone (Safari)</strong>, toque no ícone de partilhar (↑) na barra
+                  inferior. No <strong>Android (Chrome)</strong>, toque no menu (⋮) no canto
+                  superior direito.
+                </p>
+              </div>
+            </div>
 
-      {isEnabled && (
-        <PushDiagnostics
-          token={token}
-          permission={permission}
-          isStandaloneMode={isStandaloneMode}
-          isIOS={isIOS}
-          isAndroid={isAndroid}
-          isSupported={isSupported}
-        />
-      )}
-    </div>
+            <div className="flex items-start gap-3 p-3 rounded-lg border bg-card/30">
+              <div className="rounded-full bg-primary/10 p-2 shrink-0">
+                <PlusSquare className="h-4 w-4 text-primary" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">2. Adicionar ao Ecrã Principal</p>
+                <p className="text-xs text-muted-foreground">
+                  Selecione <strong>"Adicionar ao Ecrã Principal"</strong> (ou "Instalar
+                  aplicação") e confirme. Depois, abra o Orbity pelo ícone instalado e ative as
+                  notificações aqui.
+                </p>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
+// ============ Browser Notifications Section ============
+function BrowserNotificationsCard({
+  enabled,
+  onChange,
+}: {
+  enabled: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  const { permission, requestPermission, showNotification } = useBrowserNotifications();
+  const [testing, setTesting] = useState(false);
+
+  const handleActivate = async () => {
+    const granted = await requestPermission();
+    if (granted) onChange(true);
+  };
+
+  const handleTest = () => {
+    setTesting(true);
+    showNotification("🔔 Alerta de Teste — Orbity", {
+      body: "As notificações do navegador estão a funcionar perfeitamente!",
+      tag: "browser-test",
+    });
+    setTimeout(() => setTesting(false), 1000);
+  };
+
+  return (
+    <Card className="bg-card/30">
+      <CardHeader className="p-4 md:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <div className="rounded-md bg-primary/10 p-2 shrink-0">
+              <Chrome className="h-4 w-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <CardTitle className="text-base">Notificações do Navegador</CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                Receba alertas nativos do Chrome, Safari ou Edge enquanto trabalha no
+                computador.
+              </CardDescription>
+            </div>
+          </div>
+          {permission === "granted" && enabled && (
+            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full shrink-0">
+              ATIVO
+            </span>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-4 md:p-6 pt-0 space-y-3">
+        {permission === "denied" ? (
+          <div className="flex items-start gap-2 p-3 rounded-md bg-amber-500/10 border border-amber-500/30">
+            <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              As notificações estão bloqueadas. Clique no ícone de cadeado (🔒) na barra de
+              endereço do seu navegador e altere a permissão de Notificações para{" "}
+              <strong>"Permitir"</strong>.
+            </p>
+          </div>
+        ) : permission !== "granted" ? (
+          <Button variant="default" size="sm" onClick={handleActivate}>
+            <Chrome className="mr-2 h-4 w-4" />
+            Ativar neste computador
+          </Button>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="browser-toggle"
+                checked={enabled}
+                onCheckedChange={onChange}
+              />
+              <Label htmlFor="browser-toggle" className="text-sm cursor-pointer">
+                Receber alertas do navegador
+              </Label>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleTest} disabled={testing}>
+              {testing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              Enviar Alerta de Teste
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============ Snooze Banner ============
 function SnoozeBanner({
   snoozedUntil,
   onResume,
@@ -180,7 +399,8 @@ function SnoozeBanner({
         <div>
           <p className="text-sm font-medium">Modo Foco ativo</p>
           <p className="text-xs text-muted-foreground">
-            Notificações pausadas até <strong>{fmt}</strong>. Alertas críticos (faturamento e sistema) continuam sendo entregues.
+            Notificações pausadas até <strong>{fmt}</strong>. Alertas críticos (faturamento e
+            sistema) continuam sendo entregues.
           </p>
         </div>
       </div>
@@ -191,6 +411,7 @@ function SnoozeBanner({
   );
 }
 
+// ============ Routing Matrix ============
 function RoutingMatrix({
   routing,
   onChange,
@@ -216,9 +437,9 @@ function RoutingMatrix({
               {ROUTING_CHANNELS.map((c) => (
                 <th
                   key={c.key}
-                  className="text-center px-4 py-3 font-medium text-muted-foreground w-[140px]"
+                  className="text-center px-3 py-3 font-medium text-muted-foreground"
                 >
-                  {c.label}
+                  {c.key === "push" ? "APP" : c.key === "in_app" ? "Sistema" : "E-mail"}
                 </th>
               ))}
             </tr>
@@ -231,7 +452,7 @@ function RoutingMatrix({
                   {cat.label}
                 </td>
                 {ROUTING_CHANNELS.map((ch) => (
-                  <td key={ch.key} className="text-center px-4 py-3">
+                  <td key={ch.key} className="text-center px-3 py-3">
                     <Checkbox
                       checked={getCellEnabled(routing, cat.key, ch.key)}
                       onCheckedChange={() => toggle(cat.key, ch.key)}
@@ -262,7 +483,9 @@ function RoutingMatrix({
                     checked={getCellEnabled(routing, cat.key, ch.key)}
                     onCheckedChange={() => toggle(cat.key, ch.key)}
                   />
-                  <span className="text-[10px] text-muted-foreground">{ch.mobile}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {ch.key === "push" ? "APP" : ch.mobile}
+                  </span>
                 </label>
               ))}
             </div>
@@ -273,6 +496,7 @@ function RoutingMatrix({
   );
 }
 
+// ============ Main Page ============
 export function NotificationPreferencesPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -283,10 +507,13 @@ export function NotificationPreferencesPage() {
 
   const [routing, setRouting] = useState<ChannelRouting>(() => normalizeRouting({}));
 
-  const [channels, setChannels] = useState<Channels>({
-    sound_enabled: true,
-    browser_notifications: false,
-  });
+  // Sound: auto-saved separately from form
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundSaving, setSoundSaving] = useState(false);
+
+  // Browser & Email: part of unified form (no local save buttons)
+  const [browserEnabled, setBrowserEnabled] = useState(false);
+  const [emailEnabled, setEmailEnabled] = useState(false);
 
   const [dnd, setDnd] = useState<DoNotDisturb>({
     dnd_start_time: "22:00",
@@ -299,6 +526,7 @@ export function NotificationPreferencesPage() {
     if (user && currentAgency) {
       void fetchPreferences();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, currentAgency]);
 
   const fetchPreferences = async () => {
@@ -330,10 +558,8 @@ export function NotificationPreferencesPage() {
         }
         setRouting(next);
 
-        setChannels({
-          sound_enabled: prefs.sound_enabled ?? true,
-          browser_notifications: prefs.browser_notifications ?? false,
-        });
+        setSoundEnabled(prefs.sound_enabled ?? true);
+        setBrowserEnabled(prefs.browser_notifications ?? false);
 
         setDnd({
           dnd_start_time: prefs.dnd_start_time || "22:00",
@@ -349,6 +575,14 @@ export function NotificationPreferencesPage() {
           setSnoozedUntil(null);
         }
       }
+
+      // Email integration is per-agency
+      const { data: integ } = await supabase
+        .from("notification_integrations")
+        .select("email_enabled")
+        .eq("agency_id", currentAgency.id)
+        .maybeSingle();
+      if (integ) setEmailEnabled(integ.email_enabled || false);
     } catch (err) {
       console.error("Error fetching preferences:", err);
     } finally {
@@ -356,15 +590,31 @@ export function NotificationPreferencesPage() {
     }
   };
 
-  const requestBrowserPermission = async () => {
-    if ("Notification" in window) {
-      const p = await Notification.requestPermission();
-      if (p === "granted") {
-        setChannels((prev) => ({ ...prev, browser_notifications: true }));
-        toast.success("Permissão concedida para notificações do navegador");
-      } else {
-        toast.error("Permissão negada para notificações do navegador");
-      }
+  // Auto-save for sound toggle
+  const handleSoundToggle = async (value: boolean) => {
+    if (!user || !currentAgency?.id) return;
+    setSoundEnabled(value);
+    setSoundSaving(true);
+    try {
+      const { error } = await supabase
+        .from("notification_preferences")
+        .upsert(
+          {
+            user_id: user.id,
+            agency_id: currentAgency.id,
+            sound_enabled: value,
+          } as any,
+          { onConflict: "user_id" },
+        );
+      if (error) throw error;
+      toast.success("Preferência de som atualizada", {
+        duration: 2000,
+      });
+    } catch (err: any) {
+      toast.error("Erro ao salvar som", { description: err?.message });
+      setSoundEnabled(!value); // revert
+    } finally {
+      setSoundSaving(false);
     }
   };
 
@@ -441,8 +691,8 @@ export function NotificationPreferencesPage() {
         system_enabled: orOfChannels("system"),
         reminders_enabled: true,
         expenses_enabled: true,
-        sound_enabled: channels.sound_enabled,
-        browser_notifications: channels.browser_notifications,
+        sound_enabled: soundEnabled,
+        browser_notifications: browserEnabled,
         dnd_start_time: dndEnabled ? dnd.dnd_start_time : null,
         dnd_end_time: dndEnabled ? dnd.dnd_end_time : null,
         dnd_weekends: dndEnabled ? dnd.dnd_weekends : false,
@@ -453,10 +703,26 @@ export function NotificationPreferencesPage() {
         .upsert(prefsToSave as any, { onConflict: "user_id" });
       if (prefsError) throw prefsError;
 
+      // Persist email integration toggle (agency-scoped)
+      const { error: integError } = await supabase
+        .from("notification_integrations")
+        .upsert(
+          {
+            agency_id: currentAgency.id,
+            email_enabled: emailEnabled,
+            email_from_name: "Orbity",
+            email_from_address: "contato@orbityapp.com.br",
+            email_provider: "resend",
+            updated_at: new Date().toISOString(),
+          } as any,
+          { onConflict: "agency_id" },
+        );
+      if (integError) throw integError;
+
       toast.success("Preferências salvas com sucesso!");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving preferences:", err);
-      toast.error("Erro ao salvar preferências");
+      toast.error("Erro ao salvar preferências", { description: err?.message });
     } finally {
       setLoading(false);
     }
@@ -476,191 +742,205 @@ export function NotificationPreferencesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
+    <div className="space-y-6 pb-24">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => navigate("/dashboard/settings")}
-          className="shrink-0"
+          className="shrink-0 self-start"
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Preferências de Notificação</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+            Preferências de Notificação
+          </h1>
           <p className="text-muted-foreground text-sm md:text-base">
             Central de comando: escolha exatamente o que receber em cada canal.
           </p>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2">
-              <PauseCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">🔕 Pausar notificações</span>
-              <span className="sm:hidden">Pausar</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => applySnooze(1)}>Por 1 hora</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => applySnooze(2)}>Por 2 horas</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => applySnooze("tomorrow")}>Até amanhã (08h)</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Sound toggle (auto-save) */}
+          <div className="flex items-center gap-2 rounded-md border bg-card/30 px-3 h-9">
+            {soundEnabled ? (
+              <Volume2 className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <VolumeX className="h-4 w-4 text-muted-foreground" />
+            )}
+            <Label
+              htmlFor="sound-header"
+              className="text-xs cursor-pointer hidden md:inline"
+            >
+              Sons do sistema
+            </Label>
+            <Switch
+              id="sound-header"
+              checked={soundEnabled}
+              onCheckedChange={handleSoundToggle}
+              disabled={soundSaving}
+            />
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <PauseCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Pausar notificações</span>
+                <span className="sm:hidden">Pausar</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => applySnooze(1)}>Por 1 hora</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => applySnooze(2)}>Por 2 horas</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => applySnooze("tomorrow")}>
+                Até amanhã (08h)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {isSnoozed && snoozedUntil && (
         <SnoozeBanner snoozedUntil={snoozedUntil} onResume={resumeSnooze} />
       )}
 
-      <Card>
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Bell className="h-4 w-4 md:h-5 md:w-5" />
-            Matriz de Roteamento
-          </CardTitle>
-          <CardDescription className="text-xs md:text-sm">
-            Escolha onde cada tipo de evento deve chegar.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0">
-          <RoutingMatrix routing={routing} onChange={setRouting} />
-        </CardContent>
-      </Card>
+      {/* Two-Column Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left: Rules */}
+        <div className="space-y-6">
+          <Card className="bg-card/30">
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                <Bell className="h-4 w-4 md:h-5 md:w-5" />
+                Matriz de Roteamento
+              </CardTitle>
+              <CardDescription className="text-xs md:text-sm">
+                Escolha onde cada tipo de evento deve chegar.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0">
+              <RoutingMatrix routing={routing} onChange={setRouting} />
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Mail className="h-4 w-4 md:h-5 md:w-5" />
-            Canais
-          </CardTitle>
-          <CardDescription className="text-xs md:text-sm">
-            Configure e teste os canais de entrega.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0">
-          <EmailIntegration />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Smartphone className="h-4 w-4 md:h-5 md:w-5" />
-            Push (Telemóvel)
-          </CardTitle>
-          <CardDescription className="text-xs md:text-sm">
-            Ative o push e use o diagnóstico para enviar um teste.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0">
-          <PushNotificationSection />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Volume2 className="h-4 w-4 md:h-5 md:w-5" />
-            Som & Navegador
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0 space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="sound" className="flex items-center gap-2 cursor-pointer text-sm">
-              <Volume2 className="h-4 w-4" />
-              Som de notificação
-            </Label>
-            <Switch
-              id="sound"
-              checked={channels.sound_enabled}
-              onCheckedChange={(checked) => setChannels((p) => ({ ...p, sound_enabled: checked }))}
-            />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <Label htmlFor="browser" className="flex items-center gap-2 cursor-pointer text-sm">
-              <Chrome className="h-4 w-4" />
-              Notificações do navegador
-            </Label>
-            <Switch
-              id="browser"
-              checked={channels.browser_notifications}
-              onCheckedChange={(checked) => {
-                if (checked && Notification.permission !== "granted") {
-                  void requestBrowserPermission();
-                } else {
-                  setChannels((p) => ({ ...p, browser_notifications: checked }));
-                }
-              }}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="p-4 md:p-6">
-          <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-            <Clock className="h-4 w-4 md:h-5 md:w-5" />
-            Não Perturbe (horário fixo)
-          </CardTitle>
-          <CardDescription className="text-xs md:text-sm">
-            Janela diária de silêncio. Alertas críticos sempre passam.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-4 md:p-6 pt-0 space-y-3 md:space-y-4">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="dnd-enabled" className="cursor-pointer text-sm">
-              Ativar Não Perturbe
-            </Label>
-            <Switch id="dnd-enabled" checked={dndEnabled} onCheckedChange={setDndEnabled} />
-          </div>
-          {dndEnabled && (
-            <div className="ml-4 md:ml-6 space-y-3 md:space-y-4 pt-2">
-              <div className="grid grid-cols-2 gap-3 md:gap-4">
-                <div className="space-y-1.5 md:space-y-2">
-                  <Label htmlFor="dnd-start" className="text-xs md:text-sm">De</Label>
-                  <Input
-                    id="dnd-start"
-                    type="time"
-                    value={dnd.dnd_start_time}
-                    onChange={(e) => setDnd((p) => ({ ...p, dnd_start_time: e.target.value }))}
-                    className="h-9"
-                  />
-                </div>
-                <div className="space-y-1.5 md:space-y-2">
-                  <Label htmlFor="dnd-end" className="text-xs md:text-sm">Até</Label>
-                  <Input
-                    id="dnd-end"
-                    type="time"
-                    value={dnd.dnd_end_time}
-                    onChange={(e) => setDnd((p) => ({ ...p, dnd_end_time: e.target.value }))}
-                    className="h-9"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="dnd-weekends"
-                  checked={dnd.dnd_weekends}
-                  onCheckedChange={(checked) => setDnd((p) => ({ ...p, dnd_weekends: checked as boolean }))}
-                />
-                <Label htmlFor="dnd-weekends" className="text-xs md:text-sm cursor-pointer">
-                  Silenciar também nos fins de semana
+          <Card className="bg-card/30">
+            <CardHeader className="p-4 md:p-6">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                <Clock className="h-4 w-4 md:h-5 md:w-5" />
+                Não Perturbe (horário fixo)
+              </CardTitle>
+              <CardDescription className="text-xs md:text-sm">
+                Janela diária de silêncio. Alertas críticos sempre passam.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6 pt-0 space-y-3 md:space-y-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="dnd-enabled" className="cursor-pointer text-sm">
+                  Ativar Não Perturbe
                 </Label>
+                <Switch
+                  id="dnd-enabled"
+                  checked={dndEnabled}
+                  onCheckedChange={setDndEnabled}
+                />
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              {dndEnabled && (
+                <div className="ml-4 md:ml-6 space-y-3 md:space-y-4 pt-2">
+                  <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    <div className="space-y-1.5 md:space-y-2">
+                      <Label htmlFor="dnd-start" className="text-xs md:text-sm">
+                        De
+                      </Label>
+                      <Input
+                        id="dnd-start"
+                        type="time"
+                        value={dnd.dnd_start_time}
+                        onChange={(e) =>
+                          setDnd((p) => ({ ...p, dnd_start_time: e.target.value }))
+                        }
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5 md:space-y-2">
+                      <Label htmlFor="dnd-end" className="text-xs md:text-sm">
+                        Até
+                      </Label>
+                      <Input
+                        id="dnd-end"
+                        type="time"
+                        value={dnd.dnd_end_time}
+                        onChange={(e) =>
+                          setDnd((p) => ({ ...p, dnd_end_time: e.target.value }))
+                        }
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="dnd-weekends"
+                      checked={dnd.dnd_weekends}
+                      onCheckedChange={(checked) =>
+                        setDnd((p) => ({ ...p, dnd_weekends: checked as boolean }))
+                      }
+                    />
+                    <Label
+                      htmlFor="dnd-weekends"
+                      className="text-xs md:text-sm cursor-pointer"
+                    >
+                      Silenciar também nos fins de semana
+                    </Label>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-      <div className="sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t py-4 -mx-4 px-4 md:-mx-6 md:px-6">
-        <div className="flex justify-end gap-2 md:gap-3">
-          <Button variant="outline" onClick={() => navigate("/dashboard/settings")} disabled={loading}>
+        {/* Right: Delivery Channels */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+            <Info className="h-3.5 w-3.5" />
+            <span>Canais de entrega — onde você quer receber as notificações.</span>
+          </div>
+
+          <AppOrbityCard />
+
+          <BrowserNotificationsCard
+            enabled={browserEnabled}
+            onChange={setBrowserEnabled}
+          />
+
+          <Card className="bg-card/30">
+            <CardContent className="p-4 md:p-6">
+              <EmailIntegration enabled={emailEnabled} onChange={setEmailEnabled} />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Sticky Footer (global save) */}
+      <div className="fixed bottom-0 left-0 right-0 lg:left-[var(--sidebar-width,16rem)] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t py-3 px-4 md:px-6 z-30">
+        <div className="flex justify-end gap-2 md:gap-3 max-w-[1600px] mx-auto">
+          <Button
+            variant="outline"
+            onClick={() => navigate("/dashboard/settings")}
+            disabled={loading}
+          >
             Cancelar
           </Button>
           <Button onClick={handleSave} disabled={loading}>
-            {loading ? "Salvando..." : "Salvar"}
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              "Salvar alterações"
+            )}
           </Button>
         </div>
       </div>
