@@ -25,14 +25,8 @@ export const LOSS_REASONS: { category: string; reasons: { value: string; label: 
   {
     category: "Problemas de Engajamento",
     reasons: [
-      { value: "ghosting", label: "Ghosting no WhatsApp" },
-      { value: "no_show", label: "No-Show (Faltou na Reunião)" },
-    ],
-  },
-  {
-    category: "Problemas de Comunicação",
-    reasons: [
       { value: "ghosting_whatsapp", label: "Ghosting no WhatsApp" },
+      { value: "no_show", label: "No-Show (Faltou na Reunião)" },
     ],
   },
   {
