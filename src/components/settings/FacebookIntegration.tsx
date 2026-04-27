@@ -270,7 +270,7 @@ export const FacebookIntegration = () => {
             {META_MAINTENANCE_ACTIVE ? (
               <Button className="w-full" disabled>
                 <Wrench className="mr-2 h-4 w-4" />
-                Conexão indisponível — previsão {META_MAINTENANCE_RETURN_DATE}
+                Conexão indisponível — em manutenção
               </Button>
             ) : (
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
