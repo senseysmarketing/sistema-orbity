@@ -46,6 +46,8 @@ export const ALL_LOSS_REASONS: { value: string; label: string }[] = [
 
 export function getLossReasonLabel(value: string | null): string {
   if (!value) return "Não informado";
+  // Compat: leads legados gravados com "ghosting" antes da unificação
+  if (value === "ghosting") return "Ghosting no WhatsApp";
   const found = ALL_LOSS_REASONS.find((r) => r.value === value);
   return found?.label || value;
 }
