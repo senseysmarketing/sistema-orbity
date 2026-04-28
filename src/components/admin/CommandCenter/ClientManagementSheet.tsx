@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { ChurnAnalysis } from "@/components/admin/ChurnAnalysis";
 import { ClientForm } from "@/components/admin/ClientForm";
+import { ClientOffboardingDialog } from "@/components/admin/ClientOffboardingDialog";
 import type { Client } from "@/hooks/useFinancialMetrics";
 
 interface ClientManagementSheetProps {
@@ -31,7 +32,7 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
   const queryClient = useQueryClient();
   const [churnOpen, setChurnOpen] = useState(true);
   const [filter, setFilter] = useState("all");
-  const [confirmClient, setConfirmClient] = useState<Client | null>(null);
+  const [offboardClient, setOffboardClient] = useState<Client | null>(null);
   const [deleteClient, setDeleteClient] = useState<Client | null>(null);
   const [editingClient, setEditingClient] = useState<any | null>(null);
   const [loadingClientId, setLoadingClientId] = useState<string | null>(null);
@@ -64,23 +65,19 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
     return clients;
   }, [clients, filter]);
 
-  const toggleMutation = useMutation({
-    mutationFn: async ({ id, activate }: { id: string; activate: boolean }) => {
+  // Reativação apenas — desativação passa pelo ClientOffboardingDialog
+  const reactivateMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("clients")
-        .update({
-          active: activate,
-          cancelled_at: activate ? null : new Date().toISOString(),
-        })
+        .update({ active: true, cancelled_at: null })
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: (_, { activate }) => {
+    onSuccess: () => {
       toast({
-        title: activate ? "Cliente reativado" : "Cliente inativado",
-        description: activate
-          ? "O cliente voltou a compor o MRR."
-          : "O cliente foi removido do MRR e cobranças futuras suspensas.",
+        title: "Cliente reativado",
+        description: "O cliente voltou a compor o MRR.",
       });
       queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
       queryClient.invalidateQueries({ queryKey: ["admin-payments-all"] });
@@ -107,16 +104,11 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
 
   const handleToggle = (client: Client) => {
     if (client.active) {
-      setConfirmClient(client);
+      // Caminho único: abre o dialog de Offboarding (Guardrail 1)
+      setOffboardClient(client);
     } else {
-      toggleMutation.mutate({ id: client.id, activate: true });
+      reactivateMutation.mutate(client.id);
     }
-  };
-
-  const confirmDeactivate = () => {
-    if (!confirmClient) return;
-    toggleMutation.mutate({ id: confirmClient.id, activate: false });
-    setConfirmClient(null);
   };
 
   const confirmDelete = () => {
