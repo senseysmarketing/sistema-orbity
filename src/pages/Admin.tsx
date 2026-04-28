@@ -25,6 +25,7 @@ import { FirstPaymentDialog } from "@/components/admin/FirstPaymentDialog";
 
 // Details dialogs
 import { ClientDetailsDialog } from "@/components/admin/ClientDetailsDialog";
+import { ClientOffboardingDialog } from "@/components/admin/ClientOffboardingDialog";
 import { ExpenseDetailsDialog } from "@/components/admin/ExpenseDetailsDialog";
 
 import { EmployeeDetailsDialog } from "@/components/admin/EmployeeDetailsDialog";
@@ -83,6 +84,7 @@ export default function Admin() {
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
   const [paymentDeleteDialogOpen, setPaymentDeleteDialogOpen] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<ClientPayment | null>(null);
+  const [offboardingClient, setOffboardingClient] = useState<Client | null>(null);
 
   const [hasEnsuredCurrentMonthPayments, setHasEnsuredCurrentMonthPayments] = useState(false);
   const [clientManagementOpen, setClientManagementOpen] = useState(false);
@@ -206,15 +208,9 @@ export default function Admin() {
   const handleEditClient = (client: Client) => { setSelectedClient(client); setClientFormOpen(true); };
   const handleViewClient = (client: Client) => { setSelectedClient(client); setClientDetailsOpen(true); };
   
-  const handleDeactivateClient = async (client: Client) => {
-    try {
-      const { error } = await supabase.from('clients').update({ active: false, cancelled_at: new Date().toISOString() }).eq('id', client.id);
-      if (error) throw error;
-      toast({ title: "Cliente desativado", description: `${client.name} foi desativado` });
-      metrics.refetchAll();
-    } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    }
+  const handleDeactivateClient = (client: Client) => {
+    // Sempre passa pelo fluxo de Offboarding (caminho único — Guardrail 1)
+    setOffboardingClient(client);
   };
 
   const handleReactivateClient = async (client: Client) => {
@@ -645,6 +641,14 @@ export default function Admin() {
       />
 
       <BillingAutomationSettings open={isBillingRulerOpen} onOpenChange={setIsBillingRulerOpen} />
+
+      {/* Offboarding inteligente — caminho único de desativação */}
+      <ClientOffboardingDialog
+        open={!!offboardingClient}
+        onOpenChange={(o) => { if (!o) setOffboardingClient(null); }}
+        client={offboardingClient}
+        onConfirmed={metrics.refetchAll}
+      />
 
       <AdvancedExpenseSheet
         open={isExpenseCentralOpen}

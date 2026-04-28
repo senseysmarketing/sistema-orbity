@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { ChurnAnalysis } from "@/components/admin/ChurnAnalysis";
 import { ClientForm } from "@/components/admin/ClientForm";
+import { ClientOffboardingDialog } from "@/components/admin/ClientOffboardingDialog";
 import type { Client } from "@/hooks/useFinancialMetrics";
 
 interface ClientManagementSheetProps {
@@ -31,7 +32,7 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
   const queryClient = useQueryClient();
   const [churnOpen, setChurnOpen] = useState(true);
   const [filter, setFilter] = useState("all");
-  const [confirmClient, setConfirmClient] = useState<Client | null>(null);
+  const [offboardClient, setOffboardClient] = useState<Client | null>(null);
   const [deleteClient, setDeleteClient] = useState<Client | null>(null);
   const [editingClient, setEditingClient] = useState<any | null>(null);
   const [loadingClientId, setLoadingClientId] = useState<string | null>(null);
@@ -64,23 +65,19 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
     return clients;
   }, [clients, filter]);
 
-  const toggleMutation = useMutation({
-    mutationFn: async ({ id, activate }: { id: string; activate: boolean }) => {
+  // Reativação apenas — desativação passa pelo ClientOffboardingDialog
+  const reactivateMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("clients")
-        .update({
-          active: activate,
-          cancelled_at: activate ? null : new Date().toISOString(),
-        })
+        .update({ active: true, cancelled_at: null })
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: (_, { activate }) => {
+    onSuccess: () => {
       toast({
-        title: activate ? "Cliente reativado" : "Cliente inativado",
-        description: activate
-          ? "O cliente voltou a compor o MRR."
-          : "O cliente foi removido do MRR e cobranças futuras suspensas.",
+        title: "Cliente reativado",
+        description: "O cliente voltou a compor o MRR.",
       });
       queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
       queryClient.invalidateQueries({ queryKey: ["admin-payments-all"] });
@@ -107,16 +104,11 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
 
   const handleToggle = (client: Client) => {
     if (client.active) {
-      setConfirmClient(client);
+      // Caminho único: abre o dialog de Offboarding (Guardrail 1)
+      setOffboardClient(client);
     } else {
-      toggleMutation.mutate({ id: client.id, activate: true });
+      reactivateMutation.mutate(client.id);
     }
-  };
-
-  const confirmDeactivate = () => {
-    if (!confirmClient) return;
-    toggleMutation.mutate({ id: confirmClient.id, activate: false });
-    setConfirmClient(null);
   };
 
   const confirmDelete = () => {
@@ -234,7 +226,7 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
                         <Switch
                           checked={client.active}
                           onCheckedChange={() => handleToggle(client)}
-                          disabled={toggleMutation.isPending}
+                          disabled={reactivateMutation.isPending}
                         />
                       </div>
                     ))
@@ -246,27 +238,16 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
         </SheetContent>
       </Sheet>
 
-      {/* Deactivation Confirmation */}
-      <AlertDialog open={!!confirmClient} onOpenChange={(o) => { if (!o) setConfirmClient(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Inativar cliente</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja inativar <strong>{confirmClient?.name}</strong>?
-              Ele será removido do seu MRR atual e as futuras cobranças automáticas serão suspensas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeactivate}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Sim, inativar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Offboarding inteligente — substitui o AlertDialog antigo */}
+      <ClientOffboardingDialog
+        open={!!offboardClient}
+        onOpenChange={(o) => { if (!o) setOffboardClient(null); }}
+        client={offboardClient}
+        onConfirmed={() => {
+          queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
+          queryClient.invalidateQueries({ queryKey: ["admin-payments-all"] });
+        }}
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteClient} onOpenChange={(o) => { if (!o) setDeleteClient(null); }}>
