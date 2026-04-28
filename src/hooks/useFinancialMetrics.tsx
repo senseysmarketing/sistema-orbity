@@ -451,6 +451,9 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
     return paymentsInMonth
       .filter(p => {
         if (p.status === 'cancelled') return false;
+        // Pagamentos pagos: dinheiro real, sempre conta (histórico imutável)
+        if (p.status === 'paid') return true;
+        // Pendentes/atrasados: só contam se cliente estava ativo no mês
         const client = clients.find(c => c.id === p.client_id);
         return client && wasClientActiveInMonth(client, selectedMonth);
       })
