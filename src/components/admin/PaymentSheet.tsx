@@ -114,7 +114,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
       setBillingType("manual");
     }
     setUpdateContract(false);
-    setDeactivateClient(false);
+    // setDeactivateClient removido — desativação centralizada no ClientOffboardingDialog
     setManualOverrideConfirmed(false);
   }, [open, payment, preselectedClient, clients, enabledGateways]);
 
