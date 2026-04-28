@@ -226,7 +226,7 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
                         <Switch
                           checked={client.active}
                           onCheckedChange={() => handleToggle(client)}
-                          disabled={toggleMutation.isPending}
+                          disabled={reactivateMutation.isPending}
                         />
                       </div>
                     ))
@@ -238,27 +238,16 @@ export function ClientManagementSheet({ open, onOpenChange, clients, selectedMon
         </SheetContent>
       </Sheet>
 
-      {/* Deactivation Confirmation */}
-      <AlertDialog open={!!confirmClient} onOpenChange={(o) => { if (!o) setConfirmClient(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Inativar cliente</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja inativar <strong>{confirmClient?.name}</strong>?
-              Ele será removido do seu MRR atual e as futuras cobranças automáticas serão suspensas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeactivate}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Sim, inativar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Offboarding inteligente — substitui o AlertDialog antigo */}
+      <ClientOffboardingDialog
+        open={!!offboardClient}
+        onOpenChange={(o) => { if (!o) setOffboardClient(null); }}
+        client={offboardClient}
+        onConfirmed={() => {
+          queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
+          queryClient.invalidateQueries({ queryKey: ["admin-payments-all"] });
+        }}
+      />
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteClient} onOpenChange={(o) => { if (!o) setDeleteClient(null); }}>
