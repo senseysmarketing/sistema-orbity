@@ -48,7 +48,19 @@ serve(async (req) => {
 
     // Normalize phone to digits only
     const digits = phone_number.replace(/\D/g, '');
-    const remoteJid = `${digits}@s.whatsapp.net`;
+
+    // If we have a conversation_id, prefer its remote_jid (handles Meta @lid leads)
+    let remoteJid = `${digits}@s.whatsapp.net`;
+    if (conversation_id) {
+      const { data: convRow } = await supabase
+        .from('whatsapp_conversations')
+        .select('remote_jid')
+        .eq('id', conversation_id)
+        .maybeSingle();
+      if (convRow?.remote_jid) {
+        remoteJid = convRow.remote_jid;
+      }
+    }
 
     console.log(`[sync] Fetching messages for ${remoteJid} from instance ${account.instance_name}`);
 
