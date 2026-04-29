@@ -427,7 +427,7 @@ serve(async (req) => {
       const isFromMe = isSendMessageEvent ? true : (key?.fromMe || false);
       const remoteJid = key?.remoteJid || '';
 
-      // Filter out invalid JIDs (groups, status, Meta Messenger @lid)
+      // Filter out invalid JIDs (groups, status, broadcasts)
       if (!isValidWhatsAppJid(remoteJid)) {
         console.log('[whatsapp-webhook] Skipping invalid JID:', remoteJid);
         return new Response(JSON.stringify({ success: true, skipped: 'invalid jid' }), {
@@ -435,17 +435,19 @@ serve(async (req) => {
         });
       }
 
-      const phoneNumber = normalizePhone(remoteJid.replace('@s.whatsapp.net', ''));
+      const isLid = isLidJid(remoteJid);
 
-      // Extra guard: skip empty or very short phone numbers
-      if (phoneNumber.length < 8) {
-        console.log('[whatsapp-webhook] Skipping short phone number:', phoneNumber);
-        return new Response(JSON.stringify({ success: true, skipped: 'short phone' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      // Resolve phone number — for @lid we MUST use alt fields (senderPn/participantPn)
+      let phoneNumber: string;
+      if (isLid) {
+        const resolved = extractPhoneFromLidPayload(data);
+        // For @lid, the local part of the JID is NOT a phone number — never use it
+        phoneNumber = resolved ? normalizePhone(resolved) : '';
+      } else {
+        phoneNumber = normalizePhone(remoteJid.replace('@s.whatsapp.net', ''));
       }
 
-      // Extract message content
+      // Extract message content (needed early for downstream logic)
       const msgContent = data?.message?.message ? data.message.message : data?.message;
       const content = msgContent?.conversation ||
         msgContent?.extendedTextMessage?.text ||
@@ -459,15 +461,53 @@ serve(async (req) => {
         msgContent?.documentMessage ? 'document' :
         'text';
 
-      // Find or create conversation using phone variants
-      const variants = phoneVariants(phoneNumber);
+      // ============================================================
+      // Conversation lookup strategy:
+      // 1) If @lid → first try by remote_jid (already linked LID)
+      // 2) Else (or if not found) → try by phone variants
+      // 3) Guardrail: if @lid and no phone resolvable AND no remote_jid match,
+      //    abort to avoid creating ghost conversations/leads.
+      // ============================================================
+      let conversation: { id: string; lead_id: string | null } | null = null;
 
-      const { data: matchingConvs } = await supabase
-        .from('whatsapp_conversations').select('id, lead_id')
-        .eq('account_id', account.id).in('phone_number', variants);
+      if (isLid) {
+        const { data: byJid } = await supabase
+          .from('whatsapp_conversations').select('id, lead_id')
+          .eq('account_id', account.id).eq('remote_jid', remoteJid).maybeSingle();
+        if (byJid) conversation = byJid;
+      }
 
-      let conversation: { id: string; lead_id: string | null } | null =
-        matchingConvs?.find((c: any) => c.lead_id) ?? matchingConvs?.[0] ?? null;
+      if (!conversation && phoneNumber && phoneNumber.length >= 8) {
+        const variants = phoneVariants(phoneNumber);
+        const { data: matchingConvs } = await supabase
+          .from('whatsapp_conversations').select('id, lead_id')
+          .eq('account_id', account.id).in('phone_number', variants);
+        conversation = matchingConvs?.find((c: any) => c.lead_id) ?? matchingConvs?.[0] ?? null;
+
+        // Link remote_jid for future LID messages from same lead
+        if (conversation && isLid) {
+          await supabase.from('whatsapp_conversations')
+            .update({ remote_jid: remoteJid }).eq('id', conversation.id);
+        }
+      }
+
+      // Guardrail: @lid sem telefone resolvido e sem conversa existente → não cria fantasma
+      if (!conversation && isLid && (!phoneNumber || phoneNumber.length < 8)) {
+        console.error('[whatsapp-webhook] Unresolvable @lid (no phone, no existing remote_jid match) — aborting to avoid ghost lead', {
+          remoteJid, instance, agency_id: account.agency_id,
+        });
+        return new Response(JSON.stringify({ success: true, skipped: 'unresolvable_lid' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // For non-LID flows, keep existing short-phone guard
+      if (!conversation && !isLid && phoneNumber.length < 8) {
+        console.log('[whatsapp-webhook] Skipping short phone number:', phoneNumber);
+        return new Response(JSON.stringify({ success: true, skipped: 'short phone' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       if (!conversation) {
         // Try to find the lead by normalized phone using RPC
@@ -484,32 +524,42 @@ serve(async (req) => {
             .eq('account_id', account.id).eq('lead_id', lead.id).maybeSingle();
 
           if (leadConv) {
+            const upd: Record<string, any> = { phone_number: phoneNumber };
+            if (isLid) upd.remote_jid = remoteJid;
             await supabase.from('whatsapp_conversations')
-              .update({ phone_number: phoneNumber }).eq('id', leadConv.id);
+              .update(upd).eq('id', leadConv.id);
             conversation = leadConv;
           }
         }
 
         if (!conversation) {
+          const insertPayload: Record<string, any> = {
+            account_id: account.id,
+            phone_number: phoneNumber,
+            lead_id: lead?.id || null,
+          };
+          if (isLid) insertPayload.remote_jid = remoteJid;
+
           const { data: newConv, error: convError } = await supabase
             .from('whatsapp_conversations')
-            .upsert({
-              account_id: account.id,
-              phone_number: phoneNumber,
-              lead_id: lead?.id || null,
-            }, { onConflict: 'account_id,phone_number' })
+            .upsert(insertPayload, { onConflict: 'account_id,phone_number' })
             .select().single();
 
           if (convError) {
+            const variants2 = phoneVariants(phoneNumber);
             const { data: raceConvs } = await supabase
               .from('whatsapp_conversations').select('id, lead_id')
-              .eq('account_id', account.id).in('phone_number', variants);
+              .eq('account_id', account.id).in('phone_number', variants2);
             conversation = raceConvs?.find((c: any) => c.lead_id) ?? raceConvs?.[0] ?? null;
+            if (conversation && isLid) {
+              await supabase.from('whatsapp_conversations')
+                .update({ remote_jid: remoteJid }).eq('id', conversation.id);
+            }
           } else {
             conversation = newConv;
           }
         }
-      } else if (!conversation.lead_id) {
+      } else if (!conversation.lead_id && phoneNumber && phoneNumber.length >= 8) {
         // Conversation exists but has no lead_id — try to link it now
         const { data: leadRows2 } = await supabase.rpc('find_lead_by_normalized_phone', {
           p_agency_id: account.agency_id,
