@@ -219,16 +219,47 @@ async function findActiveAutomations(
 
 /**
  * Checks if a remoteJid is a valid WhatsApp individual chat.
- * Filters out group chats, status broadcasts, Meta Messenger IDs (@lid), etc.
+ * Filters out group chats and status broadcasts.
+ * Accepts both standard JIDs (@s.whatsapp.net) and Meta privacy-anonymized
+ * identifiers (@lid) used by Click-to-WhatsApp Ads.
  */
 function isValidWhatsAppJid(remoteJid: string): boolean {
   if (!remoteJid) return false;
   if (remoteJid.includes('@g.us')) return false;
   if (remoteJid === 'status@broadcast') return false;
-  if (remoteJid.includes('@lid')) return false;
-  // Must be a standard WhatsApp JID
-  if (!remoteJid.includes('@s.whatsapp.net')) return false;
-  return true;
+  if (remoteJid.includes('@broadcast')) return false;
+  if (remoteJid.includes('@newsletter')) return false;
+  return remoteJid.includes('@s.whatsapp.net') || remoteJid.includes('@lid');
+}
+
+function isLidJid(remoteJid: string): boolean {
+  return !!remoteJid && remoteJid.includes('@lid');
+}
+
+/**
+ * Tries to extract a real phone number from a payload that uses an @lid JID.
+ * Evolution API v2 / Baileys often expose the real number in alternative fields:
+ *  - data.key.senderPn / data.key.participantPn
+ *  - data.senderPn / data.participantPn
+ *  - data.pushName is NOT a phone — never use it.
+ * Returns digits-only or null when nothing usable is found.
+ */
+function extractPhoneFromLidPayload(data: any): string | null {
+  const candidates: (string | undefined)[] = [
+    data?.key?.senderPn,
+    data?.key?.participantPn,
+    data?.senderPn,
+    data?.participantPn,
+    data?.message?.key?.senderPn,
+    data?.message?.key?.participantPn,
+  ];
+  for (const c of candidates) {
+    if (!c) continue;
+    const raw = String(c).split('@')[0];
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length >= 10) return digits;
+  }
+  return null;
 }
 
 serve(async (req) => {
