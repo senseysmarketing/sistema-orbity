@@ -7379,6 +7379,7 @@ export type Database = {
           last_message_is_from_me: boolean | null
           lead_id: string | null
           phone_number: string
+          remote_jid: string | null
           session_phone: string | null
           updated_at: string | null
         }
@@ -7391,6 +7392,7 @@ export type Database = {
           last_message_is_from_me?: boolean | null
           lead_id?: string | null
           phone_number: string
+          remote_jid?: string | null
           session_phone?: string | null
           updated_at?: string | null
         }
@@ -7403,6 +7405,7 @@ export type Database = {
           last_message_is_from_me?: boolean | null
           lead_id?: string | null
           phone_number?: string
+          remote_jid?: string | null
           session_phone?: string | null
           updated_at?: string | null
         }
