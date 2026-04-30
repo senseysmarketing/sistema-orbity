@@ -99,6 +99,8 @@ export interface CashFlowItem {
   invoiceUrl?: string;
   conexaChargeId?: string;
   paidAt?: string;
+  clientId?: string;
+  clientPhone?: string | null;
 }
 
 export interface ClientProfitabilityItem {
@@ -521,6 +523,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         invoiceUrl: (p as any).conexa_invoice_url || (p as any).invoice_url || undefined,
         conexaChargeId: (p as any).conexa_charge_id || undefined,
         paidAt: (p as any).paid_at || p.paid_date || undefined,
+        clientId: client.id,
+        clientPhone: (client as any).phone ?? null,
       });
     });
 
@@ -682,6 +686,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         sourceType: 'client_payment',
         sourceId: c.id,
         billingType: c.default_billing_type || 'manual',
+        clientId: c.id,
+        clientPhone: (c as any).phone ?? null,
       });
     });
 
