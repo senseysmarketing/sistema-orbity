@@ -350,6 +350,12 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
                                     Ver Fatura
                                   </DropdownMenuItem>
                                 )}
+                                {item.type === 'INCOME' && item.status !== 'PAID' && item.status !== 'CANCELLED' && (
+                                  <DropdownMenuItem onClick={() => setBillingItem(item)}>
+                                    <MessageCircle className="h-4 w-4 mr-2" />
+                                    Enviar Cobrança
+                                  </DropdownMenuItem>
+                                )}
                                 {item.billingType === 'conexa' && !item.invoiceUrl && item.conexaChargeId && item.status !== 'PAID' && item.status !== 'CANCELLED' && (
                                   <DropdownMenuItem
                                     onClick={() => handleInvoiceConexaSale(item)}
