@@ -1,82 +1,52 @@
-## Objetivo
+## Bug
 
-Adicionar um botão "Salvar modelo" ao lado de "Cancelar" / "Enviar via WhatsApp" no `ManualBillingDialog`, persistindo a mensagem editada **por agência** e **por modelo** (Asaas, Conexa, PIX, Genérico). Da próxima vez que aquele modelo for selecionado naquela agência, o texto carregado será o customizado — não o default hardcoded.
+O modal "Enviar Cobrança Manual" mostra **"Este cliente não possui telefone cadastrado"** mesmo quando o cliente tem o campo "Contato (WhatsApp)" preenchido (ex.: EOS Imóveis com `(15) 99695-4016`).
 
-## Escopo e princípios
+## Causa raiz
 
-- **Tabela isolada** (`agency_billing_templates`) — não reutilizar a `whatsapp_templates` (que é do CRM/leads) para evitar acoplamento.
-- **Chave única** `(agency_id, template_key)` — onde `template_key ∈ {asaas, conexa, pix, generic}`. Upsert simples, no máximo 4 linhas por agência.
-- **Variáveis preservadas como tokens** — salvamos o texto cru com `{{nome_cliente}}`, `{{valor_formatado}}`, `{{data_vencimento}}`, `{{link_fatura}}`, `{{#link}}…{{/link}}`. A renderização (Guardrails 1 e 2 já implementados) acontece sempre no momento de abrir o diálogo.
-- **Defaults imutáveis** — os 4 templates hardcoded em `ManualBillingDialog.tsx` continuam sendo o fallback. Se a agência não tem custom salvo para aquele key, usa o default.
-- **Reset opcional** — incluir um item discreto no menu de overflow (ou um link "restaurar padrão") para apagar o custom e voltar ao default.
+Em `src/hooks/useFinancialMetrics.tsx`, dois pontos quebram a leitura do telefone:
 
-## Camada 1 — Migration (Supabase)
+1. **Linha 162** — o `select` da query `clients` **não inclui a coluna `phone`** (e o campo "Contato (WhatsApp)" do formulário grava em `contact`, não em `phone`).
+2. **Linhas 527 e 690** — o mapeamento usa `(client as any).phone ?? null`, que sempre retorna `null` porque:
+   - a coluna `phone` não foi selecionada, e
+   - o telefone real do WhatsApp do cliente vive em `contact` (confirmado em `ClientForm.tsx` linha 441 e `ClientOverview.tsx`).
 
-Criar tabela `public.agency_billing_templates`:
+Resultado: `clientPhone` chega como `null` no `ManualBillingDialog`, disparando o aviso amarelo e bloqueando o envio.
 
-```text
-id              uuid PK default gen_random_uuid()
-agency_id       uuid NOT NULL references agencies(id) on delete cascade
-template_key    text NOT NULL  CHECK (template_key IN ('asaas','conexa','pix','generic'))
-content         text NOT NULL
-updated_by      uuid references auth.users(id)
-created_at      timestamptz default now()
-updated_at      timestamptz default now()
-UNIQUE (agency_id, template_key)
+## Correção
+
+### 1. `src/hooks/useFinancialMetrics.tsx` — incluir `phone` no select (defensivo, caso algum cliente legado use)
+
+Linha 162:
+
+```ts
+.select('id, name, monthly_value, active, start_date, contact, phone, service, ...')
 ```
 
-- Enable RLS.
-- Policies (usar `(select auth.uid())` conforme regra de performance):
-  - SELECT: membros da agência (via helper `is_agency_member` já existente, ou EXISTS em `agency_members`).
-  - INSERT/UPDATE/DELETE: somente admins/owners da agência (reaproveitar padrão usado em outras tabelas administrativas — confirmar helper antes da migration).
-- Trigger `set_updated_at` (padrão do projeto).
+### 2. `src/hooks/useFinancialMetrics.tsx` — preferir `contact` (campo oficial do form) com fallback para `phone`
 
-## Camada 2 — UI (`ManualBillingDialog.tsx`)
+Linhas 527 e 690 — trocar:
 
-1. **Carregamento ao abrir / trocar de modelo**:
-   - Após detectar `selectedTpl`, fazer `select` em `agency_billing_templates` filtrando por `agency_id` e `template_key`.
-   - Se existir → usar `data.content` como template base; senão → usar `TEMPLATES[selectedTpl]` (default atual).
-   - Renderizar com `renderTemplate(...)` (mantém Guardrails 1 e 2).
-   - Cache local em `useRef` para evitar refetch ao alternar entre modelos no mesmo diálogo aberto.
-
-2. **Novo botão "Salvar modelo"** no `DialogFooter`, à esquerda de "Cancelar":
-   - Variant `ghost` ou `outline`, ícone `Save` (lucide).
-   - Habilitado somente quando `isEdited === true` (evita salvar o default sem mudanças).
-   - Ao clicar:
-     - Reverter a mensagem renderizada para a forma "crua com tokens": substituir os valores resolvidos de volta pelos placeholders (ex.: `formatCurrency(item.amount)` → `{{valor_formatado}}`, `formatDueDate(item.dueDate)` → `{{data_vencimento}}`, `item.title` → `{{nome_cliente}}`, `item.invoiceUrl` → `{{link_fatura}}`).
-     - Se `item.invoiceUrl` ausente, **não** tentar reinserir bloco `{{#link}}…{{/link}}` (manter o que o usuário escreveu).
-     - Upsert em `agency_billing_templates` por `(agency_id, template_key)`.
-     - `toast.success("Modelo salvo para futuros envios")`, manter diálogo aberto, setar `isEdited = false`.
-
-3. **Indicador visual** discreto no `Select` quando o modelo atual já tem versão customizada salva (badge "Personalizado" ao lado do label, opcional, baixo custo).
-
-4. **Restaurar padrão** (opcional, recomendado): pequeno botão `link` "Restaurar padrão" abaixo do textarea — visível só quando há custom salvo. Faz `delete` na linha e recarrega o default.
-
-### Detalhe técnico — "des-renderizar" antes de salvar
-
-Para garantir que tokens sejam preservados, salvamos a mensagem que o usuário vê substituindo na ordem inversa:
-
-```text
-content → replace(formatCurrency(amount), "{{valor_formatado}}")
-       → replace(formatDueDate(dueDate),  "{{data_vencimento}}")
-       → replace(item.title,              "{{nome_cliente}}")
-       → if invoiceUrl: replace(invoiceUrl, "{{link_fatura}}")
+```ts
+clientPhone: (client as any).phone ?? null,
 ```
 
-Como esses valores são únicos no contexto de uma cobrança real (nome + valor formatado + data + URL), a colisão é improvável. Documentar limitação no código: se o usuário escrever literalmente "R$ 990,00" sem ter sido o token, vira `{{valor_formatado}}` ao salvar — comportamento aceitável e previsível.
+por:
 
-## Camada 3 — Tipagem
+```ts
+clientPhone: (client as any).contact ?? (client as any).phone ?? null,
+```
 
-- Após a migration, os tipos do Supabase (`src/integrations/supabase/types.ts`) serão regenerados automaticamente — nenhuma ação manual.
+## Por que essa ordem (`contact` antes de `phone`)
+
+- O formulário de cliente (`ClientForm.tsx` linha 441) rotula o campo como **"Contato (WhatsApp) *"** e persiste em `contact` — é o campo que o usuário entende como "telefone para cobrança".
+- `phone` existe na tabela mas não é exposto no formulário visto pelo admin nesse fluxo; mantemos como fallback para compatibilidade com dados importados/legados.
 
 ## Arquivos afetados
 
-- **Criado**: `supabase/migrations/<timestamp>_agency_billing_templates.sql`
-- **Editado**: `src/components/admin/CommandCenter/ManualBillingDialog.tsx`
-- (Auto) `src/integrations/supabase/types.ts`
+- **Editado**: `src/hooks/useFinancialMetrics.tsx` (3 linhas: 162, 527, 690)
 
 ## Fora do escopo
 
-- Versionamento/histórico de templates.
-- Templates por cliente individual (apenas por agência, conforme pedido).
-- UI dedicada de gestão em Configurações (a edição inline no diálogo já cobre o caso de uso). Se desejado depois, podemos adicionar uma aba em Ajustes.
+- Higienização do telefone (`replace(/\D/g,'')`) — já está implementada no `ManualBillingDialog` via Guardrail 4, então máscaras como `(15) 99695-4016` continuam sendo aceitas automaticamente após o fix.
+- Migração para unificar `contact` e `phone` em uma única coluna — mudança maior, fora do escopo deste bugfix.
