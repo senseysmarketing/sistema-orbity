@@ -99,6 +99,8 @@ export interface CashFlowItem {
   invoiceUrl?: string;
   conexaChargeId?: string;
   paidAt?: string;
+  clientId?: string;
+  clientPhone?: string | null;
 }
 
 export interface ClientProfitabilityItem {
