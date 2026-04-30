@@ -523,6 +523,8 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         invoiceUrl: (p as any).conexa_invoice_url || (p as any).invoice_url || undefined,
         conexaChargeId: (p as any).conexa_charge_id || undefined,
         paidAt: (p as any).paid_at || p.paid_date || undefined,
+        clientId: client.id,
+        clientPhone: (client as any).phone ?? null,
       });
     });
 
