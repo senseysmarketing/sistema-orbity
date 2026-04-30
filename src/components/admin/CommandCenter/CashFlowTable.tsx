@@ -529,6 +529,14 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Manual Billing (WhatsApp) Dialog */}
+      <ManualBillingDialog
+        open={!!billingItem}
+        onOpenChange={(o) => { if (!o) setBillingItem(null); }}
+        item={billingItem}
+        agencyId={agencyId}
+      />
+
     </div>
     </TooltipProvider>
   );
