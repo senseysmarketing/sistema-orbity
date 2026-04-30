@@ -687,7 +687,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         sourceId: c.id,
         billingType: c.default_billing_type || 'manual',
         clientId: c.id,
-        clientPhone: (c as any).phone ?? null,
+        clientPhone: (c as any).contact ?? null,
       });
     });
 
