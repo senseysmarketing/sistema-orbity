@@ -524,7 +524,7 @@ export function useFinancialMetrics(agencyId: string | undefined, selectedMonth:
         conexaChargeId: (p as any).conexa_charge_id || undefined,
         paidAt: (p as any).paid_at || p.paid_date || undefined,
         clientId: client.id,
-        clientPhone: (client as any).phone ?? null,
+        clientPhone: (client as any).contact ?? null,
       });
     });
 
