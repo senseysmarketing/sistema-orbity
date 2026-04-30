@@ -48,6 +48,7 @@ export function CashFlowTable({ cashFlow, expensesByCategory, onMarkAsPaid, isMa
   const [isDeletingItem, setIsDeletingItem] = useState(false);
   const [revertItem, setRevertItem] = useState<CashFlowItem | null>(null);
   const [gatewayInfoItem, setGatewayInfoItem] = useState<CashFlowItem | null>(null);
+  const [billingItem, setBillingItem] = useState<CashFlowItem | null>(null);
   const [isReverting, setIsReverting] = useState(false);
 
   const [invoicingId, setInvoicingId] = useState<string | null>(null);
