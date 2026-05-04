@@ -372,7 +372,7 @@ export function ManualBillingDialog({ open, onOpenChange, item, agencyId }: Manu
             />
             <div className="flex items-center justify-between">
               <p className="text-[11px] text-muted-foreground">
-                Variáveis: <code>{"{{nome_cliente}}"}</code>, <code>{"{{valor_formatado}}"}</code>, <code>{"{{data_vencimento}}"}</code>, <code>{"{{link_fatura}}"}</code>
+                Dica: use <code>{"{nome}"}</code>, <code>{"{valor}"}</code>, <code>{"{vencimento}"}</code> ou <code>{"{link}"}</code>
               </p>
               {isCurrentCustom && (
                 <button
