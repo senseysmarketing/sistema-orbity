@@ -9,6 +9,7 @@ import { MessageCircle, AlertTriangle, Loader2, Save, RotateCcw } from "lucide-r
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
+import { renderBillingTemplate } from "@/lib/billing-utils";
 import type { CashFlowItem } from "@/hooks/useFinancialMetrics";
 
 type TemplateKey = "asaas" | "conexa" | "pix" | "generic";
