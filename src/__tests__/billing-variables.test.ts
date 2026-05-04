@@ -56,4 +56,10 @@ describe('Billing Variable Replacement', () => {
     const result = renderBillingTemplate(template, vars);
     expect(result).toBe('Vence em 15/05/2026');
   });
+
+  it('should handle {valor} and {{valor}} specifically as requested', () => {
+    const template = 'O valor é {valor} ou {{valor}}';
+    const result = renderBillingTemplate(template, { valor: 'R$ 100,00' });
+    expect(result).toBe('O valor é R$ 100,00 ou R$ 100,00');
+  });
 });
