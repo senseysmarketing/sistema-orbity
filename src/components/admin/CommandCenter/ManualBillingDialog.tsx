@@ -39,11 +39,22 @@ function formatDueDate(dueDate: string): string {
 
 // Guardrail 2: parse robusto do bloco condicional {{#link}}...{{/link}}
 function renderTemplate(tpl: string, vars: Record<string, string>, hasLink: boolean): string {
-  let out = hasLink
-    ? tpl.replace(/\{\{#link\}\}/g, "").replace(/\{\{\/link\}\}/g, "")
-    : tpl.replace(/\{\{#link\}\}[\s\S]*?\{\{\/link\}\}/g, "");
-  for (const [k, v] of Object.entries(vars)) {
+  let out = tpl;
+  // Handle conditional block
+  if (out.includes('{{#link}}')) {
+    out = hasLink
+      ? out.replace(/\{\{#link\}\}/g, "").replace(/\{\{\/link\}\}/g, "")
+      : out.replace(/\{\{#link\}\}[\s\S]*?\{\{\/link\}\}/g, "");
+  }
+
+  // Ordenar chaves por tamanho descendente para evitar que 'valor' substitua parte de 'valor_formatado'
+  const keys = Object.keys(vars).sort((a, b) => b.length - a.length);
+
+  for (const k of keys) {
+    const v = vars[k];
+    // Substituir tanto {{token}} quanto {token}
     out = out.split(`{{${k}}}`).join(v);
+    out = out.split(`{${k}}`).join(v);
   }
   return out;
 }
