@@ -39,11 +39,22 @@ function formatDueDate(dueDate: string): string {
 
 // Guardrail 2: parse robusto do bloco condicional {{#link}}...{{/link}}
 function renderTemplate(tpl: string, vars: Record<string, string>, hasLink: boolean): string {
-  let out = hasLink
-    ? tpl.replace(/\{\{#link\}\}/g, "").replace(/\{\{\/link\}\}/g, "")
-    : tpl.replace(/\{\{#link\}\}[\s\S]*?\{\{\/link\}\}/g, "");
-  for (const [k, v] of Object.entries(vars)) {
+  let out = tpl;
+  // Handle conditional block
+  if (out.includes('{{#link}}')) {
+    out = hasLink
+      ? out.replace(/\{\{#link\}\}/g, "").replace(/\{\{\/link\}\}/g, "")
+      : out.replace(/\{\{#link\}\}[\s\S]*?\{\{\/link\}\}/g, "");
+  }
+
+  // Ordenar chaves por tamanho descendente para evitar que 'valor' substitua parte de 'valor_formatado'
+  const keys = Object.keys(vars).sort((a, b) => b.length - a.length);
+
+  for (const k of keys) {
+    const v = vars[k];
+    // Substituir tanto {{token}} quanto {token}
     out = out.split(`{{${k}}}`).join(v);
+    out = out.split(`{${k}}`).join(v);
   }
   return out;
 }
@@ -89,11 +100,19 @@ export function ManualBillingDialog({ open, onOpenChange, item, agencyId }: Manu
 
   const variables = useMemo(() => {
     if (!item) return null;
-    return {
+    const base = {
       nome_cliente: item.title || "Cliente",
       valor_formatado: formatCurrency(item.amount),
       data_vencimento: formatDueDate(item.dueDate),
       link_fatura: item.invoiceUrl || "",
+    };
+    return {
+      ...base,
+      // Alias amigáveis
+      nome: base.nome_cliente,
+      valor: base.valor_formatado,
+      vencimento: base.data_vencimento,
+      link: base.link_fatura,
     };
   }, [item]);
 
@@ -274,7 +293,7 @@ export function ManualBillingDialog({ open, onOpenChange, item, agencyId }: Manu
         body: {
           account_id: accountId,
           phone_number: cleanPhone,
-          message,
+          message: renderTemplate(message, variables || {}, hasInvoiceLink),
         },
       });
       if (error) throw new Error(error.message);
@@ -353,7 +372,7 @@ export function ManualBillingDialog({ open, onOpenChange, item, agencyId }: Manu
             />
             <div className="flex items-center justify-between">
               <p className="text-[11px] text-muted-foreground">
-                Variáveis: <code>{"{{nome_cliente}}"}</code>, <code>{"{{valor_formatado}}"}</code>, <code>{"{{data_vencimento}}"}</code>, <code>{"{{link_fatura}}"}</code>
+                Dica: use <code>{"{nome}"}</code>, <code>{"{valor}"}</code>, <code>{"{vencimento}"}</code> ou <code>{"{link}"}</code>
               </p>
               {isCurrentCustom && (
                 <button
