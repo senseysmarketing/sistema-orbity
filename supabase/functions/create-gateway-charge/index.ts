@@ -327,6 +327,7 @@ Deno.serve(async (req) => {
 
     // 2. Parse & validate input
     const {
+      payment_id, // Added for update support
       client_id,
       amount,
       due_date,
