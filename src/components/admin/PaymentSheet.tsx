@@ -629,7 +629,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
               {/* Conexa Section */}
               {billingType === 'conexa' && isEditing && (
                 <div className="space-y-2">
-                  {hasConexaCharge ? (
+                  {hasConexaCharge && payment?.conexa_invoice_url ? (
                     <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
                       <div className="flex items-center justify-between">
                         <Badge variant="warning" className="text-xs">Aguardando Pagamento (Conexa)</Badge>
