@@ -510,8 +510,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 5. INSERT into client_payments
-    const insertPayload = {
+    // 5. UPSERT or INSERT into client_payments
+    const finalPayload = {
       client_id,
       amount,
       due_date,
@@ -529,11 +529,25 @@ Deno.serve(async (req) => {
       gateway_fee,
     };
 
-    const { data: payment, error: insertError } = await adminClient
-      .from("client_payments")
-      .insert([insertPayload])
-      .select()
-      .single();
+    let result;
+    if (payment_id) {
+      console.log(`[Gateway] Updating existing payment: ${payment_id}`);
+      result = await adminClient
+        .from("client_payments")
+        .update(finalPayload)
+        .eq("id", payment_id)
+        .select()
+        .single();
+    } else {
+      console.log("[Gateway] Inserting new payment");
+      result = await adminClient
+        .from("client_payments")
+        .insert([finalPayload])
+        .select()
+        .single();
+    }
+
+    const { data: payment, error: dbError } = result;
 
     if (insertError) {
       console.error("Insert error:", insertError);
