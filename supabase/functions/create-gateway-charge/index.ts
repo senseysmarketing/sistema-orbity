@@ -549,10 +549,10 @@ Deno.serve(async (req) => {
 
     const { data: payment, error: dbError } = result;
 
-    if (insertError) {
-      console.error("Insert error:", insertError);
+    if (dbError) {
+      console.error("DB error:", dbError);
       return jsonResponse(
-        { error: "Failed to save payment", details: insertError.message },
+        { error: "Failed to save payment", details: dbError.message },
         500
       );
     }
