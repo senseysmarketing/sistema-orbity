@@ -100,11 +100,19 @@ export function ManualBillingDialog({ open, onOpenChange, item, agencyId }: Manu
 
   const variables = useMemo(() => {
     if (!item) return null;
-    return {
+    const base = {
       nome_cliente: item.title || "Cliente",
       valor_formatado: formatCurrency(item.amount),
       data_vencimento: formatDueDate(item.dueDate),
       link_fatura: item.invoiceUrl || "",
+    };
+    return {
+      ...base,
+      // Alias amigáveis
+      nome: base.nome_cliente,
+      valor: base.valor_formatado,
+      vencimento: base.data_vencimento,
+      link: base.link_fatura,
     };
   }, [item]);
 
