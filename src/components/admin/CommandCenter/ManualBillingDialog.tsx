@@ -9,6 +9,7 @@ import { MessageCircle, AlertTriangle, Loader2, Save, RotateCcw } from "lucide-r
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/utils";
+import { renderBillingTemplate } from "@/lib/billing-utils";
 import type { CashFlowItem } from "@/hooks/useFinancialMetrics";
 
 type TemplateKey = "asaas" | "conexa" | "pix" | "generic";
@@ -39,24 +40,7 @@ function formatDueDate(dueDate: string): string {
 
 // Guardrail 2: parse robusto do bloco condicional {{#link}}...{{/link}}
 function renderTemplate(tpl: string, vars: Record<string, string>, hasLink: boolean): string {
-  let out = tpl;
-  // Handle conditional block
-  if (out.includes('{{#link}}')) {
-    out = hasLink
-      ? out.replace(/\{\{#link\}\}/g, "").replace(/\{\{\/link\}\}/g, "")
-      : out.replace(/\{\{#link\}\}[\s\S]*?\{\{\/link\}\}/g, "");
-  }
-
-  // Ordenar chaves por tamanho descendente para evitar que 'valor' substitua parte de 'valor_formatado'
-  const keys = Object.keys(vars).sort((a, b) => b.length - a.length);
-
-  for (const k of keys) {
-    const v = vars[k];
-    // Substituir tanto {{token}} quanto {token}
-    out = out.split(`{{${k}}}`).join(v);
-    out = out.split(`{${k}}`).join(v);
-  }
-  return out;
+  return renderBillingTemplate(tpl, vars, hasLink);
 }
 
 // Faz a "des-renderização" — converte valores resolvidos de volta em tokens

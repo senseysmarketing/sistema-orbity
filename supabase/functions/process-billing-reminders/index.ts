@@ -41,11 +41,27 @@ function formatMessage(
   template: string,
   vars: Record<string, string>
 ): string {
-  return template
-    .replace(/\{nome_cliente\}/g, vars.nome_cliente ?? "")
-    .replace(/\{valor\}/g, vars.valor ?? "")
-    .replace(/\{data_vencimento\}/g, vars.data_vencimento ?? "")
-    .replace(/\{link_pagamento\}/g, vars.link_pagamento ?? "");
+  let out = template;
+  
+  // Create aliases to match frontend
+  const expandedVars = {
+    ...vars,
+    nome: vars.nome_cliente,
+    vencimento: vars.data_vencimento,
+    link: vars.link_pagamento || vars.link_fatura,
+  };
+
+  // Sort keys by length descending to avoid partial matches (e.g., 'valor' vs 'valor_formatado')
+  const keys = Object.keys(expandedVars).sort((a, b) => b.length - a.length);
+
+  for (const k of keys) {
+    const v = expandedVars[k] ?? "";
+    // Handle both {{token}} and {token}
+    out = out.split(`{{${k}}}`).join(v);
+    out = out.split(`{${k}}`).join(v);
+  }
+  
+  return out;
 }
 
 type Gateway = "manual" | "conexa" | "asaas";
