@@ -260,12 +260,71 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
   const isGatewayActive = billingType !== 'manual';
   const gatewayName = billingType === 'asaas' ? 'Asaas' : billingType === 'conexa' ? 'Conexa' : 'Manual';
 
-  const handleGenerateAsaasCharge = () => {
-    toast({ title: "Em breve", description: "A geração de cobranças via Asaas será disponibilizada em breve." });
+  const handleGenerateAsaasCharge = async () => {
+    if (!payment || !currentAgency?.id) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-gateway-charge', {
+        body: {
+          payment_id: payment.id,
+          client_id: clientId,
+          amount: totalAmount,
+          due_date: dueDate,
+          description: description || null,
+          billing_type: 'asaas',
+          agency_id: currentAgency.id,
+          status: status,
+          auto_invoice: true,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({ title: "✅ Cobrança Asaas gerada!", description: "Boleto/Pix criado com sucesso." });
+      onSuccess();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Erro ao gerar cobrança", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleGenerateConexaCharge = () => {
-    toast({ title: "Em breve", description: "A geração de cobranças via Conexa será disponibilizada em breve." });
+  const handleGenerateConexaCharge = async () => {
+    if (!payment || !currentAgency?.id) return;
+    setLoading(true);
+    try {
+      // Se já tem um conexa_charge_id mas não tem o link, usamos a função especializada
+      // caso contrário, usamos a create-gateway-charge que faz tudo
+      const { data, error } = await supabase.functions.invoke(
+        payment.conexa_charge_id && !payment.conexa_invoice_url ? 'invoice-conexa-sale' : 'create-gateway-charge',
+        {
+          body: {
+            payment_id: payment.id,
+            client_id: clientId,
+            amount: totalAmount,
+            due_date: dueDate,
+            description: description || null,
+            billing_type: 'conexa',
+            agency_id: currentAgency.id,
+            status: status,
+            auto_invoice: true,
+          },
+        }
+      );
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({ title: "✅ Cobrança Conexa gerada!", description: "Fatura emitida com sucesso." });
+      onSuccess();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Erro ao gerar cobrança", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCopyPaymentLink = (source: 'asaas' | 'conexa' = 'asaas') => {
