@@ -588,7 +588,7 @@ export function PaymentSheet({ open, onOpenChange, onSuccess, payment, preselect
               {/* Asaas Section */}
               {billingType === 'asaas' && isEditing && (
                 <div className="space-y-2">
-                  {hasAsaasCharge ? (
+                  {hasAsaasCharge && payment?.invoice_url ? (
                     <div className="rounded-lg border bg-muted/50 p-3 space-y-2">
                       <div className="flex items-center justify-between">
                         <Badge variant="warning" className="text-xs">Aguardando Pagamento (Asaas)</Badge>
