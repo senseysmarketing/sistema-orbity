@@ -293,7 +293,7 @@ export function ManualBillingDialog({ open, onOpenChange, item, agencyId }: Manu
         body: {
           account_id: accountId,
           phone_number: cleanPhone,
-          message,
+          message: renderTemplate(message, variables || {}, hasInvoiceLink),
         },
       });
       if (error) throw new Error(error.message);
