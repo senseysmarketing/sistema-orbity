@@ -91,6 +91,7 @@ serve(async (req) => {
       body: JSON.stringify({
         number: formattedPhone,
         text: message,
+        linkPreview: false,
       }),
     });
 
