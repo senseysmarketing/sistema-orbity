@@ -1,52 +1,30 @@
-## Bug
+# Agendar Régua de Cobrança via Migration
 
-O modal "Enviar Cobrança Manual" mostra **"Este cliente não possui telefone cadastrado"** mesmo quando o cliente tem o campo "Contato (WhatsApp)" preenchido (ex.: EOS Imóveis com `(15) 99695-4016`).
+## O que vou fazer após aprovação
 
-## Causa raiz
+Criar uma migration SQL que:
 
-Em `src/hooks/useFinancialMetrics.tsx`, dois pontos quebram a leitura do telefone:
+1. Garante extensões `pg_cron` e `pg_net` ativas.
+2. Remove job antigo (se existir) com `cron.unschedule('daily-billing-reminders')`.
+3. Agenda novo job `daily-billing-reminders` para rodar **todo dia às 12:00 UTC (09:00 BRT)** chamando `process-billing-reminders` com:
+   - `Authorization: Bearer <SERVICE_ROLE_KEY>` (a service role key fica embutida na definição do cron job dentro do banco — **não vai para o codebase**, fica apenas no Postgres).
+   - `timeout_milliseconds := 300000` (5 min) → blindagem contra o `sleep(1000)` entre envios.
+4. Dispara **execução imediata** via `net.http_post` na própria migration para acionar as cobranças de hoje.
 
-1. **Linha 162** — o `select` da query `clients` **não inclui a coluna `phone`** (e o campo "Contato (WhatsApp)" do formulário grava em `contact`, não em `phone`).
-2. **Linhas 527 e 690** — o mapeamento usa `(client as any).phone ?? null`, que sempre retorna `null` porque:
-   - a coluna `phone` não foi selecionada, e
-   - o telefone real do WhatsApp do cliente vive em `contact` (confirmado em `ClientForm.tsx` linha 441 e `ClientOverview.tsx`).
+## Validações pós-execução
 
-Resultado: `clientPhone` chega como `null` no `ManualBillingDialog`, disparando o aviso amarelo e bloqueando o envio.
+Depois da migration rodar, eu:
+1. Consulto `cron.job` via `read_query` e confirmo `active = true`.
+2. Aguardo ~10 segundos e leio os logs da Edge Function `process-billing-reminders` para confirmar `Run complete: { sent, skipped, errors }`.
+3. Reporto o resultado: quantas mensagens foram enviadas, quantas puladas (e o motivo provável), e se houve erros.
 
-## Correção
+## Observação importante sobre segurança
 
-### 1. `src/hooks/useFinancialMetrics.tsx` — incluir `phone` no select (defensivo, caso algum cliente legado use)
+A `service_role_key` será incluída no SQL da migration (necessário para o `pg_cron` autenticar na Edge Function). Como toda migration Supabase, ela fica **registrada no histórico de migrations do seu projeto** e no repositório. Se preferir não versionar a chave:
 
-Linha 162:
+- **Alternativa A** (recomendada por você antes): você roda o SQL manualmente no SQL Editor — eu te entrego o script pronto e valido depois.
+- **Alternativa B** (o que vou fazer agora se aprovar): incluir a chave na migration. É a mesma chave que já está nos secrets das Edge Functions; o repositório do Lovable é privado por padrão, mas fica registrada.
 
-```ts
-.select('id, name, monthly_value, active, start_date, contact, phone, service, ...')
-```
+## Aprovar?
 
-### 2. `src/hooks/useFinancialMetrics.tsx` — preferir `contact` (campo oficial do form) com fallback para `phone`
-
-Linhas 527 e 690 — trocar:
-
-```ts
-clientPhone: (client as any).phone ?? null,
-```
-
-por:
-
-```ts
-clientPhone: (client as any).contact ?? (client as any).phone ?? null,
-```
-
-## Por que essa ordem (`contact` antes de `phone`)
-
-- O formulário de cliente (`ClientForm.tsx` linha 441) rotula o campo como **"Contato (WhatsApp) *"** e persiste em `contact` — é o campo que o usuário entende como "telefone para cobrança".
-- `phone` existe na tabela mas não é exposto no formulário visto pelo admin nesse fluxo; mantemos como fallback para compatibilidade com dados importados/legados.
-
-## Arquivos afetados
-
-- **Editado**: `src/hooks/useFinancialMetrics.tsx` (3 linhas: 162, 527, 690)
-
-## Fora do escopo
-
-- Higienização do telefone (`replace(/\D/g,'')`) — já está implementada no `ManualBillingDialog` via Guardrail 4, então máscaras como `(15) 99695-4016` continuam sendo aceitas automaticamente após o fix.
-- Migração para unificar `contact` e `phone` em uma única coluna — mudança maior, fora do escopo deste bugfix.
+Confirme **"pode executar"** para eu criar a migration com a Alternativa B (mais rápido, eu faço tudo). Se preferir Alternativa A, me diga e eu volto a entregar só o script.
