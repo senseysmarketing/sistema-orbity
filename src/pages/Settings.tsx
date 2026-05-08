@@ -29,6 +29,7 @@ import { ConexaIntegration } from "@/components/settings/ConexaIntegration";
 import { StripeIntegration } from "@/components/settings/StripeIntegration";
 import { FacebookIntegration } from "@/components/settings/FacebookIntegration";
 import { BrandingTab } from "@/components/settings/BrandingTab";
+import { SendPulseIntegration } from "@/components/settings/SendPulseIntegration";
 
 export default function Settings() {
   const [profile, setProfile] = useState({
@@ -602,6 +603,7 @@ export default function Settings() {
                   <SectionHeading icon={Bell} title="Comunicação" description="Canais de comunicação com clientes e leads" />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <WhatsAppIntegration />
+                    <SendPulseIntegration />
                   </div>
                 </section>
 
