@@ -34,6 +34,9 @@ export interface Meeting {
   whatsapp_reminder_enabled?: boolean;
   client_whatsapp?: string | null;
   reminder_hours_before?: number;
+  last_whatsapp_reminder_sent_at?: string | null;
+  whatsapp_reminder_status?: 'pending' | 'sent' | 'failed' | null;
+  whatsapp_reminder_error?: string | null;
   organizer?: { name: string; email: string };
   client?: { name: string };
   lead?: { name: string };
