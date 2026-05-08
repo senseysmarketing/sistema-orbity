@@ -3,7 +3,7 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGrou
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Gauge, ContactRound, FileText, Instagram, Calendar, Upload, Trophy, MessageSquareHeart } from "lucide-react";
+import { LayoutDashboard, CheckSquare, User, Users, TrendingUp, DollarSign, BarChart3, Settings, LogOut, ChevronDown, Gauge, ContactRound, FileText, Instagram, Calendar, Upload, Trophy, MessageSquareHeart, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAgency } from "@/hooks/useAgency";
 import { usePermissions, PermissionsResult } from "@/hooks/usePermissions";
@@ -66,6 +66,7 @@ const menuCategories: MenuCategory[] = [
       { title: "Social Media", url: "/dashboard/social-media", icon: Instagram, permission: "canAccessSocialMedia" },
       { title: "Controle de Tráfego", url: "/dashboard/traffic", icon: TrendingUp, permission: "canAccessTraffic" },
       { title: "Contratos", url: "/dashboard/contracts", icon: FileText, permission: "canAccessContracts" },
+      { title: "E-mail Marketing", url: "/dashboard/email-marketing", icon: Mail },
     ],
   },
   {
