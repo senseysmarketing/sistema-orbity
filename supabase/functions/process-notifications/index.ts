@@ -1490,6 +1490,7 @@ Deno.serve(async (req) => {
         processExpenses(),
         processLeads(),
         processMeetings(),
+        processMeetingWhatsAppReminders(),
       ]);
     }
 
