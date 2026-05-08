@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 import { toZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
-import { addDays, addHours } from 'https://esm.sh/date-fns@3.6.0';
+import { addDays, addHours, format } from 'https://esm.sh/date-fns@3.6.0';
+import { ptBR } from 'https://esm.sh/date-fns@3.6.0/locale/pt-BR';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
