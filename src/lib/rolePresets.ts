@@ -10,6 +10,7 @@ export interface AppPermissions {
   social_media: boolean;
   traffic: boolean;
   contracts: boolean;
+  email_marketing: boolean;
 
   // Administração
   nps: boolean;
@@ -28,6 +29,7 @@ export const DEFAULT_PERMISSIONS: AppPermissions = {
   social_media: false,
   traffic: false,
   contracts: false,
+  email_marketing: false,
   nps: false,
   goals: false,
   financial: false,
@@ -37,7 +39,7 @@ export const DEFAULT_PERMISSIONS: AppPermissions = {
 
 const ALL_FALSE: AppPermissions = {
   clients: false, tasks: false, reminders: false, agenda: false, crm: false,
-  social_media: false, traffic: false, contracts: false,
+  social_media: false, traffic: false, contracts: false, email_marketing: false,
   nps: false, goals: false, financial: false, reports: false, import_data: false,
 };
 
@@ -63,7 +65,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     label: "Social Media",
     emoji: "📱",
     description: "Gerencia conteúdo, posts e calendário editorial.",
-    permissions: { ...ALL_FALSE, tasks: true, reminders: true, agenda: true, social_media: true },
+    permissions: { ...ALL_FALSE, tasks: true, reminders: true, agenda: true, social_media: true, email_marketing: true },
   },
   {
     id: "Gestor de Tráfego",
@@ -94,7 +96,7 @@ export const ROLE_PRESETS: RolePreset[] = [
     description: "Vê toda a operação, exceto Financeiro Administrativo e Importação.",
     permissions: {
       clients: true, tasks: true, reminders: true, agenda: true, crm: true,
-      social_media: true, traffic: true, contracts: true,
+      social_media: true, traffic: true, contracts: true, email_marketing: true,
       nps: true, goals: true, financial: false, reports: true, import_data: false,
     },
   },
@@ -110,7 +112,7 @@ export const ROLE_PRESETS: RolePreset[] = [
 
 const PERM_KEYS: (keyof AppPermissions)[] = [
   "clients", "tasks", "reminders", "agenda", "crm",
-  "social_media", "traffic", "contracts",
+  "social_media", "traffic", "contracts", "email_marketing",
   "nps", "goals", "financial", "reports", "import_data",
 ];
 
