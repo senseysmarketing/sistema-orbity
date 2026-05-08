@@ -13,8 +13,18 @@ import {
   Users,
   Clock,
   Video,
+  MessageCircle,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAgency } from "@/hooks/useAgency";
 import { MeetingNotesTab } from "./MeetingNotesTab";
 import { MeetingContextTab } from "./MeetingContextTab";
 import { MeetingFormDialog } from "./MeetingFormDialog";
