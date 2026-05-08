@@ -46,15 +46,15 @@ serve(async (req) => {
     // Get SendPulse credentials
     const { data: integration, error: intError } = await supabase
       .from('agency_integrations')
-      .select('sendpulse_client_id, sendpulse_secret')
+      .select('sendpulse_client_id, sendpulse_client_secret')
       .eq('agency_id', agencyId)
       .single();
 
-    if (intError || !integration || !integration.sendpulse_client_id || !integration.sendpulse_secret) {
+    if (intError || !integration || !integration.sendpulse_client_id || !integration.sendpulse_client_secret) {
       throw new Error('SendPulse not configured for this agency');
     }
 
-    const { sendpulse_client_id: clientId, sendpulse_secret: clientSecret } = integration;
+    const { sendpulse_client_id: clientId, sendpulse_client_secret: clientSecret } = integration;
 
     // Auth with SendPulse to get access token
     const tokenRes = await fetch('https://api.sendpulse.com/oauth/access_token', {

@@ -46,6 +46,7 @@ import PublicClientReport from "./pages/PublicClientReport";
 import NPSPage from "./pages/NPSPage";
 import PublicNPSSurvey from "./pages/PublicNPSSurvey";
 import PublicApproval from "./pages/PublicApproval";
+import EmailMarketing from "./pages/EmailMarketing";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -124,6 +125,7 @@ const App = () => (
                           <Route path="contracts" element={<RequirePermission permission="canAccessContracts"><Contracts /></RequirePermission>} />
                           <Route path="social-media" element={<RequirePermission permission="canAccessSocialMedia"><SocialMedia /></RequirePermission>} />
                           <Route path="import" element={<RequirePermission permission="canAccessImport"><Import /></RequirePermission>} />
+                          <Route path="email-marketing" element={<EmailMarketing />} />
                           <Route path="reports" element={<RequirePermission permission="canAccessReports"><Reports /></RequirePermission>} />
                           <Route path="settings" element={<Settings />} />
                           <Route path="settings/notifications" element={<NotificationSettings />} />

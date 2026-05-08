@@ -46,11 +46,11 @@ export default function EmailMarketing() {
     try {
       const { data, error } = await supabase
         .from('agency_integrations')
-        .select('sendpulse_client_id, sendpulse_secret')
+        .select('sendpulse_client_id, sendpulse_client_secret')
         .eq('agency_id', currentAgency.id)
         .single();
 
-      if (data?.sendpulse_client_id && data?.sendpulse_secret) {
+      if (data?.sendpulse_client_id && data?.sendpulse_client_secret) {
         setConfigured(true);
         fetchAddressBooks();
       } else {
