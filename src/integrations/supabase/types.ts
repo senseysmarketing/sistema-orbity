@@ -387,6 +387,58 @@ export type Database = {
           },
         ]
       }
+      agency_integrations: {
+        Row: {
+          agency_id: string
+          created_at: string | null
+          id: string
+          sendpulse_client_id: string | null
+          sendpulse_client_secret: string | null
+          sendpulse_connected: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          agency_id: string
+          created_at?: string | null
+          id?: string
+          sendpulse_client_id?: string | null
+          sendpulse_client_secret?: string | null
+          sendpulse_connected?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          agency_id?: string
+          created_at?: string | null
+          id?: string
+          sendpulse_client_id?: string | null
+          sendpulse_client_secret?: string | null
+          sendpulse_connected?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_integrations_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_integrations_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "agency_integrations_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: true
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       agency_invites: {
         Row: {
           agency_id: string
