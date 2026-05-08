@@ -16,6 +16,7 @@ export interface PermissionsResult {
   canAccessSocialMedia: boolean;
   canAccessTraffic: boolean;
   canAccessContracts: boolean;
+  canAccessEmailMarketing: boolean;
   canAccessNPS: boolean;
   canAccessGoals: boolean;
   canAccessFinancial: boolean;
@@ -26,7 +27,7 @@ export interface PermissionsResult {
 
 const ALL_TRUE: AppPermissions = {
   clients: true, tasks: true, reminders: true, agenda: true, crm: true,
-  social_media: true, traffic: true, contracts: true,
+  social_media: true, traffic: true, contracts: true, email_marketing: true,
   nps: true, goals: true, financial: true, reports: true, import_data: true,
 };
 
