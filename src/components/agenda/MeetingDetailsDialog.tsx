@@ -260,7 +260,75 @@ export const MeetingDetailsDialog = ({
                     </>
                   )}
 
-                  {meeting.organizer && (
+
+                  <Separator />
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MessageCircle className={cn("h-4 w-4", meeting.whatsapp_reminder_enabled ? "text-green-600" : "text-muted-foreground")} />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Lembrete Automático (WhatsApp)</p>
+                          <div className="flex items-center gap-2">
+                            {meeting.whatsapp_reminder_enabled ? (
+                              <Badge variant="outline" className="text-green-600 border-green-600/20 bg-green-50">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Ativo
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-muted-foreground">
+                                Desativado
+                              </Badge>
+                            )}
+                            {meeting.whatsapp_reminder_enabled && meeting.whatsapp_reminder_status === 'sent' && (
+                              <Badge variant="outline" className="text-blue-600 border-blue-600/20 bg-blue-50">
+                                Enviado em {meeting.last_whatsapp_reminder_sent_at ? format(new Date(meeting.last_whatsapp_reminder_sent_at), "HH:mm") : ''}
+                              </Badge>
+                            )}
+                            {meeting.whatsapp_reminder_enabled && meeting.whatsapp_reminder_status === 'failed' && (
+                              <Badge variant="outline" className="text-red-600 border-red-600/20 bg-red-50" title={meeting.whatsapp_reminder_error || "Erro desconhecido"}>
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Falha no envio
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {updatingReminder && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                        <Switch 
+                          checked={meeting.whatsapp_reminder_enabled} 
+                          onCheckedChange={handleToggleReminder}
+                          disabled={updatingReminder || (meeting.status !== 'scheduled' && !meeting.whatsapp_reminder_enabled)}
+                        />
+                      </div>
+                    </div>
+
+                    {meeting.whatsapp_reminder_enabled && (
+                      <div className="pl-6 space-y-1">
+                        <p className="text-xs text-muted-foreground">
+                          {meeting.whatsapp_reminder_status === 'sent' 
+                            ? "Lembrete enviado ao cliente." 
+                            : `Previsão de envio: ${getReminderTime()} (${meeting.reminder_hours_before}h antes)`}
+                        </p>
+                        {meeting.client_whatsapp && (
+                          <p className="text-xs font-medium">Destinatário: {meeting.client_whatsapp}</p>
+                        )}
+                        {!whatsappAccount && (
+                          <div className="flex items-center gap-1.5 text-amber-600 text-[10px] mt-1">
+                            <AlertCircle className="h-3 w-3" />
+                            <span>WhatsApp não conectado na agência</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {!meeting.whatsapp_reminder_enabled && meeting.status === 'scheduled' && (
+                      <p className="text-[10px] text-muted-foreground pl-6">
+                        Ative para enviar um lembrete automático ao cliente {meeting.reminder_hours_before}h antes da reunião.
+                      </p>
+                    )}
+                  </div>
+
                     <>
                       <Separator />
                       <div className="flex items-center gap-2">
