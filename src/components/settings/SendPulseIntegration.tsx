@@ -8,11 +8,13 @@ import { Eye, EyeOff, Save, Loader2, Mail, Unlink, CheckCircle2, Info, ExternalL
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useMarketingIntegrations } from "@/hooks/useMarketingIntegrations";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export function SendPulseIntegration() {
   const { isAgencyAdmin } = useAgency();
+  const perms = usePermissions();
   const { toast } = useToast();
-  const isAdmin = isAgencyAdmin();
+  const isAdmin = isAgencyAdmin() || perms.canAccessEmailMarketing;
 
   const { integrations, isLoading, updateIntegrations, isSaving } = useMarketingIntegrations();
 
