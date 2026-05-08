@@ -847,6 +847,115 @@ async function processMeetings() {
   console.log(`✅ Created ${notificationsToCreate.length} meeting notifications`);
 }
 
+async function processMeetingWhatsAppReminders() {
+  console.log('📱 Processing WhatsApp meeting reminders...');
+  
+  const now = new Date();
+  
+  // Fetch meetings with pending WhatsApp reminders
+  const { data: meetings, error } = await supabase
+    .from('meetings')
+    .select(`
+      id, 
+      title, 
+      start_time, 
+      agency_id, 
+      client_whatsapp, 
+      reminder_hours_before,
+      whatsapp_reminder_status,
+      client:clients(name),
+      lead:leads(name)
+    `)
+    .eq('whatsapp_reminder_enabled', true)
+    .eq('whatsapp_reminder_status', 'pending')
+    .not('agency_id', 'is', null)
+    .not('client_whatsapp', 'is', null)
+    .gte('start_time', now.toISOString());
+
+  if (error) {
+    console.error('Error fetching meetings for WhatsApp reminders:', error);
+    return;
+  }
+
+  console.log(`📊 Found ${meetings?.length || 0} pending WhatsApp reminders`);
+
+  for (const meeting of meetings || []) {
+    const startTime = new Date(meeting.start_time);
+    const hoursBefore = meeting.reminder_hours_before || 2;
+    const notificationTime = new Date(startTime.getTime() - hoursBefore * 60 * 60 * 1000);
+
+    // Only send if we are past the notification time
+    if (now >= notificationTime) {
+      console.log(`📤 Sending WhatsApp reminder for meeting: ${meeting.title}`);
+      
+      try {
+        // 1. Find connected WhatsApp account for the agency
+        const { data: whatsappAccount, error: accountError } = await supabase
+          .from('whatsapp_accounts')
+          .select('id')
+          .eq('agency_id', meeting.agency_id)
+          .eq('status', 'connected')
+          .maybeSingle();
+
+        if (accountError || !whatsappAccount) {
+          console.warn(`⚠️ No connected WhatsApp account for agency ${meeting.agency_id}`);
+          await supabase.from('meetings').update({
+            whatsapp_reminder_status: 'failed',
+            whatsapp_reminder_error: 'No connected WhatsApp account found for this agency.'
+          }).eq('id', meeting.id);
+          continue;
+        }
+
+        // 2. Prepare message
+        const clientName = meeting.client?.name || meeting.lead?.name || 'Cliente';
+        const meetingTime = format(toZonedTime(startTime, TIMEZONE), "HH:mm", { locale: ptBR });
+        const message = `Olá ${clientName}, passando para lembrar da nossa reunião *${meeting.title}* agendada para hoje às *${meetingTime}*. Até lá!`;
+
+        // 3. Call whatsapp-send function
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        
+        const response = await fetch(`${supabaseUrl}/functions/v1/whatsapp-send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`
+          },
+          body: JSON.stringify({
+            account_id: whatsappAccount.id,
+            phone_number: meeting.client_whatsapp,
+            message: message,
+            meeting_id: meeting.id // Pass meeting_id for tracking if the function supports it
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          console.log(`✅ WhatsApp reminder sent for meeting ${meeting.id}`);
+          await supabase.from('meetings').update({
+            whatsapp_reminder_status: 'sent',
+            last_whatsapp_reminder_sent_at: new Date().toISOString()
+          }).eq('id', meeting.id);
+        } else {
+          console.error(`❌ Failed to send WhatsApp reminder for meeting ${meeting.id}:`, result.error);
+          await supabase.from('meetings').update({
+            whatsapp_reminder_status: 'failed',
+            whatsapp_reminder_error: result.error || 'Unknown error from whatsapp-send'
+          }).eq('id', meeting.id);
+        }
+      } catch (err) {
+        console.error(`❌ Exception sending WhatsApp reminder for meeting ${meeting.id}:`, err);
+        await supabase.from('meetings').update({
+          whatsapp_reminder_status: 'failed',
+          whatsapp_reminder_error: err.message
+        }).eq('id', meeting.id);
+      }
+    }
+  }
+}
+
+
 async function processExpenses() {
   console.log('💸 Processing expense notifications...');
   
