@@ -329,6 +329,7 @@ export const MeetingDetailsDialog = ({
                     )}
                   </div>
 
+                  {meeting.organizer && (
                     <>
                       <Separator />
                       <div className="flex items-center gap-2">
