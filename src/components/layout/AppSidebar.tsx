@@ -21,6 +21,7 @@ type PermKey = Extract<
   | "canAccessSocialMedia"
   | "canAccessTraffic"
   | "canAccessContracts"
+  | "canAccessEmailMarketing"
   | "canAccessNPS"
   | "canAccessGoals"
   | "canAccessFinancial"
@@ -66,7 +67,7 @@ const menuCategories: MenuCategory[] = [
       { title: "Social Media", url: "/dashboard/social-media", icon: Instagram, permission: "canAccessSocialMedia" },
       { title: "Controle de Tráfego", url: "/dashboard/traffic", icon: TrendingUp, permission: "canAccessTraffic" },
       { title: "Contratos", url: "/dashboard/contracts", icon: FileText, permission: "canAccessContracts" },
-      { title: "E-mail Marketing", url: "/dashboard/email-marketing", icon: Mail },
+      { title: "E-mail Marketing", url: "/dashboard/email-marketing", icon: Mail, permission: "canAccessEmailMarketing" },
     ],
   },
   {
