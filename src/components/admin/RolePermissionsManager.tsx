@@ -25,6 +25,7 @@ import {
   Briefcase,
   Megaphone,
   Settings2,
+  Mail,
   type LucideIcon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -84,6 +85,7 @@ const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "social_media", label: "Social Media", description: "Planejamento e posts.", icon: Instagram },
       { key: "traffic", label: "Tráfego", description: "Campanhas e contas de anúncio.", icon: TrendingUp },
       { key: "contracts", label: "Contratos", description: "Geração e gestão de contratos.", icon: FileText },
+      { key: "email_marketing", label: "E-mail Marketing", description: "Campanhas e disparos de e-mail.", icon: Mail },
     ],
   },
   {

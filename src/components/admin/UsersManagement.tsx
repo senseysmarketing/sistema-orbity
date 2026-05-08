@@ -19,6 +19,7 @@ import {
   Trophy,
   BarChart3,
   Upload,
+  Mail,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,6 +62,7 @@ const PERMISSION_META: Record<keyof AppPermissions, { label: string; icon: typeo
   social_media: { label: "Social", icon: Share2 },
   traffic: { label: "Tráfego", icon: TrendingUp },
   contracts: { label: "Contratos", icon: FileText },
+  email_marketing: { label: "E-mail Marketing", icon: Mail },
   nps: { label: "NPS", icon: MessageSquareHeart },
   goals: { label: "Metas", icon: Trophy },
   financial: { label: "Financeiro", icon: DollarSign },
