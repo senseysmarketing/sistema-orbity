@@ -77,11 +77,54 @@ export const MeetingDetailsDialog = ({
   onOpenChange,
   onDuplicate,
 }: MeetingDetailsDialogProps) => {
-  const { deleteMeeting } = useMeetings();
+  const { deleteMeeting, updateMeeting } = useMeetings();
+  const { currentAgency } = useAgency();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
+  const [updatingReminder, setUpdatingReminder] = useState(false);
+
+  const { data: whatsappAccount } = useQuery({
+    queryKey: ["whatsapp-account", currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return null;
+      const { data } = await supabase
+        .from("whatsapp_accounts")
+        .select("*")
+        .eq("agency_id", currentAgency.id)
+        .eq("status", "connected")
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!currentAgency?.id && open,
+  });
+
+  if (!meeting) return null;
+
+  const handleToggleReminder = async (checked: boolean) => {
+    try {
+      setUpdatingReminder(true);
+      await updateMeeting.mutateAsync({
+        id: meeting.id,
+        whatsapp_reminder_enabled: checked,
+        // If enabling and no status, set to pending
+        ...(checked && !meeting.whatsapp_reminder_status ? { whatsapp_reminder_status: 'pending' } : {})
+      });
+      toast.success(checked ? "Lembrete WhatsApp ativado" : "Lembrete WhatsApp desativado");
+    } catch (error) {
+      toast.error("Erro ao atualizar lembrete");
+    } finally {
+      setUpdatingReminder(false);
+    }
+  };
+
+  const getReminderTime = () => {
+    const startTime = new Date(meeting.start_time);
+    const hoursBefore = meeting.reminder_hours_before || 2;
+    const reminderDate = new Date(startTime.getTime() - hoursBefore * 60 * 60 * 1000);
+    return format(toZonedTime(reminderDate, TIMEZONE), "dd/MM HH:mm", { locale: ptBR });
+  };
 
   if (!meeting) return null;
 
