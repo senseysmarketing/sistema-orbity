@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, EyeOff, Save, Loader2, Mail, Unlink, CheckCircle2, Info, ExternalLink } from "lucide-react";
+import { Eye, EyeOff, Save, Loader2, Mail, Unlink, CheckCircle2, Info, ExternalLink, Shield } from "lucide-react";
 import { useAgency } from "@/hooks/useAgency";
 import { useToast } from "@/hooks/use-toast";
 import { useMarketingIntegrations } from "@/hooks/useMarketingIntegrations";
@@ -71,8 +71,8 @@ export function SendPulseIntegration() {
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="p-6 flex items-center justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
       </Card>
     );
@@ -82,70 +82,83 @@ export function SendPulseIntegration() {
   const obscuredClientId = clientId ? `***${clientId.slice(-4)}` : "";
 
   return (
-    <Card className="overflow-hidden border-muted/60 shadow-sm transition-all hover:shadow-md">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+    <Card>
+      <CardHeader className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-900/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30 flex-shrink-0">
               <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <div>
-              <CardTitle className="text-base font-semibold">SendPulse (E-mail Marketing)</CardTitle>
-              <CardDescription className="text-xs">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardTitle className="text-base sm:text-lg">SendPulse (E-mail Marketing)</CardTitle>
+                {isConnected && (
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 flex-shrink-0">
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                    Conectado
+                  </Badge>
+                )}
+              </div>
+              <CardDescription className="text-xs sm:text-sm">
                 Campanhas em massa e gerenciamento de listas de contatos
               </CardDescription>
             </div>
           </div>
-          {isConnected && (
-            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800">
-              <CheckCircle2 className="mr-1 h-3 w-3" />
-              Conectado
-            </Badge>
-          )}
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4 pt-2">
+      <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0 sm:pt-0">
         {!isConnected ? (
-          <div className="space-y-4 animate-in fade-in slide-in-from-top-1 duration-300">
-            <div className="space-y-2">
-              <Label htmlFor="client-id" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                API Client ID
-              </Label>
-              <Input
-                id="client-id"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                placeholder="Ex: 5b2..."
-                className="bg-muted/30 focus-visible:ring-blue-500"
-                disabled={!isAdmin}
-              />
+          <div className="space-y-4">
+            <div className="p-3 sm:p-4 border rounded-lg bg-muted/30 space-y-2">
+              <p className="text-sm font-medium">Recursos disponíveis:</p>
+              <ul className="text-xs sm:text-sm text-muted-foreground space-y-1">
+                <li>• Envio de campanhas de e-mail em massa</li>
+                <li>• Gerenciamento dinâmico de listas de contatos</li>
+                <li>• Relatórios de abertura e cliques</li>
+                <li className="hidden sm:list-item">• Automação de réguas de nutrição</li>
+              </ul>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="client-secret" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                API Client Secret
-              </Label>
-              <div className="relative">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="client-id" className="text-sm font-medium">
+                  API Client ID
+                </Label>
                 <Input
-                  id="client-secret"
-                  type={showSecret ? "text" : "password"}
-                  value={clientSecret}
-                  onChange={(e) => setClientSecret(e.target.value)}
-                  placeholder="Seu secret key da SendPulse"
-                  className="bg-muted/30 pr-10 focus-visible:ring-blue-500"
+                  id="client-id"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  placeholder="Seu Client ID da SendPulse"
                   disabled={!isAdmin}
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent text-muted-foreground"
-                  onClick={() => setShowSecret(!showSecret)}
-                  disabled={!isAdmin}
-                >
-                  {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="client-secret" className="text-sm font-medium">
+                  API Client Secret
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="client-secret"
+                    type={showSecret ? "text" : "password"}
+                    value={clientSecret}
+                    onChange={(e) => setClientSecret(e.target.value)}
+                    placeholder="Sua Secret Key"
+                    className="pr-10"
+                    disabled={!isAdmin}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowSecret(!showSecret)}
+                    disabled={!isAdmin}
+                  >
+                    {showSecret ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -153,7 +166,7 @@ export function SendPulseIntegration() {
               <Button 
                 onClick={handleSave} 
                 disabled={isSaving || !clientId || !clientSecret} 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all"
+                className="w-full"
               >
                 {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                 Conectar SendPulse
@@ -161,24 +174,30 @@ export function SendPulseIntegration() {
             )}
           </div>
         ) : (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-1 duration-300">
-            <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Client ID Conectado</span>
-                <span className="text-sm font-mono font-medium">{obscuredClientId}</span>
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 sm:p-4 border rounded-lg bg-muted/30">
+              <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-green-500" />
+                  Conta conectada
+                </p>
+                <p className="text-xs sm:text-sm text-muted-foreground font-mono">
+                  Client ID: {obscuredClientId}
+                </p>
               </div>
-              {isAdmin && (
-                <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                  <Button variant="outline" size="sm" onClick={handleTestConnection} className="flex-1 text-xs">
-                    Testar Conexão
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={handleDisconnect} className="flex-1 text-xs text-destructive hover:text-destructive hover:bg-destructive/10">
-                    <Unlink className="h-3 w-3 mr-2" />
-                    Desconectar
-                  </Button>
-                </div>
-              )}
             </div>
+
+            {isAdmin && (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="outline" size="sm" onClick={handleTestConnection} className="w-full sm:w-auto">
+                  Testar Conexão
+                </Button>
+                <Button variant="destructive" size="sm" onClick={handleDisconnect} className="w-full sm:w-auto">
+                  <Unlink className="mr-2 h-4 w-4" />
+                  Desconectar
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -187,11 +206,10 @@ export function SendPulseIntegration() {
             href="https://login.sendpulse.com/settings/#api" 
             target="_blank" 
             rel="noopener noreferrer"
-            className="group flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-blue-500 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
           >
-            <Info className="h-3 w-3" />
+            <Info className="h-3.5 w-3.5" />
             <span>Como obter minhas credenciais API da SendPulse?</span>
-            <ExternalLink className="h-2 w-2 opacity-0 group-hover:opacity-100 transition-opacity" />
           </a>
         </div>
       </CardContent>
