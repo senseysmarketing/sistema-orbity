@@ -460,7 +460,12 @@ export const MeetingFormDialog = ({
     const startDate = new Date(formData.start_time);
     const endDate = new Date(formData.end_time);
 
-    const meetingData = {
+    const shouldResetReminder = meeting && (
+      meeting.start_time !== startDate.toISOString() || 
+      (whatsappReminderEnabled && !meeting.whatsapp_reminder_enabled)
+    );
+
+    const meetingData: any = {
       ...formData,
       start_time: startDate.toISOString(),
       end_time: endDate.toISOString(),
@@ -473,6 +478,10 @@ export const MeetingFormDialog = ({
       whatsapp_reminder_enabled: whatsappReminderEnabled,
       client_whatsapp: whatsappReminderEnabled ? clientWhatsapp : null,
       reminder_hours_before: reminderHoursBefore,
+      ...(shouldResetReminder || (!meeting && whatsappReminderEnabled) ? { 
+        whatsapp_reminder_status: 'pending' as const,
+        whatsapp_reminder_error: null 
+      } : {}),
     };
 
     try {

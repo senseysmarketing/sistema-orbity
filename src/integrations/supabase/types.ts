@@ -3645,6 +3645,7 @@ export type Database = {
           google_meet_link: string | null
           id: string
           is_internal: boolean
+          last_whatsapp_reminder_sent_at: string | null
           lead_id: string | null
           location: string | null
           meeting_notes: string | null
@@ -3660,6 +3661,10 @@ export type Database = {
           title: string
           updated_at: string
           whatsapp_reminder_enabled: boolean
+          whatsapp_reminder_error: string | null
+          whatsapp_reminder_status:
+            | Database["public"]["Enums"]["whatsapp_reminder_status"]
+            | null
         }
         Insert: {
           action_items?: Json | null
@@ -3677,6 +3682,7 @@ export type Database = {
           google_meet_link?: string | null
           id?: string
           is_internal?: boolean
+          last_whatsapp_reminder_sent_at?: string | null
           lead_id?: string | null
           location?: string | null
           meeting_notes?: string | null
@@ -3692,6 +3698,10 @@ export type Database = {
           title: string
           updated_at?: string
           whatsapp_reminder_enabled?: boolean
+          whatsapp_reminder_error?: string | null
+          whatsapp_reminder_status?:
+            | Database["public"]["Enums"]["whatsapp_reminder_status"]
+            | null
         }
         Update: {
           action_items?: Json | null
@@ -3709,6 +3719,7 @@ export type Database = {
           google_meet_link?: string | null
           id?: string
           is_internal?: boolean
+          last_whatsapp_reminder_sent_at?: string | null
           lead_id?: string | null
           location?: string | null
           meeting_notes?: string | null
@@ -3724,6 +3735,10 @@ export type Database = {
           title?: string
           updated_at?: string
           whatsapp_reminder_enabled?: boolean
+          whatsapp_reminder_error?: string | null
+          whatsapp_reminder_status?:
+            | Database["public"]["Enums"]["whatsapp_reminder_status"]
+            | null
         }
         Relationships: [
           {
@@ -7917,6 +7932,7 @@ export type Database = {
         | "super_admin"
         | "agency_admin"
         | "agency_user"
+      whatsapp_reminder_status: "pending" | "sent" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -8089,6 +8105,7 @@ export const Constants = {
         "agency_admin",
         "agency_user",
       ],
+      whatsapp_reminder_status: ["pending", "sent", "failed"],
     },
   },
 } as const

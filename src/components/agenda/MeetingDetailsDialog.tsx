@@ -13,8 +13,18 @@ import {
   Users,
   Clock,
   Video,
+  MessageCircle,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAgency } from "@/hooks/useAgency";
 import { MeetingNotesTab } from "./MeetingNotesTab";
 import { MeetingContextTab } from "./MeetingContextTab";
 import { MeetingFormDialog } from "./MeetingFormDialog";
@@ -67,11 +77,54 @@ export const MeetingDetailsDialog = ({
   onOpenChange,
   onDuplicate,
 }: MeetingDetailsDialogProps) => {
-  const { deleteMeeting } = useMeetings();
+  const { deleteMeeting, updateMeeting } = useMeetings();
+  const { currentAgency } = useAgency();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
+  const [updatingReminder, setUpdatingReminder] = useState(false);
+
+  const { data: whatsappAccount } = useQuery({
+    queryKey: ["whatsapp-account", currentAgency?.id],
+    queryFn: async () => {
+      if (!currentAgency?.id) return null;
+      const { data } = await supabase
+        .from("whatsapp_accounts")
+        .select("*")
+        .eq("agency_id", currentAgency.id)
+        .eq("status", "connected")
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!currentAgency?.id && open,
+  });
+
+  if (!meeting) return null;
+
+  const handleToggleReminder = async (checked: boolean) => {
+    try {
+      setUpdatingReminder(true);
+      await updateMeeting.mutateAsync({
+        id: meeting.id,
+        whatsapp_reminder_enabled: checked,
+        // If enabling and no status, set to pending
+        ...(checked && !meeting.whatsapp_reminder_status ? { whatsapp_reminder_status: 'pending' } : {})
+      });
+      toast.success(checked ? "Lembrete WhatsApp ativado" : "Lembrete WhatsApp desativado");
+    } catch (error) {
+      toast.error("Erro ao atualizar lembrete");
+    } finally {
+      setUpdatingReminder(false);
+    }
+  };
+
+  const getReminderTime = () => {
+    const startTime = new Date(meeting.start_time);
+    const hoursBefore = meeting.reminder_hours_before || 2;
+    const reminderDate = new Date(startTime.getTime() - hoursBefore * 60 * 60 * 1000);
+    return format(toZonedTime(reminderDate, TIMEZONE), "dd/MM HH:mm", { locale: ptBR });
+  };
 
   if (!meeting) return null;
 
@@ -206,6 +259,75 @@ export const MeetingDetailsDialog = ({
                       </div>
                     </>
                   )}
+
+
+                  <Separator />
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MessageCircle className={cn("h-4 w-4", meeting.whatsapp_reminder_enabled ? "text-green-600" : "text-muted-foreground")} />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Lembrete Automático (WhatsApp)</p>
+                          <div className="flex items-center gap-2">
+                            {meeting.whatsapp_reminder_enabled ? (
+                              <Badge variant="outline" className="text-green-600 border-green-600/20 bg-green-50">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Ativo
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-muted-foreground">
+                                Desativado
+                              </Badge>
+                            )}
+                            {meeting.whatsapp_reminder_enabled && meeting.whatsapp_reminder_status === 'sent' && (
+                              <Badge variant="outline" className="text-blue-600 border-blue-600/20 bg-blue-50">
+                                Enviado em {meeting.last_whatsapp_reminder_sent_at ? format(new Date(meeting.last_whatsapp_reminder_sent_at), "HH:mm") : ''}
+                              </Badge>
+                            )}
+                            {meeting.whatsapp_reminder_enabled && meeting.whatsapp_reminder_status === 'failed' && (
+                              <Badge variant="outline" className="text-red-600 border-red-600/20 bg-red-50" title={meeting.whatsapp_reminder_error || "Erro desconhecido"}>
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Falha no envio
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {updatingReminder && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                        <Switch 
+                          checked={meeting.whatsapp_reminder_enabled} 
+                          onCheckedChange={handleToggleReminder}
+                          disabled={updatingReminder || (meeting.status !== 'scheduled' && !meeting.whatsapp_reminder_enabled)}
+                        />
+                      </div>
+                    </div>
+
+                    {meeting.whatsapp_reminder_enabled && (
+                      <div className="pl-6 space-y-1">
+                        <p className="text-xs text-muted-foreground">
+                          {meeting.whatsapp_reminder_status === 'sent' 
+                            ? "Lembrete enviado ao cliente." 
+                            : `Previsão de envio: ${getReminderTime()} (${meeting.reminder_hours_before}h antes)`}
+                        </p>
+                        {meeting.client_whatsapp && (
+                          <p className="text-xs font-medium">Destinatário: {meeting.client_whatsapp}</p>
+                        )}
+                        {!whatsappAccount && (
+                          <div className="flex items-center gap-1.5 text-amber-600 text-[10px] mt-1">
+                            <AlertCircle className="h-3 w-3" />
+                            <span>WhatsApp não conectado na agência</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {!meeting.whatsapp_reminder_enabled && meeting.status === 'scheduled' && (
+                      <p className="text-[10px] text-muted-foreground pl-6">
+                        Ative para enviar um lembrete automático ao cliente {meeting.reminder_hours_before}h antes da reunião.
+                      </p>
+                    )}
+                  </div>
 
                   {meeting.organizer && (
                     <>
