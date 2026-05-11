@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Code, Eye, TrendingUp, Sparkles, Save, FilePlus } from "lucide-react";
+import { Code, Eye, TrendingUp, Sparkles, Save, Loader2 } from "lucide-react";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { TemplateLibraryDialog } from "./TemplateLibraryDialog";
 import { 
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
 import { toast } from "sonner";
@@ -28,7 +29,8 @@ interface CampaignBuilderProps {
     [key: string]: any;
   };
   setCampaign: React.Dispatch<React.SetStateAction<any>>;
-  onAIGenerate: () => void;
+  aiLoading: boolean;
+  callAI: (type: string, prompt: string, agencyId?: string) => Promise<any>;
   campaignView: "editor" | "preview";
   setCampaignView: (view: "editor" | "preview") => void;
 }
@@ -36,7 +38,8 @@ interface CampaignBuilderProps {
 export function CampaignBuilder({ 
   campaign, 
   setCampaign, 
-  onAIGenerate, 
+  aiLoading,
+  callAI,
   campaignView, 
   setCampaignView 
 }: CampaignBuilderProps) {
@@ -44,6 +47,9 @@ export function CampaignBuilder({
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  
+  const [aiPromptOpen, setAiPromptOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
 
   const handleSelectTemplate = (template: { subject: string; content: string }) => {
     setCampaign(prev => ({
@@ -88,6 +94,22 @@ export function CampaignBuilder({
     }
   };
 
+  const handleAIGenerate = async () => {
+    if (!aiPrompt) return;
+    try {
+      const result = await callAI("email_generation", aiPrompt, currentAgency?.id);
+      const html = typeof result === "string" ? result : result?.html;
+      if (html) {
+        setCampaign(prev => ({ ...prev, body: html }));
+        setAiPromptOpen(false);
+        setAiPrompt("");
+        toast.success("Conteúdo gerado com sucesso!");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <Card className="border shadow-sm overflow-hidden min-h-[600px] flex flex-col">
       <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b space-y-4 sm:space-y-0">
@@ -115,7 +137,6 @@ export function CampaignBuilder({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Novas funcionalidades de Modelos */}
           <TemplateLibraryDialog 
             onSelectTemplate={handleSelectTemplate} 
             currentContent={campaign.body} 
@@ -157,15 +178,44 @@ export function CampaignBuilder({
 
           <Separator orientation="vertical" className="hidden sm:block h-6 mx-1" />
 
-          <Button 
-            variant="action" 
-            size="sm" 
-            className="gap-2 shadow-sm"
-            onClick={onAIGenerate}
-          >
-            <Sparkles className="h-4 w-4" />
-            IA Assist
-          </Button>
+          <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                variant="action" 
+                size="sm" 
+                className="gap-2 shadow-sm"
+              >
+                <Sparkles className="h-4 w-4" />
+                IA Assist
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>O que você quer escrever?</DialogTitle>
+                <DialogDescription>
+                  Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.
+                  <br />
+                  <span className="text-[10px] text-primary font-medium">
+                    Dica: Você pode pedir para a IA usar as variáveis {"{{Nome}}"} e {"{{Telefone}}"} no texto.
+                  </span>
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <Textarea 
+                  placeholder="Ex: Oferta de serviço de gestão de tráfego para novos leads..." 
+                  value={aiPrompt} 
+                  onChange={e => setAiPrompt(e.target.value)} 
+                  rows={4} 
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAiPromptOpen(false)}>Cancelar</Button>
+                <Button onClick={handleAIGenerate} disabled={aiLoading || !aiPrompt}>
+                  {aiLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Gerar Conteúdo
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </CardHeader>
       
@@ -174,6 +224,7 @@ export function CampaignBuilder({
           <RichTextEditor 
             value={campaign.body} 
             onChange={(val) => setCampaign(prev => ({ ...prev, body: val }))} 
+            placeholder="Escreva o conteúdo persuasivo da sua campanha..."
           />
         ) : (
           <div className="p-8 h-full bg-muted/20 overflow-y-auto">
@@ -186,3 +237,4 @@ export function CampaignBuilder({
     </Card>
   );
 }
+
