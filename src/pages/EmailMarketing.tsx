@@ -280,43 +280,69 @@ export default function EmailMarketing() {
         <TabsContent value="lists" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Suas Listas na SendPulse</h3>
-            <Dialog open={syncModalOpen} onOpenChange={setSyncModalOpen}>
-              <DialogTrigger asChild>
-                <Button variant="action">
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Sincronizar Leads do CRM
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Sincronizar Leads</DialogTitle>
-                  <DialogDescription>
-                    Selecione a lista de destino na SendPulse para importar leads "Ganhos" ou "Em Contato".
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                  <Select onValueChange={setSelectedBook} value={selectedBook}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma lista..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {addressBooks.map(book => (
-                        <SelectItem key={book.id} value={book.id.toString()}>
-                          {book.name} ({book.all_email_count} contatos)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setSyncModalOpen(false)}>Cancelar</Button>
-                  <Button onClick={handleSyncLeads} disabled={syncing || !selectedBook}>
-                    {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Sincronizar agora
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <div className="flex gap-2">
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline">➕ Nova Lista</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Nova Lista</DialogTitle>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <Input 
+                      placeholder="Nome da Lista" 
+                      value={newListName} 
+                      onChange={(e) => setNewListName(e.target.value)} 
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={handleCreateList} disabled={!newListName}>Criar</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={syncModalOpen} onOpenChange={setSyncModalOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">🔄 Sincronizar do CRM</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Sincronizar Leads</DialogTitle>
+                    <DialogDescription>
+                      Selecione a lista de destino na SendPulse para importar leads "Ganhos" ou "Em Contato".
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <Select onValueChange={setSelectedBook} value={selectedBook}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma lista..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {addressBooks.map(book => (
+                          <SelectItem key={book.id} value={book.id.toString()}>
+                            {book.name} ({book.all_email_count} contatos)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setSyncModalOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleSyncLeads} disabled={syncing || !selectedBook}>
+                      {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Sincronizar agora
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              <Button onClick={() => setImportOpen(true)}>📥 Importar Planilha</Button>
+            </div>
+            <ImportSendpulseDialog 
+              open={importOpen} 
+              onOpenChange={setImportOpen} 
+              addressBooks={addressBooks} 
+              onSuccess={fetchAddressBooks} 
+            />
           </div>
 
           <Card>
