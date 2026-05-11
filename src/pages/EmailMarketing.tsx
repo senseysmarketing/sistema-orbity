@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users } from "lucide-react";
+import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users, RefreshCw, AlertCircle, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgency } from "@/hooks/useAgency";
@@ -22,6 +22,8 @@ import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function EmailMarketing() {
   const { currentAgency } = useAgency();
@@ -32,8 +34,8 @@ export default function EmailMarketing() {
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [selectedBook, setSelectedBook] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
-  const [balance, setBalance] = useState<any>(null);
-  const [loadingBalance, setLoadingBalance] = useState(false);
+  const [accountInfo, setAccountInfo] = useState<any>(null);
+  const [loadingInfo, setLoadingInfo] = useState(false);
   const [selectedBookContacts, setSelectedBookContacts] = useState<number | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [newListName, setNewListName] = useState("");
