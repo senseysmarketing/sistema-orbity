@@ -5,11 +5,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, RefreshCw, AlertCircle } from "lucide-react";
+import { Loader2, RefreshCw, AlertCircle, Calendar } from "lucide-react";
 import { useLeadStatuses } from "@/hooks/useLeadStatuses";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAgency } from "@/hooks/useAgency";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { DateRange } from "react-day-picker";
 
 interface SyncCRMDialogProps {
   open: boolean;
@@ -27,6 +29,7 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
   const [syncing, setSyncing] = useState(false);
   const [previewCount, setPreviewCount] = useState<number>(0);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   useEffect(() => {
     if (open) {
@@ -34,27 +37,38 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
       setSelectedStatuses([]);
       setTargetBookId("");
       setPreviewCount(0);
+      setDateRange(undefined);
     }
   }, [open]);
 
   useEffect(() => {
-    if (selectedStatuses.length > 0) {
-      updatePreviewCount();
-    } else {
-      setPreviewCount(0);
-    }
-  }, [selectedStatuses]);
+    updatePreviewCount();
+  }, [selectedStatuses, dateRange]);
 
   async function updatePreviewCount() {
-    if (!currentAgency?.id) return;
+    if (!currentAgency?.id || selectedStatuses.length === 0) {
+      setPreviewCount(0);
+      return;
+    }
+    
     setLoadingPreview(true);
     try {
-      const { count, error } = await supabase
+      let query = supabase
         .from('leads')
         .select('*', { count: 'exact', head: true })
         .eq('agency_id', currentAgency.id)
         .not('email', 'is', null)
+        .neq('email', '')
         .in('status', selectedStatuses);
+      
+      if (dateRange?.from) {
+        query = query.gte('created_at', dateRange.from.toISOString());
+      }
+      if (dateRange?.to) {
+        query = query.lte('created_at', dateRange.to.toISOString());
+      }
+      
+      const { count, error } = await query;
       
       if (error) throw error;
       setPreviewCount(count || 0);
@@ -74,17 +88,27 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
   };
 
   async function handleSync() {
-    if (!targetBookId || selectedStatuses.length === 0) return;
+    if (!targetBookId || selectedStatuses.length === 0 || previewCount === 0) return;
     
     setSyncing(true);
     try {
       // 1. Fetch leads with email and name
-      const { data: leads, error: leadsError } = await supabase
+      let query = supabase
         .from('leads')
         .select('email, name')
         .eq('agency_id', currentAgency?.id)
         .not('email', 'is', null)
+        .neq('email', '')
         .in('status', selectedStatuses);
+
+      if (dateRange?.from) {
+        query = query.gte('created_at', dateRange.from.toISOString());
+      }
+      if (dateRange?.to) {
+        query = query.lte('created_at', dateRange.to.toISOString());
+      }
+
+      const { data: leads, error: leadsError } = await query;
 
       if (leadsError) throw leadsError;
 
@@ -93,10 +117,10 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
         return;
       }
 
-      // 2. Format for SendPulse
+      // 2. Format for SendPulse - mapping Nome: lead.name
       const formattedEmails = leads.map(l => ({
         email: l.email,
-        variables: { name: l.name || "" }
+        variables: { Nome: l.name || "" }
       }));
 
       // 3. Call Edge Function
@@ -165,6 +189,21 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
                   ))
                 )}
               </div>
+              
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Período de Criação
+                </Label>
+                <DateRangePicker 
+                  date={dateRange} 
+                  onDateChange={setDateRange}
+                  className="w-full"
+                />
+                <p className="text-[10px] text-muted-foreground italic">
+                  Opcional: se vazio, sincroniza todo o histórico.
+                </p>
+              </div>
 
               {selectedStatuses.length > 0 && (
                 <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 flex items-center gap-3">
@@ -212,7 +251,7 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
           {step === 1 ? (
             <Button 
               className="w-full" 
-              disabled={selectedStatuses.length === 0 || loadingPreview}
+              disabled={selectedStatuses.length === 0 || loadingPreview || previewCount === 0}
               onClick={() => setStep(2)}
             >
               Próximo Passo
@@ -224,7 +263,7 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
               </Button>
               <Button 
                 className="flex-1" 
-                disabled={!targetBookId || syncing}
+                disabled={!targetBookId || syncing || previewCount === 0}
                 onClick={handleSync}
               >
                 {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
