@@ -86,7 +86,7 @@ export function EditContactDialog({ open, onOpenChange, bookId, contact, onSucce
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="edit-name">Nome (Variável Magic)</Label>
+            <Label htmlFor="edit-name">Nome</Label>
             <Input
               id="edit-name"
               placeholder="Nome completo"
@@ -95,7 +95,7 @@ export function EditContactDialog({ open, onOpenChange, bookId, contact, onSucce
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="edit-phone">Telefone (Variável Magic)</Label>
+            <Label htmlFor="edit-phone">Telefone</Label>
             <Input
               id="edit-phone"
               placeholder="+55 00 00000-0000"
