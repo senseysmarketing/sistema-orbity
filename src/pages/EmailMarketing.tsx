@@ -111,19 +111,20 @@ export default function EmailMarketing() {
       setSelectedBookContacts(book.all_email_count);
     }
   }
+
+  async function handleSyncLeads() {
     if (!selectedBook) {
       toast.error("Selecione uma lista de destino");
       return;
     }
     setSyncing(true);
     try {
-      // Fetch won leads with email
       const { data: leads, error: leadsError } = await supabase
         .from('leads')
         .select('email, name')
         .eq('agency_id', currentAgency?.id)
         .not('email', 'is', null)
-        .in('status', ['ganhos', 'em_contato']); // Simplified status filter
+        .in('status', ['ganhos', 'em_contato']);
 
       if (leadsError) throw leadsError;
       if (!leads || leads.length === 0) {
