@@ -484,7 +484,7 @@ export default function EmailMarketing() {
         </TabsContent>
 
         <TabsContent value="campaign" className="pt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-10 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
             {/* Coluna Esquerda: O Estúdio (70%) */}
             <div className="lg:col-span-7">
               <Card className="border shadow-sm overflow-hidden min-h-[600px] flex flex-col">
