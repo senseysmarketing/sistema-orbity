@@ -42,14 +42,10 @@ export default function EmailMarketing() {
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
-  const [syncModalOpen, setSyncModalOpen] = useState(false);
-  const [selectedBook, setSelectedBook] = useState<string>("");
-  const [syncing, setSyncing] = useState(false);
+  const [targetBookId, setTargetBookId] = useState<string>("");
   const [accountInfo, setAccountInfo] = useState<any>(null);
   const [loadingInfo, setLoadingInfo] = useState(false);
   const [selectedBookContacts, setSelectedBookContacts] = useState<number | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
-  const [newListName, setNewListName] = useState("");
   const [scheduled, setScheduled] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [scheduledTime, setScheduledTime] = useState("09:00");
