@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Search } from "lucide-react";
+import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Search, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgency } from "@/hooks/useAgency";
@@ -484,45 +484,47 @@ export default function EmailMarketing() {
         </TabsContent>
 
         <TabsContent value="campaign" className="pt-4">
-          <div className="grid grid-cols-1 lg:grid-cols-10 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
             {/* Coluna Esquerda: O Estúdio (70%) */}
-            <div className="lg:col-span-7 space-y-4">
-              <div className="flex justify-between items-center px-2">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary/60" />
-                  Estúdio de Criação
-                </h3>
-                <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="gap-2 border-primary/20 text-primary hover:bg-primary/5 shadow-sm rounded-full px-4">
-                      ✨ Escrever com IA
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>O que você quer escrever?</DialogTitle>
-                      <DialogDescription>Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.</DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                      <Textarea placeholder="Ex: Oferta de serviço de gestão de tráfego para novos leads..." value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={4} />
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setAiPromptOpen(false)}>Cancelar</Button>
-                      <Button onClick={handleAIGenerate} disabled={aiLoading || !aiPrompt}>
-                        {aiLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Gerar Conteúdo
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-              
+            <div className="lg:col-span-7">
               <Card className="border shadow-sm overflow-hidden min-h-[600px] flex flex-col">
-                <Textarea 
-                  placeholder="Escreva aqui o corpo do e-mail (aceita HTML)..." 
-                  className="flex-1 font-mono text-sm p-6 leading-relaxed border-none focus-visible:ring-0 resize-none bg-card/10"
-                  value={campaign.body}
-                  onChange={e => setCampaign(prev => ({ ...prev, body: e.target.value }))}
-                />
+                <CardHeader className="flex flex-row items-center justify-between pb-4 border-b space-y-0">
+                  <div className="space-y-1">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-primary" /> Estúdio de Criação
+                    </CardTitle>
+                  </div>
+                  <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <Sparkles className="h-4 w-4" /> Escrever com IA
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>O que você quer escrever?</DialogTitle>
+                        <DialogDescription>Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.</DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4">
+                        <Textarea placeholder="Ex: Oferta de serviço de gestão de tráfego para novos leads..." value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={4} />
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setAiPromptOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleAIGenerate} disabled={aiLoading || !aiPrompt}>
+                          {aiLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Gerar Conteúdo
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </CardHeader>
+                <div className="flex-1 flex flex-col">
+                  <Textarea 
+                    placeholder="Escreva aqui o corpo do e-mail (aceita HTML)..." 
+                    className="flex-1 font-mono text-sm p-6 leading-relaxed border-none focus-visible:ring-0 resize-none bg-card/10"
+                    value={campaign.body}
+                    onChange={e => setCampaign(prev => ({ ...prev, body: e.target.value }))}
+                  />
+                </div>
               </Card>
             </div>
 
