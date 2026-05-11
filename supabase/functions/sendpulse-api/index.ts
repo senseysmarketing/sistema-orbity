@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface SendPulseAction {
-  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info' | 'get_campaigns' | 'get_campaign_stats' | 'cancel_campaign' | 'update_addressbook' | 'delete_addressbook' | 'get_contacts' | 'get_senders' | 'add_sender';
+  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info' | 'get_campaigns' | 'get_campaign_stats' | 'cancel_campaign' | 'update_addressbook' | 'delete_addressbook' | 'get_contacts' | 'get_senders' | 'add_sender' | 'send_test_email';
   book_id?: number;
   campaign_id?: number;
   emails?: { email: string; variables?: Record<string, string> }[];
@@ -17,6 +17,7 @@ interface SendPulseAction {
   body?: string;
   send_date?: string;
   name?: string;
+  target_email?: string;
 }
 
 serve(async (req) => {
@@ -242,6 +243,39 @@ serve(async (req) => {
         body: JSON.stringify({
           email: params.sender_email,
           name: params.name
+        }),
+      });
+      result = await res.json();
+    } else if (action === 'send_test_email') {
+      const { sender_name, sender_email, subject, body, target_email } = params;
+      if (!sender_name || !sender_email || !subject || !body || !target_email) {
+        throw new Error('Missing test email parameters');
+      }
+
+      const res = await fetch('https://api.sendpulse.com/smtp/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: {
+            html: btoa(unescape(encodeURIComponent(body))), // Some APIs expect base64, but SendPulse SMTP docs usually say string. Let's check.
+            // Actually, the user instruction says: "html": "string do body"
+            // Wait, the create_campaign uses btoa. Let's stick to what the user said for SMTP.
+            html: body,
+            text: body.replace(/<[^>]*>?/gm, ''), // Simple strip tags
+            subject,
+            from: {
+              name: sender_name,
+              email: sender_email
+            },
+            to: [
+              {
+                email: target_email
+              }
+            ]
+          }
         }),
       });
       result = await res.json();
