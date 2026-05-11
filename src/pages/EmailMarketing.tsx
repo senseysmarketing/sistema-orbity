@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, RefreshCw, Send, Plus, Search, ExternalLink, Loader2, Users, Wallet } from "lucide-react";
+import { Mail, RefreshCw, Send, Plus, Search, ExternalLink, Loader2, Users, Wallet, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,6 +17,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAIAssist } from "@/hooks/useAIAssist";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { ImportSendpulseDialog } from "@/components/email/ImportSendpulseDialog";
+import { format } from "date-fns";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 export default function EmailMarketing() {
   const { currentAgency } = useAgency();
@@ -30,6 +37,11 @@ export default function EmailMarketing() {
   const [balance, setBalance] = useState<any>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [selectedBookContacts, setSelectedBookContacts] = useState<number | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [newListName, setNewListName] = useState("");
+  const [scheduled, setScheduled] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
+  const [scheduledTime, setScheduledTime] = useState("09:00");
   
   // Campaign form
   const [campaign, setCampaign] = useState({
@@ -157,6 +169,22 @@ export default function EmailMarketing() {
     }
   }
 
+  async function handleCreateList() {
+    if (!newListName) return;
+    try {
+      const { data, error } = await supabase.functions.invoke('sendpulse-api', {
+        body: { action: 'create_addressbook', name: newListName }
+      });
+      if (error) throw error;
+      toast.success("Lista criada com sucesso!");
+      setNewListName("");
+      fetchAddressBooks();
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao criar lista");
+    }
+  }
+
   async function handleSendCampaign() {
     const { sender_name, sender_email, subject, body, book_id } = campaign;
     if (!sender_name || !sender_email || !subject || !body || !book_id) {
@@ -165,12 +193,19 @@ export default function EmailMarketing() {
     }
 
     setSending(true);
+    let send_date = undefined;
+    if (scheduled && scheduledDate) {
+      const dateStr = format(scheduledDate, 'yyyy-MM-dd');
+      send_date = `${dateStr} ${scheduledTime}:00`;
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke('sendpulse-api', {
         body: { 
           action: 'create_campaign',
           ...campaign,
-          book_id: parseInt(book_id)
+          book_id: parseInt(book_id),
+          send_date
         }
       });
 
@@ -280,43 +315,69 @@ export default function EmailMarketing() {
         <TabsContent value="lists" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Suas Listas na SendPulse</h3>
-            <Dialog open={syncModalOpen} onOpenChange={setSyncModalOpen}>
-              <DialogTrigger asChild>
-                <Button variant="action">
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Sincronizar Leads do CRM
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Sincronizar Leads</DialogTitle>
-                  <DialogDescription>
-                    Selecione a lista de destino na SendPulse para importar leads "Ganhos" ou "Em Contato".
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                  <Select onValueChange={setSelectedBook} value={selectedBook}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma lista..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {addressBooks.map(book => (
-                        <SelectItem key={book.id} value={book.id.toString()}>
-                          {book.name} ({book.all_email_count} contatos)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setSyncModalOpen(false)}>Cancelar</Button>
-                  <Button onClick={handleSyncLeads} disabled={syncing || !selectedBook}>
-                    {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Sincronizar agora
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <div className="flex gap-2">
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline">➕ Nova Lista</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Nova Lista</DialogTitle>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <Input 
+                      placeholder="Nome da Lista" 
+                      value={newListName} 
+                      onChange={(e) => setNewListName(e.target.value)} 
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={handleCreateList} disabled={!newListName}>Criar</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={syncModalOpen} onOpenChange={setSyncModalOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">🔄 Sincronizar do CRM</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Sincronizar Leads</DialogTitle>
+                    <DialogDescription>
+                      Selecione a lista de destino na SendPulse para importar leads "Ganhos" ou "Em Contato".
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4">
+                    <Select onValueChange={setSelectedBook} value={selectedBook}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma lista..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {addressBooks.map(book => (
+                          <SelectItem key={book.id} value={book.id.toString()}>
+                            {book.name} ({book.all_email_count} contatos)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setSyncModalOpen(false)}>Cancelar</Button>
+                    <Button onClick={handleSyncLeads} disabled={syncing || !selectedBook}>
+                      {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Sincronizar agora
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              <Button onClick={() => setImportOpen(true)}>📥 Importar Planilha</Button>
+            </div>
+            <ImportSendpulseDialog 
+              open={importOpen} 
+              onOpenChange={setImportOpen} 
+              addressBooks={addressBooks} 
+              onSuccess={fetchAddressBooks} 
+            />
           </div>
 
           <Card>
@@ -357,123 +418,182 @@ export default function EmailMarketing() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="campaign">
           <Card>
             <CardHeader>
               <CardTitle>Detalhes da Campanha</CardTitle>
               <CardDescription>Configure os parâmetros de envio e o conteúdo do e-mail.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Nome do Remetente</label>
-                  <Input 
-                    placeholder="Ex: Orbity Marketing" 
-                    value={campaign.sender_name}
-                    onChange={e => setCampaign(prev => ({ ...prev, sender_name: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">E-mail do Remetente</label>
-                  <Input 
-                    type="email" 
-                    placeholder="Ex: contato@suaagencia.com" 
-                    value={campaign.sender_email}
-                    onChange={e => setCampaign(prev => ({ ...prev, sender_email: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Assunto</label>
-                <Input 
-                  placeholder="Assunto do e-mail..." 
-                  value={campaign.subject}
-                  onChange={e => setCampaign(prev => ({ ...prev, subject: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Lista de Destino</label>
-                <Select onValueChange={handleBookSelect} value={campaign.book_id}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione para quem enviar..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {addressBooks.map(book => (
-                      <SelectItem key={book.id} value={book.id.toString()}>
-                        {book.name} ({book.all_email_count} contatos)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedBookContacts !== null && (
-                  <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground px-1">
-                    <Users className="h-3 w-3" />
-                    <span>Esta lista possui <strong>{selectedBookContacts}</strong> contatos.</span>
-                    {getEmailBalance() !== null && selectedBookContacts > (getEmailBalance() || 0) && (
-                      <span className="text-destructive font-medium flex items-center gap-1">
-                        (Saldo insuficiente: {getEmailBalance()?.toLocaleString()})
-                      </span>
-                    )}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Column: Editor */}
+                <div className="lg:col-span-2 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <label className="text-sm font-medium">Conteúdo do E-mail</label>
+                    <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-2 border-primary/20 text-primary hover:bg-primary/5">
+                          <Plus className="h-4 w-4" />
+                          ✨ Escrever com IA
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>O que você quer escrever?</DialogTitle>
+                          <DialogDescription>
+                            Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                          <Textarea 
+                            placeholder="Ex: Oferta de serviço de gestão de tráfego para novos leads..." 
+                            value={aiPrompt}
+                            onChange={e => setAiPrompt(e.target.value)}
+                            rows={4}
+                          />
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setAiPromptOpen(false)}>Cancelar</Button>
+                          <Button onClick={handleAIGenerate} disabled={aiLoading || !aiPrompt}>
+                            {aiLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Gerar Conteúdo
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </div>
-                )}
-              </div>
+                  <Textarea 
+                    placeholder="Escreva aqui o corpo do e-mail (aceita HTML)..." 
+                    className="min-h-[450px] font-mono text-sm p-4 leading-relaxed"
+                    value={campaign.body}
+                    onChange={e => setCampaign(prev => ({ ...prev, body: e.target.value }))}
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-sm font-medium">Conteúdo do E-mail</label>
-                  <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="secondary" size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" />
-                        Escrever com IA
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>O que você quer escrever?</DialogTitle>
-                        <DialogDescription>
-                          Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="py-4">
-                        <Textarea 
-                          placeholder="Ex: Oferta de serviço de gestão de tráfego para novos leads..." 
-                          value={aiPrompt}
-                          onChange={e => setAiPrompt(e.target.value)}
-                          rows={4}
+                {/* Right Column: Settings */}
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Informações Básicas</h4>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Nome do Remetente</label>
+                        <Input 
+                          placeholder="Ex: Orbity Marketing" 
+                          value={campaign.sender_name}
+                          onChange={e => setCampaign(prev => ({ ...prev, sender_name: e.target.value }))}
                         />
                       </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setAiPromptOpen(false)}>Cancelar</Button>
-                        <Button onClick={handleAIGenerate} disabled={aiLoading || !aiPrompt}>
-                          {aiLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                          Gerar Conteúdo
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-                <Textarea 
-                  placeholder="Escreva aqui o corpo do e-mail (aceita HTML)..." 
-                  className="min-h-[300px] font-mono text-sm"
-                  value={campaign.body}
-                  onChange={e => setCampaign(prev => ({ ...prev, body: e.target.value }))}
-                />
-              </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">E-mail do Remetente</label>
+                        <Input 
+                          type="email" 
+                          placeholder="Ex: contato@suaagencia.com" 
+                          value={campaign.sender_email}
+                          onChange={e => setCampaign(prev => ({ ...prev, sender_email: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Assunto</label>
+                        <Input 
+                          placeholder="Assunto do e-mail..." 
+                          value={campaign.subject}
+                          onChange={e => setCampaign(prev => ({ ...prev, subject: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Lista de Destino</label>
+                        <Select onValueChange={handleBookSelect} value={campaign.book_id}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione para quem enviar..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {addressBooks.map(book => (
+                              <SelectItem key={book.id} value={book.id.toString()}>
+                                {book.name} ({book.all_email_count})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="flex justify-end pt-4 border-t">
-                <Button 
-                  variant="action" 
-                  size="lg" 
-                  className="gap-2" 
-                  onClick={handleSendCampaign}
-                  disabled={sending}
-                >
-                  {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Enviar Campanha
-                </Button>
+                  <Separator />
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Agendamento</h4>
+                      <Switch checked={scheduled} onCheckedChange={setScheduled} />
+                    </div>
+                    
+                    {scheduled ? (
+                      <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Data</label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !scheduledDate && "text-muted-foreground"
+                                )}
+                              >
+                                <Calendar className="mr-2 h-4 w-4" />
+                                {scheduledDate ? format(scheduledDate, "PPP") : <span>Selecione uma data</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={scheduledDate}
+                                onSelect={setScheduledDate}
+                                initialFocus
+                                disabled={(date) => date < new Date()}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Horário</label>
+                          <Select value={scheduledTime} onValueChange={setScheduledTime}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 24 }).map((_, i) => (
+                                <SelectItem key={i} value={`${String(i).padStart(2, '0')}:00`}>
+                                  {String(i).padStart(2, '0')}:00
+                                </SelectItem>
+                              ))}
+                              {Array.from({ length: 24 }).map((_, i) => (
+                                <SelectItem key={i + 24} value={`${String(i).padStart(2, '0')}:30`}>
+                                  {String(i).padStart(2, '0')}:30
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">
+                        A campanha será disparada imediatamente para todos os contatos da lista.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="pt-4">
+                    <Button 
+                      variant="action" 
+                      size="lg" 
+                      className="w-full gap-2 h-12 text-base font-semibold" 
+                      onClick={handleSendCampaign}
+                      disabled={sending}
+                    >
+                      {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                      {scheduled ? "Agendar Campanha" : "Disparar Campanha Agora"}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
