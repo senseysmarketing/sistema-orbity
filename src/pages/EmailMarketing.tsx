@@ -276,44 +276,53 @@ export default function EmailMarketing() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col gap-6">
         <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-3xl font-bold tracking-tight">E-mail Marketing</h2>
-            {configured && accountInfo && (
-              <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 px-3 py-1">
-                {accountInfo.pricing_plan}
-              </Badge>
-            )}
-          </div>
-          <p className="text-muted-foreground">Crie campanhas e gerencie suas listas de contatos com IA.</p>
+          <h2 className="text-3xl font-bold tracking-tight">E-mail Marketing</h2>
+          <p className="text-muted-foreground">Gestão profissional de campanhas e listas com inteligência artificial.</p>
         </div>
-        {configured && (
-          <div className="flex flex-wrap items-center gap-6 bg-card border rounded-xl p-4 shadow-sm animate-in fade-in slide-in-from-right-4 duration-500">
-            <div className="space-y-1.5 min-w-[160px]">
-              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> E-mails</span>
-                <span>{getEmailUsage().sent.toLocaleString()} / {getEmailUsage().limit.toLocaleString()}</span>
-              </div>
-              <Progress value={getEmailUsage().percent} className="h-1.5" />
-            </div>
-            <Separator orientation="vertical" className="h-8 hidden md:block" />
-            <div className="space-y-1.5 min-w-[160px]">
-              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Contatos</span>
-                <span>{getContactUsage().total.toLocaleString()} / {getContactUsage().limit.toLocaleString()}</span>
-              </div>
-              <Progress value={getContactUsage().percent} className="h-1.5" />
-            </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
-              onClick={() => { fetchAddressBooks(); fetchAccountInfo(); }}
-              disabled={loadingInfo}
-            >
-              <RefreshCw className={cn("h-4 w-4", loadingInfo && "animate-spin")} />
-            </Button>
+
+        {configured && accountInfo && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Card 1: Plano */}
+            <Card className="bg-card/20 border shadow-none">
+              <CardContent className="p-4 flex flex-col justify-between h-full space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Seu Plano</span>
+                  <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-bold">
+                    {accountInfo.pricing_plan}
+                  </Badge>
+                </div>
+                <div className="flex items-end justify-between">
+                  <span className="text-sm font-semibold">SendPulse Connected</span>
+                  <TrendingUp className="h-4 w-4 text-primary opacity-50" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 2: E-mails */}
+            <Card className="bg-card/20 border shadow-none">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Volume Mensal (E-mails)</span>
+                  <span className="text-xs font-bold">{getEmailUsage().sent.toLocaleString()} / {getEmailUsage().limit.toLocaleString()}</span>
+                </div>
+                <Progress value={getEmailUsage().percent} className="h-1.5" />
+                <p className="text-[10px] text-muted-foreground">Uso de quota atual no mês</p>
+              </CardContent>
+            </Card>
+
+            {/* Card 3: Base */}
+            <Card className="bg-card/20 border shadow-none">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Base de Contatos</span>
+                  <span className="text-xs font-bold">{getContactUsage().total.toLocaleString()} / {getContactUsage().limit.toLocaleString()}</span>
+                </div>
+                <Progress value={getContactUsage().percent} className="h-1.5" />
+                <p className="text-[10px] text-muted-foreground">Capacidade total de contatos únicos</p>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
