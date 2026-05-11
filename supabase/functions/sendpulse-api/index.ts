@@ -7,8 +7,9 @@ const corsHeaders = {
 };
 
 interface SendPulseAction {
-  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info';
+  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info' | 'get_campaigns' | 'get_campaign_stats' | 'cancel_campaign';
   book_id?: number;
+  campaign_id?: number;
   emails?: { email: string; variables?: Record<string, string> }[];
   sender_name?: string;
   sender_email?: string;
