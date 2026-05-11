@@ -7,13 +7,15 @@ const corsHeaders = {
 };
 
 interface SendPulseAction {
-  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details';
+  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook';
   book_id?: number;
   emails?: { email: string; variables?: Record<string, string> }[];
   sender_name?: string;
   sender_email?: string;
   subject?: string;
   body?: string;
+  send_date?: string;
+  name?: string;
 }
 
 serve(async (req) => {
@@ -79,6 +81,17 @@ serve(async (req) => {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
       result = await res.json();
+    } else if (action === 'create_addressbook') {
+      if (!params.name) throw new Error('name is required');
+      const res = await fetch('https://api.sendpulse.com/addressbooks', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ bookName: params.name }),
+      });
+      result = await res.json();
     } else if (action === 'get_addressbook_details') {
       if (!params.book_id) throw new Error('book_id is required');
       const res = await fetch(`https://api.sendpulse.com/addressbooks/${params.book_id}`, {
@@ -102,7 +115,7 @@ serve(async (req) => {
       });
       result = await res.json();
     } else if (action === 'create_campaign') {
-      const { sender_name, sender_email, subject, body, book_id } = params;
+      const { sender_name, sender_email, subject, body, book_id, send_date } = params;
       if (!sender_name || !sender_email || !subject || !body || !book_id) {
         throw new Error('Missing campaign parameters');
       }
@@ -143,6 +156,7 @@ serve(async (req) => {
           subject,
           body: btoa(unescape(encodeURIComponent(body))), // Base64 encoded HTML
           list_id: book_id,
+          send_date: send_date || undefined,
         }),
       });
 
