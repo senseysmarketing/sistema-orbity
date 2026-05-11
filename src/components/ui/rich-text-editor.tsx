@@ -16,8 +16,8 @@ import {
   RotateCw,
   Quote
 } from 'lucide-react';
-import { Toggle } from './toggle';
-import { Button } from './button';
+import { Toggle } from "@/components/ui/toggle";
+import { Button } from "@/components/ui/button";
 import { useEffect } from 'react';
 
 interface RichTextEditorProps {
