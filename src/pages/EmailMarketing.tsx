@@ -74,6 +74,9 @@ export default function EmailMarketing() {
       } else {
         setConfigured(false);
       }
+      if (data?.sendpulse_client_id) {
+        fetchAccountInfo();
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -94,24 +97,36 @@ export default function EmailMarketing() {
     }
   }
 
-  async function fetchBalance() {
-    setLoadingBalance(true);
+  async function fetchAccountInfo() {
+    setLoadingInfo(true);
     try {
       const { data, error } = await supabase.functions.invoke('sendpulse-api', {
-        body: { action: 'get_balance' }
+        body: { action: 'get_account_info' }
       });
       if (error) throw error;
-      setBalance(data);
+      setAccountInfo(data);
     } catch (e) {
       console.error(e);
+      toast.error("Erro ao carregar informações da conta");
     } finally {
-      setLoadingBalance(false);
+      setLoadingInfo(false);
     }
   }
 
-  const getEmailBalance = () => {
-    if (!balance) return null;
-    return balance?.email?.emails_left ?? balance?.email?.balance ?? balance?.[0]?.balance ?? 0;
+  const getEmailUsage = () => {
+    if (!accountInfo) return { sent: 0, limit: 0, percent: 0 };
+    const sent = accountInfo.email_qty || 0;
+    const limit = accountInfo.email_limit || 0;
+    const percent = limit > 0 ? (sent / limit) * 100 : 0;
+    return { sent, limit, percent };
+  };
+
+  const getContactUsage = () => {
+    if (!accountInfo) return { total: 0, limit: 0, percent: 0 };
+    const total = addressBooks.reduce((acc, book) => acc + (book.all_email_count || 0), 0);
+    const limit = accountInfo.addressbook_limit || 0;
+    const percent = limit > 0 ? (total / limit) * 100 : 0;
+    return { total, limit, percent };
   };
 
   async function handleBookSelect(val: string) {
