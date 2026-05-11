@@ -95,10 +95,10 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
     
     setSyncing(true);
     try {
-      // 1. Fetch leads with email and name
+      // 1. Fetch leads with email, name and phone
       let query = supabase
         .from('leads')
-        .select('email, name')
+        .select('email, name, phone')
         .eq('agency_id', currentAgency?.id)
         .not('email', 'is', null)
         .neq('email', '')
@@ -123,10 +123,13 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
         return;
       }
 
-      // 2. Format for SendPulse - mapping Nome: lead.name
+      // 2. Format for SendPulse - mapping Nome: lead.name, Telefone: lead.phone
       const formattedEmails = leads.map(l => ({
         email: l.email,
-        variables: { Nome: l.name || "" }
+        variables: { 
+          Nome: l.name || "",
+          Telefone: l.phone || ""
+        }
       }));
 
       // 3. Call Edge Function

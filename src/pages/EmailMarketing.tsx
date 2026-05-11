@@ -414,7 +414,13 @@ export default function EmailMarketing() {
                     <DialogContent>
                       <DialogHeader>
                         <DialogTitle>O que você quer escrever?</DialogTitle>
-                        <DialogDescription>Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.</DialogDescription>
+                        <DialogDescription>
+                          Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.
+                          <br />
+                          <span className="text-[10px] text-primary font-medium">
+                            Dica: Você pode pedir para a IA usar as variáveis {"{{Nome}}"} e {"{{Telefone}}"} no texto.
+                          </span>
+                        </DialogDescription>
                       </DialogHeader>
                       <div className="py-4">
                         <Textarea placeholder="Ex: Oferta de serviço de gestão de tráfego para novos leads..." value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={4} />
