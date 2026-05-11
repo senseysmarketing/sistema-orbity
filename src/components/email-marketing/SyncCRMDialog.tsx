@@ -22,7 +22,7 @@ interface SyncCRMDialogProps {
 
 export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: SyncCRMDialogProps) {
   const { currentAgency } = useAgency();
-  const { statuses, loading: loadingStatuses } = useLeadStatuses();
+  const { statuses, loading: loadingStatuses, mapDisplayStatusToDatabase } = useLeadStatuses();
   const [step, setStep] = useState(1);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [targetBookId, setTargetBookId] = useState<string>("");
@@ -65,7 +65,9 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
         query = query.gte('created_at', dateRange.from.toISOString());
       }
       if (dateRange?.to) {
-        query = query.lte('created_at', dateRange.to.toISOString());
+        const toDate = new Date(dateRange.to);
+        toDate.setHours(23, 59, 59, 999);
+        query = query.lte('created_at', toDate.toISOString());
       }
       
       const { count, error } = await query;
@@ -79,11 +81,12 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
     }
   }
 
-  const toggleStatus = (statusId: string) => {
+  const toggleStatus = (statusName: string) => {
+    const dbStatus = mapDisplayStatusToDatabase(statusName);
     setSelectedStatuses(prev => 
-      prev.includes(statusId) 
-        ? prev.filter(s => s !== statusId)
-        : [...prev, statusId]
+      prev.includes(dbStatus) 
+        ? prev.filter(s => s !== dbStatus)
+        : [...prev, dbStatus]
     );
   };
 
@@ -105,7 +108,10 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
         query = query.gte('created_at', dateRange.from.toISOString());
       }
       if (dateRange?.to) {
-        query = query.lte('created_at', dateRange.to.toISOString());
+        // Set to end of day to include all leads from that day
+        const toDate = new Date(dateRange.to);
+        toDate.setHours(23, 59, 59, 999);
+        query = query.lte('created_at', toDate.toISOString());
       }
 
       const { data: leads, error: leadsError } = await query;
@@ -169,24 +175,27 @@ export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: S
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  statuses?.map((status: any) => (
-                    <div key={status.id} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-secondary/50 transition-colors">
-                      <Checkbox 
-                        id={`status-${status.id}`} 
-                        checked={selectedStatuses.includes(status.id)}
-                        onCheckedChange={() => toggleStatus(status.id)}
-                      />
-                      <Label 
-                        htmlFor={`status-${status.id}`} 
-                        className="flex-1 cursor-pointer flex items-center justify-between"
-                      >
-                        <span className="capitalize">{status.name.replace(/_/g, ' ')}</span>
-                        <Badge variant="outline" className="text-[10px] uppercase font-bold">
-                          {status.id}
-                        </Badge>
-                      </Label>
-                    </div>
-                  ))
+                  statuses?.map((status: any) => {
+                    const dbStatus = mapDisplayStatusToDatabase(status.name);
+                    return (
+                      <div key={status.id} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-secondary/50 transition-colors">
+                        <Checkbox 
+                          id={`status-${status.id}`} 
+                          checked={selectedStatuses.includes(dbStatus)}
+                          onCheckedChange={() => toggleStatus(status.name)}
+                        />
+                        <Label 
+                          htmlFor={`status-${status.id}`} 
+                          className="flex-1 cursor-pointer flex items-center justify-between"
+                        >
+                          <span className="capitalize">{status.name}</span>
+                          <Badge variant="outline" className="text-[10px] uppercase font-bold">
+                            {dbStatus}
+                          </Badge>
+                        </Label>
+                      </div>
+                    );
+                  })
                 )}
               </div>
               
