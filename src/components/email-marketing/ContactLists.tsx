@@ -183,7 +183,7 @@ export function ContactLists({ addressBooks, onRefresh }: ContactListsProps) {
               <TableRow key={book.id}>
                 <TableCell className="font-medium">{book.name}</TableCell>
                 <TableCell>{book.all_email_count}</TableCell>
-                <TableCell>{new Date(book.created).toLocaleDateString()}</TableCell>
+                <TableCell>{book.creation_date || book.created ? new Date(book.creation_date || book.created).toLocaleDateString() : '-'}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
