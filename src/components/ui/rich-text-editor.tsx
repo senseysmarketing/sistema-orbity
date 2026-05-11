@@ -105,7 +105,7 @@ export function RichTextEditor({ value, onChange, placeholder = 'Escreva sua cam
           onPressedChange={() => editor.chain().focus().toggleUnderline().run()}
           aria-label="Toggle underline"
         >
-          <span className="underline font-bold decoration-2">U</span>
+          <UnderlineIcon className="h-4 w-4" />
         </Toggle>
         <Toggle
           size="sm"
