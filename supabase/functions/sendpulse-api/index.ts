@@ -75,7 +75,7 @@ serve(async (req) => {
 
     let result;
     if (action === 'get_balance') {
-      const res = await fetch('https://api.sendpulse.com/balance', {
+      const res = await fetch('https://api.sendpulse.com/user/balance/detail', {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
       result = await res.json();
@@ -109,16 +109,16 @@ serve(async (req) => {
 
       // Pre-flight check: Get balance and address book size
       const [balanceRes, bookRes] = await Promise.all([
-        fetch('https://api.sendpulse.com/balance', { headers: { 'Authorization': `Bearer ${accessToken}` } }),
+        fetch('https://api.sendpulse.com/user/balance/detail', { headers: { 'Authorization': `Bearer ${accessToken}` } }),
         fetch(`https://api.sendpulse.com/addressbooks/${book_id}`, { headers: { 'Authorization': `Bearer ${accessToken}` } })
       ]);
 
       const balanceData = await balanceRes.json();
       const bookData = await bookRes.json();
 
-      // SendPulse returns balance in an array usually, or direct object. Let's assume emails balance.
-      // Based on docs, it might be { "email": { "balance": 1000, ... } } or similar
-      const emailBalance = balanceData?.email?.balance || balanceData?.[0]?.balance || 0;
+      // SendPulse returns balance in an array usually, or direct object. 
+      // Based on docs for /user/balance/detail, it is { "email": { "emails_left": 1000, ... } }
+      const emailBalance = balanceData?.email?.emails_left ?? balanceData?.email?.balance ?? balanceData?.[0]?.balance ?? 0;
       const contactsCount = bookData?.all_email_count || 0;
 
       if (contactsCount > emailBalance) {

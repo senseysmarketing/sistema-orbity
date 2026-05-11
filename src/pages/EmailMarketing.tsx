@@ -101,7 +101,8 @@ export default function EmailMarketing() {
 
   const getEmailBalance = () => {
     if (!balance) return null;
-    return balance?.email?.balance || balance?.[0]?.balance || 0;
+    // Handle both /user/balance/detail and legacy /balance
+    return balance?.email?.emails_left ?? balance?.email?.balance ?? balance?.[0]?.balance ?? 0;
   };
 
   async function handleBookSelect(val: string) {
