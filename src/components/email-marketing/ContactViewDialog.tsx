@@ -86,7 +86,7 @@ export function ContactViewDialog({ open, onOpenChange, bookId, bookName }: Cont
                       <TableRow key={idx}>
                         <TableCell className="font-medium">{contact.email}</TableCell>
                         <TableCell>{getStatusLabel(contact.status)}</TableCell>
-                        <TableCell>{new Date(contact.add_time).toLocaleDateString()}</TableCell>
+                        <TableCell>{contact.add_time || contact.registration_date ? new Date(contact.add_time || contact.registration_date).toLocaleDateString() : '-'}</TableCell>
                       </TableRow>
                     ))
                   ) : (
