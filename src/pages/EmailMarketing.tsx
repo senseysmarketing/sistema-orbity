@@ -417,20 +417,20 @@ export default function EmailMarketing() {
         </TabsContent>
 
         <TabsContent value="campaign">
-          <Card>
-            <CardHeader>
-              <CardTitle>Detalhes da Campanha</CardTitle>
-              <CardDescription>Configure os parâmetros de envio e o conteúdo do e-mail.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Conteúdo do E-mail</label>
+          <Card className="border-none shadow-none bg-transparent">
+            <CardContent className="p-0 space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Coluna Esquerda: O Estúdio */}
+                <div className="lg:col-span-8 space-y-4">
+                  <div className="flex justify-between items-center bg-card p-4 border rounded-t-xl">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-primary" />
+                      O Estúdio
+                    </h3>
                     <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
                       <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="gap-2 border-primary/20 text-primary hover:bg-primary/5">
-                          <Plus className="h-4 w-4" /> ✨ Escrever com IA
+                        <Button variant="outline" size="sm" className="gap-2 border-primary/20 text-primary hover:bg-primary/5 shadow-sm">
+                          ✨ Escrever com IA
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
@@ -450,87 +450,123 @@ export default function EmailMarketing() {
                       </DialogContent>
                     </Dialog>
                   </div>
-                  <Textarea 
-                    placeholder="Escreva aqui o corpo do e-mail (aceita HTML)..." 
-                    className="min-h-[450px] font-mono text-sm p-4 leading-relaxed"
-                    value={campaign.body}
-                    onChange={e => setCampaign(prev => ({ ...prev, body: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-6">
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Informações Básicas</h4>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Nome do Remetente</label>
-                        <Input placeholder="Ex: Orbity Marketing" value={campaign.sender_name} onChange={e => setCampaign(prev => ({ ...prev, sender_name: e.target.value }))} />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">E-mail do Remetente</label>
-                        <Input type="email" placeholder="Ex: contato@suaagencia.com" value={campaign.sender_email} onChange={e => setCampaign(prev => ({ ...prev, sender_email: e.target.value }))} />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Assunto</label>
-                        <Input placeholder="Assunto do e-mail..." value={campaign.subject} onChange={e => setCampaign(prev => ({ ...prev, subject: e.target.value }))} />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Lista de Destino</label>
-                        <Select onValueChange={handleBookSelect} value={campaign.book_id}>
-                          <SelectTrigger><SelectValue placeholder="Selecione para quem enviar..." /></SelectTrigger>
-                          <SelectContent>
-                            {addressBooks.map(book => (
-                              <SelectItem key={book.id} value={book.id.toString()}>{book.name} ({book.all_email_count})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+                  <div className="bg-card border border-t-0 rounded-b-xl p-6 shadow-sm min-h-[500px]">
+                    <Textarea 
+                      placeholder="Escreva aqui o corpo do e-mail (aceita HTML)..." 
+                      className="min-h-[480px] font-mono text-sm p-4 leading-relaxed border-none focus-visible:ring-0 resize-none bg-transparent"
+                      value={campaign.body}
+                      onChange={e => setCampaign(prev => ({ ...prev, body: e.target.value }))}
+                    />
                   </div>
-                  <Separator />
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Agendamento</h4>
-                      <Switch checked={scheduled} onCheckedChange={setScheduled} />
-                    </div>
-                    {scheduled ? (
-                      <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                </div>
+
+                {/* Coluna Direita: Configuração e Voo */}
+                <div className="lg:col-span-4 space-y-6">
+                  <Card className="shadow-sm border-muted/60">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="text-base font-semibold">Configuração e Voo</CardTitle>
+                      <CardDescription>Ajuste os detalhes finais antes de disparar.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-4">
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Data</label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !scheduledDate && "text-muted-foreground")}>
-                                <Calendar className="mr-2 h-4 w-4" />
-                                {scheduledDate ? format(scheduledDate, "PPP") : <span>Selecione uma data</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <CalendarComponent mode="single" selected={scheduledDate} onSelect={setScheduledDate} initialFocus disabled={(date) => date < new Date()} />
-                            </PopoverContent>
-                          </Popover>
+                          <label className="text-sm font-medium">Remetente</label>
+                          <Input placeholder="Nome (Ex: Orbity)" value={campaign.sender_name} onChange={e => setCampaign(prev => ({ ...prev, sender_name: e.target.value }))} />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-sm font-medium">Horário</label>
-                          <Select value={scheduledTime} onValueChange={setScheduledTime}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
+                          <label className="text-sm font-medium">E-mail do Remetente</label>
+                          <Input type="email" placeholder="contato@suaagencia.com" value={campaign.sender_email} onChange={e => setCampaign(prev => ({ ...prev, sender_email: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Assunto</label>
+                          <Input placeholder="Assunto cativante..." value={campaign.subject} onChange={e => setCampaign(prev => ({ ...prev, subject: e.target.value }))} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Lista de Destino</label>
+                          <Select onValueChange={handleBookSelect} value={campaign.book_id}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Selecione os destinatários..." />
+                            </SelectTrigger>
                             <SelectContent>
-                              {Array.from({ length: 24 }).map((_, i) => (
-                                <SelectItem key={i} value={`${String(i).padStart(2, '0')}:00`}>{String(i).padStart(2, '0')}:00</SelectItem>
-                              ))}
-                              {Array.from({ length: 24 }).map((_, i) => (
-                                <SelectItem key={i + 24} value={`${String(i).padStart(2, '0')}:30`}>{String(i).padStart(2, '0')}:30</SelectItem>
+                              {addressBooks.map(book => (
+                                <SelectItem key={book.id} value={book.id.toString()}>{book.name} ({book.all_email_count} contatos)</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
+                          
+                          {selectedBookContacts !== null && accountInfo && selectedBookContacts > (accountInfo.email_limit - accountInfo.email_qty) && (
+                            <Alert variant="destructive" className="mt-2 py-2 px-3 bg-amber-50 border-amber-200 text-amber-800">
+                              <AlertCircle className="h-4 w-4 text-amber-600" />
+                              <AlertDescription className="text-xs">
+                                Atenção: Esta lista ({selectedBookContacts}) excede o saldo restante do seu plano ({accountInfo.email_limit - accountInfo.email_qty}).
+                              </AlertDescription>
+                            </Alert>
+                          )}
                         </div>
                       </div>
-                    ) : <p className="text-xs text-muted-foreground italic">A campanha será disparada imediatamente para todos os contatos da lista.</p>}
-                  </div>
-                  <div className="pt-4">
-                    <Button variant="action" size="lg" className="w-full gap-2 h-12 text-base font-semibold" onClick={handleSendCampaign} disabled={sending}>
-                      {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                      {scheduled ? "Agendar Campanha" : "Disparar Campanha Agora"}
-                    </Button>
-                  </div>
+
+                      <Separator className="bg-muted/60" />
+
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <h4 className="text-sm font-medium">Agendamento</h4>
+                            <p className="text-xs text-muted-foreground">{scheduled ? "Data/Hora selecionada" : "Enviar imediatamente"}</p>
+                          </div>
+                          <Switch checked={scheduled} onCheckedChange={setScheduled} />
+                        </div>
+                        
+                        {scheduled && (
+                          <div className="space-y-3 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] font-semibold uppercase text-muted-foreground">Data de Envio</label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9", !scheduledDate && "text-muted-foreground")}>
+                                    <Calendar className="mr-2 h-4 w-4" />
+                                    {scheduledDate ? format(scheduledDate, "PPP") : <span>Selecione uma data</span>}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <CalendarComponent mode="single" selected={scheduledDate} onSelect={setScheduledDate} initialFocus disabled={(date) => date < new Date()} />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[11px] font-semibold uppercase text-muted-foreground">Horário</label>
+                              <Select value={scheduledTime} onValueChange={setScheduledTime}>
+                                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {Array.from({ length: 24 }).map((_, i) => (
+                                    <SelectItem key={i} value={`${String(i).padStart(2, '0')}:00`}>{String(i).padStart(2, '0')}:00</SelectItem>
+                                  ))}
+                                  {Array.from({ length: 24 }).map((_, i) => (
+                                    <SelectItem key={i + 24} value={`${String(i).padStart(2, '0')}:30`}>{String(i).padStart(2, '0')}:30</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="pt-2">
+                        <Button 
+                          variant="action" 
+                          size="lg" 
+                          className={cn(
+                            "w-full gap-2 h-12 text-base font-semibold transition-all duration-300 shadow-md",
+                            scheduled ? "bg-amber-600 hover:bg-amber-700" : "bg-primary hover:bg-primary/90"
+                          )} 
+                          onClick={handleSendCampaign} 
+                          disabled={sending}
+                        >
+                          {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : (scheduled ? <Calendar className="h-5 w-5" /> : <Send className="h-5 w-5" />)}
+                          {scheduled ? "🗓️ Confirmar Agendamento" : "🚀 Disparar Agora"}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             </CardContent>
