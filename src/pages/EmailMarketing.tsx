@@ -376,21 +376,28 @@ export default function EmailMarketing() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 max-w-[500px]">
-          <TabsTrigger value="lists">Listas de Contatos</TabsTrigger>
-          <TabsTrigger value="campaign">Nova Campanha</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="lists" className="gap-2">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Listas de Contatos</span>
+          </TabsTrigger>
+          <TabsTrigger value="campaign" className="gap-2">
+            <Send className="h-4 w-4" />
+            <span className="hidden sm:inline">Nova Campanha</span>
+          </TabsTrigger>
           <TabsTrigger value="campaigns" className="gap-2">
-            <BarChart3 className="h-4 w-4" /> Gerenciar Campanhas
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Gerenciar Campanhas</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="lists" className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h3 className="text-lg font-medium">Suas Listas na SendPulse</h3>
             <div className="flex flex-wrap gap-2">
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button variant="outline" className="gap-2">
                     <Plus className="h-4 w-4" /> Nova Lista
                   </Button>
                 </DialogTrigger>
@@ -408,7 +415,7 @@ export default function EmailMarketing() {
               </Dialog>
               <Dialog open={syncModalOpen} onOpenChange={setSyncModalOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button variant="outline" className="gap-2">
                     <Users className="h-4 w-4" /> Sincronizar do CRM
                   </Button>
                 </DialogTrigger>
@@ -436,7 +443,7 @@ export default function EmailMarketing() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-              <Button size="sm" className="gap-2" onClick={() => setImportOpen(true)}>
+              <Button className="gap-2" onClick={() => setImportOpen(true)}>
                 <Mail className="h-4 w-4" /> Importar Planilha
               </Button>
             </div>
@@ -487,7 +494,7 @@ export default function EmailMarketing() {
                 </h3>
                 <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 border-primary/20 text-primary hover:bg-primary/5 shadow-sm rounded-full px-4">
+                    <Button variant="outline" className="gap-2 border-primary/20 text-primary hover:bg-primary/5 shadow-sm rounded-full px-4">
                       ✨ Escrever com IA
                     </Button>
                   </DialogTrigger>
@@ -647,9 +654,9 @@ export default function EmailMarketing() {
         </TabsContent>
 
         <TabsContent value="campaigns" className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h3 className="text-lg font-medium">Relatório de Campanhas</h3>
-            <Button variant="outline" size="sm" className="gap-2" onClick={fetchCampaigns} disabled={loadingCampaigns}>
+            <Button variant="outline" className="gap-2" onClick={fetchCampaigns} disabled={loadingCampaigns}>
               <RefreshCw className={cn("h-4 w-4", loadingCampaigns && "animate-spin")} /> Atualizar
             </Button>
           </div>
