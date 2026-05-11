@@ -88,8 +88,8 @@ export function ImportSendpulseDialog({
       const emails = data.map((row: any) => ({
         email: row.email,
         variables: {
-          name: row.name || "",
-          phone: row.phone || row.telefone || ""
+          Nome: row.nome || row.name || "",
+          Telefone: row.telefone || row.phone || ""
         }
       })).filter(item => item.email);
 

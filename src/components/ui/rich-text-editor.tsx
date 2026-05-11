@@ -15,11 +15,18 @@ import {
   RotateCcw,
   RotateCw,
   Quote,
-  Underline as UnderlineIcon
+  Underline as UnderlineIcon,
+  Braces
 } from 'lucide-react';
 import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
 import { useEffect } from 'react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface RichTextEditorProps {
   value: string;
@@ -194,6 +201,31 @@ export function RichTextEditor({ value, onChange, placeholder = 'Escreva sua cam
         >
           <RotateCw className="h-4 w-4" />
         </Button>
+
+        <div className="w-px h-6 bg-border mx-1" />
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2 text-xs font-semibold h-8">
+              <Braces className="h-3.5 w-3.5" />
+              Variáveis
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => editor.chain().focus().insertContent('{{Nome}}').run()}>
+              Nome do Contato
+              <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-1 rounded">{"{{Nome}}"}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().insertContent('{{Email}}').run()}>
+              E-mail do Contato
+              <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-1 rounded">{"{{Email}}"}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => editor.chain().focus().insertContent('{{Telefone}}').run()}>
+              Telefone
+              <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-1 rounded">{"{{Telefone}}"}</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div className="overflow-y-auto max-h-[500px]">
         <EditorContent editor={editor} />
