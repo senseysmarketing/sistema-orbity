@@ -99,6 +99,10 @@ export default function EmailMarketing() {
       });
       if (error) throw error;
       setAddressBooks(data || []);
+      // If we have lists, refresh account info to get latest contact totals
+      if (data && data.length > 0) {
+        fetchAccountInfo();
+      }
     } catch (e) {
       console.error(e);
       toast.error("Erro ao carregar listas de contatos");
