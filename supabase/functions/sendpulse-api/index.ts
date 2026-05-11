@@ -126,7 +126,9 @@ serve(async (req) => {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
       const data = await res.json();
-      console.log("SendPulse Addressbooks Raw Response:", JSON.stringify(data));
+      if (data && data.length > 0) {
+        console.log("Sample Addressbook:", JSON.stringify(data[0]));
+      }
       result = data;
     } else if (action === 'add_emails') {
       if (!params.book_id || !params.emails) throw new Error('book_id and emails are required');

@@ -107,6 +107,7 @@ export default function EmailMarketing() {
         body: { action: 'get_addressbooks' }
       });
       if (error) throw error;
+      console.log("AddressBooks fetched:", data);
       setAddressBooks(data || []);
       // If we have lists, refresh account info to get latest contact totals
       if (data && data.length > 0) {
