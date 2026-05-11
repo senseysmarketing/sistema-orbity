@@ -20,7 +20,7 @@ interface SyncCRMDialogProps {
 
 export function SyncCRMDialog({ open, onOpenChange, addressBooks, onSuccess }: SyncCRMDialogProps) {
   const { currentAgency } = useAgency();
-  const { data: statuses, isLoading: loadingStatuses } = useLeadStatuses();
+  const { statuses, loading: loadingStatuses } = useLeadStatuses();
   const [step, setStep] = useState(1);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [targetBookId, setTargetBookId] = useState<string>("");
