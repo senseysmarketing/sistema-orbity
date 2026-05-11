@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Search } from "lucide-react";
+import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Search, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgency } from "@/hooks/useAgency";
