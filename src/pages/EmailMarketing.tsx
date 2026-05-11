@@ -494,7 +494,7 @@ export default function EmailMarketing() {
                 </h3>
                 <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 border-primary/20 text-primary hover:bg-primary/5 shadow-sm rounded-full px-4">
+                    <Button variant="outline" className="gap-2 border-primary/20 text-primary hover:bg-primary/5 shadow-sm rounded-full px-4">
                       ✨ Escrever com IA
                     </Button>
                   </DialogTrigger>
