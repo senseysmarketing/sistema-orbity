@@ -63,6 +63,7 @@ export default function EmailMarketing() {
   const [sending, setSending] = useState(false);
   const [aiPromptOpen, setAiPromptOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
+  const [campaignView, setCampaignView] = useState<"editor" | "preview">("editor");
 
   useEffect(() => {
     checkIntegration();
