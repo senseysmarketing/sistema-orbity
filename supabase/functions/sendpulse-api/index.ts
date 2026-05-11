@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface SendPulseAction {
-  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info' | 'get_campaigns' | 'get_campaign_stats' | 'cancel_campaign';
+  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info' | 'get_campaigns' | 'get_campaign_stats' | 'cancel_campaign' | 'update_addressbook' | 'delete_addressbook' | 'get_contacts';
   book_id?: number;
   campaign_id?: number;
   emails?: { email: string; variables?: Record<string, string> }[];
@@ -199,6 +199,30 @@ serve(async (req) => {
       if (!params.campaign_id) throw new Error('campaign_id is required');
       const res = await fetch(`https://api.sendpulse.com/campaigns/${params.campaign_id}`, {
         method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json();
+    } else if (action === 'update_addressbook') {
+      if (!params.book_id || !params.name) throw new Error('book_id and name are required');
+      const res = await fetch(`https://api.sendpulse.com/addressbooks/${params.book_id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ bookName: params.name }),
+      });
+      result = await res.json();
+    } else if (action === 'delete_addressbook') {
+      if (!params.book_id) throw new Error('book_id is required');
+      const res = await fetch(`https://api.sendpulse.com/addressbooks/${params.book_id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json();
+    } else if (action === 'get_contacts') {
+      if (!params.book_id) throw new Error('book_id is required');
+      const res = await fetch(`https://api.sendpulse.com/addressbooks/${params.book_id}/emails`, {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
       result = await res.json();
