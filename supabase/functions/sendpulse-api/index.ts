@@ -7,8 +7,9 @@ const corsHeaders = {
 };
 
 interface SendPulseAction {
-  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info';
+  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info' | 'get_campaigns' | 'get_campaign_stats' | 'cancel_campaign';
   book_id?: number;
+  campaign_id?: number;
   emails?: { email: string; variables?: Record<string, string> }[];
   sender_name?: string;
   sender_email?: string;
@@ -182,6 +183,24 @@ serve(async (req) => {
       if (res.status === 429) throw new Error('RATE_LIMIT: Muitas requisições. Tente novamente em instantes.');
       if (res.status === 402 || res.status === 403) throw new Error('PLAN_RESTRICTION: Restrição de plano ou pagamento na SendPulse.');
       
+      result = await res.json();
+    } else if (action === 'get_campaigns') {
+      const res = await fetch('https://api.sendpulse.com/campaigns?limit=100&offset=0', {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json();
+    } else if (action === 'get_campaign_stats') {
+      if (!params.campaign_id) throw new Error('campaign_id is required');
+      const res = await fetch(`https://api.sendpulse.com/campaigns/${params.campaign_id}/stat`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json();
+    } else if (action === 'cancel_campaign') {
+      if (!params.campaign_id) throw new Error('campaign_id is required');
+      const res = await fetch(`https://api.sendpulse.com/campaigns/${params.campaign_id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
       result = await res.json();
     } else {
       throw new Error(`Unknown action: ${action}`);

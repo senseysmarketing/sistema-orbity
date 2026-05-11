@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users, RefreshCw, AlertCircle, TrendingUp } from "lucide-react";
+import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgency } from "@/hooks/useAgency";
@@ -25,13 +25,20 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CampaignStatsDialog } from "@/components/email-marketing/CampaignStatsDialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function EmailMarketing() {
   const { currentAgency } = useAgency();
   const { loading: aiLoading, callAI } = useAIAssist() as any;
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("lists");
   const [configured, setConfigured] = useState(false);
   const [addressBooks, setAddressBooks] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+  const [statsDialogOpen, setStatsDialogOpen] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [selectedBook, setSelectedBook] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
@@ -71,6 +78,7 @@ export default function EmailMarketing() {
       if (data?.sendpulse_client_id && data?.sendpulse_client_secret) {
         setConfigured(true);
         fetchAddressBooks();
+        fetchCampaigns();
       } else {
         setConfigured(false);
       }
@@ -94,6 +102,38 @@ export default function EmailMarketing() {
     } catch (e) {
       console.error(e);
       toast.error("Erro ao carregar listas de contatos");
+    }
+  }
+
+  async function fetchCampaigns() {
+    setLoadingCampaigns(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sendpulse-api', {
+        body: { action: 'get_campaigns' }
+      });
+      if (error) throw error;
+      setCampaigns(data || []);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao carregar campanhas");
+    } finally {
+      setLoadingCampaigns(false);
+    }
+  }
+
+  async function handleCancelCampaign(campaignId: number) {
+    if (!confirm("Tem certeza que deseja cancelar/remover esta campanha?")) return;
+    
+    try {
+      const { error } = await supabase.functions.invoke('sendpulse-api', {
+        body: { action: 'cancel_campaign', campaign_id: campaignId }
+      });
+      if (error) throw error;
+      toast.success("Operação realizada com sucesso!");
+      fetchCampaigns();
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao cancelar campanha");
     }
   }
 
@@ -215,6 +255,8 @@ export default function EmailMarketing() {
       if (error) throw error;
       toast.success(scheduled ? "Campanha agendada com sucesso!" : "Campanha enviada com sucesso!");
       setCampaign({ sender_name: "", sender_email: "", subject: "", body: "", book_id: "" });
+      fetchCampaigns();
+      setActiveTab("campaigns");
     } catch (e: any) {
       console.error(e);
       const errorMessage = e.message || "";
@@ -333,10 +375,13 @@ export default function EmailMarketing() {
         )}
       </div>
 
-      <Tabs defaultValue="lists" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3 max-w-[500px]">
           <TabsTrigger value="lists">Listas de Contatos</TabsTrigger>
           <TabsTrigger value="campaign">Nova Campanha</TabsTrigger>
+          <TabsTrigger value="campaigns" className="gap-2">
+            <BarChart3 className="h-4 w-4" /> Gerenciar Campanhas
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="lists" className="space-y-4">
@@ -600,7 +645,90 @@ export default function EmailMarketing() {
             </div>
           </div>
         </TabsContent>
+
+        <TabsContent value="campaigns" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-medium">Relatório de Campanhas</h3>
+            <Button variant="outline" size="sm" className="gap-2" onClick={fetchCampaigns} disabled={loadingCampaigns}>
+              <RefreshCw className={cn("h-4 w-4", loadingCampaigns && "animate-spin")} /> Atualizar
+            </Button>
+          </div>
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome da Campanha</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Lista de Destino</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loadingCampaigns ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : campaigns.length > 0 ? campaigns.map((camp) => (
+                  <TableRow key={camp.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col">
+                        <span>{camp.name}</span>
+                        <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">{camp.subject}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {camp.status === 0 && <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20">Agendada</Badge>}
+                      {camp.status === 1 && <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">Enviando</Badge>}
+                      {camp.status === 2 && <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20">Concluída</Badge>}
+                      {camp.status === 3 && <Badge variant="secondary" className="bg-red-500/10 text-red-600 border-red-500/20">Erro</Badge>}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{addressBooks.find(b => b.id === camp.list_id)?.name || camp.list_id}</TableCell>
+                    <TableCell className="text-sm">{new Date(camp.send_date || camp.all_email_count).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right flex justify-end gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => {
+                          setSelectedCampaign(camp);
+                          setStatsDialogOpen(true);
+                        }}
+                      >
+                        <BarChart3 className="h-4 w-4 text-primary" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0 hover:text-red-600"
+                        onClick={() => handleCancelCampaign(camp.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhuma campanha encontrada.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      <CampaignStatsDialog 
+        open={statsDialogOpen} 
+        onOpenChange={setStatsDialogOpen} 
+        campaign={selectedCampaign} 
+      />
     </div>
   );
 }
