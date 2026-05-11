@@ -8,6 +8,7 @@ export interface ParsedData {
   expenses?: any[];
   salaries?: any[];
   leads?: any[];
+  emailContacts?: any[];
 }
 
 function normalizeHeader(header: string): string {
