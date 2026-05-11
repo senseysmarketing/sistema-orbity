@@ -140,5 +140,5 @@ export function useAIAssist() {
     return callAI("generate_caption", content, agencyId);
   };
 
-  return { preFillTask, preFillPost, generateReport, analyzeCampaign, analyzeTaskPeriod, improveTask, generateCaption, loading };
+  return { preFillTask, preFillPost, generateReport, analyzeCampaign, analyzeTaskPeriod, improveTask, generateCaption, callAI, loading };
 }
