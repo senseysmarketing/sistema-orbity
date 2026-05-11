@@ -8,6 +8,7 @@ export interface ParsedData {
   expenses?: any[];
   salaries?: any[];
   leads?: any[];
+  emailContacts?: any[];
 }
 
 function normalizeHeader(header: string): string {
@@ -166,12 +167,29 @@ export async function parseLeads(file: File): Promise<ParsedData> {
   return result;
 }
 
+export async function parseEmailContacts(file: File): Promise<ParsedData> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer);
+  const result: ParsedData = {};
+  
+  // Try to find a sheet with email contacts, or use the first one if 'Contatos' doesn't exist
+  const sheetName = workbook.SheetNames.includes('Contatos') ? 'Contatos' : workbook.SheetNames[0];
+  const sheet = readSheet(workbook, sheetName);
+  
+  if (sheet && sheet.rawData.length > 0) {
+    const map = mapHeaders(sheet.headers);
+    result.emailContacts = sheet.rawData.map((r) => transformRow(r, map));
+  }
+  return result;
+}
+
 export async function parseImportFile(file: File, type: string): Promise<ParsedData> {
   switch (type) {
     case 'clients_and_payments': return parseClientsAndPayments(file);
     case 'expenses': return parseExpenses(file);
     case 'salaries': return parseSalaries(file);
     case 'leads': return parseLeads(file);
+    case 'email_contacts': return parseEmailContacts(file);
     default: throw new Error('Tipo de importação inválido');
   }
 }

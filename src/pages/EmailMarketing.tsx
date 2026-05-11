@@ -115,15 +115,15 @@ export default function EmailMarketing() {
   const getEmailUsage = () => {
     if (!accountInfo) return { sent: 0, limit: 0, percent: 0 };
     const sent = accountInfo.email_qty || 0;
-    const limit = accountInfo.email_limit || 0;
+    const limit = accountInfo.email_limit || 15000;
     const percent = limit > 0 ? (sent / limit) * 100 : 0;
     return { sent, limit, percent };
   };
 
   const getContactUsage = () => {
     if (!accountInfo) return { total: 0, limit: 0, percent: 0 };
-    const total = addressBooks.reduce((acc, book) => acc + (book.all_email_count || 0), 0);
-    const limit = accountInfo.addressbook_limit || 0;
+    const total = accountInfo.emails_total || 0;
+    const limit = accountInfo.addressbook_limit || 500;
     const percent = limit > 0 ? (total / limit) * 100 : 0;
     return { total, limit, percent };
   };
@@ -276,44 +276,58 @@ export default function EmailMarketing() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col gap-6">
         <div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-3xl font-bold tracking-tight">E-mail Marketing</h2>
-            {configured && accountInfo && (
-              <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 px-3 py-1">
-                {accountInfo.pricing_plan}
-              </Badge>
-            )}
-          </div>
-          <p className="text-muted-foreground">Crie campanhas e gerencie suas listas de contatos com IA.</p>
+          <h2 className="text-3xl font-bold tracking-tight">E-mail Marketing</h2>
+          <p className="text-muted-foreground">Gestão profissional de campanhas e listas com inteligência artificial.</p>
         </div>
-        {configured && (
-          <div className="flex flex-wrap items-center gap-6 bg-card border rounded-xl p-4 shadow-sm animate-in fade-in slide-in-from-right-4 duration-500">
-            <div className="space-y-1.5 min-w-[160px]">
-              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> E-mails</span>
-                <span>{getEmailUsage().sent.toLocaleString()} / {getEmailUsage().limit.toLocaleString()}</span>
-              </div>
-              <Progress value={getEmailUsage().percent} className="h-1.5" />
-            </div>
-            <Separator orientation="vertical" className="h-8 hidden md:block" />
-            <div className="space-y-1.5 min-w-[160px]">
-              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Contatos</span>
-                <span>{getContactUsage().total.toLocaleString()} / {getContactUsage().limit.toLocaleString()}</span>
-              </div>
-              <Progress value={getContactUsage().percent} className="h-1.5" />
-            </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
-              onClick={() => { fetchAddressBooks(); fetchAccountInfo(); }}
-              disabled={loadingInfo}
-            >
-              <RefreshCw className={cn("h-4 w-4", loadingInfo && "animate-spin")} />
-            </Button>
+
+        {configured && accountInfo && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Card 1: Plano */}
+            <Card className="bg-card/20 border shadow-none">
+              <CardContent className="p-4 flex flex-col justify-between h-full space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Seu Plano</span>
+                  <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-bold">
+                    {accountInfo.pricing_plan}
+                  </Badge>
+                </div>
+                <div className="flex items-end justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold">SendPulse Connected</span>
+                    {accountInfo.renewal_date && (
+                      <span className="text-[10px] text-muted-foreground italic">Renova em: {accountInfo.renewal_date}</span>
+                    )}
+                  </div>
+                  <TrendingUp className="h-4 w-4 text-primary opacity-50" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card 2: E-mails */}
+            <Card className="bg-card/20 border shadow-none">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Volume Mensal (E-mails)</span>
+                  <span className="text-xs font-bold">{getEmailUsage().sent.toLocaleString()} / {getEmailUsage().limit.toLocaleString()}</span>
+                </div>
+                <Progress value={getEmailUsage().percent} className="h-1.5" />
+                <p className="text-[10px] text-muted-foreground">Uso de quota atual no mês</p>
+              </CardContent>
+            </Card>
+
+            {/* Card 3: Base */}
+            <Card className="bg-card/20 border shadow-none">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Base de Contatos</span>
+                  <span className="text-xs font-bold">{getContactUsage().total.toLocaleString()} / {getContactUsage().limit.toLocaleString()}</span>
+                </div>
+                <Progress value={getContactUsage().percent} className="h-1.5" />
+                <p className="text-[10px] text-muted-foreground">Capacidade total de contatos únicos</p>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
@@ -416,161 +430,158 @@ export default function EmailMarketing() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="campaign">
-          <Card className="border-none shadow-none bg-transparent">
-            <CardContent className="p-0 space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Coluna Esquerda: O Estúdio */}
-                <div className="lg:col-span-8 space-y-4">
-                  <div className="flex justify-between items-center bg-card p-4 border rounded-t-xl">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5 text-primary" />
-                      O Estúdio
-                    </h3>
-                    <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="gap-2 border-primary/20 text-primary hover:bg-primary/5 shadow-sm">
-                          ✨ Escrever com IA
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>O que você quer escrever?</DialogTitle>
-                          <DialogDescription>Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.</DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                          <Textarea placeholder="Ex: Oferta de serviço de gestão de tráfego para novos leads..." value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={4} />
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setAiPromptOpen(false)}>Cancelar</Button>
-                          <Button onClick={handleAIGenerate} disabled={aiLoading || !aiPrompt}>
-                            {aiLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Gerar Conteúdo
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                  <div className="bg-card border border-t-0 rounded-b-xl p-6 shadow-sm min-h-[500px]">
-                    <Textarea 
-                      placeholder="Escreva aqui o corpo do e-mail (aceita HTML)..." 
-                      className="min-h-[480px] font-mono text-sm p-4 leading-relaxed border-none focus-visible:ring-0 resize-none bg-transparent"
-                      value={campaign.body}
-                      onChange={e => setCampaign(prev => ({ ...prev, body: e.target.value }))}
-                    />
-                  </div>
-                </div>
+        <TabsContent value="campaign" className="pt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-10 gap-8">
+            {/* Coluna Esquerda: O Estúdio (70%) */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="flex justify-between items-center px-2">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary/60" />
+                  Estúdio de Criação
+                </h3>
+                <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2 border-primary/20 text-primary hover:bg-primary/5 shadow-sm rounded-full px-4">
+                      ✨ Escrever com IA
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>O que você quer escrever?</DialogTitle>
+                      <DialogDescription>Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Textarea placeholder="Ex: Oferta de serviço de gestão de tráfego para novos leads..." value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={4} />
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setAiPromptOpen(false)}>Cancelar</Button>
+                      <Button onClick={handleAIGenerate} disabled={aiLoading || !aiPrompt}>
+                        {aiLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Gerar Conteúdo
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              
+              <Card className="border shadow-sm overflow-hidden min-h-[600px] flex flex-col">
+                <Textarea 
+                  placeholder="Escreva aqui o corpo do e-mail (aceita HTML)..." 
+                  className="flex-1 font-mono text-sm p-6 leading-relaxed border-none focus-visible:ring-0 resize-none bg-card/10"
+                  value={campaign.body}
+                  onChange={e => setCampaign(prev => ({ ...prev, body: e.target.value }))}
+                />
+              </Card>
+            </div>
 
-                {/* Coluna Direita: Configuração e Voo */}
-                <div className="lg:col-span-4 space-y-6">
-                  <Card className="shadow-sm border-muted/60">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="text-base font-semibold">Configuração e Voo</CardTitle>
-                      <CardDescription>Ajuste os detalhes finais antes de disparar.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Remetente</label>
-                          <Input placeholder="Nome (Ex: Orbity)" value={campaign.sender_name} onChange={e => setCampaign(prev => ({ ...prev, sender_name: e.target.value }))} />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">E-mail do Remetente</label>
-                          <Input type="email" placeholder="contato@suaagencia.com" value={campaign.sender_email} onChange={e => setCampaign(prev => ({ ...prev, sender_email: e.target.value }))} />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Assunto</label>
-                          <Input placeholder="Assunto cativante..." value={campaign.subject} onChange={e => setCampaign(prev => ({ ...prev, subject: e.target.value }))} />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Lista de Destino</label>
-                          <Select onValueChange={handleBookSelect} value={campaign.book_id}>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Selecione os destinatários..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {addressBooks.map(book => (
-                                <SelectItem key={book.id} value={book.id.toString()}>{book.name} ({book.all_email_count} contatos)</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          
-                          {selectedBookContacts !== null && accountInfo && selectedBookContacts > (accountInfo.email_limit - accountInfo.email_qty) && (
-                            <Alert variant="destructive" className="mt-2 py-2 px-3 bg-amber-50 border-amber-200 text-amber-800">
-                              <AlertCircle className="h-4 w-4 text-amber-600" />
-                              <AlertDescription className="text-xs">
-                                Atenção: Esta lista ({selectedBookContacts}) excede o saldo restante do seu plano ({accountInfo.email_limit - accountInfo.email_qty}).
-                              </AlertDescription>
-                            </Alert>
-                          )}
-                        </div>
+            {/* Coluna Direita: Logística de Voo (30%) */}
+            <div className="lg:col-span-3 space-y-6">
+              <Card className="shadow-sm border">
+                <CardHeader className="pb-3 border-b bg-muted/20">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                    <Send className="h-4 w-4" /> Logística de Voo
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-6">
+                  {/* Seção 1: Informações Básicas */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-tight">Informações Básicas</h4>
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium">Nome do Remetente</label>
+                        <Input placeholder="Ex: Orbity Agência" value={campaign.sender_name} onChange={e => setCampaign(prev => ({ ...prev, sender_name: e.target.value }))} className="bg-muted/30 border-none h-9 text-sm" />
                       </div>
-
-                      <Separator className="bg-muted/60" />
-
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-0.5">
-                            <h4 className="text-sm font-medium">Agendamento</h4>
-                            <p className="text-xs text-muted-foreground">{scheduled ? "Data/Hora selecionada" : "Enviar imediatamente"}</p>
-                          </div>
-                          <Switch checked={scheduled} onCheckedChange={setScheduled} />
-                        </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium">E-mail do Remetente</label>
+                        <Input type="email" placeholder="contato@suaagencia.com" value={campaign.sender_email} onChange={e => setCampaign(prev => ({ ...prev, sender_email: e.target.value }))} className="bg-muted/30 border-none h-9 text-sm" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium">Assunto</label>
+                        <Input placeholder="Assunto cativante..." value={campaign.subject} onChange={e => setCampaign(prev => ({ ...prev, subject: e.target.value }))} className="bg-muted/30 border-none h-9 text-sm" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium">Lista de Destino</label>
+                        <Select onValueChange={handleBookSelect} value={campaign.book_id}>
+                          <SelectTrigger className="bg-muted/30 border-none h-9 text-sm">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {addressBooks.map(book => (
+                              <SelectItem key={book.id} value={book.id.toString()}>{book.name} ({book.all_email_count})</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         
-                        {scheduled && (
-                          <div className="space-y-3 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                            <div className="space-y-1.5">
-                              <label className="text-[11px] font-semibold uppercase text-muted-foreground">Data de Envio</label>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9", !scheduledDate && "text-muted-foreground")}>
-                                    <Calendar className="mr-2 h-4 w-4" />
-                                    {scheduledDate ? format(scheduledDate, "PPP") : <span>Selecione uma data</span>}
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <CalendarComponent mode="single" selected={scheduledDate} onSelect={setScheduledDate} initialFocus disabled={(date) => date < new Date()} />
-                                </PopoverContent>
-                              </Popover>
-                            </div>
-                            <div className="space-y-1.5">
-                              <label className="text-[11px] font-semibold uppercase text-muted-foreground">Horário</label>
-                              <Select value={scheduledTime} onValueChange={setScheduledTime}>
-                                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {Array.from({ length: 24 }).map((_, i) => (
-                                    <SelectItem key={i} value={`${String(i).padStart(2, '0')}:00`}>{String(i).padStart(2, '0')}:00</SelectItem>
-                                  ))}
-                                  {Array.from({ length: 24 }).map((_, i) => (
-                                    <SelectItem key={i + 24} value={`${String(i).padStart(2, '0')}:30`}>{String(i).padStart(2, '0')}:30</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                        {selectedBookContacts !== null && accountInfo && selectedBookContacts > 500 && (
+                          <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex gap-2">
+                            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                            <p className="text-[10px] leading-tight text-amber-800">
+                              ⚠️ Esta lista ({selectedBookContacts}) excede o limite do seu plano (500 contatos).
+                            </p>
                           </div>
                         )}
                       </div>
+                    </div>
+                  </div>
 
-                      <div className="pt-2">
-                        <Button 
-                          variant="action" 
-                          size="lg" 
-                          className={cn(
-                            "w-full gap-2 h-12 text-base font-semibold transition-all duration-300 shadow-md",
-                            scheduled ? "bg-amber-600 hover:bg-amber-700" : "bg-primary hover:bg-primary/90"
-                          )} 
-                          onClick={handleSendCampaign} 
-                          disabled={sending}
-                        >
-                          {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : (scheduled ? <Calendar className="h-5 w-5" /> : <Send className="h-5 w-5" />)}
-                          {scheduled ? "🗓️ Confirmar Agendamento" : "🚀 Disparar Agora"}
-                        </Button>
+                  <Separator className="bg-muted/60" />
+
+                  {/* Seção 2: Agendamento */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-tight">Agendamento</h4>
+                      <Switch checked={scheduled} onCheckedChange={setScheduled} />
+                    </div>
+                    
+                    {scheduled && (
+                      <div className="space-y-4 pt-1 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-semibold text-muted-foreground">Data</label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal h-9 bg-muted/30 border-none text-sm", !scheduledDate && "text-muted-foreground")}>
+                                <Calendar className="mr-2 h-4 w-4 opacity-50" />
+                                {scheduledDate ? format(scheduledDate, "PPP") : <span>Selecione...</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent mode="single" selected={scheduledDate} onSelect={setScheduledDate} initialFocus disabled={(date) => date < new Date()} />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-semibold text-muted-foreground">Hora</label>
+                          <Select value={scheduledTime} onValueChange={setScheduledTime}>
+                            <SelectTrigger className="h-9 bg-muted/30 border-none text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 24 }).map((_, i) => (
+                                <SelectItem key={`${i}:00`} value={`${String(i).padStart(2, '0')}:00`}>{String(i).padStart(2, '0')}:00</SelectItem>
+                              ))}
+                              {Array.from({ length: 24 }).map((_, i) => (
+                                <SelectItem key={`${i}:30`} value={`${String(i).padStart(2, '0')}:30`}>{String(i).padStart(2, '0')}:30</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                    )}
+                  </div>
+
+                  <div className="pt-2">
+                    <Button 
+                      variant="action" 
+                      size="lg" 
+                      className="w-full gap-2 h-12 text-sm font-bold shadow-lg shadow-primary/20" 
+                      onClick={handleSendCampaign} 
+                      disabled={sending}
+                    >
+                      {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : (scheduled ? <Calendar className="h-4 w-4" /> : <Send className="h-4 w-4" />)}
+                      {scheduled ? "Agendar Campanha" : "Disparar Campanha Agora"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
