@@ -70,7 +70,6 @@ export default function EmailMarketing() {
       if (data?.sendpulse_client_id && data?.sendpulse_client_secret) {
         setConfigured(true);
         fetchAddressBooks();
-        fetchBalance();
       } else {
         setConfigured(false);
       }
