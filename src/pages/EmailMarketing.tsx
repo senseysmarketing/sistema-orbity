@@ -293,10 +293,12 @@ export default function EmailMarketing() {
         <TabsContent value="lists" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Suas Listas na SendPulse</h3>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="outline">➕ Nova Lista</Button>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" /> Nova Lista
+                  </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
@@ -312,7 +314,9 @@ export default function EmailMarketing() {
               </Dialog>
               <Dialog open={syncModalOpen} onOpenChange={setSyncModalOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline">🔄 Sincronizar do CRM</Button>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Users className="h-4 w-4" /> Sincronizar do CRM
+                  </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
@@ -338,7 +342,9 @@ export default function EmailMarketing() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-              <Button onClick={() => setImportOpen(true)}>📥 Importar Planilha</Button>
+              <Button size="sm" className="gap-2" onClick={() => setImportOpen(true)}>
+                <Mail className="h-4 w-4" /> Importar Planilha
+              </Button>
             </div>
             <ImportSendpulseDialog open={importOpen} onOpenChange={setImportOpen} addressBooks={addressBooks} onSuccess={fetchAddressBooks} />
           </div>
