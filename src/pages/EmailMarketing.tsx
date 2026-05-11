@@ -30,6 +30,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ContactLists } from "@/components/email-marketing/ContactLists";
+import { AddSenderDialog } from "@/components/email-marketing/AddSenderDialog";
 
 export default function EmailMarketing() {
   const { currentAgency } = useAgency();
@@ -49,6 +50,9 @@ export default function EmailMarketing() {
   const [scheduled, setScheduled] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [scheduledTime, setScheduledTime] = useState("09:00");
+  const [senders, setSenders] = useState<any[]>([]);
+  const [loadingSenders, setLoadingSenders] = useState(false);
+  const [addSenderOpen, setAddSenderOpen] = useState(false);
   
   const [campaign, setCampaign] = useState({
     sender_name: "",
@@ -79,6 +83,7 @@ export default function EmailMarketing() {
         setConfigured(true);
         fetchAddressBooks();
         fetchCampaigns();
+        fetchSenders();
       } else {
         setConfigured(false);
       }
@@ -122,6 +127,22 @@ export default function EmailMarketing() {
       toast.error("Erro ao carregar campanhas");
     } finally {
       setLoadingCampaigns(false);
+    }
+  }
+
+  async function fetchSenders() {
+    setLoadingSenders(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sendpulse-api', {
+        body: { action: 'get_senders' }
+      });
+      if (error) throw error;
+      setSenders(data || []);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao carregar remetentes");
+    } finally {
+      setLoadingSenders(false);
     }
   }
 
@@ -177,6 +198,17 @@ export default function EmailMarketing() {
     setCampaign(prev => ({ ...prev, book_id: val }));
     const book = addressBooks.find(b => b.id.toString() === val);
     if (book) setSelectedBookContacts(book.all_email_count);
+  }
+
+  async function handleSenderSelect(val: string) {
+    const sender = senders.find(s => s.email === val);
+    if (sender) {
+      setCampaign(prev => ({ 
+        ...prev, 
+        sender_email: sender.email, 
+        sender_name: sender.name 
+      }));
+    }
   }
 
   // Note: List synchronization and creation are now handled in the ContactLists component.
@@ -433,23 +465,29 @@ export default function EmailMarketing() {
                     <h4 className="text-sm font-semibold text-muted-foreground">Informações Básicas</h4>
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="sender_name">Nome do Remetente</Label>
-                        <Input 
-                          id="sender_name"
-                          placeholder="Ex: Orbity Agência" 
-                          value={campaign.sender_name} 
-                          onChange={e => setCampaign(prev => ({ ...prev, sender_name: e.target.value }))} 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="sender_email">E-mail do Remetente</Label>
-                        <Input 
-                          id="sender_email"
-                          type="email" 
-                          placeholder="contato@suaagencia.com" 
-                          value={campaign.sender_email} 
-                          onChange={e => setCampaign(prev => ({ ...prev, sender_email: e.target.value }))} 
-                        />
+                        <Label htmlFor="sender_select">Remetente da Campanha</Label>
+                        <div className="flex flex-col gap-2">
+                          <Select onValueChange={handleSenderSelect} value={campaign.sender_email}>
+                            <SelectTrigger id="sender_select">
+                              <SelectValue placeholder={loadingSenders ? "Carregando remetentes..." : "Selecione um remetente verificado..."} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {senders.filter(s => s.status === 'Active' || s.is_activated).map(sender => (
+                                <SelectItem key={sender.email} value={sender.email}>
+                                  {sender.name} &lt;{sender.email}&gt;
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button 
+                            variant="link" 
+                            size="sm" 
+                            className="h-auto p-0 justify-start text-[10px]"
+                            onClick={() => setAddSenderOpen(true)}
+                          >
+                            <Plus className="h-3 w-3 mr-1" /> Adicionar novo remetente
+                          </Button>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="subject">Assunto</Label>
@@ -534,7 +572,7 @@ export default function EmailMarketing() {
                       size="lg" 
                       className="w-full gap-2 h-11 text-sm font-semibold" 
                       onClick={handleSendCampaign} 
-                      disabled={sending}
+                      disabled={sending || !campaign.sender_email || !campaign.book_id || !campaign.subject || !campaign.body}
                     >
                       {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : (scheduled ? <Calendar className="h-4 w-4" /> : <Send className="h-4 w-4" />)}
                       {scheduled ? "Agendar Campanha" : "Disparar Campanha Agora"}
@@ -628,6 +666,12 @@ export default function EmailMarketing() {
         open={statsDialogOpen} 
         onOpenChange={setStatsDialogOpen} 
         campaign={selectedCampaign} 
+      />
+
+      <AddSenderDialog 
+        open={addSenderOpen}
+        onOpenChange={setAddSenderOpen}
+        onSuccess={fetchSenders}
       />
     </div>
   );
