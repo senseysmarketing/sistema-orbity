@@ -7,10 +7,12 @@ const corsHeaders = {
 };
 
 interface SendPulseAction {
-  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info' | 'get_campaigns' | 'get_campaign_stats' | 'cancel_campaign' | 'update_addressbook' | 'delete_addressbook' | 'get_contacts' | 'get_senders' | 'add_sender' | 'send_test_email';
+  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info' | 'get_campaigns' | 'get_campaign_stats' | 'cancel_campaign' | 'update_addressbook' | 'delete_addressbook' | 'get_contacts' | 'get_senders' | 'add_sender' | 'send_test_email' | 'add_single_contact' | 'delete_contact' | 'update_contact';
   book_id?: number;
   campaign_id?: number;
-  emails?: { email: string; variables?: Record<string, string> }[];
+  emails?: (string | { email: string; variables?: Record<string, string> })[];
+  email?: string;
+  variables?: Record<string, string>;
   sender_name?: string;
   sender_email?: string;
   subject?: string;
@@ -277,6 +279,47 @@ serve(async (req) => {
         throw new Error(`SendPulse SMTP error (${res.status}): ${responseText}`);
       }
       result = JSON.parse(responseText);
+    } else if (action === 'add_single_contact') {
+      if (!params.book_id || !params.email) throw new Error('book_id and email are required');
+      const res = await fetch(`https://api.sendpulse.com/addressbooks/${params.book_id}/emails`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          emails: JSON.stringify([{ 
+            email: params.email, 
+            variables: params.variables 
+          }]) 
+        }),
+      });
+      result = await res.json();
+    } else if (action === 'delete_contact') {
+      if (!params.book_id || !params.email) throw new Error('book_id and email are required');
+      const res = await fetch(`https://api.sendpulse.com/addressbooks/${params.book_id}/emails`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ emails: JSON.stringify([params.email]) }),
+      });
+      result = await res.json();
+    } else if (action === 'update_contact') {
+      if (!params.book_id || !params.email || !params.variables) throw new Error('book_id, email and variables are required');
+      const res = await fetch(`https://api.sendpulse.com/addressbooks/${params.book_id}/emails/variable`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          email: params.email,
+          variables: params.variables 
+        }),
+      });
+      result = await res.json();
     } else {
       throw new Error(`Unknown action: ${action}`);
     }
