@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, RefreshCw, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users } from "lucide-react";
+import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgency } from "@/hooks/useAgency";
@@ -65,7 +65,6 @@ export default function EmailMarketing() {
         .select('sendpulse_client_id, sendpulse_client_secret')
         .eq('agency_id', currentAgency.id)
         .single();
-
       if (data?.sendpulse_client_id && data?.sendpulse_client_secret) {
         setConfigured(true);
         fetchAddressBooks();
@@ -116,9 +115,7 @@ export default function EmailMarketing() {
   async function handleBookSelect(val: string) {
     setCampaign(prev => ({ ...prev, book_id: val }));
     const book = addressBooks.find(b => b.id.toString() === val);
-    if (book) {
-      setSelectedBookContacts(book.all_email_count);
-    }
+    if (book) setSelectedBookContacts(book.all_email_count);
   }
 
   async function handleSyncLeads() {
@@ -134,18 +131,15 @@ export default function EmailMarketing() {
         .eq('agency_id', currentAgency?.id)
         .not('email', 'is', null)
         .in('status', ['ganhos', 'em_contato']);
-
       if (leadsError) throw leadsError;
       if (!leads || leads.length === 0) {
         toast.info("Nenhum lead qualificado encontrado para sincronização.");
         return;
       }
-
       const formattedEmails = leads.map(l => ({
         email: l.email,
         variables: { name: l.name }
       }));
-
       const { error } = await supabase.functions.invoke('sendpulse-api', {
         body: { 
           action: 'add_emails', 
@@ -153,7 +147,6 @@ export default function EmailMarketing() {
           emails: formattedEmails
         }
       });
-
       if (error) throw error;
       toast.success(`${leads.length} leads sincronizados com sucesso!`);
       setSyncModalOpen(false);
@@ -187,14 +180,12 @@ export default function EmailMarketing() {
       toast.error("Preencha todos os campos da campanha");
       return;
     }
-
     setSending(true);
     let send_date = undefined;
     if (scheduled && scheduledDate) {
       const dateStr = format(scheduledDate, 'yyyy-MM-dd');
       send_date = `${dateStr} ${scheduledTime}:00`;
     }
-
     try {
       const { error } = await supabase.functions.invoke('sendpulse-api', {
         body: { 
@@ -204,7 +195,6 @@ export default function EmailMarketing() {
           send_date
         }
       });
-
       if (error) throw error;
       toast.success(scheduled ? "Campanha agendada com sucesso!" : "Campanha enviada com sucesso!");
       setCampaign({ sender_name: "", sender_email: "", subject: "", body: "", book_id: "" });
@@ -229,7 +219,6 @@ export default function EmailMarketing() {
 
   async function handleAIGenerate() {
     if (!aiPrompt) return;
-    
     try {
       const result = await callAI("email_generation", aiPrompt, currentAgency?.id);
       if (result) {
@@ -280,11 +269,7 @@ export default function EmailMarketing() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Badge variant="outline" className="h-7 px-3 font-medium bg-background border-muted-foreground/20 text-muted-foreground animate-in fade-in slide-in-from-left-2 duration-500">
-                      {loadingBalance ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
-                      ) : (
-                        <Wallet className="h-3 w-3 mr-1.5 text-primary/60" />
-                      )}
+                      {loadingBalance ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Wallet className="h-3 w-3 mr-1.5 text-primary/60" />}
                       Saldo SendPulse: {getEmailBalance()?.toLocaleString() ?? '...'} e-mails
                     </Badge>
                   </TooltipTrigger>
@@ -295,9 +280,7 @@ export default function EmailMarketing() {
               </TooltipProvider>
             )}
           </div>
-          <p className="text-muted-foreground">
-            Crie campanhas e gerencie suas listas de contatos com IA.
-          </p>
+          <p className="text-muted-foreground">Crie campanhas e gerencie suas listas de contatos com IA.</p>
         </div>
       </div>
 
@@ -320,18 +303,13 @@ export default function EmailMarketing() {
                     <DialogTitle>Nova Lista</DialogTitle>
                   </DialogHeader>
                   <div className="py-4">
-                    <Input 
-                      placeholder="Nome da Lista" 
-                      value={newListName} 
-                      onChange={(e) => setNewListName(e.target.value)} 
-                    />
+                    <Input placeholder="Nome da Lista" value={newListName} onChange={(e) => setNewListName(e.target.value)} />
                   </div>
                   <DialogFooter>
                     <Button onClick={handleCreateList} disabled={!newListName}>Criar</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-              
               <Dialog open={syncModalOpen} onOpenChange={setSyncModalOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline">🔄 Sincronizar do CRM</Button>
@@ -339,20 +317,14 @@ export default function EmailMarketing() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Sincronizar Leads</DialogTitle>
-                    <DialogDescription>
-                      Selecione a lista de destino na SendPulse para importar leads "Ganhos" ou "Em Contato".
-                    </DialogDescription>
+                    <DialogDescription>Selecione a lista de destino na SendPulse para importar leads "Ganhos" ou "Em Contato".</DialogDescription>
                   </DialogHeader>
                   <div className="py-4">
                     <Select onValueChange={setSelectedBook} value={selectedBook}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma lista..." />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Selecione uma lista..." /></SelectTrigger>
                       <SelectContent>
                         {addressBooks.map(book => (
-                          <SelectItem key={book.id} value={book.id.toString()}>
-                            {book.name} ({book.all_email_count} contatos)
-                          </SelectItem>
+                          <SelectItem key={book.id} value={book.id.toString()}>{book.name} ({book.all_email_count} contatos)</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -366,18 +338,10 @@ export default function EmailMarketing() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-
               <Button onClick={() => setImportOpen(true)}>📥 Importar Planilha</Button>
             </div>
-            
-            <ImportSendpulseDialog 
-              open={importOpen} 
-              onOpenChange={setImportOpen} 
-              addressBooks={addressBooks} 
-              onSuccess={fetchAddressBooks} 
-            />
+            <ImportSendpulseDialog open={importOpen} onOpenChange={setImportOpen} addressBooks={addressBooks} onSuccess={fetchAddressBooks} />
           </div>
-
           <Card>
             <Table>
               <TableHeader>
@@ -389,32 +353,29 @@ export default function EmailMarketing() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {addressBooks.length > 0 ? (
-                  addressBooks.map((book) => (
-                    <TableRow key={book.id}>
-                      <TableCell className="font-medium">{book.name}</TableCell>
-                      <TableCell>{book.all_email_count}</TableCell>
-                      <TableCell>{new Date(book.created).toLocaleDateString()}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" asChild>
-                          <a href={`https://login.sendpulse.com/addressbooks/emails/id/${book.id}`} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                      Nenhuma lista encontrada.
+                {addressBooks.length > 0 ? addressBooks.map((book) => (
+                  <TableRow key={book.id}>
+                    <TableCell className="font-medium">{book.name}</TableCell>
+                    <TableCell>{book.all_email_count}</TableCell>
+                    <TableCell>{new Date(book.created).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" asChild>
+                        <a href={`https://login.sendpulse.com/addressbooks/emails/id/${book.id}`} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </Button>
                     </TableCell>
+                  </TableRow>
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Nenhuma lista encontrada.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
           </Card>
         </TabsContent>
+
         <TabsContent value="campaign">
           <Card>
             <CardHeader>
@@ -423,37 +384,27 @@ export default function EmailMarketing() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left Column: Editor */}
                 <div className="lg:col-span-2 space-y-4">
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium">Conteúdo do E-mail</label>
                     <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
                       <DialogTrigger asChild>
                         <Button variant="outline" size="sm" className="gap-2 border-primary/20 text-primary hover:bg-primary/5">
-                          <Plus className="h-4 w-4" />
-                          ✨ Escrever com IA
+                          <Plus className="h-4 w-4" /> ✨ Escrever com IA
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>O que você quer escrever?</DialogTitle>
-                          <DialogDescription>
-                            Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.
-                          </DialogDescription>
+                          <DialogDescription>Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.</DialogDescription>
                         </DialogHeader>
                         <div className="py-4">
-                          <Textarea 
-                            placeholder="Ex: Oferta de serviço de gestão de tráfego para novos leads..." 
-                            value={aiPrompt}
-                            onChange={e => setAiPrompt(e.target.value)}
-                            rows={4}
-                          />
+                          <Textarea placeholder="Ex: Oferta de serviço de gestão de tráfego para novos leads..." value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={4} />
                         </div>
                         <DialogFooter>
                           <Button variant="outline" onClick={() => setAiPromptOpen(false)}>Cancelar</Button>
                           <Button onClick={handleAIGenerate} disabled={aiLoading || !aiPrompt}>
-                            {aiLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Gerar Conteúdo
+                            {aiLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Gerar Conteúdo
                           </Button>
                         </DialogFooter>
                       </DialogContent>
@@ -466,127 +417,76 @@ export default function EmailMarketing() {
                     onChange={e => setCampaign(prev => ({ ...prev, body: e.target.value }))}
                   />
                 </div>
-
-                {/* Right Column: Settings */}
                 <div className="space-y-6">
                   <div className="space-y-4">
                     <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Informações Básicas</h4>
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Nome do Remetente</label>
-                        <Input 
-                          placeholder="Ex: Orbity Marketing" 
-                          value={campaign.sender_name}
-                          onChange={e => setCampaign(prev => ({ ...prev, sender_name: e.target.value }))}
-                        />
+                        <Input placeholder="Ex: Orbity Marketing" value={campaign.sender_name} onChange={e => setCampaign(prev => ({ ...prev, sender_name: e.target.value }))} />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">E-mail do Remetente</label>
-                        <Input 
-                          type="email" 
-                          placeholder="Ex: contato@suaagencia.com" 
-                          value={campaign.sender_email}
-                          onChange={e => setCampaign(prev => ({ ...prev, sender_email: e.target.value }))}
-                        />
+                        <Input type="email" placeholder="Ex: contato@suaagencia.com" value={campaign.sender_email} onChange={e => setCampaign(prev => ({ ...prev, sender_email: e.target.value }))} />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Assunto</label>
-                        <Input 
-                          placeholder="Assunto do e-mail..." 
-                          value={campaign.subject}
-                          onChange={e => setCampaign(prev => ({ ...prev, subject: e.target.value }))}
-                        />
+                        <Input placeholder="Assunto do e-mail..." value={campaign.subject} onChange={e => setCampaign(prev => ({ ...prev, subject: e.target.value }))} />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Lista de Destino</label>
                         <Select onValueChange={handleBookSelect} value={campaign.book_id}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione para quem enviar..." />
-                          </SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder="Selecione para quem enviar..." /></SelectTrigger>
                           <SelectContent>
                             {addressBooks.map(book => (
-                              <SelectItem key={book.id} value={book.id.toString()}>
-                                {book.name} ({book.all_email_count})
-                              </SelectItem>
+                              <SelectItem key={book.id} value={book.id.toString()}>{book.name} ({book.all_email_count})</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
                   </div>
-
                   <Separator />
-
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Agendamento</h4>
                       <Switch checked={scheduled} onCheckedChange={setScheduled} />
                     </div>
-                    
                     {scheduled ? (
                       <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Data</label>
                           <Popover>
                             <PopoverTrigger asChild>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full justify-start text-left font-normal",
-                                  !scheduledDate && "text-muted-foreground"
-                                )}
-                              >
+                              <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !scheduledDate && "text-muted-foreground")}>
                                 <Calendar className="mr-2 h-4 w-4" />
                                 {scheduledDate ? format(scheduledDate, "PPP") : <span>Selecione uma data</span>}
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
-                              <CalendarComponent
-                                mode="single"
-                                selected={scheduledDate}
-                                onSelect={setScheduledDate}
-                                initialFocus
-                                disabled={(date) => date < new Date()}
-                              />
+                              <CalendarComponent mode="single" selected={scheduledDate} onSelect={setScheduledDate} initialFocus disabled={(date) => date < new Date()} />
                             </PopoverContent>
                           </Popover>
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Horário</label>
                           <Select value={scheduledTime} onValueChange={setScheduledTime}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {Array.from({ length: 24 }).map((_, i) => (
-                                <SelectItem key={i} value={`${String(i).padStart(2, '0')}:00`}>
-                                  {String(i).padStart(2, '0')}:00
-                                </SelectItem>
+                                <SelectItem key={i} value={`${String(i).padStart(2, '0')}:00`}>{String(i).padStart(2, '0')}:00</SelectItem>
                               ))}
                               {Array.from({ length: 24 }).map((_, i) => (
-                                <SelectItem key={i + 24} value={`${String(i).padStart(2, '0')}:30`}>
-                                  {String(i).padStart(2, '0')}:30
-                                </SelectItem>
+                                <SelectItem key={i + 24} value={`${String(i).padStart(2, '0')}:30`}>{String(i).padStart(2, '0')}:30</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
                       </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground italic">
-                        A campanha será disparada imediatamente para todos os contatos da lista.
-                      </p>
-                    )}
+                    ) : <p className="text-xs text-muted-foreground italic">A campanha será disparada imediatamente para todos os contatos da lista.</p>}
                   </div>
-
                   <div className="pt-4">
-                    <Button 
-                      variant="action" 
-                      size="lg" 
-                      className="w-full gap-2 h-12 text-base font-semibold" 
-                      onClick={handleSendCampaign}
-                      disabled={sending}
-                    >
+                    <Button variant="action" size="lg" className="w-full gap-2 h-12 text-base font-semibold" onClick={handleSendCampaign} disabled={sending}>
                       {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                       {scheduled ? "Agendar Campanha" : "Disparar Campanha Agora"}
                     </Button>
