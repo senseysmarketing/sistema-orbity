@@ -125,7 +125,9 @@ serve(async (req) => {
       const res = await fetch('https://api.sendpulse.com/addressbooks', {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
-      result = await res.json();
+      const data = await res.json();
+      console.log("SendPulse Addressbooks Raw Response:", JSON.stringify(data));
+      result = data;
     } else if (action === 'add_emails') {
       if (!params.book_id || !params.emails) throw new Error('book_id and emails are required');
       const res = await fetch(`https://api.sendpulse.com/addressbooks/${params.book_id}/emails`, {
