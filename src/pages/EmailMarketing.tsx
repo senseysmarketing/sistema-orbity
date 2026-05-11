@@ -32,6 +32,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ContactLists } from "@/components/email-marketing/ContactLists";
 import { AddSenderDialog } from "@/components/email-marketing/AddSenderDialog";
 import { TestEmailDialog } from "@/components/email-marketing/TestEmailDialog";
+import { CampaignBuilder } from "@/components/email-marketing/CampaignBuilder";
 
 
 export default function EmailMarketing() {
