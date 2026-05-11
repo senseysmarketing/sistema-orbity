@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users, RefreshCw, AlertCircle, TrendingUp } from "lucide-react";
+import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgency } from "@/hooks/useAgency";
@@ -25,6 +25,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CampaignStatsDialog } from "@/components/email-marketing/CampaignStatsDialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function EmailMarketing() {
   const { currentAgency } = useAgency();
