@@ -32,8 +32,13 @@ export default function EmailMarketing() {
   const { currentAgency } = useAgency();
   const { loading: aiLoading, callAI } = useAIAssist() as any;
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("lists");
   const [configured, setConfigured] = useState(false);
   const [addressBooks, setAddressBooks] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+  const [statsDialogOpen, setStatsDialogOpen] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [selectedBook, setSelectedBook] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
