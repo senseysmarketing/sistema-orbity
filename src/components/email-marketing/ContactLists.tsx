@@ -46,6 +46,7 @@ import {
   RefreshCw 
 } from "lucide-react";
 import { ContactViewDialog } from "./ContactViewDialog";
+import { AddContactDialog } from "./AddContactDialog";
 import { SyncCRMDialog } from "./SyncCRMDialog";
 import { ImportSendpulseDialog } from "@/components/email/ImportSendpulseDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,6 +64,7 @@ export function ContactLists({ addressBooks, onRefresh }: ContactListsProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [addContactOpen, setAddContactOpen] = useState(false);
   
   const [selectedBook, setSelectedBook] = useState<any>(null);
   const [newListName, setNewListName] = useState("");
@@ -82,6 +84,11 @@ export function ContactLists({ addressBooks, onRefresh }: ContactListsProps) {
   const handleOpenView = (book: any) => {
     setSelectedBook(book);
     setViewDialogOpen(true);
+  };
+
+  const handleOpenAddContact = (book: any) => {
+    setSelectedBook(book);
+    setAddContactOpen(true);
   };
 
   const handleUpdateList = async () => {
@@ -195,6 +202,9 @@ export function ContactLists({ addressBooks, onRefresh }: ContactListsProps) {
                       <DropdownMenuItem onClick={() => handleOpenView(book)}>
                         <Eye className="mr-2 h-4 w-4" /> Visualizar Contatos
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleOpenAddContact(book)}>
+                        <Plus className="mr-2 h-4 w-4" /> Adicionar Contato
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleOpenEdit(book)}>
                         <Pencil className="mr-2 h-4 w-4" /> Editar Nome
                       </DropdownMenuItem>
@@ -237,6 +247,13 @@ export function ContactLists({ addressBooks, onRefresh }: ContactListsProps) {
         onOpenChange={setViewDialogOpen}
         bookId={selectedBook?.id}
         bookName={selectedBook?.name || ""}
+      />
+
+      <AddContactDialog 
+        open={addContactOpen}
+        onOpenChange={setAddContactOpen}
+        bookId={selectedBook?.id}
+        onSuccess={onRefresh}
       />
 
       <SyncCRMDialog 
