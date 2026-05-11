@@ -130,21 +130,44 @@ export function ContactViewDialog({ open, onOpenChange, bookId, bookName }: Cont
                   <TableRow>
                     <TableHead>E-mail</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Data de Inscrição</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {contacts.length > 0 ? (
                     contacts.map((contact, idx) => (
-                      <TableRow key={idx}>
+                      <TableRow key={idx} className={isUpdating && selectedContact?.email === contact.email ? "opacity-50" : ""}>
                         <TableCell className="font-medium">{contact.email}</TableCell>
                         <TableCell>{getStatusLabel(contact.status)}</TableCell>
                         <TableCell>{contact.add_time || contact.registration_date ? new Date(contact.add_time || contact.registration_date).toLocaleDateString() : '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7" 
+                              onClick={() => openEdit(contact)}
+                              disabled={isUpdating}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" 
+                              onClick={() => openDelete(contact)}
+                              disabled={isUpdating}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                         Nenhum contato encontrado nesta lista.
                       </TableCell>
                     </TableRow>
