@@ -29,6 +29,7 @@ import { CampaignStatsDialog } from "@/components/email-marketing/CampaignStatsD
 import { Skeleton } from "@/components/ui/skeleton";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ContactLists } from "@/components/email-marketing/ContactLists";
 
 export default function EmailMarketing() {
   const { currentAgency } = useAgency();
@@ -395,95 +396,7 @@ export default function EmailMarketing() {
         </TabsList>
 
         <TabsContent value="lists" className="space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <h3 className="text-lg font-medium">Suas Listas na SendPulse</h3>
-            <div className="flex flex-wrap gap-2">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Plus className="h-4 w-4" /> Nova Lista
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Nova Lista</DialogTitle>
-                  </DialogHeader>
-                  <div className="py-4">
-                    <Input placeholder="Nome da Lista" value={newListName} onChange={(e) => setNewListName(e.target.value)} />
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleCreateList} disabled={!newListName}>Criar</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-              <Dialog open={syncModalOpen} onOpenChange={setSyncModalOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Users className="h-4 w-4" /> Sincronizar do CRM
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Sincronizar Leads</DialogTitle>
-                    <DialogDescription>Selecione a lista de destino na SendPulse para importar leads "Ganhos" ou "Em Contato".</DialogDescription>
-                  </DialogHeader>
-                  <div className="py-4">
-                    <Select onValueChange={setSelectedBook} value={selectedBook}>
-                      <SelectTrigger><SelectValue placeholder="Selecione uma lista..." /></SelectTrigger>
-                      <SelectContent>
-                        {addressBooks.map(book => (
-                          <SelectItem key={book.id} value={book.id.toString()}>{book.name} ({book.all_email_count} contatos)</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setSyncModalOpen(false)}>Cancelar</Button>
-                    <Button onClick={handleSyncLeads} disabled={syncing || !selectedBook}>
-                      {syncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Sincronizar agora
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-              <Button className="gap-2" onClick={() => setImportOpen(true)}>
-                <Mail className="h-4 w-4" /> Importar Planilha
-              </Button>
-            </div>
-            <ImportSendpulseDialog open={importOpen} onOpenChange={setImportOpen} addressBooks={addressBooks} onSuccess={fetchAddressBooks} />
-          </div>
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome da Lista</TableHead>
-                  <TableHead>Contatos</TableHead>
-                  <TableHead>Criada em</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {addressBooks.length > 0 ? addressBooks.map((book) => (
-                  <TableRow key={book.id}>
-                    <TableCell className="font-medium">{book.name}</TableCell>
-                    <TableCell>{book.all_email_count}</TableCell>
-                    <TableCell>{new Date(book.created).toLocaleDateString()}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" asChild>
-                        <a href={`https://login.sendpulse.com/addressbooks/emails/id/${book.id}`} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )) : (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Nenhuma lista encontrada.</TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </Card>
+          <ContactLists addressBooks={addressBooks} onRefresh={fetchAddressBooks} />
         </TabsContent>
 
         <TabsContent value="campaign" className="pt-4">
