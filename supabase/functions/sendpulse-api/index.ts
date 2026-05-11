@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface SendPulseAction {
-  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook';
+  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info';
   book_id?: number;
   emails?: { email: string; variables?: Record<string, string> }[];
   sender_name?: string;
@@ -81,6 +81,20 @@ serve(async (req) => {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
       result = await res.json();
+    } else if (action === 'get_account_info') {
+      const res = await fetch('https://api.sendpulse.com/user/info', {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      
+      // Map relevant info
+      result = {
+        pricing_plan: data.pricing_plan || 'Free',
+        email_qty: data.emails_qty || 0,
+        email_limit: data.emails_limit || 0,
+        addressbook_limit: data.addressbooks_limit || 0,
+        balance: data.balance || []
+      };
     } else if (action === 'create_addressbook') {
       if (!params.name) throw new Error('name is required');
       const res = await fetch('https://api.sendpulse.com/addressbooks', {
