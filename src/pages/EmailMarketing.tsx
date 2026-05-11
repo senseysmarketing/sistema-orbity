@@ -376,11 +376,18 @@ export default function EmailMarketing() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 max-w-[500px]">
-          <TabsTrigger value="lists">Listas de Contatos</TabsTrigger>
-          <TabsTrigger value="campaign">Nova Campanha</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="lists" className="gap-2">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Listas de Contatos</span>
+          </TabsTrigger>
+          <TabsTrigger value="campaign" className="gap-2">
+            <Send className="h-4 w-4" />
+            <span className="hidden sm:inline">Nova Campanha</span>
+          </TabsTrigger>
           <TabsTrigger value="campaigns" className="gap-2">
-            <BarChart3 className="h-4 w-4" /> Gerenciar Campanhas
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Gerenciar Campanhas</span>
           </TabsTrigger>
         </TabsList>
 
@@ -390,7 +397,7 @@ export default function EmailMarketing() {
             <div className="flex flex-wrap gap-2">
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button variant="outline" className="gap-2">
                     <Plus className="h-4 w-4" /> Nova Lista
                   </Button>
                 </DialogTrigger>
@@ -408,7 +415,7 @@ export default function EmailMarketing() {
               </Dialog>
               <Dialog open={syncModalOpen} onOpenChange={setSyncModalOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button variant="outline" className="gap-2">
                     <Users className="h-4 w-4" /> Sincronizar do CRM
                   </Button>
                 </DialogTrigger>
@@ -436,7 +443,7 @@ export default function EmailMarketing() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-              <Button size="sm" className="gap-2" onClick={() => setImportOpen(true)}>
+              <Button className="gap-2" onClick={() => setImportOpen(true)}>
                 <Mail className="h-4 w-4" /> Importar Planilha
               </Button>
             </div>
