@@ -206,7 +206,7 @@ export default function EmailMarketing() {
   async function handleBookSelect(val: string) {
     setCampaign(prev => ({ ...prev, book_id: val }));
     const book = addressBooks.find(b => b.id.toString() === val);
-    if (book) setSelectedBookContacts(book.all_email_count);
+    if (book) setSelectedBookContacts(book.all_email_qty || book.all_email_count || 0);
   }
 
   async function handleSenderSelect(val: string) {
