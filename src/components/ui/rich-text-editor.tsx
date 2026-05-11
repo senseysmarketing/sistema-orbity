@@ -14,7 +14,8 @@ import {
   Link as LinkIcon,
   RotateCcw,
   RotateCw,
-  Quote
+  Quote,
+  Underline as UnderlineIcon
 } from 'lucide-react';
 import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
