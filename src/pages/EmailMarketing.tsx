@@ -31,6 +31,8 @@ import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ContactLists } from "@/components/email-marketing/ContactLists";
 import { AddSenderDialog } from "@/components/email-marketing/AddSenderDialog";
+import { TestEmailDialog } from "@/components/email-marketing/TestEmailDialog";
+
 
 export default function EmailMarketing() {
   const { currentAgency } = useAgency();
@@ -53,6 +55,8 @@ export default function EmailMarketing() {
   const [senders, setSenders] = useState<any[]>([]);
   const [loadingSenders, setLoadingSenders] = useState(false);
   const [addSenderOpen, setAddSenderOpen] = useState(false);
+  const [testEmailOpen, setTestEmailOpen] = useState(false);
+
   
   const [campaign, setCampaign] = useState({
     sender_name: "",
@@ -583,7 +587,17 @@ export default function EmailMarketing() {
                       {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : (scheduled ? <Calendar className="h-4 w-4" /> : <Send className="h-4 w-4" />)}
                       {scheduled ? "Agendar Campanha" : "Disparar Campanha Agora"}
                     </Button>
+
+                    <Button 
+                      variant="outline" 
+                      className="w-full mt-2 gap-2"
+                      onClick={() => setTestEmailOpen(true)}
+                      disabled={!campaign.sender_email || !campaign.subject || !campaign.body}
+                    >
+                      🧪 Enviar E-mail de Teste
+                    </Button>
                   </div>
+
                 </CardContent>
               </Card>
             </div>
@@ -678,6 +692,17 @@ export default function EmailMarketing() {
         open={addSenderOpen}
         onOpenChange={setAddSenderOpen}
         onSuccess={fetchSenders}
+      />
+
+      <TestEmailDialog 
+        open={testEmailOpen}
+        onOpenChange={setTestEmailOpen}
+        campaign={{
+          sender_name: campaign.sender_name,
+          sender_email: campaign.sender_email,
+          subject: campaign.subject,
+          body: campaign.body
+        }}
       />
     </div>
   );
