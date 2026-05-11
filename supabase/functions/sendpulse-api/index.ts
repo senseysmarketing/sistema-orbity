@@ -96,7 +96,7 @@ serve(async (req) => {
         email_qty: data.email_qty || data.emails_qty || 0,
         email_limit: (data.email_limit === 0 || !data.email_limit) && isFree ? 15000 : (data.email_limit || 0),
         emails_total: data.emails_total || 0,
-        addressbook_limit: (data.addressbook_limit === 0 || !data.addressbook_limit) && isFree ? 500 : (data.addressbook_limit || 0),
+        addressbook_limit: (data.addressbook_limit === 0 || data.addressbooks_limit === 0 || !data.addressbook_limit) && isFree ? 500 : (data.addressbook_limit || data.addressbooks_limit || 0),
         balance: data.balance || []
       };
     } else if (action === 'create_addressbook') {
