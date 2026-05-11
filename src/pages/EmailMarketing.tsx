@@ -266,8 +266,9 @@ export default function EmailMarketing() {
     if (!aiPrompt) return;
     try {
       const result = await callAI("email_generation", aiPrompt, currentAgency?.id);
-      if (result) {
-        setCampaign(prev => ({ ...prev, body: result }));
+      const html = typeof result === "string" ? result : result?.html;
+      if (html) {
+        setCampaign(prev => ({ ...prev, body: html }));
         setAiPromptOpen(false);
         setAiPrompt("");
       }
