@@ -2485,6 +2485,58 @@ export type Database = {
           },
         ]
       }
+      email_templates: {
+        Row: {
+          agency_id: string
+          content: string
+          created_at: string
+          id: string
+          name: string
+          subject: string | null
+          updated_at: string
+        }
+        Insert: {
+          agency_id: string
+          content: string
+          created_at?: string
+          id?: string
+          name: string
+          subject?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agency_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          name?: string
+          subject?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_templates_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_templates_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "email_templates_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       employee_scorecards: {
         Row: {
           agency_id: string
