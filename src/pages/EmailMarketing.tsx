@@ -644,6 +644,8 @@ export default function EmailMarketing() {
               </Card>
             </div>
           </div>
+        </TabsContent>
+
         <TabsContent value="campaigns" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-medium">Relatório de Campanhas</h3>
