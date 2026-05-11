@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface SendPulseAction {
-  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info' | 'get_campaigns' | 'get_campaign_stats' | 'cancel_campaign' | 'update_addressbook' | 'delete_addressbook' | 'get_contacts';
+  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info' | 'get_campaigns' | 'get_campaign_stats' | 'cancel_campaign' | 'update_addressbook' | 'delete_addressbook' | 'get_contacts' | 'get_senders' | 'add_sender';
   book_id?: number;
   campaign_id?: number;
   emails?: { email: string; variables?: Record<string, string> }[];
@@ -224,6 +224,25 @@ serve(async (req) => {
       if (!params.book_id) throw new Error('book_id is required');
       const res = await fetch(`https://api.sendpulse.com/addressbooks/${params.book_id}/emails`, {
         headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json();
+    } else if (action === 'get_senders') {
+      const res = await fetch('https://api.sendpulse.com/senders', {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json();
+    } else if (action === 'add_sender') {
+      if (!params.name || !params.sender_email) throw new Error('name and sender_email are required');
+      const res = await fetch('https://api.sendpulse.com/senders', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: params.sender_email,
+          name: params.name
+        }),
       });
       result = await res.json();
     } else {
