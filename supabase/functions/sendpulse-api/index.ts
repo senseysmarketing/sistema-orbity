@@ -248,9 +248,18 @@ serve(async (req) => {
       result = await res.json();
     } else if (action === 'send_test_email') {
       const { sender_name, sender_email, subject, body, target_email } = params;
+      console.log('send_test_email params:', { 
+        has_sender_name: !!sender_name, 
+        has_sender_email: !!sender_email, 
+        has_subject: !!subject, 
+        has_body: !!body, 
+        has_target_email: !!target_email 
+      });
       if (!sender_name || !sender_email || !subject || !body || !target_email) {
-        throw new Error('Missing test email parameters');
+        throw new Error(`Missing test email parameters: ${JSON.stringify({ sender_name: !!sender_name, sender_email: !!sender_email, subject: !!subject, body: !!body, target_email: !!target_email })}`);
       }
+
+      const textBody = body.replace(/<[^>]*>?/gm, '').trim() || ' ';
 
       const res = await fetch('https://api.sendpulse.com/smtp/emails', {
         method: 'POST',
@@ -260,25 +269,20 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           email: {
-            html: btoa(unescape(encodeURIComponent(body))), // Some APIs expect base64, but SendPulse SMTP docs usually say string. Let's check.
-            // Actually, the user instruction says: "html": "string do body"
-            // Wait, the create_campaign uses btoa. Let's stick to what the user said for SMTP.
-            html: body,
-            text: body.replace(/<[^>]*>?/gm, ''), // Simple strip tags
+            html: btoa(unescape(encodeURIComponent(body))),
+            text: textBody,
             subject,
-            from: {
-              name: sender_name,
-              email: sender_email
-            },
-            to: [
-              {
-                email: target_email
-              }
-            ]
+            from: { name: sender_name, email: sender_email },
+            to: [{ email: target_email }]
           }
         }),
       });
-      result = await res.json();
+      const responseText = await res.text();
+      console.log('SendPulse SMTP response:', res.status, responseText);
+      if (!res.ok) {
+        throw new Error(`SendPulse SMTP error (${res.status}): ${responseText}`);
+      }
+      result = JSON.parse(responseText);
     } else {
       throw new Error(`Unknown action: ${action}`);
     }
