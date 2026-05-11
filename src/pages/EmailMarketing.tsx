@@ -294,7 +294,12 @@ export default function EmailMarketing() {
                   </Badge>
                 </div>
                 <div className="flex items-end justify-between">
-                  <span className="text-sm font-semibold">SendPulse Connected</span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold">SendPulse Connected</span>
+                    {accountInfo.renewal_date && (
+                      <span className="text-[10px] text-muted-foreground italic">Renova em: {accountInfo.renewal_date}</span>
+                    )}
+                  </div>
                   <TrendingUp className="h-4 w-4 text-primary opacity-50" />
                 </div>
               </CardContent>
