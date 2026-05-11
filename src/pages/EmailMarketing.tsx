@@ -415,7 +415,6 @@ export default function EmailMarketing() {
             </Table>
           </Card>
         </TabsContent>
-
         <TabsContent value="campaign">
           <Card>
             <CardHeader>
