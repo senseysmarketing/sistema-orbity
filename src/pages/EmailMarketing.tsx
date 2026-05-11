@@ -104,6 +104,38 @@ export default function EmailMarketing() {
     }
   }
 
+  async function fetchCampaigns() {
+    setLoadingCampaigns(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sendpulse-api', {
+        body: { action: 'get_campaigns' }
+      });
+      if (error) throw error;
+      setCampaigns(data || []);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao carregar campanhas");
+    } finally {
+      setLoadingCampaigns(false);
+    }
+  }
+
+  async function handleCancelCampaign(campaignId: number) {
+    if (!confirm("Tem certeza que deseja cancelar/remover esta campanha?")) return;
+    
+    try {
+      const { error } = await supabase.functions.invoke('sendpulse-api', {
+        body: { action: 'cancel_campaign', campaign_id: campaignId }
+      });
+      if (error) throw error;
+      toast.success("Operação realizada com sucesso!");
+      fetchCampaigns();
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao cancelar campanha");
+    }
+  }
+
   async function fetchAccountInfo() {
     setLoadingInfo(true);
     try {
