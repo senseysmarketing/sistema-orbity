@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
-import { Mail, RefreshCw, Send, Plus, Search, ExternalLink, Loader2, Users, Wallet, Calendar } from "lucide-react";
+import { Mail, RefreshCw, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info } from "lucide-react";
 import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -27,7 +25,7 @@ import { cn } from "@/lib/utils";
 
 export default function EmailMarketing() {
   const { currentAgency } = useAgency();
-  const { loading: aiLoading, callAI } = useAIAssist() as any; // Cast as any if typing is strict and doesn't have custom actions
+  const { loading: aiLoading, callAI } = useAIAssist() as any;
   const [loading, setLoading] = useState(true);
   const [configured, setConfigured] = useState(false);
   const [addressBooks, setAddressBooks] = useState<any[]>([]);
@@ -43,7 +41,6 @@ export default function EmailMarketing() {
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [scheduledTime, setScheduledTime] = useState("09:00");
   
-  // Campaign form
   const [campaign, setCampaign] = useState({
     sender_name: "",
     sender_email: "",
@@ -63,7 +60,7 @@ export default function EmailMarketing() {
     if (!currentAgency?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('agency_integrations')
         .select('sendpulse_client_id, sendpulse_client_secret')
         .eq('agency_id', currentAgency.id)
@@ -113,7 +110,6 @@ export default function EmailMarketing() {
 
   const getEmailBalance = () => {
     if (!balance) return null;
-    // Handle both /user/balance/detail and legacy /balance
     return balance?.email?.emails_left ?? balance?.email?.balance ?? balance?.[0]?.balance ?? 0;
   };
 
@@ -150,7 +146,7 @@ export default function EmailMarketing() {
         variables: { name: l.name }
       }));
 
-      const { data, error } = await supabase.functions.invoke('sendpulse-api', {
+      const { error } = await supabase.functions.invoke('sendpulse-api', {
         body: { 
           action: 'add_emails', 
           book_id: parseInt(selectedBook),
@@ -172,7 +168,7 @@ export default function EmailMarketing() {
   async function handleCreateList() {
     if (!newListName) return;
     try {
-      const { data, error } = await supabase.functions.invoke('sendpulse-api', {
+      const { error } = await supabase.functions.invoke('sendpulse-api', {
         body: { action: 'create_addressbook', name: newListName }
       });
       if (error) throw error;
@@ -200,7 +196,7 @@ export default function EmailMarketing() {
     }
 
     try {
-      const { data, error } = await supabase.functions.invoke('sendpulse-api', {
+      const { error } = await supabase.functions.invoke('sendpulse-api', {
         body: { 
           action: 'create_campaign',
           ...campaign,
@@ -210,9 +206,9 @@ export default function EmailMarketing() {
       });
 
       if (error) throw error;
-      toast.success("Campanha enviada com sucesso!");
+      toast.success(scheduled ? "Campanha agendada com sucesso!" : "Campanha enviada com sucesso!");
       setCampaign({ sender_name: "", sender_email: "", subject: "", body: "", book_id: "" });
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
       const errorMessage = e.message || "";
       if (errorMessage.includes("QUOTA_EXCEEDED")) {
@@ -224,7 +220,7 @@ export default function EmailMarketing() {
           description: "Seu plano SendPulse possui restrições para esta operação. Verifique sua conta."
         });
       } else {
-        toast.error("Erro ao enviar campanha");
+        toast.error("Erro ao processar campanha");
       }
     } finally {
       setSending(false);
@@ -235,7 +231,6 @@ export default function EmailMarketing() {
     if (!aiPrompt) return;
     
     try {
-      // Using generic callAI from useAIAssist if available, otherwise we'd need to add a type
       const result = await callAI("email_generation", aiPrompt, currentAgency?.id);
       if (result) {
         setCampaign(prev => ({ ...prev, body: result }));
@@ -336,6 +331,7 @@ export default function EmailMarketing() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+              
               <Dialog open={syncModalOpen} onOpenChange={setSyncModalOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline">🔄 Sincronizar do CRM</Button>
@@ -370,8 +366,10 @@ export default function EmailMarketing() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+
               <Button onClick={() => setImportOpen(true)}>📥 Importar Planilha</Button>
             </div>
+            
             <ImportSendpulseDialog 
               open={importOpen} 
               onOpenChange={setImportOpen} 
