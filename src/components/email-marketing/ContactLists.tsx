@@ -190,10 +190,10 @@ export function ContactLists({ addressBooks, onRefresh }: ContactListsProps) {
               <TableRow key={book.id}>
                  <TableCell className="font-medium">{book.name}</TableCell>
                  <TableCell>
-                   {book.all_email_count !== undefined ? book.all_email_count : 
-                    (book.active_email_count || book.contacts || book.total || 0)}
+                   {book.all_email_qty !== undefined ? book.all_email_qty : 
+                    (book.all_email_count || book.active_email_count || book.contacts || book.total || 0)}
                  </TableCell>
-                 <TableCell>{book.creation_date || book.created || book.creationdate ? new Date(book.creation_date || book.created || book.creationdate).toLocaleDateString() : '-'}</TableCell>
+                 <TableCell>{book.creation_date || book.created || book.creationdate || book.creation_date ? new Date(book.creation_date || book.created || book.creationdate || book.creation_date).toLocaleDateString() : '-'}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
