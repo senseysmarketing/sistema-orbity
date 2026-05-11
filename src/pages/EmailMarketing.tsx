@@ -418,6 +418,7 @@ export default function EmailMarketing() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="campaign">
           <Card>
             <CardHeader>
               <CardTitle>Detalhes da Campanha</CardTitle>
