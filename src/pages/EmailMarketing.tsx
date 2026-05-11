@@ -175,61 +175,7 @@ export default function EmailMarketing() {
     if (book) setSelectedBookContacts(book.all_email_count);
   }
 
-  async function handleSyncLeads() {
-    if (!selectedBook) {
-      toast.error("Selecione uma lista de destino");
-      return;
-    }
-    setSyncing(true);
-    try {
-      const { data: leads, error: leadsError } = await supabase
-        .from('leads')
-        .select('email, name')
-        .eq('agency_id', currentAgency?.id)
-        .not('email', 'is', null)
-        .in('status', ['ganhos', 'em_contato']);
-      if (leadsError) throw leadsError;
-      if (!leads || leads.length === 0) {
-        toast.info("Nenhum lead qualificado encontrado para sincronização.");
-        return;
-      }
-      const formattedEmails = leads.map(l => ({
-        email: l.email,
-        variables: { name: l.name }
-      }));
-      const { error } = await supabase.functions.invoke('sendpulse-api', {
-        body: { 
-          action: 'add_emails', 
-          book_id: parseInt(selectedBook),
-          emails: formattedEmails
-        }
-      });
-      if (error) throw error;
-      toast.success(`${leads.length} leads sincronizados com sucesso!`);
-      setSyncModalOpen(false);
-    } catch (e) {
-      console.error(e);
-      toast.error("Erro ao sincronizar leads");
-    } finally {
-      setSyncing(false);
-    }
-  }
-
-  async function handleCreateList() {
-    if (!newListName) return;
-    try {
-      const { error } = await supabase.functions.invoke('sendpulse-api', {
-        body: { action: 'create_addressbook', name: newListName }
-      });
-      if (error) throw error;
-      toast.success("Lista criada com sucesso!");
-      setNewListName("");
-      fetchAddressBooks();
-    } catch (e) {
-      console.error(e);
-      toast.error("Erro ao criar lista");
-    }
-  }
+  // Note: List synchronization and creation are now handled in the ContactLists component.
 
   async function handleSendCampaign() {
     const { sender_name, sender_email, subject, body, book_id } = campaign;
