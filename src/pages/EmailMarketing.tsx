@@ -255,6 +255,8 @@ export default function EmailMarketing() {
       if (error) throw error;
       toast.success(scheduled ? "Campanha agendada com sucesso!" : "Campanha enviada com sucesso!");
       setCampaign({ sender_name: "", sender_email: "", subject: "", body: "", book_id: "" });
+      fetchCampaigns();
+      setActiveTab("campaigns");
     } catch (e: any) {
       console.error(e);
       const errorMessage = e.message || "";
