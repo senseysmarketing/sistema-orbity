@@ -373,10 +373,13 @@ export default function EmailMarketing() {
         )}
       </div>
 
-      <Tabs defaultValue="lists" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3 max-w-[500px]">
           <TabsTrigger value="lists">Listas de Contatos</TabsTrigger>
           <TabsTrigger value="campaign">Nova Campanha</TabsTrigger>
+          <TabsTrigger value="campaigns" className="gap-2">
+            <BarChart3 className="h-4 w-4" /> Gerenciar Campanhas
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="lists" className="space-y-4">
