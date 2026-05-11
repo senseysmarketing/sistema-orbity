@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, Facebook, Settings, BarChart, Activity, LogOut, Users, TrendingUp, Wrench } from "lucide-react";
+import { AlertCircle, Settings, BarChart, Activity, LogOut, Users, TrendingUp, Wrench } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { META_MAINTENANCE_ACTIVE, META_MAINTENANCE_RETURN_DATE, META_MAINTENANCE_MESSAGE } from "@/components/traffic/utils/metaMaintenanceNotice";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -180,7 +180,7 @@ export default function Traffic() {
             )}
             <Card className="border-2 border-dashed">
               <CardHeader className="text-center">
-                <Facebook className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+                <Settings className="h-12 w-12 text-blue-600 mx-auto mb-4" />
                 <CardTitle>Meta Ads</CardTitle>
                 <CardDescription>
                   {META_MAINTENANCE_ACTIVE
@@ -293,7 +293,7 @@ export default function Traffic() {
         <Card>
           <CardContent className="flex items-center justify-between p-4">
             <div className="flex items-center gap-2">
-              <Facebook className="h-5 w-5 text-blue-600" />
+              <Settings className="h-5 w-5 text-blue-600" />
               <span className="font-medium">Facebook</span>
             </div>
             <Badge variant="outline" className="text-green-600 border-green-600">Conectado</Badge>

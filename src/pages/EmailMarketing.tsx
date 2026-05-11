@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Search, Sparkles } from "lucide-react";
+import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Search, Sparkles, Eye, Code } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgency } from "@/hooks/useAgency";
@@ -27,6 +27,8 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CampaignStatsDialog } from "@/components/email-marketing/CampaignStatsDialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export default function EmailMarketing() {
   const { currentAgency } = useAgency();
@@ -61,6 +63,7 @@ export default function EmailMarketing() {
   const [sending, setSending] = useState(false);
   const [aiPromptOpen, setAiPromptOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
+  const [campaignView, setCampaignView] = useState<"editor" | "preview">("editor");
 
   useEffect(() => {
     checkIntegration();
@@ -489,10 +492,27 @@ export default function EmailMarketing() {
             <div className="lg:col-span-7">
               <Card className="border shadow-sm overflow-hidden min-h-[600px] flex flex-col">
                 <CardHeader className="flex flex-row items-center justify-between pb-4 border-b space-y-0">
-                  <div className="space-y-1">
+                  <div className="flex items-center gap-4">
                     <CardTitle className="text-base font-semibold flex items-center gap-2">
                       <TrendingUp className="h-4 w-4 text-primary" /> Estúdio de Criação
                     </CardTitle>
+                    <Separator orientation="vertical" className="h-6" />
+                    <ToggleGroup 
+                      type="single" 
+                      value={campaignView} 
+                      onValueChange={(val) => val && setCampaignView(val as any)}
+                      size="sm"
+                      className="bg-muted/50 p-1 rounded-lg"
+                    >
+                      <ToggleGroupItem value="editor" aria-label="Editor mode" className="gap-2">
+                        <Code className="h-4 w-4" />
+                        <span className="hidden sm:inline">Editor</span>
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="preview" aria-label="Preview mode" className="gap-2">
+                        <Eye className="h-4 w-4" />
+                        <span className="hidden sm:inline">Visualização</span>
+                      </ToggleGroupItem>
+                    </ToggleGroup>
                   </div>
                   <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
                     <DialogTrigger asChild>
@@ -517,13 +537,25 @@ export default function EmailMarketing() {
                     </DialogContent>
                   </Dialog>
                 </CardHeader>
-                <div className="flex-1 flex flex-col">
-                  <Textarea 
-                    placeholder="Escreva aqui o corpo do e-mail (aceita HTML)..." 
-                    className="flex-1 font-mono text-sm p-6 leading-relaxed border-none focus-visible:ring-0 resize-none bg-card/10"
-                    value={campaign.body}
-                    onChange={e => setCampaign(prev => ({ ...prev, body: e.target.value }))}
-                  />
+                <div className="flex-1 p-0 overflow-y-auto bg-card/5">
+                  {campaignView === "editor" ? (
+                    <div className="p-4">
+                      <RichTextEditor 
+                        value={campaign.body}
+                        onChange={(val) => setCampaign(prev => ({ ...prev, body: val }))}
+                        placeholder="Escreva o conteúdo persuasivo da sua campanha..."
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-8 bg-muted/20 min-h-full flex justify-center">
+                      <div className="w-full max-w-[600px] bg-white shadow-lg border rounded-lg p-10 min-h-[500px]">
+                        <div 
+                          className="prose prose-slate max-w-none text-gray-900"
+                          dangerouslySetInnerHTML={{ __html: campaign.body || '<p className="text-gray-400 italic">Nenhum conteúdo para visualizar...</p>' }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </Card>
             </div>
