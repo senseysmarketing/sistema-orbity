@@ -266,20 +266,6 @@ export default function EmailMarketing() {
     }
   }
 
-  async function handleAIGenerate() {
-    if (!aiPrompt) return;
-    try {
-      const result = await callAI("email_generation", aiPrompt, currentAgency?.id);
-      const html = typeof result === "string" ? result : result?.html;
-      if (html) {
-        setCampaign(prev => ({ ...prev, body: html }));
-        setAiPromptOpen(false);
-        setAiPrompt("");
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }
 
   if (loading) {
     return (
@@ -368,7 +354,6 @@ export default function EmailMarketing() {
 
       <Tabs value={activeTab} onValueChange={(val) => {
         setActiveTab(val);
-        setAiPrompt("");
       }} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="lists" className="gap-2">
@@ -393,83 +378,14 @@ export default function EmailMarketing() {
           <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
             {/* Coluna Esquerda: O Estúdio (70%) */}
             <div className="lg:col-span-7">
-              <Card className="border shadow-sm overflow-hidden min-h-[600px] flex flex-col">
-                <CardHeader className="flex flex-row items-center justify-between pb-4 border-b space-y-0">
-                  <div className="flex items-center gap-4">
-                    <CardTitle className="text-base font-semibold flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-primary" /> Estúdio de Criação
-                    </CardTitle>
-                    <Separator orientation="vertical" className="h-6" />
-                    <ToggleGroup 
-                      type="single" 
-                      value={campaignView} 
-                      onValueChange={(val) => val && setCampaignView(val as any)}
-                      size="sm"
-                      className="bg-muted/50 p-1 rounded-lg"
-                    >
-                      <ToggleGroupItem value="editor" aria-label="Editor mode" className="gap-2">
-                        <Code className="h-4 w-4" />
-                        <span className="hidden sm:inline">Editor</span>
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="preview" aria-label="Preview mode" className="gap-2">
-                        <Eye className="h-4 w-4" />
-                        <span className="hidden sm:inline">Visualização</span>
-                      </ToggleGroupItem>
-                    </ToggleGroup>
-                  </div>
-                  <Dialog open={aiPromptOpen} onOpenChange={(open) => {
-                    setAiPromptOpen(open);
-                    if (!open) setAiPrompt("");
-                  }}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-2">
-                        <Sparkles className="h-4 w-4" /> Escrever com IA
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>O que você quer escrever?</DialogTitle>
-                        <DialogDescription>
-                          Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.
-                          <br />
-                          <span className="text-[10px] text-primary font-medium">
-                            Dica: Você pode pedir para a IA usar as variáveis {"{{Nome}}"} e {"{{Telefone}}"} no texto.
-                          </span>
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="py-4">
-                        <Textarea placeholder="Ex: Oferta de serviço de gestão de tráfego para novos leads..." value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} rows={4} />
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setAiPromptOpen(false)}>Cancelar</Button>
-                        <Button onClick={handleAIGenerate} disabled={aiLoading || !aiPrompt}>
-                          {aiLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Gerar Conteúdo
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </CardHeader>
-                <div className="flex-1 p-0 overflow-y-auto bg-card/5">
-                  {campaignView === "editor" ? (
-                    <div className="p-4">
-                      <RichTextEditor 
-                        value={campaign.body}
-                        onChange={(val) => setCampaign(prev => ({ ...prev, body: val }))}
-                        placeholder="Escreva o conteúdo persuasivo da sua campanha..."
-                      />
-                    </div>
-                  ) : (
-                    <div className="p-8 bg-muted/20 min-h-full flex justify-center">
-                      <div className="w-full max-w-[600px] bg-white shadow-lg border rounded-lg p-10 min-h-[500px]">
-                        <div 
-                          className="prose prose-slate max-w-none text-gray-900"
-                          dangerouslySetInnerHTML={{ __html: campaign.body || '<p className="text-gray-400 italic">Nenhum conteúdo para visualizar...</p>' }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
+              <CampaignBuilder 
+                campaign={campaign}
+                setCampaign={setCampaign}
+                aiLoading={aiLoading}
+                callAI={callAI}
+                campaignView={campaignView}
+                setCampaignView={setCampaignView}
+              />
             </div>
 
             {/* Coluna Direita: Logística de Voo (30%) */}
