@@ -214,15 +214,15 @@ export function RichTextEditor({ value, onChange, placeholder = 'Escreva sua cam
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onClick={() => editor.chain().focus().insertContent('{{Nome}}').run()}>
               Nome do Contato
-              <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-1 rounded">{{Nome}}</span>
+              <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-1 rounded">{"{{Nome}}"}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => editor.chain().focus().insertContent('{{Email}}').run()}>
               E-mail do Contato
-              <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-1 rounded">{{Email}}</span>
+              <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-1 rounded">{"{{Email}}"}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => editor.chain().focus().insertContent('{{Telefone}}').run()}>
               Telefone
-              <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-1 rounded">{{Telefone}}</span>
+              <span className="ml-auto text-[10px] text-muted-foreground bg-muted px-1 rounded">{"{{Telefone}}"}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
