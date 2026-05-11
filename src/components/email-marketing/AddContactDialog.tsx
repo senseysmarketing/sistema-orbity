@@ -80,7 +80,7 @@ export function AddContactDialog({ open, onOpenChange, bookId, onSuccess }: AddC
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="name">Nome (Variável Magic)</Label>
+            <Label htmlFor="name">Nome</Label>
             <Input
               id="name"
               placeholder="Nome completo"
@@ -89,7 +89,7 @@ export function AddContactDialog({ open, onOpenChange, bookId, onSuccess }: AddC
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="phone">Telefone (Variável Magic)</Label>
+            <Label htmlFor="phone">Telefone</Label>
             <Input
               id="phone"
               placeholder="+55 00 00000-0000"
