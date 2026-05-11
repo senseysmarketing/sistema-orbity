@@ -188,9 +188,12 @@ export function ContactLists({ addressBooks, onRefresh }: ContactListsProps) {
           <TableBody>
             {addressBooks.length > 0 ? addressBooks.map((book) => (
               <TableRow key={book.id}>
-                <TableCell className="font-medium">{book.name}</TableCell>
-                <TableCell>{book.all_email_count || book.active_email_count || book.contacts || 0}</TableCell>
-                <TableCell>{book.creation_date || book.created || book.creationdate ? new Date(book.creation_date || book.created || book.creationdate).toLocaleDateString() : '-'}</TableCell>
+                 <TableCell className="font-medium">{book.name}</TableCell>
+                 <TableCell>
+                   {book.all_email_count !== undefined ? book.all_email_count : 
+                    (book.active_email_count || book.contacts || book.total || 0)}
+                 </TableCell>
+                 <TableCell>{book.creation_date || book.created || book.creationdate ? new Date(book.creation_date || book.created || book.creationdate).toLocaleDateString() : '-'}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
