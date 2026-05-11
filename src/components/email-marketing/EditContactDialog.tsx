@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import InputMask from "react-input-mask";
+import { formatPhoneBR } from "@/lib/phone-mask";
 import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -97,19 +97,13 @@ export function EditContactDialog({ open, onOpenChange, bookId, contact, onSucce
           </div>
           <div className="grid gap-2">
             <Label htmlFor="edit-phone">Telefone</Label>
-            <InputMask
-              mask="(99) 99999-9999"
+            <Input
+              id="edit-phone"
+              placeholder="(00) 00000-0000"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            >
-              {(inputProps: any) => (
-                <Input
-                  {...inputProps}
-                  id="edit-phone"
-                  placeholder="(00) 00000-0000"
-                />
-              )}
-            </InputMask>
+              onChange={(e) => setPhone(formatPhoneBR(e.target.value))}
+              inputMode="tel"
+            />
           </div>
         </div>
         <DialogFooter>
