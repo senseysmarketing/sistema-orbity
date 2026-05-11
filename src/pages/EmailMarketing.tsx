@@ -193,7 +193,11 @@ export default function EmailMarketing() {
 
   const getContactUsage = () => {
     if (!accountInfo) return { total: 0, limit: 0, percent: 0 };
-    const total = accountInfo.emails_total || 0;
+    
+    // Sum contacts from all address books for a more accurate total
+    const addressBookTotal = addressBooks.reduce((acc, book) => acc + (book.all_email_qty || book.all_email_count || 0), 0);
+    const total = addressBookTotal > 0 ? addressBookTotal : (accountInfo.emails_total || 0);
+    
     const limit = accountInfo.addressbook_limit || 500;
     const percent = limit > 0 ? (total / limit) * 100 : 0;
     return { total, limit, percent };
@@ -202,7 +206,7 @@ export default function EmailMarketing() {
   async function handleBookSelect(val: string) {
     setCampaign(prev => ({ ...prev, book_id: val }));
     const book = addressBooks.find(b => b.id.toString() === val);
-    if (book) setSelectedBookContacts(book.all_email_count);
+    if (book) setSelectedBookContacts(book.all_email_qty || book.all_email_count || 0);
   }
 
   async function handleSenderSelect(val: string) {
