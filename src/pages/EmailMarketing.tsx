@@ -115,15 +115,15 @@ export default function EmailMarketing() {
   const getEmailUsage = () => {
     if (!accountInfo) return { sent: 0, limit: 0, percent: 0 };
     const sent = accountInfo.email_qty || 0;
-    const limit = accountInfo.email_limit || 0;
+    const limit = accountInfo.email_limit || 15000;
     const percent = limit > 0 ? (sent / limit) * 100 : 0;
     return { sent, limit, percent };
   };
 
   const getContactUsage = () => {
     if (!accountInfo) return { total: 0, limit: 0, percent: 0 };
-    const total = addressBooks.reduce((acc, book) => acc + (book.all_email_count || 0), 0);
-    const limit = accountInfo.addressbook_limit || 0;
+    const total = accountInfo.emails_total || 0;
+    const limit = accountInfo.addressbook_limit || 500;
     const percent = limit > 0 ? (total / limit) * 100 : 0;
     return { total, limit, percent };
   };
