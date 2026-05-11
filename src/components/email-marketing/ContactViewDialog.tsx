@@ -2,7 +2,19 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Users } from "lucide-react";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Loader2, Users, Pencil, Trash2, RefreshCw } from "lucide-react";
+import { EditContactDialog } from "./EditContactDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -15,7 +27,11 @@ interface ContactViewDialogProps {
 
 export function ContactViewDialog({ open, onOpenChange, bookId, bookName }: ContactViewDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [contacts, setContacts] = useState<any[]>([]);
+  const [selectedContact, setSelectedContact] = useState<any>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (open && bookId) {
@@ -41,6 +57,43 @@ export function ContactViewDialog({ open, onOpenChange, bookId, bookName }: Cont
       setLoading(false);
     }
   }
+
+  const handleDeleteContact = async () => {
+    if (!bookId || !selectedContact) return;
+    
+    setIsUpdating(true);
+    try {
+      const { error } = await supabase.functions.invoke('sendpulse-api', {
+        body: { 
+          action: 'delete_contact', 
+          book_id: bookId, 
+          email: selectedContact.email 
+        }
+      });
+      
+      if (error) throw error;
+      
+      toast.success("Contato removido com sucesso!");
+      // Feedback instantâneo local
+      setContacts(prev => prev.filter(c => c.email !== selectedContact.email));
+      setDeleteDialogOpen(false);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erro ao excluir contato");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const openEdit = (contact: any) => {
+    setSelectedContact(contact);
+    setEditDialogOpen(true);
+  };
+
+  const openDelete = (contact: any) => {
+    setSelectedContact(contact);
+    setDeleteDialogOpen(true);
+  };
 
   const getStatusLabel = (status: number) => {
     switch (status) {
@@ -77,21 +130,44 @@ export function ContactViewDialog({ open, onOpenChange, bookId, bookName }: Cont
                   <TableRow>
                     <TableHead>E-mail</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Data de Inscrição</TableHead>
+                    <TableHead>Data</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {contacts.length > 0 ? (
                     contacts.map((contact, idx) => (
-                      <TableRow key={idx}>
+                      <TableRow key={idx} className={isUpdating && selectedContact?.email === contact.email ? "opacity-50" : ""}>
                         <TableCell className="font-medium">{contact.email}</TableCell>
                         <TableCell>{getStatusLabel(contact.status)}</TableCell>
                         <TableCell>{contact.add_time || contact.registration_date ? new Date(contact.add_time || contact.registration_date).toLocaleDateString() : '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7" 
+                              onClick={() => openEdit(contact)}
+                              disabled={isUpdating}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" 
+                              onClick={() => openDelete(contact)}
+                              disabled={isUpdating}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                         Nenhum contato encontrado nesta lista.
                       </TableCell>
                     </TableRow>
@@ -102,6 +178,39 @@ export function ContactViewDialog({ open, onOpenChange, bookId, bookName }: Cont
           )}
         </div>
       </DialogContent>
+
+      <EditContactDialog 
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        bookId={bookId}
+        contact={selectedContact}
+        onSuccess={fetchContacts}
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Contato?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a remover <strong>{selectedContact?.email}</strong> desta lista. Esta ação não pode ser desfeita na SendPulse.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUpdating}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteContact();
+              }}
+              disabled={isUpdating}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isUpdating && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+              Excluir Contato
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
