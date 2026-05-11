@@ -97,7 +97,8 @@ serve(async (req) => {
         email_limit: (data.email_limit === 0 || !data.email_limit) && isFree ? 15000 : (data.email_limit || 0),
         emails_total: data.emails_total || 0,
         addressbook_limit: (data.addressbook_limit === 0 || data.addressbooks_limit === 0 || !data.addressbook_limit) && isFree ? 500 : (data.addressbook_limit || data.addressbooks_limit || 0),
-        balance: data.balance || []
+        balance: data.balance || [],
+        renewal_date: data.renewal_date || data.expiry_date || null
       };
     } else if (action === 'create_addressbook') {
       if (!params.name) throw new Error('name is required');
