@@ -392,7 +392,7 @@ export default function EmailMarketing() {
         </TabsList>
 
         <TabsContent value="lists" className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h3 className="text-lg font-medium">Suas Listas na SendPulse</h3>
             <div className="flex flex-wrap gap-2">
               <Dialog>
@@ -654,9 +654,9 @@ export default function EmailMarketing() {
         </TabsContent>
 
         <TabsContent value="campaigns" className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h3 className="text-lg font-medium">Relatório de Campanhas</h3>
-            <Button variant="outline" size="sm" className="gap-2" onClick={fetchCampaigns} disabled={loadingCampaigns}>
+            <Button variant="outline" className="gap-2" onClick={fetchCampaigns} disabled={loadingCampaigns}>
               <RefreshCw className={cn("h-4 w-4", loadingCampaigns && "animate-spin")} /> Atualizar
             </Button>
           </div>
