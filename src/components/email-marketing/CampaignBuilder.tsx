@@ -112,110 +112,143 @@ export function CampaignBuilder({
 
   return (
     <Card className="border shadow-sm overflow-hidden min-h-[600px] flex flex-col">
-      <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b space-y-4 sm:space-y-0">
-        <div className="flex flex-wrap items-center gap-3">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-primary" /> Estúdio de Criação
-          </CardTitle>
-          <Separator orientation="vertical" className="hidden sm:block h-6" />
+      <CardHeader className="flex flex-col space-y-4 pb-4 border-b">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <TrendingUp className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-bold">Estúdio de Criação</CardTitle>
+              <p className="text-xs text-muted-foreground">Desenvolva o conteúdo da sua campanha</p>
+            </div>
+          </div>
+
           <ToggleGroup 
             type="single" 
             value={campaignView} 
             onValueChange={(val) => val && setCampaignView(val as any)}
             size="sm"
-            className="bg-muted/50 p-1 rounded-lg"
+            className="bg-muted p-1 rounded-xl w-fit"
           >
-            <ToggleGroupItem value="editor" aria-label="Editor mode" className="gap-2">
+            <ToggleGroupItem value="editor" className="gap-2 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm px-4">
               <Code className="h-4 w-4" />
-              <span className="hidden sm:inline">Editor</span>
+              <span>Editor</span>
             </ToggleGroupItem>
-            <ToggleGroupItem value="preview" aria-label="Preview mode" className="gap-2">
+            <ToggleGroupItem value="preview" className="gap-2 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm px-4">
               <Eye className="h-4 w-4" />
-              <span className="hidden sm:inline">Visualização</span>
+              <span>Visualização</span>
             </ToggleGroupItem>
           </ToggleGroup>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <TemplateLibraryDialog 
-            onSelectTemplate={handleSelectTemplate} 
-            currentContent={campaign.body} 
-          />
-          
-          <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-primary">
-                <Save className="h-4 w-4" />
-                Salvar como Modelo
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Salvar como Modelo</DialogTitle>
-                <DialogDescription>
-                  Dê um nome para este modelo para encontrá-lo facilmente depois.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="template-name">Nome do Modelo</Label>
-                  <Input 
-                    id="template-name" 
-                    placeholder="Ex: Relatório Mensal de Tráfego" 
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                  />
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <TemplateLibraryDialog 
+              onSelectTemplate={handleSelectTemplate} 
+              currentContent={campaign.body} 
+            />
+            
+            <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" className="gap-2 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors">
+                  <Save className="h-4 w-4" />
+                  Salvar como Modelo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Salvar como Modelo</DialogTitle>
+                  <DialogDescription>
+                    Crie um modelo reutilizável a partir deste conteúdo.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="template-name">Nome do Modelo</Label>
+                    <Input 
+                      id="template-name" 
+                      placeholder="Ex: Newsletter Semanal" 
+                      value={templateName}
+                      onChange={(e) => setTemplateName(e.target.value)}
+                      className="focus-visible:ring-primary"
+                    />
+                  </div>
                 </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>Cancelar</Button>
-                <Button onClick={handleSaveAsTemplate} disabled={isSaving}>
-                  {isSaving ? "Salvando..." : "Salvar Modelo"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>Cancelar</Button>
+                  <Button onClick={handleSaveAsTemplate} disabled={isSaving} className="bg-primary hover:bg-primary/90">
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : "Salvar Modelo"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
 
-          <Separator orientation="vertical" className="hidden sm:block h-6 mx-1" />
-
-          <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                variant="action" 
-                size="sm" 
-                className="gap-2 shadow-sm"
-              >
-                <Sparkles className="h-4 w-4" />
-                IA Assist
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>O que você quer escrever?</DialogTitle>
-                <DialogDescription>
-                  Descreva o objetivo do e-mail e nossa IA criará o conteúdo para você.
-                  <br />
-                  <span className="text-[10px] text-primary font-medium">
-                    Dica: Você pode pedir para a IA usar as variáveis {"{{Nome}}"} e {"{{Telefone}}"} no texto.
-                  </span>
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <Textarea 
-                  placeholder="Ex: Oferta de serviço de gestão de tráfego para novos leads..." 
-                  value={aiPrompt} 
-                  onChange={e => setAiPrompt(e.target.value)} 
-                  rows={4} 
-                />
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setAiPromptOpen(false)}>Cancelar</Button>
-                <Button onClick={handleAIGenerate} disabled={aiLoading || !aiPrompt}>
-                  {aiLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Gerar Conteúdo
+          <div className="flex items-center gap-2">
+            <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  variant="action" 
+                  size="sm" 
+                  className="gap-2 shadow-md hover:shadow-lg transition-all"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  IA Assist
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-primary">
+                    <Sparkles className="h-5 w-5" />
+                    Inteligência Artificial
+                  </DialogTitle>
+                  <DialogDescription>
+                    Descreva o que deseja comunicar e a IA gerará um e-mail persuasivo.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label>Instruções para a IA</Label>
+                    <Textarea 
+                      placeholder="Ex: Escreva um e-mail de boas-vindas para novos clientes que acabaram de assinar o plano pro..." 
+                      value={aiPrompt} 
+                      onChange={e => setAiPrompt(e.target.value)} 
+                      rows={5}
+                      className="resize-none focus-visible:ring-primary"
+                    />
+                  </div>
+                  <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
+                    <p className="text-[11px] text-primary font-medium flex items-center gap-2">
+                      <Code className="h-3 w-3" />
+                      Dica: Use as tags {"{{Nome}}"} e {"{{Telefone}}"} para personalização.
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setAiPromptOpen(false)}>Cancelar</Button>
+                  <Button onClick={handleAIGenerate} disabled={aiLoading || !aiPrompt} className="bg-primary hover:bg-primary/90">
+                    {aiLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Gerando...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Gerar Conteúdo
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </CardHeader>
       
