@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface SendPulseAction {
-  action: 'get_addressbooks' | 'add_emails' | 'create_campaign';
+  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details';
   book_id?: number;
   emails?: { email: string; variables?: Record<string, string> }[];
   sender_name?: string;
@@ -74,7 +74,18 @@ serve(async (req) => {
     const { action, ...params }: SendPulseAction = await req.json();
 
     let result;
-    if (action === 'get_addressbooks') {
+    if (action === 'get_balance') {
+      const res = await fetch('https://api.sendpulse.com/balance', {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json();
+    } else if (action === 'get_addressbook_details') {
+      if (!params.book_id) throw new Error('book_id is required');
+      const res = await fetch(`https://api.sendpulse.com/addressbooks/${params.book_id}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json();
+    } else if (action === 'get_addressbooks') {
       const res = await fetch('https://api.sendpulse.com/addressbooks', {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
@@ -95,6 +106,31 @@ serve(async (req) => {
       if (!sender_name || !sender_email || !subject || !body || !book_id) {
         throw new Error('Missing campaign parameters');
       }
+
+      // Pre-flight check: Get balance and address book size
+      const [balanceRes, bookRes] = await Promise.all([
+        fetch('https://api.sendpulse.com/balance', { headers: { 'Authorization': `Bearer ${accessToken}` } }),
+        fetch(`https://api.sendpulse.com/addressbooks/${book_id}`, { headers: { 'Authorization': `Bearer ${accessToken}` } })
+      ]);
+
+      const balanceData = await balanceRes.json();
+      const bookData = await bookRes.json();
+
+      // SendPulse returns balance in an array usually, or direct object. Let's assume emails balance.
+      // Based on docs, it might be { "email": { "balance": 1000, ... } } or similar
+      const emailBalance = balanceData?.email?.balance || balanceData?.[0]?.balance || 0;
+      const contactsCount = bookData?.all_email_count || 0;
+
+      if (contactsCount > emailBalance) {
+        return new Response(JSON.stringify({ 
+          error: "QUOTA_EXCEEDED", 
+          message: `O seu saldo na SendPulse é insuficiente para esta campanha. Saldo: ${emailBalance}. Necessário: ${contactsCount}.` 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const res = await fetch('https://api.sendpulse.com/campaigns', {
         method: 'POST',
         headers: {
@@ -109,6 +145,10 @@ serve(async (req) => {
           list_id: book_id,
         }),
       });
+
+      if (res.status === 429) throw new Error('RATE_LIMIT: Muitas requisições. Tente novamente em instantes.');
+      if (res.status === 402 || res.status === 403) throw new Error('PLAN_RESTRICTION: Restrição de plano ou pagamento na SendPulse.');
+      
       result = await res.json();
     } else {
       throw new Error(`Unknown action: ${action}`);

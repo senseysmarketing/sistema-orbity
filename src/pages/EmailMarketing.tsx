@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
-import { Mail, RefreshCw, Send, Plus, Search, ExternalLink, Loader2, Users } from "lucide-react";
+import { Mail, RefreshCw, Send, Plus, Search, ExternalLink, Loader2, Users, Wallet } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -23,6 +27,9 @@ export default function EmailMarketing() {
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [selectedBook, setSelectedBook] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
+  const [balance, setBalance] = useState<any>(null);
+  const [loadingBalance, setLoadingBalance] = useState(false);
+  const [selectedBookContacts, setSelectedBookContacts] = useState<number | null>(null);
   
   // Campaign form
   const [campaign, setCampaign] = useState({
@@ -53,6 +60,7 @@ export default function EmailMarketing() {
       if (data?.sendpulse_client_id && data?.sendpulse_client_secret) {
         setConfigured(true);
         fetchAddressBooks();
+        fetchBalance();
       } else {
         setConfigured(false);
       }
@@ -76,6 +84,34 @@ export default function EmailMarketing() {
     }
   }
 
+  async function fetchBalance() {
+    setLoadingBalance(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sendpulse-api', {
+        body: { action: 'get_balance' }
+      });
+      if (error) throw error;
+      setBalance(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingBalance(false);
+    }
+  }
+
+  const getEmailBalance = () => {
+    if (!balance) return null;
+    return balance?.email?.balance || balance?.[0]?.balance || 0;
+  };
+
+  async function handleBookSelect(val: string) {
+    setCampaign(prev => ({ ...prev, book_id: val }));
+    const book = addressBooks.find(b => b.id.toString() === val);
+    if (book) {
+      setSelectedBookContacts(book.all_email_count);
+    }
+  }
+
   async function handleSyncLeads() {
     if (!selectedBook) {
       toast.error("Selecione uma lista de destino");
@@ -83,13 +119,12 @@ export default function EmailMarketing() {
     }
     setSyncing(true);
     try {
-      // Fetch won leads with email
       const { data: leads, error: leadsError } = await supabase
         .from('leads')
         .select('email, name')
         .eq('agency_id', currentAgency?.id)
         .not('email', 'is', null)
-        .in('status', ['ganhos', 'em_contato']); // Simplified status filter
+        .in('status', ['ganhos', 'em_contato']);
 
       if (leadsError) throw leadsError;
       if (!leads || leads.length === 0) {
@@ -143,7 +178,18 @@ export default function EmailMarketing() {
       setCampaign({ sender_name: "", sender_email: "", subject: "", body: "", book_id: "" });
     } catch (e) {
       console.error(e);
-      toast.error("Erro ao enviar campanha");
+      const errorMessage = e.message || "";
+      if (errorMessage.includes("QUOTA_EXCEEDED")) {
+        toast.error("Saldo insuficiente", {
+          description: "O seu saldo na SendPulse é insuficiente para esta campanha. Por favor, regularize seu plano no painel da SendPulse."
+        });
+      } else if (errorMessage.includes("PLAN_RESTRICTION")) {
+        toast.error("Restrição de Plano", {
+          description: "Seu plano SendPulse possui restrições para esta operação. Verifique sua conta."
+        });
+      } else {
+        toast.error("Erro ao enviar campanha");
+      }
     } finally {
       setSending(false);
     }
@@ -194,11 +240,34 @@ export default function EmailMarketing() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">E-mail Marketing</h2>
-        <p className="text-muted-foreground">
-          Crie campanhas e gerencie suas listas de contatos com IA.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <h2 className="text-3xl font-bold tracking-tight">E-mail Marketing</h2>
+            {configured && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="h-7 px-3 font-medium bg-background border-muted-foreground/20 text-muted-foreground animate-in fade-in slide-in-from-left-2 duration-500">
+                      {loadingBalance ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                      ) : (
+                        <Wallet className="h-3 w-3 mr-1.5 text-primary/60" />
+                      )}
+                      Saldo SendPulse: {getEmailBalance()?.toLocaleString() ?? '...'} e-mails
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Este é o limite do seu plano atual na SendPulse</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+          <p className="text-muted-foreground">
+            Crie campanhas e gerencie suas listas de contatos com IA.
+          </p>
+        </div>
       </div>
 
       <Tabs defaultValue="lists" className="space-y-4">
@@ -325,7 +394,7 @@ export default function EmailMarketing() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Lista de Destino</label>
-                <Select onValueChange={val => setCampaign(prev => ({ ...prev, book_id: val }))} value={campaign.book_id}>
+                <Select onValueChange={handleBookSelect} value={campaign.book_id}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione para quem enviar..." />
                   </SelectTrigger>
@@ -337,6 +406,17 @@ export default function EmailMarketing() {
                     ))}
                   </SelectContent>
                 </Select>
+                {selectedBookContacts !== null && (
+                  <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground px-1">
+                    <Users className="h-3 w-3" />
+                    <span>Esta lista possui <strong>{selectedBookContacts}</strong> contatos.</span>
+                    {getEmailBalance() !== null && selectedBookContacts > (getEmailBalance() || 0) && (
+                      <span className="text-destructive font-medium flex items-center gap-1">
+                        (Saldo insuficiente: {getEmailBalance()?.toLocaleString()})
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
