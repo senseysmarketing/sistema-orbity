@@ -388,6 +388,29 @@ serve(async (req) => {
       systemPrompt = DEFAULT_CONTRACT_PROMPT + CONTRACT_TECHNICAL_INSTRUCTIONS + dateContext;
       tools = CONTRACT_TOOLS;
       toolChoice = { type: "function", function: { name: "extract_contract_data" } };
+    } else if (type === "email_generation") {
+      systemPrompt = `Você é um copywriter especialista em e-mail marketing para agências de marketing digital.
+Gere um e-mail HTML persuasivo, profissional e bem estruturado a partir do briefing do usuário.
+REGRAS OBRIGATÓRIAS:
+- Retorne APENAS HTML válido (use <p>, <h1>-<h3>, <ul>/<li>, <strong>, <em>, <a>). Sem <html>, <head> ou <body>.
+- Use as variáveis {{Nome}} e {{Telefone}} quando fizer sentido para personalização.
+- Tom profissional, claro, com chamada para ação (CTA) clara.
+- Idioma: português do Brasil.${dateContext}`;
+      tools = [{
+        type: "function",
+        function: {
+          name: "generate_email_html",
+          description: "Gera o HTML de um e-mail marketing.",
+          parameters: {
+            type: "object",
+            properties: {
+              html: { type: "string", description: "Conteúdo HTML do e-mail." }
+            },
+            required: ["html"]
+          }
+        }
+      }];
+      toolChoice = { type: "function", function: { name: "generate_email_html" } };
     } else {
       return new Response(JSON.stringify({ error: "Tipo inválido." }), {
         status: 400,
