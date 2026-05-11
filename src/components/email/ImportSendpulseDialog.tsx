@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Upload, FileSpreadsheet, X, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -212,4 +213,3 @@ export function ImportSendpulseDialog({
   );
 }
 
-import { Input } from "@/components/ui/input";
