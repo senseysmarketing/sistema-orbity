@@ -67,8 +67,6 @@ export default function EmailMarketing() {
     book_id: ""
   });
   const [sending, setSending] = useState(false);
-  const [aiPromptOpen, setAiPromptOpen] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState("");
   const [campaignView, setCampaignView] = useState<"editor" | "preview">("editor");
 
   useEffect(() => {
