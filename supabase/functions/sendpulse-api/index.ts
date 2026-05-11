@@ -247,16 +247,10 @@ serve(async (req) => {
       });
       result = await res.json();
     } else if (action === 'send_test_email') {
-      const { sender_name, sender_email, subject, body, target_email } = params;
-      console.log('send_test_email params:', { 
-        has_sender_name: !!sender_name, 
-        has_sender_email: !!sender_email, 
-        has_subject: !!subject, 
-        has_body: !!body, 
-        has_target_email: !!target_email 
-      });
-      if (!sender_name || !sender_email || !subject || !body || !target_email) {
-        throw new Error(`Missing test email parameters: ${JSON.stringify({ sender_name: !!sender_name, sender_email: !!sender_email, subject: !!subject, body: !!body, target_email: !!target_email })}`);
+      const { sender_email, subject, body, target_email } = params;
+      const sender_name = params.sender_name || params.sender_email;
+      if (!sender_email || !subject || !body || !target_email) {
+        throw new Error(`Missing test email parameters: ${JSON.stringify({ sender_email: !!sender_email, subject: !!subject, body: !!body, target_email: !!target_email })}`);
       }
 
       const textBody = body.replace(/<[^>]*>?/gm, '').trim() || ' ';
