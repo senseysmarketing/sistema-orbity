@@ -362,7 +362,10 @@ export default function EmailMarketing() {
         )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={(val) => {
+        setActiveTab(val);
+        setAiPrompt("");
+      }} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="lists" className="gap-2">
             <Users className="h-4 w-4" />
@@ -410,7 +413,10 @@ export default function EmailMarketing() {
                       </ToggleGroupItem>
                     </ToggleGroup>
                   </div>
-                  <Dialog open={aiPromptOpen} onOpenChange={setAiPromptOpen}>
+                  <Dialog open={aiPromptOpen} onOpenChange={(open) => {
+                    setAiPromptOpen(open);
+                    if (!open) setAiPrompt("");
+                  }}>
                     <DialogTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-2">
                         <Sparkles className="h-4 w-4" /> Escrever com IA
