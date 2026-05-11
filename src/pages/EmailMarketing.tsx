@@ -281,24 +281,42 @@ export default function EmailMarketing() {
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-3xl font-bold tracking-tight">E-mail Marketing</h2>
-            {configured && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="outline" className="h-7 px-3 font-medium bg-background border-muted-foreground/20 text-muted-foreground animate-in fade-in slide-in-from-left-2 duration-500">
-                      {loadingBalance ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Wallet className="h-3 w-3 mr-1.5 text-primary/60" />}
-                      Saldo SendPulse: {getEmailBalance()?.toLocaleString() ?? '...'} e-mails
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Este é o limite do seu plano atual na SendPulse</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+            {configured && accountInfo && (
+              <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 px-3 py-1">
+                {accountInfo.pricing_plan}
+              </Badge>
             )}
           </div>
           <p className="text-muted-foreground">Crie campanhas e gerencie suas listas de contatos com IA.</p>
         </div>
+        {configured && (
+          <div className="flex flex-wrap items-center gap-6 bg-card border rounded-xl p-4 shadow-sm animate-in fade-in slide-in-from-right-4 duration-500">
+            <div className="space-y-1.5 min-w-[160px]">
+              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                <span className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> E-mails</span>
+                <span>{getEmailUsage().sent.toLocaleString()} / {getEmailUsage().limit.toLocaleString()}</span>
+              </div>
+              <Progress value={getEmailUsage().percent} className="h-1.5" />
+            </div>
+            <Separator orientation="vertical" className="h-8 hidden md:block" />
+            <div className="space-y-1.5 min-w-[160px]">
+              <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Contatos</span>
+                <span>{getContactUsage().total.toLocaleString()} / {getContactUsage().limit.toLocaleString()}</span>
+              </div>
+              <Progress value={getContactUsage().percent} className="h-1.5" />
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors"
+              onClick={() => { fetchAddressBooks(); fetchAccountInfo(); }}
+              disabled={loadingInfo}
+            >
+              <RefreshCw className={cn("h-4 w-4", loadingInfo && "animate-spin")} />
+            </Button>
+          </div>
+        )}
       </div>
 
       <Tabs defaultValue="lists" className="space-y-4">
