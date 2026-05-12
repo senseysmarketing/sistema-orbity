@@ -262,7 +262,29 @@ export function CampaignBuilder({
             value={campaign.body} 
             onChange={(val) => setCampaign(prev => ({ ...prev, body: val }))} 
             placeholder="Escreva o conteúdo persuasivo da sua campanha..."
+            onPasteHTML={(html) => {
+              setCampaign(prev => ({ ...prev, body: html }));
+              setCampaignView('html');
+              toast.success("HTML detectado e colado no modo Código");
+            }}
           />
+        ) : campaignView === 'html' ? (
+          <div className="flex flex-col h-full">
+            <div className="px-4 py-2 bg-muted/40 border-b text-xs text-muted-foreground flex items-center gap-2">
+              <FileCode2 className="h-3.5 w-3.5" />
+              Cole aqui o HTML completo do seu e-mail. A visualização renderizará exatamente este código.
+            </div>
+            <Textarea
+              value={campaign.body}
+              onChange={(e) => setCampaign(prev => ({ ...prev, body: e.target.value }))}
+              placeholder="<!doctype html>&#10;<html>&#10;  ..."
+              className="flex-1 font-mono text-xs rounded-none border-0 resize-none focus-visible:ring-0 min-h-[500px]"
+              spellCheck={false}
+            />
+            <div className="px-4 py-2 border-t text-[11px] text-muted-foreground text-right">
+              {campaign.body?.length || 0} caracteres
+            </div>
+          </div>
         ) : (
           <div className="p-8 h-full bg-muted/20 overflow-y-auto">
             <div className="max-w-2xl mx-auto bg-white shadow-lg border rounded-lg p-10 min-h-[600px] prose prose-sm max-w-none dark:bg-slate-900 dark:border-slate-800">
