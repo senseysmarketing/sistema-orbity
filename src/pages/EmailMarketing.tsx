@@ -153,7 +153,7 @@ export default function EmailMarketing() {
         body: {
           action: "create_campaign",
           ...campaign,
-          book_id: parseInt(book_id),
+          book_id: parseInt(campaign.book_id),
           send_date,
         },
       });
