@@ -334,7 +334,7 @@ export default function EmailMarketing() {
                             setCampaign((prev) => ({
                               ...prev,
                               sender_email: sender.email,
-                              sender_name: sender.name,
+                              sender_name: sender.name?.trim() || sender.email.split("@")[0],
                             }))
                           }
                           onAddNew={() => setAddSenderOpen(true)}
