@@ -52,12 +52,22 @@ import { ImportSendpulseDialog } from "@/components/email/ImportSendpulseDialog"
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+import { useSendPulseAddressBooks, useSendPulseInvalidate } from "@/hooks/useSendPulse";
+
 interface ContactListsProps {
-  addressBooks: any[];
-  onRefresh: () => void;
+  addressBooks?: any[];
+  onRefresh?: () => void;
 }
 
-export function ContactLists({ addressBooks, onRefresh }: ContactListsProps) {
+export function ContactLists(_props: ContactListsProps = {}) {
+  const addressBooksQuery = useSendPulseAddressBooks();
+  const addressBooks = addressBooksQuery.data ?? [];
+  const invalidate = useSendPulseInvalidate();
+  const onRefresh = () => {
+    invalidate.invalidateAddressBooks();
+    invalidate.invalidateAccountInfo();
+  };
+
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -65,6 +75,7 @@ export function ContactLists({ addressBooks, onRefresh }: ContactListsProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [addContactOpen, setAddContactOpen] = useState(false);
+
   
   const [selectedBook, setSelectedBook] = useState<any>(null);
   const [newListName, setNewListName] = useState("");
