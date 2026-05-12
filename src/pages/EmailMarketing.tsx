@@ -32,6 +32,7 @@ import {
   useSendPulseAccountInfo,
   useSendPulseAddressBooks,
   useSendPulseCampaigns,
+  useSendPulseSenders,
   useSendPulseInvalidate,
   useSendPulseIsFetching,
 } from "@/hooks/useSendPulse";
