@@ -133,7 +133,11 @@ export function CampaignBuilder({
           >
             <ToggleGroupItem value="editor" className="gap-2 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm px-4">
               <Code className="h-4 w-4" />
-              <span>Editor</span>
+              <span>Visual</span>
+            </ToggleGroupItem>
+            <ToggleGroupItem value="html" className="gap-2 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm px-4">
+              <FileCode2 className="h-4 w-4" />
+              <span>HTML</span>
             </ToggleGroupItem>
             <ToggleGroupItem value="preview" className="gap-2 rounded-lg data-[state=on]:bg-background data-[state=on]:shadow-sm px-4">
               <Eye className="h-4 w-4" />
