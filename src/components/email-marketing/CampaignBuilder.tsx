@@ -3,7 +3,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Code, Eye, TrendingUp, Sparkles, Save, Loader2 } from "lucide-react";
+import { Code, Eye, TrendingUp, Sparkles, Save, Loader2, FileCode2 } from "lucide-react";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { TemplateLibraryDialog } from "./TemplateLibraryDialog";
 import { 
@@ -31,8 +31,8 @@ interface CampaignBuilderProps {
   setCampaign: React.Dispatch<React.SetStateAction<any>>;
   aiLoading: boolean;
   callAI: (type: string, prompt: string, agencyId?: string) => Promise<any>;
-  campaignView: "editor" | "preview";
-  setCampaignView: (view: "editor" | "preview") => void;
+  campaignView: "editor" | "html" | "preview";
+  setCampaignView: (view: "editor" | "html" | "preview") => void;
 }
 
 export function CampaignBuilder({ 
