@@ -552,7 +552,6 @@ function SenderSelect({
   onSelect: (sender: { email: string; name: string }) => void;
   onAddNew: () => void;
 }) {
-  const { useSendPulseSenders } = require("@/hooks/useSendPulse");
   const sendersQuery = useSendPulseSenders();
   const senders: any[] = sendersQuery.data ?? [];
   const handleChange = (val: string) => {
