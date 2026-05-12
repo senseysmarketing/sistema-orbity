@@ -1,58 +1,72 @@
-## Problema
+## Diagnóstico
 
-O "Editor" do Estúdio de Criação usa o **TipTap (RichTextEditor)**, que é um editor visual (WYSIWYG). Quando você cola o código-fonte de um e-mail HTML completo (`<!doctype html>`, `<table>`, estilos inline, etc.), o TipTap trata isso como **texto puro** e escapa as tags. Resultado:
+Olhando o print, o card "Logística de Voo" mostra o remetente como `<contato@senseys.com.br>` — sem nome antes do `<...>`. Isso bate exatamente com o template do `SenderSelect`:
 
-- O `campaign.body` salvo fica como `&lt;!doctype html&gt;...` (texto literal, não HTML real).
-- A "Visualização" usa `dangerouslySetInnerHTML`, então renderiza esse texto escapado — aparece como uma parede de tags em vez do design final.
-- Mesmo que conseguisse interpretar, o TipTap remove `<table>`, atributos de estilo inline e a estrutura típica de e-mail HTML, que são justamente o que esses templates precisam.
-
-Ou seja: o comportamento atual é uma limitação do editor visual, não um bug do preview.
-
-## Solução proposta
-
-Adicionar um **terceiro modo "Código HTML"** ao lado de Editor e Visualização, e tratar HTML colado de forma inteligente.
-
-### 1. Novo toggle de modo no `CampaignBuilder`
-
-Trocar o `ToggleGroup` atual (Editor / Visualização) por três opções:
-
-```
-[ </> Visual ]  [ {} HTML ]  [ 👁 Visualização ]
+```tsx
+{sender.name} <{sender.email}>
 ```
 
-- **Visual** → TipTap atual (texto rico simples, ideal para e-mails escritos do zero).
-- **HTML** → `<textarea>` em fonte monoespaçada, ligado diretamente a `campaign.body`. É aqui que o usuário cola o HTML completo do template.
-- **Visualização** → mantém o `dangerouslySetInnerHTML` que já existe, agora renderizando o HTML real.
+Ou seja, o remetente cadastrado na SendPulse veio com `name` vazio (só com email). Quando você seleciona, o `onSelect` faz:
 
-Estado: estender `campaignView` para `"visual" | "html" | "preview"` (atualizar `EmailMarketing.tsx` onde for declarado).
+```ts
+setCampaign(prev => ({ ...prev, sender_email: sender.email, sender_name: sender.name }))
+```
 
-### 2. Detecção automática de HTML colado no modo Visual
+`sender_name` vira string vazia. Já a validação em `handleSendCampaign` exige todos os campos truthy:
 
-No `RichTextEditor`, adicionar um `editorProps.handlePaste` que:
+```ts
+if (!sender_name || !sender_email || !subject || !body || !book_id) {
+  toast.error("Preencha todos os campos da campanha");
+}
+```
 
-- Lê `clipboardData.getData('text/plain')`.
-- Se o texto começar com `<!doctype`, `<html`, `<table` ou contiver mais de N tags, mostra um `toast` perguntando *"Detectamos código HTML. Deseja colar como HTML?"* e, ao confirmar, troca o modo para **HTML** e escreve o conteúdo bruto em `campaign.body`.
-- Caso contrário, deixa o paste padrão do TipTap acontecer.
+Como `sender_name === ""`, a validação dispara o toast — mesmo com tudo o resto preenchido. **Não há campo oculto na UI**, é o `sender_name` em branco vindo da SendPulse que bloqueia o envio.
 
-### 3. Sincronização entre modos
+Confirmações no print:
+- Assunto: "Teste Senseys" ✅
+- Lista: "Teste ()" ✅ (book_id selecionado)
+- Remetente: aparece só `<contato@senseys.com.br>` → name vazio ❌
+- Body: o preview à esquerda está renderizando ✅
 
-- Modo **Visual → HTML**: `campaign.body` já é HTML gerado pelo TipTap, então a textarea exibe naturalmente.
-- Modo **HTML → Visual**: avisar (toast informativo) que o TipTap pode simplificar tags complexas (tabelas, estilos inline) — opcional, mas evita confusão.
-- A **Visualização** sempre usa `campaign.body`, sem transformação.
+## Correção proposta
 
-### 4. UI da textarea HTML
+Pequeno ajuste de UX, sem mexer em backend:
 
-- `font-mono text-xs`, altura mínima ~500px, scroll vertical.
-- Pequeno rodapé com a contagem de caracteres e um botão "Formatar" (opcional, pode ficar para depois).
-- Mesmo container/Card já usado pelo editor para manter consistência visual.
+### 1. `src/pages/EmailMarketing.tsx` — `SenderSelect.onSelect` (linha ~317)
+Garantir um nome derivado quando a SendPulse retornar `name` vazio:
 
-## Arquivos afetados
+```ts
+onSelect={(sender) =>
+  setCampaign(prev => ({
+    ...prev,
+    sender_email: sender.email,
+    sender_name: sender.name?.trim() || sender.email.split("@")[0],
+  }))
+}
+```
 
-- `src/components/email-marketing/CampaignBuilder.tsx` — novo toggle de 3 modos, textarea HTML, ajuste do render condicional.
-- `src/pages/EmailMarketing.tsx` — atualizar o tipo/estado `campaignView` para incluir `"html"`.
-- `src/components/ui/rich-text-editor.tsx` — `handlePaste` com detecção de HTML e callback opcional `onPasteHTML?: (html: string) => void` para o pai trocar de modo.
+### 2. `SenderSelect` render (linha 570)
+Mostrar fallback no dropdown também, para o usuário entender o que está selecionando:
+
+```tsx
+{(sender.name?.trim() || sender.email.split("@")[0])} &lt;{sender.email}&gt;
+```
+
+### 3. `handleSendCampaign` (linha 127) — validação mais útil
+Trocar a checagem genérica por mensagens específicas, e tratar `sender_name` como opcional (já temos fallback):
+
+```ts
+if (!campaign.sender_email) return toast.error("Selecione um remetente verificado");
+if (!campaign.subject?.trim()) return toast.error("Informe o assunto da campanha");
+if (!campaign.book_id) return toast.error("Selecione a lista de destino");
+if (!campaign.body || campaign.body === "<p></p>") return toast.error("O conteúdo do e-mail está vazio");
+```
+
+Aplicar o mesmo refinamento na validação do botão "Enviar E-mail de Teste" (linha 423) só para `sender_email`/`subject`/`body`.
 
 ## Fora de escopo
+- Não vamos alterar o cadastro de remetentes na SendPulse, nem a Edge Function `sendpulse-api`.
+- Não vamos mexer no `CampaignBuilder` nem na lógica de cache do React Query.
 
-- Não vamos trocar o TipTap por um editor de blocos drag-and-drop (Unlayer/MJML) — isso seria uma refatoração grande, fica para um próximo passo se você quiser.
-- Não vamos sanitizar/reescrever o HTML colado; ele vai para o preview e para o envio exatamente como você colou.
+## Resultado
+Após a correção, ao clicar em **Disparar Campanha Agora** com os campos atuais do print, a campanha será enviada normalmente — e, caso falte algo no futuro, o toast dirá exatamente qual campo.
