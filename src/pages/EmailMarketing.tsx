@@ -581,7 +581,7 @@ function SenderSelect({
         <SelectContent>
           {senders.filter((s) => s.status === "Active" || s.is_activated).map((sender) => (
             <SelectItem key={sender.email} value={sender.email}>
-              {sender.name} &lt;{sender.email}&gt;
+              {(sender.name?.trim() || sender.email.split("@")[0])} &lt;{sender.email}&gt;
             </SelectItem>
           ))}
         </SelectContent>
