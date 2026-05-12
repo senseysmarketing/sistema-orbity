@@ -123,10 +123,24 @@ export default function EmailMarketing() {
   }
 
   async function handleSendCampaign() {
-    const { sender_name, sender_email, subject, body, book_id } = campaign;
-    if (!sender_name || !sender_email || !subject || !body || !book_id) {
-      toast.error("Preencha todos os campos da campanha");
+    if (!campaign.sender_email) {
+      toast.error("Selecione um remetente verificado");
       return;
+    }
+    if (!campaign.subject?.trim()) {
+      toast.error("Informe o assunto da campanha");
+      return;
+    }
+    if (!campaign.book_id) {
+      toast.error("Selecione a lista de destino");
+      return;
+    }
+    if (!campaign.body || campaign.body === "<p></p>") {
+      toast.error("O conteúdo do e-mail está vazio");
+      return;
+    }
+    if (!campaign.sender_name?.trim()) {
+      campaign.sender_name = campaign.sender_email.split("@")[0];
     }
     setSending(true);
     let send_date: string | undefined;
