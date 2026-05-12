@@ -32,9 +32,10 @@ interface RichTextEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  onPasteHTML?: (html: string) => void;
 }
 
-export function RichTextEditor({ value, onChange, placeholder = 'Escreva sua campanha aqui...' }: RichTextEditorProps) {
+export function RichTextEditor({ value, onChange, placeholder = 'Escreva sua campanha aqui...', onPasteHTML }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -53,6 +54,22 @@ export function RichTextEditor({ value, onChange, placeholder = 'Escreva sua cam
     editorProps: {
       attributes: {
         class: 'prose prose-sm sm:prose-base dark:prose-invert focus:outline-none min-h-[300px] max-w-none p-4 text-foreground',
+      },
+      handlePaste: (_view, event) => {
+        if (!onPasteHTML) return false;
+        const text = event.clipboardData?.getData('text/plain') ?? '';
+        const trimmed = text.trim().toLowerCase();
+        const looksLikeHtmlDoc =
+          trimmed.startsWith('<!doctype') ||
+          trimmed.startsWith('<html') ||
+          trimmed.startsWith('<table') ||
+          (trimmed.startsWith('<') && (text.match(/<\/?[a-z][\s\S]*?>/gi)?.length ?? 0) > 5);
+        if (looksLikeHtmlDoc) {
+          event.preventDefault();
+          onPasteHTML(text);
+          return true;
+        }
+        return false;
       },
     },
   });

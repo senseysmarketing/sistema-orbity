@@ -65,7 +65,7 @@ export default function EmailMarketing() {
     book_id: ""
   });
   const [sending, setSending] = useState(false);
-  const [campaignView, setCampaignView] = useState<"editor" | "preview">("editor");
+  const [campaignView, setCampaignView] = useState<"editor" | "html" | "preview">("editor");
 
   useEffect(() => {
     checkIntegration();
