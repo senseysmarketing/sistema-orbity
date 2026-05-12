@@ -1,29 +1,25 @@
-import { useState, useEffect } from "react";
-import { Mail, Send, Plus, ExternalLink, Loader2, Wallet, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Search } from "lucide-react";
+import { useState } from "react";
+import { Mail, Send, Plus, Loader2, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAIAssist } from "@/hooks/useAIAssist";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { ImportSendpulseDialog } from "@/components/email/ImportSendpulseDialog";
 import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CampaignStatsDialog } from "@/components/email-marketing/CampaignStatsDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -31,152 +27,71 @@ import { ContactLists } from "@/components/email-marketing/ContactLists";
 import { AddSenderDialog } from "@/components/email-marketing/AddSenderDialog";
 import { TestEmailDialog } from "@/components/email-marketing/TestEmailDialog";
 import { CampaignBuilder } from "@/components/email-marketing/CampaignBuilder";
-
+import {
+  useSendPulseIntegration,
+  useSendPulseAccountInfo,
+  useSendPulseAddressBooks,
+  useSendPulseCampaigns,
+  useSendPulseInvalidate,
+  useSendPulseIsFetching,
+} from "@/hooks/useSendPulse";
 
 export default function EmailMarketing() {
   const { currentAgency } = useAgency();
   const { loading: aiLoading, callAI } = useAIAssist() as any;
-  const [loading, setLoading] = useState(true);
+
   const [activeTab, setActiveTab] = useState("lists");
-  const [configured, setConfigured] = useState(false);
-  const [addressBooks, setAddressBooks] = useState<any[]>([]);
-  const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [statsDialogOpen, setStatsDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
-  const [targetBookId, setTargetBookId] = useState<string>("");
-  const [accountInfo, setAccountInfo] = useState<any>(null);
-  const [loadingInfo, setLoadingInfo] = useState(false);
-  const [selectedBookContacts, setSelectedBookContacts] = useState<number | null>(null);
   const [scheduled, setScheduled] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [scheduledTime, setScheduledTime] = useState("09:00");
-  const [senders, setSenders] = useState<any[]>([]);
-  const [loadingSenders, setLoadingSenders] = useState(false);
   const [addSenderOpen, setAddSenderOpen] = useState(false);
   const [testEmailOpen, setTestEmailOpen] = useState(false);
+  const [selectedBookContacts, setSelectedBookContacts] = useState<number | null>(null);
 
-  
   const [campaign, setCampaign] = useState({
     sender_name: "",
     sender_email: "",
     subject: "",
     body: "",
-    book_id: ""
+    book_id: "",
   });
   const [sending, setSending] = useState(false);
   const [campaignView, setCampaignView] = useState<"editor" | "html" | "preview">("editor");
 
-  useEffect(() => {
-    checkIntegration();
-  }, [currentAgency?.id]);
+  // Queries (cached, deduped via React Query)
+  const integrationQuery = useSendPulseIntegration();
+  const configured = !!integrationQuery.data?.configured;
+  const hasClientId = !!integrationQuery.data?.hasClientId;
 
-  async function checkIntegration() {
-    if (!currentAgency?.id) return;
-    setLoading(true);
-    try {
-      const { data } = await supabase
-        .from('agency_integrations')
-        .select('sendpulse_client_id, sendpulse_client_secret')
-        .eq('agency_id', currentAgency.id)
-        .single();
-      if (data?.sendpulse_client_id && data?.sendpulse_client_secret) {
-        setConfigured(true);
-        fetchAddressBooks();
-        fetchCampaigns();
-        fetchSenders();
-      } else {
-        setConfigured(false);
-      }
-      if (data?.sendpulse_client_id) {
-        fetchAccountInfo();
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const accountInfoQuery = useSendPulseAccountInfo(hasClientId);
+  const accountInfo = accountInfoQuery.data;
 
-  async function fetchAddressBooks() {
-    try {
-      const { data, error } = await supabase.functions.invoke('sendpulse-api', {
-        body: { action: 'get_addressbooks' }
-      });
-      if (error) throw error;
-      console.log("AddressBooks fetched:", data);
-      setAddressBooks(data || []);
-      // If we have lists, refresh account info to get latest contact totals
-      if (data && data.length > 0) {
-        fetchAccountInfo();
-      }
-    } catch (e) {
-      console.error(e);
-      toast.error("Erro ao carregar listas de contatos");
-    }
-  }
+  // Page also needs addressbooks for the "Logística de Voo" Select, the warning,
+  // and to label campaigns by list name. CampaignBuilder consumes its own copy
+  // of the same query (deduped automatically by React Query).
+  const addressBooksQuery = useSendPulseAddressBooks(configured);
+  const addressBooks = addressBooksQuery.data ?? [];
 
-  async function fetchCampaigns() {
-    setLoadingCampaigns(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('sendpulse-api', {
-        body: { action: 'get_campaigns' }
-      });
-      if (error) throw error;
-      setCampaigns(data || []);
-    } catch (e) {
-      console.error(e);
-      toast.error("Erro ao carregar campanhas");
-    } finally {
-      setLoadingCampaigns(false);
-    }
-  }
+  const campaignsQuery = useSendPulseCampaigns(configured);
+  const campaigns = campaignsQuery.data ?? [];
 
-  async function fetchSenders() {
-    setLoadingSenders(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('sendpulse-api', {
-        body: { action: 'get_senders' }
-      });
-      if (error) throw error;
-      setSenders(data || []);
-    } catch (e) {
-      console.error(e);
-      toast.error("Erro ao carregar remetentes");
-    } finally {
-      setLoadingSenders(false);
-    }
-  }
+  const invalidate = useSendPulseInvalidate();
+  const isFetchingAny = useSendPulseIsFetching();
 
   async function handleCancelCampaign(campaignId: number) {
     if (!confirm("Tem certeza que deseja cancelar/remover esta campanha?")) return;
-    
     try {
-      const { error } = await supabase.functions.invoke('sendpulse-api', {
-        body: { action: 'cancel_campaign', campaign_id: campaignId }
+      const { error } = await supabase.functions.invoke("sendpulse-api", {
+        body: { action: "cancel_campaign", campaign_id: campaignId },
       });
       if (error) throw error;
       toast.success("Operação realizada com sucesso!");
-      fetchCampaigns();
+      invalidate.invalidateCampaigns();
     } catch (e) {
       console.error(e);
       toast.error("Erro ao cancelar campanha");
-    }
-  }
-
-  async function fetchAccountInfo() {
-    setLoadingInfo(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('sendpulse-api', {
-        body: { action: 'get_account_info' }
-      });
-      if (error) throw error;
-      setAccountInfo(data);
-    } catch (e) {
-      console.error(e);
-      toast.error("Erro ao carregar informações da conta");
-    } finally {
-      setLoadingInfo(false);
     }
   }
 
@@ -190,34 +105,21 @@ export default function EmailMarketing() {
 
   const getContactUsage = () => {
     if (!accountInfo) return { total: 0, limit: 0, percent: 0 };
-    
-    // Sum contacts from all address books for a more accurate total
-    const addressBookTotal = addressBooks.reduce((acc, book) => acc + (book.all_email_qty || book.all_email_count || 0), 0);
+    const addressBookTotal = addressBooks.reduce(
+      (acc: number, book: any) => acc + (book.all_email_qty || book.all_email_count || 0),
+      0
+    );
     const total = addressBookTotal > 0 ? addressBookTotal : (accountInfo.emails_total || 0);
-    
     const limit = accountInfo.addressbook_limit || 500;
     const percent = limit > 0 ? (total / limit) * 100 : 0;
     return { total, limit, percent };
   };
 
-  async function handleBookSelect(val: string) {
-    setCampaign(prev => ({ ...prev, book_id: val }));
-    const book = addressBooks.find(b => b.id.toString() === val);
+  function handleBookSelect(val: string) {
+    setCampaign((prev) => ({ ...prev, book_id: val }));
+    const book = addressBooks.find((b: any) => b.id.toString() === val);
     if (book) setSelectedBookContacts(book.all_email_qty || book.all_email_count || 0);
   }
-
-  async function handleSenderSelect(val: string) {
-    const sender = senders.find(s => s.email === val);
-    if (sender) {
-      setCampaign(prev => ({ 
-        ...prev, 
-        sender_email: sender.email, 
-        sender_name: sender.name 
-      }));
-    }
-  }
-
-  // Note: List synchronization and creation are now handled in the ContactLists component.
 
   async function handleSendCampaign() {
     const { sender_name, sender_email, subject, body, book_id } = campaign;
@@ -226,35 +128,36 @@ export default function EmailMarketing() {
       return;
     }
     setSending(true);
-    let send_date = undefined;
+    let send_date: string | undefined;
     if (scheduled && scheduledDate) {
-      const dateStr = format(scheduledDate, 'yyyy-MM-dd');
+      const dateStr = format(scheduledDate, "yyyy-MM-dd");
       send_date = `${dateStr} ${scheduledTime}:00`;
     }
     try {
-      const { error } = await supabase.functions.invoke('sendpulse-api', {
-        body: { 
-          action: 'create_campaign',
+      const { error } = await supabase.functions.invoke("sendpulse-api", {
+        body: {
+          action: "create_campaign",
           ...campaign,
           book_id: parseInt(book_id),
-          send_date
-        }
+          send_date,
+        },
       });
       if (error) throw error;
       toast.success(scheduled ? "Campanha agendada com sucesso!" : "Campanha enviada com sucesso!");
       setCampaign({ sender_name: "", sender_email: "", subject: "", body: "", book_id: "" });
-      fetchCampaigns();
+      invalidate.invalidateCampaigns();
+      invalidate.invalidateAccountInfo();
       setActiveTab("campaigns");
     } catch (e: any) {
       console.error(e);
       const errorMessage = e.message || "";
       if (errorMessage.includes("QUOTA_EXCEEDED")) {
         toast.error("Saldo insuficiente", {
-          description: "O seu saldo na SendPulse é insuficiente para esta campanha. Por favor, regularize seu plano no painel da SendPulse."
+          description: "O seu saldo na SendPulse é insuficiente para esta campanha.",
         });
       } else if (errorMessage.includes("PLAN_RESTRICTION")) {
         toast.error("Restrição de Plano", {
-          description: "Seu plano SendPulse possui restrições para esta operação. Verifique sua conta."
+          description: "Seu plano SendPulse possui restrições para esta operação.",
         });
       } else {
         toast.error("Erro ao processar campanha");
@@ -264,8 +167,8 @@ export default function EmailMarketing() {
     }
   }
 
-
-  if (loading) {
+  // Initial loader: only when there's no integration data at all
+  if (integrationQuery.isLoading && !integrationQuery.data) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -295,14 +198,24 @@ export default function EmailMarketing() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">E-mail Marketing</h2>
-          <p className="text-muted-foreground">Gestão profissional de campanhas e listas com inteligência artificial.</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">E-mail Marketing</h2>
+            <p className="text-muted-foreground">Gestão profissional de campanhas e listas com inteligência artificial.</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => invalidate.invalidateAll()}
+            title="Atualizar dados da SendPulse"
+            className="shrink-0"
+          >
+            <RefreshCw className={cn("h-4 w-4", isFetchingAny && "animate-spin")} />
+          </Button>
         </div>
 
-        {configured && accountInfo && (
+        {accountInfo ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Card 1: Plano */}
             <Card className="bg-card/20 border shadow-none">
               <CardContent className="p-4 flex flex-col justify-between h-full space-y-2">
                 <div className="flex items-center justify-between">
@@ -323,7 +236,6 @@ export default function EmailMarketing() {
               </CardContent>
             </Card>
 
-            {/* Card 2: E-mails */}
             <Card className="bg-card/20 border shadow-none">
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -335,7 +247,6 @@ export default function EmailMarketing() {
               </CardContent>
             </Card>
 
-            {/* Card 3: Base */}
             <Card className="bg-card/20 border shadow-none">
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -347,12 +258,16 @@ export default function EmailMarketing() {
               </CardContent>
             </Card>
           </div>
-        )}
+        ) : accountInfoQuery.isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-[92px] w-full" />
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      <Tabs value={activeTab} onValueChange={(val) => {
-        setActiveTab(val);
-      }} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="lists" className="gap-2">
             <Users className="h-4 w-4" />
@@ -369,14 +284,13 @@ export default function EmailMarketing() {
         </TabsList>
 
         <TabsContent value="lists" className="space-y-4">
-          <ContactLists addressBooks={addressBooks} onRefresh={fetchAddressBooks} />
+          <ContactLists />
         </TabsContent>
 
         <TabsContent value="campaign" className="pt-4">
           <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
-            {/* Coluna Esquerda: O Estúdio (70%) */}
             <div className="lg:col-span-7">
-              <CampaignBuilder 
+              <CampaignBuilder
                 campaign={campaign}
                 setCampaign={setCampaign}
                 aiLoading={aiLoading}
@@ -386,7 +300,6 @@ export default function EmailMarketing() {
               />
             </div>
 
-            {/* Coluna Direita: Logística de Voo (30%) */}
             <div className="lg:col-span-3 space-y-6">
               <Card className="border shadow-sm">
                 <CardHeader className="pb-4 border-b">
@@ -395,42 +308,30 @@ export default function EmailMarketing() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-6">
-                  {/* Seção 1: Informações Básicas */}
                   <div className="space-y-4">
                     <h4 className="text-sm font-semibold text-muted-foreground">Informações Básicas</h4>
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="sender_select">Remetente da Campanha</Label>
-                        <div className="flex flex-col gap-2">
-                          <Select onValueChange={handleSenderSelect} value={campaign.sender_email}>
-                            <SelectTrigger id="sender_select">
-                              <SelectValue placeholder={loadingSenders ? "Carregando remetentes..." : "Selecione um remetente verificado..."} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {senders.filter(s => s.status === 'Active' || s.is_activated).map(sender => (
-                                <SelectItem key={sender.email} value={sender.email}>
-                                  {sender.name} &lt;{sender.email}&gt;
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button 
-                            variant="link" 
-                            size="sm" 
-                            className="h-auto p-0 justify-start text-[10px]"
-                            onClick={() => setAddSenderOpen(true)}
-                          >
-                            <Plus className="h-3 w-3 mr-1" /> Adicionar novo remetente
-                          </Button>
-                        </div>
+                        <SenderSelect
+                          value={campaign.sender_email}
+                          onSelect={(sender) =>
+                            setCampaign((prev) => ({
+                              ...prev,
+                              sender_email: sender.email,
+                              sender_name: sender.name,
+                            }))
+                          }
+                          onAddNew={() => setAddSenderOpen(true)}
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="subject">Assunto</Label>
-                        <Input 
+                        <Input
                           id="subject"
-                          placeholder="Assunto cativante..." 
-                          value={campaign.subject} 
-                          onChange={e => setCampaign(prev => ({ ...prev, subject: e.target.value }))} 
+                          placeholder="Assunto cativante..."
+                          value={campaign.subject}
+                          onChange={(e) => setCampaign((prev) => ({ ...prev, subject: e.target.value }))}
                         />
                       </div>
                       <div className="space-y-2">
@@ -440,12 +341,14 @@ export default function EmailMarketing() {
                             <SelectValue placeholder="Selecione..." />
                           </SelectTrigger>
                           <SelectContent>
-                            {addressBooks.map(book => (
-                              <SelectItem key={book.id} value={book.id.toString()}>{book.name} ({book.all_email_count})</SelectItem>
+                            {addressBooks.map((book: any) => (
+                              <SelectItem key={book.id} value={book.id.toString()}>
+                                {book.name} ({book.all_email_count})
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                        
+
                         {selectedBookContacts !== null && accountInfo && selectedBookContacts > 500 && (
                           <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex gap-2">
                             <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
@@ -460,13 +363,12 @@ export default function EmailMarketing() {
 
                   <Separator />
 
-                  {/* Seção 2: Agendamento */}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h4 className="text-sm font-semibold text-muted-foreground">Agendamento</h4>
                       <Switch checked={scheduled} onCheckedChange={setScheduled} />
                     </div>
-                    
+
                     {scheduled && (
                       <div className="space-y-4 pt-1 animate-in fade-in slide-in-from-top-2 duration-300">
                         <div className="space-y-2">
@@ -489,10 +391,10 @@ export default function EmailMarketing() {
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {Array.from({ length: 24 }).map((_, i) => (
-                                <SelectItem key={`${i}:00`} value={`${String(i).padStart(2, '0')}:00`}>{String(i).padStart(2, '0')}:00</SelectItem>
+                                <SelectItem key={`${i}:00`} value={`${String(i).padStart(2, "0")}:00`}>{String(i).padStart(2, "0")}:00</SelectItem>
                               ))}
                               {Array.from({ length: 24 }).map((_, i) => (
-                                <SelectItem key={`${i}:30`} value={`${String(i).padStart(2, '0')}:30`}>{String(i).padStart(2, '0')}:30</SelectItem>
+                                <SelectItem key={`${i}:30`} value={`${String(i).padStart(2, "0")}:30`}>{String(i).padStart(2, "0")}:30</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -502,19 +404,19 @@ export default function EmailMarketing() {
                   </div>
 
                   <div className="pt-2">
-                    <Button 
-                      variant="action" 
-                      size="lg" 
-                      className="w-full gap-2 h-11 text-sm font-semibold" 
-                      onClick={handleSendCampaign} 
+                    <Button
+                      variant="action"
+                      size="lg"
+                      className="w-full gap-2 h-11 text-sm font-semibold"
+                      onClick={handleSendCampaign}
                       disabled={sending || !campaign.sender_email || !campaign.book_id || !campaign.subject || !campaign.body}
                     >
                       {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : (scheduled ? <Calendar className="h-4 w-4" /> : <Send className="h-4 w-4" />)}
                       {scheduled ? "Agendar Campanha" : "Disparar Campanha Agora"}
                     </Button>
 
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="w-full mt-2 gap-2"
                       onClick={() => setTestEmailOpen(true)}
                       disabled={!campaign.sender_email || !campaign.subject || !campaign.body}
@@ -522,7 +424,6 @@ export default function EmailMarketing() {
                       🧪 Enviar E-mail de Teste
                     </Button>
                   </div>
-
                 </CardContent>
               </Card>
             </div>
@@ -532,8 +433,13 @@ export default function EmailMarketing() {
         <TabsContent value="campaigns" className="space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h3 className="text-lg font-medium">Relatório de Campanhas</h3>
-            <Button variant="outline" className="gap-2" onClick={fetchCampaigns} disabled={loadingCampaigns}>
-              <RefreshCw className={cn("h-4 w-4", loadingCampaigns && "animate-spin")} /> Atualizar
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => invalidate.invalidateCampaigns()}
+              disabled={campaignsQuery.isFetching}
+            >
+              <RefreshCw className={cn("h-4 w-4", campaignsQuery.isFetching && "animate-spin")} /> Atualizar
             </Button>
           </div>
           <Card>
@@ -548,7 +454,7 @@ export default function EmailMarketing() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loadingCampaigns ? (
+                {campaignsQuery.isLoading && campaigns.length === 0 ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
@@ -558,7 +464,7 @@ export default function EmailMarketing() {
                       <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                     </TableRow>
                   ))
-                ) : campaigns.length > 0 ? campaigns.map((camp) => (
+                ) : campaigns.length > 0 ? campaigns.map((camp: any) => (
                   <TableRow key={camp.id}>
                     <TableCell className="font-medium">
                       <div className="flex flex-col">
@@ -572,12 +478,14 @@ export default function EmailMarketing() {
                       {camp.status === 2 && <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20">Concluída</Badge>}
                       {camp.status === 3 && <Badge variant="secondary" className="bg-red-500/10 text-red-600 border-red-500/20">Erro</Badge>}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{addressBooks.find(b => b.id === camp.list_id)?.name || camp.list_id}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {addressBooks.find((b: any) => b.id === camp.list_id)?.name || camp.list_id}
+                    </TableCell>
                     <TableCell className="text-sm">{new Date(camp.send_date || camp.all_email_count).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right flex justify-end gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         className="h-8 w-8 p-0"
                         onClick={() => {
                           setSelectedCampaign(camp);
@@ -586,9 +494,9 @@ export default function EmailMarketing() {
                       >
                         <BarChart3 className="h-4 w-4 text-primary" />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         className="h-8 w-8 p-0 hover:text-red-600"
                         onClick={() => handleCancelCampaign(camp.id)}
                       >
@@ -607,28 +515,71 @@ export default function EmailMarketing() {
         </TabsContent>
       </Tabs>
 
-      <CampaignStatsDialog 
-        open={statsDialogOpen} 
-        onOpenChange={setStatsDialogOpen} 
-        campaign={selectedCampaign} 
+      <CampaignStatsDialog
+        open={statsDialogOpen}
+        onOpenChange={setStatsDialogOpen}
+        campaign={selectedCampaign}
       />
 
-      <AddSenderDialog 
+      <AddSenderDialog
         open={addSenderOpen}
         onOpenChange={setAddSenderOpen}
-        onSuccess={fetchSenders}
+        onSuccess={() => invalidate.invalidateSenders()}
       />
 
-      <TestEmailDialog 
+      <TestEmailDialog
         open={testEmailOpen}
         onOpenChange={setTestEmailOpen}
         campaign={{
           sender_name: campaign.sender_name,
           sender_email: campaign.sender_email,
           subject: campaign.subject,
-          body: campaign.body
+          body: campaign.body,
         }}
       />
+    </div>
+  );
+}
+
+// Inline sender select that consumes the senders query directly (deduped via React Query).
+function SenderSelect({
+  value,
+  onSelect,
+  onAddNew,
+}: {
+  value: string;
+  onSelect: (sender: { email: string; name: string }) => void;
+  onAddNew: () => void;
+}) {
+  const { useSendPulseSenders } = require("@/hooks/useSendPulse");
+  const sendersQuery = useSendPulseSenders();
+  const senders: any[] = sendersQuery.data ?? [];
+  const handleChange = (val: string) => {
+    const sender = senders.find((s) => s.email === val);
+    if (sender) onSelect({ email: sender.email, name: sender.name });
+  };
+  return (
+    <div className="flex flex-col gap-2">
+      <Select onValueChange={handleChange} value={value}>
+        <SelectTrigger id="sender_select">
+          <SelectValue placeholder={sendersQuery.isLoading && senders.length === 0 ? "Carregando remetentes..." : "Selecione um remetente verificado..."} />
+        </SelectTrigger>
+        <SelectContent>
+          {senders.filter((s) => s.status === "Active" || s.is_activated).map((sender) => (
+            <SelectItem key={sender.email} value={sender.email}>
+              {sender.name} &lt;{sender.email}&gt;
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button
+        variant="link"
+        size="sm"
+        className="h-auto p-0 justify-start text-[10px]"
+        onClick={onAddNew}
+      >
+        <Plus className="h-3 w-3 mr-1" /> Adicionar novo remetente
+      </Button>
     </div>
   );
 }
