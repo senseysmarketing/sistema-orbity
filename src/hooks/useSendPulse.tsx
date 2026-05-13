@@ -20,7 +20,7 @@ export const sendpulseKeys = {
   addressBooks: (agencyId?: string) => ["sendpulse", agencyId, "addressbooks"] as const,
   campaigns: (agencyId?: string) => ["sendpulse", agencyId, "campaigns"] as const,
   senders: (agencyId?: string) => ["sendpulse", agencyId, "senders"] as const,
-  domains: (agencyId?: string) => ["sendpulse", agencyId, "domains"] as const,
+  
 };
 
 const baseOpts = {
@@ -105,19 +105,6 @@ export function useSendPulseSenders(enabled = true) {
   });
 }
 
-export function useSendPulseDomains(enabled = true) {
-  const { currentAgency } = useAgency();
-  const agencyId = currentAgency?.id;
-  return useQuery<any[]>({
-    queryKey: sendpulseKeys.domains(agencyId),
-    queryFn: async () => {
-      const r = await invokeSendPulse("get_domains");
-      return Array.isArray(r) ? r : [];
-    },
-    enabled: !!agencyId && enabled,
-    ...baseOpts,
-  });
-}
 
 export function useSendPulseInvalidate() {
   const { currentAgency } = useAgency();
@@ -135,8 +122,6 @@ export function useSendPulseInvalidate() {
       queryClient.invalidateQueries({ queryKey: sendpulseKeys.campaigns(agencyId) }),
     invalidateSenders: () =>
       queryClient.invalidateQueries({ queryKey: sendpulseKeys.senders(agencyId) }),
-    invalidateDomains: () =>
-      queryClient.invalidateQueries({ queryKey: sendpulseKeys.domains(agencyId) }),
   };
 }
 
