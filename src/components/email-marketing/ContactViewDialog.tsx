@@ -95,11 +95,16 @@ export function ContactViewDialog({ open, onOpenChange, bookId, bookName }: Cont
     setDeleteDialogOpen(true);
   };
 
-  const getStatusLabel = (status: number) => {
+  const getStatusLabel = (contact: any) => {
+    // Se a API retornar status_explain, usamos ele pois é a fonte da verdade da SendPulse
+    if (contact.status_explain) return contact.status_explain;
+    
+    const status = Number(contact.status);
     switch (status) {
       case 0: return "Ativo";
-      case 1: return "Cancelado";
-      case 2: return "Inativo";
+      case 1: return "Cancelado"; // Opt-out/Unsubscribed
+      case 2: return "Inativo";   // Spam/Bounce
+      case 3: return "Não confirmado";
       default: return "Desconhecido";
     }
   };
@@ -139,8 +144,12 @@ export function ContactViewDialog({ open, onOpenChange, bookId, bookName }: Cont
                     contacts.map((contact, idx) => (
                       <TableRow key={idx} className={isUpdating && selectedContact?.email === contact.email ? "opacity-50" : ""}>
                         <TableCell className="font-medium">{contact.email}</TableCell>
-                        <TableCell>{getStatusLabel(contact.status)}</TableCell>
-                        <TableCell>{contact.add_time || contact.registration_date ? new Date(contact.add_time || contact.registration_date).toLocaleDateString() : '-'}</TableCell>
+                        <TableCell>{getStatusLabel(contact)}</TableCell>
+                        <TableCell>
+                          {contact.add_time || contact.registration_date || contact.last_update_date ? 
+                            new Date((contact.add_time || contact.registration_date || contact.last_update_date).replace(/-/g, "/")).toLocaleDateString() 
+                            : '-'}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             <Button 
