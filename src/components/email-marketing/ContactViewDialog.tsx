@@ -95,11 +95,16 @@ export function ContactViewDialog({ open, onOpenChange, bookId, bookName }: Cont
     setDeleteDialogOpen(true);
   };
 
-  const getStatusLabel = (status: number) => {
+  const getStatusLabel = (contact: any) => {
+    // Se a API retornar status_explain, usamos ele pois é a fonte da verdade da SendPulse
+    if (contact.status_explain) return contact.status_explain;
+    
+    const status = Number(contact.status);
     switch (status) {
       case 0: return "Ativo";
-      case 1: return "Cancelado";
-      case 2: return "Inativo";
+      case 1: return "Cancelado"; // Opt-out/Unsubscribed
+      case 2: return "Inativo";   // Spam/Bounce
+      case 3: return "Não confirmado";
       default: return "Desconhecido";
     }
   };
@@ -139,8 +144,21 @@ export function ContactViewDialog({ open, onOpenChange, bookId, bookName }: Cont
                     contacts.map((contact, idx) => (
                       <TableRow key={idx} className={isUpdating && selectedContact?.email === contact.email ? "opacity-50" : ""}>
                         <TableCell className="font-medium">{contact.email}</TableCell>
-                        <TableCell>{getStatusLabel(contact.status)}</TableCell>
-                        <TableCell>{contact.add_time || contact.registration_date ? new Date(contact.add_time || contact.registration_date).toLocaleDateString() : '-'}</TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                            contact.status === 0 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                            contact.status === 1 ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                            contact.status === 3 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+                            "bg-muted text-muted-foreground"
+                          }`}>
+                            {getStatusLabel(contact)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {contact.add_time || contact.registration_date || contact.last_update_date ? 
+                            new Date((contact.add_time || contact.registration_date || contact.last_update_date).replace(/-/g, "/")).toLocaleDateString() 
+                            : '-'}
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
                             <Button 
