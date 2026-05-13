@@ -1,52 +1,28 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AtSign, Globe, Plus, Trash2, Copy, AlertCircle, CheckCircle2, Clock, Loader2, ExternalLink, ShieldCheck, RefreshCw } from "lucide-react";
+import { AtSign, Globe, Plus, Trash2, CheckCircle2, Clock, ExternalLink, ShieldCheck, Pencil, Check } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { useSendPulseSenders, useSendPulseDomains, useSendPulseInvalidate } from "@/hooks/useSendPulse";
+import { useSendPulseSenders, useSendPulseInvalidate } from "@/hooks/useSendPulse";
 import { AddSenderDialog } from "./AddSenderDialog";
-import { cn } from "@/lib/utils";
+import { EditSenderDialog } from "./EditSenderDialog";
 
 function isSenderActive(s: any) {
   return s?.status === "Active" || s?.is_activated === true || s?.status === 1;
 }
 
-function CopyButton({ value }: { value: string }) {
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-7 w-7"
-      onClick={() => {
-        navigator.clipboard.writeText(value);
-        toast.success("Copiado!");
-      }}
-    >
-      <Copy className="h-3.5 w-3.5" />
-    </Button>
-  );
-}
-
 export function SendingSettingsTab() {
   const sendersQuery = useSendPulseSenders();
-  const domainsQuery = useSendPulseDomains();
   const invalidate = useSendPulseInvalidate();
 
   const [addSenderOpen, setAddSenderOpen] = useState(false);
-  const [addDomainOpen, setAddDomainOpen] = useState(false);
-  const [newDomain, setNewDomain] = useState("");
-  const [addingDomain, setAddingDomain] = useState(false);
-  const [dnsDialogDomain, setDnsDialogDomain] = useState<string | null>(null);
+  const [editSenderOpen, setEditSenderOpen] = useState(false);
+  const [selectedSender, setSelectedSender] = useState<any>(null);
 
   const senders: any[] = sendersQuery.data ?? [];
-  const domains: any[] = domainsQuery.data ?? [];
 
   async function handleDeleteSender(email: string) {
     if (!confirm(`Remover o remetente ${email}?`)) return;
@@ -63,50 +39,9 @@ export function SendingSettingsTab() {
     }
   }
 
-  async function handleAddDomain(e: React.FormEvent) {
-    e.preventDefault();
-    const clean = newDomain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-    if (!clean || !clean.includes(".")) {
-      toast.error("Informe um domínio válido (ex: minhaagencia.com.br)");
-      return;
-    }
-    setAddingDomain(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("sendpulse-api", {
-        body: { action: "add_domain", domain: clean },
-      });
-      if (error) throw error;
-      if (data?.error_code || data?.message === "Not Found") {
-        throw new Error(data?.message || "Não foi possível adicionar o domínio");
-      }
-      toast.success("Domínio adicionado!", {
-        description: "Configure os registros DNS para autenticá-lo.",
-      });
-      invalidate.invalidateDomains();
-      setNewDomain("");
-      setAddDomainOpen(false);
-      setDnsDialogDomain(clean);
-    } catch (e: any) {
-      console.error(e);
-      toast.error("Erro ao adicionar domínio", { description: e.message });
-    } finally {
-      setAddingDomain(false);
-    }
-  }
-
-  async function handleDeleteDomain(domain: string) {
-    if (!confirm(`Remover o domínio ${domain}?`)) return;
-    try {
-      const { error } = await supabase.functions.invoke("sendpulse-api", {
-        body: { action: "delete_domain", domain },
-      });
-      if (error) throw error;
-      toast.success("Domínio removido");
-      invalidate.invalidateDomains();
-    } catch (e: any) {
-      console.error(e);
-      toast.error("Erro ao remover domínio", { description: e.message });
-    }
+  function handleEditSender(sender: any) {
+    setSelectedSender(sender);
+    setEditSenderOpen(true);
   }
 
   return (
@@ -163,9 +98,14 @@ export function SendingSettingsTab() {
                         </p>
                       )}
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" onClick={() => handleDeleteSender(s.email)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-primary" onClick={() => handleEditSender(s)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" onClick={() => handleDeleteSender(s.email)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 );
               })}
@@ -174,278 +114,79 @@ export function SendingSettingsTab() {
         </CardContent>
       </Card>
 
-      {/* CARD B: Domínios */}
-      <Card className="border shadow-sm">
-        <CardHeader className="pb-4 border-b">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Globe className="h-4 w-4 text-primary" /> Autenticação de Domínio
-              </CardTitle>
-              <CardDescription className="text-xs mt-1">
-                Domínios autenticados (SPF/DKIM) para máxima entregabilidade.
-              </CardDescription>
-            </div>
-            <Button size="sm" variant="action" className="gap-1.5" onClick={() => setAddDomainOpen(true)}>
-              <Plus className="h-3.5 w-3.5" /> Autenticar
-            </Button>
-          </div>
+      {/* CARD B: Autenticação de Domínio (Guia Estático) */}
+      <Card className="border shadow-sm overflow-hidden flex flex-col">
+        <CardHeader className="pb-4 border-b bg-muted/30">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" /> Autenticação de Domínio (DKIM/SPF)
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Aumente a entregabilidade e evite que seus e-mails caiam no SPAM.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="pt-4 space-y-3">
-          {domainsQuery.isLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+        <CardContent className="pt-6 flex-1 flex flex-col justify-between space-y-6">
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Para garantir que as suas campanhas caiam na <strong>Caixa de Entrada</strong> e não no SPAM, é obrigatório autenticar o seu domínio (ex: agencia.com.br).
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex gap-3">
+                <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">1</div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Aceda à SendPulse</p>
+                  <p className="text-xs text-muted-foreground">Clique no botão abaixo para abrir a página de configurações de domínio na SendPulse.</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">2</div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Copie os Registros</p>
+                  <p className="text-xs text-muted-foreground">Adicione o seu domínio e copie os registros TXT (SPF e DKIM) gerados.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="h-6 w-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">3</div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Configure o seu DNS</p>
+                  <p className="text-xs text-muted-foreground">Cole os registros no seu provedor de DNS (Cloudflare, GoDaddy, HostGator, etc).</p>
+                </div>
+              </div>
             </div>
-          ) : domains.length === 0 ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">
-              Nenhum domínio autenticado ainda.
-              <p className="text-xs mt-2">Autenticar seu domínio aumenta drasticamente a entregabilidade.</p>
+
+            <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/10 flex gap-3">
+              <Check className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-700 dark:text-blue-300 leading-tight">
+                Uma vez configurado, a SendPulse verificará automaticamente. Este processo é feito apenas uma vez por domínio.
+              </p>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {domains.map((d: any) => {
-                const verified = d?.status === 1 || d?.status === "1" || d?.is_verified === true;
-                const domainName = d?.domain || d?.email;
-                return (
-                  <div key={domainName} className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card/30 hover:bg-card/60 transition-colors">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm truncate">{domainName}</span>
-                        {verified ? (
-                          <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20 text-[10px] gap-1">
-                            <ShieldCheck className="h-2.5 w-2.5" /> Autenticado
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px] gap-1">
-                            <Clock className="h-2.5 w-2.5" /> Pendente DNS
-                          </Badge>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setDnsDialogDomain(domainName)}
-                        className="text-xs text-primary hover:underline mt-0.5"
-                      >
-                        Ver registros DNS →
-                      </button>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive" onClick={() => handleDeleteDomain(domainName)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          </div>
+
+          <Button 
+            variant="default" 
+            className="w-full gap-2 shadow-sm"
+            onClick={() => window.open("https://login.sendpulse.com/emailservice/settings/#domains", "_blank")}
+          >
+            Configurar na SendPulse <ExternalLink className="h-4 w-4" />
+          </Button>
         </CardContent>
       </Card>
 
       {/* Dialogs */}
-      <AddSenderDialog open={addSenderOpen} onOpenChange={setAddSenderOpen} onSuccess={() => invalidate.invalidateSenders()} />
+      <AddSenderDialog 
+        open={addSenderOpen} 
+        onOpenChange={setAddSenderOpen} 
+        onSuccess={() => invalidate.invalidateSenders()} 
+      />
 
-      <Dialog open={addDomainOpen} onOpenChange={setAddDomainOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Autenticar Novo Domínio</DialogTitle>
-            <DialogDescription>
-              Insira o domínio que deseja autenticar. Após adicionar, configure os registros DNS no painel do seu provedor (GoDaddy, Cloudflare, Registro.br, etc.).
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAddDomain} className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="new-domain">Domínio</Label>
-              <Input
-                id="new-domain"
-                placeholder="minhaagencia.com.br"
-                value={newDomain}
-                onChange={(e) => setNewDomain(e.target.value)}
-                autoFocus
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Sem "www" e sem "https://". Apenas o domínio raiz.
-              </p>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setAddDomainOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={addingDomain}>
-                {addingDomain && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Adicionar Domínio
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {dnsDialogDomain && (
-        <DnsRecordsDialog
-          domain={dnsDialogDomain}
-          open={!!dnsDialogDomain}
-          onOpenChange={(o) => !o && setDnsDialogDomain(null)}
-          onVerified={() => invalidate.invalidateDomains()}
-        />
-      )}
+      <EditSenderDialog
+        sender={selectedSender}
+        open={editSenderOpen}
+        onOpenChange={setEditSenderOpen}
+        onSuccess={() => invalidate.invalidateSenders()}
+      />
     </div>
-  );
-}
-
-function DnsRecordsDialog({
-  domain,
-  open,
-  onOpenChange,
-  onVerified,
-}: {
-  domain: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onVerified: () => void;
-}) {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<any>(null);
-  const [verifying, setVerifying] = useState(false);
-
-  const fetchRecords = async () => {
-    setLoading(true);
-    try {
-      const { data: result, error } = await supabase.functions.invoke("sendpulse-api", {
-        body: { action: "get_domain_records", domain },
-      });
-      if (error) throw error;
-      setData(result);
-    } catch (e: any) {
-      toast.error("Erro ao buscar registros DNS", { description: e.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (open) fetchRecords();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, domain]);
-
-  const handleVerify = async () => {
-    setVerifying(true);
-    try {
-      const { error } = await supabase.functions.invoke("sendpulse-api", {
-        body: { action: "verify_domain", domain },
-      });
-      if (error) throw error;
-      toast.success("Verificação iniciada!", { description: "A SendPulse irá checar os registros DNS." });
-      await fetchRecords();
-      onVerified();
-    } catch (e: any) {
-      toast.error("Erro na verificação", { description: e.message });
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  // Build records array from various response shapes
-  const records: Array<{ type: string; name: string; value: string; purpose: string }> = [];
-  if (data) {
-    // SPF
-    const spf = data.spf || data.SPF;
-    if (spf) records.push({ type: "TXT", name: typeof spf === "object" ? (spf.host || "@") : "@", value: typeof spf === "object" ? (spf.value || spf.txt) : spf, purpose: "SPF (Autenticação)" });
-    // DKIM
-    const dkim = data.dkim || data.DKIM;
-    if (dkim) records.push({ type: "TXT", name: typeof dkim === "object" ? (dkim.host || dkim.selector || "sp._domainkey") : "sp._domainkey", value: typeof dkim === "object" ? (dkim.value || dkim.txt) : dkim, purpose: "DKIM (Assinatura digital)" });
-    // Tracking
-    const tracking = data.tracking || data.cname;
-    if (tracking) records.push({ type: "CNAME", name: typeof tracking === "object" ? (tracking.host || "track") : "track", value: typeof tracking === "object" ? (tracking.value || tracking.target) : tracking, purpose: "Tracking de cliques/aberturas" });
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5 text-primary" /> Configuração de DNS
-          </DialogTitle>
-          <DialogDescription>
-            Domínio: <span className="font-mono text-foreground">{domain}</span>
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          ) : records.length === 0 ? (
-            <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 flex gap-2">
-              <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-              <div className="text-xs">
-                <p className="font-medium text-amber-800 dark:text-amber-300">Registros não disponíveis</p>
-                <p className="text-amber-700 dark:text-amber-400 mt-1">
-                  A SendPulse ainda não retornou registros DNS para este domínio. Tente atualizar em alguns minutos.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-lg border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[80px]">Tipo</TableHead>
-                    <TableHead>Nome / Host</TableHead>
-                    <TableHead>Valor</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {records.map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-[10px]">{r.type}</Badge>
-                        <p className="text-[10px] text-muted-foreground mt-1">{r.purpose}</p>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        <div className="flex items-center gap-1">
-                          <span className="truncate max-w-[120px]">{r.name}</span>
-                          <CopyButton value={r.name} />
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        <div className="flex items-center gap-1">
-                          <span className="truncate max-w-[200px]" title={r.value}>{r.value}</span>
-                          <CopyButton value={r.value} />
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-
-          <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/20 text-xs space-y-1">
-            <p className="font-medium text-foreground flex items-center gap-1.5">
-              <AlertCircle className="h-3.5 w-3.5 text-blue-500" /> Como configurar
-            </p>
-            <p className="text-muted-foreground leading-relaxed">
-              Estes registros devem ser inseridos na zona de DNS do seu provedor (GoDaddy, Cloudflare, Registro.br...). Após adicioná-los, aguarde a propagação (até 48h) e clique em "Verificar Agora".
-            </p>
-            <a
-              href="https://login.sendpulse.com/settings/#smtp-domains"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-primary hover:underline mt-1"
-            >
-              Caso tenha dificuldades, configure diretamente no painel da SendPulse
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
-        </div>
-
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={fetchRecords} disabled={loading} className="gap-1.5">
-            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} /> Atualizar
-          </Button>
-          <Button onClick={handleVerify} disabled={verifying} className="gap-1.5">
-            {verifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
-            Verificar Agora
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
