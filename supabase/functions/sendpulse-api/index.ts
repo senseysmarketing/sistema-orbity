@@ -7,7 +7,8 @@ const corsHeaders = {
 };
 
 interface SendPulseAction {
-  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info' | 'get_campaigns' | 'get_campaign_stats' | 'cancel_campaign' | 'update_addressbook' | 'delete_addressbook' | 'get_contacts' | 'get_senders' | 'add_sender' | 'send_test_email' | 'add_single_contact' | 'delete_contact' | 'update_contact';
+  action: 'get_addressbooks' | 'add_emails' | 'create_campaign' | 'get_balance' | 'get_addressbook_details' | 'create_addressbook' | 'get_account_info' | 'get_campaigns' | 'get_campaign_stats' | 'cancel_campaign' | 'update_addressbook' | 'delete_addressbook' | 'get_contacts' | 'get_senders' | 'add_sender' | 'delete_sender' | 'get_domains' | 'add_domain' | 'get_domain_records' | 'verify_domain' | 'delete_domain' | 'send_test_email' | 'add_single_contact' | 'delete_contact' | 'update_contact';
+  domain?: string;
   book_id?: number;
   campaign_id?: number;
   emails?: (string | { email: string; variables?: Record<string, string> })[];
@@ -255,6 +256,49 @@ serve(async (req) => {
         }),
       });
       result = await res.json();
+    } else if (action === 'delete_sender') {
+      if (!params.sender_email) throw new Error('sender_email is required');
+      const res = await fetch(`https://api.sendpulse.com/senders/${encodeURIComponent(params.sender_email)}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json().catch(() => ({ result: res.ok }));
+    } else if (action === 'get_domains') {
+      const res = await fetch('https://api.sendpulse.com/smtp/domains', {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json();
+    } else if (action === 'add_domain') {
+      if (!params.domain) throw new Error('domain is required');
+      const res = await fetch('https://api.sendpulse.com/smtp/domains', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: params.domain }),
+      });
+      result = await res.json();
+    } else if (action === 'get_domain_records') {
+      if (!params.domain) throw new Error('domain is required');
+      const res = await fetch(`https://api.sendpulse.com/smtp/domains/${encodeURIComponent(params.domain)}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json();
+    } else if (action === 'verify_domain') {
+      if (!params.domain) throw new Error('domain is required');
+      const res = await fetch(`https://api.sendpulse.com/smtp/domains/${encodeURIComponent(params.domain)}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json().catch(() => ({ result: res.ok }));
+    } else if (action === 'delete_domain') {
+      if (!params.domain) throw new Error('domain is required');
+      const res = await fetch(`https://api.sendpulse.com/smtp/domains/${encodeURIComponent(params.domain)}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      result = await res.json().catch(() => ({ result: res.ok }));
     } else if (action === 'send_test_email') {
       const { sender_email, subject, body, target_email } = params;
       const sender_name = params.sender_name || params.sender_email;

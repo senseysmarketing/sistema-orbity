@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, Send, Plus, Loader2, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2 } from "lucide-react";
+import { Mail, Send, Plus, Loader2, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ContactLists } from "@/components/email-marketing/ContactLists";
 import { AddSenderDialog } from "@/components/email-marketing/AddSenderDialog";
 import { TestEmailDialog } from "@/components/email-marketing/TestEmailDialog";
+import { SendingSettingsTab } from "@/components/email-marketing/SendingSettingsTab";
 import { CampaignBuilder } from "@/components/email-marketing/CampaignBuilder";
 import {
   useSendPulseIntegration,
@@ -324,7 +325,7 @@ export default function EmailMarketing() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="lists" className="gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Listas de Contatos</span>
@@ -336,6 +337,10 @@ export default function EmailMarketing() {
           <TabsTrigger value="campaigns" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Gerenciar Campanhas</span>
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="gap-2">
+            <Settings2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Configurações</span>
           </TabsTrigger>
         </TabsList>
 
@@ -585,6 +590,10 @@ export default function EmailMarketing() {
               </TableBody>
             </Table>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-4">
+          <SendingSettingsTab />
         </TabsContent>
       </Tabs>
 
