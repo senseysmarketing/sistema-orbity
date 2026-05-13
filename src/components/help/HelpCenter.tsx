@@ -47,9 +47,22 @@ const quickGuides = [
 export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
   const { startTour } = useProductTour();
   const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("Todos");
+  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+
+  const filteredVideos = useMemo(() => {
+    return videoTutorials.filter((video) => {
+      const matchesSearch = 
+        video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        video.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = activeCategory === "Todos" || video.category === activeCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [searchQuery, activeCategory]);
 
   const handleStartTour = () => {
-    onClose();
+...
     setTimeout(() => startTour(), 300);
   };
 
