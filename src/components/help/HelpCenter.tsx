@@ -215,6 +215,24 @@ export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
             </CardContent>
           </Card>
         </div>
+        <Dialog open={!!selectedVideo} onOpenChange={(open) => !open && setSelectedVideo(null)}>
+          <DialogContent className="max-w-4xl p-0 overflow-hidden border-none bg-black/95">
+            <DialogHeader className="sr-only">
+              <DialogTitle>{selectedVideo?.title}</DialogTitle>
+            </DialogHeader>
+            {selectedVideo && (
+              <div className="aspect-video w-full">
+                <iframe
+                  src={`https://www.youtube.com/embed/${selectedVideo.youtubeId}?autoplay=1&rel=0&modestbranding=1&showinfo=0`}
+                  title={selectedVideo.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full border-none"
+                />
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </SheetContent>
     </Sheet>
   );
