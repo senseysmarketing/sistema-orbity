@@ -32,5 +32,13 @@ export const videoTutorials = [
     category: "Financeiro & Contratos",
     duration: "07:30",
     youtubeId: "dQw4w9WgXcQ"
+  },
+  {
+    id: "5",
+    title: "Gestão de Tarefas",
+    description: "Aprenda a organizar o fluxo de trabalho da sua equipa e gerir tarefas de forma eficiente.",
+    category: "Operação & Social",
+    duration: "05:40",
+    youtubeId: "U2egxnTZbLg"
   }
 ];
