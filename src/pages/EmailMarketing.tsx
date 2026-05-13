@@ -493,15 +493,20 @@ export default function EmailMarketing() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {camp.status === 0 && <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20">Agendada</Badge>}
-                      {camp.status === 1 && <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">Enviando</Badge>}
-                      {camp.status === 2 && <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20">Concluída</Badge>}
-                      {camp.status === 3 && <Badge variant="secondary" className="bg-red-500/10 text-red-600 border-red-500/20">Erro</Badge>}
+                      {renderCampaignStatusBadge(camp)}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {addressBooks.find((b: any) => b.id === camp.list_id)?.name || camp.list_id}
+                      {(() => {
+                        const listId = camp.address_book_id ?? camp.list_id;
+                        const book = addressBooks.find((b: any) => Number(b.id) === Number(listId));
+                        return book?.name || (listId ? `Lista #${listId}` : "—");
+                      })()}
                     </TableCell>
-                    <TableCell className="text-sm">{new Date(camp.send_date || camp.all_email_count).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-sm">
+                      {camp.send_date
+                        ? format(new Date(camp.send_date.replace(" ", "T")), "dd/MM/yyyy HH:mm")
+                        : "—"}
+                    </TableCell>
                     <TableCell className="text-right flex justify-end gap-1">
                       <Button
                         variant="ghost"
