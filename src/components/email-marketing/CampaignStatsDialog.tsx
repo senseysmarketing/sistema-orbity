@@ -108,6 +108,11 @@ export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignSt
           </div>
         ) : (
           <div className="space-y-6 py-4">
+            {noMetricsYet && (
+              <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-3 text-xs text-blue-700 dark:text-blue-300">
+                📊 As métricas de abertura e clique podem levar alguns minutos para serem processadas pela SendPulse após o disparo. Volte mais tarde para ver os resultados completos.
+              </div>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card className="border shadow-none bg-card/20">
                 <CardContent className="p-4">
