@@ -15,7 +15,8 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,36 @@ import {
   useSendPulseInvalidate,
   useSendPulseIsFetching,
 } from "@/hooks/useSendPulse";
+
+// Maps SendPulse status_explain (or numeric status) into a friendly badge.
+// SendPulse returns inconsistent codes across endpoints, so we trust status_explain when present.
+function renderCampaignStatusBadge(camp: any) {
+  const explain = String(camp?.status_explain ?? "").toLowerCase();
+  const code = camp?.status;
+
+  // Sent / completed
+  if (/(sent|send|complete|finish|done)/.test(explain) || code === 3) {
+    return <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20">Concluída</Badge>;
+  }
+  // Sending / in progress
+  if (/(sending|process|run|deliver|in.?progress)/.test(explain) || code === 12) {
+    return <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">Enviando</Badge>;
+  }
+  // Queue / moderation / draft / scheduled
+  if (/(queue|moderat|draft|wait|schedul|pending)/.test(explain) || code === 1 || code === 2 || code === 11) {
+    return <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20">Agendada</Badge>;
+  }
+  // Pause / stop / cancel
+  if (/(pause|stop|cancel)/.test(explain) || code === 4) {
+    return <Badge variant="secondary" className="bg-muted text-muted-foreground border-border">Pausada</Badge>;
+  }
+  // Error / failed
+  if (/(error|fail|reject|deny)/.test(explain)) {
+    return <Badge variant="secondary" className="bg-red-500/10 text-red-600 border-red-500/20">Erro</Badge>;
+  }
+  // Unknown — show raw label if we have one
+  return <Badge variant="secondary" className="bg-muted text-muted-foreground border-border capitalize">{camp?.status_explain || `Status ${code ?? "?"}`}</Badge>;
+}
 
 export default function EmailMarketing() {
   const { currentAgency } = useAgency();
@@ -258,7 +289,11 @@ export default function EmailMarketing() {
                   <span className="text-xs font-bold">{getEmailUsage().sent.toLocaleString()} / {getEmailUsage().limit.toLocaleString()}</span>
                 </div>
                 <Progress value={getEmailUsage().percent} className="h-1.5" />
-                <p className="text-[10px] text-muted-foreground">Uso de quota atual no mês</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {accountInfoQuery.dataUpdatedAt
+                    ? `Atualizado ${formatDistanceToNow(new Date(accountInfoQuery.dataUpdatedAt), { locale: ptBR, addSuffix: true })} · pode levar alguns minutos para refletir após disparos`
+                    : "Uso de quota atual no mês"}
+                </p>
               </CardContent>
             </Card>
 
@@ -488,15 +523,20 @@ export default function EmailMarketing() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {camp.status === 0 && <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20">Agendada</Badge>}
-                      {camp.status === 1 && <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">Enviando</Badge>}
-                      {camp.status === 2 && <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20">Concluída</Badge>}
-                      {camp.status === 3 && <Badge variant="secondary" className="bg-red-500/10 text-red-600 border-red-500/20">Erro</Badge>}
+                      {renderCampaignStatusBadge(camp)}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {addressBooks.find((b: any) => b.id === camp.list_id)?.name || camp.list_id}
+                      {(() => {
+                        const listId = camp.address_book_id ?? camp.list_id;
+                        const book = addressBooks.find((b: any) => Number(b.id) === Number(listId));
+                        return book?.name || (listId ? `Lista #${listId}` : "—");
+                      })()}
                     </TableCell>
-                    <TableCell className="text-sm">{new Date(camp.send_date || camp.all_email_count).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-sm">
+                      {camp.send_date
+                        ? format(new Date(camp.send_date.replace(" ", "T")), "dd/MM/yyyy HH:mm")
+                        : "—"}
+                    </TableCell>
                     <TableCell className="text-right flex justify-end gap-1">
                       <Button
                         variant="ghost"

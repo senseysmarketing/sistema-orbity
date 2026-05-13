@@ -39,17 +39,26 @@ export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignSt
     }
   }
 
-  const getStatusBadge = (status: number) => {
-    switch (status) {
-      case 0: return <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20">Agendada</Badge>;
-      case 1: return <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">Enviando</Badge>;
-      case 2: return <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20">Concluída</Badge>;
-      case 3: return <Badge variant="secondary" className="bg-red-500/10 text-red-600 border-red-500/20">Erro</Badge>;
-      default: return <Badge variant="secondary">{status}</Badge>;
-    }
+  const getStatusBadge = (camp: any) => {
+    const explain = String(camp?.status_explain ?? "").toLowerCase();
+    const status = camp?.status;
+    if (/(sent|send|complete|finish|done)/.test(explain) || status === 3)
+      return <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20">Concluída</Badge>;
+    if (/(sending|process|run|deliver)/.test(explain) || status === 12)
+      return <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">Enviando</Badge>;
+    if (/(queue|moderat|draft|wait|schedul|pending)/.test(explain) || status === 1 || status === 2 || status === 11)
+      return <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-500/20">Agendada</Badge>;
+    if (/(pause|stop|cancel)/.test(explain) || status === 4)
+      return <Badge variant="secondary" className="bg-muted text-muted-foreground border-border">Pausada</Badge>;
+    if (/(error|fail|reject)/.test(explain))
+      return <Badge variant="secondary" className="bg-red-500/10 text-red-600 border-red-500/20">Erro</Badge>;
+    return <Badge variant="secondary">{camp?.status_explain || `Status ${status ?? "?"}`}</Badge>;
   };
 
-  const isScheduled = campaign?.status === 0;
+  const explainLower = String(campaign?.status_explain ?? "").toLowerCase();
+  const isScheduled = /(queue|moderat|draft|wait|schedul|pending)/.test(explainLower) || campaign?.status === 1 || campaign?.status === 2 || campaign?.status === 11 || campaign?.status === 0;
+  const isSent = /(sent|send|complete|finish|done)/.test(explainLower) || campaign?.status === 3;
+  const noMetricsYet = isSent && stats && (stats.sent ?? 0) > 0 && (stats.opened ?? 0) === 0 && (stats.clicked ?? 0) === 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -60,7 +69,7 @@ export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignSt
               <BarChart3 className="h-5 w-5 text-primary" />
               {campaign?.name || "Estatísticas da Campanha"}
             </DialogTitle>
-            {campaign && getStatusBadge(campaign.status)}
+            {campaign && getStatusBadge(campaign)}
           </div>
           <DialogDescription>
             {campaign?.subject && `Assunto: ${campaign.subject}`}
@@ -99,6 +108,11 @@ export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignSt
           </div>
         ) : (
           <div className="space-y-6 py-4">
+            {noMetricsYet && (
+              <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-3 text-xs text-blue-700 dark:text-blue-300">
+                📊 As métricas de abertura e clique podem levar alguns minutos para serem processadas pela SendPulse após o disparo. Volte mais tarde para ver os resultados completos.
+              </div>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card className="border shadow-none bg-card/20">
                 <CardContent className="p-4">

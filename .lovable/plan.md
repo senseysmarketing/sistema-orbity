@@ -1,72 +1,57 @@
 ## Diagnóstico
 
-Olhando o print, o card "Logística de Voo" mostra o remetente como `<contato@senseys.com.br>` — sem nome antes do `<...>`. Isso bate exatamente com o template do `SenderSelect`:
+Analisando `src/pages/EmailMarketing.tsx` (aba "Gerenciar Campanhas") e a edge function `sendpulse-api` (action `get_campaigns`), identifiquei 4 problemas distintos no card de relatório:
 
-```tsx
-{sender.name} <{sender.email}>
-```
+### 1. Status "Erro" incorreto
+A SendPulse retorna `status` numérico junto com `status_explain` (string). O nosso mapeamento atual está invertido em relação aos códigos reais da API:
 
-Ou seja, o remetente cadastrado na SendPulse veio com `name` vazio (só com email). Quando você seleciona, o `onSelect` faz:
+- Código atual assume: `0=Agendada, 1=Enviando, 2=Concluída, 3=Erro`
+- SendPulse usa (entre outros): `1=Draft, 2=Em moderação, 3=Enviada/Concluída, 4=Pausada, 11=Em fila, 12=Enviando…`
 
-```ts
-setCampaign(prev => ({ ...prev, sender_email: sender.email, sender_name: sender.name }))
-```
+Como a campanha foi enviada (status real = 3 = "Sent"), o badge mostra "Erro" porque na nossa tabela 3 = Erro. Por isso também o `CampaignStatsDialog` mostra tudo zerado: ele entra no branch `isScheduled = (status === 0)` apenas, e na verdade está chamando `get_campaign_stats` mas como a SendPulse acabou de processar, ainda retorna métricas vazias (esperado nas primeiras horas) — mas o problema visual principal é o badge errado.
 
-`sender_name` vira string vazia. Já a validação em `handleSendCampaign` exige todos os campos truthy:
+**Fix**: ler `status_explain` retornado pela própria SendPulse e renderizá-lo como badge, com cor inferida (Sent/Send→verde, Error/Failed→vermelho, Draft/Queue→âmbar, Sending→azul). Isso elimina dependência de adivinhar códigos.
 
-```ts
-if (!sender_name || !sender_email || !subject || !body || !book_id) {
-  toast.error("Preencha todos os campos da campanha");
-}
-```
+### 2. Coluna "Lista de Destino" vazia
+O código faz: `addressBooks.find((b) => b.id === camp.list_id)`.
 
-Como `sender_name === ""`, a validação dispara o toast — mesmo com tudo o resto preenchido. **Não há campo oculto na UI**, é o `sender_name` em branco vindo da SendPulse que bloqueia o envio.
+A API `GET /campaigns` da SendPulse retorna o campo como `address_book_id` (não `list_id`). Como `camp.list_id` é `undefined`, o fallback `|| camp.list_id` também imprime nada.
 
-Confirmações no print:
-- Assunto: "Teste Senseys" ✅
-- Lista: "Teste ()" ✅ (book_id selecionado)
-- Remetente: aparece só `<contato@senseys.com.br>` → name vazio ❌
-- Body: o preview à esquerda está renderizando ✅
+**Fix**: usar `camp.address_book_id ?? camp.list_id` na lookup, e como fallback final mostrar "—" em vez de string vazia.
 
-## Correção proposta
+### 3. Coluna "Data" exibindo data atual estranha
+Linha 499: `new Date(camp.send_date || camp.all_email_count).toLocaleDateString()`.
 
-Pequeno ajuste de UX, sem mexer em backend:
+`all_email_count` é um número de contatos, não uma data — quando `send_date` está ausente isso vira `new Date(123)` (epoch ms) ou data inválida. A SendPulse retorna o timestamp real em `send_date` (formato `"YYYY-MM-DD HH:mm:ss"`).
 
-### 1. `src/pages/EmailMarketing.tsx` — `SenderSelect.onSelect` (linha ~317)
-Garantir um nome derivado quando a SendPulse retornar `name` vazio:
+**Fix**: usar `camp.send_date` formatado com `date-fns` (`dd/MM/yyyy HH:mm`) e fallback "—" quando ausente.
 
-```ts
-onSelect={(sender) =>
-  setCampaign(prev => ({
-    ...prev,
-    sender_email: sender.email,
-    sender_name: sender.name?.trim() || sender.email.split("@")[0],
-  }))
-}
-```
+### 4. Volume Mensal não atualizou após envio
+Após `handleSendCampaign` o código já chama `invalidate.invalidateAccountInfo()`. O contador zerado se deve a:
 
-### 2. `SenderSelect` render (linha 570)
-Mostrar fallback no dropdown também, para o usuário entender o que está selecionando:
+a) A SendPulse atualiza `email_qty` (consumo do mês) com latência de minutos após o disparo — não é instantâneo na API `/userinfo`.
+b) O `staleTime` do hook `useSendPulseAccountInfo` (5 min) não interfere aqui pois invalidate força refetch — mas o dado em si na SendPulse ainda não mudou.
 
-```tsx
-{(sender.name?.trim() || sender.email.split("@")[0])} &lt;{sender.email}&gt;
-```
+**Fix**: nada a corrigir no código além do que já está; vou adicionar uma nota visual sutil ("Atualizado há X min · pode levar alguns minutos para refletir após disparos") abaixo do card "Volume Mensal" usando `accountInfoQuery.dataUpdatedAt`. Assim o usuário entende que o número virá.
 
-### 3. `handleSendCampaign` (linha 127) — validação mais útil
-Trocar a checagem genérica por mensagens específicas, e tratar `sender_name` como opcional (já temos fallback):
+### 5. (Bônus) Diálogo de estatísticas
+Hoje só mostra layout "Agendada" se `status === 0`. Como vamos passar a usar `status_explain`, também ajusto o `CampaignStatsDialog`:
+- Receber `status_explain` e renderizar o mesmo badge bonito que a tabela
+- Quando métricas vierem zeradas mas a campanha está "Sent", exibir aviso: "📊 As métricas de abertura/clique podem levar alguns minutos para serem processadas pela SendPulse após o disparo."
 
-```ts
-if (!campaign.sender_email) return toast.error("Selecione um remetente verificado");
-if (!campaign.subject?.trim()) return toast.error("Informe o assunto da campanha");
-if (!campaign.book_id) return toast.error("Selecione a lista de destino");
-if (!campaign.body || campaign.body === "<p></p>") return toast.error("O conteúdo do e-mail está vazio");
-```
+## Arquivos a alterar
 
-Aplicar o mesmo refinamento na validação do botão "Enviar E-mail de Teste" (linha 423) só para `sender_email`/`subject`/`body`.
+1. **`src/pages/EmailMarketing.tsx`** (aba "Gerenciar Campanhas", linhas ~482-499)
+   - Criar helper `renderStatusBadge(camp)` baseado em `status_explain`
+   - Trocar lookup da lista para `address_book_id`
+   - Formatar `send_date` corretamente
+   - Adicionar nota "atualizado há X" no card Volume Mensal (linhas 254-263)
+
+2. **`src/components/email-marketing/CampaignStatsDialog.tsx`**
+   - Usar `status_explain` no badge do header
+   - Adicionar aviso de processamento quando `sent > 0` mas `opened/clicked === 0` e a campanha foi enviada há pouco
 
 ## Fora de escopo
-- Não vamos alterar o cadastro de remetentes na SendPulse, nem a Edge Function `sendpulse-api`.
-- Não vamos mexer no `CampaignBuilder` nem na lógica de cache do React Query.
-
-## Resultado
-Após a correção, ao clicar em **Disparar Campanha Agora** com os campos atuais do print, a campanha será enviada normalmente — e, caso falte algo no futuro, o toast dirá exatamente qual campo.
+- Não mexer em `useSendPulse.tsx` / cache / edge function `sendpulse-api`
+- Não alterar fluxo de envio (`handleSendCampaign`) nem `CampaignBuilder`
+- Não tocar nas outras abas (Listas, Nova Campanha)
