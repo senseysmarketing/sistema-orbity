@@ -24,9 +24,7 @@ import {
   TrendingUp,
   DollarSign,
   BarChart3,
-  Search,
-  Play,
-  PlayCircle
+  Search
 } from 'lucide-react';
 
 interface HelpCenterProps {
