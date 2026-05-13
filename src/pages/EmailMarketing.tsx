@@ -591,6 +591,10 @@ export default function EmailMarketing() {
             </Table>
           </Card>
         </TabsContent>
+
+        <TabsContent value="settings" className="space-y-4">
+          <SendingSettingsTab />
+        </TabsContent>
       </Tabs>
 
       <CampaignStatsDialog
