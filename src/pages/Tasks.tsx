@@ -893,39 +893,21 @@ Instruções Criativas: ${newTask.creative_instructions || "Nenhuma"}`;
     }
   };
 
-  const handleCreateTask = async () => {
-    if (!newTask.title.trim()) {
-      toast({
-        title: "Erro",
-        description: "O título da tarefa é obrigatório.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!newTask.task_type) {
-      toast({
-        title: "Erro",
-        description: "O tipo da tarefa é obrigatório.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const performCreateTask = async (data: TaskFormValues) => {
     try {
-      const isSocial = newTask.task_type === "redes_sociais";
-      const hasCreative = ["redes_sociais", "criativos"].includes(newTask.task_type);
-      const hashtagsArray = isSocial && newTask.hashtags.trim()
-        ? newTask.hashtags.split(",").map(h => h.trim()).filter(Boolean)
+      const isSocial = data.task_type === "redes_sociais";
+      const hasCreative = ["redes_sociais", "criativos"].includes(data.task_type);
+      const hashtagsArray = isSocial && data.hashtags.trim()
+        ? data.hashtags.split(",").map(h => h.trim()).filter(Boolean)
         : null;
 
-      const recurrenceRulePayload: RecurrenceRule | null = newTask.is_recurring
+      const recurrenceRulePayload: RecurrenceRule | null = data.is_recurring
         ? {
-            frequency: newTask.recurrence_frequency,
-            interval: Math.max(1, newTask.recurrence_interval || 1),
-            ...(newTask.recurrence_frequency === "weekly" &&
-            newTask.recurrence_days_of_week.length > 0
-              ? { daysOfWeek: newTask.recurrence_days_of_week }
+            frequency: data.recurrence_frequency,
+            interval: Math.max(1, data.recurrence_interval || 1),
+            ...(data.recurrence_frequency === "weekly" &&
+            data.recurrence_days_of_week.length > 0
+              ? { daysOfWeek: data.recurrence_days_of_week }
               : {}),
           }
         : null;
@@ -933,26 +915,26 @@ Instruções Criativas: ${newTask.creative_instructions || "Nenhuma"}`;
       const { data: taskData, error } = await supabase
         .from("tasks")
         .insert([{
-          title: newTask.title,
-          description: newTask.description,
-          status: newTask.status as any,
-          priority: newTask.priority,
-          assigned_to: newTask.assigned_to === "unassigned" ? null : newTask.assigned_to,
-          client_id: separateVirtualClients(newTask.client_ids).realClientIds[0] || null,
-          is_internal: separateVirtualClients(newTask.client_ids).isInternal,
-          due_date: newTask.due_date ? dateOnlyToISO(newTask.due_date) : null,
+          title: data.title,
+          description: data.description,
+          status: data.status as any,
+          priority: data.priority,
+          assigned_to: data.assigned_to === "unassigned" ? null : data.assigned_to,
+          client_id: separateVirtualClients(data.client_ids).realClientIds[0] || null,
+          is_internal: separateVirtualClients(data.client_ids).isInternal,
+          due_date: data.due_date ? dateOnlyToISO(data.due_date) : null,
           created_by: profile?.user_id,
           agency_id: currentAgency?.id,
-          subtasks: newTask.subtasks as any,
-          attachments: newTask.attachments as any,
-          task_type: newTask.task_type || null,
-          platform: isSocial ? (newTask.platform || null) : null,
-          post_type: isSocial ? (newTask.post_type || null) : null,
-          post_date: isSocial && newTask.post_date ? dateOnlyToISO(newTask.post_date) : null,
+          subtasks: data.subtasks as any,
+          attachments: data.attachments as any,
+          task_type: data.task_type || null,
+          platform: isSocial ? (data.platform || null) : null,
+          post_type: isSocial ? (data.post_type || null) : null,
+          post_date: isSocial && data.post_date ? dateOnlyToISO(data.post_date) : null,
           hashtags: hashtagsArray,
-          creative_instructions: hasCreative ? (newTask.creative_instructions || null) : null,
-          post_caption: hasCreative ? (newTask.post_caption || null) : null,
-          is_recurring: !!newTask.is_recurring,
+          creative_instructions: hasCreative ? (data.creative_instructions || null) : null,
+          post_caption: hasCreative ? (data.post_caption || null) : null,
+          is_recurring: !!data.is_recurring,
           recurrence_rule: recurrenceRulePayload as any,
         }])
         .select()
@@ -960,12 +942,11 @@ Instruções Criativas: ${newTask.creative_instructions || "Nenhuma"}`;
 
       if (error) throw error;
 
-      if (newTask.assigned_users.length > 0 && taskData) {
-        await assignUsersToTask(taskData.id, newTask.assigned_users);
+      if (data.assigned_users.length > 0 && taskData) {
+        await assignUsersToTask(taskData.id, data.assigned_users);
       }
 
-      // Create client relations (only real clients)
-      const { realClientIds: createRealIds } = separateVirtualClients(newTask.client_ids);
+      const { realClientIds: createRealIds } = separateVirtualClients(data.client_ids);
       if (taskData && createRealIds.length > 0) {
         await updateClientRelations("task", taskData.id, createRealIds);
       }
@@ -985,6 +966,42 @@ Instruções Criativas: ${newTask.creative_instructions || "Nenhuma"}`;
         variant: "destructive",
       });
     }
+  };
+
+  const handleCreateTask = async () => {
+    if (!newTask.title.trim()) {
+      toast({
+        title: "Erro",
+        description: "O título da tarefa é obrigatório.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newTask.task_type) {
+      toast({
+        title: "Erro",
+        description: "O tipo da tarefa é obrigatório.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prevenção de tarefas órfãs: cliente e/ou responsável ausentes
+    const { realClientIds, isInternal } = separateVirtualClients(newTask.client_ids);
+    const hasClient = isInternal || realClientIds.length > 0;
+    const hasUser =
+      newTask.assigned_users.length > 0 ||
+      (newTask.assigned_to && newTask.assigned_to !== "unassigned");
+
+    if (!hasClient || !hasUser) {
+      setMissingInfoParams({ client: !hasClient, user: !hasUser });
+      setPendingSubmitData(newTask);
+      setShowMissingInfoAlert(true);
+      return;
+    }
+
+    await performCreateTask(newTask);
   };
 
   const applyTemplate = (template: TaskTemplate) => {
