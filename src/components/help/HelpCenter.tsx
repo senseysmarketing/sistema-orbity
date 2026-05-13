@@ -1,10 +1,16 @@
+import { useState, useMemo } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useProductTour } from '@/hooks/useProductTour';
 import { useNavigate } from 'react-router-dom';
 import { HelpAIChat } from './HelpAIChat';
+import { videoTutorials, videoCategories } from "@/data/videoTutorials";
+import { VideoTutorialCard } from "./VideoTutorialCard";
 import { 
   BookOpen, 
   Video, 
@@ -17,7 +23,9 @@ import {
   MessageSquare,
   TrendingUp,
   DollarSign,
-  BarChart3
+  BarChart3,
+  Search,
+  Play
 } from 'lucide-react';
 
 interface HelpCenterProps {
