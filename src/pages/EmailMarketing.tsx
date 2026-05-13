@@ -83,6 +83,7 @@ export default function EmailMarketing() {
   const [selectedBookContacts, setSelectedBookContacts] = useState<number | null>(null);
 
   const [campaign, setCampaign] = useState({
+    name: "",
     sender_name: "",
     sender_email: "",
     subject: "",
