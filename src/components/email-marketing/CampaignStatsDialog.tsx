@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { BarChart3, Mail, MousePointer2, AlertCircle, Rocket, Clock } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useSendPulseAddressBooks } from "@/hooks/useSendPulse";
 
 interface CampaignStatsDialogProps {
   open: boolean;
@@ -14,13 +15,139 @@ interface CampaignStatsDialogProps {
   campaign: any;
 }
 
+interface NormalizedStats {
+  sent: number;
+  opened: number;
+  clicked: number;
+  error: number;
+  unsubscribed: number;
+  open_rate: number;
+  click_rate: number;
+  source: "api" | "campaign" | "addressbook" | "none";
+}
+
+// Normalizes whatever SendPulse returns into a consistent shape.
+// Handles: /campaigns/{id}/stat OK, embedded campaign.statistics, addressbook fallback,
+// and SendPulse error payloads like { message: "Not Found", error_code: 404 }.
+function normalizeStats(
+  apiData: any,
+  campaign: any,
+  addressBooks: any[]
+): NormalizedStats {
+  const isErrorPayload =
+    apiData &&
+    typeof apiData === "object" &&
+    (apiData.error_code || apiData.error || apiData.message === "Not Found");
+
+  // 1) Try the dedicated stat endpoint
+  if (apiData && !isErrorPayload && typeof apiData === "object") {
+    const sent =
+      Number(apiData.sent ?? apiData.total_sent ?? apiData.delivered ?? 0) || 0;
+    const opened = Number(apiData.opened ?? apiData.opening ?? 0) || 0;
+    const clicked =
+      Number(apiData.clicked ?? apiData.link_redirected ?? apiData.clicks ?? 0) || 0;
+    const error = Number(apiData.error ?? apiData.errors ?? 0) || 0;
+    const unsubscribed =
+      Number(apiData.unsubscribed ?? apiData.unsubscribe ?? 0) || 0;
+    if (sent > 0 || opened > 0 || clicked > 0 || error > 0) {
+      return {
+        sent,
+        opened,
+        clicked,
+        error,
+        unsubscribed,
+        open_rate: sent > 0 ? Math.round((opened / sent) * 100) : 0,
+        click_rate: sent > 0 ? Math.round((clicked / sent) * 100) : 0,
+        source: "api",
+      };
+    }
+  }
+
+  // 2) Use statistics already embedded in the campaign object (from get_campaigns)
+  const embedded = campaign?.statistics;
+  if (embedded && typeof embedded === "object") {
+    const sent =
+      Number(embedded.sent ?? embedded.delivered ?? 0) || 0;
+    const opened = Number(embedded.opening ?? embedded.opened ?? 0) || 0;
+    const clicked =
+      Number(embedded.link_redirected ?? embedded.clicked ?? 0) || 0;
+    const error = Number(embedded.error ?? 0) || 0;
+    const unsubscribed = Number(embedded.unsubscribe ?? embedded.unsubscribed ?? 0) || 0;
+    if (sent > 0 || opened > 0 || clicked > 0 || error > 0 || unsubscribed > 0) {
+      return {
+        sent,
+        opened,
+        clicked,
+        error,
+        unsubscribed,
+        open_rate: sent > 0 ? Math.round((opened / sent) * 100) : 0,
+        click_rate: sent > 0 ? Math.round((clicked / sent) * 100) : 0,
+        source: "campaign",
+      };
+    }
+  }
+
+  // 3) Fallback to campaign-level counts (all_email_qty) or address book size
+  const campaignSent =
+    Number(campaign?.all_email_qty ?? campaign?.tariff_email_qty ?? 0) || 0;
+  if (campaignSent > 0) {
+    return {
+      sent: campaignSent,
+      opened: 0,
+      clicked: 0,
+      error: 0,
+      unsubscribed: 0,
+      open_rate: 0,
+      click_rate: 0,
+      source: "campaign",
+    };
+  }
+
+  const listId =
+    campaign?.address_book_id ??
+    campaign?.list_id ??
+    campaign?.message?.list_id;
+  if (listId != null) {
+    const book = addressBooks.find((b: any) => Number(b.id) === Number(listId));
+    const bookCount = Number(book?.all_email_qty ?? book?.all_email_count ?? 0) || 0;
+    if (bookCount > 0) {
+      return {
+        sent: bookCount,
+        opened: 0,
+        clicked: 0,
+        error: 0,
+        unsubscribed: 0,
+        open_rate: 0,
+        click_rate: 0,
+        source: "addressbook",
+      };
+    }
+  }
+
+  return {
+    sent: 0,
+    opened: 0,
+    clicked: 0,
+    error: 0,
+    unsubscribed: 0,
+    open_rate: 0,
+    click_rate: 0,
+    source: "none",
+  };
+}
+
 export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignStatsDialogProps) {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<any>(null);
+  const [apiData, setApiData] = useState<any>(null);
+
+  const addressBooksQuery = useSendPulseAddressBooks(open);
+  const addressBooks = addressBooksQuery.data ?? [];
 
   useEffect(() => {
     if (open && campaign?.id) {
       fetchStats();
+    } else if (!open) {
+      setApiData(null);
     }
   }, [open, campaign?.id]);
 
@@ -31,13 +158,19 @@ export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignSt
         body: { action: 'get_campaign_stats', campaign_id: campaign.id }
       });
       if (error) throw error;
-      setStats(data);
+      setApiData(data);
     } catch (e) {
       console.error("Erro ao carregar estatísticas:", e);
+      setApiData(null);
     } finally {
       setLoading(false);
     }
   }
+
+  const stats = useMemo(
+    () => normalizeStats(apiData, campaign, addressBooks),
+    [apiData, campaign, addressBooks]
+  );
 
   const getStatusBadge = (camp: any) => {
     const explain = String(camp?.status_explain ?? "").toLowerCase();
@@ -58,7 +191,9 @@ export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignSt
   const explainLower = String(campaign?.status_explain ?? "").toLowerCase();
   const isScheduled = /(queue|moderat|draft|wait|schedul|pending)/.test(explainLower) || campaign?.status === 1 || campaign?.status === 2 || campaign?.status === 11 || campaign?.status === 0;
   const isSent = /(sent|send|complete|finish|done)/.test(explainLower) || campaign?.status === 3;
-  const noMetricsYet = isSent && stats && (stats.sent ?? 0) > 0 && (stats.opened ?? 0) === 0 && (stats.clicked ?? 0) === 0;
+  const metricsPending =
+    isSent && stats.sent > 0 && stats.opened === 0 && stats.clicked === 0 && stats.error === 0;
+  const usingFallback = stats.source === "addressbook" || stats.source === "campaign";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -108,9 +243,14 @@ export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignSt
           </div>
         ) : (
           <div className="space-y-6 py-4">
-            {noMetricsYet && (
+            {metricsPending && (
               <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-3 text-xs text-blue-700 dark:text-blue-300">
-                📊 As métricas de abertura e clique podem levar alguns minutos para serem processadas pela SendPulse após o disparo. Volte mais tarde para ver os resultados completos.
+                📊 As métricas de abertura, clique e bounces podem levar alguns minutos para serem processadas pela SendPulse após o disparo. Volte mais tarde para ver os resultados completos.
+              </div>
+            )}
+            {!metricsPending && usingFallback && stats.sent > 0 && (
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-700 dark:text-amber-300">
+                ℹ️ Volume de envios estimado a partir da lista de destino. Aberturas, cliques e erros aparecerão assim que a SendPulse finalizar o processamento.
               </div>
             )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -120,18 +260,18 @@ export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignSt
                     <Mail className="h-3 w-3" />
                     <span className="text-[10px] uppercase font-bold tracking-wider">Enviados</span>
                   </div>
-                  <div className="text-2xl font-bold">{stats?.sent || 0}</div>
+                  <div className="text-2xl font-bold">{stats.sent}</div>
                 </CardContent>
               </Card>
-              
+
               <Card className="border shadow-none bg-card/20">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 text-muted-foreground mb-1">
                     <Rocket className="h-3 w-3" />
                     <span className="text-[10px] uppercase font-bold tracking-wider">Aberturas</span>
                   </div>
-                  <div className="text-2xl font-bold">{stats?.open_rate || 0}%</div>
-                  <p className="text-[10px] text-muted-foreground">{stats?.opened || 0} cliques únicos</p>
+                  <div className="text-2xl font-bold">{stats.open_rate}%</div>
+                  <p className="text-[10px] text-muted-foreground">{stats.opened} aberturas únicas</p>
                 </CardContent>
               </Card>
 
@@ -141,8 +281,8 @@ export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignSt
                     <MousePointer2 className="h-3 w-3" />
                     <span className="text-[10px] uppercase font-bold tracking-wider">Clicks (CTR)</span>
                   </div>
-                  <div className="text-2xl font-bold">{stats?.click_rate || 0}%</div>
-                  <p className="text-[10px] text-muted-foreground">{stats?.clicked || 0} cliques totais</p>
+                  <div className="text-2xl font-bold">{stats.click_rate}%</div>
+                  <p className="text-[10px] text-muted-foreground">{stats.clicked} cliques totais</p>
                 </CardContent>
               </Card>
 
@@ -152,7 +292,7 @@ export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignSt
                     <AlertCircle className="h-3 w-3" />
                     <span className="text-[10px] uppercase font-bold tracking-wider">Erros</span>
                   </div>
-                  <div className="text-2xl font-bold">{stats?.error || 0}</div>
+                  <div className="text-2xl font-bold">{stats.error}</div>
                   <p className="text-[10px] text-muted-foreground">Bounces / Inválidos</p>
                 </CardContent>
               </Card>
@@ -166,24 +306,24 @@ export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignSt
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
                     <span>Taxa de Entrega</span>
-                    <span className="font-semibold">{stats?.sent ? Math.round(((stats.sent - (stats.error || 0)) / stats.sent) * 100) : 0}%</span>
+                    <span className="font-semibold">{stats.sent ? Math.round(((stats.sent - stats.error) / stats.sent) * 100) : 0}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-green-500" 
-                      style={{ width: `${stats?.sent ? Math.round(((stats.sent - (stats.error || 0)) / stats.sent) * 100) : 0}%` }} 
+                    <div
+                      className="h-full bg-green-500"
+                      style={{ width: `${stats.sent ? Math.round(((stats.sent - stats.error) / stats.sent) * 100) : 0}%` }}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
                     <span>Taxa de Rejeição (Unsubscribe)</span>
-                    <span className="font-semibold">{stats?.unsubscribed || 0}</span>
+                    <span className="font-semibold">{stats.unsubscribed}</span>
                   </div>
                   <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-red-400" 
-                      style={{ width: `${stats?.sent ? Math.round((stats.unsubscribed / stats.sent) * 100) : 0}%` }} 
+                    <div
+                      className="h-full bg-red-400"
+                      style={{ width: `${stats.sent ? Math.round((stats.unsubscribed / stats.sent) * 100) : 0}%` }}
                     />
                   </div>
                 </div>
