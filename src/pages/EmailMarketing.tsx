@@ -477,7 +477,7 @@ export default function EmailMarketing() {
                       size="lg"
                       className="w-full gap-2 h-11 text-sm font-semibold"
                       onClick={handleSendCampaign}
-                      disabled={sending || !campaign.sender_email || !campaign.book_id || !campaign.subject || !campaign.body}
+                      disabled={sending || !campaign.name?.trim() || !campaign.sender_email || !campaign.book_id || !campaign.subject || !campaign.body}
                     >
                       {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : (scheduled ? <Calendar className="h-4 w-4" /> : <Send className="h-4 w-4" />)}
                       {scheduled ? "Agendar Campanha" : "Disparar Campanha Agora"}
