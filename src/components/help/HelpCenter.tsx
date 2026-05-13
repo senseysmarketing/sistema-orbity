@@ -1,10 +1,16 @@
+import { useState, useMemo } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useProductTour } from '@/hooks/useProductTour';
 import { useNavigate } from 'react-router-dom';
 import { HelpAIChat } from './HelpAIChat';
+import { videoTutorials, videoCategories } from "@/data/videoTutorials";
+import { VideoTutorialCard } from "./VideoTutorialCard";
 import { 
   BookOpen, 
   Video, 
@@ -17,7 +23,8 @@ import {
   MessageSquare,
   TrendingUp,
   DollarSign,
-  BarChart3
+  BarChart3,
+  Search
 } from 'lucide-react';
 
 interface HelpCenterProps {
@@ -39,6 +46,19 @@ const quickGuides = [
 export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
   const { startTour } = useProductTour();
   const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("Todos");
+  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+
+  const filteredVideos = useMemo(() => {
+    return videoTutorials.filter((video) => {
+      const matchesSearch = 
+        video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        video.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = activeCategory === "Todos" || video.category === activeCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [searchQuery, activeCategory]);
 
   const handleStartTour = () => {
     onClose();
@@ -121,24 +141,53 @@ export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
             </div>
           </TabsContent>
 
-          <TabsContent value="videos" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Vídeos Tutoriais</CardTitle>
-                <CardDescription>
-                  Aprenda de forma visual com nossos tutoriais em vídeo
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Em breve você terá acesso a uma biblioteca completa de vídeos tutoriais explicando cada funcionalidade do sistema.
-                </p>
-                <div className="bg-muted rounded-lg p-8 text-center">
-                  <Video className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">Conteúdo em produção</p>
+          <TabsContent value="videos" className="space-y-6 mt-4 pb-20">
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar tutoriais..."
+                  className="pl-9 bg-muted/50 border-none"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {videoCategories.map((category) => (
+                  <Button
+                    key={category}
+                    variant={activeCategory === category ? "default" : "secondary"}
+                    size="sm"
+                    className="h-7 text-[10px] uppercase font-bold tracking-wider rounded-full"
+                    onClick={() => setActiveCategory(category)}
+                  >
+                    {category}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {filteredVideos.length > 0 ? (
+                filteredVideos.map((video) => (
+                  <VideoTutorialCard 
+                    key={video.id} 
+                    video={video} 
+                    onClick={setSelectedVideo}
+                  />
+                ))
+              ) : (
+                <div className="col-span-full py-12 text-center space-y-3">
+                  <div className="bg-muted w-12 h-12 rounded-full flex items-center justify-center mx-auto">
+                    <Search className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Nenhum vídeo encontrado para sua busca.
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
 
@@ -165,6 +214,24 @@ export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
             </CardContent>
           </Card>
         </div>
+        <Dialog open={!!selectedVideo} onOpenChange={(open) => !open && setSelectedVideo(null)}>
+          <DialogContent className="max-w-4xl p-0 overflow-hidden border-none bg-black/95">
+            <DialogHeader className="sr-only">
+              <DialogTitle>{selectedVideo?.title}</DialogTitle>
+            </DialogHeader>
+            {selectedVideo && (
+              <div className="aspect-video w-full">
+                <iframe
+                  src={`https://www.youtube.com/embed/${selectedVideo.youtubeId}?autoplay=1&rel=0&modestbranding=1&showinfo=0`}
+                  title={selectedVideo.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full border-none"
+                />
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </SheetContent>
     </Sheet>
   );
