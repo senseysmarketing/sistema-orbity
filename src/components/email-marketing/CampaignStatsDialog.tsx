@@ -69,7 +69,7 @@ export function CampaignStatsDialog({ open, onOpenChange, campaign }: CampaignSt
               <BarChart3 className="h-5 w-5 text-primary" />
               {campaign?.name || "Estatísticas da Campanha"}
             </DialogTitle>
-            {campaign && getStatusBadge(campaign.status)}
+            {campaign && getStatusBadge(campaign)}
           </div>
           <DialogDescription>
             {campaign?.subject && `Assunto: ${campaign.subject}`}
