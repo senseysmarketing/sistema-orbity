@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, Send, Plus, Loader2, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Settings2 } from "lucide-react";
+import { Mail, Send, Loader2, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,7 +25,7 @@ import { CampaignStatsDialog } from "@/components/email-marketing/CampaignStatsD
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { ContactLists } from "@/components/email-marketing/ContactLists";
-import { AddSenderDialog } from "@/components/email-marketing/AddSenderDialog";
+
 import { TestEmailDialog } from "@/components/email-marketing/TestEmailDialog";
 import { SendingSettingsTab } from "@/components/email-marketing/SendingSettingsTab";
 import { CampaignBuilder } from "@/components/email-marketing/CampaignBuilder";
@@ -79,7 +79,7 @@ export default function EmailMarketing() {
   const [scheduled, setScheduled] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<Date | undefined>(new Date());
   const [scheduledTime, setScheduledTime] = useState("09:00");
-  const [addSenderOpen, setAddSenderOpen] = useState(false);
+  
   const [testEmailOpen, setTestEmailOpen] = useState(false);
   const [selectedBookContacts, setSelectedBookContacts] = useState<number | null>(null);
 
@@ -395,7 +395,6 @@ export default function EmailMarketing() {
                               sender_name: sender.name?.trim() || sender.email.split("@")[0],
                             }))
                           }
-                          onAddNew={() => setAddSenderOpen(true)}
                         />
                       </div>
                       <div className="space-y-2">
@@ -603,11 +602,6 @@ export default function EmailMarketing() {
         campaign={selectedCampaign}
       />
 
-      <AddSenderDialog
-        open={addSenderOpen}
-        onOpenChange={setAddSenderOpen}
-        onSuccess={() => invalidate.invalidateSenders()}
-      />
 
       <TestEmailDialog
         open={testEmailOpen}
@@ -627,11 +621,9 @@ export default function EmailMarketing() {
 function SenderSelect({
   value,
   onSelect,
-  onAddNew,
 }: {
   value: string;
   onSelect: (sender: { email: string; name: string }) => void;
-  onAddNew: () => void;
 }) {
   const sendersQuery = useSendPulseSenders();
   const senders: any[] = sendersQuery.data ?? [];
@@ -653,14 +645,6 @@ function SenderSelect({
           ))}
         </SelectContent>
       </Select>
-      <Button
-        variant="link"
-        size="sm"
-        className="h-auto p-0 justify-start text-[10px]"
-        onClick={onAddNew}
-      >
-        <Plus className="h-3 w-3 mr-1" /> Adicionar novo remetente
-      </Button>
     </div>
   );
 }
