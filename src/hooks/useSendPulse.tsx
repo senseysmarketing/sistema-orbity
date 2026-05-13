@@ -68,7 +68,10 @@ export function useSendPulseAddressBooks(enabled = true) {
   const agencyId = currentAgency?.id;
   return useQuery<any[]>({
     queryKey: sendpulseKeys.addressBooks(agencyId),
-    queryFn: async () => (await invokeSendPulse("get_addressbooks")) ?? [],
+    queryFn: async () => {
+      const r = await invokeSendPulse("get_addressbooks");
+      return Array.isArray(r) ? r : [];
+    },
     enabled: !!agencyId && enabled,
     ...baseOpts,
   });
@@ -79,7 +82,10 @@ export function useSendPulseCampaigns(enabled = true) {
   const agencyId = currentAgency?.id;
   return useQuery<any[]>({
     queryKey: sendpulseKeys.campaigns(agencyId),
-    queryFn: async () => (await invokeSendPulse("get_campaigns")) ?? [],
+    queryFn: async () => {
+      const r = await invokeSendPulse("get_campaigns");
+      return Array.isArray(r) ? r : [];
+    },
     enabled: !!agencyId && enabled,
     ...baseOpts,
   });
