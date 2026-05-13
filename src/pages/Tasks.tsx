@@ -2490,7 +2490,7 @@ Instruções Criativas: ${newTask.creative_instructions || "Nenhuma"}`;
               . Tarefas incompletas podem perder-se no fluxo de trabalho. Deseja continuar?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2 sm:gap-3">
             <AlertDialogAction
               onClick={() => setShowMissingInfoAlert(false)}
               className="sm:order-2"
