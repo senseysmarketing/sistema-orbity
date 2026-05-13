@@ -2477,6 +2477,40 @@ Instruções Criativas: ${newTask.creative_instructions || "Nenhuma"}`;
         templates={templates}
         onSelectTemplate={applyTemplate}
       />
+
+      <AlertDialog open={showMissingInfoAlert} onOpenChange={setShowMissingInfoAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Atenção: Informações ausentes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você está prestes a criar uma tarefa sem
+              {missingInfoParams.client ? " um cliente vinculado" : ""}
+              {missingInfoParams.client && missingInfoParams.user ? " e sem" : ""}
+              {missingInfoParams.user ? " um responsável atribuído" : ""}
+              . Tarefas incompletas podem perder-se no fluxo de trabalho. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => setShowMissingInfoAlert(false)}
+              className="sm:order-2"
+            >
+              Voltar e preencher
+            </AlertDialogAction>
+            <AlertDialogCancel
+              onClick={async () => {
+                const data = pendingSubmitData;
+                setShowMissingInfoAlert(false);
+                setPendingSubmitData(null);
+                if (data) await performCreateTask(data);
+              }}
+              className="sm:order-1 mt-0 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              Criar assim mesmo
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
