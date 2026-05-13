@@ -259,7 +259,11 @@ export default function EmailMarketing() {
                   <span className="text-xs font-bold">{getEmailUsage().sent.toLocaleString()} / {getEmailUsage().limit.toLocaleString()}</span>
                 </div>
                 <Progress value={getEmailUsage().percent} className="h-1.5" />
-                <p className="text-[10px] text-muted-foreground">Uso de quota atual no mês</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {accountInfoQuery.dataUpdatedAt
+                    ? `Atualizado ${formatDistanceToNow(new Date(accountInfoQuery.dataUpdatedAt), { locale: ptBR, addSuffix: true })} · pode levar alguns minutos para refletir após disparos`
+                    : "Uso de quota atual no mês"}
+                </p>
               </CardContent>
             </Card>
 
