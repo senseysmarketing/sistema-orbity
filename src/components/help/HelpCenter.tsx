@@ -62,7 +62,7 @@ export function HelpCenter({ isOpen, onClose }: HelpCenterProps) {
   }, [searchQuery, activeCategory]);
 
   const handleStartTour = () => {
-...
+    onClose();
     setTimeout(() => startTour(), 300);
   };
 
