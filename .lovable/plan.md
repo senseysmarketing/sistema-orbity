@@ -1,57 +1,42 @@
 ## Diagnóstico
 
-Analisando `src/pages/EmailMarketing.tsx` (aba "Gerenciar Campanhas") e a edge function `sendpulse-api` (action `get_campaigns`), identifiquei 4 problemas distintos no card de relatório:
+O modal está chamando `get_campaign_stats` em `GET /campaigns/{id}/stat`, mas a request real está voltando `404 Not Found` para a campanha atual. Como o componente só usa `stats.sent`, `stats.opened`, etc., qualquer resposta 404 ou formato inesperado vira visualmente tudo zerado.
 
-### 1. Status "Erro" incorreto
-A SendPulse retorna `status` numérico junto com `status_explain` (string). O nosso mapeamento atual está invertido em relação aos códigos reais da API:
+Além disso, o próprio objeto da campanha já traz dados suficientes para pelo menos estimar “Enviados” com segurança: lista usada (`address_book_id`/`list_id`) e/ou contagens retornadas pela campanha/lista. Por isso, mesmo quando a SendPulse ainda não libera estatísticas detalhadas, o modal não deveria mostrar `Enviados = 0` para uma campanha concluída que foi disparada para 3 contatos.
 
-- Código atual assume: `0=Agendada, 1=Enviando, 2=Concluída, 3=Erro`
-- SendPulse usa (entre outros): `1=Draft, 2=Em moderação, 3=Enviada/Concluída, 4=Pausada, 11=Em fila, 12=Enviando…`
+## Plano de ajuste
 
-Como a campanha foi enviada (status real = 3 = "Sent"), o badge mostra "Erro" porque na nossa tabela 3 = Erro. Por isso também o `CampaignStatsDialog` mostra tudo zerado: ele entra no branch `isScheduled = (status === 0)` apenas, e na verdade está chamando `get_campaign_stats` mas como a SendPulse acabou de processar, ainda retorna métricas vazias (esperado nas primeiras horas) — mas o problema visual principal é o badge errado.
+1. **Normalizar métricas no modal**
+   - Criar uma função local em `CampaignStatsDialog.tsx` para transformar respostas diferentes da SendPulse em um formato único:
+     - `sent`
+     - `opened`
+     - `clicked`
+     - `error`
+     - `unsubscribed`
+     - `open_rate`
+     - `click_rate`
+   - Tratar explicitamente respostas de erro como `{ message: "Not Found", error_code: 404 }` para não mascarar como “zero real”.
 
-**Fix**: ler `status_explain` retornado pela própria SendPulse e renderizá-lo como badge, com cor inferida (Sent/Send→verde, Error/Failed→vermelho, Draft/Queue→âmbar, Sending→azul). Isso elimina dependência de adivinhar códigos.
+2. **Adicionar fallback inteligente para “Enviados”**
+   - Fazer o modal buscar/usar as listas via `useSendPulseAddressBooks`, sem prop drilling.
+   - Quando `get_campaign_stats` vier vazio/404, calcular `sent` usando, nesta ordem:
+     - campos de contagem existentes no objeto `campaign`, se houver;
+     - quantidade da lista vinculada (`address_book_id` ou `list_id`) encontrada em `addressBooks` (`all_email_count`/`all_email_qty`);
+     - `0` apenas se não houver nenhum dado confiável.
+   - Assim, para sua campanha enviada para 3 contatos, o modal passa a exibir `Enviados = 3` mesmo que estatísticas detalhadas ainda estejam indisponíveis.
 
-### 2. Coluna "Lista de Destino" vazia
-O código faz: `addressBooks.find((b) => b.id === camp.list_id)`.
+3. **Melhorar a mensagem do modal**
+   - Se a campanha está concluída e as métricas detalhadas da SendPulse ainda não estão disponíveis, exibir um aviso claro: os envios foram estimados pela lista de destino e aberturas/cliques podem aparecer depois.
+   - Manter aberturas, cliques e erros zerados apenas quando a API realmente não retornou esses dados.
 
-A API `GET /campaigns` da SendPulse retorna o campo como `address_book_id` (não `list_id`). Como `camp.list_id` é `undefined`, o fallback `|| camp.list_id` também imprime nada.
+4. **Corrigir pequenos rótulos inconsistentes**
+   - Em “Aberturas”, trocar o subtítulo atual “cliques únicos” para “aberturas únicas”.
+   - Manter “Cliques (CTR)” como cliques totais.
 
-**Fix**: usar `camp.address_book_id ?? camp.list_id` na lookup, e como fallback final mostrar "—" em vez de string vazia.
+5. **Opcional no backend, se necessário**
+   - Ajustar a Edge Function `sendpulse-api` para retornar status HTTP 200 com um objeto normalizado quando a SendPulse responder 404 em estatísticas, em vez de repassar um payload que parece métrica válida.
+   - Não alterar o fluxo de envio da campanha nem a lógica de cache já aprovada.
 
-### 3. Coluna "Data" exibindo data atual estranha
-Linha 499: `new Date(camp.send_date || camp.all_email_count).toLocaleDateString()`.
+## Resultado esperado
 
-`all_email_count` é um número de contatos, não uma data — quando `send_date` está ausente isso vira `new Date(123)` (epoch ms) ou data inválida. A SendPulse retorna o timestamp real em `send_date` (formato `"YYYY-MM-DD HH:mm:ss"`).
-
-**Fix**: usar `camp.send_date` formatado com `date-fns` (`dd/MM/yyyy HH:mm`) e fallback "—" quando ausente.
-
-### 4. Volume Mensal não atualizou após envio
-Após `handleSendCampaign` o código já chama `invalidate.invalidateAccountInfo()`. O contador zerado se deve a:
-
-a) A SendPulse atualiza `email_qty` (consumo do mês) com latência de minutos após o disparo — não é instantâneo na API `/userinfo`.
-b) O `staleTime` do hook `useSendPulseAccountInfo` (5 min) não interfere aqui pois invalidate força refetch — mas o dado em si na SendPulse ainda não mudou.
-
-**Fix**: nada a corrigir no código além do que já está; vou adicionar uma nota visual sutil ("Atualizado há X min · pode levar alguns minutos para refletir após disparos") abaixo do card "Volume Mensal" usando `accountInfoQuery.dataUpdatedAt`. Assim o usuário entende que o número virá.
-
-### 5. (Bônus) Diálogo de estatísticas
-Hoje só mostra layout "Agendada" se `status === 0`. Como vamos passar a usar `status_explain`, também ajusto o `CampaignStatsDialog`:
-- Receber `status_explain` e renderizar o mesmo badge bonito que a tabela
-- Quando métricas vierem zeradas mas a campanha está "Sent", exibir aviso: "📊 As métricas de abertura/clique podem levar alguns minutos para serem processadas pela SendPulse após o disparo."
-
-## Arquivos a alterar
-
-1. **`src/pages/EmailMarketing.tsx`** (aba "Gerenciar Campanhas", linhas ~482-499)
-   - Criar helper `renderStatusBadge(camp)` baseado em `status_explain`
-   - Trocar lookup da lista para `address_book_id`
-   - Formatar `send_date` corretamente
-   - Adicionar nota "atualizado há X" no card Volume Mensal (linhas 254-263)
-
-2. **`src/components/email-marketing/CampaignStatsDialog.tsx`**
-   - Usar `status_explain` no badge do header
-   - Adicionar aviso de processamento quando `sent > 0` mas `opened/clicked === 0` e a campanha foi enviada há pouco
-
-## Fora de escopo
-- Não mexer em `useSendPulse.tsx` / cache / edge function `sendpulse-api`
-- Não alterar fluxo de envio (`handleSendCampaign`) nem `CampaignBuilder`
-- Não tocar nas outras abas (Listas, Nova Campanha)
+Ao abrir o modal da campanha concluída, o primeiro card deve mostrar pelo menos `Enviados = 3`; as demais métricas continuam podendo ficar zeradas até a SendPulse processar aberturas, cliques, erros e unsubscribes.
