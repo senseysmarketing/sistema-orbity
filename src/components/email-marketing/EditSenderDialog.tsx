@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,18 +21,12 @@ export function EditSenderDialog({ sender, open, onOpenChange, onSuccess }: Edit
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Update name when sender changes
-  useState(() => {
-    if (sender) setName(sender.name || "");
-  });
-
-  // Since we can't use useEffect easily with useState initialization like that in a clean way for this pattern:
-  const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen && sender) {
+  // Sync state with prop when dialog opens or sender changes
+  useEffect(() => {
+    if (open && sender) {
       setName(sender.name || "");
     }
-    onOpenChange(newOpen);
-  };
+  }, [open, sender]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +38,7 @@ export function EditSenderDialog({ sender, open, onOpenChange, onSuccess }: Edit
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sendpulse-api", {
+      const { error } = await supabase.functions.invoke("sendpulse-api", {
         body: { 
           action: "update_sender", 
           sender_email: sender.email,
@@ -68,7 +62,7 @@ export function EditSenderDialog({ sender, open, onOpenChange, onSuccess }: Edit
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Editar Remetente</DialogTitle>
