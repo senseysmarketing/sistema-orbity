@@ -325,7 +325,7 @@ export default function EmailMarketing() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="lists" className="gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Listas de Contatos</span>
@@ -337,6 +337,10 @@ export default function EmailMarketing() {
           <TabsTrigger value="campaigns" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Gerenciar Campanhas</span>
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="gap-2">
+            <Settings2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Configurações</span>
           </TabsTrigger>
         </TabsList>
 
