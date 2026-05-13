@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Mail, Send, Plus, Loader2, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2 } from "lucide-react";
+import { Mail, Send, Plus, Loader2, Calendar, Users, RefreshCw, AlertCircle, TrendingUp, BarChart3, Trash2, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAgency } from "@/hooks/useAgency";
 import { supabase } from "@/integrations/supabase/client";
