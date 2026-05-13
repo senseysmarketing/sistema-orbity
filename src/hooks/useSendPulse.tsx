@@ -20,6 +20,7 @@ export const sendpulseKeys = {
   addressBooks: (agencyId?: string) => ["sendpulse", agencyId, "addressbooks"] as const,
   campaigns: (agencyId?: string) => ["sendpulse", agencyId, "campaigns"] as const,
   senders: (agencyId?: string) => ["sendpulse", agencyId, "senders"] as const,
+  domains: (agencyId?: string) => ["sendpulse", agencyId, "domains"] as const,
 };
 
 const baseOpts = {
