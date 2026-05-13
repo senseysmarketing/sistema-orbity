@@ -90,7 +90,10 @@ export function useSendPulseSenders(enabled = true) {
   const agencyId = currentAgency?.id;
   return useQuery<any[]>({
     queryKey: sendpulseKeys.senders(agencyId),
-    queryFn: async () => (await invokeSendPulse("get_senders")) ?? [],
+    queryFn: async () => {
+      const r = await invokeSendPulse("get_senders");
+      return Array.isArray(r) ? r : [];
+    },
     enabled: !!agencyId && enabled,
     ...baseOpts,
   });
@@ -101,7 +104,10 @@ export function useSendPulseDomains(enabled = true) {
   const agencyId = currentAgency?.id;
   return useQuery<any[]>({
     queryKey: sendpulseKeys.domains(agencyId),
-    queryFn: async () => (await invokeSendPulse("get_domains")) ?? [],
+    queryFn: async () => {
+      const r = await invokeSendPulse("get_domains");
+      return Array.isArray(r) ? r : [];
+    },
     enabled: !!agencyId && enabled,
     ...baseOpts,
   });
