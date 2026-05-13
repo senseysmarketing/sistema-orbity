@@ -318,12 +318,10 @@ function DnsRecordsDialog({
     }
   };
 
-  // Fetch on open
-  useState(() => {
+  useEffect(() => {
     if (open) fetchRecords();
-  });
-  // Trigger fetch when opens
-  if (open && !data && !loading) fetchRecords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, domain]);
 
   const handleVerify = async () => {
     setVerifying(true);
