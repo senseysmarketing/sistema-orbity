@@ -83,6 +83,7 @@ export default function EmailMarketing() {
   const [selectedBookContacts, setSelectedBookContacts] = useState<number | null>(null);
 
   const [campaign, setCampaign] = useState({
+    name: "",
     sender_name: "",
     sender_email: "",
     subject: "",
@@ -154,6 +155,10 @@ export default function EmailMarketing() {
   }
 
   async function handleSendCampaign() {
+    if (!campaign.name?.trim()) {
+      toast.error("Informe o nome da campanha");
+      return;
+    }
     if (!campaign.sender_email) {
       toast.error("Selecione um remetente verificado");
       return;
@@ -184,13 +189,14 @@ export default function EmailMarketing() {
         body: {
           action: "create_campaign",
           ...campaign,
+          name: campaign.name.trim(),
           book_id: parseInt(campaign.book_id),
           send_date,
         },
       });
       if (error) throw error;
       toast.success(scheduled ? "Campanha agendada com sucesso!" : "Campanha enviada com sucesso!");
-      setCampaign({ sender_name: "", sender_email: "", subject: "", body: "", book_id: "" });
+      setCampaign({ name: "", sender_name: "", sender_email: "", subject: "", body: "", book_id: "" });
       invalidate.invalidateCampaigns();
       invalidate.invalidateAccountInfo();
       setActiveTab("campaigns");
@@ -362,6 +368,18 @@ export default function EmailMarketing() {
                     <h4 className="text-sm font-semibold text-muted-foreground">Informações Básicas</h4>
                     <div className="space-y-4">
                       <div className="space-y-2">
+                        <Label htmlFor="campaign_name">Nome da Campanha</Label>
+                        <Input
+                          id="campaign_name"
+                          placeholder="Ex: Newsletter Maio 2026 - Promoções"
+                          value={campaign.name}
+                          onChange={(e) => setCampaign((prev) => ({ ...prev, name: e.target.value }))}
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          Identificação interna da campanha (não aparece para o destinatário).
+                        </p>
+                      </div>
+                      <div className="space-y-2">
                         <Label htmlFor="sender_select">Remetente da Campanha</Label>
                         <SenderSelect
                           value={campaign.sender_email}
@@ -459,7 +477,7 @@ export default function EmailMarketing() {
                       size="lg"
                       className="w-full gap-2 h-11 text-sm font-semibold"
                       onClick={handleSendCampaign}
-                      disabled={sending || !campaign.sender_email || !campaign.book_id || !campaign.subject || !campaign.body}
+                      disabled={sending || !campaign.name?.trim() || !campaign.sender_email || !campaign.book_id || !campaign.subject || !campaign.body}
                     >
                       {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : (scheduled ? <Calendar className="h-4 w-4" /> : <Send className="h-4 w-4" />)}
                       {scheduled ? "Agendar Campanha" : "Disparar Campanha Agora"}

@@ -142,7 +142,7 @@ serve(async (req) => {
       });
       result = await res.json();
     } else if (action === 'create_campaign') {
-      const { sender_name, sender_email, subject, body, book_id, send_date } = params;
+      const { name, sender_name, sender_email, subject, body, book_id, send_date } = params;
       if (!sender_name || !sender_email || !subject || !body || !book_id) {
         throw new Error('Missing campaign parameters');
       }
@@ -156,8 +156,6 @@ serve(async (req) => {
       const balanceData = await balanceRes.json();
       const bookData = await bookRes.json();
 
-      // SendPulse returns balance in an array usually, or direct object. 
-      // Based on docs for /user/balance/detail, it is { "email": { "emails_left": 1000, ... } }
       const emailBalance = balanceData?.email?.emails_left ?? balanceData?.email?.balance ?? balanceData?.[0]?.balance ?? 0;
       const contactsCount = bookData?.all_email_count || 0;
 
@@ -171,20 +169,25 @@ serve(async (req) => {
         });
       }
 
+      const campaignPayload: Record<string, any> = {
+        sender_name,
+        sender_email,
+        subject,
+        body: btoa(unescape(encodeURIComponent(body))),
+        list_id: book_id,
+        send_date: send_date || undefined,
+      };
+      if (name && typeof name === 'string' && name.trim()) {
+        campaignPayload.name = name.trim();
+      }
+
       const res = await fetch('https://api.sendpulse.com/campaigns', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          sender_name,
-          sender_email,
-          subject,
-          body: btoa(unescape(encodeURIComponent(body))), // Base64 encoded HTML
-          list_id: book_id,
-          send_date: send_date || undefined,
-        }),
+        body: JSON.stringify(campaignPayload),
       });
 
       if (res.status === 429) throw new Error('RATE_LIMIT: Muitas requisições. Tente novamente em instantes.');
