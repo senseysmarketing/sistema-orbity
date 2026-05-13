@@ -313,6 +313,9 @@ export default function Tasks() {
   const [createStep, setCreateStep] = useState<number>(1);
   const { preFillTask, generateCaption, loading: aiLoading } = useAIAssist();
   const [captionLoading, setCaptionLoading] = useState(false);
+  const [showMissingInfoAlert, setShowMissingInfoAlert] = useState(false);
+  const [missingInfoParams, setMissingInfoParams] = useState<{ client: boolean; user: boolean }>({ client: false, user: false });
+  const [pendingSubmitData, setPendingSubmitData] = useState<TaskFormValues | null>(null);
 
   // Filtros e busca
   const [searchTerm, setSearchTerm] = useState("");
