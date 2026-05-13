@@ -155,6 +155,10 @@ export default function EmailMarketing() {
   }
 
   async function handleSendCampaign() {
+    if (!campaign.name?.trim()) {
+      toast.error("Informe o nome da campanha");
+      return;
+    }
     if (!campaign.sender_email) {
       toast.error("Selecione um remetente verificado");
       return;
@@ -185,13 +189,14 @@ export default function EmailMarketing() {
         body: {
           action: "create_campaign",
           ...campaign,
+          name: campaign.name.trim(),
           book_id: parseInt(campaign.book_id),
           send_date,
         },
       });
       if (error) throw error;
       toast.success(scheduled ? "Campanha agendada com sucesso!" : "Campanha enviada com sucesso!");
-      setCampaign({ sender_name: "", sender_email: "", subject: "", body: "", book_id: "" });
+      setCampaign({ name: "", sender_name: "", sender_email: "", subject: "", body: "", book_id: "" });
       invalidate.invalidateCampaigns();
       invalidate.invalidateAccountInfo();
       setActiveTab("campaigns");
