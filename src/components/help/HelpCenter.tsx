@@ -25,7 +25,8 @@ import {
   DollarSign,
   BarChart3,
   Search,
-  Play
+  Play,
+  PlayCircle
 } from 'lucide-react';
 
 interface HelpCenterProps {
