@@ -368,6 +368,18 @@ export default function EmailMarketing() {
                     <h4 className="text-sm font-semibold text-muted-foreground">Informações Básicas</h4>
                     <div className="space-y-4">
                       <div className="space-y-2">
+                        <Label htmlFor="campaign_name">Nome da Campanha</Label>
+                        <Input
+                          id="campaign_name"
+                          placeholder="Ex: Newsletter Maio 2026 - Promoções"
+                          value={campaign.name}
+                          onChange={(e) => setCampaign((prev) => ({ ...prev, name: e.target.value }))}
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          Identificação interna da campanha (não aparece para o destinatário).
+                        </p>
+                      </div>
+                      <div className="space-y-2">
                         <Label htmlFor="sender_select">Remetente da Campanha</Label>
                         <SenderSelect
                           value={campaign.sender_email}
