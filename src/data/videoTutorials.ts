@@ -3,42 +3,50 @@ export const videoCategories = ["Todos", "Boas-vindas", "Vendas & CRM", "Operaç
 export const videoTutorials = [
   {
     id: "1",
-    title: "Boas-vindas e Visão Geral",
-    description: "Aprenda a dominar o seu novo centro de comando em menos de 5 minutos.",
+    title: "Dashboard - Visão Geral",
+    description: "Conheça o centro de comando do Orbity e domine sua visão geral em poucos minutos.",
     category: "Boas-vindas",
-    duration: "04:20",
-    youtubeId: "dQw4w9WgXcQ"
+    duration: "05:00",
+    youtubeId: "FGPjnA5DIcA"
   },
   {
     id: "2",
-    title: "Gestão de CRM e Leads",
-    description: "Como organizar seu funil de vendas e nunca mais perder uma oportunidade.",
-    category: "Vendas & CRM",
-    duration: "08:45",
-    youtubeId: "dQw4w9WgXcQ"
+    title: "Gestão de Clientes",
+    description: "Aprenda a cadastrar, organizar e acompanhar todos os seus clientes na plataforma.",
+    category: "Operação & Social",
+    duration: "06:00",
+    youtubeId: "wzTuXYbCg5c"
   },
   {
     id: "3",
-    title: "Agendamento de Social Media",
-    description: "Planeje seus posts e mantenha sua presença digital ativa.",
+    title: "Gestão de Tarefas",
+    description: "Organize o fluxo de trabalho da sua equipa e gerencie tarefas de forma eficiente.",
     category: "Operação & Social",
-    duration: "06:15",
-    youtubeId: "dQw4w9WgXcQ"
+    duration: "05:40",
+    youtubeId: "Icw6AUTkV0c"
   },
   {
     id: "4",
-    title: "Financeiro e Contratos",
-    description: "Controle suas receitas e emita contratos de forma automática.",
-    category: "Financeiro & Contratos",
-    duration: "07:30",
-    youtubeId: "dQw4w9WgXcQ"
+    title: "Agenda e Reuniões",
+    description: "Planeje reuniões, eventos e mantenha o calendário da agência sempre sincronizado.",
+    category: "Operação & Social",
+    duration: "04:30",
+    youtubeId: "2Ni9bRI8I34"
   },
   {
     id: "5",
-    title: "Gestão de Tarefas",
-    description: "Aprenda a organizar o fluxo de trabalho da sua equipa e gerir tarefas de forma eficiente.",
+    title: "CRM & Vendas",
+    description: "Como organizar o funil de vendas, acompanhar leads e fechar mais negócios.",
+    category: "Vendas & CRM",
+    duration: "08:45",
+    youtubeId: "gH2iCSawtRM"
+  },
+  {
+    id: "6",
+    title: "Social Media",
+    description: "Planeje posts, agende conteúdos e mantenha sua presença digital sempre ativa.",
     category: "Operação & Social",
-    duration: "05:40",
-    youtubeId: "U2egxnTZbLg"
+    duration: "06:15",
+    youtubeId: "UcQKYnzBcJM"
   }
 ];
