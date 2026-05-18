@@ -31,25 +31,39 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Missing authorization');
+    const isServiceRole = authHeader?.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'never-match');
+    
+    let user = null;
+    if (authHeader && !isServiceRole) {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(
+        authHeader.replace('Bearer ', '')
+      );
+      if (authError) throw authError;
+      user = authUser;
+    }
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-    if (authError || !user) throw new Error('Unauthorized');
-
-    // Check if user is master
-    const { data: masterUser } = await supabase
-      .from('master_users')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
+    // Check if user is master (if not service role)
+    let isMaster = isServiceRole;
+    if (user && !isMaster) {
+      const { data: masterUser } = await supabase
+        .from('master_users')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+      isMaster = !!masterUser;
+    }
 
     const { action, phone, message } = await req.json();
 
-    // Only master users can connect/status. send_message can be called internally or by master.
-    if (!masterUser && action !== 'send_message') {
+    // Only master users (or service role) can connect/status.
+    // send_message can be called by master or service role.
+    if (!isMaster && action !== 'send_message') {
       throw new Error('Unauthorized: master access required');
+    }
+    
+    // For send_message, if not master and not service role, still unauthorized
+    if (!isMaster && !user && action === 'send_message') {
+       throw new Error('Unauthorized');
     }
 
     const { apiUrl, adminToken } = getUazapiConfig();
