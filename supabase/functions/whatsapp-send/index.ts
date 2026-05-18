@@ -41,18 +41,16 @@ serve(async (req) => {
     if (accError || !account) throw new Error('WhatsApp account not found');
     if (account.status !== 'connected') throw new Error('WhatsApp not connected');
 
-    // Use centralized secrets as fallback
-    const effectiveUrl = (account.api_url || Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '');
-    const effectiveKey = account.api_key || Deno.env.get('EVOLUTION_API_KEY') || '';
+    const apiUrl = (Deno.env.get('UAZAPI_SERVER_URL') || '').replace(/\/$/, '');
+    const instanceToken = account.api_key; // Stored instance token
 
-    if (!effectiveUrl || !effectiveKey) {
-      throw new Error('Evolution API not configured');
+    if (!apiUrl || !instanceToken) {
+      throw new Error('Uazapi API not configured or instance token missing');
     }
 
     // Ensure conversation exists
     let convId = conversation_id;
     if (!convId) {
-      // Elastic search: handle Brazilian 9th-digit variations
       const variations = phoneVariants(phone_number);
       const { data: existingConv } = await supabase
         .from('whatsapp_conversations')
@@ -80,29 +78,29 @@ serve(async (req) => {
       }
     }
 
-    // Send via Evolution API — normalize to digits with country code 55
+    // Send via Uazapi — normalize to digits with country code 55
     const formattedPhone = normalizeBrazilPhone(phone_number);
-    const sendRes = await fetch(`${effectiveUrl}/message/sendText/${account.instance_name}`, {
+    const sendRes = await fetch(`${apiUrl}/send/text`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': effectiveKey,
+        'token': instanceToken,
       },
       body: JSON.stringify({
         number: formattedPhone,
         text: message,
-        linkPreview: false,
       }),
     });
 
     const sendData = await sendRes.json();
+    console.log('[whatsapp-send] Uazapi response:', sendData);
 
     if (!sendRes.ok) {
-      throw new Error(`Evolution API send error: ${JSON.stringify(sendData)}`);
+      throw new Error(`Uazapi API send error: ${JSON.stringify(sendData)}`);
     }
 
-    // Save message BEFORE webhook arrives (idempotency)
-    const messageId = sendData?.key?.id || crypto.randomUUID();
+    // Save message BEFORE webhook arrives
+    const messageId = sendData?.message?.id || sendData?.id || crypto.randomUUID();
 
     await supabase
       .from('whatsapp_messages')

@@ -6,53 +6,47 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-function getEvolutionConfig() {
-  const apiUrl = (Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '');
-  const apiKey = Deno.env.get('EVOLUTION_API_KEY') || '';
-  if (!apiUrl || !apiKey) throw new Error('Evolution API not configured (missing EVOLUTION_API_URL or EVOLUTION_API_KEY)');
-  return { apiUrl, apiKey };
+function getUazapiConfig() {
+  const apiUrl = (Deno.env.get('UAZAPI_SERVER_URL') || '').replace(/\/$/, '');
+  const adminToken = Deno.env.get('UAZAPI_ADMIN_TOKEN') || '';
+  if (!apiUrl || !adminToken) throw new Error('Uazapi API not configured (missing UAZAPI_SERVER_URL or UAZAPI_ADMIN_TOKEN)');
+  return { apiUrl, adminToken };
 }
 
 function generateInstanceName(agencyId: string, purpose: string): string {
-  return `orbity_${agencyId.substring(0, 8)}_${purpose}`;
+  // Keeping purpose to allow multiple instances (e.g. general vs billing) while following requested prefix
+  return `orbity_agency_${agencyId.substring(0, 8)}_${purpose}`;
 }
 
-async function configureWebhook(apiUrl: string, apiKey: string, instanceName: string) {
-  const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-webhook`;
-  const endpoint = `${apiUrl}/webhook/set/${instanceName}`;
-
+async function configureWebhook(apiUrl: string, instanceToken: string, agencyId: string) {
+  const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-webhook?agency_id=${agencyId}`;
+  
   const payload = {
-    webhook: {
-      enabled: true,
-      url: webhookUrl,
-      byEvents: true,
-      base64: false,
-      events: [
-        'MESSAGES_UPSERT',
-        'MESSAGES_UPDATE',
-        'CONNECTION_UPDATE',
-        'SEND_MESSAGE',
-      ],
-    },
+    enabled: true,
+    url: webhookUrl,
+    events: [
+      'messages',
+      'messages_update',
+      'connection'
+    ],
+    excludeMessages: ["wasSentByApi"]
   };
 
-  console.log('[whatsapp-connect] Webhook endpoint:', endpoint);
+  console.log('[whatsapp-connect] Webhook configuration for agency:', agencyId);
 
   try {
-    const res = await fetch(endpoint, {
+    const res = await fetch(`${apiUrl}/webhook`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': apiKey },
+      headers: { 
+        'Content-Type': 'application/json', 
+        'token': instanceToken 
+      },
       body: JSON.stringify(payload),
     });
 
-    const data = await res.text();
-    console.log('[whatsapp-connect] Webhook response status:', res.status);
-
-    try {
-      return { success: res.ok, data: JSON.parse(data) };
-    } catch {
-      return { success: res.ok, data };
-    }
+    const data = await res.json();
+    console.log('[whatsapp-connect] Webhook response:', data);
+    return { success: res.ok, data };
   } catch (e) {
     console.error('[whatsapp-connect] Webhook configuration failed:', (e as Error).message);
     return { success: false, error: (e as Error).message };
@@ -92,21 +86,57 @@ serve(async (req) => {
       throw new Error('Unauthorized: admin access required');
     }
 
-    // Get centralized Evolution config
-    const { apiUrl, apiKey } = getEvolutionConfig();
+    const { apiUrl, adminToken } = getUazapiConfig();
 
     switch (action) {
       case 'connect': {
         const instanceName = generateInstanceName(agency_id, purpose);
 
-        // Save account info
+        // 1. Create instance on Uazapi
+        let instanceToken = '';
+        try {
+          const createRes = await fetch(`${apiUrl}/instance/create`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'admintoken': adminToken,
+            },
+            body: JSON.stringify({ instanceName }),
+          });
+
+          const createData = await createRes.json();
+          console.log('[whatsapp-connect] Instance create response:', createData);
+
+          if (!createRes.ok && createRes.status !== 409) {
+            throw new Error(`Uazapi API error: ${JSON.stringify(createData)}`);
+          }
+          
+          instanceToken = createData.token || createData.instance?.token;
+          
+          // If instance already exists, we might need to fetch the token if not returned
+          if (!instanceToken && createRes.status === 409) {
+             const listRes = await fetch(`${apiUrl}/instance/list`, {
+               headers: { 'admintoken': adminToken }
+             });
+             const listData = await listRes.json();
+             const existing = listData.find((inst: any) => inst.name === instanceName);
+             instanceToken = existing?.token;
+          }
+        } catch (e) {
+          console.error('[whatsapp-connect] Instance create failed:', (e as Error).message);
+          throw e;
+        }
+
+        if (!instanceToken) throw new Error('Failed to obtain instance token from Uazapi');
+
+        // 2. Save account info
         const { data: account, error: upsertError } = await supabase
           .from('whatsapp_accounts')
           .upsert({
             agency_id,
             instance_name: instanceName,
             api_url: apiUrl,
-            api_key: apiKey,
+            api_key: instanceToken, // Storing instance token here as requested
             status: 'connecting',
             purpose,
           }, { onConflict: 'agency_id,purpose' })
@@ -115,63 +145,48 @@ serve(async (req) => {
 
         if (upsertError) throw upsertError;
 
-        // Create instance on Evolution API
-        try {
-          const createRes = await fetch(`${apiUrl}/instance/create`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': apiKey,
-            },
-            body: JSON.stringify({
-              instanceName,
-              integration: 'WHATSAPP-BAILEYS',
-              qrcode: true,
-            }),
-          });
+        // 3. Configure webhook
+        await configureWebhook(apiUrl, instanceToken, agency_id);
 
-          const createData = await createRes.json();
-
-          if (!createRes.ok && createRes.status !== 409) {
-            throw new Error(`Evolution API error: ${JSON.stringify(createData)}`);
-          }
-        } catch (e) {
-          console.log('Instance create result:', (e as Error).message);
-        }
-
-        // Configure webhook automatically
-        await configureWebhook(apiUrl, apiKey, instanceName);
-
-        // Get QR code
-        const qrRes = await fetch(`${apiUrl}/instance/connect/${instanceName}`, {
-          method: 'GET',
-          headers: { 'apikey': apiKey },
+        // 4. Get QR code
+        const connectRes = await fetch(`${apiUrl}/instance/connect`, {
+          method: 'POST',
+          headers: { 'token': instanceToken },
         });
 
-        const qrData = await qrRes.json();
+        const connectData = await connectRes.json();
+        console.log('[whatsapp-connect] Connect response:', connectData);
 
-        if (qrData.base64) {
+        if (connectData.base64) {
           await supabase
             .from('whatsapp_accounts')
-            .update({ qr_code: qrData.base64, status: 'connecting' })
+            .update({ qr_code: connectData.base64, status: 'connecting' })
             .eq('id', account.id);
 
           return new Response(JSON.stringify({
             success: true,
-            qr_code: qrData.base64,
+            qr_code: connectData.base64,
             status: 'connecting',
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
         // Already connected
-        await supabase
-          .from('whatsapp_accounts')
-          .update({ status: 'connected', qr_code: null })
-          .eq('id', account.id);
+        if (connectData.status === 'connected' || connectData.message === 'Instance already connected') {
+          await supabase
+            .from('whatsapp_accounts')
+            .update({ status: 'connected', qr_code: null })
+            .eq('id', account.id);
+
+          return new Response(JSON.stringify({
+            success: true,
+            status: 'connected',
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
 
         return new Response(JSON.stringify({
           success: true,
-          status: 'connected',
+          status: 'connecting',
+          message: connectData.message
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
@@ -189,42 +204,24 @@ serve(async (req) => {
           });
         }
 
-        const effectiveUrl = account.api_url || apiUrl;
-        const effectiveKey = account.api_key || apiKey;
-        const instanceName = account.instance_name;
+        const instanceToken = account.api_key;
+        if (!instanceToken) throw new Error('No instance token found for account');
 
         try {
-          const statusRes = await fetch(
-            `${effectiveUrl}/instance/connectionState/${instanceName}`,
-            { headers: { 'apikey': effectiveKey } }
-          );
+          const statusRes = await fetch(`${apiUrl}/instance/status`, { 
+            headers: { 'token': instanceToken } 
+          });
           const statusData = await statusRes.json();
+          console.log('[whatsapp-connect] Status response:', statusData);
 
-          const isConnected = statusData?.instance?.state === 'open';
+          const isConnected = statusData?.status === 'connected';
           const newStatus = isConnected ? 'connected' : 'disconnected';
 
-          // Fetch and persist phone number when connected (Guardrail 2: strict sanitization)
           let connectedPhone: string | null = account.phone_number;
           if (isConnected && !connectedPhone) {
-            try {
-              const instRes = await fetch(
-                `${effectiveUrl}/instance/fetchInstances?instanceName=${instanceName}`,
-                { headers: { 'apikey': effectiveKey } }
-              );
-              const instData = await instRes.json();
-              const arr = Array.isArray(instData) ? instData : [instData];
-              const rawJid = arr[0]?.ownerJid
-                || arr[0]?.instance?.owner
-                || arr[0]?.owner
-                || arr[0]?.instance?.wuid
-                || arr[0]?.instance?.profileName?.id;
-
-              if (rawJid) {
-                const cleaned = String(rawJid).split('@')[0].replace(/\D/g, '');
-                if (cleaned) connectedPhone = cleaned;
-              }
-            } catch (e) {
-              console.log('[whatsapp-connect] fetchInstances failed:', (e as Error).message);
+            const rawJid = statusData?.instance?.wuid || statusData?.instance?.phone;
+            if (rawJid) {
+              connectedPhone = String(rawJid).split('@')[0].replace(/\D/g, '');
             }
           }
 
@@ -241,19 +238,14 @@ serve(async (req) => {
               .eq('id', account.id);
           }
 
-          // Re-configure webhook when connected (auto-healing)
-          if (isConnected) {
-            await configureWebhook(effectiveUrl, effectiveKey, instanceName);
-          }
-
-          // If disconnected, auto-fetch new QR code
+          // If disconnected, try to get new QR
           let qr_code = null;
           if (!isConnected) {
             try {
-              const qrRes = await fetch(
-                `${effectiveUrl}/instance/connect/${instanceName}`,
-                { headers: { 'apikey': effectiveKey } }
-              );
+              const qrRes = await fetch(`${apiUrl}/instance/connect`, {
+                method: 'POST',
+                headers: { 'token': instanceToken }
+              });
               const qrData = await qrRes.json();
               if (qrData.base64) {
                 qr_code = qrData.base64;
@@ -263,7 +255,7 @@ serve(async (req) => {
                   .eq('id', account.id);
               }
             } catch (qrErr) {
-              console.log('QR fetch error (non-critical):', (qrErr as Error).message);
+              console.log('QR fetch error:', (qrErr as Error).message);
             }
           }
 
@@ -274,11 +266,11 @@ serve(async (req) => {
             qr_code,
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         } catch (apiErr) {
-          console.log('Evolution API status check failed:', (apiErr as Error).message);
+          console.error('Uazapi status check failed:', (apiErr as Error).message);
           return new Response(JSON.stringify({
             success: true,
             status: account.status,
-            error_detail: 'Não foi possível verificar o status na Evolution API.',
+            error_detail: 'Não foi possível verificar o status na Uazapi.',
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
       }
@@ -291,14 +283,11 @@ serve(async (req) => {
           .eq('purpose', purpose)
           .single();
 
-        if (account) {
-          const effectiveUrl = account.api_url || apiUrl;
-          const effectiveKey = account.api_key || apiKey;
-
+        if (account && account.api_key) {
           try {
-            await fetch(`${effectiveUrl}/instance/logout/${account.instance_name}`, {
-              method: 'DELETE',
-              headers: { 'apikey': effectiveKey },
+            await fetch(`${apiUrl}/instance/logout`, {
+              method: 'POST',
+              headers: { 'token': account.api_key },
             });
           } catch (e) {
             console.log('Logout error (non-critical):', (e as Error).message);
@@ -323,15 +312,12 @@ serve(async (req) => {
           .eq('purpose', purpose)
           .single();
 
-        if (!account) throw new Error('No WhatsApp account found');
+        if (!account || !account.api_key) throw new Error('No valid WhatsApp account found');
 
-        const effectiveUrl = account.api_url || apiUrl;
-        const effectiveKey = account.api_key || apiKey;
-
-        const qrRes = await fetch(
-          `${effectiveUrl}/instance/connect/${account.instance_name}`,
-          { headers: { 'apikey': effectiveKey } }
-        );
+        const qrRes = await fetch(`${apiUrl}/instance/connect`, {
+          method: 'POST',
+          headers: { 'token': account.api_key }
+        });
         const qrData = await qrRes.json();
 
         if (qrData.base64) {
@@ -346,15 +332,9 @@ serve(async (req) => {
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
-        // Already connected
-        await supabase
-          .from('whatsapp_accounts')
-          .update({ status: 'connected', qr_code: null })
-          .eq('id', account.id);
-
         return new Response(JSON.stringify({
           success: true,
-          status: 'connected',
+          status: qrData.status || 'unknown',
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
@@ -366,46 +346,14 @@ serve(async (req) => {
           .eq('purpose', purpose)
           .single();
 
-        if (!account) throw new Error('No WhatsApp account found');
+        if (!account || !account.api_key) throw new Error('No valid WhatsApp account found');
 
-        const effectiveUrl = account.api_url || apiUrl;
-        const effectiveKey = account.api_key || apiKey;
-        const expectedUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/whatsapp-webhook`;
-
-        try {
-          const findRes = await fetch(
-            `${effectiveUrl}/webhook/find/${account.instance_name}`,
-            { headers: { 'apikey': effectiveKey } }
-          );
-          const findData = await findRes.json();
-
-          const currentUrl = findData?.url || findData?.webhook?.url || null;
-          const isEnabled = findData?.enabled ?? findData?.webhook?.enabled ?? false;
-          const needsReconfigure = !currentUrl || currentUrl !== expectedUrl || !isEnabled;
-
-          if (needsReconfigure) {
-            const result = await configureWebhook(effectiveUrl, effectiveKey, account.instance_name);
-            return new Response(JSON.stringify({
-              success: true,
-              action: 'reconfigured',
-              webhook_result: result,
-            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-          }
-
-          return new Response(JSON.stringify({
-            success: true,
-            action: 'already_configured',
-            webhook_url: currentUrl,
-          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-        } catch (e) {
-          console.error('[whatsapp-connect] Webhook check failed:', (e as Error).message);
-          const result = await configureWebhook(effectiveUrl, effectiveKey, account.instance_name);
-          return new Response(JSON.stringify({
-            success: true,
-            action: 'force_reconfigured',
-            webhook_result: result,
-          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-        }
+        const result = await configureWebhook(apiUrl, account.api_key, agency_id);
+        return new Response(JSON.stringify({
+          success: true,
+          action: 'reconfigured',
+          webhook_result: result,
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
       default:

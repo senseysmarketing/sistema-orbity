@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   MessageSquare, Send, Loader2, Play, Pause, Bot, 
-  WifiOff, Zap, RefreshCw
+  WifiOff, Zap, RefreshCw, Check, CheckCheck
 } from "lucide-react";
+
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
@@ -223,6 +224,18 @@ export function WhatsAppChat({ leadId, leadPhone }: WhatsAppChatProps) {
                     msg.is_from_me ? "text-green-200" : "text-muted-foreground"
                   )}>
                     {format(new Date(msg.created_at), "HH:mm", { locale: ptBR })}
+                    {msg.is_from_me && (
+                      <span className="ml-1 inline-flex items-center">
+                        {msg.status === 'read' ? (
+                          <CheckCheck className="h-3 w-3 text-blue-400" />
+                        ) : msg.status === 'delivered' ? (
+                          <CheckCheck className="h-3 w-3 text-white/70" />
+                        ) : (
+                          <Check className="h-3 w-3 text-white/70" />
+                        )}
+                      </span>
+                    )}
+
                   </p>
                 </div>
               </div>
