@@ -66,14 +66,16 @@ export function CompanyDataStep() {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       const cleanedPhone = phone.replace(/\D/g, '');
 
-      const response = await fetch('https://senseys-n8n.cloudfy.cloud/webhook/validador-orbity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanedPhone, code }),
+      const { data, error } = await supabase.functions.invoke('master-whatsapp', {
+        body: { 
+          action: 'send_message', 
+          phone: cleanedPhone, 
+          message: `Olá! O seu código de verificação do Orbity é: *${code}* 🚀` 
+        },
       });
 
-      if (!response.ok) {
-        throw new Error('Webhook failed');
+      if (error) {
+        throw new Error(error.message || 'Erro ao enviar código');
       }
 
       setGeneratedCode(code);
