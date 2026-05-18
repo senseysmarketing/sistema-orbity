@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Settings, Clock, ToggleLeft, Database } from 'lucide-react';
+import { Save, Settings, Clock, ToggleLeft, Database, MessageSquare, QrCode, RefreshCw, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface SystemConfigItem {
