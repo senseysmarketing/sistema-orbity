@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Settings, Clock, ToggleLeft, Database } from 'lucide-react';
+import { Save, Settings, Clock, ToggleLeft, Database, MessageSquare, QrCode, RefreshCw, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface SystemConfigItem {
@@ -19,7 +19,50 @@ export function SystemConfig() {
   const [configs, setConfigs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [masterWhatsapp, setMasterWhatsapp] = useState<{ status: string; qr_code?: string; phone?: string; instance?: any } | null>(null);
+  const [loadingWhatsapp, setLoadingWhatsapp] = useState(false);
   const { toast } = useToast();
+
+  const fetchMasterWhatsappStatus = async () => {
+    setLoadingWhatsapp(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('master-whatsapp', {
+        body: { action: 'status' }
+      });
+      if (error) throw error;
+      setMasterWhatsapp(data);
+    } catch (error) {
+      console.error('Error fetching master whatsapp status:', error);
+    } finally {
+      setLoadingWhatsapp(false);
+    }
+  };
+
+  const handleConnectMasterWhatsapp = async () => {
+    setLoadingWhatsapp(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('master-whatsapp', {
+        body: { action: 'connect' }
+      });
+      if (error) throw error;
+      setMasterWhatsapp(prev => ({ ...prev, ...data }));
+      if (data.qr_code) {
+        toast({
+          title: 'QR Code gerado',
+          description: 'Leia o código com seu WhatsApp para conectar.',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error connecting master whatsapp:', error);
+      toast({
+        title: 'Erro ao conectar',
+        description: error.message || 'Tente novamente em instantes',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingWhatsapp(false);
+    }
+  };
 
   const fetchConfigs = async () => {
     setLoading(true);
@@ -52,6 +95,7 @@ export function SystemConfig() {
 
   useEffect(() => {
     fetchConfigs();
+    fetchMasterWhatsappStatus();
   }, []);
 
   const saveConfig = async (key: string, value: any) => {
@@ -270,6 +314,90 @@ export function SystemConfig() {
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* WhatsApp Official Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">📱 WhatsApp Oficial do Orbity</CardTitle>
+            </div>
+            {masterWhatsapp?.status === 'connected' ? (
+              <div className="flex items-center text-green-600 text-sm font-medium bg-green-50 px-3 py-1 rounded-full border border-green-100">
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Conectado
+              </div>
+            ) : (
+              <div className="flex items-center text-red-600 text-sm font-medium bg-red-50 px-3 py-1 rounded-full border border-red-100">
+                <XCircle className="h-4 w-4 mr-2" />
+                Desconectado
+              </div>
+            )}
+          </div>
+          <CardDescription>
+            Instância mestre utilizada para disparar códigos de verificação e notificações de onboarding
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {masterWhatsapp?.qr_code && masterWhatsapp.status !== 'connected' && (
+            <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+              <div className="bg-white p-4 rounded-xl shadow-sm mb-4">
+                <img src={masterWhatsapp.qr_code} alt="QR Code" className="w-64 h-64" />
+              </div>
+              <p className="text-sm text-slate-600 mb-2">Leia o código acima com o WhatsApp do número oficial</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fetchMasterWhatsappStatus}
+                disabled={loadingWhatsapp}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loadingWhatsapp ? 'animate-spin' : ''}`} />
+                Já escaneei
+              </Button>
+            </div>
+          )}
+
+          {!masterWhatsapp?.qr_code && masterWhatsapp?.status !== 'connected' && (
+            <div className="flex flex-col items-center justify-center p-12 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+              <QrCode className="h-12 w-12 text-slate-300 mb-4" />
+              <p className="text-slate-500 mb-6">Nenhuma conexão ativa detectada</p>
+              <Button 
+                onClick={handleConnectMasterWhatsapp} 
+                disabled={loadingWhatsapp}
+                className="bg-primary hover:bg-primary/90 text-white px-8"
+              >
+                {loadingWhatsapp ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <QrCode className="h-4 w-4 mr-2" />
+                )}
+                Gerar QR Code de Conexão
+              </Button>
+            </div>
+          )}
+
+          {masterWhatsapp?.status === 'connected' && (
+            <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Número Conectado</p>
+                <p className="text-xl font-semibold text-slate-900">
+                  {masterWhatsapp.instance?.phone || 'Número Oficial'}
+                </p>
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={handleConnectMasterWhatsapp} 
+                disabled={loadingWhatsapp}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-100"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loadingWhatsapp ? 'animate-spin' : ''}`} />
+                Reconectar
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
