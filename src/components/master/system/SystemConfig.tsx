@@ -19,7 +19,50 @@ export function SystemConfig() {
   const [configs, setConfigs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [masterWhatsapp, setMasterWhatsapp] = useState<{ status: string; qr_code?: string; phone?: string } | null>(null);
+  const [loadingWhatsapp, setLoadingWhatsapp] = useState(false);
   const { toast } = useToast();
+
+  const fetchMasterWhatsappStatus = async () => {
+    setLoadingWhatsapp(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('master-whatsapp', {
+        body: { action: 'status' }
+      });
+      if (error) throw error;
+      setMasterWhatsapp(data);
+    } catch (error) {
+      console.error('Error fetching master whatsapp status:', error);
+    } finally {
+      setLoadingWhatsapp(false);
+    }
+  };
+
+  const handleConnectMasterWhatsapp = async () => {
+    setLoadingWhatsapp(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('master-whatsapp', {
+        body: { action: 'connect' }
+      });
+      if (error) throw error;
+      setMasterWhatsapp(prev => ({ ...prev, ...data }));
+      if (data.qr_code) {
+        toast({
+          title: 'QR Code gerado',
+          description: 'Leia o código com seu WhatsApp para conectar.',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error connecting master whatsapp:', error);
+      toast({
+        title: 'Erro ao conectar',
+        description: error.message || 'Tente novamente em instantes',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingWhatsapp(false);
+    }
+  };
 
   const fetchConfigs = async () => {
     setLoading(true);
