@@ -63,12 +63,29 @@ serve(async (req) => {
     // Check if user is master (if not service role)
     let isMaster = isServiceRole;
     if (user && !isMaster) {
+      // Check if user is in master_users table
       const { data: masterUser } = await supabase
         .from('master_users')
         .select('id')
         .eq('user_id', user.id)
         .single();
-      isMaster = !!masterUser;
+      
+      if (masterUser) {
+        isMaster = true;
+      } else {
+        // Fallback: Check if user is owner/admin of the MASTER_AGENCY_ID
+        const MASTER_AGENCY_ID = '7bef1258-af3d-48cc-b3a7-f79fac29c7c0';
+        const { data: agencyUser } = await supabase
+          .from('agency_users')
+          .select('role')
+          .eq('agency_id', MASTER_AGENCY_ID)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (agencyUser && (agencyUser.role === 'owner' || agencyUser.role === 'admin')) {
+          isMaster = true;
+        }
+      }
     }
 
     const { action, phone, message } = await req.json();
