@@ -19,7 +19,7 @@ export function SystemConfig() {
   const [configs, setConfigs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [masterWhatsapp, setMasterWhatsapp] = useState<{ status: string; qr_code?: string; phone?: string } | null>(null);
+  const [masterWhatsapp, setMasterWhatsapp] = useState<{ status: string; qr_code?: string; phone?: string; instance?: any } | null>(null);
   const [loadingWhatsapp, setLoadingWhatsapp] = useState(false);
   const { toast } = useToast();
 
