@@ -118,10 +118,11 @@ serve(async (req) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'apikey': adminToken,
             'admintoken': adminToken,
           },
           body: JSON.stringify({ 
-            instanceName: instanceName,
+            instanceName,
             name: instanceName,
             Name: instanceName
           }),
