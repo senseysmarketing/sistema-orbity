@@ -103,6 +103,8 @@ serve(async (req) => {
        throw new Error('Unauthorized');
     }
 
+    console.log(`[master-whatsapp] Action: ${action}, isMaster: ${isMaster}, user: ${user?.id}`);
+
     const { apiUrl, adminToken } = getUazapiConfig();
     const SETTING_KEY = 'master_whatsapp_instance';
 
