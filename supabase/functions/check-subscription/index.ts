@@ -182,6 +182,12 @@ serve(async (req) => {
     const periodStart = toIsoOrNull(activeSubscription.current_period_start);
 
     // Get plan details from database based on price ID
+    const { data: agencyWithPlan } = await supabaseClient
+      .from('agencies')
+      .select('id, name, contact_phone, welcome_message_sent_at')
+      .eq('id', agencyId)
+      .single();
+
     const { data: plan } = await supabaseClient
       .from('subscription_plans')
       .select('id, name, slug')
@@ -191,6 +197,38 @@ serve(async (req) => {
     const planName = plan?.name || 'Personalizado';
 
     logStep("Subscription details retrieved from Stripe", { priceId, planName, subscriptionEnd, trialEnd });
+
+    // Enviar mensagem de boas-vindas se for a primeira vez
+    if (activeSubscription.status === 'active' && agencyWithPlan && !agencyWithPlan.welcome_message_sent_at && agencyWithPlan.contact_phone) {
+      logStep("Enviando mensagem de boas-vindas após ativação de assinatura paga");
+      try {
+        const welcomeMessage = `🎉 *Bem-vindo ao Orbity!* Sua conta foi ativada com sucesso.
+\nAgência: ${agencyWithPlan.name}
+Plano: ${planName}
+Assinatura válida até: ${new Date(activeSubscription.current_period_end * 1000).toLocaleDateString('pt-BR')}
+\nAcesse seu painel agora mesmo para começar. 🚀`;
+
+        await supabaseClient.functions.invoke('master-whatsapp', {
+          body: {
+            action: 'send_message',
+            phone: agencyWithPlan.contact_phone,
+            message: welcomeMessage
+          }
+        });
+
+        // Mark as sent
+        await supabaseClient
+          .from('agencies')
+          .update({ welcome_message_sent_at: new Date().toISOString() })
+          .eq('id', agencyId);
+          
+        logStep("Mensagem de boas-vindas (paga) enviada com sucesso");
+      } catch (error) {
+        logStep("Erro ao enviar mensagem de boas-vindas paga (não crítico)", { 
+          error: error instanceof Error ? error.message : String(error) 
+        });
+      }
+    }
 
     // Check if local subscription exists
     const { data: existingSubscription } = await supabaseClient
