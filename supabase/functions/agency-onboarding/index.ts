@@ -226,46 +226,36 @@ serve(async (req) => {
 
     if (onboardingError) throw new Error(`Failed to create onboarding record: ${onboardingError.message}`);
 
-    // Step 8: Disparar webhook para n8n (boas-vindas) — apenas para trial
+    // Step 8: Enviar mensagem de boas-vindas via master-whatsapp
     if (flow === 'trial' || !flow) {
-      logStep("Disparando webhook para n8n (flow trial)");
+      logStep("Enviando mensagem de boas-vindas via master-whatsapp");
       try {
-        const webhookPayload = {
-          admin_name: adminUser.name,
-          admin_email: adminUser.email,
-          company_name: companyData.name,
-          company_description: companyData.description || '',
-          company_email: companyData.contactEmail,
-          company_phone: companyData.contactPhone || '',
-          agency_id: agencyId,
-          agency_slug: agencySlug,
-          plan_slug: planSlug,
-          flow: flow || 'trial',
-          trial_start: new Date().toISOString(),
-          trial_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          created_at: new Date().toISOString()
-        };
+        const welcomeMessage = `🎉 *Bem-vindo ao Orbity!* Sua conta foi ativada com sucesso.
 
-        const webhookResponse = await fetch(
-          "https://senseys-n8n.cloudfy.cloud/webhook/onboarding-orbity",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(webhookPayload)
+Agência: ${companyData.name}
+Plano: ${planSlug}
+Trial até: ${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR')}
+
+Acesse seu painel agora mesmo para começar. 🚀`;
+
+        const { data: whatsappData, error: whatsappError } = await supabaseClient.functions.invoke('master-whatsapp', {
+          body: {
+            action: 'send_message',
+            phone: companyData.contactPhone,
+            message: welcomeMessage
           }
-        );
-        
-        logStep("Webhook enviado com sucesso", { 
-          status: webhookResponse.status,
-          ok: webhookResponse.ok 
         });
-      } catch (webhookError) {
-        logStep("Erro ao enviar webhook (não crítico)", { 
-          error: webhookError instanceof Error ? webhookError.message : String(webhookError) 
+
+        if (whatsappError) throw whatsappError;
+        
+        logStep("Mensagem de boas-vindas enviada com sucesso");
+      } catch (error) {
+        logStep("Erro ao enviar mensagem de boas-vindas (não crítico)", { 
+          error: error instanceof Error ? error.message : String(error) 
         });
       }
     } else {
-      logStep("Webhook ignorado - Fluxo de assinatura direta", { flow });
+      logStep("Mensagem de boas-vindas ignorada - Fluxo de assinatura direta", { flow });
     }
 
     logStep("Onboarding completed successfully");
