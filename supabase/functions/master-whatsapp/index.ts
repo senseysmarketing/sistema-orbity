@@ -113,13 +113,18 @@ serve(async (req) => {
         const instanceName = "orbity_master_official";
 
         // 1. Create instance
+        console.log(`[master-whatsapp] Creating instance: ${instanceName} at ${apiUrl}`);
         const createRes = await fetch(`${apiUrl}/instance/create`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'admintoken': adminToken,
           },
-          body: JSON.stringify({ instanceName }),
+          body: JSON.stringify({ 
+            instanceName: instanceName,
+            name: instanceName,
+            Name: instanceName
+          }),
         });
 
         const createData = await createRes.json();
