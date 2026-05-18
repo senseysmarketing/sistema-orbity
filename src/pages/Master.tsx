@@ -7,6 +7,7 @@ import { AgenciesTable } from '@/components/master/AgenciesTable';
 
 import { MasterAnalytics } from '@/components/master/MasterAnalytics';
 import { OrbityLeadsTable } from '@/components/master/OrbityLeadsTable';
+import { MasterSystem } from '@/components/master/MasterSystem';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Building2, Settings, UserPlus } from 'lucide-react';
@@ -77,12 +78,7 @@ export default function Master() {
         </TabsContent>
 
         <TabsContent value="system" className="space-y-6">
-          <div className="p-8 border-2 border-dashed border-muted rounded-lg text-center">
-            <Settings className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium text-muted-foreground">Configurações do Sistema</h3>
-            <p className="text-sm text-muted-foreground">Logs, configurações globais e administração avançada</p>
-            <p className="text-sm text-muted-foreground mt-2">Em desenvolvimento</p>
-          </div>
+          <MasterSystem />
         </TabsContent>
       </Tabs>
     </div>
