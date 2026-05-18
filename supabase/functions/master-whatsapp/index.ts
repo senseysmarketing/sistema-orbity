@@ -113,13 +113,19 @@ serve(async (req) => {
         const instanceName = "orbity_master_official";
 
         // 1. Create instance
+        console.log(`[master-whatsapp] Creating instance: ${instanceName} at ${apiUrl}`);
         const createRes = await fetch(`${apiUrl}/instance/create`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'apikey': adminToken,
             'admintoken': adminToken,
           },
-          body: JSON.stringify({ instanceName }),
+          body: JSON.stringify({ 
+            instanceName,
+            name: instanceName,
+            Name: instanceName
+          }),
         });
 
         const createData = await createRes.json();
@@ -134,7 +140,10 @@ serve(async (req) => {
         // If instance already exists, fetch token
         if (!instanceToken && createRes.status === 409) {
           const listRes = await fetch(`${apiUrl}/instance/list`, {
-            headers: { 'admintoken': adminToken }
+            headers: { 
+              'apikey': adminToken,
+              'admintoken': adminToken 
+            }
           });
           const listData = await listRes.json();
           const existing = listData.find((inst: any) => inst.name === instanceName);
@@ -162,6 +171,11 @@ serve(async (req) => {
         const connectRes = await fetch(`${apiUrl}/instance/connect`, {
           method: 'POST',
           headers: { 'token': instanceToken },
+          body: JSON.stringify({ 
+            instanceName,
+            name: instanceName,
+            Name: instanceName
+          }),
         });
 
         const connectData = await connectRes.json();
