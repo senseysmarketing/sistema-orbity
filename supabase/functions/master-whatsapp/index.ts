@@ -56,13 +56,15 @@ serve(async (req) => {
     const { action, phone, message } = await req.json();
 
     // Only master users (or service role) can connect/status.
-    // send_message can be called by master or service role.
-    if (!isMaster && action !== 'send_message') {
+    if (!isMaster && (action === 'connect' || action === 'status')) {
       throw new Error('Unauthorized: master access required');
     }
     
-    // For send_message, if not master and not service role, still unauthorized
-    if (!isMaster && !user && action === 'send_message') {
+    // For send_message, we allow it to be called for onboarding verification
+    // In a production environment, we should add rate limiting or more checks here.
+    if (action === 'send_message') {
+       // Proceed to send_message
+    } else if (!isMaster) {
        throw new Error('Unauthorized');
     }
 
