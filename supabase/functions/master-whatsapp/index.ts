@@ -140,7 +140,10 @@ serve(async (req) => {
         // If instance already exists, fetch token
         if (!instanceToken && createRes.status === 409) {
           const listRes = await fetch(`${apiUrl}/instance/list`, {
-            headers: { 'admintoken': adminToken }
+            headers: { 
+              'apikey': adminToken,
+              'admintoken': adminToken 
+            }
           });
           const listData = await listRes.json();
           const existing = listData.find((inst: any) => inst.name === instanceName);
