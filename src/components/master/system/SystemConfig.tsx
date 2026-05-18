@@ -95,6 +95,7 @@ export function SystemConfig() {
 
   useEffect(() => {
     fetchConfigs();
+    fetchMasterWhatsappStatus();
   }, []);
 
   const saveConfig = async (key: string, value: any) => {
