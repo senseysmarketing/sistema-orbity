@@ -6464,6 +6464,24 @@ export type Database = {
         }
         Relationships: []
       }
+      system_settings: {
+        Row: {
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       task_approval_items: {
         Row: {
           approval_id: string
