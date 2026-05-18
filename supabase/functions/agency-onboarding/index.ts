@@ -248,6 +248,12 @@ Acesse seu painel agora mesmo para começar. 🚀`;
 
         if (whatsappError) throw whatsappError;
         
+        // Mark as sent
+        await supabaseClient
+          .from('agencies')
+          .update({ welcome_message_sent_at: new Date().toISOString() })
+          .eq('id', agencyId);
+          
         logStep("Mensagem de boas-vindas enviada com sucesso");
       } catch (error) {
         logStep("Erro ao enviar mensagem de boas-vindas (não crítico)", { 
@@ -255,7 +261,7 @@ Acesse seu painel agora mesmo para começar. 🚀`;
         });
       }
     } else {
-      logStep("Mensagem de boas-vindas ignorada - Fluxo de assinatura direta", { flow });
+      logStep("Mensagem de boas-vindas será enviada após o checkout", { flow });
     }
 
     logStep("Onboarding completed successfully");
