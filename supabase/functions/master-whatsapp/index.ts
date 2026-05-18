@@ -14,10 +14,28 @@ function getUazapiConfig() {
 }
 
 function normalizeBrazilPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  const clean = digits.startsWith('0') ? digits.slice(1) : digits;
-  if (clean.length <= 11) return '55' + clean;
-  return clean;
+  // Remove tudo que não é dígito
+  let digits = phone.replace(/\D/g, '');
+  
+  // Remove o zero à esquerda se existir
+  if (digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+
+  // Se não tem DDI (55), adiciona
+  if (digits.length <= 11 && !digits.startsWith('55')) {
+    digits = '55' + digits;
+  }
+
+  // Regra específica: DDI + DDD + número sem o 9 (para números de 13 dígitos como 5511988887777)
+  // Alguns provedores preferem 12 dígitos (removendo o 9 extra do Brasil)
+  if (digits.length === 13 && digits.startsWith('55')) {
+    // 55 (0,1) + DD (2,3) + 9 (4) + rest (5-12)
+    // Retorna 55 + DD + rest
+    return digits.slice(0, 4) + digits.slice(5);
+  }
+
+  return digits;
 }
 
 serve(async (req) => {
