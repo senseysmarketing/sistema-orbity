@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useLocation } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,9 @@ import authBackground from "@/assets/auth-background-new.png";
 
 export default function Auth() {
   const { user, loading, signIn } = useAuth();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
+  const redirectTo = (location.state as { from?: string } | null)?.from || "/dashboard";
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState("");
@@ -25,7 +27,7 @@ export default function Auth() {
     );
   }
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={redirectTo} replace />;
   }
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

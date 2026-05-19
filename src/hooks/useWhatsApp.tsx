@@ -178,6 +178,11 @@ export function useWhatsApp(purpose: string = 'general') {
       if (!data?.success) throw new Error(data?.error || 'Send failed');
       return data;
     },
+    onSuccess: (data, params) => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-conversation', account?.id, params.lead_id] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', data?.conversation_id || params.conversation_id] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-automation', account?.id, params.lead_id] });
+    },
     onError: (error: Error) => {
       toast({ title: 'Erro ao enviar mensagem', description: error.message, variant: 'destructive' });
     },
@@ -441,7 +446,11 @@ export function useWhatsApp(purpose: string = 'general') {
     onSuccess: (data) => {
       if (data?.synced > 0) {
         queryClient.invalidateQueries({ queryKey: ['whatsapp-messages'] });
+        queryClient.invalidateQueries({ queryKey: ['whatsapp-conversation'] });
       }
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao sincronizar mensagens', description: error.message, variant: 'destructive' });
     },
   });
 

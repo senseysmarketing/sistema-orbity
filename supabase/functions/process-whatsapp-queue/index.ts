@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { assertOptionalSecret, HttpError } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,12 @@ const MIN_INTERVAL_MS = 120_000;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [30_000, 120_000, 300_000]; // 30s, 2min, 5min
 const RATE_LIMIT_DELAY_MS = 1_000; // 1s between sends
+
+type InsertOnlyClient = {
+  from: (table: string) => {
+    insert: (payload: Record<string, unknown>) => Promise<unknown>;
+  };
+};
 
 interface SendingSchedule {
   enabled: boolean;
@@ -35,7 +42,7 @@ function getNextAllowedTime(schedule: SendingSchedule, baseTime: Date): Date {
 
   const utcNow = baseTime.getTime();
   const spNow = dateObj.getTime();
-  let candidate = new Date(dateObj);
+  const candidate = new Date(dateObj);
 
   if (isDayAllowed && hour < schedule.start_hour) {
     candidate.setHours(schedule.start_hour, 0, 0, 0);
@@ -53,11 +60,11 @@ function getNextAllowedTime(schedule: SendingSchedule, baseTime: Date): Date {
 }
 
 async function logAutomationEvent(
-  supabase: any,
+  supabase: InsertOnlyClient,
   automationId: string | null,
   accountId: string | null,
   event: string,
-  details: Record<string, any> = {}
+  details: Record<string, unknown> = {}
 ) {
   try {
     await supabase.from('whatsapp_automation_logs').insert({
@@ -81,6 +88,8 @@ serve(async (req) => {
   }
 
   try {
+    assertOptionalSecret(req, 'WHATSAPP_QUEUE_SECRET');
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -233,7 +242,7 @@ serve(async (req) => {
 
           if (customerReplyTime > referenceTime) {
             // Also fix conversation_id if it was pointing to the wrong conversation
-            const updates: Record<string, any> = {
+            const updates: Record<string, string> = {
               status: 'responded',
               conversation_state: 'customer_replied',
             };
@@ -489,7 +498,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('[process-queue] Error:', error);
     return new Response(JSON.stringify({ success: false, error: (error as Error).message }), {
-      status: 500,
+      status: error instanceof HttpError ? error.status : 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
