@@ -60,7 +60,7 @@ serve(async (req) => {
 
     const { apiUrl, adminToken } = getUazapiConfig();
 
-    if (action === 'connect') {
+    if (action === 'connect' || action === 'refresh_qr') {
       const instanceName = generateInstanceName(agency_id, purpose);
       
       // Step A: Check agency_integrations for existing token
