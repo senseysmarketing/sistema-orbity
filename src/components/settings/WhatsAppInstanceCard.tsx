@@ -46,9 +46,10 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
     }
   }, [account, autoChecked]);
 
-  // Poll status when connecting
+  // Poll status when connecting (Polling inteligente 3s)
   useEffect(() => {
-    if (account?.status === 'connecting' || qrCode) {
+    // Regra Anti-Flicker: Manter QR enquanto status for connecting
+    if ((account?.status === 'connecting' || qrCode) && !isConnected) {
       const interval = setInterval(async () => {
         try {
           const result = await checkStatus.mutateAsync();
@@ -56,17 +57,16 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
             setQrCode(null);
             setConnectionError(false);
           } else if (result?.qr_code) {
+            // Só atualiza se o QR code mudar, evitando flicker desnecessário
             setQrCode(result.qr_code);
           }
-          // Se result?.qr_code for null, mantemos o qrCode atual no estado
         } catch {
-          // Não definimos erro de conexão aqui para não interromper o polling visualmente
           console.log("Polling status check failed");
         }
-      }, 5000);
+      }, 3000);
       return () => clearInterval(interval);
     }
-  }, [account?.status, qrCode]);
+  }, [account?.status, qrCode, isConnected]);
 
   // Load QR from account
   useEffect(() => {
