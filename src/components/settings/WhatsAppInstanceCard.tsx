@@ -39,7 +39,9 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
         if (result?.qr_code) {
           setQrCode(result.qr_code);
         }
-      }).catch(() => { setConnectionError(true); });
+      }).catch(() => { 
+        setConnectionError(true); 
+      });
     }
   }, [account, autoChecked]);
 
@@ -55,8 +57,10 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
           } else if (result?.qr_code) {
             setQrCode(result.qr_code);
           }
+          // Se result?.qr_code for null, mantemos o qrCode atual no estado
         } catch {
-          setConnectionError(true);
+          // Não definimos erro de conexão aqui para não interromper o polling visualmente
+          console.log("Polling status check failed");
         }
       }, 5000);
       return () => clearInterval(interval);

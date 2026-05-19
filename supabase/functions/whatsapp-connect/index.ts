@@ -165,21 +165,23 @@ serve(async (req) => {
         const connectData = await connectRes.json();
         console.log('[whatsapp-connect] Connect response:', connectData);
 
-        if (connectData.base64) {
+        const qrCode = connectData.base64 || connectData.qr_code || connectData.qrcode || (connectData.instance?.qrcode);
+
+        if (qrCode) {
           await supabase
             .from('whatsapp_accounts')
-            .update({ qr_code: connectData.base64, status: 'connecting' })
+            .update({ qr_code: qrCode, status: 'connecting' })
             .eq('id', account.id);
 
           return new Response(JSON.stringify({
             success: true,
-            qr_code: connectData.base64,
+            qr_code: qrCode,
             status: 'connecting',
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
         // Already connected
-        if (connectData.status === 'connected' || connectData.message === 'Instance already connected') {
+        if (connectData.status === 'connected' || connectData.message?.includes('already connected')) {
           await supabase
             .from('whatsapp_accounts')
             .update({ status: 'connected', qr_code: null })
@@ -194,6 +196,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({
           success: true,
           status: 'connecting',
+          qr_code: account.qr_code, // Return previously stored QR if any
           message: connectData.message
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -222,8 +225,12 @@ serve(async (req) => {
           const statusData = await statusRes.json();
           console.log('[whatsapp-connect] Status response:', statusData);
 
-          const isConnected = statusData?.status === 'connected';
-          const newStatus = isConnected ? 'connected' : 'disconnected';
+          const rawStatus = statusData?.status || 'disconnected';
+          const isConnected = rawStatus === 'connected';
+          
+          // Only map to 'disconnected' if Uazapi explicitly says so or if it's not 'connecting'/'qr'
+          const connectingStates = ['connecting', 'qr', 'initializing', 'initializing...'];
+          const newStatus = isConnected ? 'connected' : (connectingStates.includes(rawStatus) ? 'connecting' : 'disconnected');
 
           let connectedPhone: string | null = account.phone_number;
           if (isConnected && !connectedPhone) {
@@ -246,8 +253,8 @@ serve(async (req) => {
               .eq('id', account.id);
           }
 
-          // If disconnected, try to get new QR
-          let qr_code = null;
+          // If not connected, try to get new QR
+          let qr_code = account.qr_code;
           if (!isConnected) {
             try {
               const qrRes = await fetch(`${apiUrl}/instance/connect`, {
@@ -255,11 +262,13 @@ serve(async (req) => {
                 headers: { 'token': instanceToken }
               });
               const qrData = await qrRes.json();
-              if (qrData.base64) {
-                qr_code = qrData.base64;
+              const newQr = qrData.base64 || qrData.qr_code || qrData.qrcode || (qrData.instance?.qrcode);
+              
+              if (newQr) {
+                qr_code = newQr;
                 await supabase
                   .from('whatsapp_accounts')
-                  .update({ qr_code: qrData.base64, status: 'connecting' })
+                  .update({ qr_code: newQr, status: 'connecting' })
                   .eq('id', account.id);
               }
             } catch (qrErr) {
@@ -269,7 +278,7 @@ serve(async (req) => {
 
           return new Response(JSON.stringify({
             success: true,
-            status: isConnected ? 'connected' : 'connecting',
+            status: newStatus,
             phone_number: connectedPhone,
             qr_code,
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

@@ -32,15 +32,23 @@ export function MasterSystem() {
   const { toast } = useToast();
 
   const fetchMasterWhatsappStatus = async () => {
-    setLoadingWhatsapp(true);
+    // Somente mostra loading se ainda não tivermos um QR code ou status
+    if (!masterWhatsapp?.qr_code && masterWhatsapp?.status !== 'connected') {
+      setLoadingWhatsapp(true);
+    }
+    
     try {
       const { data, error } = await supabase.functions.invoke('master-whatsapp', {
         body: { action: 'status' }
       });
       if (error) throw error;
-      setMasterWhatsapp({
-        ...data,
-        qr_code: data.qr_code || data.qrcode || (data.instance?.qrcode)
+      
+      setMasterWhatsapp(prev => {
+        const newQr = data.qr_code || data.qrcode || (data.instance?.qrcode);
+        return {
+          ...data,
+          qr_code: newQr || prev?.qr_code // Preserva o QR anterior se o novo for null
+        };
       });
     } catch (error) {
       console.error('Error fetching master whatsapp status:', error);
@@ -56,12 +64,15 @@ export function MasterSystem() {
         body: { action: 'connect' }
       });
       if (error) throw error;
+      
+      const newQr = data.qr_code || data.qrcode || (data.instance?.qrcode);
       setMasterWhatsapp(prev => ({ 
         ...prev, 
         ...data,
-        qr_code: data.qr_code || data.qrcode || (data.instance?.qrcode)
+        qr_code: newQr || prev?.qr_code
       }));
-      if (data.qr_code) {
+      
+      if (newQr) {
         toast({
           title: 'QR Code gerado',
           description: 'Leia o código com seu WhatsApp para conectar.',
