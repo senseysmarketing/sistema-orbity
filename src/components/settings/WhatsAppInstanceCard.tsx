@@ -77,6 +77,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
 
   const handleConnect = async () => {
     try {
+      setIsGenerating(true);
       setConnectionError(false);
       const result = await connect.mutateAsync();
       if (result?.qr_code) {
@@ -84,6 +85,8 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
       }
     } catch {
       setConnectionError(true);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
