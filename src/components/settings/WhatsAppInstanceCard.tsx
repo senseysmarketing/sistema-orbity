@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +15,17 @@ interface WhatsAppInstanceCardProps {
   description: string;
 }
 
+const getQrImageSrc = (qrCode: string) => {
+  if (qrCode.startsWith('data:') || /^https?:\/\//i.test(qrCode)) return qrCode;
+  return `data:image/png;base64,${qrCode}`;
+};
+
 export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppInstanceCardProps) => {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [autoChecked, setAutoChecked] = useState(false);
-  const [connectionError, setConnectionError] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const pollingStartedAtRef = useRef<number | null>(null);
 
   const {
     account,
@@ -40,24 +46,40 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
       checkStatus.mutateAsync().then((result) => {
         if (result?.qr_code) {
           setQrCode(result.qr_code);
+          setConnectionError(null);
+        } else if (result?.error && result?.status === 'disconnected') {
+          setConnectionError(result.error);
         }
-      }).catch(() => { 
-        setConnectionError(true); 
+      }).catch((error: Error) => { 
+        setConnectionError(error.message || 'Erro ao verificar status da conexão.'); 
       });
     }
   }, [account, autoChecked]);
 
-  // Polling de Status (2s) - Hard Reset Refactor
+  // Polling de Status (2s) - finaliza se conectar ou se a API não entregar QR em até 45s.
   useEffect(() => {
     if (!isConnected && (account?.status === 'connecting' || qrCode)) {
+      if (!pollingStartedAtRef.current) pollingStartedAtRef.current = Date.now();
+
       const interval = setInterval(async () => {
         try {
           const result = await checkStatus.mutateAsync();
           if (result?.status === 'connected') {
             setQrCode(null);
-            setConnectionError(false);
+            setConnectionError(null);
+            pollingStartedAtRef.current = null;
           } else if (result?.qr_code) {
             setQrCode(result.qr_code);
+            setConnectionError(null);
+          } else if (result?.status === 'disconnected' && result?.error) {
+            setQrCode(null);
+            setConnectionError(result.error);
+            pollingStartedAtRef.current = null;
+          }
+
+          if (pollingStartedAtRef.current && Date.now() - pollingStartedAtRef.current > 45_000 && !qrCode) {
+            setConnectionError('A Uazapi não retornou o QR Code dentro do tempo esperado. Clique em Atualizar QR Code ou Resetar Conexão.');
+            pollingStartedAtRef.current = null;
           }
         } catch (err) {
           console.error("Polling status check failed:", err);
@@ -65,25 +87,37 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
       }, 2000);
       return () => clearInterval(interval);
     }
+
+    pollingStartedAtRef.current = null;
   }, [account?.status, qrCode, isConnected]);
 
   // Load QR from account
   useEffect(() => {
     if (account?.qr_code && !isConnected) {
       setQrCode(account.qr_code);
+      setConnectionError(null);
     }
-  }, [account]);
+  }, [account, isConnected]);
 
   const handleConnect = async () => {
     try {
       setIsGenerating(true);
-      setConnectionError(false);
+      setConnectionError(null);
+      setQrCode(null);
+      pollingStartedAtRef.current = Date.now();
       const result = await connect.mutateAsync();
       if (result?.qr_code) {
         setQrCode(result.qr_code);
+        setConnectionError(null);
+      } else if (result?.status === 'connected') {
+        setQrCode(null);
+        setConnectionError(null);
+      } else if (result?.error) {
+        setConnectionError(result.error);
       }
-    } catch {
-      setConnectionError(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao iniciar conexão.';
+      setConnectionError(message);
     } finally {
       setIsGenerating(false);
     }
@@ -91,22 +125,36 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
 
   const handleRefreshQR = async () => {
     try {
+      setConnectionError(null);
       const result = await refreshQR.mutateAsync();
       if (result?.qr_code) {
         setQrCode(result.qr_code);
+        setConnectionError(null);
       } else if (result?.status === 'connected') {
         setQrCode(null);
+        setConnectionError(null);
+      } else if (result?.error) {
+        setQrCode(null);
+        setConnectionError(result.error);
       }
-    } catch {}
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao atualizar QR Code.';
+      setConnectionError(message);
+    }
   };
 
   const handleHardReset = async () => {
     if (confirm("Deseja realmente apagar todos os tokens e resetar a conexão? Isso forçará a geração de um novo QR Code.")) {
       try {
         setQrCode(null);
+        setConnectionError(null);
+        pollingStartedAtRef.current = null;
         await hardReset.mutateAsync();
         setAutoChecked(false);
-      } catch {}
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Erro ao resetar conexão.';
+        setConnectionError(message);
+      }
     }
   };
 
@@ -121,7 +169,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
   }
 
   const isConnecting = account?.status === 'connecting' || isGenerating || connect.isPending;
-  const showQrCode = qrCode && !isConnected;
+  const showQrCode = !!qrCode && !isConnected;
   const showConnectButton = !isConnected && !showQrCode && !isConnecting;
 
   const IconComponent = purpose === 'billing' ? CreditCard : MessageSquare;
@@ -249,38 +297,36 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                 
                 {showQrCode && (
                   <div className="flex flex-col items-center gap-3 animate-in zoom-in-95 duration-300">
-                    {connectionError ? (
-                      <Alert variant="destructive" className="w-full">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertDescription>
-                          Erro ao conectar. Tente novamente ou realize um reset de conexão.
-                        </AlertDescription>
-                      </Alert>
-                    ) : (
-                      <>
-                        <p className="text-sm font-medium flex items-center gap-2 text-foreground/80">
-                          <QrCode className="h-4 w-4" />
-                          Escaneie o QR Code no WhatsApp
-                        </p>
-                        <div className="relative group">
-                          {refreshQR.isPending && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[1px] z-10 rounded-lg transition-all">
-                              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                            </div>
-                          )}
-                          <img
-                            src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`}
-                            alt="WhatsApp QR Code"
-                            className="w-[250px] h-[250px] rounded-lg shadow-md border bg-white p-2"
-                          />
-                        </div>
-                      </>
-                    )}
+                    <>
+                      <p className="text-sm font-medium flex items-center gap-2 text-foreground/80">
+                        <QrCode className="h-4 w-4" />
+                        Escaneie o QR Code no WhatsApp
+                      </p>
+                      <div className="relative group">
+                        {refreshQR.isPending && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[1px] z-10 rounded-lg transition-all">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                          </div>
+                        )}
+                        <img
+                          src={getQrImageSrc(qrCode)}
+                          alt="WhatsApp QR Code"
+                          className="w-[250px] h-[250px] rounded-lg shadow-md border bg-white p-2"
+                        />
+                      </div>
+                    </>
                   </div>
+                )}
+
+                {connectionError && (
+                  <Alert variant="destructive" className="w-full max-w-md">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{connectionError}</AlertDescription>
+                  </Alert>
                 )}
                 
                 <div className="flex flex-wrap gap-2 justify-center mt-2">
-                  {(showQrCode || account?.status === 'connecting') && (
+                  {(showQrCode || account?.status === 'connecting' || connectionError) && (
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -335,9 +381,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                 {connectionError && (
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      Erro ao conectar. Tente novamente ou use o reset.
-                    </AlertDescription>
+                    <AlertDescription>{connectionError}</AlertDescription>
                   </Alert>
                 )}
 
