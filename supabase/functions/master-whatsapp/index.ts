@@ -1,357 +1,429 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  createOrGetInstance,
+  connectInstance,
+  getInstanceStatus,
+  disconnectInstance,
+  deleteInstance,
+  parseQrCode,
+  parseStatus,
+  parsePhoneNumber,
+  sendText,
+  parseSendResponse,
+  getUazapiConfig,
+} from "../_shared/uazapi.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-function getUazapiConfig() {
-  const apiUrl = (Deno.env.get('UAZAPI_SERVER_URL') || '').replace(/\/$/, '');
-  const adminToken = Deno.env.get('UAZAPI_ADMIN_TOKEN') || '';
-  if (!apiUrl || !adminToken) throw new Error('Uazapi API not configured (missing UAZAPI_SERVER_URL or UAZAPI_ADMIN_TOKEN)');
-  return { apiUrl, adminToken };
+const SETTING_KEY = 'master_whatsapp_instance';
+const INSTANCE_NAME = 'orbity_master_official';
+const MASTER_AGENCY_ID = '7bef1258-af3d-48cc-b3a7-f79fac29c7c0';
+
+type Status = 'disconnected' | 'provisioning' | 'qr_pending' | 'connected' | 'error';
+
+interface State {
+  provider: 'uazapi';
+  instance_name: string;
+  token: string | null;
+  status: Status;
+  provider_status: string | null;
+  phone_number: string | null;
+  qr_code: string | null;
+  last_error: string | null;
+  last_checked_at: string | null;
+  connected_at: string | null;
+  updated_at: string;
+}
+
+const DEFAULT_STATE: State = {
+  provider: 'uazapi',
+  instance_name: INSTANCE_NAME,
+  token: null,
+  status: 'disconnected',
+  provider_status: null,
+  phone_number: null,
+  qr_code: null,
+  last_error: null,
+  last_checked_at: null,
+  connected_at: null,
+  updated_at: new Date(0).toISOString(),
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+function publicState(s: State) {
+  return {
+    status: s.status,
+    qr_code: s.qr_code,
+    phone_number: s.phone_number,
+    error: s.last_error,
+    provider_status: s.provider_status,
+    last_checked_at: s.last_checked_at,
+    connected_at: s.connected_at,
+    instance_name: s.instance_name,
+  };
 }
 
 function normalizeBrazilPhone(phone: string): string {
-  // Remove tudo que não é dígito
   let digits = phone.replace(/\D/g, '');
-  
-  // Remove o zero à esquerda se existir
-  if (digits.startsWith('0')) {
-    digits = digits.slice(1);
-  }
-
-  // Se não tem DDI (55), adiciona
-  if (digits.length <= 11 && !digits.startsWith('55')) {
-    digits = '55' + digits;
-  }
-
-  // Regra específica: DDI + DDD + número sem o 9 (para números de 13 dígitos como 5511988887777)
-  // Alguns provedores preferem 12 dígitos (removendo o 9 extra do Brasil)
+  if (digits.startsWith('0')) digits = digits.slice(1);
+  if (digits.length <= 11 && !digits.startsWith('55')) digits = '55' + digits;
   if (digits.length === 13 && digits.startsWith('55')) {
-    // 55 (0,1) + DD (2,3) + 9 (4) + rest (5-12)
-    // Retorna 55 + DD + rest
     return digits.slice(0, 4) + digits.slice(5);
   }
-
   return digits;
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+
+  async function loadState(): Promise<State> {
+    const { data } = await supabase
+      .from('system_config')
+      .select('value')
+      .eq('key', SETTING_KEY)
+      .maybeSingle();
+    let v: any = data?.value;
+    if (typeof v === 'string') {
+      try { v = JSON.parse(v); } catch { v = null; }
+    }
+    if (!v || typeof v !== 'object') return { ...DEFAULT_STATE };
+    return { ...DEFAULT_STATE, ...v };
+  }
+
+  async function saveState(patch: Partial<State>, current?: State): Promise<State> {
+    const base = current ?? (await loadState());
+    const next: State = {
+      ...base,
+      ...patch,
+      updated_at: new Date().toISOString(),
+      last_checked_at: new Date().toISOString(),
+    };
+    await supabase
+      .from('system_config')
+      .upsert({ key: SETTING_KEY, value: JSON.stringify(next), updated_at: next.updated_at }, { onConflict: 'key' });
+    return next;
+  }
+
+  async function logEntry(entry: {
+    action: string;
+    phone_number?: string | null;
+    status: 'success' | 'error';
+    error_message?: string | null;
+    provider_status?: string | null;
+    provider_message_id?: string | null;
+    metadata?: Record<string, unknown>;
+  }) {
+    try {
+      await supabase.from('master_whatsapp_logs').insert({
+        action: entry.action,
+        phone_number: entry.phone_number ?? null,
+        status: entry.status,
+        error_message: entry.error_message ?? null,
+        provider_status: entry.provider_status ?? null,
+        provider_message_id: entry.provider_message_id ?? null,
+        metadata: entry.metadata ?? {},
+      });
+    } catch (e) {
+      console.error('[master-whatsapp] Failed to log entry:', (e as Error).message);
+    }
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const body = await req.json().catch(() => ({}));
+    const action: string = body?.action ?? '';
 
-    const authHeader = req.headers.get('Authorization');
-    const isServiceRole = authHeader?.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'never-match');
-    
-    let user = null;
-    if (authHeader && !isServiceRole) {
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(
-        authHeader.replace('Bearer ', '')
-      );
-      if (authError) throw authError;
-      user = authUser;
-    }
+    // ── Authorization ────────────────────────────────────────────────
+    const authHeader = req.headers.get('Authorization') || '';
+    const token = authHeader.replace('Bearer ', '');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '__none__';
+    const isServiceRole = !!token && token === serviceKey;
 
-    // Check if user is master (if not service role)
+    let userId: string | null = null;
     let isMaster = isServiceRole;
-    if (user && !isMaster) {
-      // Check if user is in master_users table
-      const { data: masterUser } = await supabase
-        .from('master_users')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-      
-      if (masterUser) {
-        isMaster = true;
-      } else {
-        // Fallback: Check if user is owner/admin of the MASTER_AGENCY_ID
-        const MASTER_AGENCY_ID = '7bef1258-af3d-48cc-b3a7-f79fac29c7c0';
-        const { data: agencyUser } = await supabase
-          .from('agency_users')
-          .select('role')
-          .eq('agency_id', MASTER_AGENCY_ID)
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        if (agencyUser && (agencyUser.role === 'owner' || agencyUser.role === 'admin')) {
+
+    if (!isServiceRole && token) {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (user) {
+        userId = user.id;
+        const { data: masterUser } = await supabase
+          .from('master_users').select('id').eq('user_id', user.id).maybeSingle();
+        if (masterUser) {
           isMaster = true;
+        } else {
+          const { data: au } = await supabase
+            .from('agency_users').select('role')
+            .eq('agency_id', MASTER_AGENCY_ID).eq('user_id', user.id).maybeSingle();
+          if (au && (au.role === 'owner' || au.role === 'admin')) isMaster = true;
         }
       }
     }
 
-    const { action, phone, message } = await req.json();
-
-    // Only master users (or service role) can connect/status.
-    if (!isMaster && (action === 'connect' || action === 'status')) {
-      throw new Error('Unauthorized: master access required');
+    const masterActions = new Set(['debug_health', 'connect', 'status', 'refresh_qr', 'disconnect', 'hard_reset']);
+    if (masterActions.has(action) && !isMaster) {
+      return json({ success: false, error: 'Unauthorized: master access required' }, 403);
     }
-    
-    // For send_message, we allow it to be called for onboarding verification
-    // In a production environment, we should add rate limiting or more checks here.
-    if (action === 'send_message') {
-       // Proceed to send_message
-    } else if (!isMaster) {
-       throw new Error('Unauthorized');
+    if (action === 'send_message' && !userId && !isServiceRole) {
+      return json({ success: false, error: 'Unauthorized' }, 401);
     }
 
-    console.log(`[master-whatsapp] Action: ${action}, isMaster: ${isMaster}, user: ${user?.id}`);
+    console.log(`[master-whatsapp] Action: ${action}, isMaster: ${isMaster}, user: ${userId}`);
 
-    const { apiUrl, adminToken } = getUazapiConfig();
-    const SETTING_KEY = 'master_whatsapp_instance';
-    const TABLE_NAME = 'system_config';
+    // ── Helpers ──────────────────────────────────────────────────────
+    async function performConnect(): Promise<State> {
+      let state = await loadState();
+      state = await saveState({ status: 'provisioning', last_error: null }, state);
 
+      const { token: tk, lastResponse } = await createOrGetInstance(INSTANCE_NAME, {
+        agencyId: 'orbity_master',
+        purpose: 'master_official',
+      });
+
+      if (!tk) {
+        const err = lastResponse?.data?.error || `Falha ao criar instância (HTTP ${lastResponse?.status})`;
+        await logEntry({ action: 'connect', status: 'error', error_message: err });
+        return await saveState({ status: 'error', last_error: err, token: null, qr_code: null }, state);
+      }
+
+      state = await saveState({ token: tk }, state);
+
+      const connectRes = await connectInstance(tk);
+      const qr = parseQrCode(connectRes.data);
+      const parsed = parseStatus(connectRes.data, !!qr);
+      const phone = parsePhoneNumber(connectRes.data);
+
+      if (parsed.domain === 'connected') {
+        const next = await saveState({
+          status: 'connected',
+          provider_status: parsed.raw,
+          phone_number: phone,
+          qr_code: null,
+          last_error: null,
+          connected_at: state.connected_at || new Date().toISOString(),
+        }, state);
+        await logEntry({ action: 'connect', status: 'success', provider_status: parsed.raw, metadata: { result: 'already_connected' } });
+        return next;
+      }
+
+      if (qr) {
+        const next = await saveState({
+          status: 'qr_pending',
+          provider_status: parsed.raw,
+          qr_code: qr,
+          last_error: null,
+        }, state);
+        await logEntry({ action: 'connect', status: 'success', provider_status: parsed.raw, metadata: { result: 'qr' } });
+        return next;
+      }
+
+      const errMsg = 'Uazapi não retornou QR Code. Tente novamente ou use Hard Reset.';
+      await logEntry({ action: 'connect', status: 'error', provider_status: parsed.raw, error_message: errMsg });
+      return await saveState({
+        status: 'error',
+        provider_status: parsed.raw,
+        qr_code: null,
+        last_error: errMsg,
+      }, state);
+    }
+
+    async function performStatus(): Promise<State> {
+      let state = await loadState();
+      if (!state.token) {
+        return await saveState({
+          status: 'disconnected', qr_code: null, phone_number: null, last_error: null, provider_status: null,
+        }, state);
+      }
+
+      const res = await getInstanceStatus(state.token);
+      if (!res.ok && (res.status === 401 || res.status === 404)) {
+        const err = 'Instância inválida no provedor. Use Hard Reset para recriar.';
+        return await saveState({ status: 'error', last_error: err, provider_status: null }, state);
+      }
+
+      const qr = parseQrCode(res.data);
+      const parsed = parseStatus(res.data, !!qr);
+      const phone = parsePhoneNumber(res.data);
+
+      if (parsed.domain === 'connected') {
+        return await saveState({
+          status: 'connected',
+          provider_status: parsed.raw,
+          phone_number: phone || state.phone_number,
+          qr_code: null,
+          last_error: null,
+          connected_at: state.connected_at || new Date().toISOString(),
+        }, state);
+      }
+
+      if (parsed.domain === 'qr_pending' && qr) {
+        return await saveState({
+          status: 'qr_pending', provider_status: parsed.raw, qr_code: qr, last_error: null,
+        }, state);
+      }
+
+      if (parsed.domain === 'provisioning') {
+        return await saveState({
+          status: 'provisioning', provider_status: parsed.raw, qr_code: null, last_error: null,
+        }, state);
+      }
+
+      return await saveState({
+        status: 'disconnected',
+        provider_status: parsed.raw,
+        qr_code: null,
+        phone_number: null,
+        last_error: null,
+        connected_at: null,
+      }, state);
+    }
+
+    // ── Dispatch ─────────────────────────────────────────────────────
     switch (action) {
-      case 'connect': {
-        const instanceName = "orbity_master_official";
-
-        // 1. Create instance
-        console.log(`[master-whatsapp] Creating instance: ${instanceName} at ${apiUrl}`);
-        const createRes = await fetch(`${apiUrl}/instance/create`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': adminToken,
-            'admintoken': adminToken,
-          },
-          body: JSON.stringify({ 
-            instanceName,
-            name: instanceName,
-            Name: instanceName
-          }),
-        });
-
-        const createData = await createRes.json();
-        console.log('[master-whatsapp] Instance create response:', createData);
-
-        let instanceToken = createData.token || createData.instance?.token;
-
-        if (!createRes.ok && createRes.status !== 409) {
-          throw new Error(`Uazapi API error: ${JSON.stringify(createData)}`);
+      case 'debug_health': {
+        let cfg: any = null;
+        try { cfg = getUazapiConfig(); } catch (e) { cfg = { error: (e as Error).message }; }
+        const state = await loadState();
+        let providerPing: any = null;
+        if (state.token) {
+          const r = await getInstanceStatus(state.token);
+          providerPing = { ok: r.ok, status: r.status, data: r.data };
         }
-
-        // If instance already exists, fetch token
-        if (!instanceToken && createRes.status === 409) {
-          const listRes = await fetch(`${apiUrl}/instance/list`, {
-            headers: { 
-              'apikey': adminToken,
-              'admintoken': adminToken 
-            }
-          });
-          const listData = await listRes.json();
-          const existing = listData.find((inst: any) => 
-            inst.name === instanceName || 
-            inst.instanceName === instanceName || 
-            inst.Name === instanceName
-          );
-          instanceToken = existing?.token;
-        }
-
-        if (!instanceToken) throw new Error('Failed to obtain instance token');
-
-        // 2. Save to system_config
-        const { error: upsertError } = await supabase
-          .from(TABLE_NAME)
-          .upsert({
-            key: SETTING_KEY,
-            value: JSON.stringify({
-              instance_name: instanceName,
-              token: instanceToken,
-              status: 'connecting',
-              updated_at: new Date().toISOString()
-            })
-          });
-
-        if (upsertError) throw upsertError;
-
-        // 3. Get QR Code
-        const connectRes = await fetch(`${apiUrl}/instance/connect`, {
-          method: 'GET',
-          headers: { 'token': instanceToken },
-        });
-
-        const connectData = await connectRes.json();
-        console.log('[master-whatsapp] Connect response:', connectData);
-
-        const qr_code = connectData.base64 || connectData.qrcode || connectData.qr_code || (connectData.instance?.qrcode);
-
-        return new Response(JSON.stringify({
+        return json({
           success: true,
-          qr_code: qr_code,
-          status: connectData.status || (qr_code ? 'connecting' : 'disconnected'),
-          message: connectData.message
-        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          config_ok: !!cfg?.apiUrl && !!cfg?.adminToken,
+          api_url: cfg?.apiUrl ?? null,
+          state: { ...state, token: state.token ? '***' : null },
+          provider_ping: providerPing,
+        });
+      }
+
+      case 'connect':
+      case 'refresh_qr': {
+        const state = await performConnect();
+        return json({ success: true, ...publicState(state) });
       }
 
       case 'status': {
-        const { data: setting } = await supabase
-          .from(TABLE_NAME)
-          .select('value')
-          .eq('key', SETTING_KEY)
-          .single();
-
-        let settingValue = setting?.value;
-        if (typeof settingValue === 'string') {
-          try {
-            settingValue = JSON.parse(settingValue);
-          } catch (e) {
-            console.error('Error parsing setting value:', e);
-          }
-        }
-
-        if (!settingValue?.token) {
-          return new Response(JSON.stringify({ success: true, status: 'disconnected' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-
-        const instanceToken = settingValue.token;
-        const statusRes = await fetch(`${apiUrl}/instance/status`, { 
-          headers: { 'token': instanceToken } 
-        });
-        const statusData = await statusRes.json();
-        
-        const rawStatus = statusData?.status || 'disconnected';
-        const isConnected = rawStatus === 'connected';
-        const connectingStates = ['connecting', 'qr', 'initializing', 'initializing...'];
-        const currentStatus = isConnected ? 'connected' : (connectingStates.includes(rawStatus) ? 'connecting' : 'disconnected');
-        
-        // Update status in settings if changed
-        if (currentStatus !== settingValue.status) {
-          await supabase
-            .from(TABLE_NAME)
-            .update({
-              value: JSON.stringify({ ...settingValue, status: currentStatus })
-            })
-            .eq('key', SETTING_KEY);
-        }
-
-        // If not connected, try to get new QR
-        let qr_code = null;
-        if (!isConnected) {
-          try {
-            const qrRes = await fetch(`${apiUrl}/instance/connect`, {
-              method: 'GET',
-              headers: { 'token': instanceToken }
-            });
-            const qrData = await qrRes.json();
-            qr_code = qrData.base64 || qrData.qrcode || qrData.qr_code || (qrData.instance?.qrcode);
-          } catch (qrErr) {
-            console.log('[master-whatsapp] QR fetch error:', (qrErr as Error).message);
-          }
-        }
-
-        return new Response(JSON.stringify({
-          success: true,
-          status: currentStatus,
-          instance: statusData?.instance,
-          qr_code: qr_code || statusData?.qrcode || statusData?.qr_code,
-        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-
-      case 'send_message': {
-        if (!phone || !message) throw new Error('Missing phone or message');
-
-        const { data: setting } = await supabase
-          .from(TABLE_NAME)
-          .select('value')
-          .eq('key', SETTING_KEY)
-          .single();
-
-        let settingValue = setting?.value;
-        if (typeof settingValue === 'string') {
-          try {
-            settingValue = JSON.parse(settingValue);
-          } catch (e) {
-            console.error('Error parsing setting value:', e);
-          }
-        }
-
-        if (!settingValue?.token) throw new Error('Master WhatsApp instance not configured');
-
-        const instanceToken = settingValue.token;
-        const formattedPhone = normalizeBrazilPhone(phone);
-
-        const sendRes = await fetch(`${apiUrl}/send/text`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'token': instanceToken,
-          },
-          body: JSON.stringify({
-            number: formattedPhone,
-            text: message,
-          }),
-        });
-
-        const sendData = await sendRes.json();
-        if (!sendRes.ok) throw new Error(`Uazapi send error: ${JSON.stringify(sendData)}`);
-
-        return new Response(JSON.stringify({ success: true, data: sendData }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        const state = await performStatus();
+        return json({ success: true, ...publicState(state) });
       }
 
       case 'disconnect': {
-        const { data: setting } = await supabase
-          .from(TABLE_NAME)
-          .select('value')
-          .eq('key', SETTING_KEY)
-          .single();
+        let state = await loadState();
+        if (state.token) {
+          await disconnectInstance(state.token);
+        }
+        state = await saveState({
+          status: 'disconnected',
+          qr_code: null,
+          phone_number: null,
+          last_error: null,
+          connected_at: null,
+          provider_status: null,
+        }, state);
+        await logEntry({ action: 'disconnect', status: 'success' });
+        return json({ success: true, ...publicState(state) });
+      }
 
-        let settingValue = setting?.value;
-        if (typeof settingValue === 'string') {
-          try {
-            settingValue = JSON.parse(settingValue);
-          } catch (e) {
-            console.error('Error parsing setting value:', e);
-          }
+      case 'hard_reset': {
+        let state = await loadState();
+        if (state.token) {
+          try { await deleteInstance(state.token); } catch { /* ignore */ }
+        }
+        state = await saveState({
+          token: null,
+          status: 'disconnected',
+          qr_code: null,
+          phone_number: null,
+          provider_status: null,
+          last_error: null,
+          connected_at: null,
+        }, state);
+        await logEntry({ action: 'hard_reset', status: 'success' });
+        return json({ success: true, ...publicState(state) });
+      }
+
+      case 'send_message': {
+        const phone: string = body?.phone || body?.phone_number || '';
+        const message: string = body?.message || '';
+        const context: string = body?.context || 'generic';
+        if (!phone || !message) {
+          return json({ success: false, error: 'Missing phone or message' }, 400);
         }
 
-        if (settingValue?.token) {
-          try {
-            await fetch(`${apiUrl}/instance/logout`, {
-              method: 'POST',
-              headers: { 'token': settingValue.token },
-              body: JSON.stringify({ 
-                instanceName: settingValue.instance_name || "orbity_master_official",
-                name: settingValue.instance_name || "orbity_master_official",
-                Name: settingValue.instance_name || "orbity_master_official"
-              }),
-            });
-          } catch (e) {
-            console.log('[master-whatsapp] Logout error (non-critical):', (e as Error).message);
-          }
+        let state = await loadState();
 
-          await supabase
-            .from(TABLE_NAME)
-            .update({
-              value: JSON.stringify({ ...settingValue, status: 'disconnected', token: null })
-            })
-            .eq('key', SETTING_KEY);
+        // Stale (>60s) → refresh
+        const stale = !state.last_checked_at || (Date.now() - new Date(state.last_checked_at).getTime() > 60_000);
+        if (stale) {
+          state = await performStatus();
         }
 
-        return new Response(JSON.stringify({ success: true, status: 'disconnected' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        if (!state.token || state.status !== 'connected') {
+          const err = 'WhatsApp oficial Orbity desconectado. Reconecte no Painel Master.';
+          await logEntry({
+            action: 'send_message',
+            phone_number: phone,
+            status: 'error',
+            error_message: err,
+            provider_status: state.status,
+            metadata: { context },
+          });
+          return json({ success: false, error: err, status: state.status }, 409);
+        }
+
+        const number = normalizeBrazilPhone(phone);
+        const sendRes = await sendText({ api_key: state.token }, { number, text: message });
+        const parsed = parseSendResponse(sendRes.raw);
+
+        if (!sendRes.ok) {
+          const err = sendRes.error || `Falha no envio (HTTP ${sendRes.status})`;
+          await logEntry({
+            action: 'send_message',
+            phone_number: number,
+            status: 'error',
+            error_message: err,
+            provider_status: parsed.status,
+            metadata: { context, http_status: sendRes.status },
+          });
+          return json({ success: false, error: err }, 502);
+        }
+
+        await logEntry({
+          action: 'send_message',
+          phone_number: number,
+          status: 'success',
+          provider_status: parsed.status,
+          provider_message_id: sendRes.messageId,
+          metadata: { context },
+        });
+
+        return json({
+          success: true,
+          provider_message_id: sendRes.messageId,
+          status: parsed.status,
         });
       }
 
       default:
-        throw new Error(`Unknown action: ${action}`);
+        return json({ success: false, error: `Unknown action: ${action}` }, 400);
     }
   } catch (error) {
     console.error('[master-whatsapp] Error:', error);
-    return new Response(JSON.stringify({ success: false, error: (error as Error).message }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ success: false, error: (error as Error).message }, 500);
   }
 });

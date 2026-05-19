@@ -3615,6 +3615,42 @@ export type Database = {
           },
         ]
       }
+      master_whatsapp_logs: {
+        Row: {
+          action: string
+          created_at: string
+          error_message: string | null
+          id: string
+          metadata: Json
+          phone_number: string | null
+          provider_message_id: string | null
+          provider_status: string | null
+          status: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          phone_number?: string | null
+          provider_message_id?: string | null
+          provider_status?: string | null
+          status?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          phone_number?: string | null
+          provider_message_id?: string | null
+          provider_status?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       meeting_calendar_events: {
         Row: {
           calendar_id: string | null
