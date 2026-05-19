@@ -111,7 +111,7 @@ serve(async (req) => {
     const instance = instanceName || body?.instance;
 
     // Filter 0: Anti-Loop / fromMe
-    if (data?.key?.fromMe === true) return new Response("Ignored", { status: 200 });
+    if (data?.key?.fromMe === true) return new Response("OK", { status: 200 });
 
     if (!event || !instance) return new Response('ok');
 
