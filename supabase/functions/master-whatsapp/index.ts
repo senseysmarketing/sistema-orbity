@@ -147,7 +147,11 @@ serve(async (req) => {
             }
           });
           const listData = await listRes.json();
-          const existing = listData.find((inst: any) => inst.name === instanceName);
+          const existing = listData.find((inst: any) => 
+            inst.name === instanceName || 
+            inst.instanceName === instanceName || 
+            inst.Name === instanceName
+          );
           instanceToken = existing?.token;
         }
 
@@ -229,10 +233,33 @@ serve(async (req) => {
             .eq('key', SETTING_KEY);
         }
 
+        // If disconnected, try to get new QR
+        let qr_code = null;
+        if (!isConnected) {
+          try {
+            const qrRes = await fetch(`${apiUrl}/instance/connect`, {
+              method: 'POST',
+              headers: { 'token': instanceToken },
+              body: JSON.stringify({ 
+                instanceName,
+                name: instanceName,
+                Name: instanceName
+              }),
+            });
+            const qrData = await qrRes.json();
+            if (qrData.base64) {
+              qr_code = qrData.base64;
+            }
+          } catch (qrErr) {
+            console.log('[master-whatsapp] QR fetch error:', (qrErr as Error).message);
+          }
+        }
+
         return new Response(JSON.stringify({
           success: true,
           status: statusData?.status || 'disconnected',
-          instance: statusData?.instance
+          instance: statusData?.instance,
+          qr_code
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
@@ -275,6 +302,50 @@ serve(async (req) => {
         if (!sendRes.ok) throw new Error(`Uazapi send error: ${JSON.stringify(sendData)}`);
 
         return new Response(JSON.stringify({ success: true, data: sendData }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      case 'disconnect': {
+        const { data: setting } = await supabase
+          .from(TABLE_NAME)
+          .select('value')
+          .eq('key', SETTING_KEY)
+          .single();
+
+        let settingValue = setting?.value;
+        if (typeof settingValue === 'string') {
+          try {
+            settingValue = JSON.parse(settingValue);
+          } catch (e) {
+            console.error('Error parsing setting value:', e);
+          }
+        }
+
+        if (settingValue?.token) {
+          try {
+            await fetch(`${apiUrl}/instance/logout`, {
+              method: 'POST',
+              headers: { 'token': settingValue.token },
+              body: JSON.stringify({ 
+                instanceName: settingValue.instance_name || "orbity_master_official",
+                name: settingValue.instance_name || "orbity_master_official",
+                Name: settingValue.instance_name || "orbity_master_official"
+              }),
+            });
+          } catch (e) {
+            console.log('[master-whatsapp] Logout error (non-critical):', (e as Error).message);
+          }
+
+          await supabase
+            .from(TABLE_NAME)
+            .update({
+              value: JSON.stringify({ ...settingValue, status: 'disconnected', token: null })
+            })
+            .eq('key', SETTING_KEY);
+        }
+
+        return new Response(JSON.stringify({ success: true, status: 'disconnected' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }

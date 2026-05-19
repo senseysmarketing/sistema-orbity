@@ -103,7 +103,8 @@ serve(async (req) => {
             },
             body: JSON.stringify({ 
               name: instanceName,
-              instanceName: instanceName 
+              instanceName: instanceName,
+              Name: instanceName
             }),
           });
 
@@ -122,7 +123,11 @@ serve(async (req) => {
                headers: { 'admintoken': adminToken }
              });
              const listData = await listRes.json();
-             const existing = listData.find((inst: any) => inst.name === instanceName);
+             const existing = listData.find((inst: any) => 
+               inst.name === instanceName || 
+               inst.instanceName === instanceName || 
+               inst.Name === instanceName
+             );
              instanceToken = existing?.token;
           }
         } catch (e) {
@@ -155,6 +160,11 @@ serve(async (req) => {
         const connectRes = await fetch(`${apiUrl}/instance/connect`, {
           method: 'POST',
           headers: { 'token': instanceToken },
+          body: JSON.stringify({ 
+            instanceName,
+            name: instanceName,
+            Name: instanceName
+          }),
         });
 
         const connectData = await connectRes.json();
@@ -247,7 +257,12 @@ serve(async (req) => {
             try {
               const qrRes = await fetch(`${apiUrl}/instance/connect`, {
                 method: 'POST',
-                headers: { 'token': instanceToken }
+                headers: { 'token': instanceToken },
+                body: JSON.stringify({ 
+                  instanceName: account.instance_name,
+                  name: account.instance_name,
+                  Name: account.instance_name
+                }),
               });
               const qrData = await qrRes.json();
               if (qrData.base64) {
@@ -291,6 +306,11 @@ serve(async (req) => {
             await fetch(`${apiUrl}/instance/logout`, {
               method: 'POST',
               headers: { 'token': account.api_key },
+              body: JSON.stringify({ 
+                instanceName: account.instance_name,
+                name: account.instance_name,
+                Name: account.instance_name
+              }),
             });
           } catch (e) {
             console.log('Logout error (non-critical):', (e as Error).message);
@@ -319,7 +339,12 @@ serve(async (req) => {
 
         const qrRes = await fetch(`${apiUrl}/instance/connect`, {
           method: 'POST',
-          headers: { 'token': account.api_key }
+          headers: { 'token': account.api_key },
+          body: JSON.stringify({ 
+            instanceName: account.instance_name,
+            name: account.instance_name,
+            Name: account.instance_name
+          }),
         });
         const qrData = await qrRes.json();
 
