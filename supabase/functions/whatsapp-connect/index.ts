@@ -252,7 +252,12 @@ serve(async (req) => {
             try {
               const qrRes = await fetch(`${apiUrl}/instance/connect`, {
                 method: 'POST',
-                headers: { 'token': instanceToken }
+                headers: { 'token': instanceToken },
+                body: JSON.stringify({ 
+                  instanceName: account.instance_name,
+                  name: account.instance_name,
+                  Name: account.instance_name
+                }),
               });
               const qrData = await qrRes.json();
               if (qrData.base64) {
@@ -324,7 +329,12 @@ serve(async (req) => {
 
         const qrRes = await fetch(`${apiUrl}/instance/connect`, {
           method: 'POST',
-          headers: { 'token': account.api_key }
+          headers: { 'token': account.api_key },
+          body: JSON.stringify({ 
+            instanceName: account.instance_name,
+            name: account.instance_name,
+            Name: account.instance_name
+          }),
         });
         const qrData = await qrRes.json();
 
