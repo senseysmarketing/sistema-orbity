@@ -131,7 +131,7 @@ export function MasterSystem() {
   }, []);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: any;
     
     if (masterWhatsapp?.status === 'connecting' || (!masterWhatsapp?.status && loadingWhatsapp)) {
       interval = setInterval(() => {
