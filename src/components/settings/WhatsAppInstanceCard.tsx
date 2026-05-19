@@ -111,8 +111,9 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
     );
   }
 
+  const isConnecting = account?.status === 'connecting' || isGenerating || connect.isPending;
   const showQrCode = qrCode && !isConnected;
-  const showConnectButton = !isConnected && !showQrCode && !isGenerating;
+  const showConnectButton = !isConnected && !showQrCode && !isConnecting;
 
   const IconComponent = purpose === 'billing' ? CreditCard : MessageSquare;
   const iconBgClass = purpose === 'billing'
@@ -225,20 +226,21 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
           </>
         ) : (
           <div className="space-y-4">
-            {(showQrCode || isGenerating || connect.isPending) && (
-              <div className="flex flex-col items-center gap-3 p-4 border rounded-lg bg-muted/30">
-                {(isGenerating || connect.isPending) && !qrCode && (
-                  <div className="flex flex-col items-center justify-center py-8 gap-4">
-                    <Skeleton className="w-[250px] h-[250px] rounded-lg" />
+            {(showQrCode || isGenerating || connect.isPending || account?.status === 'connecting') && (
+              <div className="flex flex-col items-center gap-3 p-4 border rounded-lg bg-muted/30 min-h-[350px] justify-center transition-all duration-300">
+                {/* Loader state when we have no QR yet but are connecting/generating */}
+                {((isGenerating || connect.isPending || account?.status === 'connecting') && !qrCode) && (
+                  <div className="flex flex-col items-center justify-center py-8 gap-4 animate-in fade-in duration-500">
+                    <Skeleton className="w-[250px] h-[250px] rounded-lg bg-muted-foreground/10" />
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Gerando QR Code...
+                      Estabelecendo conexão segura...
                     </div>
                   </div>
                 )}
                 
                 {showQrCode && (
-                  <>
+                  <div className="flex flex-col items-center gap-3 animate-in zoom-in-95 duration-300">
                     {connectionError ? (
                       <Alert variant="destructive" className="w-full">
                         <AlertTriangle className="h-4 w-4" />
@@ -248,38 +250,46 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                       </Alert>
                     ) : (
                       <>
-                        <p className="text-sm font-medium flex items-center gap-2">
+                        <p className="text-sm font-medium flex items-center gap-2 text-foreground/80">
                           <QrCode className="h-4 w-4" />
                           Escaneie o QR Code no WhatsApp
                         </p>
-                        <div className="relative">
+                        <div className="relative group">
                           {refreshQR.isPending && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-10 rounded-lg">
+                            <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-[1px] z-10 rounded-lg transition-all">
                               <Loader2 className="h-8 w-8 animate-spin text-primary" />
                             </div>
                           )}
                           <img
                             src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`}
                             alt="WhatsApp QR Code"
-                            className="w-[250px] h-[250px] rounded-lg shadow-sm"
+                            className="w-[250px] h-[250px] rounded-lg shadow-md border bg-white p-2"
                           />
                         </div>
                       </>
                     )}
-                  </>
+                  </div>
                 )}
                 
-                <Button variant="outline" size="sm" onClick={handleRefreshQR} disabled={refreshQR.isPending}>
-                  {refreshQR.isPending ? (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="mr-1 h-4 w-4" />
-                  )}
-                  Atualizar QR
-                </Button>
+                {(showQrCode || account?.status === 'connecting') && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleRefreshQR} 
+                    disabled={refreshQR.isPending}
+                    className="mt-2 transition-all hover:bg-muted"
+                  >
+                    {refreshQR.isPending ? (
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-1 h-4 w-4" />
+                    )}
+                    Atualizar QR Code
+                  </Button>
+                )}
                 
                 {showQrCode && !connectionError && (
-                  <p className="text-xs text-muted-foreground text-center">
+                  <p className="text-[11px] text-muted-foreground text-center max-w-[250px] leading-relaxed">
                     Abra o WhatsApp {'>'} Configurações {'>'} Dispositivos conectados {'>'} Conectar dispositivo
                   </p>
                 )}
