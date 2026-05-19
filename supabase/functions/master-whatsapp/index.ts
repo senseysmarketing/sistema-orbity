@@ -188,7 +188,7 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({
           success: true,
-          qr_code: connectData.base64,
+          qr_code: connectData.base64 || connectData.qrcode,
           status: connectData.status || 'connecting',
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
@@ -259,7 +259,7 @@ serve(async (req) => {
           success: true,
           status: statusData?.status || 'disconnected',
           instance: statusData?.instance,
-          qr_code
+          qr_code: qr_code || statusData?.qrcode,
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
