@@ -48,20 +48,21 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
 
   // Poll status when connecting (Polling inteligente 3s)
   useEffect(() => {
-    // Regra Anti-Flicker: Manter QR enquanto status for connecting
-    if ((account?.status === 'connecting' || qrCode) && !isConnected) {
+    // Regra Anti-Flicker: Manter QR enquanto status for connecting ou enquanto tivermos um QR code mas não estivermos conectados
+    if (!isConnected && (account?.status === 'connecting' || qrCode)) {
       const interval = setInterval(async () => {
         try {
           const result = await checkStatus.mutateAsync();
+          // Só entramos em connected se a API retornar explicitamente status: 'connected'
           if (result?.status === 'connected') {
             setQrCode(null);
             setConnectionError(false);
           } else if (result?.qr_code) {
-            // Só atualiza se o QR code mudar, evitando flicker desnecessário
+            // Só atualiza se o QR code for retornado, mantendo o anterior caso contrário (Anti-Flicker)
             setQrCode(result.qr_code);
           }
-        } catch {
-          console.log("Polling status check failed");
+        } catch (err) {
+          console.error("Polling status check failed:", err);
         }
       }, 3000);
       return () => clearInterval(interval);
@@ -226,7 +227,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
           </>
         ) : (
           <div className="space-y-4">
-            {(showQrCode || isGenerating || connect.isPending || account?.status === 'connecting') && (
+            {(showQrCode || isGenerating || connect.isPending || account?.status === 'connecting') ? (
               <div className="flex flex-col items-center gap-3 p-4 border rounded-lg bg-muted/30 min-h-[350px] justify-center transition-all duration-300">
                 {/* Loader state when we have no QR yet but are connecting/generating */}
                 {((isGenerating || connect.isPending || account?.status === 'connecting') && !qrCode) && (
@@ -294,7 +295,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                   </p>
                 )}
               </div>
-            )}
+            ) : null}
 
             {showConnectButton && !connect.isPending && (
               <>
