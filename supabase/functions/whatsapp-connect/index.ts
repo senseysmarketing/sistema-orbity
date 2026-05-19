@@ -103,7 +103,8 @@ serve(async (req) => {
             },
             body: JSON.stringify({ 
               name: instanceName,
-              instanceName: instanceName 
+              instanceName: instanceName,
+              Name: instanceName
             }),
           });
 
@@ -122,7 +123,11 @@ serve(async (req) => {
                headers: { 'admintoken': adminToken }
              });
              const listData = await listRes.json();
-             const existing = listData.find((inst: any) => inst.name === instanceName);
+             const existing = listData.find((inst: any) => 
+               inst.name === instanceName || 
+               inst.instanceName === instanceName || 
+               inst.Name === instanceName
+             );
              instanceToken = existing?.token;
           }
         } catch (e) {
