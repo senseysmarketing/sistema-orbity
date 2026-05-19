@@ -52,22 +52,23 @@ export function useWhatsAppConnection(purpose: 'general' | 'billing' = 'general'
     refetchOnWindowFocus: false,
   });
 
-  const mutate = (action: Exclude<Action, 'status' | 'debug_health'>, opts?: { successMsg?: string }) =>
-    useMutation({
+  function makeMutation(action: Exclude<Action, 'status' | 'debug_health'>, successMsg?: string) {
+    return {
       mutationFn: () => invoke(action),
-      onSuccess: (data) => {
+      onSuccess: (data: WhatsAppConnectionState) => {
         queryClient.setQueryData(queryKey, data);
-        if (opts?.successMsg) toast({ title: opts.successMsg });
+        if (successMsg) toast({ title: successMsg });
       },
       onError: (e: Error) => {
         toast({ title: 'Erro', description: e.message, variant: 'destructive' });
       },
-    });
+    };
+  }
 
-  const connect = mutate('connect');
-  const refreshQr = mutate('refresh_qr');
-  const disconnect = mutate('disconnect', { successMsg: 'WhatsApp desconectado' });
-  const hardReset = mutate('hard_reset', { successMsg: 'Conexão resetada' });
+  const connect = useMutation(makeMutation('connect'));
+  const refreshQr = useMutation(makeMutation('refresh_qr'));
+  const disconnect = useMutation(makeMutation('disconnect', 'WhatsApp desconectado'));
+  const hardReset = useMutation(makeMutation('hard_reset', 'Conexão resetada'));
 
   return {
     state: query.data ?? { status: 'disconnected' as const, qr_code: null, phone_number: null, error: null },
