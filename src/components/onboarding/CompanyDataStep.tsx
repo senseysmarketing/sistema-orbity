@@ -74,7 +74,7 @@ export function CompanyDataStep() {
         .eq('key', 'whatsapp_verification_template')
         .maybeSingle();
       
-      let messageTemplate = configData?.value ? JSON.parse(configData.value) : \"Para finalizar seu acesso à Orbity, use o código: {code}\";
+      let messageTemplate = configData?.value ? JSON.parse(configData.value) : "Para finalizar seu acesso à Orbity, use o código: {code}";
       const message = messageTemplate.replace('{code}', code);
 
       const { data, error } = await supabase.functions.invoke('master-whatsapp', {
