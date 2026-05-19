@@ -181,10 +181,13 @@ serve(async (req) => {
         const connectData = await connectRes.json();
         console.log('[master-whatsapp] Connect response:', connectData);
 
+        const qr_code = connectData.base64 || connectData.qrcode || connectData.qr_code || (connectData.instance?.qrcode);
+
         return new Response(JSON.stringify({
           success: true,
-          qr_code: connectData.base64 || connectData.qrcode,
-          status: connectData.status || 'connecting',
+          qr_code: qr_code,
+          status: connectData.status || (qr_code ? 'connecting' : 'disconnected'),
+          message: connectData.message
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
@@ -216,19 +219,22 @@ serve(async (req) => {
         });
         const statusData = await statusRes.json();
         
-        const isConnected = statusData?.status === 'connected';
+        const rawStatus = statusData?.status || 'disconnected';
+        const isConnected = rawStatus === 'connected';
+        const connectingStates = ['connecting', 'qr', 'initializing', 'initializing...'];
+        const currentStatus = isConnected ? 'connected' : (connectingStates.includes(rawStatus) ? 'connecting' : 'disconnected');
         
         // Update status in settings if changed
-        if (isConnected && settingValue.status !== 'connected') {
+        if (currentStatus !== settingValue.status) {
           await supabase
             .from(TABLE_NAME)
             .update({
-              value: JSON.stringify({ ...settingValue, status: 'connected' })
+              value: JSON.stringify({ ...settingValue, status: currentStatus })
             })
             .eq('key', SETTING_KEY);
         }
 
-        // If disconnected, try to get new QR
+        // If not connected, try to get new QR
         let qr_code = null;
         if (!isConnected) {
           try {
@@ -237,9 +243,7 @@ serve(async (req) => {
               headers: { 'token': instanceToken }
             });
             const qrData = await qrRes.json();
-            if (qrData.base64) {
-              qr_code = qrData.base64;
-            }
+            qr_code = qrData.base64 || qrData.qrcode || qrData.qr_code || (qrData.instance?.qrcode);
           } catch (qrErr) {
             console.log('[master-whatsapp] QR fetch error:', (qrErr as Error).message);
           }
@@ -247,9 +251,9 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({
           success: true,
-          status: statusData?.status || 'disconnected',
+          status: currentStatus,
           instance: statusData?.instance,
-          qr_code: qr_code || statusData?.qrcode,
+          qr_code: qr_code || statusData?.qrcode || statusData?.qr_code,
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
