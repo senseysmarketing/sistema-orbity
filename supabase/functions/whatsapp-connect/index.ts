@@ -155,6 +155,11 @@ serve(async (req) => {
         const connectRes = await fetch(`${apiUrl}/instance/connect`, {
           method: 'POST',
           headers: { 'token': instanceToken },
+          body: JSON.stringify({ 
+            instanceName,
+            name: instanceName,
+            Name: instanceName
+          }),
         });
 
         const connectData = await connectRes.json();
