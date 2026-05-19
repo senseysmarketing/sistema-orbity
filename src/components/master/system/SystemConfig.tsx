@@ -30,7 +30,10 @@ export function SystemConfig() {
         body: { action: 'status' }
       });
       if (error) throw error;
-      setMasterWhatsapp(data);
+      setMasterWhatsapp({
+        ...data,
+        qr_code: data.qr_code || data.qrcode || (data.instance?.qrcode)
+      });
     } catch (error) {
       console.error('Error fetching master whatsapp status:', error);
     } finally {
@@ -45,7 +48,11 @@ export function SystemConfig() {
         body: { action: 'connect' }
       });
       if (error) throw error;
-      setMasterWhatsapp(prev => ({ ...prev, ...data }));
+      setMasterWhatsapp(prev => ({ 
+        ...prev, 
+        ...data,
+        qr_code: data.qr_code || data.qrcode || (data.instance?.qrcode)
+      }));
       if (data.qr_code) {
         toast({
           title: 'QR Code gerado',
