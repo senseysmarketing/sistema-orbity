@@ -155,13 +155,6 @@ export type Database = {
             foreignKeyName: "admin_notes_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "admin_notes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -947,21 +940,7 @@ export type Database = {
             foreignKeyName: "agency_users_invited_by_fkey"
             columns: ["invited_by"]
             isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "agency_users_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "agency_users_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "master_users"
             referencedColumns: ["user_id"]
           },
           {
@@ -1512,13 +1491,6 @@ export type Database = {
             foreignKeyName: "client_credentials_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "client_credentials_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -1600,13 +1572,6 @@ export type Database = {
             foreignKeyName: "client_files_uploaded_by_fkey"
             columns: ["uploaded_by"]
             isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "client_files_uploaded_by_fkey"
-            columns: ["uploaded_by"]
-            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -1671,13 +1636,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "client_notes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "client_notes_created_by_fkey"
@@ -2169,13 +2127,6 @@ export type Database = {
             foreignKeyName: "content_plans_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "content_plans_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -2410,13 +2361,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "contracts_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "contracts_created_by_fkey"
@@ -2985,6 +2929,13 @@ export type Database = {
             columns: ["connection_id"]
             isOneToOne: false
             referencedRelation: "facebook_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "facebook_lead_integrations_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "master_facebook_connections"
             referencedColumns: ["id"]
           },
         ]
@@ -3609,6 +3560,61 @@ export type Database = {
         }
         Relationships: []
       }
+      master_system_logs: {
+        Row: {
+          agency_id: string | null
+          created_at: string | null
+          description: string
+          details: string | null
+          id: string
+          log_type: string
+          metadata: Json | null
+          status: string
+        }
+        Insert: {
+          agency_id?: string | null
+          created_at?: string | null
+          description: string
+          details?: string | null
+          id?: string
+          log_type: string
+          metadata?: Json | null
+          status: string
+        }
+        Update: {
+          agency_id?: string | null
+          created_at?: string | null
+          description?: string
+          details?: string | null
+          id?: string
+          log_type?: string
+          metadata?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_system_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "agencies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_system_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_overview"
+            referencedColumns: ["agency_id"]
+          },
+          {
+            foreignKeyName: "master_system_logs_agency_id_fkey"
+            columns: ["agency_id"]
+            isOneToOne: false
+            referencedRelation: "master_agency_usage"
+            referencedColumns: ["agency_id"]
+          },
+        ]
+      }
       meeting_calendar_events: {
         Row: {
           calendar_id: string | null
@@ -3828,13 +3834,6 @@ export type Database = {
             foreignKeyName: "meetings_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "meetings_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -3844,13 +3843,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "leads"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "meetings_organizer_id_fkey"
-            columns: ["organizer_id"]
-            isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "meetings_organizer_id_fkey"
@@ -5757,6 +5749,13 @@ export type Database = {
             referencedRelation: "facebook_connections"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "selected_ad_accounts_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "master_facebook_connections"
+            referencedColumns: ["id"]
+          },
         ]
       }
       social_media_approval_rules: {
@@ -6467,21 +6466,24 @@ export type Database = {
         }
         Relationships: []
       }
-      system_settings: {
+      system_config: {
         Row: {
+          description: string | null
           key: string
           updated_at: string | null
-          value: Json
+          value: string
         }
         Insert: {
+          description?: string | null
           key: string
           updated_at?: string | null
-          value?: Json
+          value: string
         }
         Update: {
+          description?: string | null
           key?: string
           updated_at?: string | null
-          value?: Json
+          value?: string
         }
         Relationships: []
       }
@@ -6791,13 +6793,6 @@ export type Database = {
             foreignKeyName: "task_templates_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "task_templates_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -6994,13 +6989,6 @@ export type Database = {
             foreignKeyName: "tasks_assigned_to_fkey"
             columns: ["assigned_to"]
             isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -7010,13 +6998,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tasks_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "tasks_created_by_fkey"
@@ -7080,13 +7061,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
-          },
-          {
-            foreignKeyName: "traffic_control_comments_author_user_id_fkey"
-            columns: ["author_user_id"]
-            isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "traffic_control_comments_author_user_id_fkey"
@@ -7164,13 +7138,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "master_agency_usage"
             referencedColumns: ["agency_id"]
-          },
-          {
-            foreignKeyName: "traffic_controls_responsible_user_id_fkey"
-            columns: ["responsible_user_id"]
-            isOneToOne: false
-            referencedRelation: "master_users"
-            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "traffic_controls_responsible_user_id_fkey"
@@ -7783,6 +7750,17 @@ export type Database = {
         }
         Relationships: []
       }
+      master_facebook_connections: {
+        Row: {
+          agency_id: string | null
+          agency_name: string | null
+          id: string | null
+          is_active: boolean | null
+          last_sync: string | null
+          token_expires_at: string | null
+        }
+        Relationships: []
+      }
       master_monthly_metrics: {
         Row: {
           converted_to_paid: number | null
@@ -7808,7 +7786,15 @@ export type Database = {
           role: string | null
           user_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "agency_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       public_pricing_plans: {
         Row: {
@@ -7931,6 +7917,7 @@ export type Database = {
         Args: { agency_uuid?: string }
         Returns: boolean
       }
+      is_master_admin: { Args: never; Returns: boolean }
       is_master_agency_admin: { Args: never; Returns: boolean }
       is_master_user: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
