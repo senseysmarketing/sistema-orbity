@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 
 export function MasterSystem() {
   const [configs, setConfigs] = useState<Record<string, any>>({});
