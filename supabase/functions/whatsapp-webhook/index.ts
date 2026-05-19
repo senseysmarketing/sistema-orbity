@@ -218,12 +218,19 @@ serve(async (req) => {
     const { event, instanceName, data } = body || {};
     const instance = instanceName || body?.instance;
 
-    if (!event || !instance) {
-      console.log('[whatsapp-webhook] Missing event or instance', { event, instance });
-      return new Response('ok', { status: 200 });
+    // Filter 0: Ignore our own messages to prevent loops
+    if (data?.key?.fromMe === true) return new Response("Ignored", { status: 200 });
+
+    // Filter 1: Only allow text messages for now (conversation or extendedTextMessage)
+    if (event === 'messages') {
+      const msgContent = data?.message?.message ? data.message.message : data?.message;
+      const isText = msgContent?.conversation || msgContent?.extendedTextMessage;
+      if (!isText && !msgContent?.imageMessage && !msgContent?.videoMessage && !msgContent?.audioMessage && !msgContent?.documentMessage) {
+         return new Response("Ignored: Not a handled message type", { status: 200 });
+      }
     }
 
-    console.log('[whatsapp-webhook] Event:', event, 'Instance:', instance);
+    if (!event || !instance) {
 
     const { data: account } = await supabase
       .from('whatsapp_accounts').select('id, agency_id')
