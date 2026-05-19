@@ -19,6 +19,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [autoChecked, setAutoChecked] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const {
     account,
