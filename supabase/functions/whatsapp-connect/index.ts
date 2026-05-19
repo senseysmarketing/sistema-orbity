@@ -101,7 +101,10 @@ serve(async (req) => {
               'Content-Type': 'application/json',
               'admintoken': adminToken,
             },
-            body: JSON.stringify({ instanceName }),
+            body: JSON.stringify({ 
+              name: instanceName,
+              instanceName: instanceName 
+            }),
           });
 
           const createData = await createRes.json();
