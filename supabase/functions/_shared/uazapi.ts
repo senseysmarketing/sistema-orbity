@@ -232,3 +232,107 @@ export async function configureWebhook(
     },
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Messaging
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface SendTextResult {
+  ok: boolean;
+  status: number;
+  messageId: string | null;
+  remoteJid: string | null;
+  providerStatus: string | null;
+  raw: any;
+  error?: string;
+}
+
+/**
+ * Sends a plain-text message via Uazapi v2 (`POST /send/text`).
+ * Uses the instance token (account.api_key). Falls back to UAZAPI_SERVER_URL.
+ */
+export async function sendText(
+  account: { api_url?: string | null; api_key: string },
+  payload: { number: string; text: string },
+): Promise<SendTextResult> {
+  const apiUrl = (account.api_url || Deno.env.get('UAZAPI_SERVER_URL') || '').replace(/\/$/, '');
+  if (!apiUrl) {
+    return { ok: false, status: 0, messageId: null, remoteJid: null, providerStatus: null, raw: null, error: 'UAZAPI_SERVER_URL not configured' };
+  }
+  const res = await uazapiRequest('/send/text', {
+    apiUrl,
+    method: 'POST',
+    token: account.api_key,
+    body: { number: payload.number, text: payload.text },
+    timeoutMs: 20_000,
+  });
+  const parsed = parseSendResponse(res.data);
+  return {
+    ok: res.ok && !parsed.error,
+    status: res.status,
+    messageId: parsed.messageId,
+    remoteJid: parsed.remoteJid,
+    providerStatus: parsed.status,
+    raw: res.data,
+    error: !res.ok ? (parsed.error || `HTTP ${res.status}`) : parsed.error,
+  };
+}
+
+/** Calls `POST /message/find` to fetch history for a chat. */
+export async function findMessages(
+  account: { api_url?: string | null; api_key: string },
+  body: Record<string, unknown>,
+): Promise<UazapiResponse> {
+  const apiUrl = (account.api_url || Deno.env.get('UAZAPI_SERVER_URL') || '').replace(/\/$/, '');
+  return await uazapiRequest('/message/find', {
+    apiUrl,
+    method: 'POST',
+    token: account.api_key,
+    body,
+    timeoutMs: 20_000,
+  });
+}
+
+export function parseSendResponse(data: any): {
+  messageId: string | null;
+  remoteJid: string | null;
+  status: string | null;
+  error: string | undefined;
+} {
+  if (!data) return { messageId: null, remoteJid: null, status: null, error: undefined };
+
+  const errCandidates = [data?.error, data?.message?.error, data?.data?.error];
+  const errStr = errCandidates.find((e) => typeof e === 'string' && e.trim());
+
+  const idCandidates = [
+    data?.messageid, data?.messageId, data?.message_id, data?.id,
+    data?.key?.id, data?.message?.id, data?.message?.key?.id,
+    data?.data?.id, data?.data?.messageId, data?.data?.key?.id,
+  ];
+  const messageId = idCandidates.find((v) => typeof v === 'string' && v.trim()) || null;
+
+  const jidCandidates = [
+    data?.remoteJid, data?.remote_jid, data?.chatid, data?.chatId, data?.to,
+    data?.key?.remoteJid, data?.message?.key?.remoteJid,
+    data?.data?.remoteJid, data?.data?.key?.remoteJid,
+  ];
+  const remoteJid = jidCandidates.find((v) => typeof v === 'string' && v.trim()) || null;
+
+  const statusCandidates = [data?.status, data?.message?.status, data?.data?.status];
+  const status = statusCandidates.find((v) => typeof v === 'string' && v.trim()) || null;
+
+  return { messageId, remoteJid, status, error: errStr || undefined };
+}
+
+/** Normalizes a provider ack/status into our domain. */
+export function parseMessageStatus(input: any): 'sent' | 'delivered' | 'read' | 'failed' | 'pending' | null {
+  const raw = (typeof input === 'string' ? input : input?.status || input?.state || input?.ack);
+  if (raw === undefined || raw === null) return null;
+  const s = String(raw).toLowerCase();
+  if (['read', 'seen', '4', '5'].includes(s)) return 'read';
+  if (['delivered', 'delivery_ack', '3'].includes(s)) return 'delivered';
+  if (['sent', 'server_ack', '2', '1'].includes(s)) return 'sent';
+  if (['failed', 'error', 'reject', 'rejected'].includes(s)) return 'failed';
+  if (['pending', '0'].includes(s)) return 'pending';
+  return null;
+}
