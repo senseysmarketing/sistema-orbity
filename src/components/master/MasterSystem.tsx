@@ -6,22 +6,26 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  MessageSquare, 
-  QrCode, 
-  RefreshCw, 
-  CheckCircle2, 
-  XCircle, 
-  Loader2, 
+import {
+  MessageSquare,
+  QrCode,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Loader2,
   Smartphone,
   Save,
   MessageCircle,
   Layout,
-  Unlink
+  Unlink,
+  AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useMasterWhatsApp } from '@/hooks/useMasterWhatsApp';
 
 export function MasterSystem() {
   const [configs, setConfigs] = useState<Record<string, any>>({});
