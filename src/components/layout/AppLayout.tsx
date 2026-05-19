@@ -1,4 +1,4 @@
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate, useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { MobileBottomNav } from './MobileBottomNav';
@@ -21,6 +21,7 @@ export function AppLayout() {
   const { user, loading: authLoading } = useAuth();
   const { loading: agencyLoading, hasNoAgency, fetchError, refreshAgencies } = useAgency();
   const { theme, setTheme } = useTheme();
+  const location = useLocation();
 
   const toggleTheme = () => {
     setTheme(theme === "light" ? "dark" : "light");
@@ -35,7 +36,7 @@ export function AppLayout() {
   }
 
   if (!user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/auth" replace state={{ from: location.pathname }} />;
   }
 
   if (fetchError) {

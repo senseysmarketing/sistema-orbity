@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { phoneVariants } from "../_shared/phone.ts";
+import { assertAgencyAccess, HttpError } from "../_shared/auth.ts";
 
 // Normalize phone to digits-only with Brazil country code 55.
 function normalizeBrazilPhone(phone: string): string {
@@ -9,6 +10,21 @@ function normalizeBrazilPhone(phone: string): string {
   if (clean.length <= 11) return '55' + clean;
   return clean;
 }
+
+async function readJson(res: Response): Promise<unknown> {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { raw: text };
+  }
+}
+
+type UazapiSendResponse = {
+  message?: { id?: string };
+  id?: string;
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,6 +57,8 @@ serve(async (req) => {
     if (accError || !account) throw new Error('WhatsApp account not found');
     if (account.status !== 'connected') throw new Error('WhatsApp not connected');
 
+    await assertAgencyAccess(req, supabase, account.agency_id);
+
     const apiUrl = (Deno.env.get('UAZAPI_SERVER_URL') || '').replace(/\/$/, '');
     const instanceToken = account.api_key; // Stored instance token
 
@@ -48,10 +66,12 @@ serve(async (req) => {
       throw new Error('Uazapi API not configured or instance token missing');
     }
 
+    const formattedPhone = normalizeBrazilPhone(phone_number);
+
     // Ensure conversation exists
     let convId = conversation_id;
     if (!convId) {
-      const variations = phoneVariants(phone_number);
+      const variations = phoneVariants(formattedPhone);
       const { data: existingConv } = await supabase
         .from('whatsapp_conversations')
         .select('id')
@@ -67,7 +87,7 @@ serve(async (req) => {
           .from('whatsapp_conversations')
           .insert({
             account_id,
-            phone_number,
+            phone_number: formattedPhone,
             lead_id: lead_id || null,
           })
           .select()
@@ -78,8 +98,7 @@ serve(async (req) => {
       }
     }
 
-    // Send via Uazapi — normalize to digits with country code 55
-    const formattedPhone = normalizeBrazilPhone(phone_number);
+    // Send via Uazapi - normalize to digits with country code 55
     const sendRes = await fetch(`${apiUrl}/send/text`, {
       method: 'POST',
       headers: {
@@ -92,11 +111,15 @@ serve(async (req) => {
       }),
     });
 
-    const sendData = await sendRes.json();
-    console.log('[whatsapp-send] Uazapi response:', sendData);
+    const sendData = await readJson(sendRes) as UazapiSendResponse | null;
+    console.log('[whatsapp-send] Uazapi response:', {
+      status: sendRes.status,
+      ok: sendRes.ok,
+      body: sendData,
+    });
 
     if (!sendRes.ok) {
-      throw new Error(`Uazapi API send error: ${JSON.stringify(sendData)}`);
+      throw new HttpError(502, `Uazapi API send error: ${JSON.stringify(sendData)}`);
     }
 
     // Save message BEFORE webhook arrives
@@ -108,7 +131,7 @@ serve(async (req) => {
         account_id,
         message_id: messageId,
         conversation_id: convId,
-        phone_number,
+        phone_number: formattedPhone,
         content: message,
         message_type: 'text',
         is_from_me: true,
@@ -140,7 +163,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('[whatsapp-send] Error:', error);
     return new Response(JSON.stringify({ success: false, error: (error as Error).message }), {
-      status: 400,
+      status: error instanceof HttpError ? error.status : 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

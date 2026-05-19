@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -23,14 +23,19 @@ interface AuthContextType {
   loading: boolean;
   sessionExpired: boolean;
   showSessionAlert: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, name: string, role: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: unknown }>;
+  signUp: (email: string, password: string, name: string, role: string) => Promise<{ error: unknown }>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
   dismissSessionAlert: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const SESSION_TIMEOUT = 2 * 60 * 60 * 1000;
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -42,31 +47,94 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [lastActivityTime, setLastActivityTime] = useState(Date.now());
   const { toast } = useToast();
 
-  // Refs para evitar re-renders desnecessários
   const currentUserIdRef = useRef<string | null>(null);
   const sessionRef = useRef<Session | null>(null);
+  const authSequenceRef = useRef(0);
+  const profileRef = useRef<Profile | null>(null);
 
-  // Session timeout: 2 hours
-  const SESSION_TIMEOUT = 2 * 60 * 60 * 1000;
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
+
+  const loadProfile = async (userId: string, sequence: number) => {
+    const { data: profileData, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (sequence !== authSequenceRef.current) return;
+
+    if (error) {
+      console.error('[Auth] Error loading profile:', {
+        user_id: userId,
+        message: error.message,
+        code: error.code,
+      });
+      setProfile(null);
+      return;
+    }
+
+    setProfile((profileData as Profile) || null);
+  };
+
+  const applySession = async (
+    source: string,
+    newSession: Session | null,
+    options: { refetchProfile?: boolean } = {}
+  ) => {
+    const sequence = ++authSequenceRef.current;
+    const newUser = newSession?.user ?? null;
+    const newUserId = newUser?.id ?? null;
+    const previousUserId = currentUserIdRef.current;
+
+    console.log('[Auth] Session update:', {
+      source,
+      previous_user_id: previousUserId,
+      next_user_id: newUserId,
+      has_session: !!newSession,
+    });
+
+    currentUserIdRef.current = newUserId;
+    sessionRef.current = newSession;
+    setSession(newSession);
+    setUser(newUser);
+
+    if (!newUser) {
+      setProfile(null);
+      setSessionExpired(false);
+      setShowSessionAlert(false);
+      setLoading(false);
+      return;
+    }
+
+    setLastActivityTime(Date.now());
+    setSessionExpired(false);
+    setShowSessionAlert(false);
+
+    const shouldLoadProfile = options.refetchProfile || newUserId !== previousUserId || !profileRef.current;
+    if (shouldLoadProfile) {
+      await loadProfile(newUser.id, sequence);
+    }
+
+    if (sequence === authSequenceRef.current) {
+      setLoading(false);
+    }
+  };
 
   const refreshSession = async () => {
     try {
       const { data, error } = await supabase.auth.refreshSession();
       if (error) throw error;
-      
-      setLastActivityTime(Date.now());
-      setSessionExpired(false);
-      setShowSessionAlert(false);
-      
-      // Atualizar refs sem causar re-render se user não mudou
-      sessionRef.current = data.session;
-      
+
+      await applySession('manual_refresh', data.session, { refetchProfile: true });
+
       toast({
-        title: "Sessão atualizada",
+        title: "Sessao atualizada",
         description: "Seus dados foram atualizados com sucesso.",
       });
     } catch (error) {
-      console.error('Error refreshing session:', error);
+      console.error('[Auth] Error refreshing session:', error);
       setSessionExpired(true);
       setShowSessionAlert(true);
     }
@@ -76,25 +144,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setShowSessionAlert(false);
   };
 
-  // Check for session expiration
   useEffect(() => {
     if (!user || !session) return;
 
     const checkSessionExpiry = () => {
       const now = Date.now();
       const timeSinceLastActivity = now - lastActivityTime;
-      
+
       if (timeSinceLastActivity > SESSION_TIMEOUT) {
         setSessionExpired(true);
         setShowSessionAlert(true);
       }
     };
 
-    const interval = setInterval(checkSessionExpiry, 60000); // Check every minute
+    const interval = setInterval(checkSessionExpiry, 60000);
     return () => clearInterval(interval);
   }, [user, session, lastActivityTime]);
 
-  // Update activity time on user interaction
   useEffect(() => {
     const updateActivity = () => {
       setLastActivityTime(Date.now());
@@ -113,109 +179,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        // Guard: SIGNED_OUT ou session nula → limpar tudo e sair imediatamente
-        if (event === 'SIGNED_OUT' || !newSession) {
-          console.log('[Auth] SIGNED_OUT or null session — clearing all state');
-          currentUserIdRef.current = null;
-          sessionRef.current = null;
-          setUser(null);
-          setSession(null);
-          setProfile(null);
-          setLoading(false);
-          return; // JAMAIS fazer fetch de profile aqui
-        }
+    let mounted = true;
 
-        // Eventos silenciosos que não devem causar re-render da árvore inteira
-        const silentEvents = ['TOKEN_REFRESHED', 'INITIAL_SESSION'];
-        
-        if (silentEvents.includes(event)) {
-          console.log('[Auth] Silent event:', event, '— updating ref only');
-          sessionRef.current = newSession;
-          // Ensure loading clears on INITIAL_SESSION
-          if (event === 'INITIAL_SESSION') setLoading(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, newSession) => {
+        if (!mounted) return;
+
+        if (event === 'SIGNED_OUT' || !newSession) {
+          void applySession(event, null);
           return;
         }
-        
-        // Verificar se user realmente mudou antes de atualizar estado
-        const newUserId = newSession?.user?.id || null;
-        const currentUserId = currentUserIdRef.current;
-        
-        if (newUserId !== currentUserId) {
-          // User actually changed — full state update + profile fetch
-          console.log('[Auth] User changed:', currentUserId, '->', newUserId);
-          currentUserIdRef.current = newUserId;
-          sessionRef.current = newSession;
-          
-          setSession(newSession);
-          setUser(newSession?.user ?? null);
-          
-          if (newSession?.user) {
-            setLastActivityTime(Date.now());
-            setSessionExpired(false);
-            setShowSessionAlert(false);
-            
-            setTimeout(async () => {
-              const { data: profileData } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('user_id', newSession.user.id)
-                .single();
-              
-              if (profileData) {
-                setProfile(profileData as Profile);
-              }
-            }, 0);
-          } else {
-            setProfile(null);
-          }
-        } else {
-          // Same user (e.g. SIGNED_IN on tab refocus) — update ref silently
-          console.log('[Auth] Same user, silent ref update for event:', event);
-          sessionRef.current = newSession;
-        }
-        
-        setLoading(false);
+
+        const shouldRefetchProfile =
+          event === 'INITIAL_SESSION' ||
+          event === 'SIGNED_IN' ||
+          event === 'USER_UPDATED';
+
+        void applySession(event, newSession, { refetchProfile: shouldRefetchProfile });
       }
     );
 
-    // Check for existing session — skip profile fetch if listener already handled it
-    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      const existingUserId = existingSession?.user?.id || null;
-      
-      // If the onAuthStateChange listener already set this user, skip redundant work
-      if (currentUserIdRef.current === existingUserId && existingUserId !== null) {
-        // Profile fetch already triggered by listener, just ensure loading is cleared
-        setLoading(false);
-        return;
-      }
-      
-      currentUserIdRef.current = existingUserId;
-      sessionRef.current = existingSession;
-      
-      setSession(existingSession);
-      setUser(existingSession?.user ?? null);
-      
-      if (existingSession?.user) {
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', existingSession.user.id)
-          .single()
-          .then(({ data: profileData }) => {
-            if (profileData) {
-              setProfile(profileData as Profile);
-            }
-            setLoading(false);
-          });
-      } else {
-        setLoading(false);
-      }
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session: existingSession }, error }) => {
+        if (!mounted) return;
+        if (error) {
+          console.error('[Auth] Error getting initial session:', error);
+          void applySession('getSession_error', null);
+          return;
+        }
+        void applySession('getSession', existingSession, { refetchProfile: true });
+      })
+      .catch((error) => {
+        console.error('[Auth] Unexpected getSession failure:', error);
+        if (mounted) void applySession('getSession_exception', null);
+      });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -226,25 +228,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
+        console.error('[Auth] signIn failed:', { email, message: error.message, code: error.code });
         toast({
           title: "Erro no login",
-          description: error.message === 'Invalid login credentials' 
-            ? "Credenciais inválidas. Verifique seu email e senha."
+          description: error.message === 'Invalid login credentials'
+            ? "Credenciais invalidas. Verifique seu email e senha."
             : error.message,
           variant: "destructive",
         });
       } else {
+        console.log('[Auth] signIn successful:', { email });
         toast({
           title: "Login realizado!",
-          description: "Bem-vindo de volta ao Sistema Senseys.",
+          description: "Bem-vindo de volta ao Orbity.",
         });
       }
 
       return { error };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      console.error('[Auth] Unexpected signIn error:', error);
       toast({
         title: "Erro no login",
-        description: "Ocorreu um erro inesperado. Tente novamente.",
+        description: getErrorMessage(error, "Ocorreu um erro inesperado. Tente novamente."),
         variant: "destructive",
       });
       return { error };
@@ -254,7 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, name: string, role: string) => {
     try {
       const redirectUrl = `${window.location.origin}/dashboard`;
-      
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -268,25 +273,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
+        console.error('[Auth] signUp failed:', { email, message: error.message, code: error.code });
         toast({
           title: "Erro no cadastro",
-          description: error.message === 'User already registered' 
-            ? "Este email já está cadastrado. Tente fazer login."
+          description: error.message === 'User already registered'
+            ? "Este email ja esta cadastrado. Tente fazer login."
             : error.message,
           variant: "destructive",
         });
       } else {
         toast({
           title: "Conta criada!",
-          description: "Sua conta foi criada com sucesso. Faça login para continuar.",
+          description: "Sua conta foi criada com sucesso. Faca login para continuar.",
         });
       }
 
       return { error };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      console.error('[Auth] Unexpected signUp error:', error);
       toast({
         title: "Erro no cadastro",
-        description: "Ocorreu um erro inesperado. Tente novamente.",
+        description: getErrorMessage(error, "Ocorreu um erro inesperado. Tente novamente."),
         variant: "destructive",
       });
       return { error };
@@ -295,18 +302,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
-      // Executar signOut com timeout de 3s (fire-and-forget se Supabase travar)
       await Promise.race([
-        supabase.auth.signOut({ scope: 'local' }),
+        supabase.auth.signOut({ scope: 'global' }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('signOut timeout')), 3000))
       ]);
       console.log('[Auth] signOut completed successfully');
     } catch (error) {
       console.warn('[Auth] signOut timeout or error, proceeding with cleanup:', error);
     } finally {
-      // Sempre limpar estado local e redirecionar
       currentUserIdRef.current = null;
       sessionRef.current = null;
+      authSequenceRef.current++;
       setUser(null);
       setSession(null);
       setProfile(null);
@@ -334,8 +340,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
       <SessionAlert
         show={showSessionAlert}
-        title="Sessão Expirada"
-        message="Você ficou muito tempo inativo. Clique em 'Atualizar' para continuar usando o sistema."
+        title="Sessao expirada"
+        message="Voce ficou muito tempo inativo. Clique em Atualizar para continuar usando o sistema."
         onRefresh={refreshSession}
         onDismiss={dismissSessionAlert}
       />

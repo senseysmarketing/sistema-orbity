@@ -1,10 +1,44 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { phoneVariants } from "../_shared/phone.ts";
+import { assertAgencyAccess, HttpError } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
+
+type UazapiMessage = {
+  key?: {
+    id?: string;
+    fromMe?: boolean;
+  };
+  id?: string;
+  fromMe?: boolean;
+  text?: string;
+  messageType?: string;
+  message?: {
+    conversation?: string;
+    extendedTextMessage?: { text?: string };
+    imageMessage?: { caption?: string };
+    videoMessage?: { caption?: string };
+    audioMessage?: unknown;
+    documentMessage?: { fileName?: string };
+  };
+  messageTimestamp?: number | string;
+  timestamp?: number | string;
+};
+
+type SyncedMessage = {
+  account_id: string;
+  conversation_id: string;
+  message_id: string;
+  content: string | null;
+  is_from_me: boolean;
+  message_type: string;
+  status: string;
+  phone_number: string;
+  created_at: string;
 };
 
 /**
@@ -32,7 +66,7 @@ serve(async (req) => {
 
     const { data: account, error: accError } = await supabase
       .from('whatsapp_accounts')
-      .select('instance_name, api_url, api_key')
+      .select('instance_name, api_url, api_key, agency_id')
       .eq('id', account_id)
       .single();
 
@@ -42,6 +76,8 @@ serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    await assertAgencyAccess(req, supabase, account.agency_id);
 
     const digits = phone_number.replace(/\D/g, '');
     let remoteJid = `${digits}@s.whatsapp.net`;
@@ -87,7 +123,10 @@ serve(async (req) => {
     }
 
     const findData = await findRes.json();
-    const messages: any[] = Array.isArray(findData) ? findData : (findData?.messages || findData?.data || []);
+    const findPayload = findData as { messages?: UazapiMessage[]; data?: UazapiMessage[] } | UazapiMessage[];
+    const messages: UazapiMessage[] = Array.isArray(findPayload)
+      ? findPayload
+      : (findPayload.messages || findPayload.data || []);
     console.log(`[sync] Got ${messages.length} messages from Uazapi`);
 
     if (messages.length === 0) {
@@ -118,7 +157,7 @@ serve(async (req) => {
     }
 
     let synced = 0;
-    const upsertBatch: any[] = [];
+    const upsertBatch: SyncedMessage[] = [];
 
     for (const msg of messages) {
       try {
@@ -168,6 +207,24 @@ serve(async (req) => {
           .upsert(chunk, { onConflict: 'account_id,message_id', ignoreDuplicates: false });
         if (!upsertError) synced += chunk.length;
       }
+
+      const sorted = [...upsertBatch].sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      const latest = sorted[0];
+      const latestCustomer = sorted.find((msg) => !msg.is_from_me);
+      const updatePayload: Record<string, string | boolean> = {
+        last_message_at: latest.created_at,
+        last_message_is_from_me: latest.is_from_me,
+      };
+      if (latestCustomer?.created_at) {
+        updatePayload.last_customer_message_at = latestCustomer.created_at;
+      }
+
+      await supabase
+        .from('whatsapp_conversations')
+        .update(updatePayload)
+        .eq('id', convId);
     }
 
     return new Response(
@@ -178,7 +235,7 @@ serve(async (req) => {
     console.error('[sync] Error:', error);
     return new Response(
       JSON.stringify({ error: (error as Error).message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: error instanceof HttpError ? error.status : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
