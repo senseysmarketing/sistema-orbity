@@ -306,6 +306,50 @@ serve(async (req) => {
         });
       }
 
+      case 'disconnect': {
+        const { data: setting } = await supabase
+          .from(TABLE_NAME)
+          .select('value')
+          .eq('key', SETTING_KEY)
+          .single();
+
+        let settingValue = setting?.value;
+        if (typeof settingValue === 'string') {
+          try {
+            settingValue = JSON.parse(settingValue);
+          } catch (e) {
+            console.error('Error parsing setting value:', e);
+          }
+        }
+
+        if (settingValue?.token) {
+          try {
+            await fetch(`${apiUrl}/instance/logout`, {
+              method: 'POST',
+              headers: { 'token': settingValue.token },
+              body: JSON.stringify({ 
+                instanceName: settingValue.instance_name || "orbity_master_official",
+                name: settingValue.instance_name || "orbity_master_official",
+                Name: settingValue.instance_name || "orbity_master_official"
+              }),
+            });
+          } catch (e) {
+            console.log('[master-whatsapp] Logout error (non-critical):', (e as Error).message);
+          }
+
+          await supabase
+            .from(TABLE_NAME)
+            .update({
+              value: JSON.stringify({ ...settingValue, status: 'disconnected', token: null })
+            })
+            .eq('key', SETTING_KEY);
+        }
+
+        return new Response(JSON.stringify({ success: true, status: 'disconnected' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
