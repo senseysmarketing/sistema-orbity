@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle, AlertTriangle, Link2, CreditCard } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { formatPhoneDisplay } from "@/lib/formatPhoneDisplay";
@@ -129,15 +130,21 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
               <div className="flex items-center gap-2 flex-wrap">
                 <CardTitle className="text-base sm:text-lg">{title}</CardTitle>
                 {isConnected && (
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 flex-shrink-0">
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 flex-shrink-0 transition-all duration-300">
                     <Check className="mr-1 h-3 w-3" />
                     Conectado
                   </Badge>
                 )}
-                {!isConnected && account && (
+                {!isConnected && account && account.status !== 'connecting' && (
                   <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800 flex-shrink-0">
                     <AlertCircle className="mr-1 h-3 w-3" />
                     Desconectado
+                  </Badge>
+                )}
+                {!isConnected && account?.status === 'connecting' && (
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800 flex-shrink-0">
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    Conectando...
                   </Badge>
                 )}
               </div>
@@ -210,8 +217,18 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
           </>
         ) : (
           <div className="space-y-4">
-            {showQrCode && (
+            {(showQrCode || connect.isPending) && (
               <div className="flex flex-col items-center gap-3 p-4 border rounded-lg bg-muted/30">
+                {connect.isPending && !qrCode && (
+                  <div className="flex flex-col items-center justify-center py-8 gap-4">
+                    <Skeleton className="w-48 h-48 sm:w-64 sm:h-64 rounded-lg" />
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Gerando QR Code...
+                    </div>
+                  </div>
+                )}
+                {showQrCode && (
                 {connectionError && (
                   <Alert variant="destructive" className="w-full">
                     <AlertTriangle className="h-4 w-4" />
@@ -226,11 +243,18 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                       <QrCode className="h-4 w-4" />
                       Escaneie o QR Code no WhatsApp
                     </p>
-                    <img
-                      src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`}
-                      alt="WhatsApp QR Code"
-                      className="w-48 h-48 sm:w-64 sm:h-64 rounded-lg"
-                    />
+                    <div className="relative">
+                      {refreshQR.isPending && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-10 rounded-lg">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                      )}
+                      <img
+                        src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`}
+                        alt="WhatsApp QR Code"
+                        className="w-48 h-48 sm:w-64 sm:h-64 rounded-lg shadow-sm"
+                      />
+                    </div>
                   </>
                 )}
                 <Button variant="outline" size="sm" onClick={handleRefreshQR} disabled={refreshQR.isPending}>
@@ -249,7 +273,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
               </div>
             )}
 
-            {showConnectButton && (
+            {showConnectButton && !connect.isPending && (
               <>
                 {purpose === 'general' && (
                   <div className="p-3 sm:p-4 border rounded-lg bg-muted/30 space-y-2">

@@ -27,7 +27,7 @@ export function MasterSystem() {
   const [configs, setConfigs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [masterWhatsapp, setMasterWhatsapp] = useState<{ status: string; qr_code?: string; phone?: string; instance?: any } | null>(null);
+  const [masterWhatsapp, setMasterWhatsapp] = useState<{ status: string; qr_code?: string; phone?: string; instance?: any } | null>({ status: 'disconnected' });
   const [loadingWhatsapp, setLoadingWhatsapp] = useState(false);
   const { toast } = useToast();
 
@@ -240,10 +240,31 @@ export function MasterSystem() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {loadingWhatsapp && !masterWhatsapp?.qr_code && (
+                <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
+                  <div className="relative">
+                    <Skeleton className="w-64 h-64 rounded-xl" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-600 mt-4 text-center">Gerando QR Code...</p>
+                </div>
+              )}
+
               {masterWhatsapp?.qr_code && masterWhatsapp.status !== 'connected' && (
                 <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
-                  <div className="bg-white p-4 rounded-xl shadow-sm mb-4">
-                    <img src={masterWhatsapp.qr_code} alt="QR Code" className="w-64 h-64" />
+                  <div className="bg-white p-4 rounded-xl shadow-sm mb-4 relative">
+                    {loadingWhatsapp && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-10 rounded-xl">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    )}
+                    <img 
+                      src={masterWhatsapp.qr_code.startsWith('data:') ? masterWhatsapp.qr_code : `data:image/png;base64,${masterWhatsapp.qr_code}`} 
+                      alt="QR Code" 
+                      className="w-64 h-64" 
+                    />
                   </div>
                   <p className="text-sm text-slate-600 mb-4 text-center">
                     Escaneie o QR Code acima com o WhatsApp oficial da Orbity
@@ -260,7 +281,7 @@ export function MasterSystem() {
                 </div>
               )}
 
-              {!masterWhatsapp?.qr_code && masterWhatsapp?.status !== 'connected' && (
+              {!masterWhatsapp?.qr_code && masterWhatsapp?.status !== 'connected' && !loadingWhatsapp && (
                 <div className="flex flex-col items-center justify-center p-12 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200">
                   <QrCode className="h-12 w-12 text-slate-300 mb-4" />
                   <p className="text-slate-500 mb-6">Nenhuma conexão ativa detectada</p>

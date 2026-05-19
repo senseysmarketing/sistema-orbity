@@ -174,13 +174,8 @@ serve(async (req) => {
 
         // 3. Get QR Code
         const connectRes = await fetch(`${apiUrl}/instance/connect`, {
-          method: 'POST',
+          method: 'GET',
           headers: { 'token': instanceToken },
-          body: JSON.stringify({ 
-            instanceName,
-            name: instanceName,
-            Name: instanceName
-          }),
         });
 
         const connectData = await connectRes.json();
@@ -238,13 +233,8 @@ serve(async (req) => {
         if (!isConnected) {
           try {
             const qrRes = await fetch(`${apiUrl}/instance/connect`, {
-              method: 'POST',
-              headers: { 'token': instanceToken },
-              body: JSON.stringify({ 
-                instanceName,
-                name: instanceName,
-                Name: instanceName
-              }),
+              method: 'GET',
+              headers: { 'token': instanceToken }
             });
             const qrData = await qrRes.json();
             if (qrData.base64) {
