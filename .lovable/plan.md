@@ -1,132 +1,148 @@
-# Refactor da conexão WhatsApp/Uazapi
 
-Escopo limitado: **somente conexão** (criar/recuperar instância, QR Code, status). Envio de mensagens, automações, fila, webhook de mensagens recebidas e chat do CRM ficam intocados.
+# Refatoração WhatsApp — Envio, Cadência, Chat e Cobrança
 
-## 1. Banco de dados (migration)
+Objetivo: tornar `whatsapp-send` o único caminho de saída de mensagens; alinhar tudo à Uazapi v2 (`/send/text`) e ao schema atual (`whatsapp_accounts.api_key`). Sem mexer no fluxo de conexão (`whatsapp-connect`, `useWhatsAppConnection`, `WhatsAppInstanceCard`), exceto para reaproveitar helpers compartilhados.
 
-### Alterar `whatsapp_accounts`
-Adicionar colunas (manter `api_key`, `qr_code`, `status`, `phone_number` existentes):
-- `provider text NOT NULL DEFAULT 'uazapi'`
-- `provider_status text` — status bruto retornado pela Uazapi
-- `last_error text`
-- `last_provider_payload jsonb` — último payload sanitizado (sem token/QR completo)
-- `last_checked_at timestamptz`
-- `connected_at timestamptz`
+## 1. Migração de banco
 
-Atualizar CHECK do `status` (ou validation trigger) para o domínio:
-`disconnected | provisioning | qr_pending | connected | error`
+Adicionar colunas (idempotente, `IF NOT EXISTS`) em:
 
-### Criar `whatsapp_connection_logs`
-Colunas conforme spec do usuário. RLS:
-- SELECT: membros owner/admin da `agency_id`
-- INSERT: apenas service role (edge function)
-Índice em `(agency_id, created_at desc)` e `(account_id, created_at desc)`.
+`whatsapp_messages`:
+- `source text default 'unknown'`
+- `metadata jsonb default '{}'::jsonb`
+- `remote_jid text`
+- `provider_payload jsonb`
+- `sent_at timestamptz`
+- `delivered_at timestamptz`
+- `read_at timestamptz`
+- `failed_at timestamptz`
+- `error_message text`
+- Índice único `(account_id, message_id)` para upsert idempotente do webhook.
 
-## 2. Módulo compartilhado `supabase/functions/_shared/uazapi.ts`
+`whatsapp_conversations`:
+- `context text default 'lead'` (valores: lead, client, billing, system)
+- `client_id uuid` (nullable, FK para `clients`)
+- `last_message_preview text`
 
-Funções puras, sem acoplamento com Supabase:
-- `getUazapiConfig()` — lê `UAZAPI_SERVER_URL` + `UAZAPI_ADMIN_TOKEN`, normaliza URL.
-- `uazapiRequest(endpoint, { method, token?, adminToken?, body? })` — wrapper fetch único, retorna `{ ok, status, data, raw }` e nunca lança em erro HTTP.
-- `createOrGetInstance(instanceName)` — usa endpoints corretos da Uazapi (`POST /instance/init` com `admintoken`); se já existir, busca via `GET /instance/all` e retorna token existente.
-- `connectInstance(token)` — `POST /instance/connect` com header `token`.
-- `getInstanceStatus(token)` — `GET /instance/status`.
-- `disconnectInstance(token)` — `POST /instance/disconnect`.
-- `deleteInstance(token)` — `POST /instance/delete` (usado só no hard_reset).
-- `configureWebhook(token, url, events)` — `POST /webhook` com payload Uazapi.
-- `parseQrCode(data)` — extrai `qrcode/base64/qr_code` e normaliza para data URL.
-- `parseStatus(data)` — mapeia status bruto Uazapi (`connected`, `connecting`, `disconnected`, `qrcode`, `loading`, ...) para domínio interno.
-- `parsePhoneNumber(data)` — extrai número do `instance.profilePicUrl`/`me.id`.
+Sem alterar RLS existente; políticas atuais (por agência via `account_id`) já cobrem.
 
-## 3. Edge Function `whatsapp-connect/index.ts` (reescrita)
+## 2. Camadas compartilhadas (Edge)
 
-### Entrada
-```json
-{ "action": "debug_health|connect|status|refresh_qr|disconnect|hard_reset",
-  "agency_id": "...", "purpose": "general|billing" }
+### `supabase/functions/_shared/uazapi.ts` (estende o existente)
+Adiciona ao módulo já criado para conexão:
+- `sendText(account, { number, text }) → { messageId, remoteJid, raw }` — chama `POST {api_url}/send/text` com header `token: account.api_key`, payload `{ number, text }`.
+- `findMessages(account, params)` — para sync (`POST /message/find`).
+- `parseSendResponse(raw)` — extrai `messageId`, `remoteJid`, `status` do retorno Uazapi v2.
+- `parseMessageStatus(event)` — normaliza `delivered|read|failed|sent`.
+
+### `supabase/functions/_shared/whatsapp.ts` (novo)
+- `normalizePhone(raw): string` — somente dígitos, ajusta DDI 55.
+- `phoneVariants(raw): string[]` — variantes BR com/sem 9º dígito (substitui a duplicação atual em `whatsapp-webhook` e `process-whatsapp-queue`; reutiliza `_shared/phone.ts` se houver).
+- `resolveConversation(supabase, { account, phone, leadId?, clientId?, context })` — busca por `(account_id, phone_variants)`; se não existir, faz `upsert` com `context`, `lead_id`, `client_id`.
+- `extractMessageContent(uazapiMessage)` — texto unificado de `conversation`, `extendedTextMessage.text`, `imageMessage.caption` etc.
+- `formatTemplateVariables(template, vars)` — substitui `{{nome}}`, `{{valor}}`, `{{vencimento}}` (centralizado para billing/automação).
+
+## 3. `whatsapp-send` (reescrita)
+
+Entrada (validada com zod):
+```
+{ account_id, agency_id?, phone_number, message,
+  conversation_id?, lead_id?, client_id?, payment_id?,
+  source: 'manual_crm'|'automation'|'billing'|'system',
+  metadata?: object }
 ```
 
-### Auth
-Validar JWT (Authorization Bearer) → garantir `agency_users.role IN ('owner','admin')` via `assertAgencyAccess`.
+Fluxo:
+1. Auth JWT do chamador (preview do user) ou `WHATSAPP_INTERNAL_SECRET` para chamadas server-to-server (queue/billing).
+2. Carregar `whatsapp_accounts` por `account_id` (ou primeira `connected` da `agency_id`); validar `status='connected'` e `api_key`.
+3. Se `account.allowed_sources` definido, validar `source` está incluído (purpose-based routing já existente).
+4. `phone = normalizePhone(phone_number)`.
+5. `sendText(account, { number: phone, text: message })` via shared.
+6. `conversation = resolveConversation(...)` com `lead_id`/`client_id` quando vierem.
+7. `INSERT whatsapp_messages` com `is_from_me=true`, `source`, `metadata`, `remote_jid`, `provider_payload=raw`, `status='sent'`, `sent_at=now()`, `message_id` do provider.
+8. `UPDATE whatsapp_conversations` → `last_message_at=now()`, `last_message_is_from_me=true`, `last_message_preview=substring(message,0,120)`.
+9. Resposta: `{ success, conversation_id, message_id, status, provider: { messageId, remoteJid } }` (sem token, sem payload sensível).
 
-### Helpers internos
-- `getOrCreateAccount(agencyId, purpose)` — upsert em `whatsapp_accounts`.
-- `setAccountState(id, patch)` — update parcial com `last_checked_at = now()`.
-- `logEvent({...})` — insere em `whatsapp_connection_logs` (sem token/QR).
+Erros: 4xx com `code` (`account_not_connected`, `invalid_phone`, `provider_failed`) e log em `whatsapp_automation_logs` quando `source!='manual_crm'`.
 
-### Regra invariante
-> Só persistir `status='qr_pending'` quando `qr_code` existir. Se Uazapi não retornar QR e não estiver conectado → `status='error'` + `last_error`.
+## 4. `process-whatsapp-queue` (refatorada)
 
-### Fluxo `connect`
-1. `getOrCreateAccount` → set `status='provisioning'`.
-2. `createOrGetInstance(instance_name = 'orbity_{agency_id}_{purpose}')`.
-3. Salvar `api_key = instance.token`.
-4. `configureWebhook` (best-effort, falha não bloqueia).
-5. `connectInstance(token)`.
-6. Decisão:
-   - status conectado → `connected`, limpa `qr_code`, salva `phone_number`, `connected_at`.
-   - QR retornado → `qr_pending` + `qr_code`.
-   - caso contrário → `error` + `last_error`.
-7. Log + resposta `{ success, status, qr_code?, phone_number?, error? }`.
+- Mantém scheduling/horário permitido/retries/rate limit.
+- Filtra `whatsapp_accounts.status='connected'` e `allowed_sources` contém `'automation'`.
+- Remove chamadas diretas à Uazapi; passa a invocar `whatsapp-send` (via `supabase.functions.invoke` com `WHATSAPP_INTERNAL_SECRET`) com:
+  ```
+  { account_id, phone_number, message,
+    lead_id, conversation_id, source:'automation',
+    metadata:{ automation_id, step_position, phase } }
+  ```
+- Usa `phoneVariants` do shared para casar lead/conversa.
+- Mantém transições de status `active→processing→active|finished` e validação por trigger existente.
 
-### Fluxo `status`
-1. Se conta inexistente ou sem `api_key` → `disconnected`.
-2. `getInstanceStatus(token)`.
-3. Mapear → atualizar conta seguindo a invariante.
-4. Se status bruto indicar "need qr" → chamar `connectInstance` para obter QR e salvar `qr_pending`.
+## 5. `whatsapp-webhook` (refatorada)
 
-### Fluxo `refresh_qr`
-Reusa `connectInstance` sem recriar instância.
+- Mantém short-circuit `fromMe===true`.
+- Parser dedicado por evento Uazapi v2:
+  - `connection`: atualiza `whatsapp_accounts.status` + `phone_number`.
+  - `messages` (recebida): `upsert` em `whatsapp_messages` por `(account_id, message_id)` com `is_from_me=false`, `remote_jid`, `provider_payload`, `source='inbound'`; atualiza conversa (`last_message_at`, `last_customer_message_at`, `last_message_is_from_me=false`, `last_message_preview`).
+  - `messages_update` (ack do provider): atualiza `status` e `delivered_at|read_at|failed_at|error_message` da mensagem outbound por `message_id`.
+- Quando inbound: chama lógica existente de `promoteLeadOnReply` + pausa `whatsapp_automation_control` ativa (`status='responded'`).
+- Usa `resolveConversation` compartilhado.
 
-### Fluxo `disconnect`
-`disconnectInstance` + zera `qr_code`, `phone_number`, `status='disconnected'`. Mantém token.
+## 6. Frontend: chat e hooks
 
-### Fluxo `hard_reset`
-`deleteInstance` (best-effort) + apaga `api_key`, `qr_code`, `phone_number`, `instance_name`, status `disconnected`.
+Quebrar `useWhatsApp.tsx` em:
+- `useWhatsAppConnection` (já existe — não tocar).
+- `useWhatsAppChat(leadId)`:
+  - busca `account` connected (reusa cache do connection hook).
+  - resolve `conversation` por lead.
+  - lista mensagens (paginadas).
+  - `sendMessage` → invoca `whatsapp-send` com `source:'manual_crm'`, `lead_id`, `conversation_id`.
+  - subscreve realtime em `whatsapp_messages` filtrado por `conversation_id`.
+  - expõe `syncMessages` (chama `whatsapp-sync-messages`).
+- `useWhatsAppAutomation(leadId)`:
+  - hooks atuais de `startAutomation`/`toggleAutomation`/`useLeadAutomation`.
 
-### Fluxo `debug_health`
-Retorna config presente (sem secrets), ping na Uazapi (`GET /instance/all` com admin), e snapshot da conta.
+`WhatsAppChat.tsx` passa a consumir os 3 hooks separados. UI praticamente igual; remove o `useRef(hasSynced)` em favor de `useQuery` com `enabled` e `staleTime`.
 
-## 4. Frontend
+## 7. `process-billing-reminders` (refatorada)
 
-### Novo hook `src/hooks/useWhatsAppConnection.ts`
-- `useQuery(['wa-conn', agencyId, purpose])` → invoca `whatsapp-connect` action `status`.
-- `refetchInterval`: `(data) => ['provisioning','qr_pending'].includes(data?.status) ? 2000 : false`.
-- `staleTime: 0` apenas neste query.
-- Mutations: `connect`, `refreshQr`, `disconnect`, `hardReset` que invalidam o query.
-- Sem polling manual com `setInterval`/múltiplos `useEffect`.
+- Mantém seleção de pagamentos vencendo/atrasados, templates, anti-duplicação (`billing_message_logs`, `notification_tracking`).
+- Mantém escolha da `account` (purpose `billing` quando houver, fallback `general`).
+- Troca envio direto por `whatsapp-send`:
+  ```
+  { account_id, phone_number, message: rendered,
+    client_id, payment_id, source:'billing',
+    metadata:{ message_type:'reminder|overdue|due_today',
+               gateway, due_date, amount } }
+  ```
+- Conversa será criada com `context='billing'` e `client_id`.
 
-### Refator `WhatsAppInstanceCard.tsx`
-Renderização dirigida puramente pelo `status`:
-- `disconnected` → botão **Conectar WhatsApp**.
-- `provisioning` → spinner "Preparando instância...".
-- `qr_pending` + `qr_code` → `<img src={qr_code}/>` + dica "Escaneie no WhatsApp > Aparelhos conectados" + botão **Atualizar QR**.
-- `qr_pending` sem `qr_code` → alerta + botão **Atualizar QR**.
-- `connected` → badge verde, número, botões **Desconectar** / **Resetar conexão**.
-- `error` → alerta com `last_error`, botões **Tentar novamente** e **Resetar conexão** (hard_reset).
+## 8. Segurança / segredos
 
-Manter o restante de `WhatsAppIntegration.tsx` (toggle billing, relink orphans) como está.
+- Reutiliza `UAZAPI_SERVER_URL` apenas como fallback; preferir `account.api_url`.
+- Novo secret opcional `WHATSAPP_INTERNAL_SECRET` para autenticar chamadas server-to-server à `whatsapp-send` (queue/billing). Pedir ao usuário se ainda não existir.
+- Nunca logar `api_key`, `provider_payload` integral em logs públicos; armazenar payload em DB sob RLS já existente.
 
-## 5. Fora de escopo (não tocar)
-- `whatsapp-send`, `process-whatsapp-queue`, `process-lead-qualification`
-- `whatsapp-webhook` (recebimento de mensagens)
-- Chat do CRM, automações, régua de cobrança
+## 9. Ordem de execução
 
-## 6. Critérios de aceite
-- Click em Conectar → QR aparece em <5s.
-- Uazapi sem QR → UI mostra erro acionável, não trava em "Conectando".
-- Status nunca `qr_pending` sem `qr_code` no banco.
-- Após escanear, próximo poll (≤2s) muda para `connected` sem refresh.
-- Logs em `whatsapp_connection_logs` permitem auditar cada tentativa sem vazar token/QR.
+1. Migração (colunas + índice).
+2. Shared `uazapi.ts` (sendText/find) + novo `whatsapp.ts`.
+3. Reescrever `whatsapp-send`.
+4. Refator `whatsapp-webhook`.
+5. Refator `process-whatsapp-queue`.
+6. Refator `process-billing-reminders`.
+7. Split de hooks + `WhatsAppChat`.
+8. QA manual nos 4 critérios de sucesso.
 
-## Detalhes técnicos (referência)
+## Critérios de aceite (resumo)
 
-Endpoints Uazapi v2 usados:
-- `POST /instance/init` (header `admintoken`, body `{ name }`)
-- `GET  /instance/all` (header `admintoken`)
-- `POST /instance/connect` (header `token`)
-- `GET  /instance/status` (header `token`)
-- `POST /instance/disconnect` (header `token`)
-- `POST /instance/delete` (header `token`)
-- `POST /webhook` (header `token`, body `{ url, events, enabled:true }`)
+- Fase 1: envio manual no modal do lead chega no WhatsApp, aparece imediato no chat, cria/atualiza conversa e mensagem, atualiza `last_message_at`.
+- Fase 2: resposta do lead é gravada via webhook (upsert), chat atualiza por realtime, automação ativa vai para `responded`, `last_customer_message_at` é preenchido.
+- Fase 3: cadência envia respeitando delays/janela/retry e para ao receber resposta.
+- Fase 4: régua de cobrança envia pela instância correta, registra log e não duplica no mesmo dia.
 
-Secrets necessários (já presentes): `UAZAPI_SERVER_URL`, `UAZAPI_ADMIN_TOKEN`. Validar em `debug_health`.
+## Fora de escopo
+
+- `whatsapp-connect` e UI de conexão.
+- Mudanças no CRM além do chat do lead.
+- Envio de mídia (texto apenas nesta fase).
