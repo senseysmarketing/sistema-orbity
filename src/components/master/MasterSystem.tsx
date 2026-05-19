@@ -31,95 +31,8 @@ export function MasterSystem() {
   const [configs, setConfigs] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [masterWhatsapp, setMasterWhatsapp] = useState<{ status: string; qr_code?: string; phone?: string; instance?: any } | null>({ status: 'disconnected' });
-  const [loadingWhatsapp, setLoadingWhatsapp] = useState(false);
   const { toast } = useToast();
-
-  const fetchMasterWhatsappStatus = async () => {
-    // Somente mostra loading se ainda não tivermos um QR code ou status
-    if (!masterWhatsapp?.qr_code && masterWhatsapp?.status !== 'connected') {
-      setLoadingWhatsapp(true);
-    }
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('master-whatsapp', {
-        body: { action: 'status' }
-      });
-      if (error) throw error;
-      
-      setMasterWhatsapp(prev => {
-        const newQr = data.qr_code || data.qrcode || (data.instance?.qrcode);
-        return {
-          ...data,
-          qr_code: newQr || prev?.qr_code // Preserva o QR anterior se o novo for null
-        };
-      });
-    } catch (error) {
-      console.error('Error fetching master whatsapp status:', error);
-    } finally {
-      setLoadingWhatsapp(false);
-    }
-  };
-
-  const handleConnectMasterWhatsapp = async () => {
-    setLoadingWhatsapp(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('master-whatsapp', {
-        body: { action: 'connect' }
-      });
-      if (error) throw error;
-      
-      const newQr = data.qr_code || data.qrcode || (data.instance?.qrcode);
-      setMasterWhatsapp(prev => ({ 
-        ...prev, 
-        ...data,
-        qr_code: newQr || prev?.qr_code
-      }));
-      
-      if (newQr) {
-        toast({
-          title: 'QR Code gerado',
-          description: 'Leia o código com seu WhatsApp para conectar.',
-        });
-      }
-    } catch (error: any) {
-      console.error('Error connecting master whatsapp:', error);
-      toast({
-        title: 'Erro ao conectar',
-        description: error.message || 'Tente novamente em instantes',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoadingWhatsapp(false);
-    }
-  };
-
-  const handleDisconnectMasterWhatsapp = async () => {
-    setLoadingWhatsapp(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('master-whatsapp', {
-        body: { action: 'disconnect' }
-      });
-      if (error) throw error;
-      setMasterWhatsapp({
-        ...data,
-        qr_code: data.qr_code || data.qrcode || (data.instance?.qrcode)
-      });
-      toast({
-        title: 'WhatsApp Desconectado',
-        description: 'A instância foi desconectada com sucesso.',
-      });
-    } catch (error: any) {
-      console.error('Error disconnecting master whatsapp:', error);
-      toast({
-        title: 'Erro ao desconectar',
-        description: error.message || 'Tente novamente em instantes',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoadingWhatsapp(false);
-    }
-  };
+  const wa = useMasterWhatsApp();
 
   const fetchConfigs = async () => {
     setLoading(true);
@@ -152,22 +65,7 @@ export function MasterSystem() {
 
   useEffect(() => {
     fetchConfigs();
-    fetchMasterWhatsappStatus();
   }, []);
-
-  useEffect(() => {
-    let interval: any;
-    
-    if (masterWhatsapp?.status === 'connecting' || (!masterWhatsapp?.status && loadingWhatsapp)) {
-      interval = setInterval(() => {
-        fetchMasterWhatsappStatus();
-      }, 5000);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [masterWhatsapp?.status, loadingWhatsapp]);
 
   const saveAllConfigs = async () => {
     setSaving(true);
