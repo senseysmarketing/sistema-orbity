@@ -67,11 +67,21 @@ export function CompanyDataStep() {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       const cleanedPhone = phone.replace(/\D/g, '');
 
+      // Get verification template from system_config
+      const { data: configData } = await supabase
+        .from('system_config')
+        .select('value')
+        .eq('key', 'whatsapp_verification_template')
+        .maybeSingle();
+      
+      let messageTemplate = configData?.value ? JSON.parse(configData.value) : "Para finalizar seu acesso à Orbity, use o código: {code}";
+      const message = messageTemplate.replace('{code}', code);
+
       const { data, error } = await supabase.functions.invoke('master-whatsapp', {
         body: { 
           action: 'send_message', 
           phone: cleanedPhone, 
-          message: `Olá! O seu código de verificação do Orbity é: *${code}* 🚀` 
+          message: message
         },
       });
 
@@ -83,7 +93,8 @@ export function CompanyDataStep() {
       setCountdown(60);
       setOtpCode('');
       setShowOtp(true);
-    } catch {
+    } catch (err) {
+      console.error('Error sending OTP:', err);
       toast.error('Erro ao contactar o servidor. Tente novamente.');
     } finally {
       setIsSendingOtp(false);

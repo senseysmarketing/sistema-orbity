@@ -10,7 +10,7 @@ import { OrbityLeadsTable } from '@/components/master/OrbityLeadsTable';
 import { MasterSystem } from '@/components/master/MasterSystem';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, Building2, Settings, UserPlus } from 'lucide-react';
+import { BarChart3, Building2, Settings } from 'lucide-react';
 import { isMasterAgencyAdmin } from '@/lib/masterAccess';
 
 export default function Master() {
@@ -46,14 +46,10 @@ export default function Master() {
       <MasterMetricsCards />
 
       <Tabs defaultValue="agencies" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="agencies" className="flex items-center space-x-2">
             <Building2 className="h-4 w-4" />
-            <span>Agências</span>
-          </TabsTrigger>
-          <TabsTrigger value="leads" className="flex items-center space-x-2">
-            <UserPlus className="h-4 w-4" />
-            <span>Aplicações / Leads</span>
+            <span>Agências & Leads</span>
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center space-x-2">
             <BarChart3 className="h-4 w-4" />
@@ -61,15 +57,12 @@ export default function Master() {
           </TabsTrigger>
           <TabsTrigger value="system" className="flex items-center space-x-2">
             <Settings className="h-4 w-4" />
-            <span>Sistema</span>
+            <span>Configurações</span>
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="agencies" className="space-y-6">
           <AgenciesTable />
-        </TabsContent>
-
-        <TabsContent value="leads" className="space-y-6">
           <OrbityLeadsTable />
         </TabsContent>
 
