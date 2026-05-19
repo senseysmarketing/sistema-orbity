@@ -72,7 +72,32 @@ serve(async (req) => {
 
       let instanceToken = (integration?.credentials as any)?.instance_token;
 
-      // Step B: If no token, create instance
+      // Step B: Active Validation (Anti-Zombie)
+      if (instanceToken) {
+        console.log(`[whatsapp-connect] Validating token for agency ${agency_id}`);
+        try {
+          const infoRes = await fetch(`${apiUrl}/instance/info`, {
+            headers: { 'token': instanceToken }
+          });
+          
+          if (!infoRes.ok) {
+            console.log(`[whatsapp-connect] Token invalid (status ${infoRes.status}), resetting...`);
+            instanceToken = null;
+            // Immediate "Reset" in DB
+            const updatedCredentials = { ...(integration?.credentials as any || {}) };
+            delete updatedCredentials.instance_token;
+            await supabase.from('agency_integrations').update({
+              credentials: updatedCredentials,
+              updated_at: new Date().toISOString()
+            }).eq('agency_id', agency_id);
+          }
+        } catch (e) {
+          console.error('[whatsapp-connect] Validation call failed:', e);
+          instanceToken = null;
+        }
+      }
+
+      // Step C: If no token (new or reset), create instance
       if (!instanceToken) {
         console.log(`[whatsapp-connect] Creating new instance for agency ${agency_id}`);
         const createRes = await fetch(`${apiUrl}/instance/create`, {
