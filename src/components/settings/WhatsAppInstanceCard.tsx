@@ -111,8 +111,9 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
     );
   }
 
+  const isConnecting = account?.status === 'connecting' || isGenerating || connect.isPending;
   const showQrCode = qrCode && !isConnected;
-  const showConnectButton = !isConnected && !showQrCode && !isGenerating;
+  const showConnectButton = !isConnected && !showQrCode && !isConnecting;
 
   const IconComponent = purpose === 'billing' ? CreditCard : MessageSquare;
   const iconBgClass = purpose === 'billing'
