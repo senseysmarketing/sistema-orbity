@@ -107,6 +107,7 @@ serve(async (req) => {
 
     const { apiUrl, adminToken } = getUazapiConfig();
     const SETTING_KEY = 'master_whatsapp_instance';
+    const TABLE_NAME = 'system_config';
 
     switch (action) {
       case 'connect': {
@@ -152,17 +153,17 @@ serve(async (req) => {
 
         if (!instanceToken) throw new Error('Failed to obtain instance token');
 
-        // 2. Save to system_settings
+        // 2. Save to system_config
         const { error: upsertError } = await supabase
-          .from('system_settings')
+          .from(TABLE_NAME)
           .upsert({
             key: SETTING_KEY,
-            value: {
+            value: JSON.stringify({
               instance_name: instanceName,
               token: instanceToken,
               status: 'connecting',
               updated_at: new Date().toISOString()
-            }
+            })
           });
 
         if (upsertError) throw upsertError;
@@ -190,18 +191,27 @@ serve(async (req) => {
 
       case 'status': {
         const { data: setting } = await supabase
-          .from('system_settings')
+          .from(TABLE_NAME)
           .select('value')
           .eq('key', SETTING_KEY)
           .single();
 
-        if (!setting?.value?.token) {
+        let settingValue = setting?.value;
+        if (typeof settingValue === 'string') {
+          try {
+            settingValue = JSON.parse(settingValue);
+          } catch (e) {
+            console.error('Error parsing setting value:', e);
+          }
+        }
+
+        if (!settingValue?.token) {
           return new Response(JSON.stringify({ success: true, status: 'disconnected' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
 
-        const instanceToken = setting.value.token;
+        const instanceToken = settingValue.token;
         const statusRes = await fetch(`${apiUrl}/instance/status`, { 
           headers: { 'token': instanceToken } 
         });
@@ -210,11 +220,11 @@ serve(async (req) => {
         const isConnected = statusData?.status === 'connected';
         
         // Update status in settings if changed
-        if (isConnected && setting.value.status !== 'connected') {
+        if (isConnected && settingValue.status !== 'connected') {
           await supabase
-            .from('system_settings')
+            .from(TABLE_NAME)
             .update({
-              value: { ...setting.value, status: 'connected' }
+              value: JSON.stringify({ ...settingValue, status: 'connected' })
             })
             .eq('key', SETTING_KEY);
         }
@@ -230,14 +240,23 @@ serve(async (req) => {
         if (!phone || !message) throw new Error('Missing phone or message');
 
         const { data: setting } = await supabase
-          .from('system_settings')
+          .from(TABLE_NAME)
           .select('value')
           .eq('key', SETTING_KEY)
           .single();
 
-        if (!setting?.value?.token) throw new Error('Master WhatsApp instance not configured');
+        let settingValue = setting?.value;
+        if (typeof settingValue === 'string') {
+          try {
+            settingValue = JSON.parse(settingValue);
+          } catch (e) {
+            console.error('Error parsing setting value:', e);
+          }
+        }
 
-        const instanceToken = setting.value.token;
+        if (!settingValue?.token) throw new Error('Master WhatsApp instance not configured');
+
+        const instanceToken = settingValue.token;
         const formattedPhone = normalizeBrazilPhone(phone);
 
         const sendRes = await fetch(`${apiUrl}/send/text`, {
