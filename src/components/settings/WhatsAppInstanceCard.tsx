@@ -19,6 +19,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [autoChecked, setAutoChecked] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const {
     account,
@@ -45,9 +46,10 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
     }
   }, [account, autoChecked]);
 
-  // Poll status when connecting
+  // Poll status when connecting (Polling inteligente 3s)
   useEffect(() => {
-    if (account?.status === 'connecting' || qrCode) {
+    // Regra Anti-Flicker: Manter QR enquanto status for connecting
+    if ((account?.status === 'connecting' || qrCode) && !isConnected) {
       const interval = setInterval(async () => {
         try {
           const result = await checkStatus.mutateAsync();
@@ -55,17 +57,16 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
             setQrCode(null);
             setConnectionError(false);
           } else if (result?.qr_code) {
+            // Só atualiza se o QR code mudar, evitando flicker desnecessário
             setQrCode(result.qr_code);
           }
-          // Se result?.qr_code for null, mantemos o qrCode atual no estado
         } catch {
-          // Não definimos erro de conexão aqui para não interromper o polling visualmente
           console.log("Polling status check failed");
         }
-      }, 5000);
+      }, 3000);
       return () => clearInterval(interval);
     }
-  }, [account?.status, qrCode]);
+  }, [account?.status, qrCode, isConnected]);
 
   // Load QR from account
   useEffect(() => {
@@ -76,6 +77,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
 
   const handleConnect = async () => {
     try {
+      setIsGenerating(true);
       setConnectionError(false);
       const result = await connect.mutateAsync();
       if (result?.qr_code) {
@@ -83,6 +85,8 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
       }
     } catch {
       setConnectionError(true);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -108,7 +112,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
   }
 
   const showQrCode = qrCode && !isConnected;
-  const showConnectButton = !isConnected && !showQrCode;
+  const showConnectButton = !isConnected && !showQrCode && !isGenerating;
 
   const IconComponent = purpose === 'billing' ? CreditCard : MessageSquare;
   const iconBgClass = purpose === 'billing'
@@ -221,11 +225,11 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
           </>
         ) : (
           <div className="space-y-4">
-            {(showQrCode || connect.isPending) && (
+            {(showQrCode || isGenerating || connect.isPending) && (
               <div className="flex flex-col items-center gap-3 p-4 border rounded-lg bg-muted/30">
-                {connect.isPending && !qrCode && (
+                {(isGenerating || connect.isPending) && !qrCode && (
                   <div className="flex flex-col items-center justify-center py-8 gap-4">
-                    <Skeleton className="w-48 h-48 sm:w-64 sm:h-64 rounded-lg" />
+                    <Skeleton className="w-[250px] h-[250px] rounded-lg" />
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Gerando QR Code...
@@ -257,7 +261,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                           <img
                             src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`}
                             alt="WhatsApp QR Code"
-                            className="w-48 h-48 sm:w-64 sm:h-64 rounded-lg shadow-sm"
+                            className="w-[250px] h-[250px] rounded-lg shadow-sm"
                           />
                         </div>
                       </>
