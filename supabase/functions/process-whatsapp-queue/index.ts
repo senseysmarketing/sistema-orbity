@@ -372,8 +372,12 @@ serve(async (req) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}` },
           body: JSON.stringify({
-            account_id: account.id, phone_number: phoneNumber, message,
-            conversation_id: conv?.id, lead_id: record.lead_id,
+            account_id: account.id, 
+            agency_id: account.agency_id,
+            phone_number: phoneNumber, 
+            message,
+            conversation_id: conv?.id, 
+            lead_id: record.lead_id,
           }),
         });
 
