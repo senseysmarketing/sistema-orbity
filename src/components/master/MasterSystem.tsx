@@ -16,7 +16,8 @@ import {
   Smartphone,
   Save,
   MessageCircle,
-  Layout
+  Layout,
+  Unlink
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -71,6 +72,30 @@ export function MasterSystem() {
     }
   };
 
+  const handleDisconnectMasterWhatsapp = async () => {
+    setLoadingWhatsapp(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('master-whatsapp', {
+        body: { action: 'disconnect' }
+      });
+      if (error) throw error;
+      setMasterWhatsapp(data);
+      toast({
+        title: 'WhatsApp Desconectado',
+        description: 'A instância foi desconectada com sucesso.',
+      });
+    } catch (error: any) {
+      console.error('Error disconnecting master whatsapp:', error);
+      toast({
+        title: 'Erro ao desconectar',
+        description: error.message || 'Tente novamente em instantes',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingWhatsapp(false);
+    }
+  };
+
   const fetchConfigs = async () => {
     setLoading(true);
     try {
@@ -104,6 +129,20 @@ export function MasterSystem() {
     fetchConfigs();
     fetchMasterWhatsappStatus();
   }, []);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (masterWhatsapp?.status === 'connecting' || (!masterWhatsapp?.status && loadingWhatsapp)) {
+      interval = setInterval(() => {
+        fetchMasterWhatsappStatus();
+      }, 5000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [masterWhatsapp?.status, loadingWhatsapp]);
 
   const saveAllConfigs = async () => {
     setSaving(true);
