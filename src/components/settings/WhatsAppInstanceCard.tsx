@@ -225,11 +225,11 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
           </>
         ) : (
           <div className="space-y-4">
-            {(showQrCode || connect.isPending) && (
+            {(showQrCode || isGenerating || connect.isPending) && (
               <div className="flex flex-col items-center gap-3 p-4 border rounded-lg bg-muted/30">
-                {connect.isPending && !qrCode && (
+                {(isGenerating || connect.isPending) && !qrCode && (
                   <div className="flex flex-col items-center justify-center py-8 gap-4">
-                    <Skeleton className="w-48 h-48 sm:w-64 sm:h-64 rounded-lg" />
+                    <Skeleton className="w-[250px] h-[250px] rounded-lg" />
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Gerando QR Code...
