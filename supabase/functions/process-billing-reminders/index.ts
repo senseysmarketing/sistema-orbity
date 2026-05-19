@@ -286,7 +286,7 @@ serve(async (req) => {
               link_pagamento: paymentLink,
             });
 
-            // Send via whatsapp-send
+            // Send via whatsapp-send (unified outbound)
             const sendRes = await fetch(
               `${supabaseUrl}/functions/v1/whatsapp-send`,
               {
@@ -297,8 +297,18 @@ serve(async (req) => {
                 },
                 body: JSON.stringify({
                   account_id: waAccountId,
+                  agency_id: agencyId,
                   phone_number: phone,
                   message,
+                  client_id: payment.client_id,
+                  payment_id: payment.id,
+                  source: "billing",
+                  metadata: {
+                    message_type: msgType,
+                    gateway: gw,
+                    due_date: payment.due_date,
+                    amount: payment.amount,
+                  },
                 }),
               }
             );
