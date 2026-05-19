@@ -1,14 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { parseMessageStatus } from "../_shared/uazapi.ts";
+import {
+  extractMessageContent,
+  normalizePhone,
+  previewOf,
+  resolveConversation,
+} from "../_shared/whatsapp.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// ============================================================
-// CRM Vivo: auto-promote lead from initial column on first reply
-// ============================================================
+// ─────────────────────────────────────────────────────────────────────────────
+// CRM: auto-promote lead from initial column on first reply
+// ─────────────────────────────────────────────────────────────────────────────
 const INITIAL_STATUSES = new Set(['leads', 'new', 'novo']);
 
 function normalizeToCanonical(rawStatus: string | null | undefined): string {
@@ -49,9 +56,7 @@ async function promoteLeadOnReply(supabase: any, agencyId: string, leadId: strin
       .order('order_position', { ascending: true });
 
     let target = 'em_contato';
-    if (statuses && statuses.length >= 2) {
-      target = normalizeToCanonical(statuses[1].name);
-    }
+    if (statuses && statuses.length >= 2) target = normalizeToCanonical(statuses[1].name);
 
     await Promise.all([
       supabase.from('leads').update({ status: target }).eq('id', leadId),
@@ -67,35 +72,41 @@ async function promoteLeadOnReply(supabase: any, agencyId: string, leadId: strin
   }
 }
 
-function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, '');
-}
-
-function phoneVariants(phone: string): string[] {
-  const digits = normalizePhone(phone);
-  const variants = new Set<string>([digits, '+' + digits]);
-  // Simplified variants logic for brevity, matches old implementation
-  if (digits.startsWith('55')) {
-     const ddd = digits.slice(2, 4);
-     variants.add(digits.slice(2));
-     variants.add(ddd + digits.slice(4));
-  }
-  return [...variants];
-}
-
-async function findActiveAutomations(supabase: any, agencyId: string, conversationId: string, leadId: string | null, phoneNumber?: string): Promise<{ id: string }[]> {
-  const { data: byConv } = await supabase
-    .from('whatsapp_automation_control').select('id')
-    .eq('conversation_id', conversationId)
-    .in('status', ['active', 'processing']).limit(10);
-  if (byConv && byConv.length > 0) return byConv;
-  return [];
-}
-
 function isValidWhatsAppJid(remoteJid: string): boolean {
   if (!remoteJid) return false;
   if (remoteJid.includes('@g.us') || remoteJid === 'status@broadcast' || remoteJid.includes('@newsletter')) return false;
-  return remoteJid.includes('@s.whatsapp.net') || remoteJid.includes('@lid');
+  return remoteJid.includes('@s.whatsapp.net') || remoteJid.includes('@lid') || remoteJid.includes('@c.us');
+}
+
+function extractFromMe(payload: any): boolean {
+  return payload?.fromMe === true
+    || payload?.key?.fromMe === true
+    || payload?.message?.key?.fromMe === true
+    || payload?.data?.key?.fromMe === true;
+}
+
+function extractRemoteJid(payload: any): string {
+  return (
+    payload?.key?.remoteJid ||
+    payload?.message?.key?.remoteJid ||
+    payload?.remoteJid ||
+    payload?.chatid ||
+    payload?.chatId ||
+    payload?.data?.key?.remoteJid ||
+    ''
+  );
+}
+
+function extractMessageId(payload: any): string {
+  return (
+    payload?.key?.id ||
+    payload?.message?.key?.id ||
+    payload?.messageid ||
+    payload?.messageId ||
+    payload?.id ||
+    payload?.data?.key?.id ||
+    ''
+  );
 }
 
 serve(async (req) => {
@@ -105,74 +116,142 @@ serve(async (req) => {
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const bodyText = await req.text();
     if (!bodyText) return new Response('ok');
-    const body = JSON.parse(bodyText);
+    let body: any;
+    try { body = JSON.parse(bodyText); } catch { return new Response('ok'); }
 
-    const { event, instanceName, data } = body || {};
-    const instance = instanceName || body?.instance;
+    // Anti-loop / outbound echo
+    if (extractFromMe(body) || extractFromMe(body?.data)) {
+      return new Response('ok', { status: 200 });
+    }
 
-    // Filter 0: Anti-Loop / fromMe
-    if (data?.key?.fromMe === true) return new Response("OK", { status: 200 });
+    const event = body?.event || body?.type || body?.EventType;
+    const instance = body?.instanceName || body?.instance || body?.instance_name || body?.token_name;
+    const data = body?.data ?? body;
 
     if (!event || !instance) return new Response('ok');
 
-    const { data: account } = await supabase.from('whatsapp_accounts').select('id, agency_id').eq('instance_name', instance).maybeSingle();
+    // Resolve account by instance_name OR api_key (some webhooks send the instance token instead)
+    const { data: account } = await supabase
+      .from('whatsapp_accounts')
+      .select('id, agency_id, instance_name')
+      .or(`instance_name.eq.${instance},api_key.eq.${instance}`)
+      .maybeSingle();
     if (!account) return new Response('ok');
 
+    // ─── connection event ─────────────────────────────────────────────────
     if (event === 'connection') {
-      const state = data?.status || data?.state;
+      const state = data?.status || data?.state || data?.connection;
+      const rawPhone = data?.wuid || data?.phone || data?.owner || data?.instance?.wuid;
+      const phoneNumber = rawPhone ? normalizePhone(String(rawPhone).split('@')[0]) : null;
+
       if (state === 'connected' || state === 'open') {
-        const rawPhone = data?.wuid || data?.phone || data?.instance?.wuid;
-        const updateData: any = { status: 'connected', qr_code: null };
-        if (rawPhone) updateData.phone_number = String(rawPhone).split('@')[0].replace(/\D/g, '');
-        await supabase.from('whatsapp_accounts').update(updateData).eq('id', account.id);
-      } else if (state === 'disconnected' || state === 'close') {
+        const update: any = { status: 'connected', qr_code: null, connected_at: new Date().toISOString() };
+        if (phoneNumber) update.phone_number = phoneNumber;
+        await supabase.from('whatsapp_accounts').update(update).eq('id', account.id);
+      } else if (state === 'disconnected' || state === 'close' || state === 'closed') {
         await supabase.from('whatsapp_accounts').update({ status: 'disconnected' }).eq('id', account.id);
       }
+      return new Response('ok');
     }
 
-    if (event === 'messages') {
-      const key = data?.key;
-      const remoteJid = key?.remoteJid || '';
+    // ─── messages_update (ack) ────────────────────────────────────────────
+    if (event === 'messages_update' || event === 'message_update' || event === 'status') {
+      const messageId = extractMessageId(data);
+      const status = parseMessageStatus(data) || parseMessageStatus(data?.update);
+      if (messageId && status) {
+        const patch: Record<string, unknown> = { status };
+        const now = new Date().toISOString();
+        if (status === 'delivered') patch.delivered_at = now;
+        if (status === 'read') patch.read_at = now;
+        if (status === 'failed') {
+          patch.failed_at = now;
+          patch.error_message = data?.error || data?.update?.error || 'provider_failed';
+        }
+        await supabase
+          .from('whatsapp_messages')
+          .update(patch)
+          .eq('account_id', account.id)
+          .eq('message_id', messageId);
+      }
+      return new Response('ok');
+    }
+
+    // ─── inbound message ──────────────────────────────────────────────────
+    if (event === 'messages' || event === 'message' || event === 'messages.upsert') {
+      const remoteJid = extractRemoteJid(data);
       if (!isValidWhatsAppJid(remoteJid)) return new Response('ok');
 
-      const phoneNumber = normalizePhone(remoteJid.replace('@s.whatsapp.net', '').replace('@lid', ''));
-      const msgContent = data?.message?.message ? data.message.message : data?.message;
-      const content = msgContent?.conversation || msgContent?.extendedTextMessage?.text || '';
+      const rawPhone = remoteJid.replace(/@(s\.whatsapp\.net|c\.us|lid)$/i, '');
+      const phoneNumber = normalizePhone(rawPhone);
+      if (!phoneNumber) return new Response('ok');
 
-      // Find/Create conversation
-      let { data: conversation } = await supabase.from('whatsapp_conversations').select('id, lead_id').eq('account_id', account.id).eq('phone_number', phoneNumber).maybeSingle();
+      const { content, messageType } = extractMessageContent(data);
+      const messageId = extractMessageId(data) || crypto.randomUUID();
 
-      if (!conversation) {
-        const { data: leadRows } = await supabase.rpc('find_lead_by_normalized_phone', { p_agency_id: account.agency_id, p_phone_digits: phoneNumber });
-        const lead = leadRows?.[0] || null;
-        const { data: newConv } = await supabase.from('whatsapp_conversations').upsert({ account_id: account.id, phone_number: phoneNumber, lead_id: lead?.id || null }, { onConflict: 'account_id,phone_number' }).select().single();
-        conversation = newConv;
-      }
+      // Find linked lead (best-effort)
+      const { data: leadRows } = await supabase.rpc('find_lead_by_normalized_phone', {
+        p_agency_id: account.agency_id, p_phone_digits: phoneNumber,
+      });
+      const lead = leadRows?.[0] || null;
 
-      if (conversation) {
-        await supabase.from('whatsapp_messages').insert({
+      const conversation = await resolveConversation(supabase, {
+        accountId: account.id,
+        phone: phoneNumber,
+        leadId: lead?.id ?? null,
+        context: 'lead',
+        remoteJid,
+      });
+
+      const now = new Date().toISOString();
+
+      // Idempotent insert
+      await supabase
+        .from('whatsapp_messages')
+        .upsert({
           account_id: account.id,
-          message_id: key?.id || crypto.randomUUID(),
           conversation_id: conversation.id,
+          message_id: messageId,
           phone_number: phoneNumber,
           content,
+          message_type: messageType,
           is_from_me: false,
-          status: 'received'
-        });
+          status: 'received',
+          source: 'inbound',
+          remote_jid: remoteJid,
+          provider_payload: data,
+        }, { onConflict: 'account_id,message_id' });
 
-        // Update automation
-        const automations = await findActiveAutomations(supabase, account.agency_id, conversation.id, conversation.lead_id, phoneNumber);
-        for (const auth of automations) {
-          await supabase.from('whatsapp_automation_control').update({ status: 'responded', conversation_state: 'customer_replied' }).eq('id', auth.id);
-        }
+      // Update conversation timeline
+      await supabase
+        .from('whatsapp_conversations')
+        .update({
+          last_message_at: now,
+          last_customer_message_at: now,
+          last_message_is_from_me: false,
+          last_message_preview: previewOf(content || `[${messageType}]`),
+          remote_jid: remoteJid,
+        })
+        .eq('id', conversation.id);
 
-        // Promote Lead
-        if (conversation.lead_id) {
-          await promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id);
-        }
+      // Pause any active automation for this lead/conversation
+      if (conversation.lead_id) {
+        await supabase
+          .from('whatsapp_automation_control')
+          .update({ status: 'responded', conversation_state: 'customer_replied' })
+          .eq('account_id', account.id)
+          .eq('lead_id', conversation.lead_id)
+          .in('status', ['active', 'processing']);
 
-        await supabase.from('whatsapp_conversations').update({ last_message_at: new Date().toISOString(), last_message_is_from_me: false }).eq('id', conversation.id);
+        await promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id);
+      } else {
+        await supabase
+          .from('whatsapp_automation_control')
+          .update({ status: 'responded', conversation_state: 'customer_replied' })
+          .eq('conversation_id', conversation.id)
+          .in('status', ['active', 'processing']);
       }
+
+      return new Response('ok');
     }
 
     return new Response('ok');
