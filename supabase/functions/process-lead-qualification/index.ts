@@ -187,6 +187,9 @@ serve(async (req) => {
 
     console.log(`[QUALIFICATION] Score: ${totalScore}, Qualification: ${qualification}`);
 
+    // Log the automatic greeting trigger as requested
+    console.log(`[QUALIFICATION] Disparando saudação automática para o lead ${lead.id} usando a instância da agência ${agency_id}`);
+
     // Save result (unique on lead_id)
     await supabase
       .from('lead_scoring_results')

@@ -3,12 +3,21 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { phoneVariants } from "../_shared/phone.ts";
 import { assertAgencyAccess, HttpError } from "../_shared/auth.ts";
 
-// Normalize phone to digits-only with Brazil country code 55.
-function normalizeBrazilPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  const clean = digits.startsWith('0') ? digits.slice(1) : digits;
-  if (clean.length <= 11) return '55' + clean;
-  return clean;
+// Normalize phone to digits-only with DDI + DDD + Number format.
+function formatPhoneNumber(phone: string): string {
+  let digits = phone.replace(/\D/g, '');
+  
+  // Brazil handling: if starts with 0, remove it
+  if (digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+  
+  // If too short for country code, assume Brazil 55
+  if (digits.length <= 11) {
+    digits = '55' + digits;
+  }
+  
+  return digits;
 }
 
 async function readJson(res: Response): Promise<unknown> {
@@ -24,6 +33,7 @@ async function readJson(res: Response): Promise<unknown> {
 type UazapiSendResponse = {
   message?: { id?: string };
   id?: string;
+  success?: boolean;
 };
 
 const corsHeaders = {
@@ -41,32 +51,73 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { account_id, phone_number, message, conversation_id, lead_id } = await req.json();
+    const { account_id, agency_id, phone_number, message, conversation_id, lead_id } = await req.json();
 
-    if (!account_id || !phone_number || !message) {
-      throw new Error('Missing required fields: account_id, phone_number, message');
+    if ((!account_id && !agency_id) || !phone_number || !message) {
+      throw new Error('Missing required fields: (account_id or agency_id), phone_number, message');
     }
 
-    // Get account details
-    const { data: account, error: accError } = await supabase
-      .from('whatsapp_accounts')
-      .select('*')
-      .eq('id', account_id)
-      .single();
+    // Get token and API URL with multi-tenant isolation
+    let account;
+    if (account_id) {
+      const { data, error } = await supabase
+        .from('whatsapp_accounts')
+        .select('*')
+        .eq('id', account_id)
+        .single();
+      
+      if (error || !data) throw new Error('WhatsApp account not found');
+      account = data;
+    } else {
+      // Background resolution via agency_id
+      // Prioritize whatsapp_accounts as primary store for now, but check agency_integrations if credentials exist
+      const { data: integ } = await supabase
+        .from('agency_integrations')
+        .select('*')
+        .eq('agency_id', agency_id)
+        .maybeSingle();
 
-    if (accError || !account) throw new Error('WhatsApp account not found');
-    if (account.status !== 'connected') throw new Error('WhatsApp not connected');
+      // Check if credentials JSONB exists in agency_integrations (as per spec)
+      const specToken = (integ as any)?.credentials?.instance_token;
+      
+      if (specToken) {
+        account = {
+          api_key: specToken,
+          api_url: Deno.env.get('UAZAPI_SERVER_URL'),
+          agency_id: agency_id,
+          status: 'connected'
+        };
+      } else {
+        const { data: acc, error: accError } = await supabase
+          .from('whatsapp_accounts')
+          .select('*')
+          .eq('agency_id', agency_id)
+          .eq('status', 'connected')
+          .eq('purpose', 'general')
+          .maybeSingle();
+        
+        if (accError || !acc) {
+          throw new Error(`No active WhatsApp instance found for agency ${agency_id}`);
+        }
+        account = acc;
+      }
+    }
 
+    if (account.status !== 'connected' && account.status !== 'connecting') {
+      throw new Error('WhatsApp instance is not connected');
+    }
+
+    // Auth check (handles service role correctly)
     await assertAgencyAccess(req, supabase, account.agency_id);
 
-    const apiUrl = (Deno.env.get('UAZAPI_SERVER_URL') || '').replace(/\/$/, '');
-    const instanceToken = account.api_key; // Stored instance token
+    const apiUrl = (account.api_url || Deno.env.get('UAZAPI_SERVER_URL') || '').replace(/\/$/, '');
+    const instanceToken = account.api_key;
 
     if (!apiUrl || !instanceToken) {
       throw new Error('Uazapi API not configured or instance token missing');
     }
 
-    const formattedPhone = normalizeBrazilPhone(phone_number);
+    const formattedPhone = formatPhoneNumber(phone_number);
 
     // Ensure conversation exists
     let convId = conversation_id;
@@ -75,7 +126,7 @@ serve(async (req) => {
       const { data: existingConv } = await supabase
         .from('whatsapp_conversations')
         .select('id')
-        .eq('account_id', account_id)
+        .eq('account_id', account.id)
         .in('phone_number', variations)
         .limit(1)
         .maybeSingle();
@@ -86,20 +137,25 @@ serve(async (req) => {
         const { data: newConv, error: convError } = await supabase
           .from('whatsapp_conversations')
           .insert({
-            account_id,
+            account_id: account.id,
             phone_number: formattedPhone,
             lead_id: lead_id || null,
           })
           .select()
           .single();
 
-        if (convError) throw convError;
-        convId = newConv.id;
+        if (convError) {
+          console.error('[whatsapp-send] Error creating conversation:', convError);
+          // Non-critical, continue without conversation linking if necessary
+        } else {
+          convId = newConv.id;
+        }
       }
     }
 
-    // Send via Uazapi - normalize to digits with country code 55
-    const sendRes = await fetch(`${apiUrl}/send/text`, {
+    // Send via Uazapi using the strict specification
+    console.log(`[whatsapp-send] Sending message to ${formattedPhone} via Uazapi`);
+    const sendRes = await fetch(`${apiUrl}/message/sendText`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -112,47 +168,40 @@ serve(async (req) => {
     });
 
     const sendData = await readJson(sendRes) as UazapiSendResponse | null;
-    console.log('[whatsapp-send] Uazapi response:', {
-      status: sendRes.status,
-      ok: sendRes.ok,
-      body: sendData,
-    });
-
+    
     if (!sendRes.ok) {
+      console.error('[whatsapp-send] Uazapi API error:', sendData);
       throw new HttpError(502, `Uazapi API send error: ${JSON.stringify(sendData)}`);
     }
 
-    // Save message BEFORE webhook arrives
+    // Save message locally
     const messageId = sendData?.message?.id || sendData?.id || crypto.randomUUID();
 
-    await supabase
-      .from('whatsapp_messages')
-      .upsert({
-        account_id,
-        message_id: messageId,
-        conversation_id: convId,
-        phone_number: formattedPhone,
-        content: message,
-        message_type: 'text',
-        is_from_me: true,
-        status: 'sent',
-      }, { onConflict: 'account_id,message_id' });
+    if (account.id) {
+      await supabase
+        .from('whatsapp_messages')
+        .upsert({
+          account_id: account.id,
+          message_id: messageId,
+          conversation_id: convId,
+          phone_number: formattedPhone,
+          content: message,
+          message_type: 'text',
+          is_from_me: true,
+          status: 'sent',
+        }, { onConflict: 'account_id,message_id' });
 
-    // Update conversation
-    await supabase
-      .from('whatsapp_conversations')
-      .update({
-        last_message_at: new Date().toISOString(),
-        last_message_is_from_me: true,
-      })
-      .eq('id', convId);
-
-    console.log('[whatsapp-send] Message sent', {
-      account_id,
-      phone_number: formattedPhone,
-      message_id: messageId,
-      conversation_id: convId,
-    });
+      // Update conversation
+      if (convId) {
+        await supabase
+          .from('whatsapp_conversations')
+          .update({
+            last_message_at: new Date().toISOString(),
+            last_message_is_from_me: true,
+          })
+          .eq('id', convId);
+      }
+    }
 
     return new Response(JSON.stringify({
       success: true,
