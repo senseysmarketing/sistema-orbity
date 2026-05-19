@@ -261,7 +261,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                           <img
                             src={qrCode.startsWith('data:') ? qrCode : `data:image/png;base64,${qrCode}`}
                             alt="WhatsApp QR Code"
-                            className="w-48 h-48 sm:w-64 sm:h-64 rounded-lg shadow-sm"
+                            className="w-[250px] h-[250px] rounded-lg shadow-sm"
                           />
                         </div>
                       </>
