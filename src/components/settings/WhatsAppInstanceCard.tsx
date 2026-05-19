@@ -295,7 +295,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                   </p>
                 )}
               </div>
-            )}
+            ) : null}
 
             {showConnectButton && !connect.isPending && (
               <>
