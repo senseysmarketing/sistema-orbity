@@ -185,12 +185,17 @@ export function useWhatsApp(purpose: string = 'general') {
     },
   });
 
-  // Send message
+  // Send message (manual CRM context)
   const sendMessage = useMutation({
-    mutationFn: async (params: { phone_number: string; message: string; conversation_id?: string; lead_id?: string }) => {
+    mutationFn: async (params: { phone_number: string; message: string; conversation_id?: string; lead_id?: string; client_id?: string }) => {
       if (!account?.id) throw new Error('WhatsApp not configured');
       const { data, error } = await supabase.functions.invoke('whatsapp-send', {
-        body: { account_id: account.id, ...params },
+        body: {
+          account_id: account.id,
+          agency_id: currentAgency?.id,
+          source: 'manual_crm',
+          ...params,
+        },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Send failed');
