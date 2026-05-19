@@ -7349,10 +7349,16 @@ export type Database = {
           allowed_sources: Json | null
           api_key: string
           api_url: string
+          connected_at: string | null
           created_at: string | null
           id: string
           instance_name: string
+          last_checked_at: string | null
+          last_error: string | null
+          last_provider_payload: Json | null
           phone_number: string | null
+          provider: string
+          provider_status: string | null
           purpose: string
           qr_code: string | null
           sending_schedule: Json | null
@@ -7364,10 +7370,16 @@ export type Database = {
           allowed_sources?: Json | null
           api_key?: string
           api_url?: string
+          connected_at?: string | null
           created_at?: string | null
           id?: string
           instance_name: string
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_provider_payload?: Json | null
           phone_number?: string | null
+          provider?: string
+          provider_status?: string | null
           purpose?: string
           qr_code?: string | null
           sending_schedule?: Json | null
@@ -7379,10 +7391,16 @@ export type Database = {
           allowed_sources?: Json | null
           api_key?: string
           api_url?: string
+          connected_at?: string | null
           created_at?: string | null
           id?: string
           instance_name?: string
+          last_checked_at?: string | null
+          last_error?: string | null
+          last_provider_payload?: Json | null
           phone_number?: string | null
+          provider?: string
+          provider_status?: string | null
           purpose?: string
           qr_code?: string | null
           sending_schedule?: Json | null
@@ -7527,6 +7545,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      whatsapp_connection_logs: {
+        Row: {
+          account_id: string | null
+          action: string
+          agency_id: string
+          created_at: string
+          error_message: string | null
+          execution_id: string | null
+          has_qr: boolean | null
+          has_token: boolean | null
+          http_status: number | null
+          id: string
+          payload_keys: string[] | null
+          provider: string
+          provider_endpoint: string | null
+          provider_status: string | null
+          purpose: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          action: string
+          agency_id: string
+          created_at?: string
+          error_message?: string | null
+          execution_id?: string | null
+          has_qr?: boolean | null
+          has_token?: boolean | null
+          http_status?: number | null
+          id?: string
+          payload_keys?: string[] | null
+          provider?: string
+          provider_endpoint?: string | null
+          provider_status?: string | null
+          purpose?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          action?: string
+          agency_id?: string
+          created_at?: string
+          error_message?: string | null
+          execution_id?: string | null
+          has_qr?: boolean | null
+          has_token?: boolean | null
+          http_status?: number | null
+          id?: string
+          payload_keys?: string[] | null
+          provider?: string
+          provider_endpoint?: string | null
+          provider_status?: string | null
+          purpose?: string | null
+        }
+        Relationships: []
       }
       whatsapp_conversations: {
         Row: {
