@@ -481,6 +481,7 @@ export function useWhatsApp(purpose: string = 'general') {
     checkStatus,
     checkWebhook,
     refreshQR,
+    hardReset,
     sendMessage,
     syncMessages,
     startAutomation,
