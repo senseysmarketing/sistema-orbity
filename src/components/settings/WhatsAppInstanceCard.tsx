@@ -227,7 +227,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
           </>
         ) : (
           <div className="space-y-4">
-            {(showQrCode || isGenerating || connect.isPending || account?.status === 'connecting') && (
+            {(showQrCode || isGenerating || connect.isPending || account?.status === 'connecting') ? (
               <div className="flex flex-col items-center gap-3 p-4 border rounded-lg bg-muted/30 min-h-[350px] justify-center transition-all duration-300">
                 {/* Loader state when we have no QR yet but are connecting/generating */}
                 {((isGenerating || connect.isPending || account?.status === 'connecting') && !qrCode) && (
