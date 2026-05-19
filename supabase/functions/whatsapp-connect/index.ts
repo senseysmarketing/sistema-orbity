@@ -163,20 +163,59 @@ serve(async (req) => {
        const { data: acc } = await supabase.from('whatsapp_accounts').select('api_key').eq('agency_id', agency_id).eq('purpose', purpose).single();
        if (!acc?.api_key) return new Response(JSON.stringify({ success: true, status: 'disconnected' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
        
-       const res = await fetch(`${apiUrl}/instance/status`, { headers: { 'token': acc.api_key } });
-       const data = await res.json();
-       const rawStatus = data?.status || 'disconnected';
+       let infoRes;
+       try {
+         infoRes = await fetch(`${apiUrl}/instance/info`, { headers: { 'token': acc.api_key } });
+       } catch (e) {
+         console.error('[whatsapp-connect] Status info call failed:', e);
+         return new Response(JSON.stringify({ success: false, error: 'Could not connect to Uazapi' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+       }
+
+       // Anti-Zombie Reset for Status check
+       if (!infoRes.ok && (infoRes.status === 401 || infoRes.status === 404)) {
+         console.log(`[whatsapp-connect] Token invalid on status check (${infoRes.status}), resetting...`);
+         
+         // Clear in agency_integrations
+         const { data: integration } = await supabase.from('agency_integrations').select('credentials').eq('agency_id', agency_id).maybeSingle();
+         const updatedCredentials = { ...(integration?.credentials as any || {}) };
+         delete updatedCredentials.instance_token;
+         await supabase.from('agency_integrations').update({ credentials: updatedCredentials }).eq('agency_id', agency_id);
+         
+         // Update account
+         await supabase.from('whatsapp_accounts').update({ status: 'disconnected', api_key: null, qr_code: null }).eq('agency_id', agency_id).eq('purpose', purpose);
+         
+         return new Response(JSON.stringify({ success: true, status: 'disconnected', reset: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+       }
+
+       const data = await infoRes.json();
+       const rawStatus = data?.status || data?.instance?.status || 'disconnected';
        const isConnected = rawStatus === 'connected';
-       const newStatus = isConnected ? 'connected' : (['connecting', 'qr'].includes(rawStatus) ? 'connecting' : 'disconnected');
+       const newStatus = isConnected ? 'connected' : (['connecting', 'qr', 'OPENING'].includes(rawStatus) ? 'connecting' : 'disconnected');
        
        let qr_code = null;
        if (!isConnected) {
          const qrRes = await fetch(`${apiUrl}/instance/connect`, { headers: { 'token': acc.api_key } });
-         const qrData = await qrRes.json();
-         qr_code = qrData.base64 || qrData.qr_code || qrData.qrcode;
+         if (qrRes.ok) {
+           const qrData = await qrRes.json();
+           qr_code = qrData.base64 || qrData.qr_code || qrData.qrcode;
+         }
        }
 
-       return new Response(JSON.stringify({ success: true, status: newStatus, qr_code }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+       // Update DB status if changed
+       if (newStatus) {
+         await supabase.from('whatsapp_accounts').update({ 
+           status: newStatus, 
+           qr_code: qr_code,
+           phone_number: data?.instance?.owner || data?.owner || null
+         }).eq('agency_id', agency_id).eq('purpose', purpose);
+       }
+
+       return new Response(JSON.stringify({ 
+         success: true, 
+         status: newStatus, 
+         qr_code,
+         phone_number: data?.instance?.owner || data?.owner || null 
+       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     if (action === 'disconnect') {
