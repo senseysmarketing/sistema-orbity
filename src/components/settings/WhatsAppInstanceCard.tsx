@@ -228,8 +228,8 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                     </div>
                   </div>
                 )}
-                {showQrCode && (
-                {connectionError && (
+                {showQrCode && !connectionError && (
+
                   <Alert variant="destructive" className="w-full">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
