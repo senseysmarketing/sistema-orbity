@@ -306,6 +306,11 @@ serve(async (req) => {
             await fetch(`${apiUrl}/instance/logout`, {
               method: 'POST',
               headers: { 'token': account.api_key },
+              body: JSON.stringify({ 
+                instanceName: account.instance_name,
+                name: account.instance_name,
+                Name: account.instance_name
+              }),
             });
           } catch (e) {
             console.log('Logout error (non-critical):', (e as Error).message);
