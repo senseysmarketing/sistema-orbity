@@ -7603,11 +7603,14 @@ export type Database = {
       whatsapp_conversations: {
         Row: {
           account_id: string
+          client_id: string | null
+          context: string | null
           created_at: string | null
           id: string
           last_customer_message_at: string | null
           last_message_at: string | null
           last_message_is_from_me: boolean | null
+          last_message_preview: string | null
           lead_id: string | null
           phone_number: string
           remote_jid: string | null
@@ -7616,11 +7619,14 @@ export type Database = {
         }
         Insert: {
           account_id: string
+          client_id?: string | null
+          context?: string | null
           created_at?: string | null
           id?: string
           last_customer_message_at?: string | null
           last_message_at?: string | null
           last_message_is_from_me?: boolean | null
+          last_message_preview?: string | null
           lead_id?: string | null
           phone_number: string
           remote_jid?: string | null
@@ -7629,11 +7635,14 @@ export type Database = {
         }
         Update: {
           account_id?: string
+          client_id?: string | null
+          context?: string | null
           created_at?: string | null
           id?: string
           last_customer_message_at?: string | null
           last_message_at?: string | null
           last_message_is_from_me?: boolean | null
+          last_message_preview?: string | null
           lead_id?: string | null
           phone_number?: string
           remote_jid?: string | null
@@ -7721,11 +7730,20 @@ export type Database = {
           content: string | null
           conversation_id: string | null
           created_at: string | null
+          delivered_at: string | null
+          error_message: string | null
+          failed_at: string | null
           id: string
           is_from_me: boolean | null
           message_id: string
           message_type: string | null
+          metadata: Json | null
           phone_number: string | null
+          provider_payload: Json | null
+          read_at: string | null
+          remote_jid: string | null
+          sent_at: string | null
+          source: string | null
           status: string | null
           updated_at: string | null
         }
@@ -7734,11 +7752,20 @@ export type Database = {
           content?: string | null
           conversation_id?: string | null
           created_at?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          failed_at?: string | null
           id?: string
           is_from_me?: boolean | null
           message_id: string
           message_type?: string | null
+          metadata?: Json | null
           phone_number?: string | null
+          provider_payload?: Json | null
+          read_at?: string | null
+          remote_jid?: string | null
+          sent_at?: string | null
+          source?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -7747,11 +7774,20 @@ export type Database = {
           content?: string | null
           conversation_id?: string | null
           created_at?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          failed_at?: string | null
           id?: string
           is_from_me?: boolean | null
           message_id?: string
           message_type?: string | null
+          metadata?: Json | null
           phone_number?: string | null
+          provider_payload?: Json | null
+          read_at?: string | null
+          remote_jid?: string | null
+          sent_at?: string | null
+          source?: string | null
           status?: string | null
           updated_at?: string | null
         }
