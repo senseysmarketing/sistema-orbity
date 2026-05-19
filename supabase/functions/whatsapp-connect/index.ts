@@ -158,13 +158,8 @@ serve(async (req) => {
 
         // 4. Get QR code
         const connectRes = await fetch(`${apiUrl}/instance/connect`, {
-          method: 'POST',
+          method: 'GET',
           headers: { 'token': instanceToken },
-          body: JSON.stringify({ 
-            instanceName,
-            name: instanceName,
-            Name: instanceName
-          }),
         });
 
         const connectData = await connectRes.json();
@@ -256,13 +251,8 @@ serve(async (req) => {
           if (!isConnected) {
             try {
               const qrRes = await fetch(`${apiUrl}/instance/connect`, {
-                method: 'POST',
-                headers: { 'token': instanceToken },
-                body: JSON.stringify({ 
-                  instanceName: account.instance_name,
-                  name: account.instance_name,
-                  Name: account.instance_name
-                }),
+                method: 'GET',
+                headers: { 'token': instanceToken }
               });
               const qrData = await qrRes.json();
               if (qrData.base64) {
@@ -338,13 +328,8 @@ serve(async (req) => {
         if (!account || !account.api_key) throw new Error('No valid WhatsApp account found');
 
         const qrRes = await fetch(`${apiUrl}/instance/connect`, {
-          method: 'POST',
-          headers: { 'token': account.api_key },
-          body: JSON.stringify({ 
-            instanceName: account.instance_name,
-            name: account.instance_name,
-            Name: account.instance_name
-          }),
+          method: 'GET',
+          headers: { 'token': account.api_key }
         });
         const qrData = await qrRes.json();
 
