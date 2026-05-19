@@ -14,6 +14,7 @@ function getUazapiConfig() {
 }
 
 function generateInstanceName(agencyId: string, purpose: string): string {
+  // Use a cleaner name format
   return `orbity_agency_${agencyId.substring(0, 8)}_${purpose}`;
 }
 
@@ -59,10 +60,44 @@ serve(async (req) => {
     if (!membership || !['owner', 'admin'].includes(membership.role)) throw new Error('Unauthorized');
 
     const { apiUrl, adminToken } = getUazapiConfig();
+    const instanceName = generateInstanceName(agency_id, purpose);
+
+    // Hard Reset Logic
+    if (action === 'hard_reset') {
+      console.log(`[whatsapp-connect] Performing Hard Reset for agency ${agency_id}`);
+      
+      // 1. Clear credentials in agency_integrations
+      const { data: integration } = await supabase.from('agency_integrations').select('credentials').eq('agency_id', agency_id).maybeSingle();
+      const credentials = integration?.credentials as any || {};
+      
+      // Attempt to logout/delete instance from Uazapi if token exists
+      if (credentials.instance_token) {
+        await fetch(`${apiUrl}/instance/logout`, { method: 'POST', headers: { 'token': credentials.instance_token } }).catch(() => {});
+        await fetch(`${apiUrl}/instance/delete`, { 
+          method: 'DELETE', 
+          headers: { 'admintoken': adminToken },
+          body: JSON.stringify({ name: instanceName }) 
+        }).catch(() => {});
+      }
+
+      // 2. Wipe DB records
+      const updatedCredentials = { ...credentials };
+      delete updatedCredentials.instance_token;
+      // Also remove legacy evolution fields if any
+      delete updatedCredentials.evolution_api_key;
+      delete updatedCredentials.evolution_url;
+
+      await supabase.from('agency_integrations').update({
+        credentials: updatedCredentials,
+        updated_at: new Date().toISOString()
+      }).eq('agency_id', agency_id);
+
+      await supabase.from('whatsapp_accounts').delete().eq('agency_id', agency_id).eq('purpose', purpose);
+
+      return new Response(JSON.stringify({ success: true, message: 'Hard reset complete' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     if (action === 'connect' || action === 'refresh_qr') {
-      const instanceName = generateInstanceName(agency_id, purpose);
-      
       // Step A: Check agency_integrations for existing token
       const { data: integration } = await supabase
         .from('agency_integrations')
@@ -70,36 +105,25 @@ serve(async (req) => {
         .eq('agency_id', agency_id)
         .maybeSingle();
 
-      let instanceToken = (integration?.credentials as any)?.instance_token;
+      let credentials = integration?.credentials as any || {};
+      let instanceToken = credentials.instance_token;
 
-      // Step B: Active Validation (Anti-Zombie)
+      // Active Validation (Anti-Zombie)
       if (instanceToken) {
-        console.log(`[whatsapp-connect] Validating token for agency ${agency_id}`);
         try {
-          const infoRes = await fetch(`${apiUrl}/instance/info`, {
-            headers: { 'token': instanceToken }
-          });
-          
+          const infoRes = await fetch(`${apiUrl}/instance/info`, { headers: { 'token': instanceToken } });
           if (!infoRes.ok) {
-            console.log(`[whatsapp-connect] Token invalid (status ${infoRes.status}), resetting...`);
+            console.log(`[whatsapp-connect] Token invalid (${infoRes.status}), resetting...`);
             instanceToken = null;
-            // Immediate "Reset" in DB
-            const updatedCredentials = { ...(integration?.credentials as any || {}) };
-            delete updatedCredentials.instance_token;
-            await supabase.from('agency_integrations').update({
-              credentials: updatedCredentials,
-              updated_at: new Date().toISOString()
-            }).eq('agency_id', agency_id);
           }
         } catch (e) {
-          console.error('[whatsapp-connect] Validation call failed:', e);
           instanceToken = null;
         }
       }
 
-      // Step C: If no token (new or reset), create instance
+      // If no token or invalid, create new instance
       if (!instanceToken) {
-        console.log(`[whatsapp-connect] Creating new instance for agency ${agency_id}`);
+        console.log(`[whatsapp-connect] Creating new instance: ${instanceName}`);
         const createRes = await fetch(`${apiUrl}/instance/create`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'admintoken': adminToken },
@@ -113,6 +137,7 @@ serve(async (req) => {
 
         instanceToken = createData.token || createData.instance?.token;
 
+        // If conflict (409), list and find token
         if (!instanceToken && createRes.status === 409) {
           const listRes = await fetch(`${apiUrl}/instance/list`, { headers: { 'admintoken': adminToken } });
           const listData = await listRes.json();
@@ -122,16 +147,20 @@ serve(async (req) => {
 
         if (!instanceToken) throw new Error('Could not obtain instance token');
 
-        // Save token to agency_integrations
-        const newCredentials = { ...(integration?.credentials as any || {}), instance_token: instanceToken };
+        // Save to DB
+        credentials.instance_token = instanceToken;
+        // Clean up legacy
+        delete credentials.evolution_api_key;
+        delete credentials.evolution_url;
+
         await supabase.from('agency_integrations').upsert({
           agency_id,
-          credentials: newCredentials,
+          credentials,
           updated_at: new Date().toISOString()
         });
       }
 
-      // Sync with whatsapp_accounts for legacy/UI compatibility
+      // Sync whatsapp_accounts
       await supabase.from('whatsapp_accounts').upsert({
         agency_id,
         instance_name: instanceName,
@@ -141,12 +170,11 @@ serve(async (req) => {
         purpose,
       }, { onConflict: 'agency_id,purpose' });
 
-      // Step C: Always get QR/Connect
+      // Always configure webhook
       await configureWebhook(apiUrl, instanceToken, agency_id);
-      const connectRes = await fetch(`${apiUrl}/instance/connect`, {
-        method: 'GET',
-        headers: { 'token': instanceToken },
-      });
+
+      // Get QR
+      const connectRes = await fetch(`${apiUrl}/instance/connect`, { headers: { 'token': instanceToken } });
       const connectData = await connectRes.json();
       const qrCode = connectData.base64 || connectData.qr_code || connectData.qrcode || connectData.instance?.qrcode;
 
@@ -157,8 +185,6 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Pass through other actions (status, disconnect, etc) but following same token logic if needed
-    // For brevity and focus on the user's critical path:
     if (action === 'status') {
        const { data: acc } = await supabase.from('whatsapp_accounts').select('api_key').eq('agency_id', agency_id).eq('purpose', purpose).single();
        if (!acc?.api_key) return new Response(JSON.stringify({ success: true, status: 'disconnected' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -167,24 +193,11 @@ serve(async (req) => {
        try {
          infoRes = await fetch(`${apiUrl}/instance/info`, { headers: { 'token': acc.api_key } });
        } catch (e) {
-         console.error('[whatsapp-connect] Status info call failed:', e);
          return new Response(JSON.stringify({ success: false, error: 'Could not connect to Uazapi' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
        }
 
-       // Anti-Zombie Reset for Status check
-       if (!infoRes.ok && (infoRes.status === 401 || infoRes.status === 404)) {
-         console.log(`[whatsapp-connect] Token invalid on status check (${infoRes.status}), resetting...`);
-         
-         // Clear in agency_integrations
-         const { data: integration } = await supabase.from('agency_integrations').select('credentials').eq('agency_id', agency_id).maybeSingle();
-         const updatedCredentials = { ...(integration?.credentials as any || {}) };
-         delete updatedCredentials.instance_token;
-         await supabase.from('agency_integrations').update({ credentials: updatedCredentials }).eq('agency_id', agency_id);
-         
-         // Update account
-         await supabase.from('whatsapp_accounts').update({ status: 'disconnected', api_key: null, qr_code: null }).eq('agency_id', agency_id).eq('purpose', purpose);
-         
-         return new Response(JSON.stringify({ success: true, status: 'disconnected', reset: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+       if (!infoRes.ok) {
+         return new Response(JSON.stringify({ success: true, status: 'disconnected', invalid: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
        }
 
        const data = await infoRes.json();
@@ -201,14 +214,11 @@ serve(async (req) => {
          }
        }
 
-       // Update DB status if changed
-       if (newStatus) {
-         await supabase.from('whatsapp_accounts').update({ 
-           status: newStatus, 
-           qr_code: qr_code,
-           phone_number: data?.instance?.owner || data?.owner || null
-         }).eq('agency_id', agency_id).eq('purpose', purpose);
-       }
+       await supabase.from('whatsapp_accounts').update({ 
+         status: newStatus, 
+         qr_code: qr_code,
+         phone_number: data?.instance?.owner || data?.owner || null
+       }).eq('agency_id', agency_id).eq('purpose', purpose);
 
        return new Response(JSON.stringify({ 
          success: true, 
@@ -219,11 +229,11 @@ serve(async (req) => {
     }
 
     if (action === 'disconnect') {
-       const { data: acc } = await supabase.from('whatsapp_accounts').select('api_key, instance_name').eq('agency_id', agency_id).eq('purpose', purpose).single();
+       const { data: acc } = await supabase.from('whatsapp_accounts').select('api_key').eq('agency_id', agency_id).eq('purpose', purpose).single();
        if (acc?.api_key) {
-         await fetch(`${apiUrl}/instance/logout`, { method: 'POST', headers: { 'token': acc.api_key }, body: JSON.stringify({ instanceName: acc.instance_name }) }).catch(() => {});
-         await supabase.from('whatsapp_accounts').update({ status: 'disconnected', qr_code: null }).eq('agency_id', agency_id).eq('purpose', purpose);
+         await fetch(`${apiUrl}/instance/logout`, { method: 'POST', headers: { 'token': acc.api_key } }).catch(() => {});
        }
+       await supabase.from('whatsapp_accounts').update({ status: 'disconnected', qr_code: null }).eq('agency_id', agency_id).eq('purpose', purpose);
        return new Response(JSON.stringify({ success: true, status: 'disconnected' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 

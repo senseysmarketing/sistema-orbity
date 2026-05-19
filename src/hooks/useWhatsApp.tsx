@@ -167,6 +167,24 @@ export function useWhatsApp(purpose: string = 'general') {
     },
   });
 
+  // Hard Reset
+  const hardReset = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('whatsapp-connect', {
+        body: { action: 'hard_reset', agency_id: currentAgency?.id, purpose },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-account', currentAgency?.id, purpose] });
+      toast({ title: 'Reset completo', description: 'A conexão foi limpa com sucesso.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao resetar', description: error.message, variant: 'destructive' });
+    },
+  });
+
   // Send message
   const sendMessage = useMutation({
     mutationFn: async (params: { phone_number: string; message: string; conversation_id?: string; lead_id?: string }) => {
@@ -463,6 +481,7 @@ export function useWhatsApp(purpose: string = 'general') {
     checkStatus,
     checkWebhook,
     refreshQR,
+    hardReset,
     sendMessage,
     syncMessages,
     startAutomation,

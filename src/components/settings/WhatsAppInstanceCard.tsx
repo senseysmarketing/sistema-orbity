@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle, AlertTriangle, Link2, CreditCard } from "lucide-react";
+import { Check, Loader2, MessageSquare, QrCode, RefreshCw, Unlink, Wifi, AlertCircle, AlertTriangle, Link2, CreditCard, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWhatsApp } from "@/hooks/useWhatsApp";
@@ -30,6 +30,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
     checkStatus,
     checkWebhook,
     refreshQR,
+    hardReset,
   } = useWhatsApp(purpose);
 
   // Auto-check status when account exists but not connected
@@ -46,25 +47,22 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
     }
   }, [account, autoChecked]);
 
-  // Poll status when connecting (Polling inteligente 3s)
+  // Polling de Status (2s) - Hard Reset Refactor
   useEffect(() => {
-    // Regra Anti-Flicker: Manter QR enquanto status for connecting ou enquanto tivermos um QR code mas não estivermos conectados
     if (!isConnected && (account?.status === 'connecting' || qrCode)) {
       const interval = setInterval(async () => {
         try {
           const result = await checkStatus.mutateAsync();
-          // Só entramos em connected se a API retornar explicitamente status: 'connected'
           if (result?.status === 'connected') {
             setQrCode(null);
             setConnectionError(false);
           } else if (result?.qr_code) {
-            // Só atualiza se o QR code for retornado, mantendo o anterior caso contrário (Anti-Flicker)
             setQrCode(result.qr_code);
           }
         } catch (err) {
           console.error("Polling status check failed:", err);
         }
-      }, 3000);
+      }, 2000);
       return () => clearInterval(interval);
     }
   }, [account?.status, qrCode, isConnected]);
@@ -100,6 +98,16 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
         setQrCode(null);
       }
     } catch {}
+  };
+
+  const handleHardReset = async () => {
+    if (confirm("Deseja realmente apagar todos os tokens e resetar a conexão? Isso forçará a geração de um novo QR Code.")) {
+      try {
+        setQrCode(null);
+        await hardReset.mutateAsync();
+        setAutoChecked(false);
+      } catch {}
+    }
   };
 
   if (isLoadingAccount) {
@@ -227,10 +235,9 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
           </>
         ) : (
           <div className="space-y-4">
-            {(showQrCode || isGenerating || connect.isPending || account?.status === 'connecting') ? (
+            {(showQrCode || isConnecting) ? (
               <div className="flex flex-col items-center gap-3 p-4 border rounded-lg bg-muted/30 min-h-[350px] justify-center transition-all duration-300">
-                {/* Loader state when we have no QR yet but are connecting/generating */}
-                {((isGenerating || connect.isPending || account?.status === 'connecting') && !qrCode) && (
+                {(!qrCode && isConnecting) && (
                   <div className="flex flex-col items-center justify-center py-8 gap-4 animate-in fade-in duration-500">
                     <Skeleton className="w-[250px] h-[250px] rounded-lg bg-muted-foreground/10" />
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -246,7 +253,7 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                       <Alert variant="destructive" className="w-full">
                         <AlertTriangle className="h-4 w-4" />
                         <AlertDescription>
-                          Erro ao conectar. Tente novamente ou entre em contato com o suporte.
+                          Erro ao conectar. Tente novamente ou realize um reset de conexão.
                         </AlertDescription>
                       </Alert>
                     ) : (
@@ -272,22 +279,39 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
                   </div>
                 )}
                 
-                {(showQrCode || account?.status === 'connecting') && (
+                <div className="flex flex-wrap gap-2 justify-center mt-2">
+                  {(showQrCode || account?.status === 'connecting') && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleRefreshQR} 
+                      disabled={refreshQR.isPending}
+                      className="transition-all hover:bg-muted"
+                    >
+                      {refreshQR.isPending ? (
+                        <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-1 h-4 w-4" />
+                      )}
+                      Atualizar QR Code
+                    </Button>
+                  )}
+                  
                   <Button 
-                    variant="outline" 
+                    variant="ghost" 
                     size="sm" 
-                    onClick={handleRefreshQR} 
-                    disabled={refreshQR.isPending}
-                    className="mt-2 transition-all hover:bg-muted"
+                    onClick={handleHardReset} 
+                    disabled={hardReset.isPending}
+                    className="text-muted-foreground hover:text-destructive transition-all"
                   >
-                    {refreshQR.isPending ? (
+                    {hardReset.isPending ? (
                       <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                     ) : (
-                      <RefreshCw className="mr-1 h-4 w-4" />
+                      <Trash2 className="mr-1 h-4 w-4" />
                     )}
-                    Atualizar QR Code
+                    Resetar Conexão
                   </Button>
-                )}
+                </div>
                 
                 {showQrCode && !connectionError && (
                   <p className="text-[11px] text-muted-foreground text-center max-w-[250px] leading-relaxed">
@@ -299,49 +323,49 @@ export const WhatsAppInstanceCard = ({ purpose, title, description }: WhatsAppIn
 
             {showConnectButton && !connect.isPending && (
               <>
-                {purpose === 'general' && (
-                  <div className="p-3 sm:p-4 border rounded-lg bg-muted/30 space-y-2">
-                    <p className="text-sm font-medium">Recursos disponíveis:</p>
-                    <ul className="text-xs sm:text-sm text-muted-foreground space-y-1">
-                      <li>• Mensagens automáticas de saudação</li>
-                      <li>• Follow-ups programados</li>
-                      <li>• Espelhamento de conversas no CRM</li>
-                      <li className="hidden sm:list-item">• Detecção de resposta do cliente</li>
-                    </ul>
-                  </div>
-                )}
-                {purpose === 'billing' && (
-                  <div className="p-3 sm:p-4 border rounded-lg bg-muted/30 space-y-2">
-                    <p className="text-sm font-medium">Recursos do número financeiro:</p>
-                    <ul className="text-xs sm:text-sm text-muted-foreground space-y-1">
-                      <li>• Lembretes automáticos de cobrança</li>
-                      <li>• Avisos de vencimento e atraso</li>
-                      <li>• Número isolado do atendimento comercial</li>
-                    </ul>
-                  </div>
-                )}
+                <div className="p-3 sm:p-4 border rounded-lg bg-muted/30 space-y-2">
+                  <p className="text-sm font-medium">Recursos disponíveis:</p>
+                  <ul className="text-xs sm:text-sm text-muted-foreground space-y-1">
+                    <li>• Mensagens automáticas e follow-ups</li>
+                    <li>• Régua de cobrança automática</li>
+                    <li>• Espelhamento de conversas no CRM</li>
+                  </ul>
+                </div>
 
                 {connectionError && (
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      Erro ao conectar. Tente novamente.
+                      Erro ao conectar. Tente novamente ou use o reset.
                     </AlertDescription>
                   </Alert>
                 )}
 
-                <Button
-                  onClick={handleConnect}
-                  disabled={connect.isPending}
-                  className="w-full"
-                >
-                  {connect.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <IconComponent className="mr-2 h-4 w-4" />
+                <div className="space-y-2">
+                  <Button
+                    onClick={handleConnect}
+                    disabled={connect.isPending}
+                    className="w-full"
+                  >
+                    {connect.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <IconComponent className="mr-2 h-4 w-4" />
+                    )}
+                    Conectar WhatsApp
+                  </Button>
+                  
+                  {account && (
+                    <Button
+                      variant="ghost"
+                      onClick={handleHardReset}
+                      disabled={hardReset.isPending}
+                      className="w-full text-xs text-muted-foreground hover:text-destructive"
+                    >
+                      Problemas com a conexão? Clique aqui para resetar.
+                    </Button>
                   )}
-                  Conectar WhatsApp
-                </Button>
+                </div>
               </>
             )}
           </div>
