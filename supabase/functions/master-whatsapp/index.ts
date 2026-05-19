@@ -233,10 +233,33 @@ serve(async (req) => {
             .eq('key', SETTING_KEY);
         }
 
+        // If disconnected, try to get new QR
+        let qr_code = null;
+        if (!isConnected) {
+          try {
+            const qrRes = await fetch(`${apiUrl}/instance/connect`, {
+              method: 'POST',
+              headers: { 'token': instanceToken },
+              body: JSON.stringify({ 
+                instanceName,
+                name: instanceName,
+                Name: instanceName
+              }),
+            });
+            const qrData = await qrRes.json();
+            if (qrData.base64) {
+              qr_code = qrData.base64;
+            }
+          } catch (qrErr) {
+            console.log('[master-whatsapp] QR fetch error:', (qrErr as Error).message);
+          }
+        }
+
         return new Response(JSON.stringify({
           success: true,
           status: statusData?.status || 'disconnected',
-          instance: statusData?.instance
+          instance: statusData?.instance,
+          qr_code
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
