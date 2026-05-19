@@ -25,7 +25,25 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useMasterWhatsApp } from '@/hooks/useMasterWhatsApp';
+import { useMasterWhatsApp, type MasterWAStatus } from '@/hooks/useMasterWhatsApp';
+
+function StatusBadge({ status }: { status: MasterWAStatus }) {
+  const map: Record<MasterWAStatus, { label: string; cls: string; Icon: any }> = {
+    connected:    { label: 'Conectado',     cls: 'text-green-600 bg-green-50 border-green-100',  Icon: CheckCircle2 },
+    qr_pending:   { label: 'Aguardando QR', cls: 'text-amber-600 bg-amber-50 border-amber-100',  Icon: QrCode },
+    provisioning: { label: 'Conectando…',   cls: 'text-blue-600 bg-blue-50 border-blue-100',     Icon: Loader2 },
+    error:        { label: 'Erro',          cls: 'text-red-600 bg-red-50 border-red-100',        Icon: AlertTriangle },
+    disconnected: { label: 'Desconectado',  cls: 'text-slate-600 bg-slate-50 border-slate-200',  Icon: XCircle },
+  };
+  const { label, cls, Icon } = map[status];
+  return (
+    <div className={`flex items-center text-sm font-medium px-3 py-1 rounded-full border ${cls}`}>
+      <Icon className={`h-4 w-4 mr-2 ${status === 'provisioning' ? 'animate-spin' : ''}`} />
+      {label}
+    </div>
+  );
+}
+
 
 export function MasterSystem() {
   const [configs, setConfigs] = useState<Record<string, any>>({});
