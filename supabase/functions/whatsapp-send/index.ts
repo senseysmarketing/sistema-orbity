@@ -138,6 +138,7 @@ serve(async (req) => {
     const msgRow = {
       account_id: account.id,
       conversation_id: conv.id,
+      lead_id: lead_id ?? conv.lead_id ?? null,
       message_id: messageId,
       phone_number: normalized,
       content: message,
@@ -145,7 +146,13 @@ serve(async (req) => {
       is_from_me: true,
       status: 'sent',
       source,
-      metadata: { ...metadata, payment_id: payment_id ?? null, lead_id: lead_id ?? null, client_id: client_id ?? null },
+      metadata: {
+        ...metadata,
+        was_sent_by_api: true,
+        payment_id: payment_id ?? null,
+        lead_id: lead_id ?? null,
+        client_id: client_id ?? null,
+      },
       remote_jid: sendRes.remoteJid,
       provider_payload: sendRes.raw ?? null,
       sent_at: now,

@@ -226,7 +226,9 @@ export async function configureWebhook(
       enabled: true,
       url,
       events,
-      excludeMessages: ['wasSentByApi', 'fromMeYes', 'isGroupYes'],
+      // Mantemos 'wasSentByApi' (a API já grava localmente no whatsapp-send)
+      // e ignoramos grupos. fromMe manual (enviado pelo celular) DEVE chegar.
+      excludeMessages: ['wasSentByApi', 'isGroupYes'],
       addUrlEvents: false,
       addUrlTypesMessages: false,
     },
