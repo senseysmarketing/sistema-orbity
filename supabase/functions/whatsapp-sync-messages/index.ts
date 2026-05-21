@@ -193,13 +193,16 @@ serve(async (req) => {
         upsertBatch.push({
           account_id,
           conversation_id: convId,
+          lead_id: resolvedLeadId,
           message_id: messageId,
           content: content || null,
           is_from_me: isFromMe,
           message_type: messageType,
-          status: 'delivered',
+          status: isFromMe ? 'sent' : 'delivered',
+          source: isFromMe ? 'manual_whatsapp' : 'inbound',
           phone_number: digits,
           created_at: timestamp,
+          metadata: { was_sent_by_api: false, synced_at: new Date().toISOString() },
         });
       } catch (e) {
         console.warn('[sync] Failed to parse message:', e);
