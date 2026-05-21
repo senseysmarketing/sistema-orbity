@@ -1,173 +1,66 @@
 import { useState, useEffect } from "react";
-import { Trophy, Settings2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAgency } from "@/hooks/useAgency";
-import { ProgramSelector } from "@/components/goals/ProgramSelector";
-import { PPRDashboard } from "@/components/goals/PPRDashboard";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-
-interface BonusProgram {
-  id: string;
-  agency_id: string;
-  program_type: string;
-  name: string;
-  is_active: boolean;
-  config: Record<string, unknown>;
-}
+import { Skeleton } from "@/components/ui/skeleton";
+import { PerformancePPRPage } from "@/components/performance/PerformancePPRPage";
 
 export default function Goals() {
   const { currentAgency, agencyRole } = useAgency();
-  const { toast } = useToast();
-  const [activeProgram, setActiveProgram] = useState<BonusProgram | null>(null);
+  const [programId, setProgramId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showSelector, setShowSelector] = useState(false);
   const isAdmin = agencyRole === "admin" || agencyRole === "owner";
 
   useEffect(() => {
-    if (currentAgency?.id) fetchProgram();
-  }, [currentAgency?.id]);
-
-  const fetchProgram = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from("bonus_programs")
-      .select("*")
-      .eq("agency_id", currentAgency!.id)
-      .eq("is_active", true)
-      .limit(1)
-      .maybeSingle();
-    setActiveProgram(data as BonusProgram | null);
-    setLoading(false);
-  };
-
-  const handleSelectProgram = async (type: string) => {
-    if (!isAdmin) return;
-    // Se o tipo selecionado é o mesmo do programa ativo, apenas voltar
-    if (activeProgram && activeProgram.program_type === type) {
-      setShowSelector(false);
-      return;
-    }
-
-    if (type !== "ppr") {
-      toast({ title: "Em breve", description: "Este modelo estará disponível em breve." });
-      return;
-    }
-
-    // Verificar se já existe um programa deste tipo (mesmo inativo) para a agência
-    const { data: existing } = await supabase
-      .from("bonus_programs")
-      .select("*")
-      .eq("agency_id", currentAgency!.id)
-      .eq("program_type", type)
-      .maybeSingle();
-
-    // Desativar o programa atual
-    if (activeProgram) {
-      await supabase
+    if (!currentAgency?.id) return;
+    (async () => {
+      setLoading(true);
+      // Find active PPR program or auto-create
+      const { data: existing } = await supabase
         .from("bonus_programs")
-        .update({ is_active: false } as Record<string, unknown>)
-        .eq("id", activeProgram.id);
-    }
+        .select("*")
+        .eq("agency_id", currentAgency.id)
+        .eq("program_type", "ppr")
+        .maybeSingle();
 
-    if (existing) {
-      // Reativar o programa existente (preserva períodos e dados)
-      const { error } = await supabase
-        .from("bonus_programs")
-        .update({ is_active: true } as Record<string, unknown>)
-        .eq("id", existing.id);
-
-      if (error) {
-        toast({ title: "Erro", description: error.message, variant: "destructive" });
-        return;
+      if (existing) {
+        if (!existing.is_active) {
+          await supabase.from("bonus_programs").update({ is_active: true } as any).eq("id", existing.id);
+        }
+        setProgramId(existing.id);
+      } else if (isAdmin) {
+        const { data: created } = await supabase
+          .from("bonus_programs")
+          .insert([{
+            agency_id: currentAgency.id,
+            program_type: "ppr",
+            name: "Participação nos Resultados (PPR)",
+            is_active: true,
+            config: { bonus_pool_percent: 10, period_type: "quarterly" },
+          }] as any)
+          .select()
+          .single();
+        if (created) setProgramId(created.id);
       }
-    } else {
-      // Criar novo apenas se nunca existiu
-      const names: Record<string, string> = {
-        ppr: "Participação nos Resultados (PPR)",
-        salary_multiplier: "Multiplicador de Salário",
-        spot_bonus: "Bônus Fixo por Meta",
-      };
-
-      const { error } = await supabase.from("bonus_programs").insert([{
-        agency_id: currentAgency!.id,
-        program_type: type,
-        name: names[type],
-        is_active: true,
-        config: { bonus_pool_percent: 10, nps_target: 60, period_type: "quarterly" },
-      }]);
-
-      if (error) {
-        toast({ title: "Erro", description: error.message, variant: "destructive" });
-        return;
-      }
-    }
-
-    setShowSelector(false);
-    fetchProgram();
-  };
+      setLoading(false);
+    })();
+  }, [currentAgency?.id, isAdmin]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-48 w-full" />
       </div>
     );
   }
 
-  if (!activeProgram || showSelector) {
+  if (!programId) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Trophy className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Metas & Bônus</h1>
-          </div>
-          {activeProgram && (
-            <Button variant="outline" size="sm" onClick={() => setShowSelector(false)}>
-              Voltar ao programa
-            </Button>
-          )}
-        </div>
-        {isAdmin ? (
-          <>
-            <p className="text-muted-foreground">
-              Escolha o modelo de bonificação que melhor se encaixa na sua agência.
-            </p>
-            <ProgramSelector onSelect={handleSelectProgram} />
-          </>
-        ) : (
-          <div className="text-center py-16 space-y-2">
-            <Trophy className="h-12 w-12 text-muted-foreground mx-auto" />
-            <h3 className="text-lg font-medium text-foreground">Nenhum programa configurado</h3>
-            <p className="text-muted-foreground">Solicite ao administrador da agência para configurar um programa de bônus.</p>
-          </div>
-        )}
+      <div className="text-center py-16 text-muted-foreground">
+        Aguarde o administrador da agência configurar o programa.
       </div>
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Trophy className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Metas & Bônus</h1>
-            <p className="text-sm text-muted-foreground">{activeProgram.name}</p>
-          </div>
-        </div>
-        {isAdmin && (
-          <Button variant="outline" size="sm" onClick={() => setShowSelector(true)}>
-            <Settings2 className="h-4 w-4 mr-2" />
-            Trocar Programa
-          </Button>
-        )}
-      </div>
-
-      {activeProgram.program_type === "ppr" && (
-        <PPRDashboard program={activeProgram} isAdmin={isAdmin} />
-      )}
-    </div>
-  );
+  return <PerformancePPRPage programId={programId} isAdmin={isAdmin} />;
 }

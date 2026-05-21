@@ -73,8 +73,8 @@ const menuCategories: MenuCategory[] = [
   {
     label: "Administração",
     items: [
-      { title: "NPS", url: "/dashboard/nps", icon: MessageSquareHeart, permission: "canAccessNPS" },
-      { title: "Metas & Bônus", url: "/dashboard/goals", icon: Trophy, permission: "canAccessGoals" },
+      { title: "NPS", url: "/dashboard/goals?tab=nps", icon: MessageSquareHeart, permission: "canAccessNPS" },
+      { title: "Performance & PPR", url: "/dashboard/goals", icon: Trophy, permission: "canAccessGoals" },
       { title: "Administrativo", url: "/dashboard/admin", icon: DollarSign, permission: "canAccessFinancial" },
       { title: "Importação", url: "/dashboard/import", icon: Upload, permission: "canAccessImport" },
       { title: "Configurações", url: "/dashboard/settings", icon: Settings },
