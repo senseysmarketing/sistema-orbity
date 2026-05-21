@@ -1,12 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { parseMessageStatus } from "../_shared/uazapi.ts";
-import {
-  extractMessageContent,
-  normalizePhone,
-  previewOf,
-  resolveConversation,
-} from "../_shared/whatsapp.ts";
+import { extractMessageContent, normalizePhone, previewOf } from "../_shared/whatsapp.ts";
+import { resolveLeadConversation, logWebhookEvent } from "../_shared/whatsapp-conversation.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +11,7 @@ const corsHeaders = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRM: auto-promote lead from initial column on first reply
+// Respects agencies.whatsapp_auto_contact toggle.
 // ─────────────────────────────────────────────────────────────────────────────
 const INITIAL_STATUSES = new Set(['leads', 'new', 'novo']);
 
@@ -39,14 +36,23 @@ function normalizeToCanonical(rawStatus: string | null | undefined): string {
   return map[key] || trimmed;
 }
 
-async function promoteLeadOnReply(supabase: any, agencyId: string, leadId: string) {
+async function maybePromoteLeadOnReply(
+  supabase: any,
+  agencyId: string,
+  leadId: string,
+): Promise<{ moved: boolean; reason: string }> {
   try {
+    // Respect agencies.whatsapp_auto_contact toggle
+    const { data: agency } = await supabase
+      .from('agencies').select('whatsapp_auto_contact').eq('id', agencyId).maybeSingle();
+    if (!agency?.whatsapp_auto_contact) return { moved: false, reason: 'toggle_off' };
+
     const { data: lead } = await supabase
       .from('leads').select('status').eq('id', leadId).maybeSingle();
-    if (!lead) return;
+    if (!lead) return { moved: false, reason: 'lead_not_found' };
 
     const currentStatus = (lead.status || '').toString().trim().toLowerCase();
-    if (!INITIAL_STATUSES.has(currentStatus)) return;
+    if (!INITIAL_STATUSES.has(currentStatus)) return { moved: false, reason: 'not_initial_status' };
 
     const { data: statuses } = await supabase
       .from('lead_statuses')
@@ -63,12 +69,18 @@ async function promoteLeadOnReply(supabase: any, agencyId: string, leadId: strin
       supabase.from('lead_history').insert({
         lead_id: leadId,
         agency_id: agencyId,
+        user_id: null,
         action_type: 'whatsapp_interaction',
-        description: 'Lead interagiu no WhatsApp. O cartão foi movido automaticamente para a próxima etapa.',
+        field_name: 'status',
+        old_value: lead.status,
+        new_value: target,
+        description: 'Lead respondeu no WhatsApp. Movido automaticamente para Em Contato.',
       }),
     ]);
+    return { moved: true, reason: target };
   } catch (e) {
-    console.error('[whatsapp-webhook] promoteLeadOnReply error:', e);
+    console.error('[whatsapp-webhook] maybePromoteLeadOnReply error:', e);
+    return { moved: false, reason: 'error' };
   }
 }
 
@@ -112,25 +124,22 @@ function extractMessageId(payload: any): string {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
   try {
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const bodyText = await req.text();
     if (!bodyText) return new Response('ok');
     let body: any;
     try { body = JSON.parse(bodyText); } catch { return new Response('ok'); }
 
-    // Anti-loop / outbound echo
-    if (extractFromMe(body) || extractFromMe(body?.data)) {
-      return new Response('ok', { status: 200 });
-    }
-
     const event = body?.event || body?.type || body?.EventType;
     const instance = body?.instanceName || body?.instance || body?.instance_name || body?.token_name;
     const data = body?.data ?? body;
+    const payloadKeys = body && typeof body === 'object' ? Object.keys(body) : [];
 
     if (!event || !instance) return new Response('ok');
 
-    // Resolve account by instance_name OR api_key (some webhooks send the instance token instead)
+    // Resolve account by instance_name OR api_key
     const { data: account } = await supabase
       .from('whatsapp_accounts')
       .select('id, agency_id, instance_name')
@@ -172,6 +181,14 @@ serve(async (req) => {
           .update(patch)
           .eq('account_id', account.id)
           .eq('message_id', messageId);
+
+        await logWebhookEvent(supabase, {
+          account_id: account.id,
+          agency_id: account.agency_id,
+          event,
+          message_id: messageId,
+          action_taken: 'message_update_received',
+        });
       }
       return new Response('ok');
     }
@@ -179,7 +196,32 @@ serve(async (req) => {
     // ─── inbound message ──────────────────────────────────────────────────
     if (event === 'messages' || event === 'message' || event === 'messages.upsert') {
       const remoteJid = extractRemoteJid(data);
-      if (!isValidWhatsAppJid(remoteJid)) return new Response('ok');
+      const fromMe = extractFromMe(body) || extractFromMe(data);
+
+      if (fromMe) {
+        // Outbound echo — do not pause automations or move lead.
+        await logWebhookEvent(supabase, {
+          account_id: account.id,
+          agency_id: account.agency_id,
+          event,
+          remote_jid: remoteJid || null,
+          from_me: true,
+          action_taken: 'message_ignored_from_me',
+          payload_keys: payloadKeys,
+        });
+        return new Response('ok');
+      }
+
+      if (!isValidWhatsAppJid(remoteJid)) {
+        await logWebhookEvent(supabase, {
+          account_id: account.id,
+          agency_id: account.agency_id,
+          event,
+          remote_jid: remoteJid || null,
+          action_taken: 'message_ignored_group',
+        });
+        return new Response('ok');
+      }
 
       const rawPhone = remoteJid.replace(/@(s\.whatsapp\.net|c\.us|lid)$/i, '');
       const phoneNumber = normalizePhone(rawPhone);
@@ -188,18 +230,12 @@ serve(async (req) => {
       const { content, messageType } = extractMessageContent(data);
       const messageId = extractMessageId(data) || crypto.randomUUID();
 
-      // Find linked lead (best-effort)
-      const { data: leadRows } = await supabase.rpc('find_lead_by_normalized_phone', {
-        p_agency_id: account.agency_id, p_phone_digits: phoneNumber,
-      });
-      const lead = leadRows?.[0] || null;
-
-      const conversation = await resolveConversation(supabase, {
+      const conversation = await resolveLeadConversation(supabase, {
         accountId: account.id,
+        agencyId: account.agency_id,
         phone: phoneNumber,
-        leadId: lead?.id ?? null,
-        context: 'lead',
         remoteJid,
+        context: 'lead',
       });
 
       const now = new Date().toISOString();
@@ -233,22 +269,60 @@ serve(async (req) => {
         })
         .eq('id', conversation.id);
 
-      // Pause any active automation for this lead/conversation
-      if (conversation.lead_id) {
-        await supabase
-          .from('whatsapp_automation_control')
-          .update({ status: 'responded', conversation_state: 'customer_replied' })
-          .eq('account_id', account.id)
-          .eq('lead_id', conversation.lead_id)
-          .in('status', ['active', 'processing']);
+      await logWebhookEvent(supabase, {
+        account_id: account.id,
+        agency_id: account.agency_id,
+        lead_id: conversation.lead_id,
+        conversation_id: conversation.id,
+        event,
+        message_id: messageId,
+        remote_jid: remoteJid,
+        phone_number: phoneNumber,
+        from_me: false,
+        resolved_conversation: true,
+        resolved_lead: !!conversation.lead_id,
+        action_taken: 'message_received',
+      });
 
-        await promoteLeadOnReply(supabase, account.agency_id, conversation.lead_id);
-      } else {
-        await supabase
-          .from('whatsapp_automation_control')
-          .update({ status: 'responded', conversation_state: 'customer_replied' })
-          .eq('conversation_id', conversation.id)
-          .in('status', ['active', 'processing']);
+      // Pause automations (Anti-bot guarantee)
+      const pauseQuery = conversation.lead_id
+        ? supabase
+            .from('whatsapp_automation_control')
+            .update({ status: 'responded', conversation_state: 'customer_replied' })
+            .eq('account_id', account.id)
+            .eq('lead_id', conversation.lead_id)
+            .in('status', ['active', 'processing'])
+        : supabase
+            .from('whatsapp_automation_control')
+            .update({ status: 'responded', conversation_state: 'customer_replied' })
+            .eq('conversation_id', conversation.id)
+            .in('status', ['active', 'processing']);
+      const { count: pausedCount } = await pauseQuery.select('id', { count: 'exact', head: true });
+
+      if (pausedCount && pausedCount > 0) {
+        await logWebhookEvent(supabase, {
+          account_id: account.id,
+          agency_id: account.agency_id,
+          lead_id: conversation.lead_id,
+          conversation_id: conversation.id,
+          event,
+          action_taken: 'automation_paused_customer_replied',
+        });
+      }
+
+      // Promote lead to "Em Contato" if toggle is on
+      if (conversation.lead_id) {
+        const promo = await maybePromoteLeadOnReply(supabase, account.agency_id, conversation.lead_id);
+        if (promo.moved) {
+          await logWebhookEvent(supabase, {
+            account_id: account.id,
+            agency_id: account.agency_id,
+            lead_id: conversation.lead_id,
+            conversation_id: conversation.id,
+            event,
+            action_taken: 'lead_moved_to_contact',
+          });
+        }
       }
 
       return new Response('ok');
@@ -257,6 +331,11 @@ serve(async (req) => {
     return new Response('ok');
   } catch (error) {
     console.error('[whatsapp-webhook] Error:', error);
+    await logWebhookEvent(supabase, {
+      event: 'webhook_error',
+      action_taken: 'webhook_error',
+      error_message: error instanceof Error ? error.message : String(error),
+    });
     return new Response('ok');
   }
 });

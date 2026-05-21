@@ -3338,7 +3338,7 @@ export type Database = {
           lead_id: string
           new_value: string | null
           old_value: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           action_type: string
@@ -3350,7 +3350,7 @@ export type Database = {
           lead_id: string
           new_value?: string | null
           old_value?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           action_type?: string
@@ -3362,7 +3362,7 @@ export type Database = {
           lead_id?: string
           new_value?: string | null
           old_value?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -8105,6 +8105,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      whatsapp_webhook_logs: {
+        Row: {
+          account_id: string | null
+          action_taken: string | null
+          agency_id: string | null
+          conversation_id: string | null
+          created_at: string
+          error_message: string | null
+          event: string
+          from_me: boolean | null
+          id: string
+          lead_id: string | null
+          message_id: string | null
+          payload_keys: string[] | null
+          phone_number: string | null
+          remote_jid: string | null
+          resolved_conversation: boolean | null
+          resolved_lead: boolean | null
+        }
+        Insert: {
+          account_id?: string | null
+          action_taken?: string | null
+          agency_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          event: string
+          from_me?: boolean | null
+          id?: string
+          lead_id?: string | null
+          message_id?: string | null
+          payload_keys?: string[] | null
+          phone_number?: string | null
+          remote_jid?: string | null
+          resolved_conversation?: boolean | null
+          resolved_lead?: boolean | null
+        }
+        Update: {
+          account_id?: string | null
+          action_taken?: string | null
+          agency_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          event?: string
+          from_me?: boolean | null
+          id?: string
+          lead_id?: string | null
+          message_id?: string | null
+          payload_keys?: string[] | null
+          phone_number?: string | null
+          remote_jid?: string | null
+          resolved_conversation?: boolean | null
+          resolved_lead?: boolean | null
+        }
+        Relationships: []
       }
     }
     Views: {

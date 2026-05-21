@@ -213,9 +213,11 @@ serve(async (req) => {
       );
       const latest = sorted[0];
       const latestCustomer = sorted.find((msg) => !msg.is_from_me);
-      const updatePayload: Record<string, string | boolean> = {
+      const updatePayload: Record<string, string | boolean | null> = {
         last_message_at: latest.created_at,
         last_message_is_from_me: latest.is_from_me,
+        last_message_preview: (latest.content || `[${latest.message_type}]`).slice(0, 120),
+        remote_jid: remoteJid,
       };
       if (latestCustomer?.created_at) {
         updatePayload.last_customer_message_at = latestCustomer.created_at;
@@ -225,7 +227,52 @@ serve(async (req) => {
         .from('whatsapp_conversations')
         .update(updatePayload)
         .eq('id', convId);
+
+      // If sync surfaced inbound messages that postdate our last automated
+      // followup, mirror webhook side-effects: pause automation + move lead to
+      // "Em Contato" if the agency toggle is on.
+      if (latestCustomer?.created_at) {
+        const { data: automation } = await supabase
+          .from('whatsapp_automation_control')
+          .select('id, lead_id, last_followup_sent_at, started_at, status')
+          .eq('account_id', account_id)
+          .eq('conversation_id', convId)
+          .maybeSingle();
+        if (automation && !['responded', 'finished'].includes(automation.status)) {
+          const ref = automation.last_followup_sent_at || automation.started_at;
+          if (!ref || new Date(latestCustomer.created_at).getTime() > new Date(ref).getTime()) {
+            await supabase
+              .from('whatsapp_automation_control')
+              .update({ status: 'responded', conversation_state: 'customer_replied' })
+              .eq('id', automation.id);
+
+            if (automation.lead_id) {
+              const { data: agency } = await supabase
+                .from('agencies').select('whatsapp_auto_contact').eq('id', account.agency_id).maybeSingle();
+              if (agency?.whatsapp_auto_contact) {
+                const { data: lead } = await supabase
+                  .from('leads').select('status').eq('id', automation.lead_id).maybeSingle();
+                const s = String(lead?.status || '').toLowerCase();
+                if (['leads', 'new', 'novo'].includes(s)) {
+                  await supabase.from('leads').update({ status: 'em_contato' }).eq('id', automation.lead_id);
+                  await supabase.from('lead_history').insert({
+                    lead_id: automation.lead_id,
+                    agency_id: account.agency_id,
+                    user_id: null,
+                    action_type: 'whatsapp_interaction',
+                    field_name: 'status',
+                    old_value: lead?.status,
+                    new_value: 'em_contato',
+                    description: 'Resposta detectada via sincronização manual. Movido para Em Contato.',
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
     }
+
 
     return new Response(
       JSON.stringify({ success: true, synced }),

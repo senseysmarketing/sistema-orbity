@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendText } from "../_shared/uazapi.ts";
-import { normalizePhone, previewOf, resolveConversation } from "../_shared/whatsapp.ts";
+import { normalizePhone, previewOf } from "../_shared/whatsapp.ts";
+import { resolveLeadConversation } from "../_shared/whatsapp-conversation.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -118,14 +119,17 @@ serve(async (req) => {
     }
 
     // 4) Resolve / create conversation
-    const conv = await resolveConversation(supabase, {
+    const conv = await resolveLeadConversation(supabase, {
       accountId: account.id,
+      agencyId: account.agency_id,
       phone: normalized,
       leadId: lead_id ?? null,
-      clientId: client_id ?? null,
-      context: pickConversationContext(source, !!client_id, !!lead_id) as any,
       remoteJid: sendRes.remoteJid,
+      context: pickConversationContext(source, !!client_id, !!lead_id),
     });
+    if (client_id && !conv.client_id) {
+      await supabase.from('whatsapp_conversations').update({ client_id }).eq('id', conv.id);
+    }
 
     // 5) Insert outbound message
     const messageId = sendRes.messageId || crypto.randomUUID();

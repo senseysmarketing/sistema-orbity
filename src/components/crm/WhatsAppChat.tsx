@@ -38,7 +38,7 @@ export function WhatsAppChat({ leadId, leadPhone }: WhatsAppChatProps) {
   const { data: messages = [], isLoading: loadingMessages } = useConversationMessages(conversation?.id || null);
   const { data: automation } = useLeadAutomation(leadId);
 
-  // Sync messages from Evolution API when conversation loads
+  // Sync messages from Uazapi when conversation loads
   const hasSynced = useRef(false);
   useEffect(() => {
     if (conversation?.id && leadPhone && !hasSynced.current) {
