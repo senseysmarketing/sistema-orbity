@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { phoneVariants } from "../_shared/phone.ts";
 import { assertAgencyAccess, HttpError } from "../_shared/auth.ts";
+import { resolveLeadConversation } from "../_shared/whatsapp-conversation.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -136,17 +136,19 @@ serve(async (req) => {
       );
     }
 
-    let convId = conversation_id;
-    if (!convId) {
-      const variations = phoneVariants(digits);
-      const { data: conv } = await supabase
-        .from('whatsapp_conversations')
-        .select('id')
-        .eq('account_id', account_id)
-        .in('phone_number', variations)
-        .limit(1)
-        .maybeSingle();
-      convId = conv?.id;
+    // Resolve the canonical conversation (merges duplicates, links orphans).
+    let convId: string | undefined = conversation_id;
+    try {
+      const resolved = await resolveLeadConversation(supabase, {
+        accountId: account_id,
+        agencyId: account.agency_id,
+        phone: digits,
+        remoteJid,
+        context: "lead",
+      });
+      convId = resolved.id;
+    } catch (e) {
+      console.warn("[sync] resolveLeadConversation failed, falling back", e);
     }
 
     if (!convId) {

@@ -7898,6 +7898,48 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_conversation_resolution_logs: {
+        Row: {
+          account_id: string | null
+          action: string
+          agency_id: string | null
+          created_at: string
+          details: Json | null
+          id: string
+          lead_id: string | null
+          new_conversation_id: string | null
+          old_conversation_id: string | null
+          phone_number: string | null
+          remote_jid: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          action: string
+          agency_id?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          lead_id?: string | null
+          new_conversation_id?: string | null
+          old_conversation_id?: string | null
+          phone_number?: string | null
+          remote_jid?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          action?: string
+          agency_id?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          lead_id?: string | null
+          new_conversation_id?: string | null
+          old_conversation_id?: string | null
+          phone_number?: string | null
+          remote_jid?: string | null
+        }
+        Relationships: []
+      }
       whatsapp_conversations: {
         Row: {
           account_id: string
@@ -8400,6 +8442,10 @@ export type Database = {
       master_get_agency_details: {
         Args: { p_agency_id: string }
         Returns: Json
+      }
+      merge_whatsapp_conversations: {
+        Args: { p_duplicates: string[]; p_primary: string }
+        Returns: undefined
       }
       relink_orphan_whatsapp_conversations: {
         Args: { p_agency_id: string }
