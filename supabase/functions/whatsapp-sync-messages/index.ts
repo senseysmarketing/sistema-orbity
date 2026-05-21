@@ -32,13 +32,16 @@ type UazapiMessage = {
 type SyncedMessage = {
   account_id: string;
   conversation_id: string;
+  lead_id: string | null;
   message_id: string;
   content: string | null;
   is_from_me: boolean;
   message_type: string;
   status: string;
+  source: string;
   phone_number: string;
   created_at: string;
+  metadata: Record<string, unknown>;
 };
 
 /**
