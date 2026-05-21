@@ -1,94 +1,52 @@
-# Plano: Conversa única por lead no WhatsApp
+# Corrigir espelhamento do WhatsApp no modal do lead
 
-## Objetivo
-Garantir que cada lead tenha exatamente UMA conversa ativa por `account_id + context='lead'`, mesclando duplicatas existentes, travando no banco e refatorando todos os pontos que dependem de `conversation_id`.
+## Causa raiz confirmada
 
-## Fase 1 — Helper central e merge
+O modal do lead mostra spinner infinito e cai em "Nenhuma mensagem ainda" porque o `useLeadConversation` chama a edge `resolve-whatsapp-conversation`, mas a edge **não está deployada** — a rede mostra `404 NOT_FOUND` / `Failed to fetch` em todas as chamadas, e os logs estão vazios (nunca executou).
 
-**Arquivo:** `supabase/functions/_shared/whatsapp-conversation.ts` (evoluir)
+Motivo: as novas funções criadas nas fases anteriores **não foram registradas em `supabase/config.toml`**. Sem entrada `[functions.<nome>]`, o Supabase não faz o deploy automático.
 
-Reescrever `resolveLeadConversation` com a ordem:
-1. Buscar todas as conversas por `account_id + lead_id + context`.
-2. Se >1: eleger principal (mais mensagens → maior `last_message_at` → mais recente) e mesclar restantes.
-3. Se 0: buscar por `account_id + remote_jid`.
-4. Se 0: buscar por `account_id + phone_number IN phoneVariants(phone)`.
-5. Se conversa órfã (sem `lead_id`): backfill `lead_id`.
-6. Se nada: criar nova.
+Funções afetadas:
+- `resolve-whatsapp-conversation` (bloqueia o modal inteiro)
+- `process-whatsapp-ghosting` (bloqueia o cron de 24h)
 
-Adicionar `mergeDuplicateConversations(primaryId, duplicateIds[])`:
-- `UPDATE whatsapp_messages SET conversation_id=primary WHERE conversation_id=ANY(dup)`
-- `UPDATE whatsapp_automation_control SET conversation_id=primary WHERE conversation_id=ANY(dup)`
-- Consolidar `last_message_at`, `last_customer_message_at`, `last_message_preview`, `remote_jid` na principal (maior data).
-- Deletar duplicatas.
-- Logar em `whatsapp_conversation_resolution_logs`.
+Entradas existentes hoje: `whatsapp-connect`, `whatsapp-send`, `whatsapp-webhook`, `process-whatsapp-queue`, `whatsapp-sync-messages`.
 
-Normalização: `phone_number` sempre apenas dígitos (`5511...`), `remote_jid` separado, nunca com `+`.
+## O que vou fazer
 
-## Fase 2 — Banco
+### 1. Registrar as duas funções em `supabase/config.toml`
 
-Migração:
-- Criar tabela `whatsapp_conversation_resolution_logs` (campos conforme spec) + RLS leitura por membros da agência.
-- RPC `merge_whatsapp_conversations(primary uuid, duplicates uuid[])` SECURITY DEFINER para uso pelas edges.
-- **Após** rodar o merge inicial via edge ou job, criar índice:
-  ```sql
-  CREATE UNIQUE INDEX whatsapp_conversations_unique_lead_context
-    ON whatsapp_conversations(account_id, lead_id, context)
-    WHERE lead_id IS NOT NULL AND context = 'lead';
-  ```
-- Job único de limpeza: para cada `(account_id, lead_id)` com duplicatas, chamar `merge`. Pode ser uma edge `cleanup-duplicate-conversations` rodada manualmente uma vez.
+Adicionar dois blocos seguindo o padrão das demais:
 
-## Fase 3 — Edge `resolve-whatsapp-conversation`
+```toml
+[functions.resolve-whatsapp-conversation]
+verify_jwt = true
 
-Já existe — ajustar para:
-- Aceitar `{ account_id, lead_id, phone_number }`.
-- Validar auth + agency access (já faz).
-- Chamar `resolveLeadConversation` (nova versão, que mescla).
-- Retornar `{ success, conversation_id, conversation, merged_or_linked }`.
+[functions.process-whatsapp-ghosting]
+verify_jwt = false
+```
 
-## Fase 4 — Refatorar edges consumidoras
+- `resolve-whatsapp-conversation`: mantém `verify_jwt = true` (ele usa `assertAgencyAccess` com o token do usuário).
+- `process-whatsapp-ghosting`: `verify_jwt = false` porque será chamada por `pg_cron`, como já fazemos com os outros jobs (padrão da memória `Auth Closure`).
 
-- **`whatsapp-send`**: substituir resolução atual por nova `resolveLeadConversation`; ignorar `conversation_id` enviado pelo frontend se diferir do principal; atualizar `last_message_at/preview` na principal.
-- **`whatsapp-webhook`**: para inbound, extrair `remote_jid`, normalizar telefone, achar lead, chamar resolver, salvar mensagem na principal, atualizar `last_customer_message_at`, pausar `whatsapp_automation_control` ativo, mover lead para "Contato" se `whatsapp_auto_contact=true`.
-- **`process-whatsapp-queue`**: resolver conversa antes de enviar; se `automation_control.conversation_id` aponta para duplicata, atualizar; checar mensagem inbound após `last_followup_sent_at`; se houver, marcar `status='responded'` e abortar. Remover suporte a `account.status='connecting'` — só enviar com `connected`.
-- **`whatsapp-sync-messages`**: usar resolver para destinar mensagens sincronizadas à conversa principal.
+### 2. Validar o deploy
 
-## Fase 5 — Frontend
+- Após a aprovação da migration/edit, chamar `resolve-whatsapp-conversation` via `supabase--curl_edge_functions` com `account_id` + `lead_id` reais para confirmar 200.
+- Conferir `whatsapp_conversation_resolution_logs` para ver o evento de resolução do lead Doraci.
+- Conferir `whatsapp_conversations` para a Doraci: deve haver **uma única linha** com `context='lead'` (a migration de merge já rodou; só faltava a edge responder).
 
-- **`useWhatsApp.useLeadConversation`**: já chama a edge `resolve-whatsapp-conversation`. Garantir que NÃO existe fallback `.maybeSingle()` por `account_id+lead_id`. Confirmar que retorna apenas o `conversation_id` da edge.
-- **`WhatsAppChat.tsx`**: ao abrir aba, chamar resolver → receber `conversation_id` único → buscar mensagens → subscribe realtime (`INSERT`/`UPDATE` em `whatsapp_messages` filtrado por `conversation_id`).
-- Remover qualquer "cura" de conversa client-side.
+### 3. Reabrir o modal e validar fluxo end-to-end
 
-## Fase 6 — Logs
+- `useLeadConversation` retorna `conversation_id` único da Doraci.
+- `useConversationMessages` carrega mensagens da conversa principal (incluindo as já enviadas).
+- Envio manual e automação continuam usando o mesmo `conversation_id` (já refatorado).
 
-Toda chamada de `resolveLeadConversation` registra evento em `whatsapp_conversation_resolution_logs` com `action` apropriado (`conversation_created`, `resolved_by_lead`, `resolved_by_phone`, `resolved_by_remote_jid`, `duplicate_conversation_merged`, `automation_relinked`, `resolution_error`).
+## Por que isso resolve
 
-## Critério de aceite
-- Doraci: ao abrir modal, conversa principal `27d97aa6-…` é retornada; mensagem 10:18 aparece; conversa vazia some; `automation_control` aponta para principal.
-- Nenhum `(account_id, lead_id, context='lead')` com >1 linha em `whatsapp_conversations` (garantido pelo índice).
-- Mensagem enviada pelo CRM/automação aparece no modal em tempo real.
-- Resposta inbound: pausa automação + move para Contato (se toggle) + reflete no modal.
-- Ghosting 24h usa `last_customer_message_at` da principal.
+Toda a lógica de merge, eleição de primária, unique index e refactor do frontend já está no lugar (migrations aprovadas, `useWhatsApp` chamando o resolver). O único elo quebrado é o registro das funções no `config.toml`, que impede o deploy. Com o registro feito, o resolver passa a responder, o spinner desaparece e o histórico da Doraci aparece.
 
 ## Detalhes técnicos
 
-```text
-Resolver (server)
- ├─ por lead_id ──► N conversas? ──► elege + merge ──► principal
- │                  1 conversa  ──────────────────────► principal
- │                  0 conversas ──┐
- ├─ por remote_jid ◄──────────────┤
- ├─ por phone variants ◄──────────┤
- └─ cria nova ◄───────────────────┘
-```
-
-Ordem de deploy:
-1. Migração (tabela logs + RPC merge).
-2. Helper + edges (`resolve`, `send`, `webhook`, `queue`, `sync`).
-3. Rodar limpeza manual de duplicatas existentes (via edge one-shot).
-4. Aplicar índice único.
-5. Refatorar frontend.
-
-## Fora de escopo
-- UI nova (mantém modal atual).
-- Mudança no schema de `whatsapp_messages`.
-- Reescrita do fluxo de ghosting (já implementado).
+- `supabase/config.toml` é a única fonte que controla quais funções entram em deploy automático no projeto.
+- Não há mudança de código TS necessária — `resolve-whatsapp-conversation/index.ts` e `process-whatsapp-ghosting/index.ts` já estão prontos.
+- Sem mudança de schema. Sem nova migration.
