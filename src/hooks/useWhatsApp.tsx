@@ -211,58 +211,55 @@ export function useWhatsApp(purpose: string = 'general') {
     },
   });
 
-  // Get messages for a conversation — uses Realtime instead of polling
-  const useConversationMessages = (conversationId: string | null) => {
-    // Set up Realtime channel (INSERT + UPDATE) to keep messages in sync.
+  // Get messages for a conversation — uses Realtime instead of polling.
+  // Prefer filter by lead_id (sobrevive a merges/relink de conversation).
+  const useConversationMessages = (conversationId: string | null, leadId?: string | null) => {
+    const key = leadId || conversationId;
+
     useEffect(() => {
-      if (!conversationId) return;
+      if (!key) return;
+
+      const filter = leadId
+        ? `lead_id=eq.${leadId}`
+        : `conversation_id=eq.${conversationId}`;
 
       const channel = supabase
-        .channel(`whatsapp-messages-${conversationId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'whatsapp_messages',
-            filter: `conversation_id=eq.${conversationId}`,
-          },
-          () => {
-            queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', conversationId] });
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'whatsapp_messages',
-            filter: `conversation_id=eq.${conversationId}`,
-          },
-          () => {
-            queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', conversationId] });
-          }
-        )
+        .channel(`whatsapp-messages-${key}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'whatsapp_messages', filter }, () => {
+          queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', key] });
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'whatsapp_messages', filter }, () => {
+          queryClient.invalidateQueries({ queryKey: ['whatsapp-messages', key] });
+        })
         .subscribe();
 
       return () => {
         supabase.removeChannel(channel);
       };
-    }, [conversationId]);
+    }, [key, leadId, conversationId]);
 
     return useQuery({
-      queryKey: ['whatsapp-messages', conversationId],
+      queryKey: ['whatsapp-messages', key],
       queryFn: async () => {
-        if (!conversationId) return [];
-        const { data, error } = await supabase
+        if (!key) return [];
+        let query = supabase
           .from('whatsapp_messages')
           .select('*')
-          .eq('conversation_id', conversationId)
           .order('created_at', { ascending: true });
+
+        if (leadId && conversationId) {
+          query = query.or(`lead_id.eq.${leadId},conversation_id.eq.${conversationId}`);
+        } else if (leadId) {
+          query = query.eq('lead_id', leadId);
+        } else if (conversationId) {
+          query = query.eq('conversation_id', conversationId);
+        }
+
+        const { data, error } = await query;
         if (error) throw error;
-        return data as WhatsAppMessage[];
+        return (data || []) as WhatsAppMessage[];
       },
-      enabled: !!conversationId,
+      enabled: !!key,
       staleTime: 30_000,
     });
   };
