@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceKey);
 
   let periodId: string | null = null;
+  let periodAgencyId: string | null = null;
   let actorUserId: string | null = null;
 
   try {
