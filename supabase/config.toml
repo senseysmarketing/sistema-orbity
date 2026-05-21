@@ -18,6 +18,13 @@ verify_jwt = false
 [functions.whatsapp-sync-messages]
 verify_jwt = false
 
+[functions.resolve-whatsapp-conversation]
+verify_jwt = false
+
+[functions.process-whatsapp-ghosting]
+verify_jwt = false
+
+
 [functions.monthly-closure]
 verify_jwt = false
 
