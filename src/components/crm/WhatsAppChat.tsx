@@ -35,7 +35,7 @@ export function WhatsAppChat({ leadId, leadPhone }: WhatsAppChatProps) {
   } = useWhatsApp();
 
   const { data: conversation, isLoading: loadingConv } = useLeadConversation(leadId);
-  const { data: messages = [], isLoading: loadingMessages } = useConversationMessages(conversation?.id || null);
+  const { data: messages = [], isLoading: loadingMessages } = useConversationMessages(conversation?.id || null, leadId);
   const { data: automation } = useLeadAutomation(leadId);
 
   // Sync messages from Uazapi when conversation loads
