@@ -1156,7 +1156,15 @@ export type Database = {
         Row: {
           agency_id: string
           bonus_pool_amount: number
+          bonus_pool_manual_amount: number | null
+          bonus_pool_mode: string
           bonus_pool_percent: number
+          calculated_at: string | null
+          calculation_error: string | null
+          calculation_snapshot: Json | null
+          calculation_status: string
+          closed_at: string | null
+          closed_by: string | null
           created_at: string
           end_date: string
           id: string
@@ -1165,17 +1173,29 @@ export type Database = {
           net_profit: number
           nps_actual: number
           nps_target: number
+          ppr_percent: number
+          profit_actual: number
+          profit_target: number
           program_id: string
           revenue_actual: number
           revenue_target: number
           start_date: string
           status: string
+          target_is_blocking: boolean
           updated_at: string
         }
         Insert: {
           agency_id: string
           bonus_pool_amount?: number
+          bonus_pool_manual_amount?: number | null
+          bonus_pool_mode?: string
           bonus_pool_percent?: number
+          calculated_at?: string | null
+          calculation_error?: string | null
+          calculation_snapshot?: Json | null
+          calculation_status?: string
+          closed_at?: string | null
+          closed_by?: string | null
           created_at?: string
           end_date: string
           id?: string
@@ -1184,17 +1204,29 @@ export type Database = {
           net_profit?: number
           nps_actual?: number
           nps_target?: number
+          ppr_percent?: number
+          profit_actual?: number
+          profit_target?: number
           program_id: string
           revenue_actual?: number
           revenue_target?: number
           start_date: string
           status?: string
+          target_is_blocking?: boolean
           updated_at?: string
         }
         Update: {
           agency_id?: string
           bonus_pool_amount?: number
+          bonus_pool_manual_amount?: number | null
+          bonus_pool_mode?: string
           bonus_pool_percent?: number
+          calculated_at?: string | null
+          calculation_error?: string | null
+          calculation_snapshot?: Json | null
+          calculation_status?: string
+          closed_at?: string | null
+          closed_by?: string | null
           created_at?: string
           end_date?: string
           id?: string
@@ -1203,11 +1235,15 @@ export type Database = {
           net_profit?: number
           nps_actual?: number
           nps_target?: number
+          ppr_percent?: number
+          profit_actual?: number
+          profit_target?: number
           program_id?: string
           revenue_actual?: number
           revenue_target?: number
           start_date?: string
           status?: string
+          target_is_blocking?: boolean
           updated_at?: string
         }
         Relationships: [
@@ -2488,13 +2524,19 @@ export type Database = {
         Row: {
           agency_id: string
           created_at: string
+          criteria_snapshot: Json | null
           employee_id: string
           final_bonus: number
           id: string
+          locked_at: string | null
           max_share: number
+          notes: string | null
           nps_retention_score: number
           period_id: string
           process_innovation_score: number
+          reviewer_user_id: string | null
+          status: string
+          submitted_at: string | null
           technical_delivery_score: number
           updated_at: string
           user_id: string | null
@@ -2503,13 +2545,19 @@ export type Database = {
         Insert: {
           agency_id: string
           created_at?: string
+          criteria_snapshot?: Json | null
           employee_id: string
           final_bonus?: number
           id?: string
+          locked_at?: string | null
           max_share?: number
+          notes?: string | null
           nps_retention_score?: number
           period_id: string
           process_innovation_score?: number
+          reviewer_user_id?: string | null
+          status?: string
+          submitted_at?: string | null
           technical_delivery_score?: number
           updated_at?: string
           user_id?: string | null
@@ -2518,13 +2566,19 @@ export type Database = {
         Update: {
           agency_id?: string
           created_at?: string
+          criteria_snapshot?: Json | null
           employee_id?: string
           final_bonus?: number
           id?: string
+          locked_at?: string | null
           max_share?: number
+          notes?: string | null
           nps_retention_score?: number
           period_id?: string
           process_innovation_score?: number
+          reviewer_user_id?: string | null
+          status?: string
+          submitted_at?: string | null
           technical_delivery_score?: number
           updated_at?: string
           user_id?: string | null
@@ -2573,6 +2627,7 @@ export type Database = {
           agency_id: string
           base_salary: number
           created_at: string
+          eligibility_weight: number
           eligible_for_ppr: boolean
           end_date: string | null
           id: string
@@ -2587,6 +2642,7 @@ export type Database = {
           agency_id: string
           base_salary?: number
           created_at?: string
+          eligibility_weight?: number
           eligible_for_ppr?: boolean
           end_date?: string | null
           id?: string
@@ -2601,6 +2657,7 @@ export type Database = {
           agency_id?: string
           base_salary?: number
           created_at?: string
+          eligibility_weight?: number
           eligible_for_ppr?: boolean
           end_date?: string | null
           id?: string
@@ -4795,6 +4852,7 @@ export type Database = {
           id: string
           is_used: boolean
           period: string
+          period_id: string | null
         }
         Insert: {
           agency_id: string
@@ -4804,6 +4862,7 @@ export type Database = {
           id?: string
           is_used?: boolean
           period: string
+          period_id?: string | null
         }
         Update: {
           agency_id?: string
@@ -4813,6 +4872,7 @@ export type Database = {
           id?: string
           is_used?: boolean
           period?: string
+          period_id?: string | null
         }
         Relationships: [
           {
@@ -4841,6 +4901,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nps_tokens_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "bonus_periods"
             referencedColumns: ["id"]
           },
         ]
@@ -4972,6 +5039,201 @@ export type Database = {
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "social_media_posts_deprecated"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ppr_calculation_logs: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          agency_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          period_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          agency_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          period_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          agency_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          period_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ppr_calculation_logs_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "bonus_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ppr_employee_results: {
+        Row: {
+          agency_id: string
+          base_share: number
+          bonus_amount: number
+          calculated_at: string
+          calculation_details: Json | null
+          eligibility_weight: number
+          employee_id: string
+          id: string
+          period_id: string
+          score_final: number
+        }
+        Insert: {
+          agency_id: string
+          base_share?: number
+          bonus_amount?: number
+          calculated_at?: string
+          calculation_details?: Json | null
+          eligibility_weight?: number
+          employee_id: string
+          id?: string
+          period_id: string
+          score_final?: number
+        }
+        Update: {
+          agency_id?: string
+          base_share?: number
+          bonus_amount?: number
+          calculated_at?: string
+          calculation_details?: Json | null
+          eligibility_weight?: number
+          employee_id?: string
+          id?: string
+          period_id?: string
+          score_final?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ppr_employee_results_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ppr_employee_results_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "bonus_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ppr_financial_adjustments: {
+        Row: {
+          adjustment_type: string
+          agency_id: string
+          amount: number
+          created_at: string
+          created_by: string | null
+          description: string | null
+          effective_date: string
+          id: string
+          period_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          adjustment_type: string
+          agency_id: string
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          effective_date: string
+          id?: string
+          period_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          adjustment_type?: string
+          agency_id?: string
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          effective_date?: string
+          id?: string
+          period_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ppr_financial_adjustments_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "bonus_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ppr_period_months: {
+        Row: {
+          adjustments: number
+          agency_id: string
+          bonus_pool: number
+          calculated_at: string
+          expenses: number
+          id: string
+          month_end: string
+          month_start: string
+          net_profit: number
+          period_id: string
+          revenue: number
+          salaries: number
+          source_snapshot: Json | null
+        }
+        Insert: {
+          adjustments?: number
+          agency_id: string
+          bonus_pool?: number
+          calculated_at?: string
+          expenses?: number
+          id?: string
+          month_end: string
+          month_start: string
+          net_profit?: number
+          period_id: string
+          revenue?: number
+          salaries?: number
+          source_snapshot?: Json | null
+        }
+        Update: {
+          adjustments?: number
+          agency_id?: string
+          bonus_pool?: number
+          calculated_at?: string
+          expenses?: number
+          id?: string
+          month_end?: string
+          month_start?: string
+          net_profit?: number
+          period_id?: string
+          revenue?: number
+          salaries?: number
+          source_snapshot?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ppr_period_months_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "bonus_periods"
             referencedColumns: ["id"]
           },
         ]
@@ -7981,6 +8243,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      check_bonus_period_overlap: {
+        Args: {
+          p_agency_id: string
+          p_end: string
+          p_exclude_id?: string
+          p_start: string
+        }
+        Returns: boolean
+      }
       check_notification_type_enabled: {
         Args: { p_agency_id: string; p_type: string; p_user_id: string }
         Returns: boolean
@@ -8065,6 +8336,10 @@ export type Database = {
       is_master_agency_admin: { Args: never; Returns: boolean }
       is_master_user: { Args: never; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
+      mark_ppr_periods_stale_by_date: {
+        Args: { p_agency_id: string; p_date: string }
+        Returns: undefined
+      }
       master_get_agency_details: {
         Args: { p_agency_id: string }
         Returns: Json
