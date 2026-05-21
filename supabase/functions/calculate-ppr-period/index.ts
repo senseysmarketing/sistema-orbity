@@ -378,6 +378,8 @@ Deno.serve(async (req) => {
             actor_user_id: actorUserId,
           });
         }
+      } catch (_) { /* swallow */ }
+    }
 
     console.error('[calculate-ppr-period] error', message);
     return new Response(
