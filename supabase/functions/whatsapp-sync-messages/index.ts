@@ -141,6 +141,7 @@ serve(async (req) => {
 
     // Resolve the canonical conversation (merges duplicates, links orphans).
     let convId: string | undefined = conversation_id;
+    let resolvedLeadId: string | null = null;
     try {
       const resolved = await resolveLeadConversation(supabase, {
         accountId: account_id,
@@ -150,6 +151,7 @@ serve(async (req) => {
         context: "lead",
       });
       convId = resolved.id;
+      resolvedLeadId = resolved.lead_id;
     } catch (e) {
       console.warn("[sync] resolveLeadConversation failed, falling back", e);
     }
