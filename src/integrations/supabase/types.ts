@@ -8075,6 +8075,7 @@ export type Database = {
           failed_at: string | null
           id: string
           is_from_me: boolean | null
+          lead_id: string | null
           message_id: string
           message_type: string | null
           metadata: Json | null
@@ -8097,6 +8098,7 @@ export type Database = {
           failed_at?: string | null
           id?: string
           is_from_me?: boolean | null
+          lead_id?: string | null
           message_id: string
           message_type?: string | null
           metadata?: Json | null
@@ -8119,6 +8121,7 @@ export type Database = {
           failed_at?: string | null
           id?: string
           is_from_me?: boolean | null
+          lead_id?: string | null
           message_id?: string
           message_type?: string | null
           metadata?: Json | null
@@ -8144,6 +8147,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
         ]
