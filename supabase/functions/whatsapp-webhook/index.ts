@@ -193,24 +193,10 @@ serve(async (req) => {
       return new Response('ok');
     }
 
-    // ─── inbound message ──────────────────────────────────────────────────
+    // ─── inbound/outbound message ─────────────────────────────────────────
     if (event === 'messages' || event === 'message' || event === 'messages.upsert') {
       const remoteJid = extractRemoteJid(data);
       const fromMe = extractFromMe(body) || extractFromMe(data);
-
-      if (fromMe) {
-        // Outbound echo — do not pause automations or move lead.
-        await logWebhookEvent(supabase, {
-          account_id: account.id,
-          agency_id: account.agency_id,
-          event,
-          remote_jid: remoteJid || null,
-          from_me: true,
-          action_taken: 'message_ignored_from_me',
-          payload_keys: payloadKeys,
-        });
-        return new Response('ok');
-      }
 
       if (!isValidWhatsAppJid(remoteJid)) {
         await logWebhookEvent(supabase, {
@@ -230,6 +216,31 @@ serve(async (req) => {
       const { content, messageType } = extractMessageContent(data);
       const messageId = extractMessageId(data) || crypto.randomUUID();
 
+      // Dedup: se a mensagem já foi gravada pelo whatsapp-send (echo do que
+      // a própria API enviou), apenas atualizamos status e saímos.
+      if (fromMe && messageId) {
+        const { data: existing } = await supabase
+          .from('whatsapp_messages')
+          .select('id, metadata')
+          .eq('account_id', account.id)
+          .eq('message_id', messageId)
+          .maybeSingle();
+
+        const wasSentByApi = existing?.metadata?.was_sent_by_api === true;
+        if (existing && wasSentByApi) {
+          await logWebhookEvent(supabase, {
+            account_id: account.id,
+            agency_id: account.agency_id,
+            event,
+            message_id: messageId,
+            remote_jid: remoteJid,
+            from_me: true,
+            action_taken: 'message_ignored_was_sent_by_api',
+          });
+          return new Response('ok');
+        }
+      }
+
       const conversation = await resolveLeadConversation(supabase, {
         accountId: account.id,
         agencyId: account.agency_id,
@@ -240,33 +251,37 @@ serve(async (req) => {
 
       const now = new Date().toISOString();
 
-      // Idempotent insert
+      // Idempotent insert (handles both inbound and outbound-manual)
       await supabase
         .from('whatsapp_messages')
         .upsert({
           account_id: account.id,
           conversation_id: conversation.id,
+          lead_id: conversation.lead_id,
           message_id: messageId,
           phone_number: phoneNumber,
           content,
           message_type: messageType,
-          is_from_me: false,
-          status: 'received',
-          source: 'inbound',
+          is_from_me: fromMe,
+          status: fromMe ? 'sent' : 'received',
+          source: fromMe ? 'manual_whatsapp' : 'inbound',
+          metadata: { was_sent_by_api: false },
           remote_jid: remoteJid,
           provider_payload: data,
         }, { onConflict: 'account_id,message_id' });
 
       // Update conversation timeline
+      const convUpdate: Record<string, unknown> = {
+        last_message_at: now,
+        last_message_is_from_me: fromMe,
+        last_message_preview: previewOf(content || `[${messageType}]`),
+        remote_jid: remoteJid,
+      };
+      if (!fromMe) convUpdate.last_customer_message_at = now;
+
       await supabase
         .from('whatsapp_conversations')
-        .update({
-          last_message_at: now,
-          last_customer_message_at: now,
-          last_message_is_from_me: false,
-          last_message_preview: previewOf(content || `[${messageType}]`),
-          remote_jid: remoteJid,
-        })
+        .update(convUpdate)
         .eq('id', conversation.id);
 
       await logWebhookEvent(supabase, {
@@ -278,50 +293,51 @@ serve(async (req) => {
         message_id: messageId,
         remote_jid: remoteJid,
         phone_number: phoneNumber,
-        from_me: false,
+        from_me: fromMe,
         resolved_conversation: true,
         resolved_lead: !!conversation.lead_id,
-        action_taken: 'message_received',
+        action_taken: fromMe ? 'manual_outbound_received' : 'message_received',
       });
 
-      // Pause automations (Anti-bot guarantee)
-      const pauseQuery = conversation.lead_id
-        ? supabase
-            .from('whatsapp_automation_control')
-            .update({ status: 'responded', conversation_state: 'customer_replied' })
-            .eq('account_id', account.id)
-            .eq('lead_id', conversation.lead_id)
-            .in('status', ['active', 'processing'])
-        : supabase
-            .from('whatsapp_automation_control')
-            .update({ status: 'responded', conversation_state: 'customer_replied' })
-            .eq('conversation_id', conversation.id)
-            .in('status', ['active', 'processing']);
-      const { count: pausedCount } = await pauseQuery.select('id', { count: 'exact', head: true });
+      // Apenas inbound real do lead pausa automação e move para Em Contato
+      if (!fromMe) {
+        const pauseQuery = conversation.lead_id
+          ? supabase
+              .from('whatsapp_automation_control')
+              .update({ status: 'responded', conversation_state: 'customer_replied' })
+              .eq('account_id', account.id)
+              .eq('lead_id', conversation.lead_id)
+              .in('status', ['active', 'processing'])
+          : supabase
+              .from('whatsapp_automation_control')
+              .update({ status: 'responded', conversation_state: 'customer_replied' })
+              .eq('conversation_id', conversation.id)
+              .in('status', ['active', 'processing']);
+        const { count: pausedCount } = await pauseQuery.select('id', { count: 'exact', head: true });
 
-      if (pausedCount && pausedCount > 0) {
-        await logWebhookEvent(supabase, {
-          account_id: account.id,
-          agency_id: account.agency_id,
-          lead_id: conversation.lead_id,
-          conversation_id: conversation.id,
-          event,
-          action_taken: 'automation_paused_customer_replied',
-        });
-      }
-
-      // Promote lead to "Em Contato" if toggle is on
-      if (conversation.lead_id) {
-        const promo = await maybePromoteLeadOnReply(supabase, account.agency_id, conversation.lead_id);
-        if (promo.moved) {
+        if (pausedCount && pausedCount > 0) {
           await logWebhookEvent(supabase, {
             account_id: account.id,
             agency_id: account.agency_id,
             lead_id: conversation.lead_id,
             conversation_id: conversation.id,
             event,
-            action_taken: 'lead_moved_to_contact',
+            action_taken: 'automation_paused_customer_replied',
           });
+        }
+
+        if (conversation.lead_id) {
+          const promo = await maybePromoteLeadOnReply(supabase, account.agency_id, conversation.lead_id);
+          if (promo.moved) {
+            await logWebhookEvent(supabase, {
+              account_id: account.id,
+              agency_id: account.agency_id,
+              lead_id: conversation.lead_id,
+              conversation_id: conversation.id,
+              event,
+              action_taken: 'lead_moved_to_contact',
+            });
+          }
         }
       }
 
