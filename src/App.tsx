@@ -120,7 +120,7 @@ const App = () => (
                           <Route path="agenda" element={<RequirePermission permission="canAccessAgenda"><Agenda /></RequirePermission>} />
                           <Route path="traffic" element={<RequirePermission permission="canAccessTraffic"><Traffic /></RequirePermission>} />
                           <Route path="goals" element={<RequirePermission permission="canAccessGoals"><Goals /></RequirePermission>} />
-                          <Route path="nps" element={<RequirePermission permission="canAccessNPS"><NPSPage /></RequirePermission>} />
+                          <Route path="nps" element={<Navigate to="/dashboard/goals?tab=nps" replace />} />
                           <Route path="admin" element={<RequirePermission permission="canAccessFinancial"><Admin /></RequirePermission>} />
                           <Route path="contracts" element={<RequirePermission permission="canAccessContracts"><Contracts /></RequirePermission>} />
                           <Route path="social-media" element={<RequirePermission permission="canAccessSocialMedia"><SocialMedia /></RequirePermission>} />
