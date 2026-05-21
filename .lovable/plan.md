@@ -1,204 +1,159 @@
+# Refatoração — Espelhamento WhatsApp + Automações Dependentes
 
-# Fase 3 — Refatoração frontend Performance & PPR
+## Objetivo
 
-Migrar a página `Goals` e `NPSPage` para um único módulo **Performance & PPR** consumindo o backend criado nas fases 1 e 2. Frontend nunca recalcula; lê dos snapshots e dispara a Edge Function.
+Criar uma única camada confiável de resolução de conversa (`account_id + lead_id + telefone + remoteJid`) e fazer com que webhook, envio manual, queue de cadência, sync e o modal do lead usem essa mesma camada. Em cima disso, corrigir as 4 automações: pausa por resposta, escudo anti-bot, mover para "Em Contato" e mover para "Perdido" após 24h.
 
----
+## Fase 1 — Resolvedor único (shared)
 
-## 1. Estrutura de arquivos
+Criar `supabase/functions/_shared/whatsapp-conversation.ts` exportando:
 
-Criar `src/components/performance/`:
-
-```text
-performance/
-├── PerformancePPRPage.tsx          # container + tabs + URL ?tab=
-├── PPRPeriodSelector.tsx           # dropdown períodos + badges status
-├── PPRPeriodDialog.tsx             # criar/editar (substitui PPRConfigDialog)
-├── PPRRecalculateButton.tsx        # invoca calculate-ppr-period
-├── PPRClosePeriodButton.tsx        # action=close c/ confirmação
-├── PPRSummaryCards.tsx             # lucro, pote, meta (referência), status
-├── tabs/
-│   ├── PPROverviewTab.tsx          # cards + alerta meta-não-bloqueante
-│   ├── PPRFinancialTab.tsx         # tabela ppr_period_months + drill-down
-│   ├── PPRAdjustmentsTab.tsx       # CRUD ppr_financial_adjustments
-│   ├── PPRBonusTab.tsx             # ppr_employee_results + scorecards
-│   ├── PPRScorecardsTab.tsx        # ScorecardCard refinado
-│   ├── PPRNpsTab.tsx               # migra UI do NPSPage
-│   └── PPRAuditTab.tsx             # ppr_calculation_logs
-└── SourceSnapshotDrawer.tsx        # mostra ids/datas/totais do mês
+```ts
+resolveLeadConversation({
+  accountId, agencyId, leadId?, phone?, remoteJid?, context
+}) => { conversation_id, lead_id, phone_number, remote_jid, created, linked }
 ```
 
-Criar `src/hooks/`:
+Ordem de resolução:
+1. Normaliza telefone via `_shared/phone.ts` (DDI 55 + nono dígito).
+2. Busca por `account_id + lead_id` (se vier).
+3. Busca por `account_id + remote_jid`.
+4. Busca por `account_id + phone_number IN variantes`.
+5. Se conversa achada estiver órfã (`lead_id IS NULL`) e tivermos `leadId` ou `find_lead_by_normalized_phone` retornar lead → faz `UPDATE lead_id`.
+6. Se houver duplicatas, escolhe a mais recente com mensagens (subquery `EXISTS whatsapp_messages`) e marca as outras como `merged_into` (campo novo opcional) — sem deletar.
+7. Se não achou nada, faz `INSERT` com `remote_jid`, `phone_number`, `lead_id`, `context`.
 
-```text
-useBonusPeriods.ts        # lista períodos da agência
-usePPRPeriodData.ts       # ppr_period_months + employee_results + scorecards do período
-usePPRMutations.ts        # create/update/close/reopen períodos + recalculate (invoke edge)
-usePPRAdjustments.ts      # CRUD ajustes
-usePPRAuditLogs.ts        # logs do período
+Manter o `resolveConversation` antigo como wrapper retrocompatível.
+
+## Fase 2 — Edge Function `resolve-whatsapp-conversation`
+
+Nova função `supabase/functions/resolve-whatsapp-conversation/index.ts`:
+- Valida JWT + agência via `_shared/auth.ts` (`assertAgencyAccess`).
+- Body: `{ account_id, lead_id, phone_number? }`.
+- Busca account/lead, chama `resolveLeadConversation`.
+- Retorna `{ conversation_id, lead_id, phone_number, remote_jid }`.
+
+## Fase 3 — Refatorar `useWhatsApp` + `WhatsAppChat`
+
+`src/hooks/useWhatsApp.tsx`:
+- Substituir `useLeadConversation` por chamada a `supabase.functions.invoke('resolve-whatsapp-conversation', …)`. Remover toda a lógica de variantes de telefone do React.
+- `useConversationMessages`: adicionar listener Realtime para `UPDATE` (além do `INSERT` atual) — para refletir ack/status.
+- `syncMessages`: garantir que envia `conversation_id`.
+- Renomear comentários "Evolution API" → "Uazapi".
+
+`src/components/crm/WhatsAppChat.tsx`:
+- Sem mudança de UX. Apenas consumir o novo hook.
+- Garantir badge "Cliente respondeu" quando `automation.status === 'responded'`.
+
+## Fase 4 — Fortalecer `whatsapp-webhook`
+
+`supabase/functions/whatsapp-webhook/index.ts`:
+- Usar `resolveLeadConversation` no lugar de `resolveConversation`.
+- Filtros já existentes (grupos, status, newsletter, fromMe) — manter e centralizar em helpers.
+- Sempre atualizar `last_message_preview`, `last_customer_message_at`, `last_message_is_from_me=false`, `remote_jid`.
+- Pausar automações: `UPDATE whatsapp_automation_control SET status='responded', conversation_state='customer_replied'` por `lead_id` ou `conversation_id`.
+- Promoção para "Em Contato": respeitar `agencies.whatsapp_auto_contact` (já existe `promoteLeadOnReply`, condicionar ao toggle).
+- Cada decisão gera 1 linha em `whatsapp_webhook_logs` (ver Fase 5).
+
+## Fase 5 — Migration: tabela de logs + ajuste lead_history
+
+Migration SQL:
+
+```sql
+-- 1) lead_history.user_id nullable (eventos automáticos)
+alter table public.lead_history alter column user_id drop not null;
+
+-- 2) Logs de webhook
+create table public.whatsapp_webhook_logs (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid,
+  agency_id uuid,
+  lead_id uuid,
+  conversation_id uuid,
+  event text not null,
+  message_id text,
+  remote_jid text,
+  phone_number text,
+  from_me boolean,
+  resolved_lead boolean,
+  resolved_conversation boolean,
+  action_taken text,        -- message_received | message_ignored_* | conversation_created | conversation_linked_to_lead | automation_paused_customer_replied | lead_moved_to_contact | message_update_received | webhook_error
+  error_message text,
+  payload_keys text[],
+  created_at timestamptz not null default now()
+);
+create index on public.whatsapp_webhook_logs (agency_id, created_at desc);
+create index on public.whatsapp_webhook_logs (lead_id, created_at desc);
+
+alter table public.whatsapp_webhook_logs enable row level security;
+create policy "agency members read webhook logs"
+  on public.whatsapp_webhook_logs for select
+  using (user_belongs_to_agency(agency_id));
+-- INSERT só via service role (sem policy de insert).
 ```
 
-Todos usam React Query (cache global 5min já configurado).
+Sem armazenar token nem payload completo (exceto `error_message` em caso controlado).
 
----
+## Fase 6 — Anti-bot + queue (`process-whatsapp-queue`)
 
-## 2. Rota e navegação
+Em `supabase/functions/process-whatsapp-queue/index.ts`:
+- Filtrar `whatsapp_accounts.status = 'connected'` (remover `connecting`).
+- Antes de enviar cada follow-up, **dupla checagem**:
+  - `conversation.last_customer_message_at > max(last_followup_sent_at, started_at)` → marcar `responded` e abortar.
+  - `SELECT 1 FROM whatsapp_messages WHERE conversation_id=… AND is_from_me=false AND created_at > <último envio nosso>` → idem.
+  - Status atual da automação ∈ {`responded`,`paused`,`finished`} → abortar.
+  - Mensagem manual (`source='manual_crm'`) nos últimos N minutos → adiar (ou pular este tick).
+- Usar resolvedor central quando precisar reconciliar.
 
-- `src/pages/Goals.tsx` (173 linhas) → enxuto, apenas renderiza `<PerformancePPRPage />`. Mantém lógica antiga de `bonus_programs` (auto-cria PPR ativo se não houver, sem mostrar `ProgramSelector` por enquanto — PPR é o único modo suportado).
-- `src/pages/NPSPage.tsx` → vira **componente redirect** simples: `<Navigate to="/dashboard/goals?tab=nps" replace />`. Arquivo preservado (não deletar — fallback).
-- `src/components/layout/AppSidebar.tsx`: item "NPS" passa a apontar `/dashboard/goals?tab=nps` (mesmo `permission: canAccessNPS`). Item "Metas & Bônus" renomeado para **"Performance & PPR"**.
-- `PerformancePPRPage` lê `?tab=` do `useSearchParams` e sincroniza com o `Tabs` do shadcn. Default: `overview`.
+## Fase 7 — `whatsapp-send`
 
----
+- Após enviar, atualizar `whatsapp_automation_control.last_followup_sent_at` quando `source='cadence'`.
+- Para `source='manual_crm'`, atualizar conversation timestamps mas **não** mexer em automation status.
+- Usar resolvedor central.
 
-## 3. PerformancePPRPage — layout
+## Fase 8 — Refatorar `whatsapp-sync-messages`
 
-Header sticky:
-```
-[Trophy] Performance & PPR · {período selecionado}        [PeriodSelector] [Recalcular] [Fechar Ciclo]
-```
+- Usar resolvedor central para obter `conversation_id`.
+- Persistir `remote_jid`, atualizar `last_message_preview`.
+- Se durante o sync surgirem inbounds mais recentes que `last_followup_sent_at` → aplicar a mesma regra do webhook (`responded` + `customer_replied` + promoção para "Em Contato" se toggle ativo).
 
-Tabs: **Visão Geral · Financeiro · Ajustes · Bônus · Scorecards · NPS · Auditoria**
+## Fase 9 — Edge Function `process-whatsapp-ghosting`
 
-Alerta global (banner cinza, dismissable session-only):
-> "A meta é referência de performance da empresa. O bônus é calculado sobre o lucro líquido do período e não é bloqueado caso a meta não seja atingida."
+Nova `supabase/functions/process-whatsapp-ghosting/index.ts` (cron 15-30 min via pg_cron — instrução separada):
 
-Status do cálculo (badge ao lado do header):
-- `not_calculated` → "Aguardando cálculo" (cinza)
-- `calculated` → "Atualizado · {calculated_at}" (verde)
-- `stale` → "Desatualizado — recalcular" (amarelo + botão recalcular destacado)
-- `error` → "Erro no cálculo" (vermelho) + tooltip com `calculation_error`
+Fluxo por agência com `whatsapp_auto_ghosting = true`:
+- Buscar `whatsapp_automation_control` cujo `last_followup_sent_at < now() - 24h` e `status NOT IN ('finished','responded')`.
+- Confirmar via `whatsapp_messages` que não há inbound posterior ao último envio nosso (defesa em profundidade contra `last_customer_message_at` desatualizado).
+- Se lead.status não estiver em (`won`,`lost`):
+  - `UPDATE leads SET status='lost', loss_reason='Ghosting no WhatsApp', status_changed_at=now()`.
+  - `INSERT INTO lead_history (... user_id=NULL, action_type='auto_ghosting', ...)`.
+- `UPDATE whatsapp_automation_control SET status='finished', conversation_state='moved_to_lost_ghosting'`.
+- Log em `whatsapp_automation_logs` + `whatsapp_webhook_logs` (`action_taken='ghosting_moved_to_lost'`).
 
-Se `period.status='closed'` → todas as ações de edição desabilitadas; botão **"Reabrir período"** visível só para `owner`/`admin`.
+Observação: já existe `process-lead-ghosting`. Reuso parcial — esta nova é específica do gatilho de cadência. Vou consolidar a lógica nesta nova função e deprecar a antiga ao final (sem remover ainda).
 
----
+## Fase 10 — `WhatsAppTemplateManager`
 
-## 4. Tabs (detalhes principais)
+Apenas trocar referências/labels "Evolution API" → "Uazapi". Sem mudança funcional.
 
-### Visão Geral
-- 4 cards: Lucro Líquido, Pote do Bônus (`bonus_pool_amount`), Meta de Lucro (`profit_target` — referência), % PPR
-- Mini chart: lucro por mês (a partir de `ppr_period_months`)
-- Lista compacta dos colaboradores e bônus calculado (top 5)
+## Critérios de sucesso (validação)
 
-### Financeiro
-Tabela mês a mês (lê `ppr_period_months`):
+1. Abrir modal de lead com conversa existente → conversa carrega via `resolve-whatsapp-conversation`.
+2. Enviar mensagem pelo modal → aparece imediatamente (otimista + realtime).
+3. Receber resposta no WhatsApp → aparece via realtime, automação vira `responded`, lead vai para "Em Contato" se toggle ativo.
+4. Áudio → renderiza `[audio]`.
+5. Cadência: não envia depois de resposta.
+6. 24h sem resposta após último follow-up → lead vai para `lost` + motivo "Ghosting no WhatsApp".
+7. Logs em `whatsapp_webhook_logs` explicam cada decisão.
+8. Conversas órfãs/duplicadas convergem para uma única por `account_id + lead_id`.
 
-| Mês | Receita | Despesas | Salários | Ajustes | Lucro | Pote |
-|---|---|---|---|---|---|---|
+## Ordem de execução (sem misturar)
 
-Clicar em qualquer célula → abre `SourceSnapshotDrawer` mostrando `source_snapshot` daquela categoria: contagem, total e lista de itens (id, valor, data). Permite auditoria sem sair da tela.
+1. Migration (logs + lead_history nullable) — `supabase--migration`.
+2. Shared resolver + `resolve-whatsapp-conversation`.
+3. Refatorar hook + chat.
+4. Webhook + queue + send + sync.
+5. `process-whatsapp-ghosting` + agendamento pg_cron.
+6. Rename Evolution → Uazapi (cosmético).
 
-Se cálculo estiver `not_calculated`/`stale`, mostra placeholder "Recalcule para ver os números atualizados".
-
-### Ajustes
-- CRUD de `ppr_financial_adjustments` (admin only, bloqueado em período fechado).
-- Form: `effective_date` (date picker), `adjustment_type` (4 opções), `amount`, `description`.
-- Mostrar selo de cor por tipo. Aviso quando `effective_date` cair fora do intervalo do período selecionado: "Este ajuste não afetará o período X. Selecione um período compatível."
-
-### Bônus
-- Tabela `ppr_employee_results`: colaborador, peso, base, score (média scorecard /10), bônus final, total.
-- Não permite editar (snapshot).
-- Export CSV (front-end, fora do escopo de cálculo).
-
-### Scorecards
-- Lista de colaboradores elegíveis (`is_active=true AND eligible_for_ppr=true`) ordenada por nome.
-- Renderiza `ScorecardCard` **ajustado** (ver §5).
-- Cabeçalho com filtro "Apenas pendentes" e "Apenas enviados".
-- Bloqueado se `period.status='closed'`.
-
-### NPS (migrada de NPSPage)
-- Mantém os blocos atuais: lista de respostas, envio de pesquisa, gráfico de NPS por categoria, customização do formulário.
-- Mudanças mínimas necessárias:
-  - `passive` → `neutral` em queries/agregações/labels.
-  - Ao gerar token, passar `period_id = selectedPeriod.id`.
-  - Antes de criar token, verificar se já existe um não-usado e não-expirado para `(client_id, period_id)`: reusa se sim; senão cria novo. Tratar erro de unique constraint com mensagem clara.
-- `PublicNPSSurvey.tsx` (rota pública): trocar `passive`→`neutral` na inserção da resposta; herdar `period_id` do token.
-
-### Auditoria
-- Lista paginada de `ppr_calculation_logs` do período (action, actor, created_at, details preview JSON).
-
----
-
-## 5. ScorecardCard refinado
-
-- Mantém 3 critérios atuais (`nps_retention_score`, `technical_delivery_score`, `process_innovation_score`) com pesos 4/4/2 e média 0–10. **Sem mudança de schema** — escala já é 0–10.
-- Remove auto-cálculo de `final_bonus`/`max_share` na UI; passa a apenas exibir `score_final` e `bonus_amount` do `ppr_employee_results` (read-only após cálculo).
-- Botões/ações:
-  - `Salvar rascunho` (status=`draft`)
-  - `Enviar para revisão` (status=`submitted`, marca `submitted_at`)
-  - Locked → apenas leitura, ícone cadeado.
-- Campo de comentário opcional por critério persistido em `criteria_snapshot` (jsonb `{ [field]: string }`) + campo `notes` geral.
-- Botão "Usar NPS" continua, mas apenas sugere valor no input (não persiste sozinho).
-- Edição bloqueada se `period.status='closed'` (mostra badge "Período fechado").
-
----
-
-## 6. PPRPeriodDialog (substitui PPRConfigDialog)
-
-Form:
-- `label` (texto)
-- `start_date` / `end_date` (date pickers)
-- `profit_target` (default 50000) — rotulado como **"Meta de lucro (referência)"**
-- `ppr_percent` (default 10) — slider 0–50%
-- `bonus_pool_mode` — radio: `percent_of_profit` | `manual`
-  - se `manual` → mostra campo `bonus_pool_manual_amount`
-- Validação local de sobreposição: chamar RPC `check_bonus_period_overlap(agency_id, start, end, exclude_id?)` no `onSubmit`. Bloquear com mensagem clara se houver conflito.
-- Após salvar, perguntar via toast com ação: "Período criado. Recalcular agora?" → dispara `calculate-ppr-period`.
-- Excluir: só permite se `status != 'closed'` E sem snapshot calculado relevante (warning explícito).
-
----
-
-## 7. Recalcular / Fechar / Reabrir
-
-- **Recalcular**: `supabase.functions.invoke('calculate-ppr-period', { body: { period_id, action: 'recalculate' } })`. Toast com `profit_actual` e `bonus_pool`. Invalida queries do período.
-- **Fechar**: confirmação modal: "Após fechar, scorecards e ajustes ficam travados. Reabrir exige justificativa." Dispara `action: 'close'`.
-- **Reabrir**: dialog exigindo campo `reason` (textarea required). Hoje a Edge Function ainda não implementa `reopen_period` (não foi feito na Fase 2). **Decisão**: criar nesta fase um endpoint mínimo `action: 'reopen'` na Edge Function existente que: valida role owner/admin, exige `reason`, faz `UPDATE bonus_periods SET status='open', closed_at=NULL, closed_by=NULL`, insere log `period_reopened` com `details.reason`. Pequena extensão pontual; sem nova migration.
-
----
-
-## 8. Textos críticos
-
-- `ProgramSelector` (caso permaneça visível): substituir a frase atual *"Só paga se houver lucro"* por:
-  > "O bônus é calculado sobre o lucro líquido do período. A meta é uma referência de performance e não bloqueia o pagamento."
-- Visão Geral exibe o mesmo aviso como banner sempre visível (não dismissable em períodos não calculados).
-
----
-
-## 9. O que NÃO muda nesta fase
-
-- Schema do banco (já feito na Fase 1).
-- Edge Function de cálculo (Fase 2), exceto adicionar a `action: 'reopen'`.
-- `PPRDashboard.tsx` antigo (948 linhas) — fica **órfão** após Goals.tsx ser refatorado. Não deletar; remover apenas a importação. Limpeza posterior.
-- `NPSPage.tsx` — vira redirect mas arquivo permanece.
-- Permissões (`canAccessNPS`, `canAccessGoals`) ficam como estão.
-
----
-
-## 10. Ordem de implementação dentro desta fase
-
-1. Hooks (`useBonusPeriods`, `usePPRPeriodData`, `usePPRMutations`, `usePPRAdjustments`, `usePPRAuditLogs`).
-2. `PerformancePPRPage` + `PPRPeriodSelector` + `PPRPeriodDialog` (esqueleto + criar/listar/editar).
-3. `PPRSummaryCards` + `PPRRecalculateButton` (fluxo recalcular ponta-a-ponta).
-4. Tabs: Visão Geral → Financeiro → Bônus → Ajustes → Scorecards → NPS → Auditoria.
-5. Migrar `Goals.tsx` para usar `PerformancePPRPage`.
-6. Redirect em `NPSPage.tsx` + sidebar atualizada + rotulagem.
-7. Extensão Edge Function: `action: 'reopen'` + `PPRClosePeriodButton` com reabertura.
-
----
-
-## Critérios de sucesso da Fase 3
-
-1. Acessar `/dashboard/goals` → `PerformancePPRPage` carrega com tabs.
-2. Criar período Q1/2026 (`profit_target=50000`, `ppr_percent=10`, `bonus_pool_mode=percent_of_profit`).
-3. Clicar **Recalcular** → backend processa, UI mostra lucro/pote e atualiza tabela mensal a partir de `ppr_period_months`.
-4. Adicionar ajuste com `effective_date` em fev/2026 → status do período vira `stale`; recalcular incorpora ajuste.
-5. Preencher scorecards → recalcular → `bonus_amount` por colaborador aparece em Bônus.
-6. Aba NPS funciona; tokens carregam `period_id`.
-7. `/dashboard/nps` redireciona para `/dashboard/goals?tab=nps`.
-8. Fechar período trava edição; reabrir exige justificativa e gera log de auditoria.
-9. Drill-down em qualquer mês do Financeiro mostra ids/datas dos lançamentos via `source_snapshot`.
-10. Meta de R$ 50.000 nunca bloqueia o pagamento na UI — texto reflete isso.
-
----
-
-Aprovar para eu começar pela criação dos hooks e do `PerformancePPRPage`.
+Sem alterações fora desse escopo. Sem mexer no módulo PPR.
