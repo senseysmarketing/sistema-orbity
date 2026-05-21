@@ -97,6 +97,29 @@ Deno.serve(async (req) => {
       throw new HttpError(400, 'Cannot recalculate a closed period');
     }
 
+    // Handle reopen action without recalculation
+    if (action === 'reopen') {
+      const reason = String(body.reason || '').trim();
+      if (!reason) throw new HttpError(400, 'reason is required');
+      if (p.status !== 'closed') throw new HttpError(400, 'Period is not closed');
+      const { error: rErr } = await supabase
+        .from('bonus_periods')
+        .update({ status: 'open', closed_at: null, closed_by: null, updated_at: new Date().toISOString() })
+        .eq('id', p.id);
+      if (rErr) throw new Error(`reopen: ${rErr.message}`);
+      await supabase.from('ppr_calculation_logs').insert({
+        period_id: p.id,
+        agency_id: p.agency_id,
+        action: 'period_reopened',
+        details: { reason },
+        actor_user_id: actorUserId,
+      });
+      return new Response(
+        JSON.stringify({ ok: true, period_id: p.id, action: 'reopen' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     // Compute monthly buckets
     const buckets = monthsBetween(p.start_date, p.end_date);
 
