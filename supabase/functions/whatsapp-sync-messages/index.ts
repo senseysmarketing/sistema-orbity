@@ -214,7 +214,7 @@ serve(async (req) => {
         const chunk = upsertBatch.slice(i, i + 50);
         const { error: upsertError } = await supabase
           .from('whatsapp_messages')
-          .upsert(chunk, { onConflict: 'account_id,message_id', ignoreDuplicates: false });
+          .upsert(chunk, { onConflict: 'account_id,message_id', ignoreDuplicates: true });
         if (!upsertError) synced += chunk.length;
       }
 
