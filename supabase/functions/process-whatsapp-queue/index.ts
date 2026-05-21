@@ -261,12 +261,43 @@ serve(async (req) => {
         }
 
         const account = record.whatsapp_accounts;
-        // Accept both 'connected' and 'connecting' — Evolution often keeps session active during transient states
-        if (account.status !== 'connected' && account.status !== 'connecting') {
+        // Anti-bot: only fire when the instance is fully connected. "connecting"
+        // is no longer acceptable to avoid silent failures and ghost sends.
+        if (account.status !== 'connected') {
           console.warn('[process-queue] Account not connected, skipping. Status:', account.status, 'Account:', account.id);
           await supabase.from('whatsapp_automation_control').update({ status: 'active' }).eq('id', record.id);
           continue;
         }
+
+        // Anti-bot final check: scan whatsapp_messages for inbound messages
+        // that arrived after our last followup. Defense in depth against stale
+        // conversation.last_customer_message_at.
+        if (conv?.id) {
+          const referenceIso = record.last_followup_sent_at
+            || record.started_at
+            || record.updated_at;
+          if (referenceIso) {
+            const { data: inboundAfter } = await supabase
+              .from('whatsapp_messages')
+              .select('id')
+              .eq('conversation_id', conv.id)
+              .eq('is_from_me', false)
+              .gt('created_at', referenceIso)
+              .limit(1)
+              .maybeSingle();
+            if (inboundAfter) {
+              await supabase
+                .from('whatsapp_automation_control')
+                .update({ status: 'responded', conversation_state: 'customer_replied' })
+                .eq('id', record.id);
+              await logAutomationEvent(supabase, record.id, account.id, 'customer_replied', {
+                lead_id: record.lead_id, via: 'inbound_messages_scan',
+              });
+              continue;
+            }
+          }
+        }
+
 
         // --- SENDING SCHEDULE CHECK ---
         const schedule = account.sending_schedule as SendingSchedule | null;
