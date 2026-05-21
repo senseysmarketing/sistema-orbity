@@ -1,159 +1,94 @@
-# Refatoração — Espelhamento WhatsApp + Automações Dependentes
+# Plano: Conversa única por lead no WhatsApp
 
 ## Objetivo
+Garantir que cada lead tenha exatamente UMA conversa ativa por `account_id + context='lead'`, mesclando duplicatas existentes, travando no banco e refatorando todos os pontos que dependem de `conversation_id`.
 
-Criar uma única camada confiável de resolução de conversa (`account_id + lead_id + telefone + remoteJid`) e fazer com que webhook, envio manual, queue de cadência, sync e o modal do lead usem essa mesma camada. Em cima disso, corrigir as 4 automações: pausa por resposta, escudo anti-bot, mover para "Em Contato" e mover para "Perdido" após 24h.
+## Fase 1 — Helper central e merge
 
-## Fase 1 — Resolvedor único (shared)
+**Arquivo:** `supabase/functions/_shared/whatsapp-conversation.ts` (evoluir)
 
-Criar `supabase/functions/_shared/whatsapp-conversation.ts` exportando:
+Reescrever `resolveLeadConversation` com a ordem:
+1. Buscar todas as conversas por `account_id + lead_id + context`.
+2. Se >1: eleger principal (mais mensagens → maior `last_message_at` → mais recente) e mesclar restantes.
+3. Se 0: buscar por `account_id + remote_jid`.
+4. Se 0: buscar por `account_id + phone_number IN phoneVariants(phone)`.
+5. Se conversa órfã (sem `lead_id`): backfill `lead_id`.
+6. Se nada: criar nova.
 
-```ts
-resolveLeadConversation({
-  accountId, agencyId, leadId?, phone?, remoteJid?, context
-}) => { conversation_id, lead_id, phone_number, remote_jid, created, linked }
+Adicionar `mergeDuplicateConversations(primaryId, duplicateIds[])`:
+- `UPDATE whatsapp_messages SET conversation_id=primary WHERE conversation_id=ANY(dup)`
+- `UPDATE whatsapp_automation_control SET conversation_id=primary WHERE conversation_id=ANY(dup)`
+- Consolidar `last_message_at`, `last_customer_message_at`, `last_message_preview`, `remote_jid` na principal (maior data).
+- Deletar duplicatas.
+- Logar em `whatsapp_conversation_resolution_logs`.
+
+Normalização: `phone_number` sempre apenas dígitos (`5511...`), `remote_jid` separado, nunca com `+`.
+
+## Fase 2 — Banco
+
+Migração:
+- Criar tabela `whatsapp_conversation_resolution_logs` (campos conforme spec) + RLS leitura por membros da agência.
+- RPC `merge_whatsapp_conversations(primary uuid, duplicates uuid[])` SECURITY DEFINER para uso pelas edges.
+- **Após** rodar o merge inicial via edge ou job, criar índice:
+  ```sql
+  CREATE UNIQUE INDEX whatsapp_conversations_unique_lead_context
+    ON whatsapp_conversations(account_id, lead_id, context)
+    WHERE lead_id IS NOT NULL AND context = 'lead';
+  ```
+- Job único de limpeza: para cada `(account_id, lead_id)` com duplicatas, chamar `merge`. Pode ser uma edge `cleanup-duplicate-conversations` rodada manualmente uma vez.
+
+## Fase 3 — Edge `resolve-whatsapp-conversation`
+
+Já existe — ajustar para:
+- Aceitar `{ account_id, lead_id, phone_number }`.
+- Validar auth + agency access (já faz).
+- Chamar `resolveLeadConversation` (nova versão, que mescla).
+- Retornar `{ success, conversation_id, conversation, merged_or_linked }`.
+
+## Fase 4 — Refatorar edges consumidoras
+
+- **`whatsapp-send`**: substituir resolução atual por nova `resolveLeadConversation`; ignorar `conversation_id` enviado pelo frontend se diferir do principal; atualizar `last_message_at/preview` na principal.
+- **`whatsapp-webhook`**: para inbound, extrair `remote_jid`, normalizar telefone, achar lead, chamar resolver, salvar mensagem na principal, atualizar `last_customer_message_at`, pausar `whatsapp_automation_control` ativo, mover lead para "Contato" se `whatsapp_auto_contact=true`.
+- **`process-whatsapp-queue`**: resolver conversa antes de enviar; se `automation_control.conversation_id` aponta para duplicata, atualizar; checar mensagem inbound após `last_followup_sent_at`; se houver, marcar `status='responded'` e abortar. Remover suporte a `account.status='connecting'` — só enviar com `connected`.
+- **`whatsapp-sync-messages`**: usar resolver para destinar mensagens sincronizadas à conversa principal.
+
+## Fase 5 — Frontend
+
+- **`useWhatsApp.useLeadConversation`**: já chama a edge `resolve-whatsapp-conversation`. Garantir que NÃO existe fallback `.maybeSingle()` por `account_id+lead_id`. Confirmar que retorna apenas o `conversation_id` da edge.
+- **`WhatsAppChat.tsx`**: ao abrir aba, chamar resolver → receber `conversation_id` único → buscar mensagens → subscribe realtime (`INSERT`/`UPDATE` em `whatsapp_messages` filtrado por `conversation_id`).
+- Remover qualquer "cura" de conversa client-side.
+
+## Fase 6 — Logs
+
+Toda chamada de `resolveLeadConversation` registra evento em `whatsapp_conversation_resolution_logs` com `action` apropriado (`conversation_created`, `resolved_by_lead`, `resolved_by_phone`, `resolved_by_remote_jid`, `duplicate_conversation_merged`, `automation_relinked`, `resolution_error`).
+
+## Critério de aceite
+- Doraci: ao abrir modal, conversa principal `27d97aa6-…` é retornada; mensagem 10:18 aparece; conversa vazia some; `automation_control` aponta para principal.
+- Nenhum `(account_id, lead_id, context='lead')` com >1 linha em `whatsapp_conversations` (garantido pelo índice).
+- Mensagem enviada pelo CRM/automação aparece no modal em tempo real.
+- Resposta inbound: pausa automação + move para Contato (se toggle) + reflete no modal.
+- Ghosting 24h usa `last_customer_message_at` da principal.
+
+## Detalhes técnicos
+
+```text
+Resolver (server)
+ ├─ por lead_id ──► N conversas? ──► elege + merge ──► principal
+ │                  1 conversa  ──────────────────────► principal
+ │                  0 conversas ──┐
+ ├─ por remote_jid ◄──────────────┤
+ ├─ por phone variants ◄──────────┤
+ └─ cria nova ◄───────────────────┘
 ```
 
-Ordem de resolução:
-1. Normaliza telefone via `_shared/phone.ts` (DDI 55 + nono dígito).
-2. Busca por `account_id + lead_id` (se vier).
-3. Busca por `account_id + remote_jid`.
-4. Busca por `account_id + phone_number IN variantes`.
-5. Se conversa achada estiver órfã (`lead_id IS NULL`) e tivermos `leadId` ou `find_lead_by_normalized_phone` retornar lead → faz `UPDATE lead_id`.
-6. Se houver duplicatas, escolhe a mais recente com mensagens (subquery `EXISTS whatsapp_messages`) e marca as outras como `merged_into` (campo novo opcional) — sem deletar.
-7. Se não achou nada, faz `INSERT` com `remote_jid`, `phone_number`, `lead_id`, `context`.
+Ordem de deploy:
+1. Migração (tabela logs + RPC merge).
+2. Helper + edges (`resolve`, `send`, `webhook`, `queue`, `sync`).
+3. Rodar limpeza manual de duplicatas existentes (via edge one-shot).
+4. Aplicar índice único.
+5. Refatorar frontend.
 
-Manter o `resolveConversation` antigo como wrapper retrocompatível.
-
-## Fase 2 — Edge Function `resolve-whatsapp-conversation`
-
-Nova função `supabase/functions/resolve-whatsapp-conversation/index.ts`:
-- Valida JWT + agência via `_shared/auth.ts` (`assertAgencyAccess`).
-- Body: `{ account_id, lead_id, phone_number? }`.
-- Busca account/lead, chama `resolveLeadConversation`.
-- Retorna `{ conversation_id, lead_id, phone_number, remote_jid }`.
-
-## Fase 3 — Refatorar `useWhatsApp` + `WhatsAppChat`
-
-`src/hooks/useWhatsApp.tsx`:
-- Substituir `useLeadConversation` por chamada a `supabase.functions.invoke('resolve-whatsapp-conversation', …)`. Remover toda a lógica de variantes de telefone do React.
-- `useConversationMessages`: adicionar listener Realtime para `UPDATE` (além do `INSERT` atual) — para refletir ack/status.
-- `syncMessages`: garantir que envia `conversation_id`.
-- Renomear comentários "Evolution API" → "Uazapi".
-
-`src/components/crm/WhatsAppChat.tsx`:
-- Sem mudança de UX. Apenas consumir o novo hook.
-- Garantir badge "Cliente respondeu" quando `automation.status === 'responded'`.
-
-## Fase 4 — Fortalecer `whatsapp-webhook`
-
-`supabase/functions/whatsapp-webhook/index.ts`:
-- Usar `resolveLeadConversation` no lugar de `resolveConversation`.
-- Filtros já existentes (grupos, status, newsletter, fromMe) — manter e centralizar em helpers.
-- Sempre atualizar `last_message_preview`, `last_customer_message_at`, `last_message_is_from_me=false`, `remote_jid`.
-- Pausar automações: `UPDATE whatsapp_automation_control SET status='responded', conversation_state='customer_replied'` por `lead_id` ou `conversation_id`.
-- Promoção para "Em Contato": respeitar `agencies.whatsapp_auto_contact` (já existe `promoteLeadOnReply`, condicionar ao toggle).
-- Cada decisão gera 1 linha em `whatsapp_webhook_logs` (ver Fase 5).
-
-## Fase 5 — Migration: tabela de logs + ajuste lead_history
-
-Migration SQL:
-
-```sql
--- 1) lead_history.user_id nullable (eventos automáticos)
-alter table public.lead_history alter column user_id drop not null;
-
--- 2) Logs de webhook
-create table public.whatsapp_webhook_logs (
-  id uuid primary key default gen_random_uuid(),
-  account_id uuid,
-  agency_id uuid,
-  lead_id uuid,
-  conversation_id uuid,
-  event text not null,
-  message_id text,
-  remote_jid text,
-  phone_number text,
-  from_me boolean,
-  resolved_lead boolean,
-  resolved_conversation boolean,
-  action_taken text,        -- message_received | message_ignored_* | conversation_created | conversation_linked_to_lead | automation_paused_customer_replied | lead_moved_to_contact | message_update_received | webhook_error
-  error_message text,
-  payload_keys text[],
-  created_at timestamptz not null default now()
-);
-create index on public.whatsapp_webhook_logs (agency_id, created_at desc);
-create index on public.whatsapp_webhook_logs (lead_id, created_at desc);
-
-alter table public.whatsapp_webhook_logs enable row level security;
-create policy "agency members read webhook logs"
-  on public.whatsapp_webhook_logs for select
-  using (user_belongs_to_agency(agency_id));
--- INSERT só via service role (sem policy de insert).
-```
-
-Sem armazenar token nem payload completo (exceto `error_message` em caso controlado).
-
-## Fase 6 — Anti-bot + queue (`process-whatsapp-queue`)
-
-Em `supabase/functions/process-whatsapp-queue/index.ts`:
-- Filtrar `whatsapp_accounts.status = 'connected'` (remover `connecting`).
-- Antes de enviar cada follow-up, **dupla checagem**:
-  - `conversation.last_customer_message_at > max(last_followup_sent_at, started_at)` → marcar `responded` e abortar.
-  - `SELECT 1 FROM whatsapp_messages WHERE conversation_id=… AND is_from_me=false AND created_at > <último envio nosso>` → idem.
-  - Status atual da automação ∈ {`responded`,`paused`,`finished`} → abortar.
-  - Mensagem manual (`source='manual_crm'`) nos últimos N minutos → adiar (ou pular este tick).
-- Usar resolvedor central quando precisar reconciliar.
-
-## Fase 7 — `whatsapp-send`
-
-- Após enviar, atualizar `whatsapp_automation_control.last_followup_sent_at` quando `source='cadence'`.
-- Para `source='manual_crm'`, atualizar conversation timestamps mas **não** mexer em automation status.
-- Usar resolvedor central.
-
-## Fase 8 — Refatorar `whatsapp-sync-messages`
-
-- Usar resolvedor central para obter `conversation_id`.
-- Persistir `remote_jid`, atualizar `last_message_preview`.
-- Se durante o sync surgirem inbounds mais recentes que `last_followup_sent_at` → aplicar a mesma regra do webhook (`responded` + `customer_replied` + promoção para "Em Contato" se toggle ativo).
-
-## Fase 9 — Edge Function `process-whatsapp-ghosting`
-
-Nova `supabase/functions/process-whatsapp-ghosting/index.ts` (cron 15-30 min via pg_cron — instrução separada):
-
-Fluxo por agência com `whatsapp_auto_ghosting = true`:
-- Buscar `whatsapp_automation_control` cujo `last_followup_sent_at < now() - 24h` e `status NOT IN ('finished','responded')`.
-- Confirmar via `whatsapp_messages` que não há inbound posterior ao último envio nosso (defesa em profundidade contra `last_customer_message_at` desatualizado).
-- Se lead.status não estiver em (`won`,`lost`):
-  - `UPDATE leads SET status='lost', loss_reason='Ghosting no WhatsApp', status_changed_at=now()`.
-  - `INSERT INTO lead_history (... user_id=NULL, action_type='auto_ghosting', ...)`.
-- `UPDATE whatsapp_automation_control SET status='finished', conversation_state='moved_to_lost_ghosting'`.
-- Log em `whatsapp_automation_logs` + `whatsapp_webhook_logs` (`action_taken='ghosting_moved_to_lost'`).
-
-Observação: já existe `process-lead-ghosting`. Reuso parcial — esta nova é específica do gatilho de cadência. Vou consolidar a lógica nesta nova função e deprecar a antiga ao final (sem remover ainda).
-
-## Fase 10 — `WhatsAppTemplateManager`
-
-Apenas trocar referências/labels "Evolution API" → "Uazapi". Sem mudança funcional.
-
-## Critérios de sucesso (validação)
-
-1. Abrir modal de lead com conversa existente → conversa carrega via `resolve-whatsapp-conversation`.
-2. Enviar mensagem pelo modal → aparece imediatamente (otimista + realtime).
-3. Receber resposta no WhatsApp → aparece via realtime, automação vira `responded`, lead vai para "Em Contato" se toggle ativo.
-4. Áudio → renderiza `[audio]`.
-5. Cadência: não envia depois de resposta.
-6. 24h sem resposta após último follow-up → lead vai para `lost` + motivo "Ghosting no WhatsApp".
-7. Logs em `whatsapp_webhook_logs` explicam cada decisão.
-8. Conversas órfãs/duplicadas convergem para uma única por `account_id + lead_id`.
-
-## Ordem de execução (sem misturar)
-
-1. Migration (logs + lead_history nullable) — `supabase--migration`.
-2. Shared resolver + `resolve-whatsapp-conversation`.
-3. Refatorar hook + chat.
-4. Webhook + queue + send + sync.
-5. `process-whatsapp-ghosting` + agendamento pg_cron.
-6. Rename Evolution → Uazapi (cosmético).
-
-Sem alterações fora desse escopo. Sem mexer no módulo PPR.
+## Fora de escopo
+- UI nova (mantém modal atual).
+- Mudança no schema de `whatsapp_messages`.
+- Reescrita do fluxo de ghosting (já implementado).
