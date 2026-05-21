@@ -7,7 +7,7 @@ import { useWhatsApp } from "./useWhatsApp";
 export function useWhatsAppChat(leadId: string | null) {
   const wa = useWhatsApp('general');
   const conversation = wa.useLeadConversation(leadId);
-  const messages = wa.useConversationMessages(conversation.data?.id || null);
+  const messages = wa.useConversationMessages(conversation.data?.id || null, leadId);
 
   return {
     account: wa.account,
