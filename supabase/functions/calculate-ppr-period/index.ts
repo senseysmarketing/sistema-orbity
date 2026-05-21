@@ -369,15 +369,15 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq('id', periodId);
-        await supabase.from('ppr_calculation_logs').insert({
-          period_id: periodId,
-          agency_id: null,
-          action: 'calculation_failed',
-          details: { error: message },
-          actor_user_id: actorUserId,
-        });
-      } catch (_) { /* swallow */ }
-    }
+        if (periodAgencyId) {
+          await supabase.from('ppr_calculation_logs').insert({
+            period_id: periodId,
+            agency_id: periodAgencyId,
+            action: 'calculation_failed',
+            details: { error: message },
+            actor_user_id: actorUserId,
+          });
+        }
 
     console.error('[calculate-ppr-period] error', message);
     return new Response(
